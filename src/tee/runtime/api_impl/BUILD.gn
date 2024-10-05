@@ -40,12 +40,14 @@ rustc_library("api_impl") {
     "src/binding_stubs.rs",
     "src/lib.rs",
     "src/mem.rs",
+    "src/storage.rs",
   ]
   deps = [
     ":malloc_fill_byte_zero_asan",
     ":malloc_fill_byte_zero_hwasan",
     "//src/tee/tee_internal_api:tee_internal",
     "//third_party/rust_crates:libc",
+    "//third_party/rust_crates:num-traits",
   ]
   test_configs = [ ":export_scudo_dynamic_options" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]

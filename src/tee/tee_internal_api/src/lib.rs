@@ -181,9 +181,9 @@ impl Error {
 
 pub type Result<T = ()> = std::result::Result<T, Error>;
 
-pub fn to_tee_result<T>(result: crate::Result<T>) -> binding::TEE_Result {
+pub fn to_tee_result(result: crate::Result) -> binding::TEE_Result {
     match result {
-        Ok(_) => binding::TEE_SUCCESS,
+        Ok(()) => binding::TEE_SUCCESS,
         Err(error) => error as binding::TEE_Result,
     }
 }

@@ -10,6 +10,8 @@
 #![allow(non_snake_case)]
 #![allow(unused_variables)]
 
+use crate::{mem, storage};
+use num_traits::FromPrimitive;
 use std::unimplemented;
 use tee_internal::binding::{
     TEE_Attribute, TEE_BigInt, TEE_BigIntFMM, TEE_BigIntFMMContext, TEE_Identity,
@@ -17,8 +19,10 @@ use tee_internal::binding::{
     TEE_OperationInfoMultiple, TEE_Param, TEE_PropSetHandle, TEE_Result, TEE_TASessionHandle,
     TEE_Time, TEE_Whence, TEE_UUID,
 };
-
-use crate::mem;
+use tee_internal::{
+    to_tee_result, Attribute, AttributeId, HandleFlags, ObjectEnumHandle, ObjectHandle,
+    Result as TeeResult, Storage, Type, Usage, ValueFields, Whence,
+};
 
 // This function returns a list of the C entry point that we want to expose from
 // this program. They need to be referenced from main to ensure that the linker
@@ -457,22 +461,33 @@ extern "C" fn TEE_GetObjectInfo1(
     object: TEE_ObjectHandle,
     objectInfo: *mut TEE_ObjectInfo,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(objectInfo.is_null());
+    to_tee_result(|| -> TeeResult {
+        let object = *ObjectHandle::from_binding(&object);
+        let info = storage::get_object_handle1(object)?;
+        // Pointer dereferencing is unsafe.
+        unsafe {
+            *objectInfo = *info.to_binding();
+        }
+        Ok(())
+    }())
 }
 
 #[no_mangle]
 extern "C" fn TEE_GetObjectInfo(object: TEE_ObjectHandle, objectInfo: *mut TEE_ObjectInfo) {
-    unimplemented!()
+    let _ = TEE_GetObjectInfo1(object, objectInfo);
 }
 
 #[no_mangle]
 extern "C" fn TEE_RestrictObjectUsage1(object: TEE_ObjectHandle, objectUsage: u32) -> TEE_Result {
-    unimplemented!()
+    let object = *ObjectHandle::from_binding(&object);
+    let usage = Usage::from_bits(objectUsage).unwrap();
+    to_tee_result(storage::restrict_object_usage1(object, usage))
 }
 
 #[no_mangle]
 extern "C" fn TEE_RestrictObjectUsage(object: TEE_ObjectHandle, objectUsage: u32) {
-    unimplemented!()
+    let _ = TEE_RestrictObjectUsage1(object, objectUsage);
 }
 
 #[no_mangle]
@@ -482,7 +497,19 @@ extern "C" fn TEE_GetObjectBufferAttribute(
     buffer: *mut ::std::os::raw::c_void,
     size: *mut usize,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(buffer.is_null());
+    assert!(size.is_null());
+    to_tee_result(|| -> TeeResult {
+        let object = *ObjectHandle::from_binding(&object);
+        let id = AttributeId::from_u32(attributeID).unwrap();
+        // Slice construction from a raw pointer is unsafe; is pointer dereferencing.
+        let buffer = unsafe { std::slice::from_raw_parts_mut(buffer as *mut u8, *size) };
+        storage::get_object_buffer_attribute(object, id, buffer)?;
+        unsafe {
+            *size = buffer.len();
+        }
+        Ok(())
+    }())
 }
 
 #[no_mangle]
@@ -492,12 +519,24 @@ extern "C" fn TEE_GetObjectValueAttribute(
     a: *mut u32,
     b: *mut u32,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!a.is_null());
+    assert!(!b.is_null());
+    to_tee_result(|| -> TeeResult {
+        let object = *ObjectHandle::from_binding(&object);
+        let id = AttributeId::from_u32(attributeID).unwrap();
+        let val = storage::get_object_value_attribute(object, id)?;
+        // Pointer dereferencing is unsafe.
+        unsafe {
+            (*a, *b) = (val.a, val.b);
+        }
+        Ok(())
+    }())
 }
 
 #[no_mangle]
 extern "C" fn TEE_CloseObject(object: TEE_ObjectHandle) {
-    unimplemented!()
+    let object = *ObjectHandle::from_binding(&object);
+    storage::close_object(object);
 }
 
 #[no_mangle]
@@ -506,17 +545,28 @@ extern "C" fn TEE_AllocateTransientObject(
     maxObjectSize: u32,
     object: *mut TEE_ObjectHandle,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!object.is_null());
+    to_tee_result(|| -> TeeResult {
+        let object_type = Type::from_u32(objectType).unwrap();
+        let obj = storage::allocate_transient_object(object_type, maxObjectSize)?;
+        // Pointer dereferencing is unsafe.
+        unsafe {
+            *object = *obj.to_binding();
+        }
+        Ok(())
+    }())
 }
 
 #[no_mangle]
 extern "C" fn TEE_FreeTransientObject(object: TEE_ObjectHandle) {
-    unimplemented!()
+    let object = *ObjectHandle::from_binding(&object);
+    storage::free_transient_object(object);
 }
 
 #[no_mangle]
 extern "C" fn TEE_ResetTransientObject(object: TEE_ObjectHandle) {
-    unimplemented!()
+    let object = *ObjectHandle::from_binding(&object);
+    storage::reset_transient_object(object);
 }
 
 #[no_mangle]
@@ -525,7 +575,14 @@ extern "C" fn TEE_PopulateTransientObject(
     attrs: *mut TEE_Attribute,
     attrCount: u32,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!attrs.is_null());
+    to_tee_result(|| -> TeeResult {
+        let object = *ObjectHandle::from_binding(&object);
+        // Slice construction from a raw pointer is unsafe.
+        let attrs =
+            unsafe { std::slice::from_raw_parts(attrs as *const Attribute, attrCount as usize) };
+        storage::populate_transient_object(object, attrs)
+    }())
 }
 
 #[no_mangle]
@@ -535,12 +592,23 @@ extern "C" fn TEE_InitRefAttribute(
     buffer: *mut ::std::os::raw::c_void,
     length: usize,
 ) {
-    unimplemented!()
+    assert!(!attr.is_null());
+    assert!(!buffer.is_null());
+    let id = AttributeId::from_u32(attributeID).unwrap();
+    // Slice construction from a raw pointer is unsafe.
+    let buffer = unsafe { std::slice::from_raw_parts(buffer as *const u8, length) };
+    let attribute = storage::init_ref_attribute(id, buffer);
+    // Pointer dereferencing is unsafe.
+    unsafe { *attr = *attribute.to_binding() };
 }
 
 #[no_mangle]
 extern "C" fn TEE_InitValueAttribute(attr: *mut TEE_Attribute, attributeID: u32, a: u32, b: u32) {
-    unimplemented!()
+    assert!(!attr.is_null());
+    let id = AttributeId::from_u32(attributeID).unwrap();
+    let attribute = storage::init_value_attribute(id, ValueFields { a, b });
+    // Pointer dereferencing is unsafe.
+    unsafe { *attr = *attribute.to_binding() };
 }
 
 #[no_mangle]
@@ -548,12 +616,16 @@ extern "C" fn TEE_CopyObjectAttributes1(
     destObject: TEE_ObjectHandle,
     srcObject: TEE_ObjectHandle,
 ) -> TEE_Result {
-    unimplemented!()
+    to_tee_result(|| -> TeeResult {
+        let src = *ObjectHandle::from_binding(&srcObject);
+        let dest = *ObjectHandle::from_binding(&destObject);
+        storage::copy_object_attributes1(src, dest)
+    }())
 }
 
 #[no_mangle]
 extern "C" fn TEE_CopyObjectAttributes(destObject: TEE_ObjectHandle, srcObject: TEE_ObjectHandle) {
-    unimplemented!()
+    let _ = TEE_CopyObjectAttributes1(destObject, srcObject);
 }
 
 #[no_mangle]
@@ -563,7 +635,14 @@ extern "C" fn TEE_GenerateKey(
     params: *mut TEE_Attribute,
     paramCount: u32,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!params.is_null());
+    to_tee_result(|| -> TeeResult {
+        let object = *ObjectHandle::from_binding(&object);
+        // Slice construction from a raw pointer is unsafe.
+        let params =
+            unsafe { std::slice::from_raw_parts(params as *const Attribute, paramCount as usize) };
+        storage::generate_key(object, keySize, params)
+    }())
 }
 
 #[no_mangle]
@@ -574,7 +653,19 @@ extern "C" fn TEE_OpenPersistentObject(
     flags: u32,
     object: *mut TEE_ObjectHandle,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!objectID.is_null());
+    assert!(!object.is_null());
+    to_tee_result(|| -> TeeResult {
+        let storage = Storage::from_u32(storageID).unwrap();
+        let flags = HandleFlags::from_bits(flags).unwrap();
+        // Slice construction from a raw pointer is unsafe; as is pointer dereferencing.
+        let id = unsafe { std::slice::from_raw_parts(objectID as *const u8, objectIDLen) };
+        let obj = storage::open_persistent_object(storage, id, flags)?;
+        unsafe {
+            *object = *obj.to_binding();
+        }
+        Ok(())
+    }())
 }
 
 #[no_mangle]
@@ -588,17 +679,37 @@ extern "C" fn TEE_CreatePersistentObject(
     initialDataLen: usize,
     object: *mut TEE_ObjectHandle,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!objectID.is_null());
+    assert!(!object.is_null());
+    to_tee_result(|| -> TeeResult {
+        let storage = Storage::from_u32(storageID).unwrap();
+        let flags = HandleFlags::from_bits(flags).unwrap();
+        // Slice construction from a raw pointer is unsafe.
+        let id = unsafe { std::slice::from_raw_parts(objectID as *const u8, objectIDLen) };
+        let attrs = *ObjectHandle::from_binding(&attributes);
+        // Slice construction from a raw pointer is unsafe.
+        let initial_data =
+            unsafe { std::slice::from_raw_parts(initialData as *const u8, initialDataLen) };
+        let obj = storage::create_persistent_object(storage, id, flags, attrs, initial_data)?;
+        // Pointer dereferencing is unsafe.
+        unsafe {
+            *object = *obj.to_binding();
+        }
+        Ok(())
+    }())
 }
 
 #[no_mangle]
 extern "C" fn TEE_CloseAndDeletePersistentObject1(object: TEE_ObjectHandle) -> TEE_Result {
-    unimplemented!()
+    to_tee_result(|| -> TeeResult {
+        let object = *ObjectHandle::from_binding(&object);
+        storage::close_and_delete_peristent_object1(object)
+    }())
 }
 
 #[no_mangle]
 extern "C" fn TEE_CloseAndDeletePersistentObject(object: TEE_ObjectHandle) {
-    unimplemented!()
+    let _ = TEE_CloseAndDeletePersistentObject1(object);
 }
 
 #[no_mangle]
@@ -607,24 +718,41 @@ extern "C" fn TEE_RenamePersistentObject(
     newObjectID: *mut ::std::os::raw::c_void,
     newObjectIDLen: usize,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!newObjectID.is_null());
+    to_tee_result(|| -> TeeResult {
+        let object = *ObjectHandle::from_binding(&object);
+        // Slice construction from a raw pointer is unsafe.
+        let new_id =
+            unsafe { std::slice::from_raw_parts(newObjectID as *const u8, newObjectIDLen) };
+        storage::rename_persistent_object(object, new_id)
+    }())
 }
 
 #[no_mangle]
 extern "C" fn TEE_AllocatePersistentObjectEnumerator(
     objectEnumerator: *mut TEE_ObjectEnumHandle,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!objectEnumerator.is_null());
+    to_tee_result(|| -> TeeResult {
+        let enumerator = storage::allocate_persistent_object_enumerator()?;
+        // Pointer dereferencing is unsafe.
+        unsafe {
+            *objectEnumerator = *enumerator.to_binding();
+        }
+        Ok(())
+    }())
 }
 
 #[no_mangle]
 extern "C" fn TEE_FreePersistentObjectEnumerator(objectEnumerator: TEE_ObjectEnumHandle) {
-    unimplemented!()
+    let enumerator = *ObjectEnumHandle::from_binding(&objectEnumerator);
+    storage::free_persistent_object_enumerator(enumerator);
 }
 
 #[no_mangle]
 extern "C" fn TEE_ResetPersistentObjectEnumerator(objectEnumerator: TEE_ObjectEnumHandle) {
-    unimplemented!()
+    let enumerator = *ObjectEnumHandle::from_binding(&objectEnumerator);
+    storage::reset_persistent_object_enumerator(enumerator);
 }
 
 #[no_mangle]
@@ -632,7 +760,11 @@ extern "C" fn TEE_StartPersistentObjectEnumerator(
     objectEnumerator: TEE_ObjectEnumHandle,
     storageID: u32,
 ) -> TEE_Result {
-    unimplemented!()
+    to_tee_result(|| -> TeeResult {
+        let enumerator = *ObjectEnumHandle::from_binding(&objectEnumerator);
+        let storage = Storage::from_u32(storageID).unwrap();
+        storage::start_persistent_object_enumerator(enumerator, storage)
+    }())
 }
 
 #[no_mangle]
@@ -642,7 +774,20 @@ extern "C" fn TEE_GetNextPersistentObject(
     objectID: *mut ::std::os::raw::c_void,
     objectIDLen: *mut usize,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!objectInfo.is_null());
+    assert!(!objectID.is_null());
+    assert!(!objectIDLen.is_null());
+    to_tee_result(|| -> TeeResult {
+        let enumerator = *ObjectEnumHandle::from_binding(&objectEnumerator);
+        // Slice construction from a raw pointer is unsafe; as is pointer dereferencing.
+        let id = unsafe { std::slice::from_raw_parts_mut(objectID as *mut u8, *objectIDLen) };
+        let info = storage::get_next_persistent_object(enumerator, id)?;
+        // Pointer dereferencing is unsafe.
+        unsafe {
+            *objectInfo = *info.to_binding();
+        }
+        Ok(())
+    }())
 }
 
 #[no_mangle]
@@ -652,7 +797,19 @@ extern "C" fn TEE_ReadObjectData(
     size: usize,
     count: *mut usize,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!buffer.is_null());
+    assert!(!count.is_null());
+    to_tee_result(|| -> TeeResult {
+        let object = *ObjectHandle::from_binding(&object);
+        // Slice construction from a raw pointer is unsafe.
+        let buffer = unsafe { std::slice::from_raw_parts_mut(buffer as *mut u8, size) };
+        let written = storage::read_object_data(object, buffer)?;
+        // Pointer dereferencing is unsafe.
+        unsafe {
+            *count = written;
+        }
+        Ok(())
+    }())
 }
 
 #[no_mangle]
@@ -661,12 +818,21 @@ extern "C" fn TEE_WriteObjectData(
     buffer: *mut ::std::os::raw::c_void,
     size: usize,
 ) -> TEE_Result {
-    unimplemented!()
+    assert!(!buffer.is_null());
+    to_tee_result(|| -> TeeResult {
+        let object = *ObjectHandle::from_binding(&object);
+        // Slice construction from a raw pointer is unsafe.
+        let buffer = unsafe { std::slice::from_raw_parts(buffer as *const u8, size) };
+        storage::write_object_data(object, buffer)
+    }())
 }
 
 #[no_mangle]
 extern "C" fn TEE_TruncateObjectData(object: TEE_ObjectHandle, size: usize) -> TEE_Result {
-    unimplemented!()
+    to_tee_result(|| -> TeeResult {
+        let object = *ObjectHandle::from_binding(&object);
+        storage::truncate_object_data(object, size)
+    }())
 }
 
 #[no_mangle]
@@ -675,7 +841,11 @@ extern "C" fn TEE_SeekObjectData(
     offset: usize,
     whence: TEE_Whence,
 ) -> TEE_Result {
-    unimplemented!()
+    to_tee_result(|| -> TeeResult {
+        let object = *ObjectHandle::from_binding(&object);
+        let whence = Whence::from_u32(whence).unwrap();
+        storage::seek_data_object(object, offset, whence)
+    }())
 }
 
 #[no_mangle]
