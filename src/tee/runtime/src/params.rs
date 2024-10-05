@@ -4,12 +4,7 @@
 
 use anyhow::Error;
 use fidl_fuchsia_tee::{self as ftee, Buffer, Direction, ParameterUnknown, Value};
-
-use tee_internal::binding::{
-    TEE_Param, TEE_Param__bindgen_ty_1, TEE_Param__bindgen_ty_2, TEE_PARAM_TYPE_MEMREF_INOUT,
-    TEE_PARAM_TYPE_MEMREF_INPUT, TEE_PARAM_TYPE_MEMREF_OUTPUT, TEE_PARAM_TYPE_NONE,
-    TEE_PARAM_TYPE_VALUE_INOUT, TEE_PARAM_TYPE_VALUE_INPUT, TEE_PARAM_TYPE_VALUE_OUTPUT,
-};
+use tee_internal::{Param, ParamType, ParamTypes, ValueFields};
 
 struct Memref {
     direction: ftee::Direction,
@@ -32,42 +27,42 @@ enum ParamInfo {
 // memory mapping operations and is stateful. This type stores this state and cleans
 // it up when dropped.
 pub struct ParamAdapter {
-    tee_params: [TEE_Param; 4],
+    tee_params: [Param; 4],
     infos: [ParamInfo; 4],
 }
 
-fn param_type(parameter: &ftee::Parameter) -> u32 {
+fn param_type(parameter: &ftee::Parameter) -> ParamType {
     match parameter {
-        ftee::Parameter::None(_) => TEE_PARAM_TYPE_NONE,
+        ftee::Parameter::None(_) => ParamType::None,
         ftee::Parameter::Buffer(buffer) => match buffer.direction {
-            Some(Direction::Input) => TEE_PARAM_TYPE_MEMREF_INPUT,
-            Some(Direction::Output) => TEE_PARAM_TYPE_MEMREF_OUTPUT,
-            Some(Direction::Inout) => TEE_PARAM_TYPE_MEMREF_INOUT,
-            None => TEE_PARAM_TYPE_NONE,
+            Some(Direction::Input) => ParamType::MemrefInput,
+            Some(Direction::Output) => ParamType::MemrefOutput,
+            Some(Direction::Inout) => ParamType::MemrefInout,
+            None => ParamType::None,
         },
         ftee::Parameter::Value(value) => match value.direction {
-            Some(Direction::Input) => TEE_PARAM_TYPE_VALUE_INPUT,
-            Some(Direction::Output) => TEE_PARAM_TYPE_VALUE_OUTPUT,
-            Some(Direction::Inout) => TEE_PARAM_TYPE_VALUE_INOUT,
-            None => TEE_PARAM_TYPE_NONE,
+            Some(Direction::Input) => ParamType::ValueInput,
+            Some(Direction::Output) => ParamType::ValueOutput,
+            Some(Direction::Inout) => ParamType::ValueInout,
+            None => ParamType::None,
         },
-        ftee::ParameterUnknown!() => TEE_PARAM_TYPE_NONE,
+        ftee::ParameterUnknown!() => ParamType::None,
     }
 }
 
-fn empty_tee_param() -> TEE_Param {
+fn empty_tee_param() -> Param {
     // Unsafe block necessary to unmarshal from zeroed bytes. Ideally we'd use
     // zerocopy::FromZeros, but the derivation of that stumbles on the
     // `*mut ::std::os::raw::c_void` field in `TEE_Param__bindgen_ty_1`.
     unsafe { std::mem::zeroed() }
 }
 
-fn import_value_from_fidl(value: Value) -> Result<(TEE_Param, ParamInfo), Error> {
+fn import_value_from_fidl(value: Value) -> Result<(Param, ParamInfo), Error> {
     match value.direction {
         Some(direction) => {
             let tee_param = match direction {
-                Direction::Input | Direction::Inout => TEE_Param {
-                    value: TEE_Param__bindgen_ty_2 {
+                Direction::Input | Direction::Inout => Param {
+                    value: ValueFields {
                         a: value.a.unwrap_or_default() as u32,
                         b: value.b.unwrap_or_default() as u32,
                     },
@@ -80,7 +75,7 @@ fn import_value_from_fidl(value: Value) -> Result<(TEE_Param, ParamInfo), Error>
     }
 }
 
-fn import_buffer_from_fidl(buffer: Buffer) -> Result<(TEE_Param, ParamInfo), Error> {
+fn import_buffer_from_fidl(buffer: Buffer) -> Result<(Param, ParamInfo), Error> {
     match buffer.direction {
         Some(direction) => {
             match direction {
@@ -116,9 +111,9 @@ fn import_buffer_from_fidl(buffer: Buffer) -> Result<(TEE_Param, ParamInfo), Err
                         (None, 0, 0)
                     };
                     return Ok((
-                        TEE_Param {
-                            memref: TEE_Param__bindgen_ty_1 {
-                                buffer: mapped_address as *mut std::os::raw::c_void,
+                        Param {
+                            memref: tee_internal::MemRef {
+                                buffer: mapped_address as *mut u8,
                                 size: mapped_length,
                             },
                         },
@@ -152,19 +147,19 @@ fn import_buffer_from_fidl(buffer: Buffer) -> Result<(TEE_Param, ParamInfo), Err
 }
 
 impl ParamAdapter {
-    pub fn from_fidl(parameters: Vec<ftee::Parameter>) -> Result<(Self, u32), Error> {
+    pub fn from_fidl(parameters: Vec<ftee::Parameter>) -> Result<(Self, ParamTypes), Error> {
         if parameters.len() > 4 {
             anyhow::bail!("Expected <= 4 parameters in set but got {}", parameters.len());
         }
 
-        let mut param_types = 0;
         // 4.3.6.2 Initial Content of params Argument specifies that unset values must be filled with zeros.
         // These entries do not affect the param_types value.
         let mut tee_params = [empty_tee_param(); 4];
+        let mut param_types = [ParamType::None, ParamType::None, ParamType::None, ParamType::None];
         let mut infos = [ParamInfo::None, ParamInfo::None, ParamInfo::None, ParamInfo::None];
         let mut i = 0;
         for param in parameters {
-            param_types |= param_type(&param) << (i * 4);
+            param_types[i] = param_type(&param);
             use fidl_fuchsia_tee::Parameter;
             let (param, info) = match param {
                 Parameter::None(_) => (empty_tee_param(), ParamInfo::None),
@@ -176,10 +171,10 @@ impl ParamAdapter {
             infos[i] = info;
             i += 1;
         }
-        Ok((Self { tee_params, infos }, param_types))
+        Ok((Self { tee_params, infos }, ParamTypes::from_types(param_types)))
     }
 
-    pub fn tee_params_mut<'a>(&'a mut self) -> &'a mut [TEE_Param; 4] {
+    pub fn tee_params_mut<'a>(&'a mut self) -> &'a mut [Param; 4] {
         &mut self.tee_params
     }
 
@@ -274,9 +269,9 @@ mod test {
         // Accessing the fields of the parameter's union is unsafe as it is a
         // repr(C) union and carries no type information.
         let memref = unsafe { empty.memref };
-        assert_eq!(memref, TEE_Param__bindgen_ty_1 { buffer: std::ptr::null_mut(), size: 0 });
+        assert_eq!(memref, tee_internal::MemRef { buffer: std::ptr::null_mut(), size: 0 });
         let value = unsafe { empty.value };
-        assert_eq!(value, TEE_Param__bindgen_ty_2 { a: 0, b: 0 });
+        assert_eq!(value, ValueFields { a: 0, b: 0 });
         Ok(())
     }
 
@@ -286,14 +281,14 @@ mod test {
 
         let (mut adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters)?;
 
-        assert_eq!(param_types, 0);
+        assert_eq!(param_types.as_u32(), 0);
 
         let tee_params = adapter.tee_params_mut();
         for i in 0..4 {
             // Accessing the 'value' field of the parameter's union is unsafe as it
             // is a repr(C) union and carries no type information.
             let value = unsafe { tee_params[i].value };
-            assert_eq!(value, TEE_Param__bindgen_ty_2 { a: 0, b: 0 });
+            assert_eq!(value, ValueFields { a: 0, b: 0 });
         }
         Ok(())
     }
@@ -325,15 +320,18 @@ mod test {
 
         let (mut adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters)?;
 
-        assert_eq!(param_types, TEE_PARAM_TYPE_VALUE_INPUT);
+        assert_eq!(param_types.get(0), ParamType::ValueInput);
+        assert_eq!(param_types.get(1), ParamType::None);
+        assert_eq!(param_types.get(2), ParamType::None);
+        assert_eq!(param_types.get(3), ParamType::None);
         let tee_params = adapter.tee_params_mut();
         // Accessing the 'value' field of the parameter's union is unsafe as it
         // is a repr(C) union and carries no type information.
         let value = unsafe { tee_params[0].value };
-        assert_eq!(value, TEE_Param__bindgen_ty_2 { a: 1, b: 2 });
+        assert_eq!(value, ValueFields { a: 1, b: 2 });
         for i in 1..4 {
             let value = unsafe { tee_params[i].value };
-            assert_eq!(value, TEE_Param__bindgen_ty_2 { a: 0, b: 0 });
+            assert_eq!(value, ValueFields { a: 0, b: 0 });
         }
         Ok(())
     }
@@ -356,18 +354,20 @@ mod test {
         ];
 
         let (mut adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters)?;
-
-        assert_eq!(param_types, TEE_PARAM_TYPE_VALUE_INPUT | (TEE_PARAM_TYPE_VALUE_INOUT << 4));
+        assert_eq!(param_types.get(0), ParamType::ValueInput);
+        assert_eq!(param_types.get(1), ParamType::ValueInout);
+        assert_eq!(param_types.get(2), ParamType::None);
+        assert_eq!(param_types.get(3), ParamType::None);
         let tee_params = adapter.tee_params_mut();
         // Accessing the 'value' field of the parameter's union is unsafe as it
         // is a repr(C) union and carries no type information.
         let value = unsafe { tee_params[0].value };
-        assert_eq!(value, TEE_Param__bindgen_ty_2 { a: 1, b: 2 });
+        assert_eq!(value, ValueFields { a: 1, b: 2 });
         let value = unsafe { tee_params[1].value };
-        assert_eq!(value, TEE_Param__bindgen_ty_2 { a: 3, b: 4 });
+        assert_eq!(value, ValueFields { a: 3, b: 4 });
         for i in 2..4 {
             let value = unsafe { tee_params[i].value };
-            assert_eq!(value, TEE_Param__bindgen_ty_2 { a: 0, b: 0 });
+            assert_eq!(value, ValueFields { a: 0, b: 0 });
         }
         Ok(())
     }
@@ -405,35 +405,33 @@ mod test {
         ];
 
         let (mut adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters)?;
+        assert_eq!(param_types.get(0), ParamType::MemrefInout);
+        assert_eq!(param_types.get(1), ParamType::MemrefInput);
+        assert_eq!(param_types.get(2), ParamType::MemrefInout);
+        assert_eq!(param_types.get(3), ParamType::None);
 
-        assert_eq!(
-            param_types,
-            TEE_PARAM_TYPE_MEMREF_INOUT
-                | (TEE_PARAM_TYPE_MEMREF_INPUT << 4)
-                | (TEE_PARAM_TYPE_MEMREF_INOUT << 8)
-        );
         let tee_params = adapter.tee_params_mut();
         // Accessing the 'value' field of the parameter's union is unsafe as it
         // is a repr(C) union and carries no type information.
         let value = unsafe { tee_params[0].memref };
         assert_eq!(value.size, page_size as usize);
-        assert!(value.buffer != std::ptr::null_mut() as *mut std::os::raw::c_void);
-        let memref_contents = unsafe { std::slice::from_raw_parts(value.buffer as *const u8, 4) };
+        assert!(value.buffer != std::ptr::null_mut());
+        let memref_contents = unsafe { std::slice::from_raw_parts(value.buffer, 4) };
         assert_eq!(memref_contents, &[1, 2, 3, 4]);
 
         let value = unsafe { tee_params[1].memref };
         assert_eq!(value.size, 2 * page_size as usize);
-        assert!(value.buffer != std::ptr::null_mut() as *mut std::os::raw::c_void);
-        let memref_contents = unsafe { std::slice::from_raw_parts(value.buffer as *const u8, 4) };
+        assert!(value.buffer != std::ptr::null_mut());
+        let memref_contents = unsafe { std::slice::from_raw_parts(value.buffer, 4) };
         assert_eq!(memref_contents, &[5, 6, 7, 8]);
 
         let value = unsafe { tee_params[2].memref };
         assert_eq!(value.size, 0);
-        assert_eq!(value.buffer, std::ptr::null_mut() as *mut std::os::raw::c_void);
+        assert_eq!(value.buffer, std::ptr::null_mut());
 
         for i in 3..4 {
             let value = unsafe { tee_params[i].value };
-            assert_eq!(value, TEE_Param__bindgen_ty_2 { a: 0, b: 0 });
+            assert_eq!(value, ValueFields { a: 0, b: 0 });
         }
         Ok(())
     }
@@ -441,8 +439,10 @@ mod test {
     #[fuchsia::test]
     fn test_export_empty_to_fidl() -> Result<(), Error> {
         let (adapter, param_types) = ParamAdapter::from_fidl(vec![])?;
-
-        assert_eq!(param_types, TEE_PARAM_TYPE_NONE);
+        assert_eq!(param_types.get(0), ParamType::None);
+        assert_eq!(param_types.get(1), ParamType::None);
+        assert_eq!(param_types.get(2), ParamType::None);
+        assert_eq!(param_types.get(3), ParamType::None);
 
         let fidl_parameters = adapter.export_to_fidl()?;
 
@@ -476,13 +476,10 @@ mod test {
             }),
         ];
         let (adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters)?;
-
-        assert_eq!(
-            param_types,
-            TEE_PARAM_TYPE_VALUE_INPUT
-                | TEE_PARAM_TYPE_VALUE_INOUT << 4
-                | TEE_PARAM_TYPE_VALUE_OUTPUT << 8
-        );
+        assert_eq!(param_types.get(0), ParamType::ValueInput);
+        assert_eq!(param_types.get(1), ParamType::ValueInout);
+        assert_eq!(param_types.get(2), ParamType::ValueOutput);
+        assert_eq!(param_types.get(3), ParamType::None);
 
         let fidl_parameters = adapter.export_to_fidl()?;
         assert_eq!(fidl_parameters.len(), 3);
@@ -530,8 +527,10 @@ mod test {
             }),
         ];
         let (mut adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters)?;
-
-        assert_eq!(param_types, TEE_PARAM_TYPE_VALUE_INOUT | TEE_PARAM_TYPE_VALUE_OUTPUT << 4);
+        assert_eq!(param_types.get(0), ParamType::ValueInout);
+        assert_eq!(param_types.get(1), ParamType::ValueOutput);
+        assert_eq!(param_types.get(2), ParamType::None);
+        assert_eq!(param_types.get(3), ParamType::None);
 
         let tee_params = adapter.tee_params_mut();
         let value = unsafe { &mut tee_params[0].value };
@@ -584,8 +583,10 @@ mod test {
         })];
 
         let (mut adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters)?;
-
-        assert_eq!(param_types, TEE_PARAM_TYPE_MEMREF_INOUT);
+        assert_eq!(param_types.get(0), ParamType::MemrefInout);
+        assert_eq!(param_types.get(1), ParamType::None);
+        assert_eq!(param_types.get(2), ParamType::None);
+        assert_eq!(param_types.get(3), ParamType::None);
 
         {
             // This logic makes two modifications to the TEE_Param[4] representation of the buffer:
@@ -594,11 +595,10 @@ mod test {
             let tee_params = adapter.tee_params_mut();
             let memref = unsafe { &mut tee_params[0].memref };
             assert_eq!(memref.size, page_size as usize);
-            assert_ne!(memref.buffer, std::ptr::null_mut() as *mut std::ffi::c_void);
+            assert_ne!(memref.buffer, std::ptr::null_mut());
 
             {
-                let mapped_buffer =
-                    unsafe { std::slice::from_raw_parts_mut(memref.buffer as *mut u8, 3) };
+                let mapped_buffer = unsafe { std::slice::from_raw_parts_mut(memref.buffer, 3) };
                 mapped_buffer.copy_from_slice(&[3, 4, 5]);
             }
             memref.size = 3;
@@ -656,8 +656,10 @@ mod test {
         ];
 
         let (mut adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters)?;
-
-        assert_eq!(param_types, TEE_PARAM_TYPE_MEMREF_INOUT | TEE_PARAM_TYPE_MEMREF_INOUT << 4);
+        assert_eq!(param_types.get(0), ParamType::MemrefInout);
+        assert_eq!(param_types.get(1), ParamType::MemrefInout);
+        assert_eq!(param_types.get(2), ParamType::None);
+        assert_eq!(param_types.get(3), ParamType::None);
 
         {
             let tee_params = adapter.tee_params_mut();

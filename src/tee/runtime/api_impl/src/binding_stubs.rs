@@ -4,7 +4,8 @@
 
 // This file contains forwarding stubs from the C entry points to Rust implementations.
 //
-// Exposed functions TEE_FooBar forwards to api_impl::foo_bar()
+// Exposed functions TEE_FooBar forwards to api_impl::foo_bar(), where foo_bar deals in the richer
+// bindings exposed top-level from the tee_internal crate.
 
 #![allow(non_snake_case)]
 #![allow(unused_variables)]
