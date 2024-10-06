@@ -19,11 +19,13 @@ pub mod resolving;
 pub mod rights;
 pub mod walk_state;
 
-use crate::bedrock::request_metadata::{protocol_metadata, runner_metadata};
+use crate::bedrock::request_metadata::{protocol_metadata, resolver_metadata, runner_metadata};
 use crate::capability_source::{
     CapabilitySource, ComponentCapability, ComponentSource, InternalCapability, VoidSource,
 };
-use crate::component_instance::{ComponentInstanceInterface, WeakComponentInstanceInterface};
+use crate::component_instance::{
+    ComponentInstanceInterface, ResolvedInstanceInterface, WeakComponentInstanceInterface,
+};
 use crate::environment::DebugRegistration;
 use crate::error::RoutingError;
 use crate::legacy_router::{
@@ -343,7 +345,13 @@ where
             .await
         }
         RouteRequest::ExposeResolver(expose_resolver_decl) => {
-            route_resolver_from_expose(expose_resolver_decl, target, mapper).await
+            route_capability_inner(
+                &target.component_sandbox().await?.component_output_dict,
+                &expose_resolver_decl.target_name,
+                resolver_metadata(Availability::Required),
+                target,
+            )
+            .await
         }
         RouteRequest::ExposeConfig(expose_config_decl) => {
             route_config_from_expose(expose_config_decl, target, mapper).await
@@ -351,7 +359,26 @@ where
 
         // Route a resolver or runner from an environment
         RouteRequest::Resolver(resolver_registration) => {
-            route_resolver(resolver_registration, target, mapper).await
+            let component_sandbox = target.component_sandbox().await?;
+            let source_dictionary = match &resolver_registration.source {
+                RegistrationSource::Parent => component_sandbox.component_input.capabilities(),
+                RegistrationSource::Self_ => component_sandbox.program_output_dict.clone(),
+                RegistrationSource::Child(static_name) => {
+                    let child_name = ChildName::parse(static_name).expect(
+                        "invalid child name, this should be prevented by manifest validation",
+                    );
+                    let child_component = target.lock_resolved_state().await?.get_child(&child_name).expect("resolver registration references nonexistent static child, this should be prevented by manifest validation");
+                    let child_sandbox = child_component.component_sandbox().await?;
+                    child_sandbox.component_output_dict.clone()
+                }
+            };
+            route_capability_inner(
+                &source_dictionary,
+                &resolver_registration.resolver,
+                resolver_metadata(Availability::Required),
+                target,
+            )
+            .await
         }
         // Route the backing directory for a storage capability
         RouteRequest::StorageBackingDirectory(storage_decl) => {
@@ -439,7 +466,22 @@ where
             .await
         }
         RouteRequest::OfferResolver(offer_resolver_decl) => {
-            route_resolver_from_offer(offer_resolver_decl, target, mapper).await
+            let target_dictionary =
+                get_dictionary_for_offer_target(target, &offer_resolver_decl).await?;
+            let metadata = resolver_metadata(Availability::Required);
+            metadata
+                .insert(
+                    Name::new(crate::bedrock::with_policy_check::SKIP_POLICY_CHECKS).unwrap(),
+                    Capability::Data(Data::Uint64(1)),
+                )
+                .unwrap();
+            route_capability_inner(
+                &target_dictionary,
+                &offer_resolver_decl.target_name,
+                metadata,
+                target,
+            )
+            .await
         }
         RouteRequest::OfferConfig(offer) => route_config_from_offer(offer, target, mapper).await,
     }
@@ -653,26 +695,6 @@ where
     Ok(RouteSource::new(source))
 }
 
-async fn route_resolver_from_offer<C>(
-    offer_decl: OfferResolverDecl,
-    target: &Arc<C>,
-    mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource, RoutingError>
-where
-    C: ComponentInstanceInterface + 'static,
-{
-    let allowed_sources = Sources::new(CapabilityTypeName::Resolver).builtin().component();
-    let source = legacy_router::route_from_offer(
-        RouteBundle::from_offer(offer_decl.into()),
-        target.clone(),
-        allowed_sources,
-        &mut NoopVisitor::new(),
-        mapper,
-    )
-    .await?;
-    Ok(RouteSource::new(source))
-}
-
 async fn route_config_from_offer<C>(
     offer_decl: OfferConfigurationDecl,
     target: &Arc<C>,
@@ -690,33 +712,6 @@ where
         mapper,
     )
     .await?;
-    Ok(RouteSource::new(source))
-}
-
-async fn route_resolver_from_expose<C>(
-    expose_decl: ExposeResolverDecl,
-    target: &Arc<C>,
-    mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource, RoutingError>
-where
-    C: ComponentInstanceInterface + 'static,
-{
-    let allowed_sources = Sources::new(CapabilityTypeName::Resolver)
-        .framework()
-        .builtin()
-        .namespace()
-        .component()
-        .capability();
-    let source = legacy_router::route_from_expose(
-        RouteBundle::from_expose(expose_decl.into()),
-        target.clone(),
-        allowed_sources,
-        &mut NoopVisitor::new(),
-        mapper,
-    )
-    .await?;
-
-    target.policy_checker().can_route_capability(&source, target.moniker())?;
     Ok(RouteSource::new(source))
 }
 
@@ -1141,29 +1136,6 @@ where
             }
         }
     };
-
-    target.policy_checker().can_route_capability(&source, target.moniker())?;
-    Ok(RouteSource::new(source))
-}
-
-/// Routes a Resolver capability from `target` to its source, starting from `registration_decl`.
-async fn route_resolver<C>(
-    registration: ResolverRegistration,
-    target: &Arc<C>,
-    mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource, RoutingError>
-where
-    C: ComponentInstanceInterface + 'static,
-{
-    let allowed_sources = Sources::new(CapabilityTypeName::Resolver).builtin().component();
-    let source = legacy_router::route_from_registration(
-        registration,
-        target.clone(),
-        allowed_sources,
-        &mut NoopVisitor::new(),
-        mapper,
-    )
-    .await?;
 
     target.policy_checker().can_route_capability(&source, target.moniker())?;
     Ok(RouteSource::new(source))
