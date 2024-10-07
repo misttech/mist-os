@@ -14,6 +14,10 @@ pub type zx_addr_t = usize;
 pub type zx_stream_seek_origin_t = u32;
 pub type zx_clock_t = u32;
 pub type zx_duration_t = i64;
+pub type zx_duration_mono_t = i64;
+pub type zx_duration_mono_ticks_t = i64;
+pub type zx_duration_boot_t = i64;
+pub type zx_duration_boot_ticks_t = i64;
 pub type zx_futex_t = AtomicI32;
 pub type zx_gpaddr_t = usize;
 pub type zx_guest_option_t = u32;
@@ -25,6 +29,10 @@ pub type zx_koid_t = u64;
 pub type zx_obj_type_t = u32;
 pub type zx_object_info_topic_t = u32;
 pub type zx_info_maps_type_t = u32;
+pub type zx_instant_boot_t = i64;
+pub type zx_instant_boot_ticks_t = i64;
+pub type zx_instant_mono_t = i64;
+pub type zx_instant_mono_ticks_t = i64;
 pub type zx_iob_allocate_id_options_t = u32;
 pub type zx_off_t = u64;
 pub type zx_paddr_t = usize;
@@ -2004,7 +2012,7 @@ struct_decl_macro! {
         pub datalen: u16,
         pub severity: u8,
         pub flags: u8,
-        pub timestamp: zx_time_t,
+        pub timestamp: zx_instant_boot_t,
         pub pid: u64,
         pub tid: u64,
         pub data: [u8; ZX_LOG_RECORD_DATA_MAX],
