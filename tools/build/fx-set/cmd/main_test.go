@@ -385,10 +385,10 @@ func TestConstructStaticSpec(t *testing.T) {
 			},
 		},
 		{
-			name: "cxx-rbe default with access",
-			args: &setArgs{},
+			name:     "cxx-rbe default with access",
+			args:     &setArgs{},
 			expected: &fintpb.Static{
-				CxxRbeEnable: rbeSupported,
+				// C++ is configured by the RBE mode
 			},
 		},
 		{
@@ -398,6 +398,13 @@ func TestConstructStaticSpec(t *testing.T) {
 				CxxRbeEnable: false,
 			},
 			cannotUseRbe: true,
+		},
+		{
+			name: "cxx-rbe disabled by RBE mode off",
+			args: &setArgs{rbeMode: "off"},
+			expected: &fintpb.Static{
+				GnArgs: []string{rbe_mode_off},
+			},
 		},
 		{
 			name: "cxx-rbe enabled",

@@ -403,7 +403,7 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 	if args.enableCxxRbe {
 		useCxxRbeFinal = true
 	} else if !args.disableCxxRbe {
-		if rbeSupported && canUseRbe && !args.useCcache {
+		if rbeSupported && canUseRbe && !args.useCcache && rbeMode != "off" {
 			useCxxRbeFinal = true
 		}
 	}
