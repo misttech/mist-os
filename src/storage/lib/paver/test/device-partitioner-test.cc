@@ -99,7 +99,6 @@ constexpr uint8_t kVbMetaBType[GPT_GUID_LEN] = GUID_VBMETA_B_VALUE;
 constexpr uint8_t kVbMetaRType[GPT_GUID_LEN] = GUID_VBMETA_R_VALUE;
 constexpr uint8_t kFvmType[GPT_GUID_LEN] = GUID_FVM_VALUE;
 constexpr uint8_t kEmptyType[GPT_GUID_LEN] = GUID_EMPTY_VALUE;
-constexpr uint8_t kSysConfigType[GPT_GUID_LEN] = GUID_SYS_CONFIG_VALUE;
 constexpr uint8_t kAbrMetaType[GPT_GUID_LEN] = GUID_ABR_META_VALUE;
 constexpr uint8_t kStateLinuxGuid[GPT_GUID_LEN] = GUID_LINUX_FILESYSTEM_DATA_VALUE;
 
@@ -984,13 +983,6 @@ class SherlockPartitionerTests : public GptDevicePartitionerTests {
  protected:
   SherlockPartitionerTests() : GptDevicePartitionerTests("sherlock", 512) {}
 
-  IsolatedDevmgr::Args BaseDevmgrArgs() override {
-    IsolatedDevmgr::Args args;
-    // Needed for InitializePartitionTable
-    args.disable_block_watcher = false;
-    return args;
-  }
-
   // Create a DevicePartition for a device.
   zx::result<std::unique_ptr<paver::DevicePartitioner>> CreatePartitioner(BlockDevice* gpt) {
     fidl::ClientEnd<fuchsia_io::Directory> svc_root = GetSvcRoot();
@@ -1014,17 +1006,6 @@ TEST_F(SherlockPartitionerTests, InitializeWithoutGptFails) {
   ASSERT_NOT_OK(CreatePartitioner(nullptr));
 }
 
-TEST_F(SherlockPartitionerTests, InitializeWithoutFvmSucceeds) {
-  std::unique_ptr<BlockDevice> gpt_dev;
-  ASSERT_NO_FATAL_FAILURE(CreateDisk(32 * kGibibyte, &gpt_dev));
-
-  // Set up a valid GPT.
-  std::unique_ptr<gpt::GptDevice> gpt;
-  ASSERT_NO_FATAL_FAILURE(CreateGptDevice(gpt_dev.get(), &gpt));
-
-  ASSERT_OK(CreatePartitioner(nullptr));
-}
-
 TEST_F(SherlockPartitionerTests, AddPartitionNotSupported) {
   std::unique_ptr<BlockDevice> gpt_dev;
   ASSERT_NO_FATAL_FAILURE(CreateDisk(64 * kMebibyte, &gpt_dev));
@@ -1034,81 +1015,6 @@ TEST_F(SherlockPartitionerTests, AddPartitionNotSupported) {
 
   ASSERT_STATUS(status->AddPartition(PartitionSpec(paver::Partition::kZirconB)),
                 ZX_ERR_NOT_SUPPORTED);
-}
-
-TEST_F(SherlockPartitionerTests, InitializePartitionTable) {
-  std::unique_ptr<BlockDevice> gpt_dev;
-  constexpr uint64_t kBlockCount = 0x748034;
-  ASSERT_NO_FATAL_FAILURE(CreateDisk(kBlockCount * block_size_, &gpt_dev));
-  {
-    // Pause the block watcher while we write partitions to the disk.
-    // This is to avoid the block watcher seeing an intermediate state of the partition table
-    // and incorrectly treating it as an MBR.
-    // The watcher is automatically resumed when this goes out of scope.
-    auto pauser = paver::BlockWatcherPauser::Create(GetSvcRoot());
-    ASSERT_OK(pauser);
-
-    std::unique_ptr<gpt::GptDevice> gpt;
-    ASSERT_NO_FATAL_FAILURE(CreateGptDevice(gpt_dev.get(), &gpt));
-
-    const PartitionDescription kStartingPartitions[] = {
-        {"bootloader", kDummyType, 0x22, 0x2000},   {"reserved", kDummyType, 0x12000, 0x20000},
-        {"env", kDummyType, 0x36000, 0x4000},       {"fts", kDummyType, 0x3E000, 0x2000},
-        {"factory", kDummyType, 0x44000, 0x10000},  {"recovery", kDummyType, 0x58000, 0x10000},
-        {"boot", kDummyType, 0x6C000, 0x10000},     {"system", kDummyType, 0x80000, 0x278000},
-        {"cache", kDummyType, 0x2FC000, 0x400000},  {"fct", kDummyType, 0x700000, 0x20000},
-        {"sysconfig", kDummyType, 0x724000, 0x800}, {"migration", kDummyType, 0x728800, 0x3800},
-        {"buf", kDummyType, 0x730000, 0x18000},
-    };
-
-    for (const auto& part : cpp20::span(kStartingPartitions)) {
-      ASSERT_OK(
-          gpt->AddPartition(part.name, part.type, GetRandomGuid(), part.start, part.length, 0),
-          "%s", part.name);
-    }
-
-    ASSERT_OK(gpt->Sync());
-  }
-
-  zx::result status = CreatePartitioner(gpt_dev.get());
-  ASSERT_OK(status);
-  std::unique_ptr<paver::DevicePartitioner>& partitioner = status.value();
-
-  ASSERT_OK(partitioner->InitPartitionTables());
-
-  // Ensure the final partition layout looks like we expect it to.
-  std::unique_ptr<gpt::GptDevice> gpt;
-  ASSERT_NO_FATAL_FAILURE(CreateGptDevice(gpt_dev.get(), &gpt));
-  const PartitionDescription kFinalPartitions[] = {
-      {"bootloader", kDummyType, 0x22, 0x2000},
-      {GUID_SYS_CONFIG_NAME, kSysConfigType, 0x2022, 0x678},
-      {GUID_ABR_META_NAME, kAbrMetaType, 0x269A, 0x8},
-      {GUID_VBMETA_A_NAME, kVbMetaAType, 0x26A2, 0x80},
-      {GUID_VBMETA_B_NAME, kVbMetaBType, 0x2722, 0x80},
-      {GUID_VBMETA_R_NAME, kVbMetaRType, 0x27A2, 0x80},
-      {"migration", kDummyType, 0x2822, 0x3800},
-      {"reserved", kDummyType, 0x12000, 0x20000},
-      {"env", kDummyType, 0x36000, 0x4000},
-      {"fts", kDummyType, 0x3E000, 0x2000},
-      {"factory", kDummyType, 0x44000, 0x10000},
-      {"recovery", kZirconRType, 0x54000, 0x10000},
-      {"boot", kZirconAType, 0x64000, 0x10000},
-      {"system", kZirconBType, 0x74000, 0x10000},
-      {GUID_FVM_NAME, kFvmType, 0x84000, 0x668000},
-      {"fct", kDummyType, 0x6EC000, 0x20000},
-      {"buffer", kDummyType, 0x70C000, 0x18000},
-  };
-  ASSERT_NO_FATAL_FAILURE(EnsurePartitionsMatch(gpt.get(), kFinalPartitions));
-
-  // Make sure we can find the important partitions.
-  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kZirconA)));
-  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kZirconB)));
-  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kZirconR)));
-  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kAbrMeta)));
-  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kVbMetaA)));
-  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kVbMetaB)));
-  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kVbMetaR)));
-  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kFuchsiaVolumeManager)));
 }
 
 TEST_F(SherlockPartitionerTests, FindPartitionNewGuids) {

@@ -21,9 +21,6 @@ namespace {
 
 using uuid::Uuid;
 
-constexpr size_t kKibibyte = 1024;
-constexpr size_t kMebibyte = kKibibyte * 1024;
-
 }  // namespace
 
 zx::result<std::unique_ptr<DevicePartitioner>> SherlockPartitioner::Initialize(
@@ -189,124 +186,8 @@ zx::result<std::unique_ptr<PartitionClient>> SherlockPartitioner::FindPartition(
 zx::result<> SherlockPartitioner::WipeFvm() const { return gpt_->WipeFvm(); }
 
 zx::result<> SherlockPartitioner::InitPartitionTables() const {
-  struct Partition {
-    const char* name;
-    Uuid type;
-    size_t min_size;
-  };
-
-  const auto add_partitions = [&](cpp20::span<const Partition> partitions) -> zx::result<> {
-    for (const auto& part : partitions) {
-      if (auto status = gpt_->AddPartition(part.name, part.type, part.min_size, 0);
-          status.is_error()) {
-        return status.take_error();
-      }
-    }
-    return zx::ok();
-  };
-
-  const char* partitions_to_wipe[] = {
-      "recovery",
-      "boot",
-      "system",
-      "fvm",
-      GUID_FVM_NAME,
-      "cache",
-      "fct",
-      GUID_SYS_CONFIG_NAME,
-      GUID_ABR_META_NAME,
-      GUID_VBMETA_A_NAME,
-      GUID_VBMETA_B_NAME,
-      GUID_VBMETA_R_NAME,
-      "migration",
-      "buf",
-      "buffer",
-  };
-  const auto wipe = [&partitions_to_wipe](const gpt_partition_t& part) {
-    char cstring_name[GPT_NAME_LEN] = {};
-    utf16_to_cstring(cstring_name, part.name, GPT_NAME_LEN);
-
-    for (const auto& partition_name : cpp20::span(partitions_to_wipe)) {
-      if (strncmp(cstring_name, partition_name, GPT_NAME_LEN) == 0) {
-        return true;
-      }
-    }
-    return false;
-  };
-
-  if (auto status = gpt_->WipePartitions(wipe); status.is_error()) {
-    return status.take_error();
-  }
-
-  const Partition partitions_to_add[] = {
-      {
-          "recovery",
-          GUID_ZIRCON_R_VALUE,
-          32 * kMebibyte,
-      },
-      {
-          "boot",
-          GUID_ZIRCON_A_VALUE,
-          32 * kMebibyte,
-      },
-      {
-          "system",
-          GUID_ZIRCON_B_VALUE,
-          32 * kMebibyte,
-      },
-      {
-          GUID_FVM_NAME,
-          GUID_FVM_VALUE,
-          3280 * kMebibyte,
-      },
-      {
-          "fct",
-          GUID_AMLOGIC_VALUE,
-          64 * kMebibyte,
-      },
-      {
-          GUID_SYS_CONFIG_NAME,
-          GUID_SYS_CONFIG_VALUE,
-          828 * kKibibyte,
-      },
-      {
-          GUID_ABR_META_NAME,
-          GUID_ABR_META_VALUE,
-          4 * kKibibyte,
-      },
-      {
-          GUID_VBMETA_A_NAME,
-          GUID_VBMETA_A_VALUE,
-          64 * kKibibyte,
-      },
-      {
-          GUID_VBMETA_B_NAME,
-          GUID_VBMETA_B_VALUE,
-          64 * kKibibyte,
-      },
-      {
-          GUID_VBMETA_R_NAME,
-          GUID_VBMETA_R_VALUE,
-          64 * kKibibyte,
-      },
-      {
-          "migration",
-          GUID_AMLOGIC_VALUE,
-          7 * kMebibyte,
-      },
-      {
-          "buffer",
-          GUID_AMLOGIC_VALUE,
-          48 * kMebibyte,
-      },
-  };
-
-  if (auto status = add_partitions(cpp20::span<const Partition>(partitions_to_add));
-      status.is_error()) {
-    return status.take_error();
-  }
-
-  return zx::ok();
+  ERROR("Initializing gpt partitions from paver is not supported on sherlock\n");
+  return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
 zx::result<> SherlockPartitioner::WipePartitionTables() const {
