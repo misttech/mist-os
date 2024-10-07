@@ -33,7 +33,6 @@ rustc_library("lib") {
     "//src/storage/gpt/rust:gpt_testing",
     "//src/storage/lib/block_server:fake_block_server",
     "//third_party/rust_crates:event-listener",
-    "//third_party/rust_crates:uuid",
   ]
   sources = [
     "src/gpt.rs",

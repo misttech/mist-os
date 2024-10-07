@@ -232,7 +232,7 @@ mod tests {
     use fake_block_server::{FakeServer, FakeServerOptions};
     use fidl::endpoints::{create_proxy, create_request_stream, ClientEnd, Proxy as _};
     use fs_management::filesystem::BlockConnector;
-    use gpt_testing::{format_gpt, PartitionDescriptor};
+    use gpt_testing::{format_gpt, Guid, PartitionInfo};
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::{Arc, Mutex};
     use vfs::directory::entry_container::Directory as _;
@@ -338,12 +338,13 @@ mod tests {
         format_gpt(
             &vmo,
             512,
-            vec![PartitionDescriptor {
+            vec![PartitionInfo {
                 label: PART_NAME.to_string(),
-                type_guid: uuid::Uuid::from_bytes(PART_TYPE_GUID),
-                instance_guid: uuid::Uuid::from_bytes(PART_INSTANCE_GUID),
+                type_guid: Guid::from_bytes(PART_TYPE_GUID),
+                instance_guid: Guid::from_bytes(PART_INSTANCE_GUID),
                 start_block: 4,
                 num_blocks: 1,
+                flags: 0,
             }],
         );
         let (block_device, shutdown, partitions_dir) = setup(vmo, 512);
@@ -379,19 +380,21 @@ mod tests {
             &vmo,
             512,
             vec![
-                PartitionDescriptor {
+                PartitionInfo {
                     label: PART_1_NAME.to_string(),
-                    type_guid: uuid::Uuid::from_bytes(PART_TYPE_GUID),
-                    instance_guid: uuid::Uuid::from_bytes(PART_INSTANCE_1_GUID),
+                    type_guid: Guid::from_bytes(PART_TYPE_GUID),
+                    instance_guid: Guid::from_bytes(PART_INSTANCE_1_GUID),
                     start_block: 4,
                     num_blocks: 1,
+                    flags: 0,
                 },
-                PartitionDescriptor {
+                PartitionInfo {
                     label: PART_2_NAME.to_string(),
-                    type_guid: uuid::Uuid::from_bytes(PART_TYPE_GUID),
-                    instance_guid: uuid::Uuid::from_bytes(PART_INSTANCE_2_GUID),
+                    type_guid: Guid::from_bytes(PART_TYPE_GUID),
+                    instance_guid: Guid::from_bytes(PART_INSTANCE_2_GUID),
                     start_block: 4,
                     num_blocks: 1,
+                    flags: 0,
                 },
             ],
         );
@@ -427,12 +430,13 @@ mod tests {
         format_gpt(
             &vmo,
             512,
-            vec![PartitionDescriptor {
+            vec![PartitionInfo {
                 label: PART_NAME.to_string(),
-                type_guid: uuid::Uuid::from_bytes(PART_TYPE_GUID),
-                instance_guid: uuid::Uuid::from_bytes(PART_INSTANCE_GUID),
+                type_guid: Guid::from_bytes(PART_TYPE_GUID),
+                instance_guid: Guid::from_bytes(PART_INSTANCE_GUID),
                 start_block: 4,
                 num_blocks: 1,
+                flags: 0,
             }],
         );
         let (block_device, shutdown, partitions_dir) = setup(vmo, 512);
@@ -513,19 +517,21 @@ mod tests {
             &vmo,
             512,
             vec![
-                PartitionDescriptor {
+                PartitionInfo {
                     label: PART_1_NAME.to_string(),
-                    type_guid: uuid::Uuid::from_bytes(PART_TYPE_GUID),
-                    instance_guid: uuid::Uuid::from_bytes(PART_INSTANCE_1_GUID),
+                    type_guid: Guid::from_bytes(PART_TYPE_GUID),
+                    instance_guid: Guid::from_bytes(PART_INSTANCE_1_GUID),
                     start_block: 4,
                     num_blocks: 1,
+                    flags: 0,
                 },
-                PartitionDescriptor {
+                PartitionInfo {
                     label: PART_2_NAME.to_string(),
-                    type_guid: uuid::Uuid::from_bytes(PART_TYPE_GUID),
-                    instance_guid: uuid::Uuid::from_bytes(PART_INSTANCE_2_GUID),
+                    type_guid: Guid::from_bytes(PART_TYPE_GUID),
+                    instance_guid: Guid::from_bytes(PART_INSTANCE_2_GUID),
                     start_block: 4,
                     num_blocks: 1,
+                    flags: 0,
                 },
             ],
         );
@@ -564,19 +570,21 @@ mod tests {
             &vmo,
             512,
             vec![
-                PartitionDescriptor {
+                PartitionInfo {
                     label: PART_1_NAME.to_string(),
-                    type_guid: uuid::Uuid::from_bytes(PART_TYPE_GUID),
-                    instance_guid: uuid::Uuid::from_bytes(PART_INSTANCE_1_GUID),
+                    type_guid: Guid::from_bytes(PART_TYPE_GUID),
+                    instance_guid: Guid::from_bytes(PART_INSTANCE_1_GUID),
                     start_block: 4,
                     num_blocks: 1,
+                    flags: 0,
                 },
-                PartitionDescriptor {
+                PartitionInfo {
                     label: PART_2_NAME.to_string(),
-                    type_guid: uuid::Uuid::from_bytes(PART_TYPE_GUID),
-                    instance_guid: uuid::Uuid::from_bytes(PART_INSTANCE_2_GUID),
+                    type_guid: Guid::from_bytes(PART_TYPE_GUID),
+                    instance_guid: Guid::from_bytes(PART_INSTANCE_2_GUID),
                     start_block: 4,
                     num_blocks: 1,
+                    flags: 0,
                 },
             ],
         );
@@ -611,12 +619,13 @@ mod tests {
         format_gpt(
             &vmo,
             BLOCK_SIZE,
-            vec![PartitionDescriptor {
+            vec![PartitionInfo {
                 label: "foo".to_string(),
-                type_guid: uuid::Uuid::from_bytes([1; 16]),
-                instance_guid: uuid::Uuid::from_bytes([2; 16]),
+                type_guid: Guid::from_bytes([1; 16]),
+                instance_guid: Guid::from_bytes([2; 16]),
                 start_block: 4,
                 num_blocks: 1,
+                flags: 0,
             }],
         );
 
@@ -632,11 +641,12 @@ mod tests {
                 _vmo: &Arc<zx::Vmo>,
                 _vmo_offset: u64,
                 opts: WriteOptions,
-            ) {
+            ) -> fake_block_server::WriteAction {
                 assert_eq!(
                     opts.contains(WriteOptions::FORCE_ACCESS),
                     self.0.load(Ordering::Relaxed)
                 );
+                fake_block_server::WriteAction::Write
             }
         }
 

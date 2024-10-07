@@ -174,7 +174,7 @@ mod tests {
     use fidl_fuchsia_process_lifecycle::LifecycleMarker;
     use fuchsia_component::client::connect_to_protocol_at_dir_svc;
     use futures::{FutureExt as _, StreamExt as _};
-    use gpt_testing::{format_gpt, PartitionDescriptor};
+    use gpt_testing::{format_gpt, Guid, PartitionInfo};
     use std::sync::Arc;
     use {
         fidl_fuchsia_device as fdevice, fidl_fuchsia_hardware_block_volume as fvolume,
@@ -221,12 +221,13 @@ mod tests {
                 format_gpt(
                     &vmo,
                     512,
-                    vec![PartitionDescriptor {
+                    vec![PartitionInfo {
                         label: "part".to_string(),
-                        type_guid: uuid::Uuid::from_bytes([0xabu8; 16]),
-                        instance_guid: uuid::Uuid::from_bytes([0xcdu8; 16]),
+                        type_guid: Guid::from_bytes([0xabu8; 16]),
+                        instance_guid: Guid::from_bytes([0xcdu8; 16]),
                         start_block: 4,
                         num_blocks: 1,
+                        flags: 0,
                     }],
                 );
                 let block_server = Arc::new(FakeServer::from_vmo(512, vmo));

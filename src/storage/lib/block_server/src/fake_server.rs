@@ -12,6 +12,13 @@ pub const TYPE_GUID: [u8; 16] = [1; 16];
 pub const INSTANCE_GUID: [u8; 16] = [2; 16];
 pub const PARTITION_NAME: &str = "fake-server";
 
+/// The Observer can silently discard writes, or fail them explicitly (zx::Status::IO is returned).
+pub enum WriteAction {
+    Write,
+    Discard,
+    Fail,
+}
+
 pub trait Observer: Send + Sync {
     fn read(
         &self,
@@ -29,7 +36,8 @@ pub trait Observer: Send + Sync {
         _vmo: &Arc<zx::Vmo>,
         _vmo_offset: u64,
         _opts: WriteOptions,
-    ) {
+    ) -> WriteAction {
+        WriteAction::Write
     }
 
     fn flush(&self) {}
@@ -154,7 +162,11 @@ impl Interface for Data {
         opts: WriteOptions,
     ) -> Result<(), zx::Status> {
         if let Some(observer) = self.observer.as_ref() {
-            observer.write(device_block_offset, block_count, vmo, vmo_offset, opts);
+            match observer.write(device_block_offset, block_count, vmo, vmo_offset, opts) {
+                WriteAction::Write => {}
+                WriteAction::Discard => return Ok(()),
+                WriteAction::Fail => return Err(zx::Status::IO),
+            }
         }
         self.data.write(
             &vmo.read_to_vec(vmo_offset, block_count as u64 * self.block_size as u64)?,
