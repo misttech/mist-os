@@ -13,12 +13,12 @@ rustc_staticlib("wlansoftmac-c") {
 
   deps = [
     "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_rust",
+    "//sdk/lib/driver/runtime/rust",
     "//sdk/rust/zx",
     "//src/connectivity/wlan/drivers/wlansoftmac/rust_driver:wlansoftmac-rust",
     "//src/connectivity/wlan/lib/ffi-transport:wlan-ffi-transport",
     "//src/connectivity/wlan/lib/mlme/rust:wlan-mlme",
     "//src/connectivity/wlan/lib/trace:wlan-trace",
-    "//src/devices/bin/driver_runtime/rust:fdf_rust_lib",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",

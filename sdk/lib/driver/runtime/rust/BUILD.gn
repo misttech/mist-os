@@ -5,7 +5,7 @@
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 
-rustc_library("fdf_rust_lib") {
+rustc_library("rust") {
   name = "fdf"
   version = "0.1.0"
   edition = "2021"
@@ -13,9 +13,9 @@ rustc_library("fdf_rust_lib") {
 
   deps = [
     "//sdk/lib/async",
+    "//sdk/lib/driver/runtime/rust/fdf_sys",
     "//sdk/rust/zx",
     "//src/devices/bin/driver_runtime",
-    "//src/devices/bin/driver_runtime/rust/fdf_sys",
     "//third_party/rust_crates:futures",
   ]
 
@@ -32,7 +32,7 @@ rustc_library("fdf_rust_lib") {
 }
 
 fuchsia_unittest_package("fdf_rust_tests") {
-  deps = [ ":fdf_rust_lib_test" ]
+  deps = [ ":rust_test" ]
 }
 
 group("tests") {
@@ -40,6 +40,5 @@ group("tests") {
   deps = [
     ":fdf_rust_tests",
     "fdf_sys:tests",
-    "server:tests",
   ]
 }
