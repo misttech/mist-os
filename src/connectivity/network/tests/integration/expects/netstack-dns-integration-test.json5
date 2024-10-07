@@ -26,21 +26,10 @@
         {
             type: "skip",
             matchers: [
-                // TODO(https://fxbug.dev/341759423): Once
-                // Netstack3 exposes NDP RAs, listen for
-                // these servers in netcfg.
+                // TODO(https://fxbug.dev/370098449): These tests are skipped to
+                // avoid flakiness in CQ due to the long timeout.
                 "discovered_ndp_dns_netcfg_basic_ns3::dns_server_watcher",
                 "discovered_ndp_dns_netcfg_advanced_ns3::dns_server_watcher",
-
-                // TODO(https://fxbug.dev/328647117): Remove
-                // once netcfg is publishing out-of-stack DHCPv4
-                // and DHCPv6 DNS servers to DnsServerWatcher.
-                "discovered_dhcpv4_dns_netcfg_basic_ns3::dns_server_watcher",
-                "discovered_dhcpv4_dns_netcfg_advanced_ns3::dns_server_watcher",
-                "discovered_dhcpv6_dns_netcfg_basic_ns2::dns_server_watcher",
-                "discovered_dhcpv6_dns_netcfg_advanced_ns2::dns_server_watcher",
-                "discovered_dhcpv6_dns_netcfg_basic_ns3::dns_server_watcher",
-                "discovered_dhcpv6_dns_netcfg_advanced_ns3::dns_server_watcher",
             ],
         },
     ],

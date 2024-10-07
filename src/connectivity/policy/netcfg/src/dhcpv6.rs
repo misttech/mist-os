@@ -306,6 +306,7 @@ pub(super) fn maybe_send_watch_prefix_response(
 pub(super) async fn stop_client(
     lookup_admin: &fnet_name::LookupAdminProxy,
     dns_servers: &mut DnsServers,
+    dns_server_watch_responders: &mut dns::DnsServerWatchResponders,
     interface_id: NonZeroU64,
     watchers: &mut DnsServerWatchers<'_>,
     prefixes_streams: &mut PrefixesStreamMap,
@@ -334,7 +335,8 @@ pub(super) async fn stop_client(
         );
     }
 
-    dns::update_servers(lookup_admin, dns_servers, source, vec![]).await
+    dns::update_servers(lookup_admin, dns_servers, dns_server_watch_responders, source, vec![])
+        .await
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]

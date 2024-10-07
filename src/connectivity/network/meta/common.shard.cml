@@ -276,11 +276,11 @@
             as: "fuchsia.posix.socket.packet.Provider_OnlyForStarnix",
         },
 
-        // TODO(https://fxbug.dev/328647117): This is not a long term solution and should be fixed
-        // soon.
+        // TODO(https://fxbug.dev/42175016): This is temporary until the new DNS
+        // configuration API is designed.
         {
             protocol: [ "fuchsia.net.name.DnsServerWatcher" ],
-            from: "#netstack",
+            from: "#netcfg",
             as: "fuchsia.net.name.DnsServerWatcher_OnlyForLowpan",
         },
         {
