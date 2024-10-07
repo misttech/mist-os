@@ -22,7 +22,7 @@ use fuchsia_inspect::{Node as InspectNode, StringReference};
 use fuchsia_inspect_contrib::inspect_insert;
 use fuchsia_inspect_contrib::log::WriteInspect;
 use futures::channel::{mpsc, oneshot};
-use futures::future::FutureExt;
+use futures::future::{Fuse, FutureExt};
 use futures::select;
 use futures::stream::{self, StreamExt, TryStreamExt};
 use std::convert::Infallible;
@@ -443,7 +443,7 @@ async fn wait_for_connect_result(
 /// - different connect requests are serviced by passing a next_network to the DISCONNECTING state
 /// - disconnect requests cause a transition to DISCONNECTING state
 async fn connecting_state<'a>(
-    common_options: CommonStateOptions,
+    mut common_options: CommonStateOptions,
     options: ConnectingOptions,
 ) -> Result<State, ExitReason> {
     debug!("Entering connecting state");
@@ -491,15 +491,16 @@ async fn connecting_state<'a>(
         (fidl_ieee80211::StatusCode::Success, _) => {
             info!("Successfully connected to network");
             let network_is_likely_hidden = common_options.network_is_likely_hidden(&options).await;
-            let connected_options = ConnectedOptions {
-                connect_txn_stream: connect_txn.take_event_stream(),
-                ap_state: Box::new(ap_state),
-                network_identifier: options.connect_selection.target.network.clone(),
-                credential: options.connect_selection.target.credential.clone(),
-                ess_connect_reason: options.connect_selection.reason,
-                multiple_bss_candidates: options.connect_selection.target.network_has_multiple_bss,
+            let connected_options = ConnectedOptions::new(
+                &mut common_options,
+                Box::new(ap_state.clone()),
+                options.connect_selection.target.network_has_multiple_bss,
+                options.connect_selection.target.network.clone(),
+                options.connect_selection.target.credential.clone(),
+                options.connect_selection.reason,
+                connect_txn.take_event_stream(),
                 network_is_likely_hidden,
-            };
+            );
             Ok(connected_state(common_options, connected_options).into_state())
         }
         (code, true) => {
@@ -604,8 +605,64 @@ struct ConnectedOptions {
     ess_connect_reason: types::ConnectReason,
     connect_txn_stream: fidl_sme::ConnectTransactionEventStream,
     network_is_likely_hidden: bool,
+    connect_start_time: fasync::MonotonicInstant,
+    initial_signal: types::Signal,
+    tracked_signals: HistoricalList<types::TimestampedSignal>,
+    roam_monitor_sender: RoamDataSender,
+    roam_receiver: mpsc::Receiver<types::ScannedCandidate>,
+    post_connect_metric_timer: Fuse<fasync::Timer>,
+    connect_duration_metric_timer: Fuse<fasync::Timer>,
 }
+impl ConnectedOptions {
+    pub fn new(
+        common_options: &mut CommonStateOptions,
+        ap_state: Box<types::ApState>,
+        multiple_bss_candidates: bool,
+        network_identifier: types::NetworkIdentifier,
+        credential: Credential,
+        ess_connect_reason: types::ConnectReason,
+        connect_txn_stream: fidl_sme::ConnectTransactionEventStream,
+        network_is_likely_hidden: bool,
+    ) -> Self {
+        // Tracked signals
+        let mut past_signals = HistoricalList::new(NUM_PAST_SCORES);
+        let initial_signal = ap_state.tracked.signal;
+        past_signals.add(types::TimestampedSignal {
+            time: fasync::MonotonicInstant::now(),
+            signal: initial_signal,
+        });
 
+        // Initialize roam monitor with roam manager service.
+        let (roam_monitor_sender, roam_receiver) =
+            common_options.roam_manager.initialize_roam_monitor(
+                (*ap_state).clone(),
+                network_identifier.clone(),
+                credential.clone(),
+            );
+        Self {
+            ap_state,
+            multiple_bss_candidates,
+            network_identifier,
+            credential,
+            ess_connect_reason,
+            connect_txn_stream,
+            network_is_likely_hidden,
+            connect_start_time: fasync::MonotonicInstant::now(),
+            initial_signal,
+            tracked_signals: HistoricalList::new(NUM_PAST_SCORES),
+            roam_monitor_sender,
+            roam_receiver,
+            post_connect_metric_timer: fasync::Timer::new(
+                AVERAGE_SCORE_DELTA_MINIMUM_DURATION.after_now(),
+            )
+            .fuse(),
+            connect_duration_metric_timer: fasync::Timer::new(
+                METRICS_SHORT_CONNECT_DURATION.after_now(),
+            )
+            .fuse(),
+        }
+    }
+}
 /// The CONNECTED state monitors the SME status. It handles the SME status response:
 /// - if still connected to the correct network, no action
 /// - if disconnected, retry connection by passing a next_network to the
@@ -619,33 +676,6 @@ async fn connected_state(
     mut options: ConnectedOptions,
 ) -> Result<State, ExitReason> {
     debug!("Entering connected state");
-    let mut connect_start_time = fasync::MonotonicInstant::now();
-
-    // Tracked signals
-    let mut past_signals = HistoricalList::new(NUM_PAST_SCORES);
-    past_signals.add(types::TimestampedSignal {
-        time: fasync::MonotonicInstant::now(),
-        signal: options.ap_state.tracked.signal,
-    });
-
-    let initial_signal = options.ap_state.tracked.signal;
-
-    // Initialize roam monitor with roam manager service.
-    let (mut roam_monitor_sender, mut roam_receiver) =
-        common_options.roam_manager.initialize_roam_monitor(
-            (*options.ap_state).clone(),
-            options.network_identifier.clone(),
-            options.credential.clone(),
-        );
-
-    // Timer to log post-connection scores metrics.
-    let mut post_connect_metric_timer =
-        fasync::Timer::new(AVERAGE_SCORE_DELTA_MINIMUM_DURATION.after_now()).fuse();
-
-    // Timer when duration has lapsed from short duration to long duration, for metrics purposes.
-    let mut connect_duration_metric_timer =
-        fasync::Timer::new(METRICS_SHORT_CONNECT_DURATION.after_now()).fuse();
-
     loop {
         select! {
             event = options.connect_txn_stream.next() => match event {
@@ -655,9 +685,7 @@ async fn connected_state(
                             notify_when_disconnect_detected(
                                 &common_options,
                                 &options,
-                                connect_start_time,
                                 fidl_info,
-                                past_signals.clone(),
                             ).await;
 
                             !fidl_info.is_sme_reconnecting
@@ -667,8 +695,7 @@ async fn connected_state(
                             if connected {
                                 // This OnConnectResult should be for reconnecting to the same AP,
                                 // so keep the same SignalData but reset the connect start time
-                                // to track as a new connection.
-                                connect_start_time = fasync::MonotonicInstant::now();
+                                options.connect_start_time = fasync::MonotonicInstant::now();
                             }
 
                             notify_when_reconnect_detected(&common_options, &options, result);
@@ -682,7 +709,7 @@ async fn connected_state(
                             if roam_succeeded {
                                 // Successful roam indicates connection to a different AP, so reset the connect
                                 // start time to track as a new connection.
-                                connect_start_time = fasync::MonotonicInstant::now();
+                                options.connect_start_time = fasync::MonotonicInstant::now();
 
                                 let bss_description = match result.bss_description {
                                     Some(ref bss_description) => bss_description,
@@ -700,7 +727,7 @@ async fn connected_state(
 
                                 *options.ap_state = ap_state;
                                 // Re-initialize roam monitor for new BSS
-                                (roam_monitor_sender, roam_receiver) =
+                                (options.roam_monitor_sender, options.roam_receiver) =
                                     common_options.roam_manager.initialize_roam_monitor(
                                         (*options.ap_state).clone(),
                                         options.network_identifier.clone(),
@@ -727,12 +754,12 @@ async fn connected_state(
                                     }),
                                 };
                                 let info = DisconnectInfo {
-                                    connected_duration: now - connect_start_time,
+                                    connected_duration: now - options.connect_start_time,
                                     is_sme_reconnecting: false,
                                     disconnect_source,
                                     previous_connect_reason: options.ess_connect_reason,
                                     ap_state: (*options.ap_state).clone(),
-                                    signals: past_signals.clone(),
+                                    signals: options.tracked_signals.clone(),
                                 };
                                 common_options.telemetry_sender.send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
                             }
@@ -743,24 +770,22 @@ async fn connected_state(
                             options.ap_state.tracked.signal = ind.into();
 
                             // Update list of signals
-                            past_signals.add(types::TimestampedSignal {
+                            options.tracked_signals.add(types::TimestampedSignal {
                                 time: fasync::MonotonicInstant::now(),
                                 signal: ind.into(),
                             });
 
                             notify_on_signal_report(
                                 &common_options,
-                                &options,
-                                &mut roam_monitor_sender,
+                                &mut options,
                                 ind
                             );
-
                             false
                         }
                         fidl_sme::ConnectTransactionEvent::OnChannelSwitched { info } => {
                             options.ap_state.tracked.channel.primary = info.new_channel;
                             // Re-initialize roam monitor for new channel
-                            (roam_monitor_sender, roam_receiver) =
+                            (options.roam_monitor_sender, options.roam_receiver) =
                                 common_options.roam_manager.initialize_roam_monitor(
                                     (*options.ap_state).clone(),
                                     options.network_identifier.clone(),
@@ -797,8 +822,6 @@ async fn connected_state(
                         notify_on_manual_disconnect(
                             &common_options,
                             &options,
-                            connect_start_time,
-                            past_signals.clone(),
                             reason,
                         ).await;
 
@@ -830,8 +853,6 @@ async fn connected_state(
                         notify_on_manual_connect(
                             &common_options,
                             &options,
-                            connect_start_time,
-                            past_signals.clone(),
                             reason,
                         ).await;
 
@@ -853,20 +874,20 @@ async fn connected_state(
                     None => return handle_none_request(),
                 };
             },
-            () = post_connect_metric_timer => {
+            () = &mut options.post_connect_metric_timer => {
                 common_options.telemetry_sender.send(TelemetryEvent::PostConnectionSignals {
-                        connect_time: connect_start_time,
-                        signal_at_connect: initial_signal,
-                        signals: past_signals.clone()
+                        connect_time: options.connect_start_time,
+                        signal_at_connect: options.initial_signal,
+                        signals: options.tracked_signals.clone()
                 });
             },
-            () = connect_duration_metric_timer => {
+            () = &mut options.connect_duration_metric_timer => {
                 // Log the average connection score metric for a long duration connection.
                 common_options.telemetry_sender.send(TelemetryEvent::LongDurationSignals{
-                    signals: past_signals.get_before(fasync::MonotonicInstant::now())
+                    signals: options.tracked_signals.get_before(fasync::MonotonicInstant::now())
                 });
             }
-            roam_request = roam_receiver.select_next_some() => {
+            roam_request = options.roam_receiver.select_next_some() => {
                 // TODO(nmccracken) Roam to this network once we have decided proactive roaming is ready to enable.
                 debug!(
                     "Roam request to candidate {:?} received, not yet implemented.",
@@ -881,19 +902,17 @@ async fn connected_state(
 async fn notify_when_disconnect_detected(
     common_options: &CommonStateOptions,
     options: &ConnectedOptions,
-    connect_start_time: fasync::MonotonicInstant,
     fidl_info: fidl_sme::DisconnectInfo,
-    past_signals: HistoricalList<types::TimestampedSignal>,
 ) {
     // Log a disconnect in Cobalt
     let now = fasync::MonotonicInstant::now();
     let info = DisconnectInfo {
-        connected_duration: now - connect_start_time,
+        connected_duration: now - options.connect_start_time,
         is_sme_reconnecting: fidl_info.is_sme_reconnecting,
         disconnect_source: fidl_info.disconnect_source,
         previous_connect_reason: options.ess_connect_reason,
         ap_state: (*options.ap_state).clone(),
-        signals: past_signals,
+        signals: options.tracked_signals.clone(),
     };
     common_options
         .telemetry_sender
@@ -904,7 +923,6 @@ async fn notify_when_disconnect_detected(
     record_disconnect(
         common_options,
         options,
-        connect_start_time,
         types::DisconnectReason::DisconnectDetectedFromSme,
         options.ap_state.tracked.signal,
     )
@@ -914,12 +932,11 @@ async fn notify_when_disconnect_detected(
 async fn record_disconnect(
     common_options: &CommonStateOptions,
     options: &ConnectedOptions,
-    connect_start_time: fasync::MonotonicInstant,
     reason: types::DisconnectReason,
     signal: types::Signal,
 ) {
     let curr_time = fasync::MonotonicInstant::now();
-    let uptime = curr_time - connect_start_time;
+    let uptime = curr_time - options.connect_start_time;
     let data = PastConnectionData::new(
         options.ap_state.original().bssid,
         curr_time,
@@ -956,8 +973,7 @@ fn notify_when_reconnect_detected(
 
 fn notify_on_signal_report(
     common_options: &CommonStateOptions,
-    options: &ConnectedOptions,
-    roam_monitor_sender: &mut RoamDataSender,
+    options: &mut ConnectedOptions,
     ind: fidl_internal::SignalReportIndication,
 ) {
     // Update reported state.
@@ -967,7 +983,8 @@ fn notify_on_signal_report(
     common_options.telemetry_sender.send(TelemetryEvent::OnSignalReport { ind });
 
     // Forward signal report data to roam monitor.
-    let _ = roam_monitor_sender
+    let _ = options
+        .roam_monitor_sender
         .send_signal_report_ind(ind)
         .inspect_err(|e| error!("Error handling signal report: {}", e));
 }
@@ -986,30 +1003,21 @@ fn notify_on_channel_switch(
 async fn notify_on_manual_disconnect(
     common_options: &CommonStateOptions,
     options: &ConnectedOptions,
-    connect_start_time: fasync::MonotonicInstant,
-    past_signals: HistoricalList<types::TimestampedSignal>,
     reason: types::DisconnectReason,
 ) {
     let now = fasync::MonotonicInstant::now();
 
-    record_disconnect(
-        common_options,
-        options,
-        connect_start_time,
-        reason,
-        options.ap_state.tracked.signal,
-    )
-    .await;
+    record_disconnect(common_options, options, reason, options.ap_state.tracked.signal).await;
 
     let info = DisconnectInfo {
-        connected_duration: now - connect_start_time,
+        connected_duration: now - options.connect_start_time,
         is_sme_reconnecting: false,
         disconnect_source: fidl_sme::DisconnectSource::User(
             types::convert_to_sme_disconnect_reason(reason),
         ),
         ap_state: *options.ap_state.clone(),
         previous_connect_reason: options.ess_connect_reason,
-        signals: past_signals,
+        signals: options.tracked_signals.clone(),
     };
     common_options
         .telemetry_sender
@@ -1019,30 +1027,21 @@ async fn notify_on_manual_disconnect(
 async fn notify_on_manual_connect(
     common_options: &CommonStateOptions,
     options: &ConnectedOptions,
-    connect_start_time: fasync::MonotonicInstant,
-    past_signals: HistoricalList<types::TimestampedSignal>,
     reason: types::DisconnectReason,
 ) {
     let now = fasync::MonotonicInstant::now();
 
-    record_disconnect(
-        common_options,
-        options,
-        connect_start_time,
-        reason,
-        options.ap_state.tracked.signal,
-    )
-    .await;
+    record_disconnect(common_options, options, reason, options.ap_state.tracked.signal).await;
 
     let info = DisconnectInfo {
-        connected_duration: now - connect_start_time,
+        connected_duration: now - options.connect_start_time,
         is_sme_reconnecting: false,
         disconnect_source: fidl_sme::DisconnectSource::User(
             types::convert_to_sme_disconnect_reason(reason),
         ),
         ap_state: *options.ap_state.clone(),
         previous_connect_reason: options.ess_connect_reason,
-        signals: past_signals.clone(),
+        signals: options.tracked_signals.clone(),
     };
     common_options
         .telemetry_sender
@@ -2012,15 +2011,16 @@ mod tests {
         let (connect_txn_proxy, _connect_txn_stream) =
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
-        let options = ConnectedOptions {
-            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
-            ap_state: Box::new(init_ap_state.clone()),
-            network_identifier: connect_selection.target.network.clone(),
-            credential: connect_selection.target.credential.clone(),
-            ess_connect_reason: connect_selection.reason,
-            connect_txn_stream: connect_txn_proxy.take_event_stream(),
-            network_is_likely_hidden: false,
-        };
+        let options = ConnectedOptions::new(
+            &mut test_values.common_options,
+            Box::new(init_ap_state.clone()),
+            connect_selection.target.network_has_multiple_bss,
+            connect_selection.target.network.clone(),
+            connect_selection.target.credential.clone(),
+            connect_selection.reason,
+            connect_txn_proxy.take_event_stream(),
+            false,
+        );
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
         let mut fut = pin!(fut);
@@ -2161,15 +2161,16 @@ mod tests {
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
         let connect_txn_handle = connect_txn_stream.control_handle();
-        let options = ConnectedOptions {
-            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
-            ap_state: Box::new(init_ap_state.clone()),
-            network_identifier: connect_selection.target.network.clone(),
-            credential: connect_selection.target.credential.clone(),
-            ess_connect_reason: connect_selection.reason,
-            connect_txn_stream: connect_txn_proxy.take_event_stream(),
-            network_is_likely_hidden: false,
-        };
+        let options = ConnectedOptions::new(
+            &mut test_values.common_options,
+            Box::new(init_ap_state.clone()),
+            connect_selection.target.network_has_multiple_bss,
+            connect_selection.target.network.clone(),
+            connect_selection.target.credential.clone(),
+            connect_selection.reason,
+            connect_txn_proxy.take_event_stream(),
+            false,
+        );
 
         // Start the state machine in the connected state.
         let initial_state = connected_state(test_values.common_options, options);
@@ -2249,15 +2250,16 @@ mod tests {
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
         let connect_txn_handle = connect_txn_stream.control_handle();
-        let options = ConnectedOptions {
-            ap_state: Box::new(ap_state.clone()),
-            network_identifier: connect_selection.target.network.clone(),
-            credential: connect_selection.target.credential.clone(),
-            ess_connect_reason: connect_selection.reason,
-            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
-            connect_txn_stream: connect_txn_proxy.take_event_stream(),
-            network_is_likely_hidden: false,
-        };
+        let options = ConnectedOptions::new(
+            &mut test_values.common_options,
+            Box::new(ap_state.clone()),
+            connect_selection.target.network_has_multiple_bss,
+            connect_selection.target.network.clone(),
+            connect_selection.target.credential.clone(),
+            connect_selection.reason,
+            connect_txn_proxy.take_event_stream(),
+            false,
+        );
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
         let mut fut = pin!(fut);
@@ -2435,7 +2437,7 @@ mod tests {
     fn connected_state_gets_duplicate_connect_selection() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
-        let test_values = test_setup();
+        let mut test_values = test_setup();
         let mut telemetry_receiver = test_values.telemetry_receiver;
 
         let connect_selection = generate_connect_selection();
@@ -2447,15 +2449,16 @@ mod tests {
         let (connect_txn_proxy, _connect_txn_stream) =
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
-        let options = ConnectedOptions {
-            ap_state: Box::new(ap_state.clone()),
-            network_identifier: connect_selection.target.network.clone(),
-            credential: connect_selection.target.credential.clone(),
-            ess_connect_reason: connect_selection.reason,
-            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
-            connect_txn_stream: connect_txn_proxy.take_event_stream(),
-            network_is_likely_hidden: false,
-        };
+        let options = ConnectedOptions::new(
+            &mut test_values.common_options,
+            Box::new(ap_state.clone()),
+            connect_selection.target.network_has_multiple_bss,
+            connect_selection.target.network.clone(),
+            connect_selection.target.credential.clone(),
+            connect_selection.reason,
+            connect_txn_proxy.take_event_stream(),
+            false,
+        );
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
         let mut fut = pin!(fut);
@@ -2497,15 +2500,16 @@ mod tests {
         let (connect_txn_proxy, _connect_txn_stream) =
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
-        let options = ConnectedOptions {
-            ap_state: Box::new(first_ap_state.clone()),
-            network_identifier: first_connect_selection.target.network.clone(),
-            credential: first_connect_selection.target.credential.clone(),
-            ess_connect_reason: first_connect_selection.reason,
-            multiple_bss_candidates: first_connect_selection.target.network_has_multiple_bss,
-            connect_txn_stream: connect_txn_proxy.take_event_stream(),
-            network_is_likely_hidden: false,
-        };
+        let options = ConnectedOptions::new(
+            &mut test_values.common_options,
+            Box::new(first_ap_state.clone()),
+            first_connect_selection.target.network_has_multiple_bss,
+            first_connect_selection.target.network.clone(),
+            first_connect_selection.target.credential.clone(),
+            first_connect_selection.reason,
+            connect_txn_proxy.take_event_stream(),
+            false,
+        );
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
         let mut fut = pin!(fut);
@@ -2692,15 +2696,16 @@ mod tests {
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
         let connect_txn_handle = connect_txn_stream.control_handle();
-        let options = ConnectedOptions {
-            ap_state: Box::new(ap_state.clone()),
-            network_identifier: connect_selection.target.network.clone(),
-            credential: connect_selection.target.credential.clone(),
-            ess_connect_reason: connect_selection.reason,
-            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
-            connect_txn_stream: connect_txn_proxy.take_event_stream(),
-            network_is_likely_hidden: false,
-        };
+        let options = ConnectedOptions::new(
+            &mut test_values.common_options,
+            Box::new(ap_state.clone()),
+            connect_selection.target.network_has_multiple_bss,
+            connect_selection.target.network.clone(),
+            connect_selection.target.credential.clone(),
+            connect_selection.reason,
+            connect_txn_proxy.take_event_stream(),
+            false,
+        );
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
         let mut fut = pin!(fut);
@@ -2754,15 +2759,16 @@ mod tests {
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
         let connect_txn_handle = connect_txn_stream.control_handle();
-        let options = ConnectedOptions {
-            network_identifier: connect_selection.target.network.clone(),
-            credential: connect_selection.target.credential.clone(),
-            ess_connect_reason: connect_selection.reason,
-            ap_state: Box::new(ap_state.clone()),
-            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
-            connect_txn_stream: connect_txn_proxy.take_event_stream(),
-            network_is_likely_hidden: false,
-        };
+        let options = ConnectedOptions::new(
+            &mut test_values.common_options,
+            Box::new(ap_state.clone()),
+            connect_selection.target.network_has_multiple_bss,
+            connect_selection.target.network.clone(),
+            connect_selection.target.credential.clone(),
+            connect_selection.reason,
+            connect_txn_proxy.take_event_stream(),
+            false,
+        );
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
         let mut fut = pin!(fut);
@@ -2811,15 +2817,16 @@ mod tests {
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
         let connect_txn_handle = connect_txn_stream.control_handle();
-        let options = ConnectedOptions {
-            network_identifier: connect_selection.target.network.clone(),
-            credential: connect_selection.target.credential.clone(),
-            ess_connect_reason: connect_selection.reason,
-            ap_state: Box::new(ap_state),
-            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
-            connect_txn_stream: connect_txn_proxy.take_event_stream(),
-            network_is_likely_hidden: false,
-        };
+        let options = ConnectedOptions::new(
+            &mut test_values.common_options,
+            Box::new(ap_state.clone()),
+            connect_selection.target.network_has_multiple_bss,
+            connect_selection.target.network.clone(),
+            connect_selection.target.credential.clone(),
+            connect_selection.reason,
+            connect_txn_proxy.take_event_stream(),
+            false,
+        );
         let initial_state = connected_state(test_values.common_options, options);
         let fut = run_state_machine(initial_state);
         let mut fut = pin!(fut);
@@ -2929,15 +2936,16 @@ mod tests {
         let (connect_txn_proxy, connect_txn_stream) =
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
-        let options = ConnectedOptions {
-            network_identifier: connect_selection.target.network.clone(),
-            credential: connect_selection.target.credential.clone(),
-            ess_connect_reason: connect_selection.reason,
-            ap_state: Box::new(ap_state.clone()),
-            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
-            connect_txn_stream: connect_txn_proxy.take_event_stream(),
-            network_is_likely_hidden: false,
-        };
+        let options = ConnectedOptions::new(
+            &mut test_values.common_options,
+            Box::new(ap_state.clone()),
+            connect_selection.target.network_has_multiple_bss,
+            connect_selection.target.network.clone(),
+            connect_selection.target.credential.clone(),
+            connect_selection.reason,
+            connect_txn_proxy.take_event_stream(),
+            false,
+        );
         let initial_state = connected_state(test_values.common_options, options);
 
         let connect_txn_handle = connect_txn_stream.control_handle();
@@ -3028,15 +3036,16 @@ mod tests {
         let (connect_txn_proxy, connect_txn_stream) =
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
-        let options = ConnectedOptions {
-            network_identifier: connect_selection.target.network.clone(),
-            credential: connect_selection.target.credential.clone(),
-            ess_connect_reason: connect_selection.reason,
-            ap_state: Box::new(ap_state),
-            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
-            connect_txn_stream: connect_txn_proxy.take_event_stream(),
-            network_is_likely_hidden: false,
-        };
+        let options = ConnectedOptions::new(
+            &mut test_values.common_options,
+            Box::new(ap_state.clone()),
+            connect_selection.target.network_has_multiple_bss,
+            connect_selection.target.network.clone(),
+            connect_selection.target.credential.clone(),
+            connect_selection.reason,
+            connect_txn_proxy.take_event_stream(),
+            false,
+        );
         let initial_state = connected_state(test_values.common_options, options);
 
         let connect_txn_handle = connect_txn_stream.control_handle();
@@ -3111,15 +3120,16 @@ mod tests {
         let (connect_txn_proxy, connect_txn_stream) =
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
-        let options = ConnectedOptions {
-            network_identifier: connect_selection.target.network.clone(),
-            credential: connect_selection.target.credential.clone(),
-            ess_connect_reason: connect_selection.reason,
-            ap_state: Box::new(ap_state),
-            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
-            connect_txn_stream: connect_txn_proxy.take_event_stream(),
-            network_is_likely_hidden: false,
-        };
+        let options = ConnectedOptions::new(
+            &mut test_values.common_options,
+            Box::new(ap_state.clone()),
+            connect_selection.target.network_has_multiple_bss,
+            connect_selection.target.network.clone(),
+            connect_selection.target.credential.clone(),
+            connect_selection.reason,
+            connect_txn_proxy.take_event_stream(),
+            false,
+        );
         let initial_state = connected_state(test_values.common_options, options);
 
         let connect_txn_handle = connect_txn_stream.control_handle();
@@ -3180,15 +3190,16 @@ mod tests {
         let (connect_txn_proxy, connect_txn_stream) =
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
-        let options = ConnectedOptions {
-            network_identifier: connect_selection.target.network.clone(),
-            credential: connect_selection.target.credential.clone(),
-            ess_connect_reason: connect_selection.reason,
-            ap_state: Box::new(ap_state),
-            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
-            connect_txn_stream: connect_txn_proxy.take_event_stream(),
-            network_is_likely_hidden: false,
-        };
+        let options = ConnectedOptions::new(
+            &mut test_values.common_options,
+            Box::new(ap_state.clone()),
+            connect_selection.target.network_has_multiple_bss,
+            connect_selection.target.network.clone(),
+            connect_selection.target.credential.clone(),
+            connect_selection.reason,
+            connect_txn_proxy.take_event_stream(),
+            false,
+        );
         let initial_state = connected_state(test_values.common_options, options);
 
         let connect_txn_handle = connect_txn_stream.control_handle();
@@ -3246,15 +3257,16 @@ mod tests {
         let (connect_txn_proxy, connect_txn_stream) =
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
-        let options = ConnectedOptions {
-            network_identifier: connect_selection.target.network.clone(),
-            credential: connect_selection.target.credential.clone(),
-            ess_connect_reason: connect_selection.reason,
-            ap_state: Box::new(ap_state),
-            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
-            connect_txn_stream: connect_txn_proxy.take_event_stream(),
-            network_is_likely_hidden: false,
-        };
+        let options = ConnectedOptions::new(
+            &mut test_values.common_options,
+            Box::new(ap_state.clone()),
+            connect_selection.target.network_has_multiple_bss,
+            connect_selection.target.network.clone(),
+            connect_selection.target.credential.clone(),
+            connect_selection.reason,
+            connect_txn_proxy.take_event_stream(),
+            false,
+        );
         let initial_state = connected_state(test_values.common_options, options);
 
         let connect_txn_handle = connect_txn_stream.control_handle();
