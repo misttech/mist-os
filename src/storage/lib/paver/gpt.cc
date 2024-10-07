@@ -36,10 +36,6 @@ constexpr size_t ReservedHeaderBlocks(size_t blk_size) {
 
 zx::result<> RebindGptDriver(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
                              block_client::BlockDevice& device) {
-  zx::result pauser = BlockWatcherPauser::Create(svc_root);
-  if (pauser.is_error()) {
-    return pauser.take_error();
-  }
   return device.Rebind("gpt.cm");
 }
 
@@ -215,12 +211,6 @@ zx::result<std::vector<GptDevicePartitioner::GptClients>> GptDevicePartitioner::
 zx::result<std::unique_ptr<GptDevicePartitioner>> GptDevicePartitioner::InitializeProvidedGptDevice(
     const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     fidl::UnownedClientEnd<fuchsia_device::Controller> gpt_device) {
-  auto pauser = BlockWatcherPauser::Create(svc_root);
-  if (pauser.is_error()) {
-    ERROR("Failed to pause the block watcher\n");
-    return pauser.take_error();
-  }
-
   // Connect to the volume protocol.
   zx::result volume_endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_volume::Volume>();
   if (volume_endpoints.is_error()) {

@@ -19,13 +19,11 @@
 #include <zxtest/zxtest.h>
 
 #include "src/storage/lib/paver/test/test-utils.h"
-#include "src/storage/lib/paver/utils.h"
 
 namespace {
 
 using device_watcher::RecursiveWaitForFile;
 using driver_integration_test::IsolatedDevmgr;
-using paver::BlockWatcherPauser;
 
 class FakePartitionClient final : public paver::PartitionClient {
  public:
@@ -364,7 +362,7 @@ class FixedOffsetBlockPartitionClientTest : public zxtest::Test {
  public:
   void SetUp() override {
     IsolatedDevmgr::Args args;
-    args.disable_block_watcher = false;
+    args.disable_block_watcher = true;
 
     ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr_));
 
@@ -428,9 +426,6 @@ void Read(std::unique_ptr<paver::PartitionClient> client, std::string* data, siz
 }
 
 TEST_F(FixedOffsetBlockPartitionClientTest, DISABLED_GetPartitionSize) {
-  auto pauser = BlockWatcherPauser::Create(GetSvcRoot());
-  ASSERT_OK(pauser);
-
   {
     auto status = RawClient()->GetPartitionSize();
     ASSERT_OK(status);
@@ -449,9 +444,6 @@ TEST_F(FixedOffsetBlockPartitionClientTest, DISABLED_ReadOffsetedPartition) {
   const std::string block0(512, '0');
   const std::string firmware(512, 'F');
 
-  auto pauser = BlockWatcherPauser::Create(GetSvcRoot());
-  ASSERT_OK(pauser);
-
   zx::result raw_client = RawClient();
   ASSERT_OK(raw_client);
   ASSERT_NO_FATAL_FAILURE(Write(std::move(*raw_client), block0 + firmware));
@@ -467,9 +459,6 @@ TEST_F(FixedOffsetBlockPartitionClientTest, DISABLED_ReadOffsetedPartition) {
 TEST_F(FixedOffsetBlockPartitionClientTest, DISABLED_WriteOffsetdPartition) {
   const std::string block0(512, '0');
   const std::string firmware(512, 'F');
-
-  auto pauser = BlockWatcherPauser::Create(GetSvcRoot());
-  ASSERT_OK(pauser);
 
   zx::result raw_client = RawClient();
   ASSERT_OK(raw_client);
@@ -490,9 +479,6 @@ TEST_F(FixedOffsetBlockPartitionClientTest, ReadPartitionOffsetedBuffer) {
   size_t block_size = 512;
   const std::string initial(block_size, '0');
 
-  auto pauser = BlockWatcherPauser::Create(GetSvcRoot());
-  ASSERT_OK(pauser);
-
   zx::result raw_client = RawClient();
   ASSERT_OK(raw_client);
   ASSERT_NO_FATAL_FAILURE(Write(std::move(*raw_client), initial));
@@ -509,9 +495,6 @@ TEST_F(FixedOffsetBlockPartitionClientTest, WritePartitionOffsetedBuffer) {
   size_t block_size = 512;
   const std::string initial(block_size, '0');
   const std::string firmware = std::string(block_size, 'A') + std::string(block_size, 'B');
-
-  auto pauser = BlockWatcherPauser::Create(GetSvcRoot());
-  ASSERT_OK(pauser);
 
   zx::result raw_client = RawClient();
   ASSERT_OK(raw_client);

@@ -24,31 +24,6 @@
 
 namespace paver {
 
-// This class pauses the block watcher when it is Create()d, and
-// resumes it when the destructor is called.
-class BlockWatcherPauser {
- public:
-  BlockWatcherPauser(BlockWatcherPauser&& other)
-      : watcher_(std::move(other.watcher_)), valid_(other.valid_) {
-    other.valid_ = false;
-  }
-  // Destructor for the pauser, which automatically resumes the watcher.
-  ~BlockWatcherPauser();
-
-  // This is the function used for creating the BlockWatcherPauser.
-  static zx::result<BlockWatcherPauser> Create(
-      fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root);
-
- private:
-  // Create a new Pauser. This should immediately be followed by a call to Pause().
-  explicit BlockWatcherPauser(fidl::ClientEnd<fuchsia_fshost::BlockWatcher> chan)
-      : watcher_(fidl::WireSyncClient(std::move(chan))), valid_(false) {}
-  zx::result<> Pause();
-
-  fidl::WireSyncClient<fuchsia_fshost::BlockWatcher> watcher_;
-  bool valid_;
-};
-
 // Helper function to auto-deduce type.
 template <typename T>
 std::unique_ptr<T> WrapUnique(T* ptr) {

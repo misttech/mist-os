@@ -51,11 +51,6 @@
             from: "#archivist",
             to: "#paver",
         },
-        {
-            protocol: [ "fuchsia.fshost.BlockWatcher" ],
-            from: "#fshost",
-            to: "#paver",
-        },
     ],
     expose: [
         {

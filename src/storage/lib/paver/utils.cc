@@ -36,53 +36,6 @@ namespace skipblock = fuchsia_hardware_skipblock;
 // Not static so test can manipulate it.
 zx_duration_t g_wipe_timeout = ZX_SEC(3);
 
-std::atomic_uint32_t g_pause_count = 0;
-
-BlockWatcherPauser::~BlockWatcherPauser() {
-  if (valid_) {
-    const uint32_t old_count = g_pause_count.fetch_sub(1);
-    if (old_count == 1) {
-      auto result = watcher_->Resume();
-      if (result.status() != ZX_OK) {
-        ERROR("Failed to unpause the block watcher: %s\n", zx_status_get_string(result.status()));
-      } else if (result.value().status != ZX_OK) {
-        ERROR("Failed to unpause the block watcher: %s\n",
-              zx_status_get_string(result.value().status));
-      }
-    }
-  }
-}
-
-zx::result<BlockWatcherPauser> BlockWatcherPauser::Create(
-    fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root) {
-  auto local = component::ConnectAt<fuchsia_fshost::BlockWatcher>(svc_root);
-  if (!local.is_ok()) {
-    return local.take_error();
-  }
-
-  BlockWatcherPauser pauser(std::move(*local));
-  if (auto status = pauser.Pause(); status.is_error()) {
-    ERROR("Failed to pause block watcher: %s", status.status_string());
-    return status.take_error();
-  }
-
-  return zx::ok(std::move(pauser));
-}
-
-zx::result<> BlockWatcherPauser::Pause() {
-  const uint32_t old_count = g_pause_count.fetch_add(1);
-  if (old_count == 0) {
-    auto result = watcher_->Pause();
-    auto status = zx::make_result(result.ok() ? result.value().status : result.status());
-
-    valid_ = status.is_ok();
-    return status;
-  }
-
-  valid_ = true;
-  return zx::ok();
-}
-
 zx::result<std::unique_ptr<VolumeConnector>> OpenBlockPartition(const paver::BlockDevices& devices,
                                                                 std::optional<Uuid> unique_guid,
                                                                 std::optional<Uuid> type_guid,
