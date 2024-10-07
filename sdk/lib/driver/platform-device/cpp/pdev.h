@@ -35,13 +35,13 @@ class PDev {
       uint32_t index, uint32_t cache_policy = ZX_CACHE_POLICY_UNCACHED_DEVICE) const;
 
   template <typename FidlType>
-  zx::result<FidlType> GetFidlMetadata(int32_t metadata_type) const {
+  zx::result<FidlType> GetFidlMetadata(std::string_view metadata_id) const {
     static_assert(fidl::IsFidlType<FidlType>::value, "|FidlType| must be a FIDL domain object.");
     static_assert(!fidl::IsResource<FidlType>::value,
                   "|FidlType| cannot be a resource type. Resources cannot be persisted.");
 
-    fidl::WireResult<fuchsia_hardware_platform_device::Device::GetMetadata> encoded_metadata =
-        pdev_->GetMetadata(metadata_type);
+    fidl::WireResult<fuchsia_hardware_platform_device::Device::GetMetadata2> encoded_metadata =
+        pdev_->GetMetadata2(fidl::StringView::FromExternal(metadata_id));
     if (!encoded_metadata.ok()) {
       return zx::error(encoded_metadata.status());
     }

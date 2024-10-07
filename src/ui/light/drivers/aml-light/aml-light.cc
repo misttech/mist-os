@@ -206,7 +206,7 @@ zx_status_t AmlLight::Init() {
   }
 
   zx::result metadata = pdev.GetFidlMetadata<fuchsia_hardware_light::Metadata>(
-      fuchsia_hardware_light::kPdevMetadataTypeIdentifier);
+      std::to_string(fuchsia_hardware_light::kPdevMetadataTypeIdentifier));
   if (metadata.is_error()) {
     zxlogf(ERROR, "Failed to get metadata: %s", metadata.status_string());
     return metadata.status_value();
