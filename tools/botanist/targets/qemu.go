@@ -67,15 +67,6 @@ var qemuTargetMapping = map[string]qemu.Target{
 	"riscv64": qemu.TargetEnum.RiscV64,
 }
 
-// MinFS is the configuration for the MinFS filesystem image.
-type MinFS struct {
-	// Image is the path to the filesystem image.
-	Image string `json:"image"`
-
-	// PCIAddress is the PCI address to map the device at.
-	PCIAddress string `json:"pci_address"`
-}
-
 // QEMUConfig is a QEMU configuration.
 type QEMUConfig struct {
 	// Path is a path to a directory that contains QEMU system binary.
@@ -102,9 +93,6 @@ type QEMUConfig struct {
 
 	// Logfile saves emulator standard output to a file if set.
 	Logfile string `json:"logfile"`
-
-	// MinFS is the filesystem to mount as a device.
-	MinFS *MinFS `json:"minfs,omitempty"`
 
 	// Path to the fvm host tool.
 	FVMTool string `json:"fvm_tool"`
@@ -386,24 +374,6 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 		qemuCmd.AddVirtioBlkPciDrive(qemu.Drive{
 			ID:   "maindisk",
 			File: fvmImage.Path,
-		})
-	}
-
-	if t.config.MinFS != nil {
-		absMinFsPath, err := normalizeFile(t.config.MinFS.Image)
-		if err != nil {
-			return fmt.Errorf("could not find minfs image %q: %w", t.config.MinFS.Image, err)
-		}
-		// Swarming hard-links Isolate downloads with a cache and the very same
-		// cached minfs image will be used across multiple tasks. To ensure
-		// that it remains blank, we must break its link.
-		if err := overwriteFileWithCopy(absMinFsPath); err != nil {
-			return err
-		}
-		qemuCmd.AddVirtioBlkPciDrive(qemu.Drive{
-			ID:   "testdisk",
-			File: absMinFsPath,
-			Addr: t.config.MinFS.PCIAddress,
 		})
 	}
 
