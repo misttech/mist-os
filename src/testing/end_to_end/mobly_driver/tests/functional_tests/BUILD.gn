@@ -6,6 +6,6 @@ group("tests") {
   testonly = true
   public_deps = [
     "smoke_test:smoke_test($host_toolchain)",
-    "test_honeydew_integration:test_honeydew_integration_fc($host_toolchain)",
+    "test_honeydew_integration:test_honeydew_integration($host_toolchain)",
   ]
 }

@@ -27,11 +27,11 @@
 # dependencies (if any). For example,
 #   * `src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_session:test_session`
 #     is a group that contains
-#     `src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_session:session_test_fc`
+#     `src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_session:session_test`
 #      test and its dependencies
 #     `src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_session:packages`.
 #     So include this group name (not the test name)
-#   * `src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_rtc:rtc_test_fc`
+#   * `src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_rtc:rtc_test`
 #     is a test and it does not have any dependencies. So you can include this test name directly
 #
 # Note - Except in `Staging` groups, please refrain from referencing one group
@@ -61,12 +61,12 @@ group_with_no_dir_target_deps("core_x64_stable_sl4f_tests") {
 group_with_no_dir_target_deps("core_x64_stable_tests") {
   testonly = true
   public_deps = [
-    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_hard_reboot_fc($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
-    "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test_fc.hermetic($host_toolchain)",
+    "examples/test_case_revive_example:run_wo_test_case_revive($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_hard_reboot($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_soft_reboot($host_toolchain)",
+    "examples/test_power_cycle:power_cycle_test($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test.hermetic($host_toolchain)",
     "honeydew/tests/functional_tests:core_x64_stable_tests",
   ]
 }
@@ -101,12 +101,12 @@ group("core_x64_staging_tests") {
 group_with_no_dir_target_deps("workbench_x64_stable_tests") {
   testonly = true
   public_deps = [
-    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_hard_reboot_fc($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
-    "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test_fc.hermetic($host_toolchain)",
+    "examples/test_case_revive_example:run_wo_test_case_revive($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_hard_reboot($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_soft_reboot($host_toolchain)",
+    "examples/test_power_cycle:power_cycle_test($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test.hermetic($host_toolchain)",
     "honeydew/tests/functional_tests:workbench_x64_stable_tests",
   ]
 }
@@ -129,8 +129,8 @@ group("workbench_x64_staging_tests") {
 group_with_no_dir_target_deps("core_vim3_stable_tests") {
   testonly = true
   public_deps = [
-    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test_fc.hermetic($host_toolchain)",
+    "examples/test_case_revive_example:run_wo_test_case_revive($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test.hermetic($host_toolchain)",
     "honeydew/tests/functional_tests:core_vim3_stable_tests",
   ]
 }
@@ -138,10 +138,10 @@ group_with_no_dir_target_deps("core_vim3_stable_tests") {
 group_with_no_dir_target_deps("core_vim3_unstable_tests") {
   testonly = true
   public_deps = [
-    "examples/test_case_revive_example:test_case_revive_with_hard_reboot_fc($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
-    "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_hard_reboot($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_soft_reboot($host_toolchain)",
+    "examples/test_power_cycle:power_cycle_test($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
     "honeydew/tests/functional_tests:core_vim3_unstable_tests",
   ]
 }
@@ -158,12 +158,12 @@ group("core_vim3_staging_tests") {
 group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
   testonly = true
   public_deps = [
-    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_hard_reboot_fc($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
-    "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test_fc.hermetic($host_toolchain)",
+    "examples/test_case_revive_example:run_wo_test_case_revive($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_hard_reboot($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_soft_reboot($host_toolchain)",
+    "examples/test_power_cycle:power_cycle_test($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test.hermetic($host_toolchain)",
     "honeydew/tests/functional_tests:workbench_vim3_stable_tests",
   ]
 }
@@ -188,12 +188,12 @@ group("workbench_vim3_staging_tests") {
 group_with_no_dir_target_deps("starnix_vim3_stable_tests") {
   testonly = true
   public_deps = [
-    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_hard_reboot_fc($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
-    "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test_fc.hermetic($host_toolchain)",
+    "examples/test_case_revive_example:run_wo_test_case_revive($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_hard_reboot($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_soft_reboot($host_toolchain)",
+    "examples/test_power_cycle:power_cycle_test($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test.hermetic($host_toolchain)",
     "honeydew/tests/functional_tests:starnix_vim3_stable_tests",
   ]
 }
@@ -221,9 +221,9 @@ group("starnix_vim3_staging_tests") {
 group_with_no_dir_target_deps("starnix_arm64_stable_tests") {
   testonly = true
   public_deps = [
-    "examples/test_case_revive_example:run_wo_test_case_revive_fc($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test_fc.hermetic($host_toolchain)",
+    "examples/test_case_revive_example:run_wo_test_case_revive($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test.hermetic($host_toolchain)",
     "honeydew/tests/functional_tests:starnix_arm64_stable_tests",
   ]
 }
@@ -231,11 +231,11 @@ group_with_no_dir_target_deps("starnix_arm64_stable_tests") {
 group_with_no_dir_target_deps("starnix_arm64_unstable_tests") {
   testonly = true
   public_deps = [
-    "examples/test_case_revive_example:test_case_revive_with_hard_reboot_fc($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_hard_reboot($host_toolchain)",
     "examples/test_case_revive_example:test_case_revive_with_idle_suspend_timer_resume($host_toolchain)",
     "examples/test_case_revive_example:test_case_revive_with_idle_suspend_timer_resume_without_duration_check($host_toolchain)",
-    "examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc($host_toolchain)",
-    "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
+    "examples/test_case_revive_example:test_case_revive_with_soft_reboot($host_toolchain)",
+    "examples/test_power_cycle:power_cycle_test($host_toolchain)",
     "honeydew/tests/functional_tests:starnix_arm64_unstable_tests",
   ]
 }
@@ -258,8 +258,8 @@ group_with_no_dir_target_deps("smart_display_nelson_stable_tests") {
 group_with_no_dir_target_deps("smart_display_nelson_unstable_tests") {
   testonly = true
   public_deps = [
-    "examples/test_power_cycle:power_cycle_test_fc($host_toolchain)",
-    "examples/test_soft_reboot:soft_reboot_test_fc($host_toolchain)",
+    "examples/test_power_cycle:power_cycle_test($host_toolchain)",
+    "examples/test_soft_reboot:soft_reboot_test($host_toolchain)",
     "honeydew/tests/functional_tests:smart_display_nelson_unstable_tests",
   ]
 }

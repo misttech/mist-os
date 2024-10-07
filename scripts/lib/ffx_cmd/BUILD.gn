@@ -55,6 +55,5 @@ if (is_host) {
       "//src/lib/diagnostics/python/fuchsia_inspect",
       ":ffx_cmd",
     ]
-    transport = "fuchsia-controller"
   }
 }

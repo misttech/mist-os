@@ -99,8 +99,6 @@ foreach(test_config, _test_configs) {
     if (host_os == "linux") {
       test_data_deps = [ "//third_party/iperf:bin($host_toolchain)" ]
     }
-
-    transport = "fuchsia-controller"
   }
 }
 

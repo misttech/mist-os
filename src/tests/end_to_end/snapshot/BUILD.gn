@@ -7,7 +7,7 @@ import("//build/testing/environments.gni")
 
 assert(is_host, "E2E tests are host only")
 
-python_mobly_test("snapshot_test_fc") {
+python_mobly_test("snapshot_test") {
   main_source = "snapshot_test.py"
   libraries = [
     "//src/testing/end_to_end/honeydew",
@@ -16,7 +16,6 @@ python_mobly_test("snapshot_test_fc") {
   ]
 
   params_source = "params.yaml"
-  transport = "fuchsia-controller"
   environments = [
     emu_env,
     vim3_env,

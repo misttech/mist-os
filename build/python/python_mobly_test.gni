@@ -348,14 +348,6 @@ template("python_mobly_test") {
     _common_host_test_args += [ "--multi-device" ]
   }
 
-  # TODO(b/369445945): will be deleted after removing "transport" arg from all of "python_mobly_tests()"
-  if (defined(invoker.transport)) {
-    _common_host_test_args += [
-      "--transport",
-      invoker.transport,
-    ]
-  }
-
   _additional_deps = []
 
   # If specified, define test params data target and data path add to host args.

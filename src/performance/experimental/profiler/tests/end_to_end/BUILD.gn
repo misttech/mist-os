@@ -6,7 +6,6 @@ import("//build/python/python_mobly_test.gni")
 if (is_host) {
   python_mobly_test("cpu_profiler") {
     main_source = "cpu_profiler_e2e_test.py"
-    transport = "fuchsia-controller"
     libraries = [
       # Honeydew provides device interaction APIs.
       "//src/testing/end_to_end/honeydew",

@@ -7,12 +7,10 @@ import("//build/python/python_mobly_test.gni")
 import("//build/testing/host_test_data.gni")
 
 if (is_host) {
-  python_mobly_test("test_honeydew_integration_fc") {
+  python_mobly_test("test_honeydew_integration") {
     main_source = "test_honeydew_integration.py"
 
     libraries = [ "//src/testing/end_to_end/mobly_controller" ]
-
-    transport = "fuchsia-controller"
 
     # Used for infra Swarming bot allocation.
     environments = [

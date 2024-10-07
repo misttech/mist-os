@@ -23,17 +23,6 @@ class LEVEL(enum.StrEnum):
     ERROR = "Error"
 
 
-# TODO(b/369445945): will be deleted after antlion migrates to use "config" param in create_device()
-class TRANSPORT(enum.StrEnum):
-    """Different Host-(Fuchsia)Target interaction transports supported."""
-
-    # use Fuchsia-Controller for Host-(Fuchsia)Target interactions.
-    FUCHSIA_CONTROLLER = "fuchsia-controller"
-
-    # prioritize Fuchsia-Controller over SL4F for Host-(Fuchsia)Target interactions.
-    FUCHSIA_CONTROLLER_PREFERRED = "fuchsia-controller-preferred"
-
-
 @dataclass(frozen=True)
 class IpPort:
     """Dataclass that holds IP Address and Port

@@ -41,7 +41,6 @@ if (is_host) {
       "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly/mobly_controller",
     ]
     params_source = "params_x64.yaml"
-    transport = "fuchsia-controller"
     environments = [ emu_env ]
     deps = target_identity_deps
   }
@@ -54,7 +53,6 @@ if (is_host) {
       "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly/mobly_controller",
     ]
     params_source = "params_vim3.yaml"
-    transport = "fuchsia-controller"
     environments = [ vim3_env ]
     deps = target_identity_deps
   }
@@ -67,7 +65,6 @@ if (is_host) {
       "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly/mobly_controller",
     ]
     params_source = "params_x64.yaml"
-    transport = "fuchsia-controller"
     environments = [
       nuc7_env,
       nuc11_env,
@@ -82,7 +79,6 @@ if (is_host) {
       "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
       "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly/mobly_controller",
     ]
-    transport = "fuchsia-controller"
     environments = [
       emu_env,
       vim3_env,
@@ -102,7 +98,6 @@ if (is_host) {
       "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
       "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly/mobly_controller",
     ]
-    transport = "fuchsia-controller"
     environments = [
       emu_env,
       vim3_env,
@@ -129,7 +124,6 @@ if (is_host) {
       "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
       "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly/mobly_controller",
     ]
-    transport = "fuchsia-controller"
     environments = [
       emu_env,
       vim3_env,
@@ -151,7 +145,6 @@ if (is_host) {
       "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
       "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly/mobly_controller",
     ]
-    transport = "fuchsia-controller"
     multi_fuchsia_device = true
     deps = [
       ":tracing_runtime_deps",

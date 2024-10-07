@@ -7,7 +7,7 @@ import("//build/testing/environments.gni")
 
 assert(is_host, "Python E2E tests are host-only")
 
-python_mobly_test("power_cycle_test_fc") {
+python_mobly_test("power_cycle_test") {
   main_source = "test_power_cycle.py"
   libraries = [
     "//src/testing/end_to_end/honeydew",
@@ -17,7 +17,6 @@ python_mobly_test("power_cycle_test_fc") {
     num_power_cycles = 1
   }
   local_config_source = "PowerCycleTestbed.yaml"
-  transport = "fuchsia-controller"
   environments = [
     vim3_env,
     nuc11_env,
@@ -27,5 +26,5 @@ python_mobly_test("power_cycle_test_fc") {
 
 group("tests") {
   testonly = true
-  public_deps = [ ":power_cycle_test_fc($host_toolchain)" ]
+  public_deps = [ ":power_cycle_test($host_toolchain)" ]
 }

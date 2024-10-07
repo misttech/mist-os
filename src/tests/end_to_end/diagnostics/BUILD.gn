@@ -21,7 +21,6 @@ python_mobly_test("diagnostics_test") {
   ]
 
   params_source = "params.yaml"
-  transport = "fuchsia-controller"
 
   environments = [
     emu_env,

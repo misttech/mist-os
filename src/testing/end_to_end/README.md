@@ -137,8 +137,6 @@ python_mobly_test("my_test_target") {
       # Base class provides common Fuchsia testing setup and teardown logic.
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     ]
-    # Transport can also be "sl4f" if SL4F is required by your test.
-    transport = "fuchsia-controller"
 }
 ```
 

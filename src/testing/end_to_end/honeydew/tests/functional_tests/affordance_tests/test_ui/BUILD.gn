@@ -12,7 +12,6 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     ]
-    transport = "fuchsia-controller"
     environments = [
       # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
       aemu_env,
@@ -28,7 +27,6 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     ]
-    transport = "fuchsia-controller"
     environments = [
       # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
       aemu_env,
@@ -43,7 +41,7 @@ group("packages") {
   public_deps = [ "//src/ui/examples:flatland-examples" ]
 }
 
-group("test_screenshot") {
+group("test_screenshot_ffx") {
   testonly = true
   public_deps = [
     ":packages",
@@ -51,7 +49,7 @@ group("test_screenshot") {
   ]
 }
 
-group("test_user_input") {
+group("test_user_input_fc") {
   testonly = true
   public_deps = [
     ":packages",
@@ -63,7 +61,7 @@ group("test_user_input") {
 group("tests") {
   testonly = true
   public_deps = [
-    ":test_screenshot",
-    ":test_user_input",
+    ":test_screenshot_ffx",
+    ":test_user_input_fc",
   ]
 }
