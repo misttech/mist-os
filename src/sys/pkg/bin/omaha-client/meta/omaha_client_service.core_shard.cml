@@ -30,11 +30,6 @@
             to: "#system-update",
         },
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: "#system-update",
-        },
-        {
             protocol: [
                 "fuchsia.feedback.ComponentDataRegister",
                 "fuchsia.feedback.CrashReporter",

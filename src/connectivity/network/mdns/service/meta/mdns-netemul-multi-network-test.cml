@@ -123,17 +123,6 @@
             ],
         },
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#local-netstack",
-                "#remote",
-                "#remote-netstack",
-                "#sync-manager",
-                "#test-driver",
-            ],
-        },
-        {
             protocol: [
                 "fuchsia.net.interfaces.State",
                 "fuchsia.posix.socket.Provider",

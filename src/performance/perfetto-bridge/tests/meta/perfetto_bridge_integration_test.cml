@@ -49,15 +49,6 @@
             dependency: "weak",
         },
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [
-                "#perfetto-bridge",
-                "#perfetto_producer",
-                "#trace_manager",
-            ],
-        },
-        {
             protocol: [ "fuchsia.device.NameProvider" ],
             from: "parent",
             to: [ "#perfetto-bridge" ],

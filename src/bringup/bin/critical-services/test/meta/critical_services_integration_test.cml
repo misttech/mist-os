@@ -40,9 +40,9 @@
     ],
     offer: [
         {
+            config: "fuchsia.diagnostics.ExceptionHandlerAvailable",
             from: "#config",
             to: "#critical-services",
-            config: "fuchsia.diagnostics.ExceptionHandlerAvailable",
         },
         {
             directory: "input",
@@ -58,14 +58,6 @@
             protocol: "fuchsia.test.pwrbtn.Tests",
             from: "self",
             to: "#test-driver",
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#critical-services",
-                "#test-driver",
-            ],
         },
         {
             protocol: "fuchsia.boot.WriteOnlyLog",

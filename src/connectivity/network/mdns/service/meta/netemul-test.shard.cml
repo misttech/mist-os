@@ -111,16 +111,6 @@
 
         // ================== remote node ==================
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#publisher",
-                "#remote-mdns",
-                "#remote-name-provider",
-                "#remote-netstack",
-            ],
-        },
-        {
             protocol: [ "fuchsia.device.NameProvider" ],
             from: "#remote-name-provider",
             to: [
