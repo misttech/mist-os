@@ -112,7 +112,7 @@ type CreateError = flexible enum {
 };
 
 /// Mutates the component instance state in a realm.
-@discoverable
+@discoverable(server="platform")
 closed protocol LifecycleController {
     /// Starts the instance identified by the given moniker. Relative
     /// monikers must start with "./".

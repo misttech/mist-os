@@ -203,7 +203,7 @@ type ChildLocation = flexible union {
 };
 
 /// Offers detailed introspection into component instances under a realm.
-@discoverable
+@discoverable(server="platform")
 closed protocol RealmQuery {
     /// Gets an instance identified by its moniker.
     @available(added=11)
@@ -326,5 +326,5 @@ type RealmQueryError = flexible enum {
 };
 
 /// Offers basic introspection into component instances under a realm.
-@discoverable
+@discoverable(server="platform")
 closed protocol RealmExplorer {};

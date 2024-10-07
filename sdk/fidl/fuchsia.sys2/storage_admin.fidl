@@ -42,7 +42,7 @@ type DeletionError = strict enum {
     UNSUPPORTED = 4;
 };
 
-@discoverable
+@discoverable(server="platform")
 closed protocol StorageAdmin {
     /// Opens the isolated directory for the given component. The open request will provision
     /// the storage if it hasn't been already.

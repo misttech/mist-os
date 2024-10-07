@@ -17,7 +17,7 @@ type ComponentCrashInfo = table {
 /// When a thread from a component using the ELF runner crashes, the thread
 /// koid along with other information is stored. This protocol can be used to
 /// retrieve that stored information.
-@discoverable
+@discoverable(server="platform")
 closed protocol CrashIntrospect {
     /// Given a thread koid, returns the information that was stored when the
     /// ELF runner observed a crash from that thread.

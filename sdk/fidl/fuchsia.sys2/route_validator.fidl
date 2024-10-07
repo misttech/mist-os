@@ -108,7 +108,7 @@ type RouteValidatorError = flexible enum {
     INSTANCE_NOT_RESOLVED = 4;
 };
 
-@discoverable
+@discoverable(server="platform")
 closed protocol RouteValidator {
     /// Routes all incoming and exposed capabilities of a component identified by the given
     /// moniker. If the routing failed, an error is returned in the response.
