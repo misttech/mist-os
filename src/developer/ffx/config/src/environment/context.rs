@@ -350,6 +350,13 @@ impl EnvironmentContext {
         }
     }
 
+    // Some tests need to clear out the env
+    pub fn remove_var(&mut self, name: &str) {
+        if let Some(env_vars) = &mut self.env_vars {
+            env_vars.remove(name);
+        }
+    }
+
     /// Creates a [`ConfigQuery`] against the global config cache and
     /// this environment.
     ///
