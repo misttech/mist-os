@@ -24,6 +24,8 @@ extend uint fuchsia.BIND_PLATFORM_DEV_PID {
   CLOVER = 0x11,
   VIOLET = 0x12,
   KOLA = 0x13,
+  IRIS = 0x14,
+  LILAC = 0x15,
 };
 
 extend uint fuchsia.BIND_PLATFORM_DEV_DID {
