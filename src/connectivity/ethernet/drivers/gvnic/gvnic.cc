@@ -952,10 +952,6 @@ void Gvnic::NetworkDeviceImplReleaseVmo(uint8_t vmo_id) {
   ZX_ASSERT_MSG(num_erased == 1, "Expected to erase one vmo, instead erased %lu.", num_erased);
 }
 
-void Gvnic::NetworkDeviceImplSetSnoop(bool snoop) {
-  // Unimplemented.
-}
-
 // ------- NetworkPort -------
 
 void Gvnic::NetworkPortGetInfo(port_base_info_t* out_info) {

@@ -279,11 +279,6 @@ void NetworkDeviceShim::ReleaseVmo(netdriver::wire::NetworkDeviceImplReleaseVmoR
   completer.buffer(arena).Reply();
 }
 
-void NetworkDeviceShim::SetSnoop(netdriver::wire::NetworkDeviceImplSetSnoopRequest* request,
-                                 fdf::Arena& arena, SetSnoopCompleter::Sync& completer) {
-  impl_.SetSnoop(request->snoop);
-}
-
 void NetworkDeviceShim::NetworkDeviceIfcPortStatusChanged(uint8_t port_id,
                                                           const port_status_t* new_status) {
   fdf::Arena arena('NETD');
@@ -422,11 +417,6 @@ void NetworkDeviceShim::NetworkDeviceIfcCompleteTx(const tx_result_t* tx_list, s
   if (!status.ok()) {
     LOGF_ERROR("CompleteTx error: %s", status.status_string());
   }
-}
-
-void NetworkDeviceShim::NetworkDeviceIfcSnoop(const rx_buffer_t* rx_list, size_t rx_count) {
-  // TODO(https://fxbug.dev/42119287): Not implemented in netdev, implement here as well when
-  // needed.
 }
 
 void NetworkDeviceShim::NetworkDeviceIfcDelegateRxLease(const delegated_rx_lease_t* delegated) {

@@ -121,8 +121,6 @@ class NetworkDeviceIfc : public fdf::WireServer<netdriver::NetworkDeviceIfc> {
     }
     complete_tx_called_.Signal();
   }
-  void Snoop(netdriver::wire::NetworkDeviceIfcSnoopRequest* request, fdf::Arena& arena,
-             SnoopCompleter::Sync& completer) override {}
   void DelegateRxLease(netdriver::wire::NetworkDeviceIfcDelegateRxLeaseRequest* request,
                        fdf::Arena& arena, DelegateRxLeaseCompleter::Sync& completer) override {}
 

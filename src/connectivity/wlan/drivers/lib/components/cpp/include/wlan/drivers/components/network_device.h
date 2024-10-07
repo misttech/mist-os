@@ -123,9 +123,6 @@ class NetworkDevice final
     // CompleteRx. This means that the device does not need to attempt any cleanup and return of
     // frames as a result of this call.
     virtual void NetDevReleaseVmo(uint8_t vmo_id) = 0;
-
-    // Start or stop snooping. This currently has limited support.
-    virtual void NetDevSetSnoopEnabled(bool snoop) = 0;
   };
 
   explicit NetworkDevice(Callbacks* callbacks);
@@ -201,8 +198,6 @@ class NetworkDevice final
   void ReleaseVmo(
       fuchsia_hardware_network_driver::wire::NetworkDeviceImplReleaseVmoRequest* request,
       fdf::Arena& arena, ReleaseVmoCompleter::Sync& completer) override;
-  void SetSnoop(fuchsia_hardware_network_driver::wire::NetworkDeviceImplSetSnoopRequest* request,
-                fdf::Arena& arena, SetSnoopCompleter::Sync& completer) override;
 
   // fidl::WireAsyncEventHandler<NodeController> implementation
   void handle_unknown_event(fidl::UnknownEventMetadata<NodeController> metadata) override {}

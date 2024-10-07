@@ -356,11 +356,6 @@ void NetworkDevice::ReleaseVmo(netdriver::wire::NetworkDeviceImplReleaseVmoReque
   completer.buffer(arena).Reply();
 }
 
-void NetworkDevice::SetSnoop(netdriver::wire::NetworkDeviceImplSetSnoopRequest* request,
-                             fdf::Arena& arena, SetSnoopCompleter::Sync& completer) {
-  callbacks_->NetDevSetSnoopEnabled(request->snoop);
-}
-
 void NetworkDevice::on_fidl_error(fidl::UnbindInfo error) {
   if (error.status() != ZX_OK) {
     LOGF(ERROR, "NetworkDevice fidl error: %s", error.FormatDescription().c_str());

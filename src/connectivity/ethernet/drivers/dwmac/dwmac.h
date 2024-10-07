@@ -130,7 +130,6 @@ class DWMacDevice : public ddk::Device<DWMacDevice, ddk::Unbindable, ddk::Suspen
   void NetworkDeviceImplPrepareVmo(uint8_t id, zx::vmo vmo,
                                    network_device_impl_prepare_vmo_callback callback, void* cookie);
   void NetworkDeviceImplReleaseVmo(uint8_t id);
-  void NetworkDeviceImplSetSnoop(bool snoop);
 
   // For NetworkPortProtocol.
   void NetworkPortGetInfo(port_base_info_t* out_info);
@@ -284,7 +283,6 @@ class NetworkFunction : public ddk::Device<NetworkFunction, ddk::Unbindable, ddk
     device_->NetworkDeviceImplPrepareVmo(id, std::move(vmo), callback, cookie);
   }
   void NetworkDeviceImplReleaseVmo(uint8_t id) { device_->NetworkDeviceImplReleaseVmo(id); }
-  void NetworkDeviceImplSetSnoop(bool snoop) { device_->NetworkDeviceImplSetSnoop(snoop); }
 
   // For NetworkPortProtocol.
   void NetworkPortGetInfo(port_base_info_t* out_info) { device_->NetworkPortGetInfo(out_info); }

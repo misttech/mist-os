@@ -80,13 +80,6 @@ constexpr size_t kRxBufferSize =
     fidl::MaxSizeInChannel<fnetwork_driver::wire::RxBuffer, fidl::MessageDirection::kSending>();
 static_assert(kMaxFidlPayloadSize - kCompleteRxSize < kRxBufferSize);
 
-// NetworkDeviceIfc.Snoop
-constexpr size_t kSnoopSize =
-    fidl::MaxSizeInChannel<fnetwork_driver::wire::NetworkDeviceIfcSnoopRequest,
-                           fidl::MessageDirection::kSending>();
-static_assert(kSnoopSize <= kMaxFidlPayloadSize);
-static_assert(kMaxFidlPayloadSize - kSnoopSize < kRxBufferSize);
-
 }  // namespace
 
 namespace {
@@ -562,12 +555,6 @@ void DeviceInterface::CompleteTx(
     fuchsia_hardware_network_driver::wire::NetworkDeviceIfcCompleteTxRequest* request, fdf::Arena&,
     CompleteTxCompleter::Sync&) {
   tx_queue_->CompleteTxList(request->tx);
-}
-
-void DeviceInterface::Snoop(fuchsia_hardware_network_driver::wire::NetworkDeviceIfcSnoopRequest*,
-                            fdf::Arena&, SnoopCompleter::Sync&) {
-  // TODO(https://fxbug.dev/42119287): Implement real version. Current implementation acts as if no
-  // LISTEN is ever in place.
 }
 
 void DeviceInterface::DelegateRxLease(
@@ -1425,9 +1412,7 @@ void DeviceInterface::CopySessionData(const Session& owner, const RxFrameInfo& f
 
 void DeviceInterface::ListenSessionData(const Session& owner,
                                         cpp20::span<const uint16_t> descriptors) {
-  if ((device_info_.device_features().value_or(0) &
-       fuchsia_hardware_network_driver::wire::kFeatureNoAutoSnoop) ||
-      !has_listen_sessions_.load(std::memory_order_relaxed)) {
+  if (!has_listen_sessions_.load(std::memory_order_relaxed)) {
     // Avoid walking through sessions and acquiring Rx lock if we know no listen sessions are
     // attached.
     return;

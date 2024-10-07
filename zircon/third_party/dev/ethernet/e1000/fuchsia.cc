@@ -1326,12 +1326,6 @@ void Device<RxDescriptor>::ReleaseVmo(netdriver::wire::NetworkDeviceImplReleaseV
 }
 
 template <typename RxDescriptor>
-void Device<RxDescriptor>::SetSnoop(netdriver::wire::NetworkDeviceImplSetSnoopRequest* request,
-                                    fdf::Arena& arena, SetSnoopCompleter::Sync& completer) {
-  // Not supported
-}
-
-template <typename RxDescriptor>
 void Device<RxDescriptor>::GetInfo(
     fdf::Arena& arena, fdf::WireServer<netdriver::NetworkPort>::GetInfoCompleter::Sync& completer) {
   constexpr netdev::wire::FrameType kRxTypes[]{

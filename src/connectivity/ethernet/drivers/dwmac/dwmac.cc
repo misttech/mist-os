@@ -946,8 +946,6 @@ void DWMacDevice::NetworkDeviceImplReleaseVmo(uint8_t id) {
   }
 }
 
-void DWMacDevice::NetworkDeviceImplSetSnoop(bool snoop) {}
-
 void DWMacDevice::NetworkPortGetInfo(port_base_info_t* out_info) {
   static constexpr uint8_t kRxTypesList[] = {
       static_cast<uint8_t>(fuchsia_hardware_network::wire::FrameType::kEthernet)};

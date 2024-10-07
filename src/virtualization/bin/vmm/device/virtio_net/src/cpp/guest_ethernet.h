@@ -58,7 +58,6 @@ class GuestEthernet : public ddk::NetworkDeviceImplProtocol<GuestEthernet>,
   void NetworkDeviceImplPrepareVmo(uint8_t vmo_id, zx::vmo vmo,
                                    network_device_impl_prepare_vmo_callback callback, void* cookie);
   void NetworkDeviceImplReleaseVmo(uint8_t vmo_id);
-  void NetworkDeviceImplSetSnoop(bool snoop);
 
   // Methods implementing the `MacAddr` banjo protocol.
   void MacAddrGetAddress(mac_address_t* out_mac);

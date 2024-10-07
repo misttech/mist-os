@@ -72,12 +72,6 @@ class TestNetworkDeviceIfc
       complete_tx_(request, arena, completer);
     }
   }
-  void Snoop(fuchsia_hardware_network_driver::wire::NetworkDeviceIfcSnoopRequest* request,
-             fdf::Arena& arena, SnoopCompleter::Sync& completer) override {
-    if (snoop_) {
-      snoop_(request, arena, completer);
-    }
-  }
 
   void DelegateRxLease(
       fuchsia_hardware_network_driver::wire::NetworkDeviceIfcDelegateRxLeaseRequest* request,
@@ -103,9 +97,6 @@ class TestNetworkDeviceIfc
   std::function<void(fuchsia_hardware_network_driver::wire::NetworkDeviceIfcCompleteTxRequest*,
                      fdf::Arena&, CompleteTxCompleter::Sync&)>
       complete_tx_;
-  std::function<void(fuchsia_hardware_network_driver::wire::NetworkDeviceIfcSnoopRequest*,
-                     fdf::Arena&, SnoopCompleter::Sync&)>
-      snoop_;
   fit::function<void(fuchsia_hardware_network_driver::wire::NetworkDeviceIfcDelegateRxLeaseRequest*,
                      fdf::Arena&, DelegateRxLeaseCompleter::Sync&)>
       delegate_rx_lease_;

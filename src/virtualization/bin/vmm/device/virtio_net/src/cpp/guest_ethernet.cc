@@ -455,12 +455,6 @@ void GuestEthernet::NetworkDeviceImplReleaseVmo(uint8_t vmo_id) {
   io_size_ = 0;
 }
 
-void GuestEthernet::NetworkDeviceImplSetSnoop(bool snoop) {
-  if (snoop) {
-    FX_LOGS(WARNING) << "Request to enable snooping ignored: Snooping is unsupported";
-  }
-}
-
 void GuestEthernet::MacAddrGetAddress(mac_address_t* out_mac) {
   std::memcpy(out_mac->octets, mac_address_, VIRTIO_ETH_MAC_SIZE);
 }

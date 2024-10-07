@@ -78,7 +78,6 @@ class NetdeviceMigration
                                    network_device_impl_prepare_vmo_callback callback, void* cookie)
       __TA_EXCLUDES(vmo_lock_);
   void NetworkDeviceImplReleaseVmo(uint8_t id) __TA_EXCLUDES(vmo_lock_);
-  void NetworkDeviceImplSetSnoop(bool snoop);
 
   // For NetworkPortProtocol.
   void NetworkPortGetInfo(port_base_info_t* out_info);

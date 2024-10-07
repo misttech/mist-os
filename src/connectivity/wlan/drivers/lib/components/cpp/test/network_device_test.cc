@@ -102,7 +102,6 @@ struct TestNetworkDevice : public TestDriver::StopHandler, public NetworkDevice:
   MOCK_METHOD(zx_status_t, NetDevPrepareVmo,
               (uint8_t vmo_id, zx::vmo vmo, uint8_t* mapped_addr, size_t mapped_size), (override));
   MOCK_METHOD(void, NetDevReleaseVmo, (uint8_t vmo_id), (override));
-  MOCK_METHOD(void, NetDevSetSnoopEnabled, (bool snoop), (override));
 
   std::function<void()> on_release_;
   libsync::Completion release_called_;
@@ -720,18 +719,6 @@ TEST_F(NetworkDeviceTestFixture, QueueRxSpace) {
   auto queue_rx = network_device_client_.sync().buffer(arena)->QueueRxSpace({arena, buffers});
   ASSERT_OK(queue_rx.status());
   queue_rx_space_called.Wait();
-}
-
-TEST_F(NetworkDeviceTestFixture, Snoop) {
-  constexpr bool kSnoopEnabled = true;
-
-  libsync::Completion set_snoop_enabled_called;
-  EXPECT_CALL(test_network_device_, NetDevSetSnoopEnabled(kSnoopEnabled))
-      .WillOnce([&](bool snoop_enabled) { set_snoop_enabled_called.Signal(); });
-  fdf::Arena arena('NETD');
-  auto snoop = network_device_client_.sync().buffer(arena)->SetSnoop(kSnoopEnabled);
-  ASSERT_OK(snoop.status());
-  set_snoop_enabled_called.Wait();
 }
 
 TEST_F(NetworkDeviceTestFixture, Remove) {

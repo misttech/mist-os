@@ -81,7 +81,6 @@ class DeviceAdapter : public ddk::NetworkDeviceImplProtocol<DeviceAdapter> {
   void NetworkDeviceImplPrepareVmo(uint8_t vmo_id, zx::vmo vmo,
                                    network_device_impl_prepare_vmo_callback callback, void* cookie);
   void NetworkDeviceImplReleaseVmo(uint8_t vmo_id);
-  void NetworkDeviceImplSetSnoop(bool snoop) { /* do nothing , only auto-snooping is allowed */ }
 
   // Attempts to get a pending transmit buffer containing data expected to reach the network from
   // the pool of pending buffers.

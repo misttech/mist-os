@@ -128,7 +128,6 @@ class FakeDeviceImpl : public ddk::NetworkPortProtocol<FakeDeviceImpl>,
     callback(cookie, ZX_OK);
   }
   void NetworkDeviceImplReleaseVmo(uint8_t vmo_id) {}
-  void NetworkDeviceImplSetSnoop(bool snoop) { ZX_PANIC("unexpected call to SetSnoop(%d)", snoop); }
   void NetworkPortGetInfo(port_base_info_t* out_info) {
     *out_info = {
         .port_class = static_cast<uint16_t>(netdev::wire::PortClass::kEthernet),
