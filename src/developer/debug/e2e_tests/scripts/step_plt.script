@@ -11,7 +11,6 @@ Breakpoint 1 now matching 1 addrs for step_plt.cc:12
 
 [zxdb] f
 ▶ 0 main() • step_plt.cc:13
-  1…4 «libc startup» (-r expands)
 
 [zxdb] next
 🛑 main() • step_plt.cc:14
