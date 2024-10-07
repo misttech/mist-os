@@ -167,8 +167,8 @@ if (is_mistos) {
       # Legacy Power Framework support.
       "//src/power/cpu-manager:component",
       "//src/power/cpu-manager:default_component_config",
-      "//src/power/power-manager:component",
-      "//src/power/power-manager:default_component_config",
+      #"//src/power/power-manager:component",
+      #"//src/power/power-manager:default_component_config",
 
       # Power Framework Support.
       "//src/power/broker:component",
@@ -185,7 +185,8 @@ if (is_mistos) {
       "//src/connectivity/network/dhcpv6/client:component",
       "//src/connectivity/network/dns:component",
       "//src/connectivity/network/netstack3:component",
-      "//src/connectivity/network/netstack3:config_for_tests",
+
+      #"//src/connectivity/network/netstack3:config_for_tests",
       "//src/connectivity/policy/http-client:component",
       "//src/connectivity/policy/netcfg:component-basic",
       "//src/connectivity/policy/reachability:component",

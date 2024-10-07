@@ -63,7 +63,7 @@ _common_deps = [
   "//zircon/vdso:zx-sys",
 ]
 
-if (is_fuchsia) {
+if (is_fuchsia || is_mistos) {
   rustc_library("zx") {
     edition = "2021"
     sources = _common_sources
