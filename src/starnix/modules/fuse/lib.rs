@@ -684,6 +684,9 @@ impl FileOps for FuseFileObject {
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
+        if file.node().info().mode.is_dir() {
+            return error!(EISDIR);
+        }
         let node = Self::get_fuse_node(file);
         let response = self.connection.lock().execute_operation(
             current_task,
@@ -714,6 +717,9 @@ impl FileOps for FuseFileObject {
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
+        if file.node().info().mode.is_dir() {
+            return error!(EISDIR);
+        }
         let node = Self::get_fuse_node(file);
         let content = data.peek_all()?;
         let response = self.connection.lock().execute_operation(

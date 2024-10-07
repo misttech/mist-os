@@ -444,6 +444,10 @@ class FuseServer {
         OK_OR_RETURN(HandleFlush(node, in_header, &flush_in));
         break;
       }
+      case FUSE_READ:
+      case FUSE_WRITE:
+        OK_OR_RETURN(WriteDataFreeResponse(in_header, -ENOTSUP));
+        break;
       case FUSE_RELEASEDIR:
       case FUSE_RELEASE: {
         struct fuse_release_in release_in = {};
@@ -1945,4 +1949,18 @@ TEST_F(FuseServerTest, InvalidateMountDir) {
 
   ASSERT_EQ(umount2(child_mount_dir.c_str(), MNT_DETACH), -1);
   EXPECT_EQ(errno, EINVAL);
+}
+
+TEST_F(FuseServerTest, ReadDir) {
+  std::shared_ptr<FuseServer> parent_server(new FuseServer());
+  std::shared_ptr<Directory> mount_dir = parent_server->fs().AddDirAtRoot("dir");
+  ASSERT_TRUE(mount_dir);
+  ASSERT_TRUE(Mount(parent_server));
+  const std::string dir_path = GetMountDir() + "/dir";
+
+  fbl::unique_fd fd(open(dir_path.c_str(), O_RDONLY));
+  ASSERT_TRUE(fd.is_valid());
+  char buf[4096];
+  ASSERT_EQ(read(fd.get(), buf, 4096), -1);
+  ASSERT_EQ(errno, EISDIR);
 }
