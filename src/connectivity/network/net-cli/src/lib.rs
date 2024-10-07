@@ -466,9 +466,6 @@ async fn do_if<C: NetCliDepsConnector>(
                     })
                     .context("get configuration")?;
 
-                let _: usize = out.stderr().write(
-                    b"DEPRECATION WARNING: if igmp get will soon be replaced by if config get",
-                )?;
                 out.line(format!("IGMP configuration on interface {}:", id))?;
                 out.line(format!(
                     "    Version: {:?}",
@@ -498,9 +495,6 @@ async fn do_if<C: NetCliDepsConnector>(
                     })
                     .context("set configuration")?;
 
-                let _: usize = out.stderr().write(
-                    b"DEPRECATION WARNING: if igmp set will soon be replaced by if config set",
-                )?;
                 info!(
                     "IGMP version set to {:?} on interface {}; previously set to {:?}",
                     version,
@@ -524,9 +518,6 @@ async fn do_if<C: NetCliDepsConnector>(
                     })
                     .context("get configuration")?;
 
-                let _: usize = out.stderr().write(
-                    b"DEPRECATION WARNING: if mld get will soon be replaced by if config get",
-                )?;
                 out.line(format!("MLD configuration on interface {}:", id))?;
                 out.line(format!(
                     "    Version: {:?}",
@@ -556,9 +547,6 @@ async fn do_if<C: NetCliDepsConnector>(
                     })
                     .context("set configuration")?;
 
-                let _: usize = out.stderr().write(
-                    b"DEPRECATION WARNING: if mld set will soon be replaced by if config set",
-                )?;
                 info!(
                     "MLD version set to {:?} on interface {}; previously set to {:?}",
                     version,
@@ -582,9 +570,6 @@ async fn do_if<C: NetCliDepsConnector>(
                     })
                     .context("get configuration")?;
 
-                let _: usize = out.stderr().write(
-                    b"DEPRECATION WARNING: if ip-forward get will soon be replaced by if config get",
-                )?;
                 out.line(format!(
                     "IP forwarding for {:?} is {} on interface {}",
                     ip_version,
@@ -606,9 +591,6 @@ async fn do_if<C: NetCliDepsConnector>(
                         })
                     })
                     .context("set configuration")?;
-                let _: usize = out.stderr().write(
-                    b"DEPRECATION WARNING: if ip-forward set will soon be replaced by if config set",
-                )?;
                 info!(
                     "IP forwarding for {:?} set to {} on interface {}; previously set to {}",
                     ip_version,
