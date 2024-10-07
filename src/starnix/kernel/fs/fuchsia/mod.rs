@@ -10,7 +10,8 @@ use starnix_uapi::open_flags::OpenFlags;
 
 mod remote;
 mod remote_bundle;
-mod remote_unix_domain_socket;
+#[cfg(not(feature = "starnix_lite"))]
+qmod remote_unix_domain_socket;
 mod syslog;
 mod timer;
 
@@ -19,6 +20,7 @@ pub mod zxio;
 
 pub use remote::*;
 pub use remote_bundle::RemoteBundle;
+#[cfg(not(feature = "starnix_lite"))]
 pub use remote_unix_domain_socket::*;
 pub use syslog::*;
 pub use timer::*;
