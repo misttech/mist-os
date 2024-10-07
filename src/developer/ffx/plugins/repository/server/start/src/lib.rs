@@ -44,10 +44,10 @@ pub enum CommandStatus {
 #[derive(FfxTool)]
 pub struct ServerStartTool {
     #[command]
-    cmd: StartCommand,
+    pub cmd: StartCommand,
     #[with(daemon_protocol())]
-    repos: ffx::RepositoryRegistryProxy,
-    context: EnvironmentContext,
+    pub repos: ffx::RepositoryRegistryProxy,
+    pub context: EnvironmentContext,
     pub target_proxy_connector: Connector<TargetProxy>,
     pub rcs_proxy_connector: Connector<RemoteControlProxy>,
 }
