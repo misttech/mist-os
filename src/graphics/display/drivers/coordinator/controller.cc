@@ -913,31 +913,28 @@ void Controller::PrepareStop() {
   for (auto& client : clients_) {
     client->CloseOnControllerLoop();
   }
-}
 
-void Controller::Stop() {
   vsync_monitor_.Deinitialize();
 
   // Set an empty config so that the display driver releases resources.
   display_config_t empty_config;
-  {
-    fbl::AutoLock lock(mtx());
-    ++controller_stamp_;
-    const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(controller_stamp_);
-    engine_driver_client_->ApplyConfiguration(&empty_config, 0, &banjo_config_stamp);
+  ++controller_stamp_;
+  const config_stamp_t banjo_config_stamp = ToBanjoConfigStamp(controller_stamp_);
+  engine_driver_client_->ApplyConfiguration(&empty_config, 0, &banjo_config_stamp);
 
-    // It's possible that the Vsync with the null configuration is never
-    // triggered when drivers are shut down. We should proactively retire
-    // all images on all displays.
-    for (DisplayInfo& display : displays_) {
-      while (fbl::RefPtr<Image> image = display.images.pop_front()) {
-        AssertMtxAliasHeld(*image->mtx());
-        image->StartRetire();
-        image->OnRetire();
-      }
+  // It's possible that the Vsync with the null configuration is never
+  // triggered when drivers are shut down. We should proactively retire
+  // all images on all displays.
+  for (DisplayInfo& display : displays_) {
+    while (fbl::RefPtr<Image> image = display.images.pop_front()) {
+      AssertMtxAliasHeld(*image->mtx());
+      image->StartRetire();
+      image->OnRetire();
     }
   }
 }
+
+void Controller::Stop() { FDF_LOG(INFO, "Controller::Stop"); }
 
 Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
                        fdf::UnownedSynchronizedDispatcher dispatcher)
