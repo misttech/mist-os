@@ -2978,10 +2978,16 @@ impl ResourceAccessor for RemoteResourceAccessor {
     ) -> Result<FdNumber, Errno> {
         profile_duration!("RemoteAddFile");
         let flags: fbinder::FileFlags = file.flags().into();
-        let handle = file.to_handle(current_task)?;
+        let handle1 = file.to_handle(current_task)?;
+        let handle2 = file.to_handle(current_task)?;
         let response = self.run_file_request(fbinder::FileRequest {
+            add_requests: Some(vec![fbinder::FileHandle {
+                file: handle1,
+                flags: Some(flags),
+                ..fbinder::FileHandle::default()
+            }]),
             add_requests2: Some(vec![fbinder::FileHandle {
-                file: handle,
+                file: handle2,
                 flags: Some(flags),
                 ..fbinder::FileHandle::default()
             }]),
@@ -8150,12 +8156,6 @@ pub mod tests {
                         }
                     }
                     for file in payload.add_requests.unwrap_or(vec![]) {
-                        let fd = next_fd;
-                        next_fd += 1;
-                        fds.insert(fd, file);
-                        response.add_responses.get_or_insert_with(Vec::new).push(fd);
-                    }
-                    for file in payload.add_requests2.unwrap_or(vec![]) {
                         let fd = next_fd;
                         next_fd += 1;
                         fds.insert(fd, file);
