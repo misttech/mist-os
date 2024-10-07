@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 
 use anyhow::{bail, Context};
+use chrono::NaiveDate;
 use itertools::Itertools;
 use serde::de::{Error, Unexpected};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::array::TryFromSliceError;
 use std::collections::BTreeMap;
 use std::fmt;
-use tracing::warn;
+use tracing::error;
 
 const VERSION_HISTORY_SCHEMA_ID: &str = "https://fuchsia.dev/schema/version_history.json";
 const VERSION_HISTORY_NAME: &str = "Platform version map";
@@ -106,7 +107,7 @@ pub struct AbiRevision(u64);
 /// from a raw ABI revision just based on the 64-bit number itself.
 ///
 /// See //build/sdk/generate_version_history for the code that generates special
-/// ABI revisions.
+/// ABI revisions, and the precise definitions of the fields below.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum AbiRevisionExplanation {
     /// This is a normal ABI revision, selected randomly. It should correspond
@@ -115,17 +116,23 @@ pub enum AbiRevisionExplanation {
 
     /// This is an unstable ABI revision targeted by platform components.
     Platform {
-        /// Prefix of the `integration.git` revision at which the package was
-        /// built.
-        git_revision: u64,
+        /// Approximate date of the `integration.git` revision at which the
+        /// package was built.
+        date: chrono::NaiveDate,
+        /// Prefix of an `integration.git` revision from around the same time
+        /// that the package was built.
+        git_revision: u16,
     },
 
     /// This is an unstable ABI revision targeted by components built with the
     /// SDK. This corresponds to API levels like `NEXT` and `HEAD`.
     Unstable {
-        /// Prefix of the `integration.git` revision at which the SDK that built
-        /// this package was built.
-        git_revision: u64,
+        /// Approximate date of the `integration.git` revision from which the
+        /// SDK that built the package was built.
+        date: chrono::NaiveDate,
+        /// Prefix of an `integration.git` revision from around the same time
+        /// that the SDK that built the package was built.
+        git_revision: u16,
     },
 
     /// This ABI revision is exactly AbiRevision::INVALID, which is 2^64-1.
@@ -133,7 +140,7 @@ pub enum AbiRevisionExplanation {
 
     /// This is a special ABI revision with an unknown meaning. Presumably it
     /// was introduced sometime after this code was compiled.
-    Unknown,
+    Malformed,
 }
 
 impl AbiRevision {
@@ -167,26 +174,41 @@ impl AbiRevision {
         const UNSTABLE_ABI_REVISION_PREFIX: u64 = 0xFF00;
         const PLATFORM_ABI_REVISION_PREFIX: u64 = 0xFF01;
 
-        // The lower 48 bits of an unstable or platform ABI revision are a
-        // prefix of the `integration.git` hash.
-        const GIT_HASH_MASK: u64 = 0x0000_FFFF_FFFF_FFFF;
+        // Extract the date from an unstable or platform ABI revision.
+        let get_date = || {
+            // The lower 32 bits of an unstable or platform ABI revision encode
+            // the date.
+            const DATE_MASK: u64 = 0x0000_0000_FFFF_FFFF;
+            let date_ordinal = (self.as_u64() & DATE_MASK) as i32;
+            chrono::NaiveDate::from_num_days_from_ce_opt(date_ordinal).unwrap_or_default()
+        };
+
+        // Extract the Git revision prefix from an unstable or platform ABI
+        // revision.
+        let get_git_revision = || {
+            // The second most significant 16 bits are a prefix of the
+            // `integration.git` hash.
+            const GIT_HASH_MASK: u64 = 0x0000_FFFF_0000_0000;
+            ((self.as_u64() & GIT_HASH_MASK) >> 32) as u16
+        };
 
         if self.as_u64() >> 56 != SPECIAL_ABI_REVISION_PREFIX {
             AbiRevisionExplanation::Normal
         } else if self.as_u64() >> 48 == UNSTABLE_ABI_REVISION_PREFIX {
-            AbiRevisionExplanation::Unstable { git_revision: self.as_u64() & GIT_HASH_MASK }
+            AbiRevisionExplanation::Unstable { date: get_date(), git_revision: get_git_revision() }
         } else if self.as_u64() >> 48 == PLATFORM_ABI_REVISION_PREFIX {
-            AbiRevisionExplanation::Platform { git_revision: self.as_u64() & GIT_HASH_MASK }
+            AbiRevisionExplanation::Platform { date: get_date(), git_revision: get_git_revision() }
         } else if self == AbiRevision::INVALID {
             AbiRevisionExplanation::Invalid
         } else {
-            AbiRevisionExplanation::Unknown
+            AbiRevisionExplanation::Malformed
         }
     }
 }
 
 impl fmt::Display for AbiRevision {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // TODO(https://fxbug.dev/370727480): Pad to 16 digits and add 0x prefix.
         write!(f, "{:x}", self.0)
     }
 }
@@ -265,9 +287,9 @@ pub struct Version {
 }
 
 impl Version {
-    /// Returns true if this version is supported - that is, whether components
+    /// Returns true if this version is runnable - that is, whether components
     /// targeting this version will be able to run on this device.
-    fn is_supported(&self) -> bool {
+    fn is_runnable(&self) -> bool {
         match self.status {
             Status::InDevelopment | Status::Supported => true,
             Status::Unsupported => false,
@@ -330,7 +352,7 @@ impl VersionHistory {
     /// TODO: https://fxbug.dev/326096999 - Remove this, or turn it into
     /// something that makes more sense.
     pub fn get_misleading_version_for_ffx(&self) -> Version {
-        self.supported_versions()
+        self.runnable_versions()
             .filter(|v| {
                 v.api_level != ApiLevel::NEXT
                     && v.api_level != ApiLevel::HEAD
@@ -345,7 +367,7 @@ impl VersionHistory {
     /// care which. The returned [Version] will be consistent within a given
     /// build, but may change from build to build.
     pub fn get_example_supported_version_for_tests(&self) -> Version {
-        self.supported_versions().last().unwrap()
+        self.runnable_versions().last().unwrap()
     }
 
     /// Check whether the platform supports building components that target the
@@ -358,16 +380,16 @@ impl VersionHistory {
         let Some(version) = self.version_from_api_level(api_level) else {
             return Err(ApiLevelError::Unknown {
                 api_level,
-                supported: self.supported_versions().map(|v| v.api_level).collect(),
+                supported: self.runnable_versions().map(|v| v.api_level).collect(),
             });
         };
 
-        if version.is_supported() {
+        if version.is_runnable() {
             Ok(version.abi_revision)
         } else {
             Err(ApiLevelError::Unsupported {
                 version,
-                supported: self.supported_versions().map(|v| v.api_level).collect(),
+                supported: self.runnable_versions().map(|v| v.api_level).collect(),
             })
         }
     }
@@ -379,57 +401,67 @@ impl VersionHistory {
         abi_revision: AbiRevision,
     ) -> Result<(), AbiRevisionError> {
         if let Some(version) = self.version_from_abi_revision(abi_revision) {
-            if version.is_supported() {
+            if version.is_runnable() {
                 Ok(())
             } else {
-                Err(AbiRevisionError::Unsupported {
+                Err(AbiRevisionError::Retired {
                     version,
-                    supported_versions: self.supported_versions().collect(),
+                    supported_versions: self.supported_versions(),
                 })
             }
         } else {
             // We don't recognize this ABI revision... Look at its structure to
             // understand what's going on.
             match abi_revision.explanation() {
-                AbiRevisionExplanation::Platform { .. } => {
-                    // TODO(https://fxbug.dev/347724655): Make this an error.
-                    warn!(
-                        "Unsupported platform ABI revision: 0x{}.
-This will become an error soon! See https://fxbug.dev/347724655",
-                        abi_revision
-                    );
-                    Ok(())
-                }
-                AbiRevisionExplanation::Unstable { .. } => {
-                    // TODO(https://fxbug.dev/347724655): Make this an error.
-                    warn!(
-                        "Unsupported unstable ABI revision: 0x{}.
-This will become an error soon! See https://fxbug.dev/347724655",
-                        abi_revision
-                    );
-                    Ok(())
-                }
-                AbiRevisionExplanation::Unknown => {
-                    // TODO(https://fxbug.dev/347724655): Make this an error.
-                    warn!(
-                        "Unrecognized ABI revision format: 0x{}.
-This will become an error soon! See https://fxbug.dev/347724655",
-                        abi_revision
-                    );
-                    Ok(())
-                }
-                AbiRevisionExplanation::Normal | AbiRevisionExplanation::Invalid => {
-                    Err(AbiRevisionError::Unknown {
+                AbiRevisionExplanation::Platform { date, git_revision } => {
+                    let (platform_date, platform_commit_hash) = self.platform_abi_info();
+                    Err(AbiRevisionError::PlatformMismatch {
                         abi_revision,
-                        supported_versions: self.supported_versions().collect(),
+                        package_date: date,
+                        package_commit_hash: git_revision,
+                        platform_date,
+                        platform_commit_hash,
                     })
                 }
+                AbiRevisionExplanation::Unstable { date, git_revision } => {
+                    let (platform_date, platform_commit_hash) = self.platform_abi_info();
+                    Err(AbiRevisionError::UnstableMismatch {
+                        abi_revision,
+                        package_sdk_date: date,
+                        package_sdk_commit_hash: git_revision,
+                        platform_date,
+                        platform_commit_hash,
+                        supported_versions: self.supported_versions(),
+                    })
+                }
+                AbiRevisionExplanation::Malformed => {
+                    Err(AbiRevisionError::Malformed { abi_revision })
+                }
+                AbiRevisionExplanation::Invalid => Err(AbiRevisionError::Invalid),
+                AbiRevisionExplanation::Normal => Err(AbiRevisionError::TooNew {
+                    abi_revision,
+                    supported_versions: self.supported_versions(),
+                }),
             }
         }
     }
 
-    fn supported_versions(&self) -> impl Iterator<Item = Version> + '_ {
-        self.versions.iter().filter(|v| v.is_supported()).cloned()
+    fn runnable_versions(&self) -> impl Iterator<Item = Version> + '_ {
+        self.versions.iter().filter(|v| v.is_runnable()).cloned()
+    }
+
+    fn supported_versions(&self) -> VersionVec {
+        VersionVec(
+            self.versions
+                .iter()
+                .filter(|v| match v.status {
+                    Status::InDevelopment => false,
+                    Status::Supported => true,
+                    Status::Unsupported => false,
+                })
+                .cloned()
+                .collect(),
+        )
     }
 
     fn version_from_abi_revision(&self, abi_revision: AbiRevision) -> Option<Version> {
@@ -439,50 +471,81 @@ This will become an error soon! See https://fxbug.dev/347724655",
     pub fn version_from_api_level(&self, api_level: ApiLevel) -> Option<Version> {
         self.versions.iter().find(|v| v.api_level == api_level).cloned()
     }
-}
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum AbiRevisionError {
-    /// A component tried to run, but its ABI revision was not recognized.
-    Unknown { abi_revision: AbiRevision, supported_versions: Vec<Version> },
-
-    /// A component tried to run, but the ABI revision it presented is not
-    /// supported by this system.
-    Unsupported { version: Version, supported_versions: Vec<Version> },
-}
-
-impl std::error::Error for AbiRevisionError {}
-
-impl std::fmt::Display for AbiRevisionError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let write_supported_versions =
-            |f: &mut std::fmt::Formatter<'_>, supported_versions: &[Version]| -> std::fmt::Result {
-                write!(f, "The following API levels are supported:")?;
-
-                for version in supported_versions.iter() {
-                    write!(f, "\n└── {} (0x{})", version.api_level, version.abi_revision)?;
-                }
-                Ok(())
-            };
-
-        match self {
-            AbiRevisionError::Unknown { abi_revision, supported_versions } => {
-                write!(
-                    f,
-                    "Unknown target ABI revision: 0x{}. Is the OS too old to support it? ",
-                    abi_revision
-                )?;
-                write_supported_versions(f, supported_versions)
-            }
-            AbiRevisionError::Unsupported { version, supported_versions } => {
-                write!(
-                    f,
-                    "API level {} (0x{}) is no longer supported. ",
-                    version.api_level, version.abi_revision
-                )?;
-                write_supported_versions(f, supported_versions)
+    fn platform_abi_info(&self) -> (NaiveDate, u16) {
+        if let Some(platform_version) = self.version_from_api_level(ApiLevel::PLATFORM) {
+            if let AbiRevisionExplanation::Platform { date, git_revision } =
+                platform_version.abi_revision.explanation()
+            {
+                return (date, git_revision);
             }
         }
+        error!(
+            "No PLATFORM API level found. This should never happen.
+Returning bogus data instead of panicking."
+        );
+        (NaiveDate::default(), 0)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum AbiRevisionError {
+    #[error(
+        "Unknown platform ABI revision: 0x{abi_revision}.
+Found platform component from {package_date} (Git hash {package_commit_hash:x}).
+Platform components must be from {platform_date} (Git hash {platform_commit_hash:x})"
+    )]
+    PlatformMismatch {
+        abi_revision: AbiRevision,
+        package_date: NaiveDate,
+        package_commit_hash: u16,
+        platform_date: NaiveDate,
+        platform_commit_hash: u16,
+    },
+    #[error(
+        "Unknown NEXT or HEAD ABI revision: 0x{abi_revision}.
+SDK is from {package_sdk_date} (Git hash {package_sdk_commit_hash:x}).
+Expected {platform_date} (Git hash {platform_commit_hash:x})
+The following API levels are stable and supported:{supported_versions}"
+    )]
+    UnstableMismatch {
+        abi_revision: AbiRevision,
+        package_sdk_date: NaiveDate,
+        package_sdk_commit_hash: u16,
+        platform_date: NaiveDate,
+        platform_commit_hash: u16,
+        supported_versions: VersionVec,
+    },
+
+    #[error(
+        "Unknown ABI revision 0x{abi_revision}. It was probably created after
+this platform or tool was built. The following API levels are stable and
+supported:{supported_versions}"
+    )]
+    TooNew { abi_revision: AbiRevision, supported_versions: VersionVec },
+
+    #[error("Retired API level {} (0x{}) cannot run.
+The following API levels are stable and supported:{supported_versions}",
+        .version.api_level, .version.abi_revision)]
+    Retired { version: Version, supported_versions: VersionVec },
+
+    #[error("Invalid ABI revision 0x{}.", AbiRevision::INVALID)]
+    Invalid,
+
+    #[error("ABI revision 0x{abi_revision} has an unrecognized format.")]
+    Malformed { abi_revision: AbiRevision },
+}
+
+/// Wrapper for a vector of Versions with a nice implementation of Display.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VersionVec(pub Vec<Version>);
+
+impl std::fmt::Display for VersionVec {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for version in self.0.iter() {
+            write!(f, "\n└── {} (0x{})", version.api_level, version.abi_revision)?;
+        }
+        Ok(())
     }
 }
 
@@ -845,21 +908,21 @@ mod tests {
             Version {
                 api_level: ApiLevel::from_u32(7),
                 abi_revision: AbiRevision::from_u64(0x58ea445e942a0007),
-                status: Status::InDevelopment,
+                status: Status::Supported,
             },
             Version {
                 api_level: ApiLevel::NEXT,
-                abi_revision: AbiRevision::from_u64(0xFF00_1234_abcd_9875),
+                abi_revision: AbiRevision::from_u64(0xFF00_8C4D_000B_4751),
                 status: Status::InDevelopment,
             },
             Version {
                 api_level: ApiLevel::HEAD,
-                abi_revision: AbiRevision::from_u64(0xFF00_1234_abcd_9876),
+                abi_revision: AbiRevision::from_u64(0xFF00_8C4D_000B_4751),
                 status: Status::InDevelopment,
             },
             Version {
                 api_level: ApiLevel::PLATFORM,
-                abi_revision: AbiRevision::from_u64(0xFF01_1234_abcd_9876),
+                abi_revision: AbiRevision::from_u64(0xFF01_8C4D_000B_4751),
                 status: Status::InDevelopment,
             },
         ],
@@ -867,25 +930,57 @@ mod tests {
 
     #[test]
     fn test_check_abi_revision() {
-        let supported_versions: Vec<Version> =
-            FAKE_VERSION_HISTORY.versions[1..].iter().cloned().collect();
+        let supported_versions =
+            VersionVec(FAKE_VERSION_HISTORY.versions[1..4].iter().cloned().collect());
+
+        assert_eq!(
+            FAKE_VERSION_HISTORY.check_abi_revision_for_runtime(0xFF01_ABCD_000B_2224.into()),
+            Err(AbiRevisionError::PlatformMismatch {
+                abi_revision: 0xFF01_ABCD_000B_2224.into(),
+                package_date: NaiveDate::from_ymd_opt(1998, 9, 4).unwrap(),
+                package_commit_hash: 0xABCD,
+                platform_date: NaiveDate::from_ymd_opt(2024, 9, 24).unwrap(),
+                platform_commit_hash: 0x8C4D,
+            })
+        );
+
+        assert_eq!(
+            FAKE_VERSION_HISTORY.check_abi_revision_for_runtime(0xFF00_ABCD_000B_2224.into()),
+            Err(AbiRevisionError::UnstableMismatch {
+                abi_revision: 0xFF00_ABCD_000B_2224.into(),
+                package_sdk_date: NaiveDate::from_ymd_opt(1998, 9, 4).unwrap(),
+                package_sdk_commit_hash: 0xABCD,
+                platform_date: NaiveDate::from_ymd_opt(2024, 9, 24).unwrap(),
+                platform_commit_hash: 0x8C4D,
+                supported_versions: supported_versions.clone()
+            })
+        );
 
         assert_eq!(
             FAKE_VERSION_HISTORY.check_abi_revision_for_runtime(0x1234.into()),
-            Err(AbiRevisionError::Unknown {
+            Err(AbiRevisionError::TooNew {
                 abi_revision: 0x1234.into(),
-
                 supported_versions: supported_versions.clone()
             })
         );
 
         assert_eq!(
             FAKE_VERSION_HISTORY.check_abi_revision_for_runtime(0x58ea445e942a0004.into()),
-            Err(AbiRevisionError::Unsupported {
+            Err(AbiRevisionError::Retired {
                 version: FAKE_VERSION_HISTORY.versions[0].clone(),
 
                 supported_versions: supported_versions.clone()
             })
+        );
+
+        assert_eq!(
+            FAKE_VERSION_HISTORY.check_abi_revision_for_runtime(AbiRevision::INVALID),
+            Err(AbiRevisionError::Invalid)
+        );
+
+        assert_eq!(
+            FAKE_VERSION_HISTORY.check_abi_revision_for_runtime(0xFF02_0000_0000_0000.into()),
+            Err(AbiRevisionError::Malformed { abi_revision: 0xFF02_0000_0000_0000.into() })
         );
 
         FAKE_VERSION_HISTORY
@@ -898,35 +993,77 @@ mod tests {
 
     #[test]
     fn test_pretty_print_abi_error() {
-        let supported_versions: Vec<Version> =
-            FAKE_VERSION_HISTORY.versions[1..].iter().cloned().collect();
+        let supported_versions =
+            VersionVec(FAKE_VERSION_HISTORY.versions[1..4].iter().cloned().collect());
 
         assert_eq!(
-                AbiRevisionError::Unknown {
-                    abi_revision: 0x1234.into(),
-                    supported_versions: supported_versions.clone()
-                }.to_string(),
-                "Unknown target ABI revision: 0x1234. Is the OS too old to support it? The following API levels are supported:
-└── 5 (0x58ea445e942a0005)
-└── 6 (0x58ea445e942a0006)
-└── 7 (0x58ea445e942a0007)
-└── NEXT (0xff001234abcd9875)
-└── HEAD (0xff001234abcd9876)
-└── PLATFORM (0xff011234abcd9876)"
-            );
+            AbiRevisionError::PlatformMismatch {
+                abi_revision: 0xFF01_ABCD_000B_2224.into(),
+                package_date: NaiveDate::from_ymd_opt(1998, 9, 4).unwrap(),
+                package_commit_hash: 0xABCD,
+                platform_date: NaiveDate::from_ymd_opt(2024, 9, 24).unwrap(),
+                platform_commit_hash: 0x8C4D,
+            }
+            .to_string(),
+            "Unknown platform ABI revision: 0xff01abcd000b2224.
+Found platform component from 1998-09-04 (Git hash abcd).
+Platform components must be from 2024-09-24 (Git hash 8c4d)"
+        );
+
         assert_eq!(
-                AbiRevisionError::Unsupported {
-                    version: FAKE_VERSION_HISTORY.versions[0].clone(),
-                    supported_versions: supported_versions.clone()
-                }.to_string(),
-                "API level 4 (0x58ea445e942a0004) is no longer supported. The following API levels are supported:
+            AbiRevisionError::UnstableMismatch {
+                abi_revision: 0xFF00_ABCD_000B_2224.into(),
+                package_sdk_date: NaiveDate::from_ymd_opt(1998, 9, 4).unwrap(),
+                package_sdk_commit_hash: 0xABCD,
+                platform_date: NaiveDate::from_ymd_opt(2024, 9, 24).unwrap(),
+                platform_commit_hash: 0x8C4D,
+                supported_versions: supported_versions.clone()
+            }
+            .to_string(),
+            "Unknown NEXT or HEAD ABI revision: 0xff00abcd000b2224.
+SDK is from 1998-09-04 (Git hash abcd).
+Expected 2024-09-24 (Git hash 8c4d)
+The following API levels are stable and supported:
 └── 5 (0x58ea445e942a0005)
 └── 6 (0x58ea445e942a0006)
-└── 7 (0x58ea445e942a0007)
-└── NEXT (0xff001234abcd9875)
-└── HEAD (0xff001234abcd9876)
-└── PLATFORM (0xff011234abcd9876)"
-            );
+└── 7 (0x58ea445e942a0007)"
+        );
+
+        assert_eq!(
+            AbiRevisionError::TooNew {
+                abi_revision: 0x1234.into(),
+                supported_versions: supported_versions.clone()
+            }
+            .to_string(),
+            "Unknown ABI revision 0x1234. It was probably created after
+this platform or tool was built. The following API levels are stable and
+supported:
+└── 5 (0x58ea445e942a0005)
+└── 6 (0x58ea445e942a0006)
+└── 7 (0x58ea445e942a0007)"
+        );
+        assert_eq!(
+            AbiRevisionError::Retired {
+                version: FAKE_VERSION_HISTORY.versions[0].clone(),
+                supported_versions: supported_versions.clone()
+            }
+            .to_string(),
+            "Retired API level 4 (0x58ea445e942a0004) cannot run.
+The following API levels are stable and supported:
+└── 5 (0x58ea445e942a0005)
+└── 6 (0x58ea445e942a0006)
+└── 7 (0x58ea445e942a0007)"
+        );
+
+        assert_eq!(
+            AbiRevisionError::Invalid.to_string(),
+            "Invalid ABI revision 0xffffffffffffffff."
+        );
+
+        assert_eq!(
+            AbiRevisionError::Malformed { abi_revision: 0xFF02_0000_0000_0000.into() }.to_string(),
+            "ABI revision 0xff02000000000000 has an unrecognized format."
+        );
     }
 
     #[test]
@@ -978,15 +1115,15 @@ The following API levels are supported: 5, 6, 7, NEXT, HEAD, PLATFORM"
         );
         assert_eq!(
             FAKE_VERSION_HISTORY.check_api_level_for_build(ApiLevel::NEXT),
-            Ok(0xff001234abcd9875.into())
+            Ok(0xFF00_8C4D_000B_4751.into())
         );
         assert_eq!(
             FAKE_VERSION_HISTORY.check_api_level_for_build(ApiLevel::HEAD),
-            Ok(0xff001234abcd9876.into())
+            Ok(0xFF00_8C4D_000B_4751.into())
         );
         assert_eq!(
             FAKE_VERSION_HISTORY.check_api_level_for_build(ApiLevel::PLATFORM),
-            Ok(0xff011234abcd9876.into())
+            Ok(0xFF01_8C4D_000B_4751.into())
         );
     }
 
@@ -994,7 +1131,7 @@ The following API levels are supported: 5, 6, 7, NEXT, HEAD, PLATFORM"
     fn test_various_getters() {
         assert_eq!(
             FAKE_VERSION_HISTORY.get_abi_revision_for_platform_components(),
-            0xff011234abcd9876.into()
+            0xFF01_8C4D_000B_4751.into()
         );
         assert_eq!(
             FAKE_VERSION_HISTORY.get_example_supported_version_for_tests(),
@@ -1016,14 +1153,36 @@ The following API levels are supported: 5, 6, 7, NEXT, HEAD, PLATFORM"
 
         assert_eq!(exp(0x1234_5678_9abc_deff), AbiRevisionExplanation::Normal);
         assert_eq!(
-            exp(0xFF01_dead_beef_eeee),
-            AbiRevisionExplanation::Platform { git_revision: 0xdead_beef_eeee }
+            exp(0xFF01_abcd_00ab_eeee),
+            AbiRevisionExplanation::Platform {
+                date: chrono::NaiveDate::from_num_days_from_ce_opt(0xab_eeee).unwrap(),
+                git_revision: 0xabcd
+            }
         );
         assert_eq!(
+            exp(0xFF00_1234_0012_3456),
+            AbiRevisionExplanation::Unstable {
+                date: chrono::NaiveDate::from_num_days_from_ce_opt(0x12_3456).unwrap(),
+                git_revision: 0x1234
+            }
+        );
+        // 0xabcd_9876 is too large a date for chrono. Make sure we return a
+        // null date, rather than crashing.
+        assert_eq!(
             exp(0xFF00_1234_abcd_9876),
-            AbiRevisionExplanation::Unstable { git_revision: 0x1234_abcd_9876 }
+            AbiRevisionExplanation::Unstable {
+                date: chrono::NaiveDate::default(),
+                git_revision: 0x1234
+            }
+        );
+        assert_eq!(
+            exp(0xFF01_1234_abcd_9876),
+            AbiRevisionExplanation::Platform {
+                date: chrono::NaiveDate::default(),
+                git_revision: 0x1234
+            }
         );
         assert_eq!(exp(0xFFFF_FFFF_FFFF_FFFF), AbiRevisionExplanation::Invalid);
-        assert_eq!(exp(0xFFFF_FFFF_FFFF_FFFE), AbiRevisionExplanation::Unknown);
+        assert_eq!(exp(0xFFFF_FFFF_FFFF_FFFE), AbiRevisionExplanation::Malformed);
     }
 }
