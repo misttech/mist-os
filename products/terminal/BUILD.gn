@@ -10,66 +10,100 @@ assert(
     is_fuchsia,
     "Product definitions and assemblies should only be defined in the fuchsia toolchain")
 
+# This is the base platform configuration used by terminal
+_platform_configuration_base = {
+  build_type = "eng"
+
+  bluetooth = {
+    type = "standard"
+    snoop = "lazy"
+  }
+
+  development_support = {
+    include_sl4f = true
+
+    # If the 'authorized_ssh_keys_path' GN arg has been set, then pass that path
+    # as part of the platform configuration.
+    if (authorized_ssh_keys_path != false) {
+      authorized_ssh_keys_path =
+          rebase_path(authorized_ssh_keys_path, root_build_dir)
+    }
+
+    tools = {
+      connectivity = {
+        enable_networking = true
+        enable_wlan = true
+        enable_thread = true
+      }
+    }
+  }
+
+  ui = {
+    enabled = true
+    supported_input_devices = [
+      "button",
+      "touchscreen",
+    ]
+    with_synthetic_device_support = true
+  }
+
+  media = {
+    audio = {
+      full_stack = {
+      }
+    }
+    enable_codecs = true
+    enable_sessions = true
+  }
+
+  fonts = {
+    # See base_packages below.
+    font_collection = "open-fonts-collection"
+  }
+
+  session = {
+    enabled = true
+
+    # avoid impacting existing terminal users like chromium tests
+    autolaunch = false
+  }
+
+  storage = {
+    mutable_storage_garbage_collection = true
+  }
+}
+
+_base_packages = [
+  {
+    # Provides font assets for `platform.fonts.font_collection` above.
+    package_target = "//src/fonts/asset_providers:open-fonts-collection.asset-provider.package"
+  },
+]
+
 product_assembly_configuration("terminal") {
   platform = {
-    build_type = "eng"
+    forward_variables_from(_platform_configuration_base, "*")
+  }
+  product = {
+    session_url =
+        "fuchsia-pkg://fuchsia.com/tiles-session#meta/tiles-session.cm"
+    build_info = default_product_build_info
+  }
 
-    bluetooth = {
-      type = "standard"
-      snoop = "lazy"
-    }
+  base_packages = _base_packages
+  deps = [ "//build/info:build_info_files" ]
+}
 
-    development_support = {
-      include_sl4f = true
+# TODO(https://fxbug.dev/370543906): Remove this product once it's no longer
+# needed.
+product_assembly_configuration("terminal_with_netstack2") {
+  platform = {
+    forward_variables_from(_platform_configuration_base, "*")
 
-      # If the 'authorized_ssh_keys_path' GN arg has been set, then pass that path
-      # as part of the platform configuration.
-      if (authorized_ssh_keys_path != false) {
-        authorized_ssh_keys_path =
-            rebase_path(authorized_ssh_keys_path, root_build_dir)
+    connectivity = {
+      network = {
+        netstack_version = "netstack2"
       }
-
-      tools = {
-        connectivity = {
-          enable_networking = true
-          enable_wlan = true
-          enable_thread = true
-        }
-      }
-    }
-
-    ui = {
-      enabled = true
-      supported_input_devices = [
-        "button",
-        "touchscreen",
-      ]
-      with_synthetic_device_support = true
-    }
-
-    media = {
-      audio = {
-        full_stack = {
-        }
-      }
-      enable_codecs = true
-      enable_sessions = true
-    }
-
-    fonts = {
-      # See base_packages below.
-      font_collection = "open-fonts-collection"
-    }
-
-    session = {
-      enabled = true
-
-      # avoid impacting existing terminal users like chromium tests
-      autolaunch = false
-    }
-
-    storage = {
-      mutable_storage_garbage_collection = true
     }
   }
   product = {
@@ -78,12 +112,6 @@ product_assembly_configuration("terminal") {
     build_info = default_product_build_info
   }
 
-  base_packages = [
-    {
-      # Provides font assets for `platform.fonts.font_collection` above.
-      package_target = "//src/fonts/asset_providers:open-fonts-collection.asset-provider.package"
-    },
-  ]
-
+  base_packages = _base_packages
   deps = [ "//build/info:build_info_files" ]
 }
