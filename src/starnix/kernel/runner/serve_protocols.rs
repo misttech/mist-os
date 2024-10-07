@@ -38,7 +38,7 @@ use {
 use {
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_io as fio,
     fidl_fuchsia_memory_attribution as fattribution,
-    fidl_fuchsia_starnix_container as fstarcontainer, fuchsia_zircon as zx,
+    fidl_fuchsia_starnix_container as fstarcontainer, zx,
 };
 
 use super::start_component;

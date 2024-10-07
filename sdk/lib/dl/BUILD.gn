@@ -11,7 +11,7 @@ source_set("runtime") {
     "//src/lib/elfldltl",
     "//zircon/system/ulib/fbl",
   ]
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     public_deps += [ "//zircon/system/ulib/zx" ]
   }
 
@@ -22,7 +22,7 @@ source_set("runtime") {
     "runtime-module.h",
   ]
   deps = [ ":concat-view" ]
-  if (is_fuchsia) {
+  if (is_fuchsia || is_mistos) {
     sources += [ "unmap-zircon.cc" ]
   } else {
     sources += [ "unmap-posix.cc" ]

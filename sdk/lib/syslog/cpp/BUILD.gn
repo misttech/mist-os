@@ -8,7 +8,7 @@ import("//build/cpp/sdk_source_set.gni")
 import("//build/cpp/sdk_static_library.gni")
 import("//build/test.gni")
 
-if (is_fuchsia) {
+if (is_fuchsia || is_mistos) {
   target_type = "sdk_source_set"
 } else {
   # Don't ship the host logging library in the SDK.

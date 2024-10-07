@@ -305,6 +305,7 @@ rustc_library("starnix_core") {
       "device/framebuffer.rs",
       "device/framebuffer_server.rs",
       "device/remote_binder.rs",
+      "fs/fuchsia/remote_unix_domain_socket.rs",
       "vfs/socket/socket_generic_netlink/nl80211.rs",
     ]
   }
@@ -448,11 +449,11 @@ rustc_library("starnix_core") {
       "//sdk/fidl/fuchsia.posix:fuchsia.posix_rust",
       "//sdk/fidl/fuchsia.recovery:fuchsia.recovery_rust",
       "//sdk/fidl/fuchsia.starnix.binder:fuchsia.starnix.binder_rust",
-      "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_rust",
       "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_rust",
       "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
       "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_rust",
       "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
+      "//sdk/fidl/fuchsia.unknown:fuchsia.unknown_rust",
       "//src/connectivity/wlan/wlanix:fuchsia.wlan.wlanix_rust",
       "//src/graphics/lib/magma/src/libmagma",
       "//src/lib/fuchsia-fs",
