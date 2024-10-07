@@ -753,6 +753,63 @@ function track-feature-status {
   _add-to-analytics-batch "feature" "${event_params}"
 }
 
+function track-build-event {
+  exec 1>/dev/null
+  exec 2>/dev/null
+  local start_time="$1"
+  local end_time="$2"
+  local exit_status="$3"
+  local ninja_switches="$4"
+  local switches="$5"
+  local fuchsia_targets="$6"
+  local build_dir="$7"
+
+  local args_gn=""
+
+  metrics-read-config
+  if [[ "${METRICS_LEVEL}" -eq 0 ]]; then
+    return 0
+  fi
+
+  if [[ "${METRICS_LEVEL}" -eq 2 ]]; then
+    switches="$(metrics-sanitize-string "${switches}")"
+    ninja_switches="$(metrics-sanitize-string "${ninja_switches}")"
+    fuchsia_targets="$(metrics-sanitize-string "${fuchsia_targets}")"
+
+    args_gn="$(grep -E 'build_info_board|build_info_product|rbe_mode|is_debug|optimize|select_variant' "${build_dir}"/args.gn | paste -sd ';' -)"
+    args_gn="${args_gn//[[:blank:]]/}" # remove blanks
+  else
+    switches=""
+    ninja_switches=""
+    fuchsia_targets=""
+    args_gn=""
+  fi
+
+  switches="${switches:0:100}"
+  ninja_switches="${ninja_switches:0:100}"
+  fuchsia_targets="${fuchsia_targets:0:100}"
+
+  local args_gn1="${args_gn:0:100}"
+  local args_gn2="${args_gn:100:100}"
+
+  event_params=$(fx-command-run jq -c -n \
+    --arg args_gn1 "${args_gn1}" \
+    --arg args_gn2 "${args_gn2}" \
+    --arg switches "${switches}" \
+    --arg ninja_switches "${ninja_switches}" \
+    --arg fuchsia_targets "${fuchsia_targets}" \
+    --arg exit_status "${exit_status}" \
+    --argjson start_time_micros "${start_time}" \
+    --argjson end_time_micros "${end_time}" \
+    '$ARGS.named')
+
+  _add-to-analytics-batch "build" "${event_params}"
+
+
+  # Send any remaining hits.
+  _send-analytics-batch
+  return 0
+}
 
 # Add an analytics hit with the given args to the batch of hits. This will trigger
 # sending a batch when the batch size limit is hit.
@@ -907,7 +964,9 @@ function _add-to-analytics-batch {
   fi
 
   local IFS=$'\n'
-  printf "$*\0" >&10
+  # printf will output \" as ". To avoid that, we use echo to send "$*"
+  echo "$*" >&10
+  printf "\0" >&10
 }
 
 # Calls __send-analytics-batch asynchronously, via metrics service
