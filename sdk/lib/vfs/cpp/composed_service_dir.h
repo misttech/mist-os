@@ -5,13 +5,14 @@
 #ifndef LIB_VFS_CPP_COMPOSED_SERVICE_DIR_H_
 #define LIB_VFS_CPP_COMPOSED_SERVICE_DIR_H_
 
+#include <fidl/fuchsia.io/cpp/markers.h>
 #include <fuchsia/io/cpp/fidl.h>
+#include <lib/fidl/cpp/client.h>
 #include <lib/vfs/cpp/node.h>
 #include <lib/vfs/cpp/service.h>
 #include <zircon/assert.h>
 
 #include <string>
-#include <string_view>
 
 namespace vfs {
 
@@ -29,10 +30,7 @@ class ComposedServiceDir final : public Node {
 
   // Sets the fallback directory for services. Services in this directory can be connected to, but
   // will not be enumerated. This method may only be called once.
-  //
-  // TODO(https://fxbug.dev/311176363): The name of this function doesn't comply with our style
-  // guide. Ideally the fallback directory should also be set when this object is constructed.
-  void set_fallback(fidl::InterfaceHandle<fuchsia::io::Directory> fallback_dir) {
+  void SetFallback(fidl::ClientEnd<fuchsia_io::Directory> fallback_dir) {
     ZX_ASSERT(vfs_internal_composed_svc_dir_set_fallback(
                   handle(), fallback_dir.TakeChannel().release()) == ZX_OK);
   }
@@ -44,16 +42,28 @@ class ComposedServiceDir final : public Node {
               ZX_OK);
   }
 
+  // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+  // Deprecated HLCPP Signatures
+  // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+  //
+  // TODO(https://fxbug.dev/336617685): Mark the following signatures as deprecated once all callers
+  // have migratred to the above LLCPP signatures.
+
+  // Sets the fallback directory for services. Services in this directory can be connected to, but
+  // will not be enumerated. This method may only be called once.
+  void set_fallback(fidl::InterfaceHandle<fuchsia::io::Directory> fallback_dir)
+      ZX_DEPRECATED_SINCE(1, 16, "Use SetFallback instead.") {
+    ZX_ASSERT(vfs_internal_composed_svc_dir_set_fallback(
+                  handle(), fallback_dir.TakeChannel().release()) == ZX_OK);
+  }
+
  private:
   static vfs_internal_node_t* MakeComposedServiceDir() {
     vfs_internal_node_t* dir;
     ZX_ASSERT(vfs_internal_composed_svc_dir_create(&dir) == ZX_OK);
     return dir;
   }
-
-} ZX_DEPRECATED_SINCE(
-    1, 16,
-    "Create and serve a custom outgoing directory with //sdk/lib/component or //sdk/lib/svc.");
+};
 
 }  // namespace vfs
 

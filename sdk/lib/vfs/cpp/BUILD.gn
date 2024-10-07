@@ -25,6 +25,7 @@ sdk_source_set("cpp") {
   ]
 
   public_deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
     "//sdk/lib/async",
     "//sdk/lib/fdio",
@@ -51,7 +52,8 @@ sdk_source_set("cpp") {
   # See https://fxbug.dev/311176363 for details.
   #
   # TODO(https://fxbug.dev/336617685): Relax this visibility list for public SDK usage once this
-  # library is compatible with the new C++ FIDL bindings, and has support for io2 rights.
+  # library has support for fuchsia.io/Flags (io2), and functions that use fuchsia.io/OpenFlags
+  # (io1) have been deprecated.
   visibility = [
     ":*",
     "//build/sdk:*",
@@ -85,6 +87,7 @@ test("vfs_cpp_unittests") {
     "//sdk/lib/fdio",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
+    "//src/testing/fidl:placeholders_cpp",
   ]
 }
 

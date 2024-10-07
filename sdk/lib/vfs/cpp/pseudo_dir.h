@@ -5,10 +5,9 @@
 #ifndef LIB_VFS_CPP_PSEUDO_DIR_H_
 #define LIB_VFS_CPP_PSEUDO_DIR_H_
 
-#include <fuchsia/io/cpp/fidl.h>
 #include <lib/vfs/cpp/node.h>
 #include <zircon/assert.h>
-#include <zircon/compiler.h>
+#include <zircon/status.h>
 
 #include <map>
 #include <memory>

@@ -5,6 +5,7 @@
 #ifndef LIB_VFS_CPP_NODE_H_
 #define LIB_VFS_CPP_NODE_H_
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
 #include <fuchsia/io/cpp/fidl.h>
 #include <lib/async/default.h>
 #include <lib/async/dispatcher.h>
@@ -41,7 +42,7 @@ class Node {
   // otherwise `ZX_ERR_INVALID_ARGS` will be returned.
   //
   // Not all node types support `Serve()` due to lifetime restrictions.
-  zx_status_t Serve(fuchsia::io::OpenFlags flags, zx::channel request,
+  zx_status_t Serve(fuchsia_io::OpenFlags flags, zx::channel request,
                     async_dispatcher_t* dispatcher = nullptr) {
     if (!dispatcher) {
       dispatcher = async_get_default_dispatcher();
@@ -60,6 +61,31 @@ class Node {
 
  private:
   vfs_internal_node_t* const handle_;
+
+ public:
+  // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+  // Deprecated HLCPP Signatures
+  // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+  //
+  // TODO(https://fxbug.dev/336617685): Mark the following signatures as deprecated once all callers
+  // have migratred to the above LLCPP signatures.
+
+  // Establishes a connection for `request` using the given `flags`. This method must only be used
+  // with a single-threaded asynchronous dispatcher. If `dispatcher` is `nullptr`, the current
+  // thread's default dispatcher will be used via `async_get_default_dispatcher`.
+  //
+  // The same `dispatcher` must be used if multiple connections are served for the same node,
+  // otherwise `ZX_ERR_INVALID_ARGS` will be returned.
+  //
+  // Not all node types support `Serve()` due to lifetime restrictions.
+  zx_status_t Serve(fuchsia::io::OpenFlags flags, zx::channel request,
+                    async_dispatcher_t* dispatcher = nullptr) {
+    if (!dispatcher) {
+      dispatcher = async_get_default_dispatcher();
+    }
+    return vfs_internal_node_serve(handle_, dispatcher, request.release(),
+                                   static_cast<uint32_t>(flags));
+  }
 };
 
 namespace internal {

@@ -5,7 +5,9 @@
 #ifndef LIB_VFS_CPP_REMOTE_DIR_H_
 #define LIB_VFS_CPP_REMOTE_DIR_H_
 
+#include <fidl/fuchsia.io/cpp/markers.h>
 #include <fuchsia/io/cpp/fidl.h>
+#include <lib/fidl/cpp/client.h>
 #include <lib/fidl/cpp/interface_handle.h>
 #include <lib/vfs/cpp/node.h>
 #include <lib/zx/channel.h>
@@ -28,11 +30,22 @@ class RemoteDir final : public Node {
   // must be compatible with the `fuchsia.io.Directory` protocol.
   explicit RemoteDir(zx::channel remote_dir) : Node(CreateRemoteDir(std::move(remote_dir))) {}
 
+  // Binds to a remotely hosted directory using the specified `directory`. The handle must be valid.
+  explicit RemoteDir(fidl::ClientEnd<fuchsia_io::Directory> directory)
+      : RemoteDir(directory.TakeChannel()) {}
+
+  using Node::Serve;
+
+  // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+  // Deprecated HLCPP Signatures
+  // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+  //
+  // TODO(https://fxbug.dev/336617685): Mark the following signatures as deprecated once all callers
+  // have migratred to the above LLCPP signatures.
+
   // Binds to a remotely hosted directory using the specified `dir`. The `dir` handle must be valid.
   explicit RemoteDir(fidl::InterfaceHandle<fuchsia::io::Directory> dir)
       : RemoteDir(dir.TakeChannel()) {}
-
-  using Node::Serve;
 
  private:
   static vfs_internal_node_t* CreateRemoteDir(zx::channel dir) {
