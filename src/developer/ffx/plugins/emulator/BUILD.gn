@@ -29,6 +29,7 @@ if (is_host) {
     ]
     deps = [
       ":aemu_internal",
+      ":crosvm_internal",
       ":qemu_internal",
       ":uefi_internal",
     ]
@@ -85,6 +86,23 @@ if (is_host) {
     }
     sdk_noop_atom("uefi_internal") {
       id = "sdk://tools/$current_cpu/qemu_uefi_internal"
+      category = "partner"
+      type = "companion_host_tool"
+    }
+  }
+
+  # crosvm is supported on mac and linux and both arm64 and x64
+  if (arm_sdk_tools || current_cpu == host_cpu) {
+    emu_companion("crosvm_internal") {
+      default_binary =
+          "//prebuilt/third_party/crosvm/${current_os}-${current_cpu}/crosvm"
+      prebuilt_path =
+          "//prebuilt/third_party/crosvm/${current_os}-${current_cpu}"
+      sdk_dest_path = "tools/${current_cpu}/crosvm_internal"
+    }
+  } else {
+    sdk_noop_atom("crosvm_internal") {
+      id = "sdk://tools/$current_cpu/crosvm_internal"
       category = "partner"
       type = "companion_host_tool"
     }
