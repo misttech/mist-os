@@ -67,6 +67,7 @@ source_set("scsi_lib") {
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//src/devices/block/lib/scsi:scsi-dfv1",
     "//src/devices/bus/lib/virtio",
+    "//src/devices/lib/dma-buffer",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",

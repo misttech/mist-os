@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_VIRTIO_SCSI_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_VIRTIO_SCSI_H_
 
-#include <lib/ddk/io-buffer.h>
+#include <lib/dma-buffer/buffer.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/scsi/block-device-dfv1.h>
 #include <lib/scsi/controller-dfv1.h>
@@ -87,13 +87,13 @@ class ScsiDevice : public virtio::Device, public scsi::Controller, public ddk::D
     bool is_write;
     void* data;
     bool vmar_mapped;
-    io_buffer_t request_buffer;
+    std::unique_ptr<dma_buffer::ContiguousBuffer> request_buffer;
     bool avail;
     vring_desc* tail_desc;
     void* cookie;
     void (*callback)(void* cookie, zx_status_t status);
     void* data_in_region;
-    io_buffer_t* request_buffers;
+    dma_buffer::ContiguousBuffer* request_buffers;
     struct virtio_scsi_resp_cmd* response;
     // Sustains the lifetime of the trim data while it is being used.
     std::optional<zx::vmo> trim_data_vmo;
