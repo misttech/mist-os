@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 
+import logging
 import typing
 
 import fidl.fuchsia_hardware_power_statecontrol as power_statecontrol
@@ -10,6 +11,8 @@ from fuchsia_controller_py import ZxStatus
 from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
 from mobly import base_test, test_runner
 from mobly_controller import fuchsia_device
+
+_LOGGER = logging.getLogger("reboot_test")
 
 
 class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
@@ -34,10 +37,12 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
         # to write to the channel.
         coro = admin.reboot(reason=power_statecontrol.RebootReason.USER_REQUEST)
         try:
+            _LOGGER.info("Issuing reboot command")
             await coro
         except ZxStatus as status:
-            if status.args[0] != ZxStatus.ZX_ERR_PEER_CLOSED:
+            if status.raw() != ZxStatus.ZX_ERR_PEER_CLOSED:
                 raise status
+            _LOGGER.info("Device reboot command sent")
         # [END reboot_example]
         await self.device.wait_offline()
         await self.device.wait_online()

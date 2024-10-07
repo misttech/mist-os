@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 """Mobly Controller for Fuchsia Device (controlled via Fuchsia Controller)."""
 
-import asyncio
 import ipaddress
 import logging
 import os
@@ -11,7 +10,6 @@ import os.path
 import time
 from typing import Any
 
-import fidl.fuchsia_developer_ffx as ffx
 from fuchsia_controller_py import Context, IsolateDir, ZxStatus
 from mobly import base_test
 
@@ -70,10 +68,6 @@ class FuchsiaDevice(object):
         self.ctx = Context(
             isolate_dir=isolate, target=self.target, config=ctx_config
         )
-        # Only add the target if the IP address has been supplied. Else we're
-        # using mDNS.
-        if ctx_config["discovery.mdns.enabled"] == "false":
-            self.ctx.target_add(self.target, True)
 
     async def wait_offline(self, timeout: int = TIMEOUTS["OFFLINE"]) -> None:
         """Waits for the Fuchsia device to be offline.
@@ -87,30 +81,11 @@ class FuchsiaDevice(object):
         """
         logging.info(f"Waiting for target '{self.target}' to go offline")
         start_time = time.time()
-        end_time = start_time + timeout
-        while time.time() < end_time:
-            try:
-                logging.debug(
-                    f"Attempting to get proxy info from target '{self.target}'"
-                )
-                assert self.ctx is not None
-                target = ffx.Target.Client(self.ctx.connect_target_proxy())
-                info = await target.identity()
-                if info.target_info.rcs_state != ffx.RemoteControlState.UP:
-                    logging.debug(
-                        f"Determined {self.config['name']} has shut down due to state"
-                    )
-                    break
-            except RuntimeError:
-                logging.debug(
-                    f"Determined {self.target} has shut down due runtime error."
-                )
-                break
-            await asyncio.sleep(TIMEOUTS["SLEEP"])
-        else:
-            raise TimeoutError(
-                f"'{self.config['name']}' failed to go offline in {timeout}s."
-            )
+        try:
+            assert self.ctx is not None
+            self.ctx.target_wait(timeout, True)
+        except ZxStatus:
+            raise TimeoutError()
         logging.info(
             f"Target '{self.target}' is now offline after {time.time() - start_time} seconds"
         )

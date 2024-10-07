@@ -13,7 +13,6 @@ use fuchsia_async::emulated_handle::Koid;
 use fuchsia_async::OnSignalsRef;
 use std::future::Future;
 use std::mem::{ManuallyDrop, MaybeUninit};
-use std::net::IpAddr;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::sync::{mpsc, Arc};
@@ -41,19 +40,10 @@ pub(crate) enum LibraryCommand {
         config: Vec<FfxConfigEntry>,
         isolate_dir: Option<PathBuf>,
     },
-    OpenDaemonProtocol {
-        env: Arc<EnvContext>,
-        protocol: String,
-        responder: Responder<CmdResult<zx_types::zx_handle_t>>,
-    },
     OpenDeviceProxy {
         env: Arc<EnvContext>,
         moniker: String,
         capability_name: String,
-        responder: Responder<CmdResult<zx_types::zx_handle_t>>,
-    },
-    OpenTargetProxy {
-        env: Arc<EnvContext>,
         responder: Responder<CmdResult<zx_types::zx_handle_t>>,
     },
     OpenRemoteControlProxy {
@@ -131,18 +121,11 @@ pub(crate) enum LibraryCommand {
         buf: ExtBuffer<u8>,
         responder: Responder<zx_status::Status>,
     },
-    TargetAdd {
-        env: Arc<EnvContext>,
-        addr: IpAddr,
-        scope_id: u32,
-        port: u16,
-        wait: bool,
-        responder: Responder<zx_status::Status>,
-    },
     TargetWait {
         env: Arc<EnvContext>,
         timeout: u64,
         responder: Responder<zx_status::Status>,
+        offline: bool,
     },
 }
 
@@ -172,26 +155,6 @@ impl LibraryCommand {
                     }
                 }
             }
-            Self::OpenDaemonProtocol { env, protocol, responder } => {
-                match env.connect_daemon_protocol(protocol).await {
-                    Ok(r) => {
-                        responder.send(Ok(r)).unwrap();
-                    }
-                    Err(e) => {
-                        env.write_err(e);
-                        responder.send(Err(zx_status::Status::INTERNAL)).unwrap();
-                    }
-                }
-            }
-            Self::OpenTargetProxy { env, responder } => match env.connect_target_proxy().await {
-                Ok(h) => {
-                    responder.send(Ok(h)).unwrap();
-                }
-                Err(e) => {
-                    env.write_err(e);
-                    responder.send(Err(zx_status::Status::INTERNAL)).unwrap();
-                }
-            },
             Self::OpenRemoteControlProxy { env, responder } => {
                 match env.connect_remote_control_proxy().await {
                     Ok(h) => {
@@ -442,24 +405,8 @@ impl LibraryCommand {
                 };
                 responder.send(status).unwrap();
             }
-            Self::TargetAdd { env, addr, scope_id, port, wait, responder } => {
-                let res = match env.target_add(addr, scope_id, port, wait).await {
-                    Ok(_) => zx_status::Status::OK,
-                    Err(e) => {
-                        env.write_err(e);
-                        zx_status::Status::INTERNAL
-                    }
-                };
-                responder.send(res).unwrap();
-            }
-            Self::TargetWait { env, timeout, responder } => {
-                let cmd = ffx_wait_args::WaitOptions { timeout, down: false };
-                let tool = ffx_wait::WaitOperation {
-                    cmd,
-                    env: env.context.clone(),
-                    waiter: ffx_wait::DeviceWaiterImpl,
-                };
-                match tool.wait_impl().await {
+            Self::TargetWait { env, timeout, responder, offline } => {
+                match env.target_wait(timeout, offline).await {
                     Ok(()) => {
                         responder.send(zx_status::Status::OK).unwrap();
                     }

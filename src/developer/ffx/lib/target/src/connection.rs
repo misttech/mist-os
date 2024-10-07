@@ -13,12 +13,19 @@ use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlPro
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+#[derive(Debug)]
+struct RcsInfo {
+    node_id: overnet_core::NodeId,
+    // Need access to the main RCS to prevent the underlying overnet loop from closing on itself.
+    _rcs_proxy: RemoteControlProxy,
+}
+
 /// Represents a direct (no daemon) connection to a Fuchsia target.
 #[derive(Debug)]
 pub struct Connection {
     overnet: OvernetClient,
     fidl_pipe: FidlPipe,
-    rcs_proxy: Mutex<Option<RemoteControlProxy>>,
+    rcs_info: Mutex<Option<RcsInfo>>,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -56,22 +63,40 @@ impl Connection {
             FidlPipe::start_internal(overnet_reader, overnet_writer, connector).await.map_err(
                 |e| ConnectionError::ConnectionStartError(connector_debug_string, e.to_string()),
             )?;
-        Ok(Self { overnet: OvernetClient { node }, fidl_pipe, rcs_proxy: Default::default() })
+        Ok(Self { overnet: OvernetClient { node }, fidl_pipe, rcs_info: Default::default() })
     }
 
     /// Attempts to retrieve an instance of the remote control proxy. When invoked for the first
     /// time, this function will run indefinitely until it finds a remote control proxy, so it is
     /// the caller's responsibility to time out.
     pub async fn rcs_proxy(&self) -> Result<RemoteControlProxy, ConnectionError> {
-        let mut rcs = self.rcs_proxy.lock().await;
-        if rcs.is_none() {
-            *rcs = Some(self.overnet.connect_remote_control().await.map_err(|e| {
+        let mut rcs_info = self.rcs_info.lock().await;
+        if rcs_info.is_none() {
+            let (proxy, node_id) = self.overnet.connect_remote_control().await.map_err(|e| {
                 ConnectionError::KnockError(
                     self.wrap_connection_errors(e).context("getting RCS proxy"),
                 )
-            })?);
+            })?;
+            *rcs_info = Some(RcsInfo { _rcs_proxy: proxy, node_id });
         }
-        Ok(rcs.as_ref().unwrap().clone())
+        let (remote_proxy, remote_server_end) =
+            fidl::endpoints::create_proxy::<RemoteControlMarker>()
+                .map_err(|e| ConnectionError::InternalError(e.into()))?;
+        let node_id = rcs_info.as_ref().unwrap().node_id;
+        self.overnet
+            .node
+            .connect_to_service(
+                node_id,
+                RemoteControlMarker::PROTOCOL_NAME,
+                remote_server_end.into_channel(),
+            )
+            .await
+            .map_err(|e| {
+                ConnectionError::KnockError(
+                    self.wrap_connection_errors(e).context("connecting to new RCS proxy"),
+                )
+            })?;
+        Ok(remote_proxy)
     }
 
     /// Takes a given connection error and, if there have been underlying connection errors, adds
@@ -130,7 +155,9 @@ impl OvernetClient {
     ///
     /// This function will not return if the remote control marker cannot be found on overnet, so
     /// the caller should ensure a proper timeout is handled for potentially indefinite waiting.
-    pub(crate) async fn connect_remote_control(&self) -> Result<RemoteControlProxy> {
+    pub(crate) async fn connect_remote_control(
+        &self,
+    ) -> Result<(RemoteControlProxy, overnet_core::NodeId)> {
         let (server, client) = fidl::Channel::create();
         let node_id = self.locate_remote_control_node().await?;
         let _ = self
@@ -138,7 +165,7 @@ impl OvernetClient {
             .connect_to_service(node_id, RemoteControlMarker::PROTOCOL_NAME, server)
             .await?;
         let proxy = RemoteControlProxy::new(fidl::AsyncChannel::from_channel(client));
-        Ok(proxy)
+        Ok((proxy, node_id))
     }
 }
 
@@ -219,6 +246,34 @@ pub mod testing {
                 rcs_fidl::RemoteControlRequest::EchoString { value, responder } => {
                     responder.send(&value).unwrap()
                 }
+                rcs_fidl::RemoteControlRequest::OpenCapability {
+                    capability_name,
+                    server_channel,
+                    responder,
+                    ..
+                } => match capability_name.as_str() {
+                    rcs_fidl::RemoteControlMarker::PROTOCOL_NAME => {
+                        fuchsia_async::Task::local(async {
+                            let mut stream = fidl::endpoints::ServerEnd::<
+                                rcs_fidl::RemoteControlMarker,
+                            >::new(server_channel)
+                            .into_stream()
+                            .unwrap();
+                            while let Ok(Some(request)) = stream.try_next().await {
+                                match request {
+                                    rcs_fidl::RemoteControlRequest::EchoString {
+                                        value,
+                                        responder,
+                                    } => responder.send(&value).unwrap(),
+                                    _ => unreachable!(),
+                                }
+                            }
+                        })
+                        .detach();
+                        responder.send(Ok(())).unwrap();
+                    }
+                    c => panic!("Received an unexpected capability name: {c}"),
+                },
                 _ => panic!("Received an unexpected request: {req:?}"),
             }
         }
@@ -261,9 +316,12 @@ pub mod testing {
                     let mut stream = rcs_fidl::RemoteControlRequestStream::from_channel(
                         fidl::AsyncChannel::from_channel(channel),
                     );
-                    while let Ok(Some(req)) = stream.try_next().await {
-                        Self::handle_transaction(req).await;
-                    }
+                    Task::local(async move {
+                        while let Ok(Some(req)) = stream.try_next().await {
+                            Self::handle_transaction(req).await;
+                        }
+                    })
+                    .detach();
                 }
             });
             let (circuit_reader, circuit_writer) = tokio::io::split(circuit_socket);
