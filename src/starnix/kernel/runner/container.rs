@@ -53,8 +53,13 @@ use std::collections::BTreeMap;
 use std::ffi::CString;
 use std::ops::DerefMut;
 use std::sync::Arc;
+#[cfg(not(feature = "starnix_lite"))]
 use zx::{
     AsHandleRef, Signals, Task as _, {self as zx},
+};
+#[cfg(feature = "starnix_lite")]
+use zx::{
+    Task as _, {self as zx},
 };
 #[cfg(not(feature = "starnix_lite"))]
 use {
