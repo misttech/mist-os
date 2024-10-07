@@ -19,13 +19,13 @@ mod repo_create;
 mod repo_publish;
 
 pub use crate::args::{
-    PackageArchiveAddCommand, PackageArchiveCreateCommand, PackageArchiveExtractCommand,
-    PackageArchiveRemoveCommand, PackageBuildCommand, RepoCreateCommand, RepoPMListCommand,
-    RepoPublishCommand,
+    PackageArchiveAddCommand, PackageArchiveCreateCommand, PackageArchiveEditCommand,
+    PackageArchiveExtractCommand, PackageArchiveRemoveCommand, PackageBuildCommand,
+    RepoCreateCommand, RepoPMListCommand, RepoPublishCommand,
 };
 pub use crate::package_archive::{
-    cmd_package_archive_add, cmd_package_archive_create, cmd_package_archive_extract,
-    cmd_package_archive_remove,
+    cmd_package_archive_add, cmd_package_archive_create, cmd_package_archive_edit,
+    cmd_package_archive_extract, cmd_package_archive_remove,
 };
 pub use crate::package_build::cmd_package_build;
 pub use crate::repo_create::cmd_repo_create;

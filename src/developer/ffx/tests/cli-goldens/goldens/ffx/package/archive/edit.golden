@@ -1,6 +1,6 @@
 {
-  "name": "remove",
-  "description": "remove a file (<file_to_remove>) from an existing package archive (<archive>), placing the resulting archive in <output>",
+  "name": "edit",
+  "description": "edit the metadata of an existing package archive (<archive>), placing the resulting archive in <output>",
   "examples": [],
   "flags": [
     {
@@ -26,13 +26,13 @@
     {
       "kind": {
         "Option": {
-          "arg_name": "file-to-remove"
+          "arg_name": "package-name"
         }
       },
-      "optionality": "required",
-      "long": "--file-to-remove",
-      "short": "f",
-      "description": "file to add to the package archive",
+      "optionality": "optional",
+      "long": "--package-name",
+      "short": null,
+      "description": "if specified, change the name of the package (i.e., what appears in meta/package) to <package_name>.",
       "hidden": false
     },
     {
