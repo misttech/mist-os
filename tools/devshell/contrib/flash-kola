@@ -53,6 +53,7 @@ fi
 stty -F "${SERIAL_PATH}" 115200 raw -echo
 
 ${FASTBOOT} flash boot_a "$ZBI_PATH"
+${FASTBOOT} flash boot_b "$ZBI_PATH"
 ${FASTBOOT} flash super "$FVM_PATH"
 
 ${FASTBOOT} reboot
