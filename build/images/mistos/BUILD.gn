@@ -185,7 +185,7 @@ if (is_mistos) {
       "//src/connectivity/network/dhcpv6/client:component",
       "//src/connectivity/network/dns:component",
       "//src/connectivity/network/netstack3:component",
-      "//src/connectivity/network/netstack3:config_for_tests",
+      #"//src/connectivity/network/netstack3:config_for_tests",
       "//src/connectivity/policy/http-client:component",
       "//src/connectivity/policy/netcfg:component-basic",
       "//src/connectivity/policy/reachability:component",

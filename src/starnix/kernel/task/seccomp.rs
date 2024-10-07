@@ -17,6 +17,7 @@ use bstr::ByteSlice;
 use ebpf::converter::{bpf_addressing_mode, bpf_class};
 #[cfg(not(feature = "starnix_lite"))]
 use ebpf::program::EbpfProgram;
+#[cfg(not(feature = "starnix_lite"))]
 use ebpf::{read_raw_packet_data, EbpfRunContext, PacketAccessor};
 use starnix_lifecycle::AtomicU64Counter;
 #[cfg(not(feature = "starnix_lite"))]
@@ -155,10 +156,12 @@ impl SeccompFilter {
     }
 }
 
+#[cfg(not(feature = "starnix_lite"))]
 impl EbpfRunContext for SeccompFilter {
     type Context<'a> = seccomp_data;
 }
 
+#[cfg(not(feature = "starnix_lite"))]
 impl EbpfRunContext for SeccompFilter {
     type Context<'a> = seccomp_data;
 }
