@@ -33,6 +33,13 @@ FuchsiaComponentInfo = provider(
     },
 )
 
+FuchsiaDeviceTreeSegmentInfo = provider(
+    "Contains information about a fuchsia devicetree fragment",
+    fields = {
+        "includes": "A depset of include directory paths used when compiling the devicetree binary.",
+    },
+)
+
 FuchsiaPackagedComponentInfo = provider(
     "Contains information about a fuchsia component that has been included in a package",
     fields = {
