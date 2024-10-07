@@ -196,6 +196,9 @@ user_platform_aib_names =
       "omaha_client",
       "system_update_configurator",
 
+      # Memory monitor
+      "memory_monitor",
+
       # Netstack
       "netstack2",
       "netstack3",
@@ -324,6 +327,11 @@ _userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
 
                          # Driver migration to Platform AIBs, but not needed in user builds.
                          "fake_battery_driver",
+
+                         # Memory monitor
+                         "memory_monitor_with_memory_sampler",
+                         "memory_monitor_critical_reports",
+                         "memory_monitor2",
 
                          # Development and debug tools for power framework
                          "power_framework_development_support",

@@ -20,6 +20,7 @@ pub mod icu_config;
 pub mod intl_config;
 pub mod kernel_config;
 pub mod media_config;
+pub mod memory_monitor_config;
 pub mod paravirtualization_config;
 pub mod power_config;
 pub mod recovery_config;
@@ -100,6 +101,10 @@ pub struct PlatformConfig {
     /// Platform configuration options for the media area.
     #[serde(default)]
     pub media: media_config::PlatformMediaConfig,
+
+    /// Platform configuration options for the memory monitor area.
+    #[serde(default)]
+    pub memory_monitor: memory_monitor_config::PlatformMemoryMonitorConfig,
 
     /// Platform configuration options for paravirtualization.
     #[serde(default)]

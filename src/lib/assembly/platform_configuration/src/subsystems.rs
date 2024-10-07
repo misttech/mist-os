@@ -43,6 +43,7 @@ mod icu;
 mod intl;
 mod kernel;
 mod media;
+mod memory_monitor;
 mod paravirtualization;
 mod power;
 mod radar;
@@ -335,6 +336,13 @@ fn configure_subsystems(
         builder,
     )
     .context("Configuring the 'media' subsystem")?;
+
+    memory_monitor::MemoryMonitorSubsystem::define_configuration(
+        &context_base.for_subsystem("memory_monitor"),
+        &platform.memory_monitor,
+        builder,
+    )
+    .context("Configuring the memory monitoring subsystem")?;
 
     power::PowerManagementSubsystem::define_configuration(
         &context_base.for_subsystem("power"),

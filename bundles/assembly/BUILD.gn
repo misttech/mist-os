@@ -1836,11 +1836,6 @@ assembly_input_bundle("common_standard") {
 # This is exclusive to user builds on the minimal support level.
 #
 assembly_input_bundle("standard_user") {
-  base_packages = [
-    # memory_monitor with profiling disabled.
-    "//src/developer/memory/monitor:monitor_without_memory_sampler",
-  ]
-
   config_data = [
     {
       package_name = "cobalt"
@@ -1848,20 +1843,6 @@ assembly_input_bundle("standard_user") {
         {
           source = "//src/cobalt/bin/app/configs/user_config.json"
           destination = "config.json"
-        },
-      ]
-    },
-  ]
-
-  compiled_packages = [
-    {
-      name = "core"
-      components = [
-        {
-          component_name = "core"
-          shards = [
-            "//src/developer/memory/monitor/meta/memory_monitor.core_shard.cml",
-          ]
         },
       ]
     },
@@ -1895,15 +1876,6 @@ assembly_input_bundle("standard_userdebug") {
         {
           source = "//src/diagnostics/detect/configs/cobalt-detect.triage"
           destination = "cobalt-detect.triage"
-        },
-      ]
-    },
-    {
-      package_name = "memory_monitor"
-      files = [
-        {
-          source = "//src/developer/memory/monitor/config/send_critical_pressure_crash_reports"
-          destination = "send_critical_pressure_crash_reports"
         },
       ]
     },
@@ -1962,10 +1934,6 @@ assembly_input_bundle("standard_userdebug_and_eng") {
     "//src/diagnostics/detect:triage-detect",
     "//src/sys/pkg/bin/pkgctl",
     "//src/sys/pkg/bin/update",
-
-    # memory_monitor with profiling enabled.
-    "//src/developer/memory/monitor:monitor_with_memory_sampler",
-    "//src/performance/memory/sampler:memory_sampler",
   ]
   shell_commands = [
     {
@@ -1992,12 +1960,7 @@ assembly_input_bundle("standard_userdebug_and_eng") {
       components = [
         {
           component_name = "core"
-          shards = [
-            "//src/diagnostics/detect/meta/detect.core_shard.cml",
-            "//src/developer/memory/monitor/meta/memory_monitor.core_shard.cml",
-            "//src/developer/memory/monitor/meta/memory_monitor_with_memory_sampler.core_shard.cml",
-            "//src/performance/memory/sampler/meta/memory_sampler.core_shard.cml",
-          ]
+          shards = [ "//src/diagnostics/detect/meta/detect.core_shard.cml" ]
         },
       ]
     },
@@ -2010,6 +1973,83 @@ assembly_input_bundle("standard_userdebug_and_eng") {
           shards = [
             "//src/diagnostics/detect/meta/detect_userdebug.root_shard.cml",
           ]
+        },
+      ]
+    },
+  ]
+}
+
+# Assembly support for memory_monitor (v1).
+assembly_input_bundle("memory_monitor") {
+  base_packages = [
+    # memory_monitor with profiling disabled.
+    "//src/developer/memory/monitor:monitor_without_memory_sampler",
+  ]
+
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [
+            "//src/developer/memory/monitor/meta/memory_monitor.core_shard.cml",
+          ]
+        },
+      ]
+    },
+  ]
+}
+
+# Assembly support for memory_monitor (v1) with memory profiling enabled.
+assembly_input_bundle("memory_monitor_with_memory_sampler") {
+  base_packages = [
+    # memory_monitor with profiling enabled.
+    "//src/developer/memory/monitor:monitor_with_memory_sampler",
+    "//src/performance/memory/sampler:memory_sampler",
+  ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [
+            "//src/developer/memory/monitor/meta/memory_monitor.core_shard.cml",
+            "//src/developer/memory/monitor/meta/memory_monitor_with_memory_sampler.core_shard.cml",
+            "//src/performance/memory/sampler/meta/memory_sampler.core_shard.cml",
+          ]
+        },
+      ]
+    },
+  ]
+}
+
+assembly_input_bundle("memory_monitor_critical_reports") {
+  config_data = [
+    {
+      package_name = "memory_monitor"
+      files = [
+        {
+          source = "//src/developer/memory/monitor/config/send_critical_pressure_crash_reports"
+          destination = "send_critical_pressure_crash_reports"
+        },
+      ]
+    },
+  ]
+}
+
+# Assembly support for memory_monitor2.
+assembly_input_bundle("memory_monitor2") {
+  base_packages = [ "//src/performance/memory/attribution/monitor:monitor" ]
+
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/performance/memory/attribution/monitor/meta/memory_monitor2.core_shard.cml" ]
         },
       ]
     },

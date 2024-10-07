@@ -504,6 +504,7 @@ group("core_realm_shards_allowlist") {
     "//src/diagnostics/realm:core_shard",
     "//src/firmware/fastboot-tcp:fastboot-tcp-core-shard",
     "//src/firmware/fastboot-usb:fastboot-usb-core-shard",
+    "//src/performance/memory/attribution/monitor:memory_monitor2_core_shard",
     "//src/recovery/factory_reset:factory_reset_core_shard",
     "//src/recovery/system:system_recovery_core_shard",
     "//src/recovery/system:system_recovery_fdr_core_shard",
