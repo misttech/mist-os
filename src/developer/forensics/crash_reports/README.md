@@ -14,19 +14,54 @@ do not upload it.
 ## Testing
 
 To test your changes, on a real device, we have some unit tests and some helper
-programs to simulate various crashes.
+programs to simulate various crashes. For the helper programs, you first need to
+apply a developer override to enable uploads on an eng device. For example, the
+userdebug config enables crash report uploading if the privacy settings also
+have it enabled.
 
-For the helper programs, you first need to add the package wrapping a config
-which enables crash report uploading and give your device consent to share data
-in its settings.
+### Developer overrides
 
-```sh
-(host)$ fx set core.x64 --with-base
-//src/developer/forensics:userdebug_configs_for_eng
+First, define developer overrides in `//local/BUILD.gn`. This file is
+Git-ignored so you can add it once and only use/modify as needed:
+
+```
+import("//build/assembly/developer_overrides.gni")
+
+assembly_developer_overrides("feedback_upload_config") {
+  developer_only_options = {
+    forensics_options = {
+      build_type_override = "eng_with_upload"
+    }
+  }
+}
+
+assembly_developer_overrides("feedback_userdebug_config") {
+  developer_only_options = {
+    forensics_options = {
+      build_type_override = "userdebug"
+    }
+  }
+}
+
+assembly_developer_overrides("feedback_user_config") {
+  developer_only_options = {
+    forensics_options = {
+      build_type_override = "user"
+    }
+  }
+}
 ```
 
-Note, the above config only works for eng builds and product assembly will fail
-it used on user/userdebug builds.
+You can apply an override via `fx set` using
+`--assembly-override <assembly_target_pattern>=<overrides_target>`. Note that
+the "assembly_target_pattern" will be different for most products:
+
+```sh
+(host)$ fx set core.x64 --assembly-override //build/images/fuchsia/*=//local:feedback_userdebug_config
+```
+
+Note, the above overrides only work for eng builds and product assembly will fail
+if used on user/userdebug builds.
 
 Then, after running each one of the helper programs (see commands in sections
 below), you should then look each time for the following line in the syslog:
