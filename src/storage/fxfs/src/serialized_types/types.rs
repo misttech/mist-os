@@ -234,7 +234,6 @@ mod tests {
     #[test]
     fn type_fprint_v40() {
         let mut success = true;
-
         success &= assert_type_fprint::<AllocatorInfoV32>("struct {layers:Vec<u64>,allocated_bytes:BTreeMap<u64,u64>,marked_for_deletion:HashSet<u64>,limit_bytes:BTreeMap<u64,u64>}");
         success &= assert_type_fprint::<AllocatorKeyV32>("struct {device_range:Range<u64>}");
         success &= assert_type_fprint::<AllocatorValueV32>(

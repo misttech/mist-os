@@ -47,7 +47,7 @@ impl Crypt for RemoteCrypt {
             .map_err(|e| zx::Status::from_raw(e))?;
         Ok((
             WrappedKey {
-                wrapping_key_id: wrapping_key_id as u128,
+                wrapping_key_id: u128::from_le_bytes(wrapping_key_id),
                 key: WrappedKeyBytes::try_from(key).map_err(map_to_status)?,
             },
             UnwrappedKey::new(unwrapped_key.try_into().map_err(|_| zx::Status::INTERNAL)?),
@@ -57,17 +57,17 @@ impl Crypt for RemoteCrypt {
     async fn create_key_with_id(
         &self,
         owner: u64,
-        wrapping_key_id: u64,
+        wrapping_key_id: u128,
     ) -> Result<(WrappedKey, UnwrappedKey), zx::Status> {
         let (key, unwrapped_key) = self
             .client
-            .create_key_with_id(owner, wrapping_key_id)
+            .create_key_with_id(owner, &wrapping_key_id.to_le_bytes())
             .await
             .map_err(|e| map_to_status(e.into()))?
             .map_err(|e| zx::Status::from_raw(e))?;
         Ok((
             WrappedKey {
-                wrapping_key_id: wrapping_key_id as u128,
+                wrapping_key_id,
                 key: WrappedKeyBytes::try_from(key).map_err(map_to_status)?,
             },
             UnwrappedKey::new(unwrapped_key.try_into().map_err(|_| zx::Status::INTERNAL)?),
@@ -81,12 +81,7 @@ impl Crypt for RemoteCrypt {
     ) -> Result<UnwrappedKey, zx::Status> {
         let unwrapped = self
             .client
-            // TODO(b/361105712): Remove try_into() when changing key to u128.
-            .unwrap_key(
-                wrapped_key.wrapping_key_id.try_into().map_err(|_| zx::Status::INTERNAL)?,
-                owner,
-                &wrapped_key.key[..],
-            )
+            .unwrap_key(&wrapped_key.wrapping_key_id.to_le_bytes(), owner, &wrapped_key.key[..])
             .await
             .map_err(|e| map_to_status(e.into()))?
             .map_err(|e| zx::Status::from_raw(e))?;

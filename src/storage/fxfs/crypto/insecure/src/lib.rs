@@ -98,7 +98,7 @@ impl Crypt for InsecureCrypt {
     async fn create_key_with_id(
         &self,
         owner: u64,
-        wrapping_key_id: u64,
+        wrapping_key_id: u128,
     ) -> Result<(WrappedKey, UnwrappedKey), zx::Status> {
         if self.shutdown.load(Ordering::Relaxed) {
             error!("Crypt was shut down");

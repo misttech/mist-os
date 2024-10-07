@@ -409,7 +409,7 @@ mod tests {
         async fn create_key_with_id(
             &self,
             _owner: u64,
-            _wrapping_key_id: u64,
+            _wrapping_key_id: u128,
         ) -> Result<(WrappedKey, UnwrappedKey), zx::Status> {
             unimplemented!("Not used in tests");
         }

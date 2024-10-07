@@ -249,7 +249,8 @@ pub fn derive_migrate(input: TokenStream) -> TokenStream {
             }
         }
         Data::Struct(s) => {
-            let fields = s.fields.iter().map(|f| {    let name = &f.ident;
+            let fields = s.fields.iter().map(|f| {
+                let name = &f.ident;
                 match f.ty.to_token_stream().into_iter().next() {
                     Some(proc_macro2::TokenTree::Ident(ident)) if ident == "Option" => {
                         quote! { #name: from.#name.map(|f| f.into()) }

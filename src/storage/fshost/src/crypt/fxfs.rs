@@ -204,20 +204,23 @@ impl CryptService {
 
         let crypt_management =
             connect_to_protocol_at_dir_root::<CryptManagementMarker>(&exposed_dir)?;
+        let wrapping_key_id_0 = [0; 16];
+        let mut wrapping_key_id_1 = [0; 16];
+        wrapping_key_id_1[0] = 1;
         crypt_management
-            .add_wrapping_key(0, data_key.deref())
+            .add_wrapping_key(&wrapping_key_id_0, data_key.deref())
             .await?
             .map_err(zx::Status::from_raw)?;
         crypt_management
-            .add_wrapping_key(1, metadata_key.deref())
+            .add_wrapping_key(&wrapping_key_id_1, metadata_key.deref())
             .await?
             .map_err(zx::Status::from_raw)?;
         crypt_management
-            .set_active_key(KeyPurpose::Data, 0)
+            .set_active_key(KeyPurpose::Data, &wrapping_key_id_0)
             .await?
             .map_err(zx::Status::from_raw)?;
         crypt_management
-            .set_active_key(KeyPurpose::Metadata, 1)
+            .set_active_key(KeyPurpose::Metadata, &wrapping_key_id_1)
             .await?
             .map_err(zx::Status::from_raw)?;
 
