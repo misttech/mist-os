@@ -44,6 +44,9 @@ pub trait DirectConnector: Debug {
     /// Returns the device address (if there currently is one).
     fn device_address(&self) -> LocalBoxFuture<'_, Option<SocketAddr>>;
 
+    /// Returns the host address of the ssh connection from the device perspective.
+    fn host_ssh_address(&self) -> LocalBoxFuture<'_, Option<String>>;
+
     /// Returns the spec of the target to which we are connecting/connected.
     fn target_spec(&self) -> Option<String>;
 }
@@ -181,6 +184,17 @@ impl<T: TryFromEnvContext + OvernetConnector + 'static> DirectConnector for Over
 
     fn device_address(&self) -> LocalBoxFuture<'_, Option<SocketAddr>> {
         Box::pin(async { self.connection.lock().await.as_ref().and_then(|c| c.device_address()) })
+    }
+
+    fn host_ssh_address(&self) -> LocalBoxFuture<'_, Option<String>> {
+        Box::pin(async {
+            self.connection
+                .lock()
+                .await
+                .as_ref()
+                .and_then(|c| c.host_ssh_address())
+                .map(|a| a.to_string())
+        })
     }
 
     fn target_spec(&self) -> Option<String> {

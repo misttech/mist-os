@@ -6,6 +6,7 @@ use crate::overnet_connector::{OvernetConnectionError, OvernetConnector};
 use anyhow::Result;
 use async_channel::Receiver;
 use compat_info::CompatibilityInfo;
+use ffx_ssh::parse::HostAddr;
 use fuchsia_async::Task;
 use futures::FutureExt;
 use futures_lite::stream::StreamExt;
@@ -25,6 +26,7 @@ pub struct FidlPipe {
     error_queue: Receiver<anyhow::Error>,
     compat: Option<CompatibilityInfo>,
     device_address: Option<SocketAddr>,
+    host_ssh_address: Option<HostAddr>,
 }
 
 pub fn create_overnet_socket(
@@ -110,12 +112,19 @@ impl FidlPipe {
         let device_address = connector.device_address();
         let (error_sender, error_queue) = async_channel::unbounded();
         let compat = overnet_connection.compat.clone();
+        let host_ssh_address = overnet_connection.ssh_host_address.clone();
         let main_task = async move {
             overnet_connection.run(overnet_writer, overnet_reader, error_sender).await;
             // Explicit drop to force the struct into the closure.
             drop(connector);
         };
-        Ok(Self { task: Some(Task::local(main_task)), error_queue, compat, device_address })
+        Ok(Self {
+            task: Some(Task::local(main_task)),
+            error_queue,
+            compat,
+            device_address,
+            host_ssh_address,
+        })
     }
 
     pub fn error_stream(&self) -> Receiver<anyhow::Error> {
@@ -135,6 +144,10 @@ impl FidlPipe {
 
     pub fn device_address(&self) -> Option<SocketAddr> {
         self.device_address.clone()
+    }
+
+    pub fn host_ssh_address(&self) -> Option<HostAddr> {
+        self.host_ssh_address.clone()
     }
 }
 
@@ -177,6 +190,7 @@ mod test {
                 errors: error_rx,
                 compat: None,
                 main_task: Some(error_task),
+                ssh_host_address: None,
             })
         }
     }
@@ -200,6 +214,7 @@ mod test {
                 errors: error_rx,
                 compat: None,
                 main_task: Some(error_task),
+                ssh_host_address: None,
             })
         }
     }
@@ -221,6 +236,7 @@ mod test {
                 errors: error_rx,
                 compat: None,
                 main_task: Some(error_task),
+                ssh_host_address: None,
             })
         }
     }

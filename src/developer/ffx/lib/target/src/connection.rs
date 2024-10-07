@@ -7,6 +7,7 @@ use crate::overnet_connector::OvernetConnector;
 use anyhow::Result;
 use async_lock::Mutex;
 use compat_info::CompatibilityInfo;
+use ffx_ssh::parse::HostAddr;
 use fidl::prelude::*;
 use fidl_fuchsia_developer_remotecontrol::{RemoteControlMarker, RemoteControlProxy};
 use std::net::SocketAddr;
@@ -93,6 +94,11 @@ impl Connection {
     /// The device to which we are connected.
     pub fn device_address(&self) -> Option<SocketAddr> {
         self.fidl_pipe.device_address()
+    }
+
+    /// The ssh host address from the perspective of the device.
+    pub fn host_ssh_address(&self) -> Option<HostAddr> {
+        self.fidl_pipe.host_ssh_address()
     }
 }
 
@@ -267,6 +273,7 @@ pub mod testing {
                 errors: self.error_receiver.clone(),
                 compat: None,
                 main_task: Some(rcs_task),
+                ssh_host_address: None,
             })
         }
     }

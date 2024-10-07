@@ -109,7 +109,7 @@ impl OvernetConnector for SshConnector {
             BUFFER_SIZE,
             cmd.stderr.take().expect("process should have stderr"),
         );
-        let (_addr, compat) =
+        let (addr, compat) =
             // This function returns a PipeError on error, which necessitates terminating the SSH
             // command. This error must be converted into an `SshError` in order to be presentable
             // to the user.
@@ -142,6 +142,7 @@ impl OvernetConnector for SshConnector {
             errors: errors_receiver,
             compat,
             main_task,
+            ssh_host_address: Some(addr),
         })
     }
 
