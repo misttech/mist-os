@@ -1321,7 +1321,7 @@ impl ComponentInstance {
         };
 
         if let Some(resource) = component_address.resource() {
-            if resource.ends_with(".cm") {
+            if resource.ends_with(".cml") {
                 warn!(
                     "Component resource ends with .cml instead of .cm, which was \
 probably not intended: {}",
