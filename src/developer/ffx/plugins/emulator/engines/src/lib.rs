@@ -19,7 +19,6 @@ use emulator_instance::{
 use errors::ffx_bail;
 use ffx_emulator_config::EmulatorEngine;
 use fho::{bug, return_user_error, Result};
-use qemu_based::crosvm::CrosvmEngine;
 use qemu_based::femu::FemuEngine;
 use qemu_based::qemu::QemuEngine;
 
@@ -111,7 +110,6 @@ impl EngineBuilder {
         match data.get_engine_type() {
             EngineType::Femu => Box::new(FemuEngine::new(data, self.emu_instances.clone())),
             EngineType::Qemu => Box::new(QemuEngine::new(data, self.emu_instances.clone())),
-            EngineType::Crosvm => Box::new(CrosvmEngine::new(data, self.emu_instances.clone())),
         }
     }
 

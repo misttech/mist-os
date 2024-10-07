@@ -79,7 +79,6 @@ pub(crate) async fn get_host_tool(name: &str) -> Result<PathBuf> {
 const KNOCK_TARGET_TIMEOUT: Duration = Duration::from_secs(6);
 
 pub(crate) mod comms;
-pub(crate) mod crosvm;
 pub(crate) mod femu;
 pub(crate) mod qemu;
 
@@ -956,12 +955,6 @@ mod tests {
             .set(fake_qemu.to_string_lossy().into())
             .await
             .expect("qemu override");
-        env.context
-            .query("sdk.overrides.crosvm_internal")
-            .level(Some(ConfigLevel::User))
-            .set(fake_qemu.to_string_lossy().into())
-            .await
-            .expect("crosvm override");
 
         let fake_aemu = env.isolate_root.path().join("fake_aemu");
         fs::write(&fake_aemu, ECHO_SCRIPT_CONTENTS).expect("fake aemu");

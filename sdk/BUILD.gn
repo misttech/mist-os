@@ -636,7 +636,6 @@ if (is_host) {
 
       # TODO(https://fxbug.dev/42177692): Remove these once the emulators are available independently.
       "//src/developer/ffx/plugins/emulator:aemu_internal",
-      "//src/developer/ffx/plugins/emulator:crosvm_internal",
       "//src/developer/ffx/plugins/emulator:qemu_internal",
     ]
   }
