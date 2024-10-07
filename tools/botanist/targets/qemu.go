@@ -103,9 +103,6 @@ type QEMUConfig struct {
 	// Logfile saves emulator standard output to a file if set.
 	Logfile string `json:"logfile"`
 
-	// Whether User networking is enabled; if false, a Tap interface will be used.
-	UserNetworking bool `json:"user_networking"`
-
 	// MinFS is the filesystem to mount as a device.
 	MinFS *MinFS `json:"minfs,omitempty"`
 
@@ -416,12 +413,7 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 	}
 	netdev.Device.AddOption("mac", net.HardwareAddr(t.mac[:]).String())
 	netdev.Device.AddOption("vectors", "8")
-	if t.config.UserNetworking {
-		netdev.User = &qemu.NetdevUser{}
-	} else {
-		netdev.Tap = &qemu.NetdevTap{Name: defaultInterfaceName}
-	}
-
+	netdev.Tap = &qemu.NetdevTap{Name: defaultInterfaceName}
 	qemuCmd.AddNetwork(netdev)
 
 	// If we're running on RISC-V, we need to add an RNG device.
