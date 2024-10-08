@@ -9,10 +9,10 @@ use crate::mm::{
 };
 use crate::signals::{SignalDetail, SignalInfo};
 use crate::task::{CurrentTask, ExceptionResult, PageFaultExceptionReport, Task};
-
+use crate::vfs::aio::AioContext;
 use crate::vfs::{
-    ActiveNamespaceNode, AioContexts, DynamicFile, DynamicFileBuf, FileWriteGuardRef, FsNodeOps,
-    FsStr, FsString, NamespaceNode, SequenceFileSource,
+    ActiveNamespaceNode, DynamicFile, DynamicFileBuf, FileWriteGuardRef, FsNodeOps, FsStr,
+    FsString, NamespaceNode, SequenceFileSource,
 };
 use anyhow::{anyhow, Error};
 use bitflags::bitflags;
@@ -271,6 +271,9 @@ pub enum MappingName {
     /// The name associated with the mapping of an ashmem region.  Set by ioctl(fd, ASHMEM_SET_NAME, ...).
     /// By default "dev/ashmem".
     Ashmem(FsString),
+
+    /// This mapping is a context for asynchronous I/O.
+    AioContext(Arc<AioContext>),
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -474,9 +477,6 @@ pub struct MemoryManagerState {
     private_anonymous: PrivateAnonymousMemoryManager,
 
     forkable_state: MemoryManagerForkableState,
-
-    /// Asynchronous I/O contexts.
-    pub aio_contexts: AioContexts,
 }
 
 #[cfg(feature = "alternate_anon_allocs")]
@@ -2767,7 +2767,6 @@ impl MemoryManager {
                 #[cfg(feature = "alternate_anon_allocs")]
                 private_anonymous: PrivateAnonymousMemoryManager::new(backing_size),
                 forkable_state: Default::default(),
-                aio_contexts: Default::default(),
             }),
             // TODO(security): Reset to DISABLE, or the value in the fs.suid_dumpable sysctl, under
             // certain conditions as specified in the prctl(2) man page.
@@ -3614,6 +3613,45 @@ impl MemoryManager {
         error!(EFAULT)
     }
 
+    pub fn get_aio_context(&self, addr: UserAddress) -> Option<Arc<AioContext>> {
+        let state = self.state.read();
+        let Some((_, mapping)) = state.mappings.get(&addr) else {
+            return None;
+        };
+        let MappingName::AioContext(ref aio_context) = mapping.name else {
+            return None;
+        };
+        Some(aio_context.clone())
+    }
+
+    pub fn destroy_aio_context(self: &Arc<Self>, addr: UserAddress) -> Result<(), Errno> {
+        let mut released_mappings = vec![];
+
+        // Hold the lock throughout the operation to uphold memory manager's invariants.
+        // See mm/README.md.
+        let mut state = self.state.write();
+
+        // Validate that this address actually has an AioContext. We need to hold the state lock
+        // until we actually remove the mappings to ensure that another thread does not manipulate
+        // the mappings after we've validated that they contain an AioContext.
+        let Some((range, mapping)) = state.mappings.get(&addr) else {
+            return error!(EINVAL);
+        };
+        let MappingName::AioContext(_) = mapping.name else {
+            return error!(EINVAL);
+        };
+        let range = range.clone();
+        let length = range.end - range.start;
+        let result = state.unmap(self, range.start, length, &mut released_mappings);
+
+        // Drop the state before the unmapped mappings, since dropping a mapping may acquire a lock
+        // in `DirEntry`'s `drop`.
+        std::mem::drop(state);
+        std::mem::drop(released_mappings);
+
+        result
+    }
+
     #[cfg(test)]
     pub fn get_mapping_name(&self, addr: UserAddress) -> Result<Option<FsString>, Errno> {
         let state = self.state.read();
@@ -3779,7 +3817,7 @@ fn write_map(
         }
     };
     match &map.name {
-        MappingName::None => {
+        MappingName::None | MappingName::AioContext(_) => {
             if map.flags.contains(MappingFlags::SHARED)
                 && map.flags.contains(MappingFlags::ANONYMOUS)
             {

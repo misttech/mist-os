@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::sync::mpsc::{channel, Receiver};
 use std::sync::{Arc, Weak};
 
@@ -13,6 +13,7 @@ use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::user_buffer::UserBuffers;
 use starnix_uapi::{errno, error, io_event};
 use std::sync::mpsc::Sender;
+use std::sync::OnceLock;
 use zerocopy::IntoBytes;
 
 use crate::task::{CurrentTask, Task};
@@ -21,25 +22,102 @@ use crate::vfs::{
     VecInputBuffer, VecOutputBuffer, WeakFileHandle,
 };
 
+/// From aio.go in gVisor.
+pub const AIO_RING_SIZE: usize = 32;
+
+pub struct AioContext {
+    // Channels to send operations to background threads.
+    //
+    // Created lazily together with the thread that consumes operations when the corresponding
+    // operation is queued.
+    read_sender: OnceLock<Sender<IoOperation>>,
+    write_sender: OnceLock<Sender<IoOperation>>,
+
+    // TODO: Refactor code from syscalls.rs into this file to make this field private.
+    pub state: Arc<Mutex<AioContextState>>,
+}
+
+impl AioContext {
+    pub fn new(max_operations: usize) -> Arc<Self> {
+        Arc::new(Self {
+            read_sender: Default::default(),
+            write_sender: Default::default(),
+            state: Arc::new(Mutex::new(AioContextState {
+                max_operations: max_operations as usize,
+                pending_operations: 0,
+                results: VecDeque::new(),
+            })),
+        })
+    }
+
+    fn reader(&self, current_task: &CurrentTask) -> &Sender<IoOperation> {
+        self.read_sender.get_or_init(|| {
+            let (sender, receiver) = channel::<IoOperation>();
+            spawn_background_thread(
+                current_task,
+                Arc::downgrade(&self.state),
+                receiver,
+                do_read_operation,
+            );
+            sender
+        })
+    }
+
+    fn writer(&self, current_task: &CurrentTask) -> &Sender<IoOperation> {
+        self.write_sender.get_or_init(|| {
+            let (sender, receiver) = channel::<IoOperation>();
+            spawn_background_thread(
+                current_task,
+                Arc::downgrade(&self.state),
+                receiver,
+                do_write_operation,
+            );
+            sender
+        })
+    }
+
+    pub fn queue_op(&self, current_task: &CurrentTask, op: IoOperation) -> Result<(), Errno> {
+        // TODO: We should increase the pending_operations count here as part of ensure that
+        // there's room in the queue for this operation.
+        if !self.state.lock().can_queue() {
+            return error!(EAGAIN);
+        }
+        match op.op_type {
+            IoOperationType::Read | IoOperationType::ReadV => {
+                self.reader(current_task).send(op).map_err(|_| errno!(EINVAL))
+            }
+            IoOperationType::Write | IoOperationType::WriteV => {
+                self.writer(current_task).send(op).map_err(|_| errno!(EINVAL))
+            }
+        }
+    }
+}
+
+impl std::fmt::Debug for AioContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AioContext").finish()
+    }
+}
+
+impl std::cmp::PartialEq for AioContext {
+    fn eq(&self, _other: &AioContext) -> bool {
+        false
+    }
+}
+
+impl std::cmp::Eq for AioContext {}
+
 /// Kernel state-machine-based implementation of asynchronous I/O.
 /// See https://man7.org/linux/man-pages/man7/aio.7.html#NOTES
-pub struct AioContext {
-    // Weak reference to the context to pass to background threads.
-    // Background thread will terminate when AioContext is dropped.
-    weak_self: Weak<Mutex<Self>>,
-
+pub struct AioContextState {
     max_operations: usize,
+
+    // TODO: Nothing ever modifies the number of pending operations.
     pending_operations: usize,
 
     // Return code from async I/O operations.
     // Enqueued from worker threads after an operation is complete.
     results: VecDeque<io_event>,
-
-    // Channels to send operations to background threads.
-    // Created lazily together with the thread that consumes operations when the corresponding
-    // operation is queued.
-    read_sender: Option<Sender<IoOperation>>,
-    write_sender: Option<Sender<IoOperation>>,
 }
 
 pub enum IoOperationType {
@@ -59,8 +137,8 @@ pub struct IoOperation {
     pub eventfd: Option<WeakFileHandle>,
 }
 
-impl AioContext {
-    pub fn can_queue(&self) -> bool {
+impl AioContextState {
+    fn can_queue(&self) -> bool {
         self.pending_operations < self.max_operations
     }
 
@@ -69,54 +147,14 @@ impl AioContext {
         self.results.drain(..len).collect()
     }
 
-    pub fn queue_result(&mut self, result: io_event) {
+    fn queue_result(&mut self, result: io_event) {
         self.results.push_back(result);
-    }
-
-    fn spawn_read_thread(&mut self, current_task: &CurrentTask) {
-        let (sender, receiver) = channel::<IoOperation>();
-        self.read_sender = Some(sender);
-        spawn_background_thread(current_task, self.weak_self.clone(), receiver, do_read_operation);
-    }
-
-    fn spawn_write_thread(&mut self, current_task: &CurrentTask) {
-        let (sender, receiver) = channel::<IoOperation>();
-        self.write_sender = Some(sender);
-        spawn_background_thread(current_task, self.weak_self.clone(), receiver, do_write_operation);
-    }
-
-    pub fn queue_op(&mut self, current_task: &CurrentTask, op: IoOperation) -> Result<(), Errno> {
-        if !self.can_queue() {
-            return error!(EAGAIN);
-        }
-        match op.op_type {
-            IoOperationType::Read | IoOperationType::ReadV => {
-                if self.read_sender.is_none() {
-                    self.spawn_read_thread(current_task);
-                }
-                self.read_sender
-                    .as_ref()
-                    .expect("read sender should be initialized")
-                    .send(op)
-                    .map_err(|_| errno!(EINVAL))
-            }
-            IoOperationType::Write | IoOperationType::WriteV => {
-                if self.write_sender.is_none() {
-                    self.spawn_write_thread(current_task);
-                }
-                self.write_sender
-                    .as_ref()
-                    .expect("write sender should be initialized")
-                    .send(op)
-                    .map_err(|_| errno!(EINVAL))
-            }
-        }
     }
 }
 
 fn spawn_background_thread<F>(
     current_task: &CurrentTask,
-    weak_ctx: Weak<Mutex<AioContext>>,
+    weak_ctx: Weak<Mutex<AioContextState>>,
     receiver: Receiver<IoOperation>,
     operation_fn: F,
 ) where
@@ -228,49 +266,5 @@ fn do_write_operation(
         file.write_at(locked, current_task, offset, &mut input_buffer)
     } else {
         file.write(locked, current_task, &mut input_buffer)
-    }
-}
-
-pub struct AioContexts {
-    contexts: HashMap<u64, Arc<Mutex<AioContext>>>,
-    next_id: u64,
-}
-
-impl Default for AioContexts {
-    fn default() -> Self {
-        AioContexts { contexts: HashMap::default(), next_id: 1 }
-    }
-}
-
-impl AioContexts {
-    pub fn setup_context(&mut self, max_operations: u32) -> Result<u64, Errno> {
-        let id = self.next_id;
-        self.next_id = id.checked_add(1).ok_or_else(|| errno!(ENOMEM))?;
-        self.contexts.insert(
-            id,
-            Arc::new_cyclic(|weak_self| {
-                Mutex::new(AioContext {
-                    weak_self: weak_self.clone(),
-                    max_operations: max_operations as usize,
-                    pending_operations: 0,
-                    results: VecDeque::new(),
-                    read_sender: None,
-                    write_sender: None,
-                })
-            }),
-        );
-        Ok(id)
-    }
-
-    pub fn get_context(&self, id: u64) -> Option<Arc<Mutex<AioContext>>> {
-        self.contexts.get(&id).map(Arc::clone)
-    }
-
-    pub fn destroy_context(&mut self, id: u64) -> Result<(), Errno> {
-        if let Some(_) = self.contexts.remove(&id) {
-            Ok(())
-        } else {
-            error!(EINVAL)
-        }
     }
 }

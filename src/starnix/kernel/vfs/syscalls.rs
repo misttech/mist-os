@@ -2,12 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::{MemoryAccessor, MemoryAccessorExt, TaskMemoryAccessor, PAGE_SIZE};
+use crate::mm::{
+    DesiredAddress, MappingName, MappingOptions, MemoryAccessor, MemoryAccessorExt,
+    ProtectionFlags, TaskMemoryAccessor, PAGE_SIZE,
+};
 use crate::security;
 use crate::task::{
     CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Timeline,
     TimerWakeup, Waiter,
 };
+use crate::vfs::aio::{AioContext, IoOperation, IoOperationType, AIO_RING_SIZE};
 use crate::vfs::buffers::{UserBuffersInputBuffer, UserBuffersOutputBuffer};
 use crate::vfs::eventfd::{new_eventfd, EventFdFileObject, EventFdType};
 use crate::vfs::fs_args::MountParams;
@@ -17,12 +21,11 @@ use crate::vfs::pidfd::new_pidfd;
 use crate::vfs::pipe::{new_pipe, PipeFileObject};
 use crate::vfs::timer::TimerFile;
 use crate::vfs::{
-    checked_add_offset_and_length, new_memfd, splice, AioContext, CheckAccessReason, DirentSink64,
+    checked_add_offset_and_length, new_memfd, splice, CheckAccessReason, DirentSink64,
     EpollFileObject, FallocMode, FdFlags, FdNumber, FileAsyncOwner, FileHandle, FileSystemOptions,
-    FlockOperation, FsStr, FsString, IoOperation, IoOperationType, LookupContext, NamespaceNode,
-    PathWithReachability, RecordLockCommand, RenameFlags, SeekTarget, StatxFlags, SymlinkMode,
-    SymlinkTarget, TargetFdNumber, TimeUpdateType, UnlinkKind, ValueOrSize, WdNumber, WhatToMount,
-    XattrOp,
+    FlockOperation, FsStr, FsString, LookupContext, NamespaceNode, PathWithReachability,
+    RecordLockCommand, RenameFlags, SeekTarget, StatxFlags, SymlinkMode, SymlinkTarget,
+    TargetFdNumber, TimeUpdateType, UnlinkKind, ValueOrSize, WdNumber, WhatToMount, XattrOp,
 };
 
 use smallvec::smallvec;
@@ -2858,8 +2861,8 @@ pub fn sys_readahead(
 pub fn sys_io_setup(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
-    nr_events: u32,
-    ctx_idp: UserRef<aio_context_t>,
+    user_nr_events: UserValue<u32>,
+    user_ctx_idp: UserRef<aio_context_t>,
 ) -> Result<(), Errno> {
     // From https://man7.org/linux/man-pages/man2/io_setup.2.html:
     //
@@ -2868,15 +2871,21 @@ pub fn sys_io_setup(
     //   0.
     //
     // TODO: Determine what "internal limits" means.
-    if nr_events > i32::MAX as u32 {
+    let max_operations =
+        user_nr_events.validate(0..(i32::MAX as u32)).ok_or_else(|| errno!(EINVAL))? as usize;
+    if current_task.read_object(user_ctx_idp)? != 0 {
         return error!(EINVAL);
     }
-    if current_task.read_object(ctx_idp)? != 0 {
-        return error!(EINVAL);
-    }
-    let mut mm_state = current_task.mm().state.write();
-    let ctx_id = mm_state.aio_contexts.setup_context(nr_events)?;
-    current_task.write_object(ctx_idp, &ctx_id)?;
+    let context = AioContext::new(max_operations);
+    let context_addr = current_task.mm().map_anonymous(
+        DesiredAddress::Any,
+        AIO_RING_SIZE,
+        ProtectionFlags::READ | ProtectionFlags::WRITE,
+        MappingOptions::ANONYMOUS,
+        MappingName::AioContext(context),
+    )?;
+    let ctx_idp = context_addr.ptr() as aio_context_t;
+    current_task.write_object(user_ctx_idp, &ctx_idp)?;
     Ok(())
 }
 
@@ -2884,19 +2893,14 @@ pub fn sys_io_submit(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     ctx_id: aio_context_t,
-    nr: i32,
+    user_nr: UserValue<i32>,
     mut iocb_addrs: UserRef<UserAddress>,
 ) -> Result<i32, Errno> {
-    if nr < 0 {
-        return error!(EINVAL);
-    }
+    let nr = user_nr.validate(0..i32::MAX).ok_or_else(|| errno!(EINVAL))?;
     if nr == 0 {
         return Ok(0);
     }
-    let ctx = {
-        let mm_state = current_task.mm().state.read();
-        mm_state.aio_contexts.get_context(ctx_id).ok_or_else(|| errno!(EINVAL))?
-    };
+    let ctx = current_task.mm().get_aio_context(ctx_id.into()).ok_or_else(|| errno!(EINVAL))?;
 
     // `iocbpp` is an array of addresses to iocb's.
     let mut num_submitted: i32 = 0;
@@ -2930,7 +2934,7 @@ fn submit_iocb(
     current_task: &CurrentTask,
     control_block: iocb,
     iocb_addr: UserAddress,
-    ctx: Arc<Mutex<AioContext>>,
+    ctx: Arc<AioContext>,
 ) -> Result<(), Errno> {
     let file = current_task.files.get(FdNumber::from_raw(control_block.aio_fildes as i32))?;
     let id = control_block.aio_data;
@@ -2988,7 +2992,6 @@ fn submit_iocb(
         None
     };
 
-    let mut ctx = ctx.lock();
     ctx.queue_op(
         current_task,
         IoOperation {
@@ -3024,13 +3027,10 @@ pub fn sys_io_getevents(
         }
     }
 
-    let ctx = {
-        let mm_state = current_task.mm().state.read();
-        mm_state.aio_contexts.get_context(ctx_id).ok_or_else(|| errno!(EINVAL))?
-    };
+    let ctx = current_task.mm().get_aio_context(ctx_id.into()).ok_or_else(|| errno!(EINVAL))?;
 
     let events = {
-        let mut ctx = ctx.lock();
+        let mut ctx = ctx.state.lock();
         ctx.read_available_results(nr as usize)
     };
 
@@ -3047,8 +3047,7 @@ pub fn sys_io_cancel(
     _result: UserRef<io_event>,
 ) -> Result<(), Errno> {
     let _iocb = current_task.read_object(user_iocb)?;
-    let mm_state = current_task.mm().state.read();
-    let _ctx = mm_state.aio_contexts.get_context(ctx_id).ok_or_else(|| errno!(EINVAL))?;
+    let _ctx = current_task.mm().get_aio_context(ctx_id.into()).ok_or_else(|| errno!(EINVAL))?;
 
     track_stub!(TODO("https://fxbug.dev/297433877"), "io_cancel");
     return error!(ENOSYS);
@@ -3059,8 +3058,7 @@ pub fn sys_io_destroy(
     current_task: &CurrentTask,
     ctx_id: aio_context_t,
 ) -> Result<(), Errno> {
-    let mut mm_state = current_task.mm().state.write();
-    mm_state.aio_contexts.destroy_context(ctx_id)
+    current_task.mm().destroy_aio_context(ctx_id.into())
 }
 
 pub fn sys_io_uring_setup(
