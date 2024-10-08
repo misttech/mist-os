@@ -53,6 +53,27 @@ impl AssemblyGenerated for PackageDestination {
     }
 }
 
+/// Whether to include these in user build type images.
+trait AddToImage {
+    fn add_to_user_images(&self) -> bool;
+    fn add_to_userdebug_images(&self) -> bool;
+}
+
+impl AddToImage for BootfsCompiledPackageDestination {
+    /// Whether to include these in user build type images.
+    fn add_to_user_images(&self) -> bool {
+        match self {
+            Self::Fshost | Self::Bootstrap | Self::Root => true,
+        }
+    }
+    /// Whether to include these in userdebug build type images.
+    fn add_to_userdebug_images(&self) -> bool {
+        match self {
+            Self::Fshost | Self::Bootstrap | Self::Root => true,
+        }
+    }
+}
+
 /// This generates the static packages allowlist, based on the build-type of the
 /// system being assembled.  Some assembly-generated packages are only created
 /// in certain build-types.
@@ -112,20 +133,20 @@ impl AssemblyGenerated for BootfsPackageDestination {
     }
 }
 
-fn get_bootfs_packages_allowlist() -> Vec<String> {
+fn get_bootfs_packages_allowlist(build_type: BuildType) -> Vec<String> {
     let mut bootfs_packages: Vec<String> = BootfsPackageDestination::iter()
-    .filter_map(|v|
         // This script only returns assembly-generated files.
         // Files from AIBs are collected and merged in a separate process.
-        if v.assembly_generated(){
-            Some(v.to_string())
-        } else {
-            None
-        }
-    )
-    .collect();
-    let mut compiled_packages: Vec<String> =
-        BootfsCompiledPackageDestination::iter().map(|a| a.to_string()).collect();
+        .filter(AssemblyGenerated::assembly_generated)
+        .map(|v| v.to_string())
+        .collect();
+    let mut compiled_packages: Vec<String> = BootfsCompiledPackageDestination::iter()
+        .filter(|a| match build_type {
+            BuildType::UserDebug => a.add_to_userdebug_images(),
+            _ => a.add_to_user_images(),
+        })
+        .map(|a| a.to_string())
+        .collect();
     bootfs_packages.append(&mut compiled_packages);
     bootfs_packages.sort();
     bootfs_packages
@@ -138,7 +159,7 @@ fn main() {
     std::fs::write(args.static_packages, static_packages.join("\n"))
         .expect("Writing packages allowlist");
 
-    let bootfs_packages = get_bootfs_packages_allowlist();
+    let bootfs_packages = get_bootfs_packages_allowlist(args.build_type);
     std::fs::write(args.bootfs_packages, bootfs_packages.join("\n"))
         .expect("Writing bootfs packages allowlist");
 
