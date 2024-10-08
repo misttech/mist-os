@@ -1395,20 +1395,22 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.sys2/StorageAdmin.OpenComponentStorage",
-        "strictness": "strict",
-        "ordinal": "4468298420184115997",
-        "direction": "one_way",
-        "request": "fuchsia.sys2/StorageAdminOpenComponentStorageRequest"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.sys2/StorageAdmin.OpenComponentStorageById",
         "strictness": "strict",
         "ordinal": "5188727505160068593",
         "direction": "two_way",
         "request": "fuchsia.sys2/StorageAdminOpenComponentStorageByIdRequest",
         "response": "fuchsia.sys2/StorageAdmin_OpenComponentStorageById_Response",
+        "error": "fuchsia.component/Error"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.sys2/StorageAdmin.OpenStorage",
+        "strictness": "strict",
+        "ordinal": "7848267339832116087",
+        "direction": "two_way",
+        "request": "fuchsia.sys2/StorageAdminOpenStorageRequest",
+        "response": "fuchsia.sys2/StorageAdmin_OpenStorage_Response",
         "error": "fuchsia.component/Error"
     },
     {
@@ -1463,31 +1465,19 @@
     },
     {
         "kind": "struct/member",
-        "name": "fuchsia.sys2/StorageAdminOpenComponentStorageRequest.flags",
+        "name": "fuchsia.sys2/StorageAdminOpenStorageRequest.object",
         "ordinal": "2",
-        "type": "fuchsia.io/OpenFlags"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.sys2/StorageAdminOpenComponentStorageRequest.mode",
-        "ordinal": "3",
-        "type": "fuchsia.io/ModeType"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.sys2/StorageAdminOpenComponentStorageRequest.object",
-        "ordinal": "4",
         "type": "server_end:fuchsia.io/Node"
     },
     {
         "kind": "struct/member",
-        "name": "fuchsia.sys2/StorageAdminOpenComponentStorageRequest.relative_moniker",
+        "name": "fuchsia.sys2/StorageAdminOpenStorageRequest.relative_moniker",
         "ordinal": "1",
         "type": "string:4096"
     },
     {
         "kind": "struct",
-        "name": "fuchsia.sys2/StorageAdminOpenComponentStorageRequest",
+        "name": "fuchsia.sys2/StorageAdminOpenStorageRequest",
         "resourceness": "resource"
     },
     {

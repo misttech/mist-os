@@ -156,6 +156,10 @@ impl StorageAdmin {
 
         while let Some(request) = stream.try_next().await? {
             match request {
+                #[cfg(any(
+                    fuchsia_api_level_less_than = "NEXT",
+                    fuchsia_api_level_at_least = "PLATFORM"
+                ))]
                 fsys::StorageAdminRequest::OpenComponentStorage {
                     relative_moniker,
                     flags,
@@ -175,6 +179,30 @@ impl StorageAdmin {
                     )
                     .await?;
                     dir_proxy.open(flags, mode, ".", object)?;
+                }
+                #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                fsys::StorageAdminRequest::OpenStorage { relative_moniker, object, responder } => {
+                    let fut = async {
+                        let moniker = Moniker::parse_str(&relative_moniker)
+                            .map_err(|_| fcomponent::Error::InvalidArguments)?;
+                        let absolute_moniker = component.moniker().concat(&moniker);
+                        let instance_id = component
+                            .component_id_index()
+                            .id_for_moniker(&absolute_moniker)
+                            .cloned();
+                        let directory = storage::open_isolated_storage(
+                            &backing_dir_source_info,
+                            moniker,
+                            instance_id.as_ref(),
+                        )
+                        .await
+                        .map_err(|_| fcomponent::Error::Internal)?;
+                        directory
+                            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, object)
+                            .map_err(|_| fcomponent::Error::Internal)?;
+                        Ok(())
+                    };
+                    responder.send(fut.await)?;
                 }
                 fsys::StorageAdminRequest::ListStorageInRealm {
                     relative_moniker,

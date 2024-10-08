@@ -314,12 +314,12 @@ async fn get_storage_for_component_instance(moniker_prefix: &str) -> fio::Direct
     assert_eq!(1, matching_storage_users.len());
     let (proxy, server_end) = create_proxy::<fio::DirectoryMarker>().unwrap();
     storage_admin
-        .open_component_storage(
+        .open_storage(
             matching_storage_users.first().unwrap(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            fio::ModeType::empty(),
             ServerEnd::new(server_end.into_channel()),
         )
+        .await
+        .unwrap()
         .unwrap();
     proxy
 }
