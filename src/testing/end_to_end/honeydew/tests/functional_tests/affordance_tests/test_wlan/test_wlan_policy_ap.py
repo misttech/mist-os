@@ -40,6 +40,10 @@ class WlanPolicyApTests(fuchsia_base_test.FuchsiaBaseTest):
         """Verify WLAN policy access point methods."""
         self.device.wlan_policy_ap.stop_all()
         self.device.wlan_policy_ap.set_new_update_listener()
+        asserts.assert_equal(
+            self.device.wlan_policy_ap.get_update(),
+            [],
+        )
 
 
 if __name__ == "__main__":

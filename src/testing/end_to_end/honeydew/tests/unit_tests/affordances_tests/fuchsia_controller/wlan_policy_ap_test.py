@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 """Unit tests for honeydew.affordances.fuchsia_controller.wlan.wlan_policy_ap."""
 
+import asyncio
 import unittest
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -16,9 +17,37 @@ from honeydew.errors import NotSupportedError
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import fuchsia_controller as fc_transport
-from honeydew.typing.wlan import ConnectivityMode, OperatingBand, SecurityType
+from honeydew.typing.wlan import (
+    AccessPointState,
+    ConnectivityMode,
+    NetworkIdentifier,
+    OperatingBand,
+    OperatingState,
+    SecurityType,
+)
 
 _TEST_SSID = "ThepromisedLAN"
+_TEST_SSID_BYTES = list(str.encode(_TEST_SSID))
+
+_ACCESS_POINT_STATE = AccessPointState(
+    state=OperatingState.STARTING,
+    mode=ConnectivityMode.LOCAL_ONLY,
+    band=OperatingBand.ONLY_2_4GHZ,
+    frequency=None,
+    clients=None,
+    id=NetworkIdentifier(ssid=_TEST_SSID, security_type=SecurityType.WPA2),
+)
+_ACCESS_POINT_STATE_FIDL = f_wlan_policy.AccessPointState(
+    state=f_wlan_policy.OperatingState.STARTING,
+    mode=f_wlan_policy.ConnectivityMode.LOCAL_ONLY,
+    band=f_wlan_policy.OperatingBand.ONLY_2_4GHZ,
+    frequency=None,
+    clients=None,
+    id=f_wlan_policy.NetworkIdentifier(
+        ssid=list(_TEST_SSID_BYTES),
+        type=f_wlan_policy.SecurityType.WPA2,
+    ),
+)
 
 
 # pylint: disable=protected-access
@@ -193,8 +222,48 @@ class WlanPolicyApFCTests(unittest.TestCase):
 
     def test_get_update(self) -> None:
         """Verify WlanPolicyAp.get_update()."""
-        with self.assertRaises(NotImplementedError):
-            self.wlan_policy_ap_obj.get_update()
+        self.assertIsNotNone(self.access_point_state_updates_proxy)
+        assert self.access_point_state_updates_proxy is not None
+
+        self.wlan_policy_ap_obj.loop().run_until_complete(
+            self.access_point_state_updates_proxy.on_access_point_state_update(
+                access_points=[
+                    _ACCESS_POINT_STATE_FIDL,
+                ]
+            )
+        )
+        self.assertEqual(
+            self.wlan_policy_ap_obj.get_update(), [_ACCESS_POINT_STATE]
+        )
+
+    def test_get_update_queuing(self) -> None:
+        """Verify WlanPolicyAp.get_update() queues updates."""
+        self.assertIsNotNone(self.access_point_state_updates_proxy)
+        assert self.access_point_state_updates_proxy is not None
+
+        self.wlan_policy_ap_obj.loop().run_until_complete(
+            self.access_point_state_updates_proxy.on_access_point_state_update(
+                access_points=[]
+            )
+        )
+        self.wlan_policy_ap_obj.loop().run_until_complete(
+            self.access_point_state_updates_proxy.on_access_point_state_update(
+                access_points=[_ACCESS_POINT_STATE_FIDL]
+            )
+        )
+        self.assertEqual(self.wlan_policy_ap_obj.get_update(), [])
+        self.assertEqual(
+            self.wlan_policy_ap_obj.get_update(), [_ACCESS_POINT_STATE]
+        )
+
+    @mock.patch(
+        "asyncio.wait_for", autospec=True, side_effect=[asyncio.TimeoutError]
+    )
+    def test_get_update_timeout(self, wait_for_mock: mock.MagicMock) -> None:
+        """Verify WlanPolicyAp.get_update() throws TimeoutError on timeout."""
+        with self.assertRaises(TimeoutError):
+            self.wlan_policy_ap_obj.get_update(timeout=10)
+        wait_for_mock.assert_called_once()
 
 
 if __name__ == "__main__":

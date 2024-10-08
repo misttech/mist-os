@@ -318,8 +318,9 @@ class WlanPolicyAp(AsyncAdapter, wlan_policy_ap.WlanPolicyAp):
             HoneydewWlanError: Error from WLAN stack.
             TimeoutError: Reached timeout without any updates.
         """
-        # TODO(http://b/324948461): Finish implementation
-        raise NotImplementedError()
+        return await asyncio.wait_for(
+            self._access_point_controller.updates.get(), timeout
+        )
 
 
 class AccessPointStateUpdatesImpl(f_wlan_policy.AccessPointStateUpdates.Server):
