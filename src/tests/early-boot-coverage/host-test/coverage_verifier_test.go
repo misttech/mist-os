@@ -143,7 +143,7 @@ func GetCoverageDataFromTest(t *testing.T, outDir string, config *Config) []stri
 	// Component manager starts up.
 	i.WaitForLogMessage("[component_manager] INFO: Component manager is starting up...")
 	// Netstack is up. This would contain the line number of the log message. Lets avoid it.
-	i.WaitForLogMessage("[netstack] INFO: main.go")
+	i.WaitForLogMessage("[netstack] INFO: ")
 
 	// Resolve node context.
 	t.Log("Resolving target IP.")
