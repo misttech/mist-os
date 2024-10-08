@@ -12,6 +12,8 @@
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
+#include <lib/mistos/starnix/kernel/vfs/dir_entry.h>
+#include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/util/bitflags.h>
@@ -114,7 +116,7 @@ fit::result<Errno, UserAddress> do_mmap(const CurrentTask& current_task, UserAdd
     return fit::ok(DesiredAddress{.address = UserAddress::NULL_});
   }() _EP(daddr);
 
-  // uint64_t memory_offset = (flags & MAP_ANONYMOUS) ? 0 : offset;
+  uint64_t memory_offset = (flags & MAP_ANONYMOUS) ? 0 : offset;
 
   auto options = MappingOptionsFlags::empty();
   if (flags & MAP_SHARED) {
@@ -139,15 +141,12 @@ fit::result<Errno, UserAddress> do_mmap(const CurrentTask& current_task, UserAdd
   if ((flags & MAP_ANONYMOUS) != 0) {
     return current_task->mm()->map_anonymous(*daddr, length, prot_flags.value(), options,
                                              {.type = MappingNameType::None});
-  } else {
-    /*
-    // TODO(tbodt): maximize protection flags so that mprotect works
-    let file = current_task.files.get(fd)?;
-    file.mmap(current_task, addr, memory_offset, length, prot_flags, options, file.name.clone())
-    */
   }
 
-  return fit::ok(0);
+  // TODO(tbodt): maximize protection flags so that mprotect works
+  auto file = current_task->files.get(fd) _EP(file);
+  return file->mmap(current_task, daddr.value(), memory_offset, length, prot_flags.value(), options,
+                    file->name);
 }
 
 fit::result<Errno> sys_munmap(const CurrentTask& current_task, UserAddress addr, size_t length) {

@@ -10,6 +10,7 @@
 #include <lib/mistos/linux_uapi/typedefs.h>
 #include <lib/mistos/starnix/kernel/mm/flags.h>
 #include <lib/mistos/starnix/kernel/mm/memory.h>
+#include <lib/mistos/starnix/kernel/mm/memory_manager.h>
 #include <lib/mistos/starnix/kernel/vfs/dirent_sink.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace_node.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
@@ -40,7 +41,7 @@ using FileSystemHandle = fbl::RefPtr<FileSystem>;
 using WeakFileHandle = util::WeakPtr<FileObject>;
 using starnix_uapi::OpenFlagsImpl;
 
-enum class SeekTargetType {
+enum class SeekTargetType : uint8_t {
   // Seek to the given offset relative to the start of the file.
   Set,
   // Seek to the given offset relative to the current position.
@@ -122,7 +123,7 @@ class FileObject : public fbl::RefCounted<FileObject> {
 
   bool can_write() const { return OpenFlagsImpl(*flags_.Lock()).can_write(); }
 
-  FileOps& ops_() const { return *ops.get(); }
+  FileOps& ops_() const { return *ops; }
 
   OpenFlags flags() const { return *flags_.Lock(); }
 
@@ -198,6 +199,11 @@ class FileObject : public fbl::RefCounted<FileObject> {
   fit::result<Errno, fbl::RefPtr<MemoryObject>> get_memory(const CurrentTask& current_task,
                                                            ktl::optional<size_t> length,
                                                            ProtectionFlags prot) const;
+
+  fit::result<Errno, UserAddress> mmap(const CurrentTask& current_task, DesiredAddress addr,
+                                       uint64_t vmo_offset, size_t length,
+                                       ProtectionFlags prot_flags, MappingOptionsFlags options,
+                                       NamespaceNode filename) const;
 
   ~FileObject();
 

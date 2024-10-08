@@ -243,6 +243,23 @@ fit::result<Errno, fbl::RefPtr<MemoryObject>> FileObject::get_memory(
   return ops_().get_memory(*this, current_task, length, prot);
 }
 
+fit::result<Errno, UserAddress> FileObject::mmap(const CurrentTask& current_task,
+                                                 DesiredAddress addr, uint64_t vmo_offset,
+                                                 size_t length, ProtectionFlags prot_flags,
+                                                 MappingOptionsFlags options,
+                                                 NamespaceNode filename) const {
+  if (!this->can_read()) {
+    return fit::error(errno(EACCES));
+  }
+  if (prot_flags.contains(ProtectionFlagsEnum::WRITE) && !this->can_write() &&
+      options.contains(MappingOptions::SHARED)) {
+    return fit::error(errno(EACCES));
+  }
+  // TODO (Herrera): Check for PERM_EXECUTE by checking whether the filesystem is mounted as noexec.
+  return ops_().mmap(*this, current_task, addr, vmo_offset, length, prot_flags, options,
+                     ktl::move(filename));
+}
+
 fit::result<Errno, off_t> default_eof_offset(const FileObject& file,
                                              const CurrentTask& current_task) {
   auto stat_result = file.node()->stat(current_task);

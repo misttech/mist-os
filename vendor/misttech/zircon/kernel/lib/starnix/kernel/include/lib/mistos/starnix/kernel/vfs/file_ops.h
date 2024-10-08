@@ -98,7 +98,7 @@ class FileOps {
   virtual fit::result<Errno, fbl::RefPtr<MemoryObject>> get_memory(const FileObject& file,
                                                                    const CurrentTask& current_task,
                                                                    ktl::optional<size_t> length,
-                                                                   ProtectionFlags prot) {
+                                                                   ProtectionFlags prot) const {
     return fit::error(errno(ENODEV));
   }
 
@@ -108,11 +108,10 @@ class FileOps {
   /// a VMO gets mapped.
   virtual fit::result<Errno, UserAddress> mmap(const FileObject& file,
                                                const CurrentTask& current_task, DesiredAddress addr,
-                                               uint64_t vmo_offset, size_t length,
-                                               ProtectionFlags prot_flags, MappingOptions options,
-                                               NamespaceNode filename) {
-    return fit::error(errno(ENOTSUP));
-  }
+                                               uint64_t memory_offset, size_t length,
+                                               ProtectionFlags prot_flags,
+                                               MappingOptionsFlags options,
+                                               NamespaceNode filename) const;
 
   /// Respond to a `getdents` or `getdents64` calls.
   ///
@@ -382,7 +381,7 @@ struct OPathOps : FileOps {
   fit::result<Errno, fbl::RefPtr<MemoryObject>> get_memory(const FileObject& file,
                                                            const CurrentTask& current_task,
                                                            ktl::optional<size_t> length,
-                                                           ProtectionFlags prot) final {
+                                                           ProtectionFlags prot) const final {
     return fit::error(errno(EBADF));
   }
 
