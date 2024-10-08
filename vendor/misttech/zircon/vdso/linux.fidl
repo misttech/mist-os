@@ -4,10 +4,13 @@
 library zx;
 
 alias new_utsname = byte;
+alias statx = byte;
+alias stat = byte;
 
 @no_protocol_prefix
 @transport("Syscall")
 closed protocol Linux {
+
     /// ## Summary
     ///
     /// Linux System Calls 
@@ -24,23 +27,51 @@ closed protocol Linux {
     /// a0000_read that by Zither sorting will be the first syscall in the syscall table.
     ///
 
-    // STUB 0
-    strict A0000Read() -> () error int64;
+    // #0, SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
+    strict A0000Read(resource struct {
+        fd uint32;
+        @out
+        buf experimental_pointer<uchar>;
+        count uint64;
+    }) -> () error int64;
 
-    // STUB 1
-    strict A0001Write() -> () error int64;
+    // #1, SYSCALL_DEFINE3(write, unsigned int, fd, const char __user *, buf, size_t, count)
+    strict A0001Write(resource struct {
+        fd uint32;
+        @in
+        buf experimental_pointer<uchar>;
+        count uint64;
+    }) -> () error int64;
 
-    // STUB 2
-    strict A0002Open() -> () error int64;
+    // #2, SYSCALL_DEFINE3(open, const char __user *, filename, int, flags, umode_t, mode)
+    strict A0002Open(resource struct {
+        @in
+        filename experimental_pointer<uchar>;
+        flags int32;
+        mode uint16;
+    }) -> () error int64;
 
-    // STUB 3
-    strict A0003Close() -> () error int64;
+    // #3, SYSCALL_DEFINE1(close, unsigned int, fd)
+    strict A0003Close(resource struct {
+        fd uint32;
+    }) -> () error int64;
 
-    // STUB 4
-    strict A0004Stat() -> () error int64;
+    // #4, SYSCALL_DEFINE2(newstat, const char __user *, filename, struct stat __user *, statbuf)
+    strict A0004Stat(resource struct {
+        @in
+        filename experimental_pointer<uchar>;
+        @voidptr
+        @out
+        statbuf experimental_pointer<stat>;
+    }) -> () error int64;
 
-    // STUB 5
-    strict A0005Fstat() -> () error int64;
+    // #5, SYSCALL_DEFINE2(newfstat, unsigned int, fd, struct stat __user *, statbuf)
+    strict A0005Fstat(resource struct {
+        fd uint32;
+        @voidptr
+        @out
+        statbuf experimental_pointer<stat>;
+    }) -> () error int64;
 
     // STUB 6
     strict A0006Lstat() -> () error int64;
@@ -91,8 +122,14 @@ closed protocol Linux {
     // STUB 16
     strict A0016Ioctl() -> () error int64;
 
-    // STUB 17
-    strict A0017Pread64() -> () error int64;
+    // #17, SYSCALL_DEFINE4(pread64, unsigned int, fd, char __user *, buf, size_t, count, loff_t, pos)
+    strict A0017Pread64(resource struct {
+        fd uint32;
+        @out
+        buf experimental_pointer<uchar>;
+        count uint64;
+        pos int64;
+    }) -> () error int64;
 
     // STUB 18
     strict A0018Pwrite64() -> () error int64;
@@ -100,11 +137,21 @@ closed protocol Linux {
     // STUB 19
     strict A0019Readv() -> () error int64;
 
-    // STUB 20
-    strict A0020Writev() -> () error int64;
+    // #20, SYSCALL_DEFINE3(writev, unsigned long, fd, const struct iovec __user *, vec, unsigned long, vlen)
+    strict A0020Writev(resource struct {
+        fd uint64;
+        @voidptr
+        @in
+        vec experimental_pointer<byte>;
+        vlen uint64;
+    }) -> () error int64;
 
-    // STUB 21
-    strict A0021Access() -> () error int64;
+    // #21, SYSCALL_DEFINE2(access, const char __user *, filename, int, mode)
+    strict A0021Access(resource struct {
+        @in
+        filename experimental_pointer<uchar>;
+        mode int32;
+    }) -> () error int64;
 
     // STUB 22
     strict A0022Pipe() -> () error int64;
@@ -313,8 +360,14 @@ closed protocol Linux {
     // STUB 88
     strict A0088Symlink() -> () error int64;
 
-    // STUB 89
-    strict A0089Readlink() -> () error int64;
+    // #89, SYSCALL_DEFINE3(readlink, const char __user *, path, char __user *, buf, int, bufsiz)
+    strict A0089Readlink(resource struct {
+        @in
+        path experimental_pointer<uchar>;
+        @out
+        buf experimental_pointer<uchar>;
+        bufsiz int32;
+    }) -> () error int64;
 
     // STUB 90
     strict A0090Chmod() -> () error int64;
@@ -828,8 +881,14 @@ closed protocol Linux {
     // STUB 256
     strict A0256MigratePages() -> () error int64;
 
-    // STUB 257
-    strict A0257Openat() -> () error int64;
+    // #257, SYSCALL_DEFINE4(openat, int, dfd, const char __user *, filename, int, flags, umode_t, mode)
+    strict A0257Openat(resource struct {
+        dfd int32;
+        @in
+        filename experimental_pointer<uchar>;
+        flags int32;
+        mode uint16;
+    }) -> () error int64;
 
     // STUB 258
     strict A0258Mkdirat() -> () error int64;
@@ -1058,8 +1117,17 @@ closed protocol Linux {
     // STUB 331
     strict A0331PkeyFree() -> () error int64;
 
-    // STUB 332
-    strict A0332Statx() -> () error int64;
+    // #332 SYSCALL_DEFINE5(statx, int, dfd, const char __user *, filename, unsigned, flags, unsigned int, mask, struct statx __user *, buffer)
+    strict A0332Statx(resource struct {
+        dfd int32;
+        @in
+        filename experimental_pointer<uchar>;
+        flags uint32;
+        mask uint32;
+        @out
+        @voidptr
+        buffer experimental_pointer<statx>;
+    }) -> () error int64;
 
     // STUB 333
     strict A0333IoPgetevents() -> () error int64;

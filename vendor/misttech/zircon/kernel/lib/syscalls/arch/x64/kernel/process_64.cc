@@ -16,7 +16,7 @@
 
 #define LOCAL_TRACE MISTOS_SYSCALLS_GLOBAL_TRACE(0)
 
-long sys_arch_prctl(int option, unsigned long arg2) {
+long sys_a0158_arch_prctl(int option, unsigned long arg2) {
   LTRACEF_LEVEL(2, "option 0x%x arg2 0x%lx\n", option, arg2);
 
   long ret = 0;
