@@ -129,17 +129,15 @@ group("default") {
 
     #"//src/starnix_lite/lib/usercopy:tests",
 
-    # Examples
-    #"//src/lib/zircon/rust/examples/zx_toy:zx_toy_zbi",
-
     # Host tools tests
     #"//zircon/tools:tests",
 
     # Generate ZBIs used to run on target
-    ##"//build/images/mistos",
+    #"//build/images/mistos",
 
     # Mist Technologies
     "//vendor/misttech/zircon/kernel/lib/linux-rt",
+    "//vendor/misttech/zircon/kernel/lib/starnix/examples",
   ]
 }
 
@@ -151,7 +149,6 @@ group("build_only") {
   testonly = true
   deps = build_only_labels
 }
-
 
 # Host-only tests.  These cannot have any dependency on an assembled platform
 # image, or the compiled OS itself, not even for their host_test_data().
