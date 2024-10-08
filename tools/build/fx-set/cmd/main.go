@@ -186,6 +186,8 @@ type setArgs struct {
 
 	buildEventService string
 
+	mainProductLabel string
+
 	includeClippy bool
 
 	isRelease        bool
@@ -245,6 +247,8 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 	flagSet.BoolVar(&cmd.enableBazelRbe, "bazel-rbe", false, "")
 
 	flagSet.StringVar(&cmd.buildEventService, "bes", "", "")
+
+	flagSet.StringVar(&cmd.mainProductLabel, "main-product", "", "")
 
 	flagSet.BoolVar(&cmd.isRelease, "release", false, "")
 	flagSet.BoolVar(&cmd.netboot, "netboot", false, "")
@@ -445,6 +449,7 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 	return &fintpb.Static{
 		Board:               boardPath,
 		Product:             productPath,
+		MainProductLabel:    args.mainProductLabel,
 		Optimize:            optimize,
 		BasePackages:        args.basePackages,
 		CachePackages:       args.cachePackages,
