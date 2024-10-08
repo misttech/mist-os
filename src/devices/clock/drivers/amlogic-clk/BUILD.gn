@@ -51,7 +51,7 @@ source_set("amlogic-clk-driver-source") {
     "//sdk/banjo/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
     "//sdk/fidl/fuchsia.hardware.clock.measure:fuchsia.hardware.clock.measure_cpp",
-    "//src/devices/bus/lib/device-protocol-pdev",
+    "//sdk/lib/driver/platform-device/cpp",
     "//src/devices/lib/amlogic",
     "//src/lib/ddk",
     "//src/lib/ddktl",
@@ -93,17 +93,30 @@ test("amlogic-clk-test-bin") {
   sources = [ "aml-clk-test.cc" ]
   deps = [
     ":amlogic-clk-driver-source",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/fake-platform-device/cpp",
     "//src/devices/lib/mmio",
     "//src/devices/lib/mmio:test_helper",
-    "//src/devices/testing/no_ddk",
+    "//src/devices/testing/mock-ddk",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture",
+    "//src/lib/testing/predicates",
     "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
-    "//zircon/system/ulib/zxtest",
   ]
 }
 
 fuchsia_unittest_package("amlogic-clk-test") {
+  manifest = "meta/amlogic-clk-test.cml"
   deps = [
     ":aml-clk-bind_test",
     ":amlogic-clk-test-bin",
   ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
