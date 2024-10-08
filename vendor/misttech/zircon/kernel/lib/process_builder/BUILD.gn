@@ -1,0 +1,24 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/zircon/migrated_targets.gni")
+
+zx_library("process_builder") {
+  sources = [
+    "elf_loader.cc",
+    "elf_parser.cc",
+    "vmar-loader.cc",
+  ]
+
+  public_deps = [
+    "//src/lib/elfldltl:headers",
+    "//vendor/misttech/zircon/kernel/lib/mistos/util:headers",
+    "//zircon/kernel/object",
+  ]
+  deps = [ "//zircon/kernel/lib/ktl" ]
+}
+
+group("tests") {
+  deps = [ "tests" ]
+}
