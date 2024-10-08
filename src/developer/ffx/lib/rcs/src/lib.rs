@@ -17,7 +17,7 @@ use fidl_fuchsia_sys2::{
 use futures::{StreamExt, TryFutureExt};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use timeout::{timeout, TimeoutError};
 
 pub use fidl_fuchsia_io::OpenFlags;
@@ -26,6 +26,8 @@ pub use fidl_fuchsia_sys2::OpenDirType;
 pub mod port_forward;
 pub mod toolbox;
 
+/// Note that this is only used for backwards compatibility. All new usages should prefer using the
+/// toolbox moniker instead.
 const REMOTE_CONTROL_MONIKER: &str = "core/remote-control";
 
 const IDENTIFY_HOST_TIMEOUT_MILLIS: u64 = 10000;
@@ -184,18 +186,35 @@ pub async fn knock_rcs(rcs_proxy: &RemoteControlProxy) -> Result<(), ffx::Target
 
 async fn knock_rcs_impl(rcs_proxy: &RemoteControlProxy) -> Result<(), KnockRcsError> {
     let (knock_client, knock_remote) = fidl::handle::Channel::create();
-    let knock_client = fuchsia_async::Channel::from_channel(knock_client);
-    let knock_client = fidl::client::Client::new(knock_client, "knock_client");
-    rcs_proxy
+    let res = rcs_proxy
         .open_capability(
-            "/core/remote-control",
-            OpenDirType::ExposedDir,
-            RemoteControlMarker::PROTOCOL_NAME,
+            toolbox::MONIKER,
+            OpenDirType::NamespaceDir,
+            &format!("svc/{}", RemoteControlMarker::PROTOCOL_NAME),
             knock_remote,
             OpenFlags::empty(),
         )
-        .await?
-        .map_err(|e| KnockRcsError::RcsConnectCapabilityError(e))?;
+        .await?;
+    let knock_client = if res.is_ok() {
+        knock_client
+    } else {
+        // Fallback to the legacy remote control moniker if toolbox doesn't contain the capability.
+        let (knock_client, knock_remote) = fidl::handle::Channel::create();
+        rcs_proxy
+            .open_capability(
+                REMOTE_CONTROL_MONIKER,
+                OpenDirType::ExposedDir,
+                RemoteControlMarker::PROTOCOL_NAME,
+                knock_remote,
+                OpenFlags::empty(),
+            )
+            .await?
+            .map_err(|e| KnockRcsError::RcsConnectCapabilityError(e))?;
+        knock_client
+    };
+
+    let knock_client = fuchsia_async::Channel::from_channel(knock_client);
+    let knock_client = fidl::client::Client::new(knock_client, "knock_client");
     let mut event_receiver = knock_client.take_event_receiver();
     let res = timeout(RCS_KNOCK_TIMEOUT, event_receiver.next()).await;
     match res {
@@ -322,15 +341,34 @@ async fn get_cf_root_from_namespace<M: fidl::endpoints::DiscoverableProtocolMark
     timeout: Duration,
 ) -> Result<M::Proxy> {
     let (proxy, server_end) = fidl::endpoints::create_proxy::<M>()?;
-    open_with_timeout_at(
+    let start_time = Instant::now();
+    let res = open_with_timeout_at(
         timeout,
-        REMOTE_CONTROL_MONIKER,
+        toolbox::MONIKER,
         OpenDirType::NamespaceDir,
         &format!("svc/{}.root", M::PROTOCOL_NAME),
         rcs_proxy,
         server_end.into_channel(),
     )
-    .await?;
+    .await;
+
+    let proxy = if res.is_ok() {
+        proxy
+    } else {
+        // Fallback to the legacy remote control moniker if toolbox doesn't contain the capability.
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<M>()?;
+        let timeout = timeout.saturating_sub(Instant::now() - start_time);
+        open_with_timeout_at(
+            timeout,
+            REMOTE_CONTROL_MONIKER,
+            OpenDirType::NamespaceDir,
+            &format!("svc/{}.root", M::PROTOCOL_NAME),
+            rcs_proxy,
+            server_end.into_channel(),
+        )
+        .await?;
+        proxy
+    };
     Ok(proxy)
 }
 
@@ -339,15 +377,35 @@ pub async fn kernel_stats(
     timeout: Duration,
 ) -> Result<fidl_fuchsia_kernel::StatsProxy> {
     let (proxy, server_end) = fidl::endpoints::create_proxy::<fidl_fuchsia_kernel::StatsMarker>()?;
-    open_with_timeout_at(
+    let start_time = Instant::now();
+    let res = open_with_timeout_at(
         timeout,
-        REMOTE_CONTROL_MONIKER,
+        toolbox::MONIKER,
         OpenDirType::NamespaceDir,
         &format!("svc/{}", fidl_fuchsia_kernel::StatsMarker::PROTOCOL_NAME),
         rcs_proxy,
         server_end.into_channel(),
     )
-    .await?;
+    .await;
+
+    let proxy = if res.is_ok() {
+        proxy
+    } else {
+        // Fallback to the legacy remote control moniker if toolbox doesn't contain the capability.
+        let (proxy, server_end) =
+            fidl::endpoints::create_proxy::<fidl_fuchsia_kernel::StatsMarker>()?;
+        let timeout = timeout.saturating_sub(Instant::now() - start_time);
+        open_with_timeout_at(
+            timeout,
+            REMOTE_CONTROL_MONIKER,
+            OpenDirType::NamespaceDir,
+            &format!("svc/{}", fidl_fuchsia_kernel::StatsMarker::PROTOCOL_NAME),
+            rcs_proxy,
+            server_end.into_channel(),
+        )
+        .await?;
+        proxy
+    };
     Ok(proxy)
 }
 

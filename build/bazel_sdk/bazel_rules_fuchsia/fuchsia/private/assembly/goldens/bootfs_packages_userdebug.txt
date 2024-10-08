@@ -61,7 +61,7 @@ sysinfo
 sysmem
 ?sysmem-config
 ?ta-manager-config
-toolbox
+?toolbox
 ums-function
 usb-audio
 usb-bus

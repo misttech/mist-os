@@ -527,7 +527,7 @@ mod test {
                             flags: _,
                             responder,
                         } => {
-                            assert_eq!(moniker, "core/remote-control");
+                            assert_eq!(moniker, "toolbox");
                             assert_eq!(capability_set, fsys::OpenDirType::NamespaceDir);
                             assert!(
                                 capability_name == "svc/fuchsia.sys2.RealmQuery.root"

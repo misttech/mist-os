@@ -14,7 +14,7 @@ use fidl_fuchsia_sys2::OpenDirType;
 use futures::Stream;
 use std::net::SocketAddr;
 use std::ops::Deref;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use {fidl_fuchsia_posix_socket as fsock, fuchsia_async as fasync};
 
 /// Connect to `fuchsia.posix.socket.Provider` from the perspective of RCS.
@@ -23,15 +23,34 @@ async fn socket_provider(
     timeout: Duration,
 ) -> Result<fsock::ProviderProxy> {
     let (proxy, server_end) = fidl::endpoints::create_proxy::<fsock::ProviderMarker>()?;
-    crate::open_with_timeout_at(
+    let start_time = Instant::now();
+    let res = crate::open_with_timeout_at(
         timeout,
-        crate::REMOTE_CONTROL_MONIKER,
+        crate::toolbox::MONIKER,
         OpenDirType::NamespaceDir,
         &format!("svc/{}", fsock::ProviderMarker::PROTOCOL_NAME),
         rcs_proxy,
         server_end.into_channel(),
     )
-    .await?;
+    .await;
+    let proxy = if res.is_ok() {
+        proxy
+    } else {
+        // Fallback to the legacy remote control moniker if toolbox doesn't contain the capability.
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fsock::ProviderMarker>()?;
+        let timeout = timeout.saturating_sub(Instant::now() - start_time);
+        crate::open_with_timeout_at(
+            timeout,
+            crate::REMOTE_CONTROL_MONIKER,
+            OpenDirType::NamespaceDir,
+            &format!("svc/{}", fsock::ProviderMarker::PROTOCOL_NAME),
+            rcs_proxy,
+            server_end.into_channel(),
+        )
+        .await?;
+        proxy
+    };
+
     Ok(proxy)
 }
 

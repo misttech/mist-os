@@ -368,7 +368,18 @@ assembly_input_bundle("embeddable_userdebug") {
     # shell
     "//zircon/third_party/uapp/dash:bootfs",
   ]
-  bootfs_packages = [ "//src/developer/toolbox" ]
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "toolbox"
+      components = [
+        {
+          component_name = "toolbox"
+          shards = [ "//src/developer/toolbox/meta/toolbox.cml" ]
+        },
+      ]
+    },
+  ]
 }
 
 # The most minimal AIB that is included in userdebug and eng assembled systems
@@ -1481,6 +1492,16 @@ assembly_input_bundle("core_realm_development_access") {
         },
       ]
     },
+    {
+      bootfs_package = true
+      name = "toolbox"
+      components = [
+        {
+          component_name = "toolbox"
+          shards = [ "//src/developer/remote-control/meta/remote-control.toolbox_shard.cml" ]
+        },
+      ]
+    },
   ]
   shell_commands = [
     {
@@ -1536,6 +1557,16 @@ assembly_input_bundle("bootstrap_realm_vsock_development_access") {
             "//src/developer/remote-control/meta/remote-control.bootstrap_shard.cml",
             "//src/developer/vsock-sshd-host/meta/vsock-sshd-host.bootstrap_shard.cml",
           ]
+        },
+      ]
+    },
+    {
+      bootfs_package = true
+      name = "toolbox"
+      components = [
+        {
+          component_name = "toolbox"
+          shards = [ "//src/developer/remote-control/meta/remote-control.vsock_toolbox_shard.cml" ]
         },
       ]
     },

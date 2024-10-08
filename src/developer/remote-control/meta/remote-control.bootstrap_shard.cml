@@ -55,5 +55,10 @@
             to: "#remote-control",
             availability: "optional",
         },
+        {
+            protocol: "fuchsia.developer.remotecontrol.RemoteControl",
+            from: "#remote-control",
+            to: "self/toolbox",
+        },
     ],
 }

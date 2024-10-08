@@ -64,12 +64,13 @@ impl AddToImage for BootfsCompiledPackageDestination {
     fn add_to_user_images(&self) -> bool {
         match self {
             Self::Fshost | Self::Bootstrap | Self::Root => true,
+            Self::Toolbox => false,
         }
     }
     /// Whether to include these in userdebug build type images.
     fn add_to_userdebug_images(&self) -> bool {
         match self {
-            Self::Fshost | Self::Bootstrap | Self::Root => true,
+            Self::Fshost | Self::Bootstrap | Self::Root | Self::Toolbox => true,
         }
     }
 }
