@@ -164,10 +164,7 @@ fit::result<Errno> sys_mprotect(const CurrentTask& current_task, UserAddress add
     // track_stub !(TODO("https://fxbug.dev/322874672"), "mprotect parse protection", prot);
     return fit::error(errno(EINVAL));
   }
-  auto result = current_task->mm()->protect(addr, length, prot_flags.value());
-  if (result.is_error()) {
-    return result.take_error();
-  }
+  auto result = current_task->mm()->protect(addr, length, prot_flags.value()) _EP(result);
   return fit::ok();
 }
 
