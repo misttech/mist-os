@@ -9,6 +9,7 @@ source_set("tests") {
 
     #"range-map-test.cc",
     "bstring-test.cc",
+    "range_ext-test.cc",
     "split_string_unittest.cc",
 
     #"trim_unittest.cc",
