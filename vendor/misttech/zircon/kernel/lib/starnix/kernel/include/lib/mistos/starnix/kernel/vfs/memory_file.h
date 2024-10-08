@@ -66,17 +66,17 @@ class MemoryFileNode : public FsNodeOps {
                                                                                              \
   fit::result<Errno, size_t> read(const FileObject& file, const CurrentTask&, size_t offset, \
                                   OutputBuffer* data) final {                                \
-    return MemoryFileObject::read(*memory.get(), file, offset, data);                        \
+    return MemoryFileObject::read(*(memory), file, offset, data);                            \
   }                                                                                          \
                                                                                              \
   fit::result<Errno, size_t> write(const FileObject& file, const CurrentTask& current_task,  \
                                    size_t offset, InputBuffer* data) final {                 \
-    return MemoryFileObject::write(*memory.get(), file, current_task, offset, data);         \
+    return MemoryFileObject::write(*(memory), file, current_task, offset, data);             \
   }                                                                                          \
                                                                                              \
   fit::result<Errno, fbl::RefPtr<MemoryObject>> get_memory(                                  \
       const FileObject& file, const CurrentTask& current_task, ktl::optional<size_t>,        \
-      ProtectionFlags prot) final {                                                          \
+      ProtectionFlags prot) const final {                                                    \
     return MemoryFileObject::get_memory(memory, file, current_task, prot);                   \
   }                                                                                          \
   using __fileops_impl_memory_force_semicolon = int
@@ -119,8 +119,8 @@ fit::result<Errno, FileHandle> new_memfd(const CurrentTask& current_task, FsStri
                                          SealFlags seals, OpenFlags flags);
 
 /// Sets memory size to `min_size` rounded to whole pages. Returns the new size of the VMO in bytes.
-fit::result<Errno, size_t> update_memory_file_size(const MemoryObject& vmo, FsNodeInfo& node_info,
-                                                   size_t requested_size);
+fit::result<Errno, size_t> update_memory_file_size(const MemoryObject& memory,
+                                                   FsNodeInfo& node_info, size_t requested_size);
 
 }  // namespace starnix
 
