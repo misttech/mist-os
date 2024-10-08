@@ -17,9 +17,7 @@
 #include <lib/mistos/starnix/kernel/mm/memory_manager.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
-#include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
-#include <lib/mistos/starnix/kernel/task/thread_group.h>
 #include <lib/mistos/starnix/kernel/vfs/dir_entry.h>
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
@@ -36,8 +34,6 @@
 #include <zircon/errors.h>
 #include <zircon/rights.h>
 #include <zircon/types.h>
-
-#include <optional>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
@@ -69,8 +65,7 @@ using starnix::StackResult;
 using starnix::StarnixLoader;
 
 constexpr size_t kMaxSegments = 4;
-constexpr size_t kMaxPhdrs = 16;
-const size_t kRandomSeedBytes = 16;
+constexpr size_t kRandomSeedBytes = 16;
 
 size_t get_initial_stack_size(const ktl::string_view& path,
                               const fbl::Vector<ktl::string_view>& argv,
@@ -107,10 +102,7 @@ fit::result<Errno, StackResult> populate_initial_stack(
                                  iter->length() + 1};
 
     stack_pointer -= arg.size();
-    auto result = write_stack(arg, stack_pointer);
-    if (result.is_error()) {
-      return result.take_error();
-    }
+    auto result = write_stack(arg, stack_pointer) _EP(result);
   }
   auto argv_start = stack_pointer;
 
@@ -187,10 +179,7 @@ fit::result<Errno, StackResult> populate_initial_stack(
   // Time to push.
   stack_pointer -= main_data.size();
   stack_pointer -= stack_pointer.ptr() % 16;
-  result = write_stack(main_data, stack_pointer);
-  if (result.is_error())
-    return result.take_error();
-
+  result = write_stack(main_data, stack_pointer) _EP(result);
   auto auxv_start = stack_pointer + auxv_start_offset;
   auto auxv_end = stack_pointer + auxv_end_offset;
 
@@ -210,11 +199,11 @@ auto GetDiagnostics() {
                                    [](auto&&... args) {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-nonliteral"
-                                     if (LOCAL_TRACE)
-                                       printf(args...);
+                                     printf(ktl::forward<decltype(args)>(args)...);
+                                     printf("\n");
 #pragma GCC diagnostic pop
                                    },
-                                   "resolve_elf: "),
+                                   "loader: "),
                                elfldltl::DiagnosticsPanicFlags());
 }
 
@@ -234,6 +223,7 @@ fit::result<Errno, LoadedElf> load_elf(
     const FileHandle& file, const fbl::RefPtr<MemoryObject>& elf_memory,
     const fbl::RefPtr<starnix::MemoryManager>& mm,
     LoadElfUsage usage /*file_write_guard: FileWriteGuardRef,*/) {
+  LTRACEF("[%s]\n", usage == LoadElfUsage::MainElf ? "MainElf" : "Interpreter");
   auto vmo = elf_memory->as_vmo();
   if (!vmo) {
     return fit::error(errno(EINVAL));
@@ -242,7 +232,7 @@ fit::result<Errno, LoadedElf> load_elf(
   auto diag = GetDiagnostics();
   elfldltl::VmoFile vmo_file(vmo.value().get().dispatcher()->vmo(), diag);
   auto headers = elfldltl::LoadHeadersFromFile<elfldltl::Elf<>>(
-      diag, vmo_file, elfldltl::FixedArrayFromFile<elfldltl::Elf<>::Phdr, kMaxPhdrs>());
+      diag, vmo_file, elfldltl::NewArrayFromFile<elfldltl::Elf<>::Phdr>());
   ZX_ASSERT(headers);
   auto& [ehdr, phdrs_result] = *headers;
   ktl::span<const elfldltl::Elf<>::Phdr> phdrs = phdrs_result;
@@ -278,7 +268,9 @@ fit::result<Errno, LoadedElf> load_elf(
   StarnixLoader mapper(mm);
   ZX_ASSERT(mapper.map_elf_segments(diag, load_info, elf_memory, mm->base_addr.ptr(), vaddr_bias));
 
-  LTRACEF("loaded at %lx, entry point %lx\n", file_base, ehdr.entry + vaddr_bias);
+  LTRACEF("[%s] loaded at %lx, entry point %lx\n",
+          usage == LoadElfUsage::MainElf ? "MainElf" : "Interpreter", file_base,
+          ehdr.entry + vaddr_bias);
 
   return fit::ok(LoadedElf{
       .file_header = ehdr, .file_base = file_base, .vaddr_bias = vaddr_bias, .length = length});
@@ -308,7 +300,7 @@ fit::result<Errno, starnix::ResolvedElf> resolve_elf(
   auto diag = GetDiagnostics();
   elfldltl::VmoFile vmo_file(vmo.value().get().dispatcher()->vmo(), diag);
   auto elf_headers = elfldltl::LoadHeadersFromFile<elfldltl::Elf<>>(
-      diag, vmo_file, elfldltl::FixedArrayFromFile<elfldltl::Elf<>::Phdr, kMaxPhdrs>());
+      diag, vmo_file, elfldltl::NewArrayFromFile<elfldltl::Elf<>::Phdr>());
   ZX_ASSERT(elf_headers);
   auto& [ehdr, phdrs_result] = *elf_headers;
   ktl::span<const elfldltl::Elf<>::Phdr> phdrs = phdrs_result;
@@ -320,7 +312,6 @@ fit::result<Errno, starnix::ResolvedElf> resolve_elf(
   if (interp) {
     // The ELF header specified an ELF interpreter.
     // Read the path and load this ELF as well.
-
     auto interp_data = memory->read_to_vec(interp->offset, interp->filesz);
     if (interp_data.is_error()) {
       return fit::error(errno(from_status_like_fdio(interp_data.error_value())));
@@ -431,8 +422,8 @@ fit::result<Errno, ResolvedElf> resolve_executable(
 fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_task,
                                                     const ResolvedElf& resolved_elf,
                                                     const ktl::string_view& original_path) {
-  auto main_elf = load_elf(resolved_elf.file, resolved_elf.memory, current_task->mm(), LoadElfUsage::MainElf/*,
-                           resolved_elf.file_write_guard*/) _EP(main_elf);
+  auto main_elf = load_elf(resolved_elf.file, resolved_elf.memory, current_task->mm(),
+                           LoadElfUsage::MainElf) _EP(main_elf);
 
   auto init_brk = UserAddress::from_ptr(main_elf->file_base).checked_add(main_elf->length);
   if (!init_brk.has_value()) {
@@ -443,9 +434,8 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
   ktl::optional<LoadedElf> interp_elf;
   if (resolved_elf.interp.has_value()) {
     auto& interp = resolved_elf.interp.value();
-    auto load_interp_result = load_elf(interp.file, interp.memory,
-                                       current_task->mm() /*,
-resolved_elf.file_write_guard*/, LoadElfUsage::Interpreter) _EP(load_interp_result);
+    auto load_interp_result = load_elf(interp.file, interp.memory, current_task->mm(),
+                                       LoadElfUsage::Interpreter) _EP(load_interp_result);
     interp_elf = load_interp_result.value();
   }
 
@@ -523,9 +513,9 @@ resolved_elf.file_write_guard*/, LoadElfUsage::Interpreter) _EP(load_interp_resu
   ZX_ASSERT(ac.check());
   auxv.push_back(ktl::pair(AT_PHDR, main_elf->file_base + main_elf->file_header.phoff), &ac);
   ZX_ASSERT(ac.check());
-  auxv.push_back(ktl::pair(AT_PHENT, main_elf->file_header.phentsize), &ac);
+  auxv.push_back(ktl::pair(AT_PHENT, static_cast<uint64_t>(main_elf->file_header.phentsize)), &ac);
   ZX_ASSERT(ac.check());
-  auxv.push_back(ktl::pair(AT_PHNUM, main_elf->file_header.phnum), &ac);
+  auxv.push_back(ktl::pair(AT_PHNUM, static_cast<uint64_t>(main_elf->file_header.phnum)), &ac);
   ZX_ASSERT(ac.check());
   auxv.push_back(ktl::pair(AT_ENTRY, main_elf->vaddr_bias + main_elf->file_header.entry), &ac);
   ZX_ASSERT(ac.check());
@@ -535,6 +525,12 @@ resolved_elf.file_write_guard*/, LoadElfUsage::Interpreter) _EP(load_interp_resu
   ZX_ASSERT(ac.check());
   auxv.push_back(ktl::pair(AT_SECURE, secure), &ac);
   ZX_ASSERT(ac.check());
+
+  if (LOCAL_TRACE) {
+    for (auto& kv : auxv) {
+      LTRACEF_LEVEL(2, "[%d]=[0x%lx]\n", kv.first, kv.second);
+    }
+  }
 
   // TODO(tbodt): implement MAP_GROWSDOWN and then reset this to 1 page. The current value of
   // this is based on adding 0x1000 each time a segfault appears.
