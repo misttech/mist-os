@@ -890,8 +890,10 @@ fit::result<Errno, FileHandle> CurrentTask::open_namespace_node_at(
   return _name.open(*this, flags, !created);
 }
 
-fit::result<Errno, ktl::pair<NamespaceNode, FsString>> CurrentTask::lookup_parent_at() const {
-  return fit::error(errno(EINVAL));
+fit::result<Errno, ktl::pair<NamespaceNode, FsString>> CurrentTask::lookup_parent_at(
+    LookupContext& context, FdNumber dir_fd, const FsStr& path) const {
+  auto result = resolve_dir_fd(dir_fd, path, ResolveFlags::empty()) _EP(result);
+  return lookup_parent(context, result->first, result->second);
 }
 
 fit::result<Errno, ktl::pair<NamespaceNode, FsString>> CurrentTask::lookup_parent(

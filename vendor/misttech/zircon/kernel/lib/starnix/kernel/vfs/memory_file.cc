@@ -293,11 +293,8 @@ fit::result<Errno, FileHandle> new_memfd(const CurrentTask& current_task, FsStri
 fit::result<Errno, size_t> update_memory_file_size(const MemoryObject& memory,
                                                    FsNodeInfo& node_info, size_t requested_size) {
   ASSERT(requested_size <= MAX_LFS_FILESIZE);
-  auto size_result = round_up_to_system_page_size(requested_size);
-  if (size_result.is_error())
-    return size_result.take_error();
-  auto size = size_result.value();
-  auto status = memory.set_size(size);
+  auto size = round_up_to_system_page_size(requested_size) _EP(size);
+  auto status = memory.set_size(size.value());
   if (status.is_error()) {
     switch (status.error_value()) {
       case ZX_ERR_NO_MEMORY:
@@ -307,8 +304,8 @@ fit::result<Errno, size_t> update_memory_file_size(const MemoryObject& memory,
         impossible_error(status.error_value());
     }
   }
-  node_info.blocks = size / node_info.blksize;
-  return fit::ok(size);
+  node_info.blocks = size.value() / node_info.blksize;
+  return fit::ok(size.value());
 }
 
 }  // namespace starnix
