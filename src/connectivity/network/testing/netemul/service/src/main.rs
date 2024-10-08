@@ -151,6 +151,7 @@ enum UniqueCapability<'a> {
     Protocol { proto_name: Cow<'a, str> },
     Configuration { name: Cow<'a, str> },
     Storage { mount_path: Cow<'a, str> },
+    Service { service_name: Cow<'a, str> },
 }
 
 impl<'a> UniqueCapability<'a> {
@@ -414,6 +415,23 @@ async fn create_realm_instance(
                                                 .to(&child_ref),
                                         );
                                         UniqueCapability::Configuration { name: capability.into() }
+                                    }
+                                    fnetemul::ExposedCapability::Service(capability) => {
+                                        debug!(
+                                            "routing capability '{}' from component '{}' to '{}'",
+                                            capability, source, name
+                                        );
+                                        let () = child_dep_routes.push(
+                                            Route::new()
+                                                .capability(Capability::service_by_name(
+                                                    &capability,
+                                                ))
+                                                .from(source)
+                                                .to(&child_ref),
+                                        );
+                                        UniqueCapability::Service {
+                                            service_name: capability.into(),
+                                        }
                                     }
                                 }
                             }

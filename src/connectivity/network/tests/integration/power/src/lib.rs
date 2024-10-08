@@ -10,7 +10,7 @@ use std::pin::pin;
 
 use assert_matches::assert_matches;
 use cm_rust::NativeIntoFidl as _;
-use fidl::endpoints::DiscoverableProtocolMarker as _;
+use fidl::endpoints::{DiscoverableProtocolMarker as _, ServiceMarker as _};
 use fidl::AsHandleRef;
 use fuchsia_async::TimeoutExt as _;
 use futures::StreamExt as _;
@@ -24,30 +24,60 @@ use packet_formats::ipv6::Ipv6Packet;
 use packet_formats::udp::{UdpPacket, UdpParseArgs};
 use test_case::test_case;
 use {
-    fidl_fuchsia_hardware_network as fhardware_network,
+    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_hardware_suspend as fhsuspend,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_ext as finterfaces_ext, fidl_fuchsia_net_tun as fnet_tun,
     fidl_fuchsia_netemul as fnetemul, fidl_fuchsia_posix_socket as fposix_socket,
     fidl_fuchsia_power_broker as fpower_broker, fidl_fuchsia_power_system as fpower_system,
-    fidl_test_sagcontrol as fsagcontrol, fuchsia_async as fasync, zx,
+    fidl_test_sagcontrol as fsagcontrol, fidl_test_suspendcontrol as ftest_suspendcontrol,
+    fuchsia_async as fasync, zx,
 };
+
+// TODO(https://fxbug.dev/372010366): Revisit this test as we consider better integrating
+// fake-suspend with fake SAG.
+async fn set_up_default_suspender(device: &ftest_suspendcontrol::DeviceProxy) {
+    device
+        .set_suspend_states(&ftest_suspendcontrol::DeviceSetSuspendStatesRequest {
+            suspend_states: Some(vec![fhsuspend::SuspendState {
+                resume_latency: Some(0),
+                ..Default::default()
+            }]),
+            ..Default::default()
+        })
+        .await
+        .expect("fake-suspend set_suspend_states")
+        .expect("fake-suspend set_suspend_states")
+}
 
 async fn create_power_realm<'a>(
     sandbox: &'a netemul::TestSandbox,
     name: &'a str,
     netstack_suspend_enabled: bool,
 ) -> netemul::TestRealm<'a> {
+    const SUSPENDER_URL: &str = "#meta/fake-suspend.cm";
+    const SUSPENDER_NAME: &str = "fake-suspend";
+
     const SAG_URL: &str = "#meta/fake-system-activity-governor.cm";
     const SAG_NAME: &str = "system-activity-governor";
 
     const PB_URL: &str = "#meta/power-broker.cm";
     const PB_NAME: &str = "power-broker";
 
-    const CONFIG_NO_SUSPENDER_URL: &str = "config-no-suspender#meta/config-no-suspender.cm";
-    const CONFIG_NO_SUSPENDER_NAME: &str = "config-no-suspender";
-    const CONFIG_NO_SUSPENDER_CONFIG: &str = "fuchsia.power.UseSuspender";
+    const CONFIG_USE_SUSPENDER_URL: &str = "config-use-suspender#meta/config-use-suspender.cm";
+    const CONFIG_USE_SUSPENDER_NAME: &str = "config-use-suspender";
+    const CONFIG_USE_SUSPENDER_CONFIG: &str = "fuchsia.power.UseSuspender";
 
     const CONFIG_NO_SUSPENDING_TOKEN_CONFIG: &str = "fuchsia.power.WaitForSuspendingToken";
+
+    fn suspender_dep() -> fnetemul::Capability {
+        fnetemul::Capability::ChildDep(fnetemul::ChildDep {
+            name: Some(SUSPENDER_NAME.to_string()),
+            capability: Some(fnetemul::ExposedCapability::Service(
+                fhsuspend::SuspendServiceMarker::SERVICE_NAME.to_string(),
+            )),
+            ..Default::default()
+        })
+    }
 
     fn power_broker_dep() -> fnetemul::Capability {
         fnetemul::Capability::ChildDep(fnetemul::ChildDep {
@@ -85,10 +115,11 @@ async fn create_power_realm<'a>(
         uses: Some(fnetemul::ChildUses::Capabilities(vec![
             fnetemul::Capability::LogSink(fnetemul::Empty {}),
             power_broker_dep(),
+            suspender_dep(),
             fnetemul::Capability::ChildDep(fnetemul::ChildDep {
-                name: Some(CONFIG_NO_SUSPENDER_NAME.to_string()),
+                name: Some(CONFIG_USE_SUSPENDER_NAME.to_string()),
                 capability: Some(fnetemul::ExposedCapability::Configuration(
-                    CONFIG_NO_SUSPENDER_CONFIG.to_string(),
+                    CONFIG_USE_SUSPENDER_CONFIG.to_string(),
                 )),
                 ..Default::default()
             }),
@@ -107,6 +138,16 @@ async fn create_power_realm<'a>(
         ..Default::default()
     };
 
+    let suspender_def = fnetemul::ChildDef {
+        source: Some(fnetemul::ChildSource::Component(SUSPENDER_URL.to_string())),
+        name: Some(SUSPENDER_NAME.to_string()),
+        uses: Some(fnetemul::ChildUses::Capabilities(vec![fnetemul::Capability::LogSink(
+            fnetemul::Empty {},
+        )])),
+        exposes: Some(vec![ftest_suspendcontrol::DeviceMarker::PROTOCOL_NAME.to_string()]),
+        ..Default::default()
+    };
+
     let pb_def = fnetemul::ChildDef {
         source: Some(fnetemul::ChildSource::Component(PB_URL.to_string())),
         name: Some(PB_NAME.to_string()),
@@ -117,13 +158,16 @@ async fn create_power_realm<'a>(
     };
 
     let sag_config_suspender_def = fnetemul::ChildDef {
-        source: Some(fnetemul::ChildSource::Component(CONFIG_NO_SUSPENDER_URL.to_string())),
-        name: Some(CONFIG_NO_SUSPENDER_NAME.to_string()),
+        source: Some(fnetemul::ChildSource::Component(CONFIG_USE_SUSPENDER_URL.to_string())),
+        name: Some(CONFIG_USE_SUSPENDER_NAME.to_string()),
         ..Default::default()
     };
 
     sandbox
-        .create_realm(name, [netstack_def, sag_def, pb_def, sag_config_suspender_def])
+        .create_realm(
+            name,
+            [netstack_def, sag_def, suspender_def, pb_def, sag_config_suspender_def],
+        )
         .expect("failed to create realm")
 }
 
@@ -143,8 +187,12 @@ fn extract_udp_frame_in_ipv6_packet(ipv6_frame: &[u8]) -> Option<&[u8]> {
 #[test_case(false; "suspend disabled")]
 async fn tx_suspension(name: &str, netstack_suspend_enabled: bool) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-
     let realm = create_power_realm(&sandbox, name, netstack_suspend_enabled).await;
+
+    let suspend_device = realm
+        .connect_to_protocol::<ftest_suspendcontrol::DeviceMarker>()
+        .expect("Couldn't connect to suspend device");
+    set_up_default_suspender(&suspend_device).await;
 
     let sagctl =
         realm.connect_to_protocol::<fsagcontrol::StateMarker>().expect("connect to SAG ctl");
@@ -291,6 +339,7 @@ async fn tx_suspension(name: &str, netstack_suspend_enabled: bool) {
             v = udp_frame_stream.next() => panic!("unexpected extra UDP frame {v:?}"),
         };
         assert_eq!(system_state, Some(fpower_system::ExecutionStateLevel::Inactive));
+        assert_eq!(suspend_device.await_suspend().await.unwrap().unwrap().state_index, Some(0));
     }
 
     // Send more data over the socket.
@@ -312,6 +361,13 @@ async fn tx_suspension(name: &str, netstack_suspend_enabled: bool) {
         );
 
         // But it does come out when the system wakes back up from suspension.
+        suspend_device
+            .resume(&ftest_suspendcontrol::DeviceResumeRequest::Result(
+                ftest_suspendcontrol::SuspendResult { ..Default::default() },
+            ))
+            .await
+            .expect("fake-suspend resume")
+            .expect("fake-suspend resume");
         sagctl
             .set(&fsagcontrol::SystemActivityGovernorState {
                 execution_state_level: Some(fpower_system::ExecutionStateLevel::Active),
@@ -321,6 +377,7 @@ async fn tx_suspension(name: &str, netstack_suspend_enabled: bool) {
             .await
             .expect("SAG set")
             .expect("SAG set");
+
         assert_eq!(udp_frame_stream.next().await.unwrap(), payload);
     } else {
         // In the no suspension case, the payload should be available even if
