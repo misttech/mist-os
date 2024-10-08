@@ -3,5 +3,8 @@
 # found in the LICENSE file.
 
 group("linux-rt") {
-  deps = [ "examples" ]
+  deps = [
+    "containers",
+    "examples",
+  ]
 }
