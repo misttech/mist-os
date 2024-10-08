@@ -9,6 +9,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -138,21 +140,33 @@ zx::result<> ArmGicVisitor::Visit(fdf_devicetree::Node& node,
 
   // Interrupt parser converts all interrupts into kInterruptsExtended. No need to look for
   // kInterrupts property.
-  if (parser_output->find(fdf_devicetree::InterruptParser::kInterruptsExtended) !=
-      parser_output->end()) {
-    return ParseInterrupts(node,
-                           (*parser_output)[fdf_devicetree::InterruptParser::kInterruptsExtended]);
-  }
+  auto interrupts_it = parser_output->find(fdf_devicetree::InterruptParser::kInterruptsExtended);
+  auto interrupt_names_it = parser_output->find(fdf_devicetree::InterruptParser::kInterruptNames);
 
-  return zx::ok();
+  if (interrupts_it == parser_output->end()) {
+    return zx::ok();
+  }
+  if (interrupt_names_it == parser_output->end()) {
+    return ParseInterrupts(node, interrupts_it->second, /*interrupt_names=*/{});
+  }
+  ZX_DEBUG_ASSERT(interrupts_it->second.size() == interrupt_names_it->second.size());
+  return ParseInterrupts(node, interrupts_it->second, interrupt_names_it->second);
 }
 
 zx::result<> ArmGicVisitor::ParseInterrupts(
-    fdf_devicetree::Node& node, std::vector<fdf_devicetree::PropertyValue>& interrupts) {
+    fdf_devicetree::Node& node, std::vector<fdf_devicetree::PropertyValue>& interrupts,
+    const std::vector<fdf_devicetree::PropertyValue>& interrupt_names) {
+  ZX_DEBUG_ASSERT(interrupt_names.empty() || interrupt_names.size() == interrupts.size());
   for (uint32_t index = 0; index < interrupts.size(); index++) {
     auto reference = interrupts[index].AsReference();
+
+    std::optional<std::string> interrupt_name = std::nullopt;
+    if (!interrupt_names.empty()) {
+      interrupt_name = interrupt_names[index].AsString();
+    }
+
     if (reference && is_match(reference->first.properties())) {
-      auto result = ParseInterrupt(node, reference->first, reference->second);
+      auto result = ParseInterrupt(node, reference->first, reference->second, interrupt_name);
       if (result.is_error()) {
         return result.take_error();
       }
@@ -163,7 +177,8 @@ zx::result<> ArmGicVisitor::ParseInterrupts(
 
 zx::result<> ArmGicVisitor::ParseInterrupt(fdf_devicetree::Node& child,
                                            fdf_devicetree::ReferenceNode& parent,
-                                           fdf_devicetree::PropertyCells interrupt_cells) {
+                                           fdf_devicetree::PropertyCells interrupt_cells,
+                                           std::optional<std::string> interrupt_name) {
   auto compatible_strings = *parent.properties().at("compatible").AsStringList();
 
   if (IsArmGicV1V2(compatible_strings) && (interrupt_cells.size() != (3 * sizeof(uint32_t)))) {
@@ -195,11 +210,14 @@ zx::result<> ArmGicVisitor::ParseInterrupt(fdf_devicetree::Node& child,
     return mode.take_error();
   }
 
+  std::optional<std::string> name = std::nullopt;
   fuchsia_hardware_platform_bus::Irq irq = {{
       .irq = interrupt.irq(),
       .mode = *mode,
+      .name = std::move(interrupt_name),
   }};
-  FDF_LOG(DEBUG, "IRQ 0x%0x with mode 0x%0x added to node '%s'.", *irq.irq(), *irq.mode(),
+  FDF_LOG(DEBUG, "IRQ 0x%0x named '%s' with mode 0x%0x added to node '%s'.", *irq.irq(),
+          irq.name().has_value() ? irq.name()->c_str() : "(no name)", *irq.mode(),
           child.name().c_str());
   child.AddIrq(irq);
   return zx::ok();

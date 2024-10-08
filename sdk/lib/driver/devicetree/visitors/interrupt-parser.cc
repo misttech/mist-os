@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/devicetree/devicetree.h>
 #include <lib/driver/devicetree/visitors/interrupt-parser.h>
+#include <lib/driver/devicetree/visitors/property-parser.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
 #include <zircon/errors.h>
@@ -14,14 +16,21 @@
 
 namespace fdf_devicetree {
 
-auto make_interrupt_properties = []() {
+namespace {
+
+Properties MakeInterruptProperties() {
   Properties props = {};
   props.emplace_back(std::make_unique<ReferenceProperty>(InterruptParser::kInterruptsExtended,
-                                                         InterruptParser::kInterruptCells));
+                                                         InterruptParser::kInterruptCells,
+                                                         /*required=*/false));
+  props.emplace_back(
+      std::make_unique<StringListProperty>(InterruptParser::kInterruptNames, /*required=*/false));
   return props;
-};
+}
 
-InterruptParser::InterruptParser() : PropertyParser(make_interrupt_properties()) {}
+}  // namespace
+
+InterruptParser::InterruptParser() : PropertyParser(MakeInterruptProperties()) {}
 
 zx::result<PropertyValues> InterruptParser::Parse(Node& node) {
   auto interrupt_values = PropertyParser::Parse(node);
@@ -115,6 +124,16 @@ zx::result<PropertyValues> InterruptParser::Parse(Node& node) {
     interrupt_references.emplace_back(interrupt, interrupt_parent);
   }
   (*interrupt_values)[kInterruptsExtended] = std::move(interrupt_references);
+
+  if (interrupt_values->find(kInterruptNames) != interrupt_values->end()) {
+    const size_t interrupt_count = (*interrupt_values)[kInterruptsExtended].size();
+    const size_t interrupt_name_count = (*interrupt_values)[kInterruptNames].size();
+    if (interrupt_count != interrupt_name_count) {
+      FDF_LOG(ERROR, "Number of interrupts (%zu) doesn't match number of interrupt-names (%zu)",
+              interrupt_count, interrupt_name_count);
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+  }
 
   return zx::ok(*interrupt_values);
 }

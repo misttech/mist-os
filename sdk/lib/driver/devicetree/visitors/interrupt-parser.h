@@ -14,6 +14,7 @@ class InterruptParser : public PropertyParser {
   static constexpr char kInterruptsExtended[] = "interrupts-extended";
   static constexpr char kInterruptCells[] = "#interrupt-cells";
   static constexpr char kInterrupts[] = "interrupts";
+  static constexpr char kInterruptNames[] = "interrupt-names";
 
   explicit InterruptParser();
   zx::result<PropertyValues> Parse(Node& node) override;
