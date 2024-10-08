@@ -14,6 +14,7 @@
 #include <lib/zbi-format/graphics.h>
 #include <unistd.h>
 #include <zircon/process.h>
+#include <zircon/status.h>
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
@@ -529,7 +530,7 @@ zx::result<> FramebufferDisplay::Initialize() {
   });
 
   // Start vsync loop.
-  async::PostTask(&dispatcher_, [this]() { OnPeriodicVSync(); });
+  vsync_task_.Post(&dispatcher_);
 
   FDF_LOG(INFO,
           "Initialized display, %" PRId32 " x %" PRId32 " (stride=%" PRId32 " format=%" PRIu32 ")",
@@ -568,7 +569,17 @@ FramebufferDisplay::FramebufferDisplay(
   }
 }
 
-void FramebufferDisplay::OnPeriodicVSync() {
+void FramebufferDisplay::OnPeriodicVSync(async_dispatcher_t* dispatcher, async::TaskBase* task,
+                                         zx_status_t status) {
+  if (status != ZX_OK) {
+    if (status == ZX_ERR_CANCELED) {
+      FDF_LOG(INFO, "Vsync task is canceled.");
+    } else {
+      FDF_LOG(ERROR, "Failed to run Vsync task: %s", zx_status_get_string(status));
+    }
+    return;
+  }
+
   if (engine_listener_.is_valid()) {
     fbl::AutoLock lock(&mtx_);
     const uint64_t banjo_display_id = display::ToBanjoDisplayId(kDisplayId);
@@ -576,7 +587,11 @@ void FramebufferDisplay::OnPeriodicVSync() {
     engine_listener_.OnDisplayVsync(banjo_display_id, next_vsync_time_.get(), &banjo_config_stamp);
   }
   next_vsync_time_ += kVSyncInterval;
-  async::PostTaskForTime(&dispatcher_, [this]() { OnPeriodicVSync(); }, next_vsync_time_);
+  zx_status_t post_status = vsync_task_.PostForTime(&dispatcher_, next_vsync_time_);
+  if (post_status != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to post Vsync task for the next Vsync: %s",
+            zx_status_get_string(status));
+  }
 }
 
 display_engine_protocol_t FramebufferDisplay::GetProtocol() {
