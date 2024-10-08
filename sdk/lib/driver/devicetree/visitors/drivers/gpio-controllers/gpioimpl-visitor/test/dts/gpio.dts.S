@@ -44,7 +44,7 @@
 
       group3: group3 {
         pins = <GROUP3_PIN1>;
-        input-enable;
+        output-disable;
         bias-disable;
         drive-open-source;
       };
@@ -59,7 +59,6 @@
 
       group4: group4 {
         pins = <GROUP4_PIN1>;
-        input-enable;
         bias-pull-up;
         drive-push-pull;
       };

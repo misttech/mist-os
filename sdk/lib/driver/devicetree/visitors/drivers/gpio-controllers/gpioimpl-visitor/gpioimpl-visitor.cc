@@ -219,56 +219,41 @@ zx::result<> GpioImplVisitor::ParsePinCtrlCfg(fdf_devicetree::Node& child,
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  std::vector<InitCall> init_calls;
-
   fuchsia_hardware_pin::Configuration config;
 
-  if (cfg_node.properties().find(kPinInputEnable) != cfg_node.properties().end()) {
-    std::optional<Pull> pull;
-    auto save_pull = [&](Pull val) -> zx::result<> {
-      if (pull.has_value()) {
-        FDF_LOG(
-            ERROR,
-            "Pin controller config '%s' can only support one pull direction. Previously already set with %d, now trying to set as %d",
-            cfg_node.name().c_str(), static_cast<uint32_t>(*pull), static_cast<uint32_t>(val));
-        return zx::error(ZX_ERR_NOT_SUPPORTED);
-      }
-      pull = val;
-      return zx::ok();
-    };
-    if (cfg_node.properties().find(kPinBiasPullDown) != cfg_node.properties().end()) {
-      auto result = save_pull(Pull::kDown);
-      if (result.is_error()) {
-        return result.take_error();
-      }
-    }
-    if (cfg_node.properties().find(kPinBiasPullUp) != cfg_node.properties().end()) {
-      auto result = save_pull(Pull::kUp);
-      if (result.is_error()) {
-        return result.take_error();
-      }
-    }
-    if (cfg_node.properties().find(kPinBiasDisable) != cfg_node.properties().end()) {
-      auto result = save_pull(Pull::kNone);
-      if (result.is_error()) {
-        return result.take_error();
-      }
-    }
-
-    if (!pull.has_value()) {
-      FDF_LOG(ERROR, "Pin controller config '%s' has unsupported input config.",
-              cfg_node.name().c_str());
+  std::optional<Pull> pull;
+  auto save_pull = [&](Pull val) -> zx::result<> {
+    if (pull.has_value()) {
+      FDF_LOG(
+          ERROR,
+          "Pin controller config '%s' can only support one pull direction. Previously already set with %d, now trying to set as %d",
+          cfg_node.name().c_str(), static_cast<uint32_t>(*pull), static_cast<uint32_t>(val));
       return zx::error(ZX_ERR_NOT_SUPPORTED);
     }
+    pull = val;
+    return zx::ok();
+  };
+  if (cfg_node.properties().find(kPinBiasPullDown) != cfg_node.properties().end()) {
+    auto result = save_pull(Pull::kDown);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+  }
+  if (cfg_node.properties().find(kPinBiasPullUp) != cfg_node.properties().end()) {
+    auto result = save_pull(Pull::kUp);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+  }
+  if (cfg_node.properties().find(kPinBiasDisable) != cfg_node.properties().end()) {
+    auto result = save_pull(Pull::kNone);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+  }
+
+  if (pull.has_value()) {
     config.pull(*pull);
-  }
-
-  if (cfg_node.properties().find(kPinOutputLow) != cfg_node.properties().end()) {
-    init_calls.emplace_back(InitCall::WithBufferMode(BufferMode::kOutputLow));
-  }
-
-  if (cfg_node.properties().find(kPinOutputHigh) != cfg_node.properties().end()) {
-    init_calls.emplace_back(InitCall::WithBufferMode(BufferMode::kOutputHigh));
   }
 
   if (cfg_node.properties().find(kPinFunction) != cfg_node.properties().end()) {
@@ -334,10 +319,38 @@ zx::result<> GpioImplVisitor::ParsePinCtrlCfg(fdf_devicetree::Node& child,
     config.power_source(*power_source);
   }
 
+  std::optional<BufferMode> buffer_mode;
+  if (cfg_node.properties().contains(kPinOutputDisable)) {
+    buffer_mode = BufferMode::kInput;
+  }
+  if (cfg_node.properties().contains(kPinOutputLow)) {
+    if (buffer_mode) {
+      FDF_LOG(
+          ERROR,
+          "Multiple values for InitCall defined in pin config '%s'. Property 'output-low' clashes with another property.",
+          cfg_node.name().c_str());
+      return zx::error(ZX_ERR_ALREADY_EXISTS);
+    }
+    buffer_mode = BufferMode::kOutputLow;
+  }
+  if (cfg_node.properties().contains(kPinOutputHigh)) {
+    if (buffer_mode) {
+      FDF_LOG(
+          ERROR,
+          "Multiple values for InitCall defined in pin config '%s'. Property 'output-high' clashes with another property.",
+          cfg_node.name().c_str());
+      return zx::error(ZX_ERR_ALREADY_EXISTS);
+    }
+    buffer_mode = BufferMode::kOutputHigh;
+  }
+
+  std::vector<InitCall> init_calls;
   if (!config.IsEmpty()) {
     init_calls.emplace_back(InitCall::WithPinConfig(std::move(config)));
   }
-
+  if (buffer_mode) {
+    init_calls.emplace_back(InitCall::WithBufferMode(*buffer_mode));
+  }
   if (init_calls.empty()) {
     FDF_LOG(ERROR, "Pin controller config '%s' does not have a valid config.",
             cfg_node.name().c_str());
@@ -372,36 +385,35 @@ zx::result<> GpioImplVisitor::ParseGpioHogChild(fdf_devicetree::Node& child) {
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
-  std::optional<InitCall> init_call = std::nullopt;
+  std::optional<fuchsia_hardware_gpio::BufferMode> buffer_mode;
 
   if (child.properties().find("input") != child.properties().end()) {
-    // Setting a temporary flag value which is updated per pin below while parsing the gpio cells.
-    init_call = InitCall::WithPinConfig({{.pull = static_cast<Pull>(0)}});
+    buffer_mode = fuchsia_hardware_gpio::BufferMode::kInput;
   }
   if (child.properties().find("output-low") != child.properties().end()) {
-    if (init_call) {
+    if (buffer_mode) {
       FDF_LOG(
           ERROR,
           "Multiple values for InitCall defined in gpio init hog '%s'. Property 'output-low' clashes with another property.",
           child.name().c_str());
       return zx::error(ZX_ERR_ALREADY_EXISTS);
     }
-    init_call = InitCall::WithBufferMode(BufferMode::kOutputLow);
+    buffer_mode = fuchsia_hardware_gpio::BufferMode::kOutputLow;
   }
 
   if (child.properties().find("output-high") != child.properties().end()) {
-    if (init_call) {
+    if (buffer_mode) {
       FDF_LOG(
           ERROR,
           "Multiple values for InitCall defined in gpio init hog '%s'. Property 'output-high' clashes with another property.",
           child.name().c_str());
       return zx::error(ZX_ERR_ALREADY_EXISTS);
     }
-    init_call = InitCall::WithBufferMode(BufferMode::kOutputHigh);
+    buffer_mode = fuchsia_hardware_gpio::BufferMode::kOutputHigh;
   }
 
-  if (!init_call) {
-    FDF_LOG(ERROR, "Gpio init hog '%s' does not have a init call", child.name().c_str());
+  if (!buffer_mode) {
+    FDF_LOG(ERROR, "Gpio init hog '%s' does not have a buffer_mode", child.name().c_str());
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
@@ -432,23 +444,24 @@ zx::result<> GpioImplVisitor::ParseGpioHogChild(fdf_devicetree::Node& child) {
 
   for (size_t byte_idx = 0; byte_idx < gpios_bytes.size_bytes(); byte_idx += entry_size) {
     auto gpio = GpioCells(gpios->second.AsBytes().subspan(byte_idx, entry_size));
-
-    // Update flags for InputFlag type.
-    if (init_call->Which() == InitCall::Tag::kPinConfig) {
-      zx::result flags = gpio.flags();
-      if (flags.is_error()) {
-        FDF_LOG(ERROR, "Failed to get input flags for gpio init hog '%s' with gpio pin %d : %s",
-                child.name().c_str(), gpio.pin(), flags.status_string());
-        return flags.take_error();
-      }
-      init_call = InitCall::WithPinConfig({{.pull = *flags}});
+    zx::result flags = gpio.flags();
+    if (flags.is_error()) {
+      FDF_LOG(ERROR, "Failed to get input flags for gpio init hog '%s' with gpio pin %d : %s",
+              child.name().c_str(), gpio.pin(), flags.status_string());
+      return flags.take_error();
     }
+
+    controller.metadata.init_steps()->push_back(fuchsia_hardware_pinimpl::InitStep::WithCall({{
+        .pin = gpio.pin(),
+        .call = InitCall::WithPinConfig({{.pull = *gpio.flags()}}),
+    }}));
+    controller.metadata.init_steps()->push_back(fuchsia_hardware_pinimpl::InitStep::WithCall({{
+        .pin = gpio.pin(),
+        .call = InitCall::WithBufferMode(*buffer_mode),
+    }}));
 
     FDF_LOG(DEBUG, "Gpio init step (pin 0x%x) added to controller '%s'", gpio.pin(),
             parent.name().c_str());
-
-    auto step = fuchsia_hardware_pinimpl::InitStep::WithCall({{gpio.pin(), *init_call}});
-    controller.metadata.init_steps()->emplace_back(step);
   }
 
   return zx::ok();

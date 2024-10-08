@@ -170,7 +170,7 @@
 
 	hdmi_hotplug_detect_pins: hdmi-hotplug-detect-pins {
 		pins = <A311D_GPIOH(2)>;
-		input-enable;
+		output-disable;
 		bias-pull-down;
 	};
 };
