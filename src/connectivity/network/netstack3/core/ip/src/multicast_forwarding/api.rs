@@ -12,7 +12,8 @@ use net_types::ip::{Ip, IpVersionMarker};
 use net_types::SpecifiedAddr;
 use netstack3_base::{
     AnyDevice, AtomicInstant, ContextPair, CoreTimerContext, CounterContext, DeviceIdContext,
-    InstantBindingsTypes, InstantContext, StrongDeviceIdentifier, WeakDeviceIdentifier,
+    Inspector, InspectorDeviceExt, InstantBindingsTypes, InstantContext, StrongDeviceIdentifier,
+    WeakDeviceIdentifier,
 };
 
 use crate::internal::base::IpLayerForwardingContext;
@@ -261,7 +262,7 @@ where
         Option<MulticastRouteStats<<C::BindingsContext as InstantBindingsTypes>::Instant>>,
         MulticastForwardingDisabledError,
     > {
-        self.core_ctx().with_state_mut(|state, ctx| {
+        self.core_ctx().with_state(|state, ctx| {
             let state = state.try_enabled()?;
             ctx.with_route_table(state, |route_table, _ctx| {
                 Ok(route_table.get(key).map(
@@ -270,6 +271,39 @@ where
                     },
                 ))
             })
+        })
+    }
+
+    /// Writes multicast routing table information to the provided `inspector`.
+    pub fn inspect<
+        N: Inspector + InspectorDeviceExt<<C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
+    >(
+        &mut self,
+        inspector: &mut N,
+    ) {
+        self.core_ctx().with_state(|state, ctx| match state {
+            MulticastForwardingState::Disabled => {
+                inspector.record_bool("ForwardingEnabled", false);
+            }
+            MulticastForwardingState::Enabled(state) => {
+                inspector.record_bool("ForwardingEnabled", true);
+                inspector.record_child("Routes", |inspector| {
+                    ctx.with_route_table(state, |route_table, _ctx| {
+                        for (route_key, route_entry) in route_table.iter() {
+                            inspector.record_unnamed_child(|inspector| {
+                                inspector.delegate_inspectable(route_key);
+                                route_entry.inspect::<_, N>(inspector);
+                            })
+                        }
+                    })
+                });
+                // NB: All other operations on the pending table require mutable
+                // access; don't bother introducing an immutable accessor just
+                // for inspect.
+                ctx.with_pending_table_mut(state, |pending_table| {
+                    inspector.record_inspectable("PendingRoutes", pending_table);
+                });
+            }
         })
     }
 }

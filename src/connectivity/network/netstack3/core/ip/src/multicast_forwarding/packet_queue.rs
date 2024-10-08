@@ -11,8 +11,8 @@ use core::time::Duration;
 use derivative::Derivative;
 use net_types::ip::{Ip, IpVersionMarker};
 use netstack3_base::{
-    CoreTimerContext, FrameDestination, Instant as _, StrongDeviceIdentifier as _,
-    WeakDeviceIdentifier,
+    CoreTimerContext, FrameDestination, Inspectable, Inspector, Instant as _,
+    StrongDeviceIdentifier as _, WeakDeviceIdentifier,
 };
 use packet::{Buf, ParseBufferMut};
 use packet_formats::ip::IpPacket;
@@ -182,6 +182,17 @@ impl<
         }
 
         removed_count
+    }
+}
+
+impl<I: IpLayerIpExt, D: WeakDeviceIdentifier, BT: MulticastForwardingBindingsTypes> Inspectable
+    for MulticastForwardingPendingPackets<I, D, BT>
+{
+    fn record<II: Inspector>(&self, inspector: &mut II) {
+        let MulticastForwardingPendingPackets { table, gc_timer: _ } = self;
+        // NB: Don't record all routes, as the size of the table may be quite
+        // large, and its contents are dictated by network traffic.
+        inspector.record_usize("NumRoutes", table.len())
     }
 }
 

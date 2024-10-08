@@ -867,18 +867,17 @@ mod tests {
             .sink::<I>()
             .serve_multicast_admin_client(request_stream);
 
-        let route = fnet_multicast_admin::Route {
-            expected_input_interface: Some(INPUT_BINDING_ID.get()),
-            action: Some(fnet_multicast_admin::Action::OutgoingInterfaces(vec![
+        let route = FidlExtRoute {
+            expected_input_interface: INPUT_BINDING_ID.get(),
+            action: fnet_multicast_admin::Action::OutgoingInterfaces(vec![
                 fnet_multicast_admin::OutgoingInterfaces {
                     id: OUTPUT_BINDING_ID.get(),
                     min_ttl: 0,
                 },
-            ])),
-            __source_breaking: fidl::marker::SourceBreaking,
+            ]),
         };
         client
-            .add_route(addresses.clone(), &route)
+            .add_route(addresses.clone(), route)
             .await
             .expect("add route request should be sent")
             .expect("add route should succeed");

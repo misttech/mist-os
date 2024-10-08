@@ -1307,6 +1307,14 @@ impl NetstackSeed {
             let routes = inspector.root().create_lazy_child("Routes", move || {
                 futures::future::ok(inspect::routes(&mut routes_ctx.clone())).boxed()
             });
+            let multicast_forwarding_ctx = netstack.ctx.clone();
+            let multicast_forwarding =
+                inspector.root().create_lazy_child("MulticastForwarding", move || {
+                    futures::future::ok(inspect::multicast_forwarding(
+                        &mut multicast_forwarding_ctx.clone(),
+                    ))
+                    .boxed()
+                });
             let devices_ctx = netstack.ctx.clone();
             let devices = inspector.root().create_lazy_child("Devices", move || {
                 futures::future::ok(inspect::devices(&mut devices_ctx.clone())).boxed()
@@ -1324,7 +1332,16 @@ impl NetstackSeed {
                 inspector.root().create_lazy_child("Filtering State", move || {
                     futures::future::ok(inspect::filtering_state(&mut filter_ctx.clone())).boxed()
                 });
-            (health, sockets, routes, devices, neighbors, counters, filtering_state)
+            (
+                health,
+                sockets,
+                routes,
+                multicast_forwarding,
+                devices,
+                neighbors,
+                counters,
+                filtering_state,
+            )
         };
 
         let diagnostics_handler = debug_fidl_worker::DiagnosticsHandler::default();
