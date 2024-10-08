@@ -99,7 +99,6 @@ BlockDevice::BlockDevice(zx_device_t* bus_device, zx::bti bti, std::unique_ptr<B
   for (auto& time : blk_req_start_timestamps_) {
     time = zx::time::infinite();
   }
-  memset(&blk_req_buf_, 0, sizeof(blk_req_buf_));
 }
 
 zx_status_t BlockDevice::Init() {
@@ -148,20 +147,20 @@ zx_status_t BlockDevice::Init() {
   // Allocate a queue of block requests.
   size_t size = sizeof(virtio_blk_req_t) * blk_req_count + sizeof(uint8_t) * blk_req_count;
 
-  zx_status_t status =
-      io_buffer_init(&blk_req_buf_, bti_.get(), size, IO_BUFFER_RW | IO_BUFFER_CONTIG);
+  auto buffer_factory = dma_buffer::CreateBufferFactory();
+  const size_t buffer_size = fbl::round_up(size, zx_system_get_page_size());
+  zx_status_t status = buffer_factory->CreateContiguous(bti_, buffer_size, 0, &blk_req_buf_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "cannot alloc blk_req buffers: %s", zx_status_get_string(status));
     return status;
   }
-  auto cleanup = fit::defer([this]() { io_buffer_release(&blk_req_buf_); });
-  blk_req_ = static_cast<virtio_blk_req_t*>(io_buffer_virt(&blk_req_buf_));
+  blk_req_ = static_cast<virtio_blk_req_t*>(blk_req_buf_->virt());
 
   zxlogf(TRACE, "allocated blk request at %p, physical address %#" PRIxPTR "", blk_req_,
-         io_buffer_phys(&blk_req_buf_));
+         blk_req_buf_->phys());
 
   // Responses are 32 words at the end of the allocated block.
-  blk_res_pa_ = io_buffer_phys(&blk_req_buf_) + sizeof(virtio_blk_req_t) * blk_req_count;
+  blk_res_pa_ = blk_req_buf_->phys() + sizeof(virtio_blk_req_t) * blk_req_count;
   blk_res_ = reinterpret_cast<uint8_t*>(
       (reinterpret_cast<uintptr_t>(blk_req_) + sizeof(virtio_blk_req_t) * blk_req_count));
 
@@ -200,14 +199,12 @@ zx_status_t BlockDevice::Init() {
     return status;
   }
 
-  cleanup.cancel();
   return ZX_OK;
 }
 
 void BlockDevice::DdkRelease() {
   thrd_join(watchdog_thread_, nullptr);
   thrd_join(worker_thread_, nullptr);
-  io_buffer_release(&blk_req_buf_);
   virtio::Device::Release();
 }
 
@@ -368,7 +365,7 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
   txn->desc = desc;
 
   // Set up the descriptor pointing to the head.
-  desc->addr = io_buffer_phys(&blk_req_buf_) + req_index * sizeof(virtio_blk_req_t);
+  desc->addr = blk_req_buf_->phys() + req_index * sizeof(virtio_blk_req_t);
   desc->len = sizeof(virtio_blk_req_t);
   desc->flags = VRING_DESC_F_NEXT;
   if (zxlog_level_enabled(TRACE)) {
@@ -409,7 +406,7 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
 
   if (type == VIRTIO_BLK_T_DISCARD) {
     desc = vring_.DescFromIndex(desc->next);
-    desc->addr = io_buffer_phys(&blk_req_buf_) + *discard_req_index * sizeof(virtio_blk_req_t);
+    desc->addr = blk_req_buf_->phys() + *discard_req_index * sizeof(virtio_blk_req_t);
     desc->len = sizeof(virtio_blk_discard_write_zeroes_t);
     desc->flags = VRING_DESC_F_NEXT;
     if (zxlog_level_enabled(TRACE)) {
