@@ -9,10 +9,10 @@
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/fpromise/bridge.h>
+#include <lib/trace/event.h>
 
 #include <algorithm>
 #include <cstdint>
-#include <memory>
 
 #include <bind/fuchsia/hardware/pinimpl/cpp/bind.h>
 #include <fbl/alloc_checker.h>
@@ -363,12 +363,24 @@ void AmlGpio::SetBufferMode(fuchsia_hardware_pinimpl::wire::PinImplSetBufferMode
     } else {
       regval &= ~pinmask;
     }
-    mmios_[block->mmio_index].Write32(regval, block->output_offset * sizeof(uint32_t));
-
     oen_regval &= ~pinmask;
+
+    TRACE_DURATION(
+        "gpio",
+        (request->mode == fuchsia_hardware_gpio::BufferMode::kOutputHigh ? "set-high" : "set-low"),
+        "pin", request->pin);
+    mmios_[block->mmio_index].Write32(regval, block->output_offset * sizeof(uint32_t));
+    TRACE_COUNTER("gpio", "output", request->pin, "value",
+                  (request->mode == fuchsia_hardware_gpio::BufferMode::kOutputHigh ? 1 : 0));
   }
 
-  mmios_[block->mmio_index].Write32(oen_regval, block->oen_offset * sizeof(uint32_t));
+  {
+    TRACE_DURATION(
+        "gpio",
+        (request->mode == fuchsia_hardware_gpio::BufferMode::kInput ? "set-input" : "set-output"),
+        "pin", request->pin);
+    mmios_[block->mmio_index].Write32(oen_regval, block->oen_offset * sizeof(uint32_t));
+  }
 
   completer.buffer(arena).ReplySuccess();
 }
