@@ -7,13 +7,15 @@ import asyncio
 import unittest
 from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import TypeVar
 from unittest import mock
 
+import fidl.fuchsia_wlan_common as f_wlan_common
 import fidl.fuchsia_wlan_policy as f_wlan_policy
-from fuchsia_controller_py import Channel
+from fuchsia_controller_py import Channel, ZxStatus
 
 from honeydew.affordances.fuchsia_controller.wlan import wlan_policy_ap
-from honeydew.errors import NotSupportedError
+from honeydew.errors import HoneydewWlanError, NotSupportedError
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import fuchsia_controller as fc_transport
@@ -48,6 +50,17 @@ _ACCESS_POINT_STATE_FIDL = f_wlan_policy.AccessPointState(
         type=f_wlan_policy.SecurityType.WPA2,
     ),
 )
+
+
+_T = TypeVar("_T")
+
+
+async def _async_response(response: _T) -> _T:
+    return response
+
+
+async def _async_error(err: Exception) -> None:
+    raise err
 
 
 # pylint: disable=protected-access
@@ -85,7 +98,10 @@ class WlanPolicyApFCTests(unittest.TestCase):
         with (
             self.mock_ap_provider(),
             self.mock_ap_listener(),
+            self.mock_ap_controller() as ap_controller_client,
         ):
+            self.access_point_controller_obj = ap_controller_client
+
             self.wlan_policy_ap_obj = wlan_policy_ap.WlanPolicyAp(
                 device_name="fuchsia-emulator",
                 ffx=self.ffx_transport_obj,
@@ -149,6 +165,19 @@ class WlanPolicyApFCTests(unittest.TestCase):
             fidl_mock.Client.return_value = ap_listener_client
             yield ap_listener_client
 
+    @contextmanager
+    def mock_ap_controller(self) -> Iterator[mock.MagicMock]:
+        ap_controller_client = mock.MagicMock(
+            spec=f_wlan_policy.AccessPointController.Client,
+            autospec=True,
+        )
+
+        with mock.patch(
+            "fidl.fuchsia_wlan_policy.AccessPointController", autospec=True
+        ) as fidl_mock:
+            fidl_mock.Client.return_value = ap_controller_client
+            yield ap_controller_client
+
     def test_verify_supported(self) -> None:
         """Verify _verify_supported fails."""
         self.ffx_transport_obj.run.return_value = ""
@@ -180,7 +209,29 @@ class WlanPolicyApFCTests(unittest.TestCase):
 
     def test_start(self) -> None:
         """Verify WlanPolicyAp.start()."""
-        with self.assertRaises(NotImplementedError):
+        self.access_point_controller_obj.start_access_point.side_effect = [
+            _async_response(
+                f_wlan_policy.AccessPointControllerStartAccessPointResponse(
+                    status=f_wlan_common.RequestStatus.ACKNOWLEDGED
+                )
+            )
+        ]
+
+        self.wlan_policy_ap_obj.start(
+            _TEST_SSID,
+            SecurityType.NONE,
+            None,
+            ConnectivityMode.LOCAL_ONLY,
+            OperatingBand.ANY,
+        )
+
+    def test_start_fails(self) -> None:
+        """Verify WlanPolicyAp.start() throws HoneydewWlanError on internal error."""
+        self.access_point_controller_obj.start_access_point.side_effect = [
+            _async_error(ZxStatus(ZxStatus.ZX_ERR_INTERNAL))
+        ]
+
+        with self.assertRaises(HoneydewWlanError):
             self.wlan_policy_ap_obj.start(
                 _TEST_SSID,
                 SecurityType.NONE,

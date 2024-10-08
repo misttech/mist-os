@@ -416,6 +416,15 @@ class NetworkConfig:
             credential_value=credential.value(),
         )
 
+    def to_fidl(self) -> f_wlan_policy.NetworkConfig:
+        """Convert to equivalent FIDL."""
+        return f_wlan_policy.NetworkConfig(
+            id=NetworkIdentifier(self.ssid, self.security_type).to_fidl(),
+            credential=Credential.from_password(
+                self.credential_value
+            ).to_fidl(),
+        )
+
     def __lt__(self, other: NetworkConfig) -> bool:
         return self.ssid < other.ssid
 
@@ -1018,6 +1027,10 @@ class ConnectivityMode(enum.IntEnum):
         """Parse from a fuchsia.wlan.policy/ConnectivityMode."""
         return ConnectivityMode(fidl)
 
+    def to_fidl(self) -> f_wlan_policy.ConnectivityMode:
+        """Convert to equivalent FIDL."""
+        return f_wlan_policy.ConnectivityMode(self.value)
+
 
 class OperatingBand(enum.IntEnum):
     """Operating band for wlan control request and status updates."""
@@ -1038,6 +1051,10 @@ class OperatingBand(enum.IntEnum):
     ) -> "OperatingBand":
         """Parse from a fuchsia.wlan.policy/OperatingBand."""
         return OperatingBand(fidl)
+
+    def to_fidl(self) -> f_wlan_policy.OperatingBand:
+        """Convert to equivalent FIDL."""
+        return f_wlan_policy.OperatingBand(self.value)
 
 
 class OperatingState(enum.IntEnum):

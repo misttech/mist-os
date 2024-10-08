@@ -21,7 +21,10 @@ from honeydew.typing.custom_types import FidlEndpoint
 from honeydew.typing.wlan import (
     AccessPointState,
     ConnectivityMode,
+    Credential,
+    NetworkConfig,
     OperatingBand,
+    RequestStatus,
     SecurityType,
 )
 
@@ -210,8 +213,27 @@ class WlanPolicyAp(AsyncAdapter, wlan_policy_ap.WlanPolicyAp):
             HoneydewWlanError: Error from WLAN stack
             HoneydewWlanRequestRejectedError: WLAN rejected the request
         """
-        # TODO(http://b/324948461): Finish implementation
-        raise NotImplementedError()
+        cred = Credential.from_password(password)
+
+        try:
+            resp = await self._access_point_controller.proxy.start_access_point(
+                config=NetworkConfig(
+                    ssid, security, cred.type(), cred.value()
+                ).to_fidl(),
+                mode=mode.to_fidl(),
+                band=band.to_fidl(),
+            )
+        except ZxStatus as status:
+            raise errors.HoneydewWlanError(
+                f"AccessPointController.StartAccessPoint() error {status}"
+            ) from status
+
+        request_status = RequestStatus.from_fidl(resp.status)
+        if request_status is not RequestStatus.ACKNOWLEDGED:
+            raise errors.HoneydewWlanRequestRejectedError(
+                "AccessPointController.StartAccessPoint()",
+                request_status,
+            )
 
     @asyncmethod
     # pylint: disable-next=invalid-overridden-method

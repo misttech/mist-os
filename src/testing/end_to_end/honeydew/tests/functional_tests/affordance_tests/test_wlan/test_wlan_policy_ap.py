@@ -3,6 +3,8 @@
 # found in the LICENSE file.
 """Mobly test for WLAN policy access point affordance."""
 
+import random
+import string
 import time
 
 from fuchsia_base_test import fuchsia_base_test
@@ -10,9 +12,33 @@ from mobly import asserts, test_runner
 
 from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.typing.netstack import InterfaceProperties, PortClass
+from honeydew.typing.wlan import (
+    AccessPointState,
+    ConnectedClientInformation,
+    ConnectivityMode,
+    NetworkIdentifier,
+    OperatingBand,
+    OperatingState,
+    SecurityType,
+)
 
 # Time to wait for a WLAN interface to become available.
 WLAN_INTERFACE_TIMEOUT = 30
+
+
+def random_str(
+    size: int = 6, chars: str = string.ascii_lowercase + string.digits
+) -> str:
+    """Generate a random string.
+
+    Args:
+        size: Length of output string
+        chars: Characters to use
+
+    Returns:
+        A random string of length size using the characters in chars.
+    """
+    return "".join(random.choice(chars) for _ in range(size))
 
 
 class WlanPolicyApTests(fuchsia_base_test.FuchsiaBaseTest):
@@ -43,6 +69,82 @@ class WlanPolicyApTests(fuchsia_base_test.FuchsiaBaseTest):
         asserts.assert_equal(
             self.device.wlan_policy_ap.get_update(),
             [],
+        )
+
+        test_ssid = random_str()
+        self.device.wlan_policy_ap.start(
+            test_ssid,
+            SecurityType.NONE,
+            None,
+            ConnectivityMode.LOCAL_ONLY,
+            OperatingBand.ONLY_2_4GHZ,
+        )
+        asserts.assert_equal(
+            self.device.wlan_policy_ap.get_update(),
+            [
+                AccessPointState(
+                    state=OperatingState.STARTING,
+                    mode=ConnectivityMode.LOCAL_ONLY,
+                    band=OperatingBand.ONLY_2_4GHZ,
+                    frequency=None,
+                    clients=None,
+                    id=NetworkIdentifier(
+                        ssid=test_ssid, security_type=SecurityType.NONE
+                    ),
+                )
+            ],
+        )
+        asserts.assert_equal(
+            self.device.wlan_policy_ap.get_update(),
+            [
+                AccessPointState(
+                    state=OperatingState.ACTIVE,
+                    mode=ConnectivityMode.LOCAL_ONLY,
+                    band=OperatingBand.ONLY_2_4GHZ,
+                    frequency=None,
+                    clients=None,
+                    id=NetworkIdentifier(
+                        ssid=test_ssid, security_type=SecurityType.NONE
+                    ),
+                )
+            ],
+        )
+        got_states = self.device.wlan_policy_ap.get_update()
+        asserts.assert_greater_equal(got_states[0].frequency, 2412)  # channel 1
+        asserts.assert_less_equal(got_states[0].frequency, 2484)  # channel 14
+        asserts.assert_equal(
+            got_states,
+            [
+                AccessPointState(
+                    state=OperatingState.ACTIVE,
+                    mode=ConnectivityMode.LOCAL_ONLY,
+                    band=OperatingBand.ONLY_2_4GHZ,
+                    frequency=got_states[0].frequency,
+                    clients=ConnectedClientInformation(count=0),
+                    id=NetworkIdentifier(
+                        ssid=test_ssid, security_type=SecurityType.NONE
+                    ),
+                )
+            ],
+        )
+
+        self.device.wlan_policy_ap.set_new_update_listener()
+        got_states = self.device.wlan_policy_ap.get_update()
+        asserts.assert_is_not_none(got_states[0].frequency)
+        asserts.assert_equal(
+            got_states,
+            [
+                AccessPointState(
+                    state=OperatingState.ACTIVE,
+                    mode=ConnectivityMode.LOCAL_ONLY,
+                    band=OperatingBand.ONLY_2_4GHZ,
+                    frequency=got_states[0].frequency,
+                    clients=ConnectedClientInformation(count=0),
+                    id=NetworkIdentifier(
+                        ssid=test_ssid, security_type=SecurityType.NONE
+                    ),
+                )
+            ],
         )
 
 
