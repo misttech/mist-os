@@ -93,3 +93,8 @@ fuchsia_assembly_developer_overrides_list(
 toolchain_type(
     name = "toolchain",
 )
+
+# Toolchain type for the Fuchsia devicetree toolchain.
+toolchain_type(
+    name = "devicetree_toolchain_type",
+)

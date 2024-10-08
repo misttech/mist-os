@@ -72,3 +72,19 @@ filegroup(
         "//examples/hello_world_cpp:test_pkg",
     ],
 )
+
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_devicetree_toolchain_info",
+)
+
+fuchsia_devicetree_toolchain_info(
+    name = "fuchsia_devicetree_toolchain_info",
+    dtc = "//tools:dtc",
+)
+
+toolchain(
+    name = "fuchsia_sdk_devicetree_toolchain",
+    toolchain = ":fuchsia_devicetree_toolchain_info",
+    toolchain_type = "@fuchsia_sdk//fuchsia:devicetree_toolchain_type",
+)

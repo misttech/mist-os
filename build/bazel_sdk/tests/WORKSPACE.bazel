@@ -55,6 +55,8 @@ fuchsia_sdk_repository(
 
 register_toolchains("@fuchsia_sdk//:fuchsia_toolchain_sdk")
 
+register_toolchains("//:fuchsia_sdk_devicetree_toolchain")
+
 # Create the @fuchsia_build_config information to get host_tag information.
 load("@fuchsia_sdk_common//common:fuchsia_platform_build.bzl", "fuchsia_build_config_repository")
 

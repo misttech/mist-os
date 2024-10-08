@@ -13,3 +13,7 @@ py_binary(
     srcs = ["package_checker.py"],
     python_version = "PY3",
 )
+
+exports_files(
+    glob(["*"]),
+)

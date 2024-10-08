@@ -14,9 +14,11 @@ def _fuchsia_devicetree_fragment_impl(ctx):
 
     includes_sets = []
     headers = []
+    file_sets = []
     for dep in ctx.attr.deps:
         if FuchsiaDeviceTreeSegmentInfo in dep:
             includes_sets.append(dep[FuchsiaDeviceTreeSegmentInfo].includes)
+            file_sets.append(dep[FuchsiaDeviceTreeSegmentInfo].files)
         if CcInfo in dep:
             context = dep[CcInfo].compilation_context
             includes_sets.append(context.system_includes)
@@ -28,8 +30,13 @@ def _fuchsia_devicetree_fragment_impl(ctx):
         order = order,
     )
 
+    files = depset(
+        transitive = file_sets,
+        order = order,
+    )
+
     if source.extension == "S":
-        output = preprocesss_file(ctx, source, include_depset, headers)
+        output = preprocesss_file(ctx, source, include_depset, headers, files)
 
     return [
         DefaultInfo(
@@ -39,6 +46,11 @@ def _fuchsia_devicetree_fragment_impl(ctx):
             includes = depset(
                 [output.dirname],
                 transitive = [include_depset],
+                order = order,
+            ),
+            files = depset(
+                [output],
+                transitive = [files],
                 order = order,
             ),
         ),

@@ -495,7 +495,13 @@ Returns the current `CcToolchainInfo`.
     # We didn't find anything.
     fail("In order to use find_cc_toolchain, your rule has to depend on C++ toolchain. See find_cc_toolchain.bzl docs for details.")
 
-def preprocesss_file(ctx, source, includes, headers = []):
+def with_fuchsia_constraint(target_compatible_with = []):
+    """Adds "@platforms//os:fuchsia" to the specified list if it's not already present."""
+    return target_compatible_with if (
+        "@platforms//os:fuchsia" in target_compatible_with
+    ) else target_compatible_with + ["@platforms//os:fuchsia"]
+
+def preprocesss_file(ctx, source, includes, headers = [], files = depset()):
     """Helper function for .S file preprocessing.
 
     Args:
@@ -503,6 +509,7 @@ def preprocesss_file(ctx, source, includes, headers = []):
       source: The source file to be preprocessed. It should be a .S file
       includes: A depset of includes paths (as strings) needed for preprocessing.
       headers: A list of headers in the format of File.
+      files: A depset of additional inputs to preprocessing action.
 
     Returns:
       A File of preprocessed file.
@@ -525,7 +532,7 @@ def preprocesss_file(ctx, source, includes, headers = []):
     ctx.actions.run(
         executable = cc_toolchain.preprocessor_executable,
         arguments = [pp_args],
-        inputs = [source] + cc_toolchain.all_files.to_list() + headers,
+        inputs = [source] + cc_toolchain.all_files.to_list() + headers + files.to_list(),
         outputs = [output_file],
     )
     return output_file

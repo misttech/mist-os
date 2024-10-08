@@ -45,6 +45,9 @@ exports_files(
     # OSPO license verification tool
     glob(["prebuilt/third_party/ospo/licenseclassifier/*/identify_license"]) +
 
+    # DTC tool for devicetree compile
+    glob(["prebuilt/third_party/dtc/**/*"]) +
+
     # vim3 bootloader
     ["prebuilt/third_party/firmware/vim3/u-boot.bin.unsigned"] +
 
@@ -86,4 +89,20 @@ filegroup(
     name = "prebuilt_python_files",
     srcs = _python_prebuilt_files,
     visibility = ["//build/bazel/toolchains/python:__pkg__"],
+)
+
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_devicetree_toolchain_info",
+)
+
+fuchsia_devicetree_toolchain_info(
+    name = "fuchsia_devicetree_toolchain_info",
+    dtc = "//prebuilt/third_party/dtc/%s/dtc" % build_config.host_tag,
+)
+
+toolchain(
+    name = "fuchsia_sdk_devicetree_toolchain",
+    toolchain = ":fuchsia_devicetree_toolchain_info",
+    toolchain_type = "@fuchsia_sdk//fuchsia:devicetree_toolchain_type",
 )

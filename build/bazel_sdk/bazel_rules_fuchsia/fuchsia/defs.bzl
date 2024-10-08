@@ -71,6 +71,15 @@ load(
     _fuchsia_unstripped_binary = "fuchsia_unstripped_binary",
 )
 load(
+    "//fuchsia/private:fuchsia_devicetree.bzl",
+    _fuchsia_devicetree = "fuchsia_devicetree",
+    _fuchsia_devicetree_source = "fuchsia_devicetree_source",
+)
+load(
+    "//fuchsia/private:fuchsia_devicetree_fragment.bzl",
+    _fuchsia_devicetree_fragment = "fuchsia_devicetree_fragment",
+)
+load(
     "//fuchsia/private:fuchsia_devicetree_visitor.bzl",
     _fuchsia_devicetree_visitor = "fuchsia_devicetree_visitor",
 )
@@ -138,8 +147,8 @@ load(
     _fuchsia_fidl_llcpp_library = "fuchsia_fidl_llcpp_library",
 )
 load(
-    "//fuchsia/private:fuchsia_devicetree_fragment.bzl",
-    _fuchsia_devicetree_fragment = "fuchsia_devicetree_fragment",
+    "//fuchsia/workspace:fuchsia_devicetree_toolchain_info.bzl",
+    _fuchsia_devicetree_toolchain_info = "fuchsia_devicetree_toolchain_info",
 )
 
 # Workspace-dependent rules.
@@ -166,7 +175,10 @@ fuchsia_component_manifest_shard_collection = _fuchsia_component_manifest_shard_
 fuchsia_cpu_filter_dict = _fuchsia_cpu_filter_dict
 fuchsia_cpu_select = _fuchsia_cpu_select
 fuchsia_debug_symbols = _fuchsia_debug_symbols
+fuchsia_devicetree = _fuchsia_devicetree
 fuchsia_devicetree_fragment = _fuchsia_devicetree_fragment
+fuchsia_devicetree_source = _fuchsia_devicetree_source
+fuchsia_devicetree_toolchain_info = _fuchsia_devicetree_toolchain_info
 fuchsia_devicetree_visitor = _fuchsia_devicetree_visitor
 fuchsia_driver_bind_bytecode = _fuchsia_driver_bind_bytecode
 fuchsia_driver_bind_bytecode_test = _fuchsia_driver_bind_bytecode_test

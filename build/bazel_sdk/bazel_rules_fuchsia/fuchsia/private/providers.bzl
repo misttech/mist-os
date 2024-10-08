@@ -37,6 +37,7 @@ FuchsiaDeviceTreeSegmentInfo = provider(
     "Contains information about a fuchsia devicetree fragment",
     fields = {
         "includes": "A depset of include directory paths used when compiling the devicetree binary.",
+        "files": "A depset of transitive dependencies needed for future devicetree compile.",
     },
 )
 
