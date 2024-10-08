@@ -489,22 +489,7 @@
             // Other (current and future) components launched under the
             // `#session` collection should not `use` these protocols without
             // first getting a security policy review.
-            protocol: [
-                "fuchsia.bluetooth.sys.HostWatcher",
-                "fuchsia.diagnostics.ArchiveAccessor",
-                "fuchsia.hardware.pty.Device",
-                "fuchsia.logger.Log",
-                "fuchsia.pkg.RepositoryManager",
-                "fuchsia.pkg.rewrite.Engine",
-                "fuchsia.process.Resolver",
-                "fuchsia.space.Manager",
-                "fuchsia.sys2.RealmExplorer.root",
-                "fuchsia.sys2.RealmQuery.root",
-                "fuchsia.virtualization.DebianGuestManager",
-                "fuchsia.virtualization.LinuxManager",
-                "fuchsia.virtualization.TerminaGuestManager",
-                "fuchsia.virtualization.ZirconGuestManager",
-            ],
+            protocol: [ "fuchsia.diagnostics.ArchiveAccessor" ],
             from: "parent",
             to: [ "#session" ],
             availability: "same_as_target",
