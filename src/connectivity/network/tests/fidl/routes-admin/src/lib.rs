@@ -1503,7 +1503,7 @@ async fn main_table_authorization<I: FidlRouteAdminIpExt + FidlRouteIpExt, N: Ne
     } = fnet_routes_ext::admin::get_authorization_for_route_table::<I>(&route_table)
         .await
         .expect("fidl should succeed");
-    assert_eq!(table_id, authorized_table_id);
+    assert_eq!(table_id.get(), authorized_table_id);
 }
 
 #[netstack_test]

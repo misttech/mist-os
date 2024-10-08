@@ -786,7 +786,9 @@ async fn on_and_off_link_route_discovery<N: Netstack>(
     let main_route_table = realm
         .connect_to_protocol::<fidl_fuchsia_net_routes_admin::RouteTableV6Marker>()
         .expect("failed to connect to protocol");
-    let main_table_id = main_route_table.get_table_id().await.expect("failed to get table id");
+    let main_table_id = fnet_routes_ext::TableId::new(
+        main_route_table.get_table_id().await.expect("failed to get table id"),
+    );
 
     if forwarding {
         enable_ipv6_forwarding(&iface).await;

@@ -272,7 +272,9 @@ async fn serve_route_watcher<I: fnet_routes_ext::FidlRouteIpExt>(
         Some(fnet_routes::TableInterest::Main(fnet_routes::Main)) => {
             RouteTableInterest::Only { table_id: routes::main_table_id::<I>().into() }
         }
-        Some(fnet_routes::TableInterest::Only(table_id)) => RouteTableInterest::Only { table_id },
+        Some(fnet_routes::TableInterest::Only(table_id)) => {
+            RouteTableInterest::Only { table_id: fnet_routes_ext::TableId::new(table_id) }
+        }
         Some(fnet_routes::TableInterest::All(fnet_routes::All)) | None => RouteTableInterest::All,
         Some(fnet_routes::TableInterest::__SourceBreaking { unknown_ordinal }) => {
             return Err(ServeWatcherError::ErrorInStream(fidl::Error::UnknownOrdinal {
@@ -293,7 +295,7 @@ pub(crate) enum RouteTableInterest {
     ///
     /// The table ID is a scalar instead of [`TableId`] because we don't perform
     /// validation but only filtering.
-    Only { table_id: u32 },
+    Only { table_id: fnet_routes_ext::TableId },
 }
 
 impl RouteTableInterest {

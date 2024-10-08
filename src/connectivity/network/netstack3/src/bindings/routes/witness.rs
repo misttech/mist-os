@@ -6,6 +6,7 @@
 
 use core::marker::PhantomData;
 
+use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use net_types::ip::{GenericOverIp, Ip, IpVersion, Ipv4, Ipv6};
 
 /// Uniquely identifies a route table.
@@ -38,6 +39,12 @@ impl<I: Ip> TableId<I> {
 impl<I: Ip> From<TableId<I>> for u32 {
     fn from(TableId(id, _marker): TableId<I>) -> u32 {
         id
+    }
+}
+
+impl<I: Ip> From<TableId<I>> for fnet_routes_ext::TableId {
+    fn from(TableId(id, _marker): TableId<I>) -> fnet_routes_ext::TableId {
+        fnet_routes_ext::TableId::new(id)
     }
 }
 

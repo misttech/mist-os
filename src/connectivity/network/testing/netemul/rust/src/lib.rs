@@ -745,7 +745,7 @@ impl<'a> TestRealm<'a> {
         fnet_routes_ext::admin::get_table_id::<I>(&main_route_table)
             .await
             .expect("failed to get_table_id")
-            .into()
+            .get()
     }
 }
 

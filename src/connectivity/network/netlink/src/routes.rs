@@ -1574,7 +1574,7 @@ mod tests {
             },
             effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric },
             // TODO(https://fxbug.dev/336382905): The tests should use the ID.
-            table_id: 0,
+            table_id: fnet_routes_ext::TableId::new(0),
         }
     }
 
@@ -2033,7 +2033,7 @@ mod tests {
             },
             effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric: METRIC1 },
             // TODO(https://fxbug.dev/336382905): The tests should use the ID.
-            table_id: 0,
+            table_id: fnet_routes_ext::TableId::new(0),
         };
 
         let actual: Result<NetlinkRouteMessage, NetlinkRouteMessageConversionError> =
@@ -2816,7 +2816,7 @@ mod tests {
             route,
             effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric },
             // TODO(https://fxbug.dev/336382905): The tests should use the ID.
-            table_id: 0,
+            table_id: fnet_routes_ext::TableId::new(0),
         })
         .try_into()
         .unwrap()
