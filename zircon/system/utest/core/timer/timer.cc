@@ -5,6 +5,7 @@
 #include <assert.h>
 #include <lib/standalone-test/standalone.h>
 #include <lib/zx/clock.h>
+#include <lib/zx/object.h>
 #include <lib/zx/resource.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
@@ -13,6 +14,7 @@
 #include <threads.h>
 #include <unistd.h>
 #include <zircon/syscalls-next.h>
+#include <zircon/syscalls/port.h>
 #include <zircon/syscalls/resource.h>
 
 #include <zxtest/zxtest.h>
@@ -231,9 +233,32 @@ void CheckCoalescing(uint32_t mode) {
 TEST(Timer, BootTimersElapseDuringSuspend) {
   NEEDS_NEXT_SKIP(zx_system_suspend_enter);
 
-  // Create a boot timer and set its deadline to 5 seconds in the future.
+  // This test verifies that boot timers fire during periods of suspension by:
+  // 1. Setting a boot timer to elapse in 5 seconds.
+  // 2. Suspending the system for 7 seconds.
+  // 3. Verifying that the boot timer was triggered during the period of suspension.
+  //
+  // Note that step (3) is more complicated than one would assume, as we cannot simply assert that
+  // the ZX_TIMER_SIGNALED signal is set on the timer object. This is due to a fundamental race in
+  // the way the signal is set inside the kernel. Specifically, when a timer interrupt fires, it
+  // schedules a DPC to set the ZX_TIMER_SIGNALED bit. However, this DPC thread will not run during
+  // suspend-to-idle, and may not even run before this test thread after the system resumes.
+  // As a result, we must rely on the kernel's zx_object_wait_async machinery to tell us when the
+  // signal is set. Once we know the signal is set, we want to verify that it was set before
+  // suspension ended, but all we have in the resulting port packet is the monotonic timestamp
+  // at which the timer was signaled. Therefore, all we can really verify is that this signal was
+  // asserted before the current time, but this should be a sufficiently tight bound for most cases.
+
+  // Create a boot timer and a port that will wait on this timer firing.
   zx::timer timer_boot;
   ASSERT_OK(zx::timer::create(0, ZX_CLOCK_BOOT, &timer_boot));
+  zx::port timer_port;
+  ASSERT_OK(zx::port::create(0, &timer_port));
+  constexpr uint64_t kWaitKey = 1;
+  ASSERT_OK(
+      timer_boot.wait_async(timer_port, kWaitKey, ZX_TIMER_SIGNALED, ZX_WAIT_ASYNC_TIMESTAMP));
+
+  // Set the timer's deadline to 5 seconds in the future.
   const zx::time_boot deadline_boot = zx::clock::get_boot() + zx::sec(5);
   ASSERT_OK(timer_boot.set(deadline_boot, zx::nsec(0)));
 
@@ -245,10 +270,11 @@ TEST(Timer, BootTimersElapseDuringSuspend) {
   const zx::time_boot deadline_suspend = zx::clock::get_boot() + zx::sec(7);
   ASSERT_OK(zx_system_suspend_enter(resource_result->get(), deadline_suspend.get()));
 
-  // Verify that the boot timer has signaled.
-  zx_signals_t pending_boot;
-  EXPECT_OK(timer_boot.wait_one(ZX_TIMER_SIGNALED, zx::time::infinite_past(), &pending_boot));
-  EXPECT_EQ(pending_boot, ZX_TIMER_SIGNALED);
+  // Verify that the boot timer was signaled before now, as explained in the block comment above.
+  zx_port_packet_t pkt;
+  ASSERT_OK(timer_port.wait(zx::time::infinite(), &pkt));
+  ASSERT_EQ(pkt.type, ZX_PKT_TYPE_SIGNAL_ONE);
+  EXPECT_LE(pkt.signal.timestamp, zx::clock::get_monotonic().get());
 }
 
 // Test is disabled, see |CheckCoalescing|.
