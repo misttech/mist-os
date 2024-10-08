@@ -62,7 +62,7 @@ zx_status_t sys_port_queue(zx_handle_t handle, user_in_ptr<const zx_port_packet_
 }
 
 // zx_status_t zx_port_wait
-zx_status_t sys_port_wait(zx_handle_t handle, zx_time_t deadline,
+zx_status_t sys_port_wait(zx_handle_t handle, zx_instant_mono_t deadline,
                           user_out_ptr<zx_port_packet_t> packet_out) {
   LTRACEF("handle %x\n", handle);
 

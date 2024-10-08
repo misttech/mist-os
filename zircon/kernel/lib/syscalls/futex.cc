@@ -16,7 +16,7 @@
 
 // zx_status_t zx_futex_wait
 zx_status_t sys_futex_wait(user_in_ptr<const zx_futex_t> value_ptr, zx_futex_t current_value,
-                           zx_handle_t new_futex_owner, zx_time_t deadline) {
+                           zx_handle_t new_futex_owner, zx_instant_mono_t deadline) {
   LTRACEF("futex %p current %d\n", value_ptr.get(), current_value);
 
   ProcessDispatcher* dispatcher = ThreadDispatcher::GetCurrent()->process();

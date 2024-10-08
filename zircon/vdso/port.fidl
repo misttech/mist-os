@@ -91,7 +91,7 @@ type PacketGuestVcpu = struct {
 };
 
 type PacketInterrupt = struct {
-    timestamp Time;
+    timestamp InstantMono;
     reserved0 uint64;
     reserved1 uint64;
     reserved2 uint64;
@@ -302,7 +302,7 @@ closed protocol Port {
     /// #include <zircon/syscalls/port.h>
     ///
     /// zx_status_t zx_port_wait(zx_handle_t handle,
-    ///                          zx_time_t deadline,
+    ///                          zx_instant_mono_t deadline,
     ///                          zx_port_packet_t* packet);
     /// ```
     ///
@@ -415,7 +415,7 @@ closed protocol Port {
     @blocking
     strict Wait(resource struct {
         handle Handle:PORT;
-        deadline Time;
+        deadline InstantMono;
     }) -> (struct {
         packet PortPacket;
     }) error Status;

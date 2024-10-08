@@ -209,7 +209,7 @@ closed protocol Interrupt {
     /// ```c
     /// #include <zircon/syscalls.h>
     ///
-    /// zx_status_t zx_interrupt_wait(zx_handle_t handle, zx_time_t* out_timestamp);
+    /// zx_status_t zx_interrupt_wait(zx_handle_t handle, zx_instant_mono_t* out_timestamp);
     /// ```
     ///
     /// ## Description
@@ -269,7 +269,7 @@ closed protocol Interrupt {
     strict Wait(resource struct {
         handle Handle:INTERRUPT;
     }) -> (struct {
-        out_timestamp Time;
+        out_timestamp InstantMono;
     }) error Status;
 
     // TODO(https://fxbug.dev/42107929): No DESTROY rights here.
@@ -424,7 +424,7 @@ closed protocol Interrupt {
     ///
     /// zx_status_t zx_interrupt_trigger(zx_handle_t handle,
     ///                                  uint32_t options,
-    ///                                  zx_time_t timestamp);
+    ///                                  zx_instant_mono_t timestamp);
     /// ```
     ///
     /// ## Description
@@ -478,6 +478,6 @@ closed protocol Interrupt {
     strict Trigger(resource struct {
         handle Handle:INTERRUPT;
         options uint32;
-        timestamp Time;
+        timestamp InstantMono;
     }) -> () error Status;
 };

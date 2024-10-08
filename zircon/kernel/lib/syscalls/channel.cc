@@ -455,8 +455,8 @@ static zx_status_t channel_write(zx_handle_t handle_value, uint32_t options,
 }
 
 template <template <typename> typename UserPtr, typename ChannelCallArgs>
-zx_status_t channel_call_noretry(zx_handle_t handle_value, uint32_t options, zx_time_t deadline,
-                                 UserPtr<ChannelCallArgs> user_args,
+zx_status_t channel_call_noretry(zx_handle_t handle_value, uint32_t options,
+                                 zx_instant_mono_t deadline, UserPtr<ChannelCallArgs> user_args,
                                  user_out_ptr<uint32_t> actual_bytes,
                                  user_out_ptr<uint32_t> actual_handles) {
   ktl::remove_const_t<ChannelCallArgs> args;
@@ -528,7 +528,7 @@ zx_status_t channel_call_noretry(zx_handle_t handle_value, uint32_t options, zx_
 }
 
 template <template <typename> typename UserPtr, typename ChannelCallArgs>
-zx_status_t channel_call_finish(zx_time_t deadline, UserPtr<ChannelCallArgs> user_args,
+zx_status_t channel_call_finish(zx_instant_mono_t deadline, UserPtr<ChannelCallArgs> user_args,
                                 user_out_ptr<uint32_t> actual_bytes,
                                 user_out_ptr<uint32_t> actual_handles) {
   ktl::remove_const_t<ChannelCallArgs> args;
@@ -574,7 +574,8 @@ zx_status_t sys_channel_write_etc(zx_handle_t handle_value, uint32_t options,
 }
 
 // zx_status_t zx_channel_call_noretry
-zx_status_t sys_channel_call_noretry(zx_handle_t handle_value, uint32_t options, zx_time_t deadline,
+zx_status_t sys_channel_call_noretry(zx_handle_t handle_value, uint32_t options,
+                                     zx_instant_mono_t deadline,
                                      user_in_ptr<const zx_channel_call_args_t> user_args,
                                      user_out_ptr<uint32_t> actual_bytes,
                                      user_out_ptr<uint32_t> actual_handles) {
@@ -583,7 +584,7 @@ zx_status_t sys_channel_call_noretry(zx_handle_t handle_value, uint32_t options,
 }
 
 // zx_status_t zx_channel_call_finish
-zx_status_t sys_channel_call_finish(zx_time_t deadline,
+zx_status_t sys_channel_call_finish(zx_instant_mono_t deadline,
                                     user_in_ptr<const zx_channel_call_args_t> user_args,
                                     user_out_ptr<uint32_t> actual_bytes,
                                     user_out_ptr<uint32_t> actual_handles) {
@@ -593,7 +594,7 @@ zx_status_t sys_channel_call_finish(zx_time_t deadline,
 
 // zx_status_t zx_channel_call_etc_noretry
 zx_status_t sys_channel_call_etc_noretry(zx_handle_t handle_value, uint32_t options,
-                                         zx_time_t deadline,
+                                         zx_instant_mono_t deadline,
                                          user_inout_ptr<zx_channel_call_etc_args_t> user_args,
                                          user_out_ptr<uint32_t> actual_bytes,
                                          user_out_ptr<uint32_t> actual_handles) {
@@ -602,7 +603,7 @@ zx_status_t sys_channel_call_etc_noretry(zx_handle_t handle_value, uint32_t opti
 }
 
 // zx_status_t zx_channel_call_etc_finish
-zx_status_t sys_channel_call_etc_finish(zx_time_t deadline,
+zx_status_t sys_channel_call_etc_finish(zx_instant_mono_t deadline,
                                         user_inout_ptr<zx_channel_call_etc_args_t> user_args,
                                         user_out_ptr<uint32_t> actual_bytes,
                                         user_out_ptr<uint32_t> actual_handles) {

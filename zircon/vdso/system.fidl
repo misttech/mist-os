@@ -935,7 +935,7 @@ closed protocol System {
     /// ```c
     /// #include <zircon/syscalls-next.h>
     ///
-    /// zx_status_t zx_system_suspend_enter(zx_handle_t resource, zx_time_t resume_deadline);
+    /// zx_status_t zx_system_suspend_enter(zx_handle_t resource, zx_instant_boot_t resume_deadline);
     /// ```
     ///
     /// ## Description
@@ -963,7 +963,7 @@ closed protocol System {
     @next
     strict SuspendEnter(resource struct {
         resource Handle:RESOURCE;
-        resume_deadline Time;
+        resume_deadline InstantBoot;
     }) -> () error Status;
 
     /// ## Summary
