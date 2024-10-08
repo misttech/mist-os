@@ -122,7 +122,19 @@ fit::result<Errno, Container> create_container(const Config& config) {
       }
     }
 
-    return init_task.exec(executable.value(), argv[0], argv, fbl::Vector<ktl::string_view>());
+    fbl::AllocChecker ac;
+    fbl::Vector<ktl::string_view> envp;
+    // envp.push_back("LD_DEBUG=all", &ac);
+    // ZX_ASSERT(ac.check());
+    // envp.push_back("LD_SHOW_AUXV=1", &ac);
+    // ZX_ASSERT(ac.check());
+    envp.push_back("LD_LIBRARY_PATH=/usr/lib", &ac);
+    ZX_ASSERT(ac.check());
+    envp.push_back("HOME=/", &ac);
+    ZX_ASSERT(ac.check());
+    envp.push_back("TERM=linux", &ac);
+    ZX_ASSERT(ac.check());
+    return init_task.exec(executable.value(), argv[0], argv, envp);
   };
 
   auto task_complete = [](fit::result<zx_status_t>) -> void {
