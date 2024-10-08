@@ -1263,7 +1263,7 @@ impl FileObject {
         self.flags.lock().can_write()
     }
 
-    fn ops(&self) -> &dyn FileOps {
+    pub fn ops(&self) -> &dyn FileOps {
         self.ops.as_ref()
     }
 
