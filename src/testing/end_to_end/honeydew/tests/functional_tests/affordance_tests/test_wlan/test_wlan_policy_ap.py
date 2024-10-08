@@ -62,6 +62,11 @@ class WlanPolicyApTests(fuchsia_base_test.FuchsiaBaseTest):
             f"Expected presence of a WLAN interface, got {interfaces}"
         )
 
+    def teardown_test(self) -> None:
+        # Don't allow access points to leak into other tests.
+        self.device.wlan_policy_ap.stop_all()
+        return super().teardown_test()
+
     def test_ap_methods(self) -> None:
         """Verify WLAN policy access point methods."""
         self.device.wlan_policy_ap.stop_all()
@@ -145,6 +150,12 @@ class WlanPolicyApTests(fuchsia_base_test.FuchsiaBaseTest):
                     ),
                 )
             ],
+        )
+
+        self.device.wlan_policy_ap.stop(test_ssid, SecurityType.NONE, None)
+        asserts.assert_equal(
+            self.device.wlan_policy_ap.get_update(),
+            [],
         )
 
 

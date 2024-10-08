@@ -242,8 +242,32 @@ class WlanPolicyApFCTests(unittest.TestCase):
 
     def test_stop(self) -> None:
         """Verify WlanPolicyAp.stop()."""
-        with self.assertRaises(NotImplementedError):
-            self.wlan_policy_ap_obj.stop(_TEST_SSID, SecurityType.NONE, None)
+        self.access_point_controller_obj.stop_access_point.side_effect = [
+            _async_response(
+                f_wlan_policy.AccessPointControllerStartAccessPointResponse(
+                    status=f_wlan_common.RequestStatus.ACKNOWLEDGED
+                )
+            )
+        ]
+
+        self.wlan_policy_ap_obj.stop(
+            _TEST_SSID,
+            SecurityType.NONE,
+            None,
+        )
+
+    def test_stop_fails(self) -> None:
+        """Verify WlanPolicyAp.stop() throws HoneydewWlanError on internal error."""
+        self.access_point_controller_obj.stop_access_point.side_effect = [
+            _async_error(ZxStatus(ZxStatus.ZX_ERR_INTERNAL))
+        ]
+
+        with self.assertRaises(HoneydewWlanError):
+            self.wlan_policy_ap_obj.stop(
+                _TEST_SSID,
+                SecurityType.NONE,
+                None,
+            )
 
     def test_stop_all(self) -> None:
         """Verify WlanPolicyAp.stop_all()."""
