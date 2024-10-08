@@ -78,11 +78,24 @@ fit::result<Errno, FdNumber> sys_openat(const CurrentTask& current_task, FdNumbe
                                         starnix_uapi::UserCString user_path, uint32_t flags,
                                         starnix_uapi::FileMode mode);
 
-fit::result<Errno, FdNumber> sys_openat2(const CurrentTask& current_task, FdNumber fir_fd,
+fit::result<Errno, FdNumber> sys_openat2(const CurrentTask& current_task, FdNumber dir_fd,
                                          starnix_uapi::UserCString, struct open_how, size_t size);
 
-fit::result<Errno, FdNumber> sys_openat2(const CurrentTask& current_task, FdNumber dd,
-                                         starnix_uapi::UserRef<struct stat>);
+fit::result<Errno> sys_faccessat(const CurrentTask& current_task, FdNumber dir_fd,
+                                 starnix_uapi::UserCString user_path, uint32_t mode);
+
+fit::result<Errno> sys_faccessat2(const CurrentTask& current_task, FdNumber dir_fd,
+                                  starnix_uapi::UserCString user_path, uint32_t mode);
+
+fit::result<Errno, size_t> sys_getdents64(const CurrentTask& current_task, FdNumber fd,
+                                          starnix_uapi::UserAddress user_buffer,
+                                          size_t user_capacity);
+
+fit::result<Errno> sys_chroot(const CurrentTask& current_task, starnix_uapi::UserCString user_path);
+
+fit::result<Errno> sys_chdir(const CurrentTask& current_task, starnix_uapi::UserCString user_path);
+
+fit::result<Errno> sys_fchdir(const CurrentTask& current_task, FdNumber fd);
 
 fit::result<Errno> sys_fstat(const CurrentTask& current_task, FdNumber fd,
                              starnix_uapi::UserRef<struct ::stat> buffer);
