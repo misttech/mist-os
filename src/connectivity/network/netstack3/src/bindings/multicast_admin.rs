@@ -407,9 +407,9 @@ fn send_event<I: IpExt + FidlMulticastAdminIpExt>(
     let addresses = key.into_fidl();
     responder.try_send(WatchRoutingEventsResponse {
         dropped_events: num_dropped_events,
-        addresses: &addresses,
+        addresses: addresses,
         input_interface: input_interface.into_fidl_with_ctx(ctx.bindings_ctx()).get(),
-        event: &fidl_event,
+        event: fidl_event,
     })
 }
 

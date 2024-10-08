@@ -5,15 +5,14 @@
 #![cfg(test)]
 
 use assert_matches::assert_matches;
-use async_trait::async_trait;
 use derivative::Derivative;
 use fidl::endpoints::Proxy as _;
 use fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _};
 
-use futures::{StreamExt as _, TryFutureExt as _, TryStreamExt as _};
+use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use maplit::hashmap;
 use net_declare::{fidl_ip, fidl_subnet};
-use net_types::ip::{Ip, IpAddr, IpVersion};
+use net_types::ip::{GenericOverIp, Ip, IpVersion, IpVersionMarker, Ipv4Addr, Ipv6Addr};
 use netemul::RealmUdpSocket as _;
 use netstack_testing_common::realms::{Netstack, TestSandboxExt as _};
 use netstack_testing_common::{interfaces, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT};
@@ -27,10 +26,11 @@ use {
     fidl_fuchsia_net_multicast_admin as fnet_multicast_admin,
 };
 
-type UnicastSourceAndMulticastDestination = IpAddr<
-    fnet_multicast_admin::Ipv4UnicastSourceAndMulticastDestination,
-    fnet_multicast_admin::Ipv6UnicastSourceAndMulticastDestination,
->;
+use fidl_fuchsia_net_multicast_ext::{
+    self as fnet_multicast_ext, AddRouteError, DelRouteError, FidlMulticastAdminIpExt,
+    GetRouteStatsError, TableControllerProxy as _, UnicastSourceAndMulticastDestination,
+    WatchRoutingEventsResponse,
+};
 
 #[derive(Clone, Copy)]
 enum IpAddrType {
@@ -168,41 +168,40 @@ impl Server {
 ///  - The router optionally forwards and/or delivers multicast packets locally.
 ///    Additionally, if configured, the router sends multicast packets.
 ///  - A client listens for forwarded multicast packets.
-struct MulticastForwardingNetwork<'a> {
+struct MulticastForwardingNetwork<'a, I: Ip> {
     router_listener_socket: Option<fasync::net::UdpSocket>,
     router_realm: &'a netemul::TestRealm<'a>,
     clients: std::collections::HashMap<Client, ClientDevice<'a>>,
     servers: std::collections::HashMap<Server, RouterConnectedDevice<'a>>,
     options: MulticastForwardingNetworkOptions,
-    version: IpVersion,
+    _marker: IpVersionMarker<I>,
 }
 
-impl<'a> MulticastForwardingNetwork<'a> {
+impl<'a, I: Ip + FidlMulticastAdminIpExt> MulticastForwardingNetwork<'a, I> {
     const PAYLOAD: &'static str = "Hello multicast";
 
     async fn new<N: Netstack>(
         name: &'a str,
-        version: IpVersion,
         sandbox: &'a netemul::TestSandbox,
         router_realm: &'a netemul::TestRealm<'a>,
         servers: Vec<Server>,
         clients: Vec<Client>,
         options: MulticastForwardingNetworkOptions,
-    ) -> MulticastForwardingNetwork<'a> {
+    ) -> MulticastForwardingNetwork<'a, I> {
         let MulticastForwardingNetworkOptions {
             source_device,
             enable_multicast_forwarding,
             listen_from_router,
             packet_ttl: _,
         } = options;
-        let multicast_socket_addr = create_socket_addr(IpAddrType::Multicast.address(version));
+        let multicast_socket_addr = create_socket_addr(IpAddrType::Multicast.address(I::VERSION));
         let servers: HashMap<_, _> = futures::stream::iter(servers)
             .then(|server| async move {
                 let device = create_router_connected_device::<N>(
                     format!("{}_{}", name, server.name()),
                     sandbox,
                     router_realm,
-                    server.config(version),
+                    server.config(I::VERSION),
                 )
                 .await;
                 (server, device)
@@ -215,12 +214,12 @@ impl<'a> MulticastForwardingNetwork<'a> {
                     format!("{}_{}", name, client.name()),
                     sandbox,
                     router_realm,
-                    client.config(version),
+                    client.config(I::VERSION),
                 )
                 .await;
                 let socket = create_listener_socket(
                     &device.realm,
-                    version,
+                    I::VERSION,
                     device.interface.id(),
                     device.ep_addr,
                     multicast_socket_addr,
@@ -249,7 +248,7 @@ impl<'a> MulticastForwardingNetwork<'a> {
             Some(
                 create_listener_socket(
                     router_realm,
-                    version,
+                    I::VERSION,
                     input_server_device.router_interface.id(),
                     input_server_device.router_ep_addr,
                     multicast_socket_addr,
@@ -265,7 +264,7 @@ impl<'a> MulticastForwardingNetwork<'a> {
             clients,
             servers,
             options,
-            version,
+            _marker: IpVersionMarker::default(),
         }
     }
 
@@ -290,12 +289,12 @@ impl<'a> MulticastForwardingNetwork<'a> {
         };
 
         let dst_addr_type = dst_addr_type.unwrap_or(IpAddrType::Multicast);
-        let dst_addr = create_socket_addr(dst_addr_type.address(self.version));
+        let dst_addr = create_socket_addr(dst_addr_type.address(I::VERSION));
         let server_sock = fasync::net::UdpSocket::bind_in_realm(realm, dst_addr)
             .await
             .expect("bind_in_realm failed for server socket");
 
-        match self.version {
+        match I::VERSION {
             IpVersion::V4 => {
                 let interface_addr = get_ipv4_address_from_subnet(addr);
                 server_sock
@@ -385,20 +384,20 @@ impl<'a> MulticastForwardingNetwork<'a> {
     }
 
     /// Creates a `RoutingTableController`.
-    fn create_multicast_controller(&self) -> Box<dyn RoutingTableController> {
-        match self.version {
-            IpVersion::V4 => Box::new(Ipv4RoutingTableController::new(self.router_realm)),
-            IpVersion::V6 => Box::new(Ipv6RoutingTableController::new(self.router_realm)),
-        }
+    fn create_multicast_controller(&self) -> I::TableControllerProxy {
+        self.router_realm
+            .connect_to_protocol::<I::TableControllerMarker>()
+            .expect("failed to create multicast table controller")
     }
 
-    async fn add_default_route(&self, controller: &Box<dyn RoutingTableController>) {
+    async fn add_default_route(&self, controller: &I::TableControllerProxy) {
         controller
             .add_route(
                 self.default_unicast_source_and_multicast_destination(),
                 self.default_multicast_route(),
             )
             .await
+            .expect("send request")
             .expect("add_route error");
     }
 
@@ -486,28 +485,27 @@ impl<'a> MulticastForwardingNetwork<'a> {
         match address {
             DeviceAddress::Router(server) => self.get_server(server).router_ep_addr.addr,
             DeviceAddress::Server(server) => self.get_server(server).ep_addr.addr,
-            DeviceAddress::Other(addr) => addr.address(self.version),
+            DeviceAddress::Other(addr) => addr.address(I::VERSION),
         }
     }
 
     fn default_unicast_source_and_multicast_destination(
         &self,
-    ) -> UnicastSourceAndMulticastDestination {
+    ) -> UnicastSourceAndMulticastDestination<I> {
         let source_addr = self.get_source_address();
-        let destination_addr = IpAddrType::Multicast.address(self.version);
+        let destination_addr = IpAddrType::Multicast.address(I::VERSION);
         self.create_unicast_source_and_multicast_destination(source_addr, destination_addr)
     }
 
-    fn default_multicast_route(&self) -> fnet_multicast_admin::Route {
-        fnet_multicast_admin::Route {
-            expected_input_interface: Some(self.get_source_router_interface_id()),
-            action: Some(fnet_multicast_admin::Action::OutgoingInterfaces(vec![
+    fn default_multicast_route(&self) -> fnet_multicast_ext::Route {
+        fnet_multicast_ext::Route {
+            expected_input_interface: self.get_source_router_interface_id(),
+            action: fnet_multicast_admin::Action::OutgoingInterfaces(vec![
                 fnet_multicast_admin::OutgoingInterfaces {
                     id: self.get_client(Client::A).device.router_interface.id(),
                     min_ttl: self.options.packet_ttl - 1,
                 },
-            ])),
-            ..Default::default()
+            ]),
         }
     }
 
@@ -515,21 +513,20 @@ impl<'a> MulticastForwardingNetwork<'a> {
         &self,
         source: fnet::IpAddress,
         destination: fnet::IpAddress,
-    ) -> UnicastSourceAndMulticastDestination {
-        match self.version {
-            IpVersion::V4 => {
-                IpAddr::V4(fnet_multicast_admin::Ipv4UnicastSourceAndMulticastDestination {
-                    unicast_source: get_ipv4_address_from_addr(source),
-                    multicast_destination: get_ipv4_address_from_addr(destination),
-                })
-            }
-            IpVersion::V6 => {
-                IpAddr::V6(fnet_multicast_admin::Ipv6UnicastSourceAndMulticastDestination {
-                    unicast_source: get_ipv6_address_from_addr(source),
-                    multicast_destination: get_ipv6_address_from_addr(destination),
-                })
-            }
-        }
+    ) -> UnicastSourceAndMulticastDestination<I> {
+        I::map_ip_out(
+            (source, destination),
+            |(source, destination)| UnicastSourceAndMulticastDestination {
+                unicast_source: Ipv4Addr::new(get_ipv4_address_from_addr(source).addr),
+                multicast_destination: Ipv4Addr::new(get_ipv4_address_from_addr(destination).addr),
+            },
+            |(source, destination)| UnicastSourceAndMulticastDestination {
+                unicast_source: Ipv6Addr::from_bytes(get_ipv6_address_from_addr(source).addr),
+                multicast_destination: Ipv6Addr::from_bytes(
+                    get_ipv6_address_from_addr(destination).addr,
+                ),
+            },
+        )
     }
 
     /// Waits for the `controller` to be fully initialized.
@@ -539,12 +536,15 @@ impl<'a> MulticastForwardingNetwork<'a> {
     /// some operations may race with the creation of a controller. In such a case,
     /// callers should invoke this function to ensure that the controller is fully
     /// initialized.
-    async fn wait_for_controller_to_start(&self, controller: &Box<dyn RoutingTableController>) {
-        let multicast_addr = IpAddrType::Multicast.address(self.version);
+    async fn wait_for_controller_to_start(&self, controller: &I::TableControllerProxy) {
+        let multicast_addr = IpAddrType::Multicast.address(I::VERSION);
         let invalid_addresses =
             self.create_unicast_source_and_multicast_destination(multicast_addr, multicast_addr);
         assert_eq!(
-            controller.add_route(invalid_addresses, self.default_multicast_route()).await,
+            controller
+                .add_route(invalid_addresses, self.default_multicast_route())
+                .await
+                .expect("send request"),
             Err(AddRouteError::InvalidAddress)
         );
     }
@@ -617,185 +617,19 @@ fn get_ipv6_address_from_addr(addr: fnet::IpAddress) -> fnet::Ipv6Address {
     assert_matches!(addr, fnet::IpAddress::Ipv6(ipv6) => ipv6)
 }
 
-// TODO(https://fxbug.dev/361052435): Deduplicate the error types with
-// `fuchsia_net_multicast_ext`.
-
-#[derive(thiserror::Error, Debug, PartialEq, multicast_forwarding_macros::FromIdenticalEnums)]
-#[identical_enums(
-    fnet_multicast_admin::Ipv4RoutingTableControllerAddRouteError,
-    fnet_multicast_admin::Ipv6RoutingTableControllerAddRouteError
-)]
-enum AddRouteError {
-    #[error("Invalid address")]
-    InvalidAddress,
-    #[error("Required route fields missing")]
-    RequiredRouteFieldsMissing,
-    #[error("Interface not found")]
-    InterfaceNotFound,
-    #[error("Input cannot be output")]
-    InputCannotBeOutput,
-    #[error("Duplicate output")]
-    DuplicateOutput,
+async fn expect_closed_for_reason<I: Ip + FidlMulticastAdminIpExt>(
+    controller: I::TableControllerProxy,
+    expected_reason: fnet_multicast_admin::TableControllerCloseReason,
+) {
+    let reason = controller
+        .take_event_stream()
+        .try_next()
+        .await
+        .expect("failed to read controller event")
+        .expect("event stream ended unexpectedly");
+    assert_eq!(reason, expected_reason);
+    assert_eq!(controller.on_closed().await, Ok(zx::Signals::CHANNEL_PEER_CLOSED));
 }
-
-#[derive(thiserror::Error, Debug, PartialEq, multicast_forwarding_macros::FromIdenticalEnums)]
-#[identical_enums(
-    fnet_multicast_admin::Ipv4RoutingTableControllerDelRouteError,
-    fnet_multicast_admin::Ipv6RoutingTableControllerDelRouteError
-)]
-enum DelRouteError {
-    #[error("Invalid address")]
-    InvalidAddress,
-    #[error("Route not found")]
-    NotFound,
-}
-
-#[derive(thiserror::Error, Debug, PartialEq, multicast_forwarding_macros::FromIdenticalEnums)]
-#[identical_enums(
-    fnet_multicast_admin::Ipv4RoutingTableControllerGetRouteStatsError,
-    fnet_multicast_admin::Ipv6RoutingTableControllerGetRouteStatsError
-)]
-enum GetRouteStatsError {
-    #[error("Invalid address")]
-    InvalidAddress,
-    #[error("Route not found")]
-    NotFound,
-}
-
-#[derive(Debug)]
-struct RoutingEventResult {
-    dropped_events: u64,
-    addresses: UnicastSourceAndMulticastDestination,
-    input_interface: u64,
-    event: fnet_multicast_admin::RoutingEvent,
-}
-
-/// A controller for interacting with a multicast routing table.
-#[async_trait]
-trait RoutingTableController {
-    async fn add_route(
-        &self,
-        addresses: UnicastSourceAndMulticastDestination,
-        route: fnet_multicast_admin::Route,
-    ) -> Result<(), AddRouteError>;
-
-    async fn del_route(
-        &self,
-        addresses: UnicastSourceAndMulticastDestination,
-    ) -> Result<(), DelRouteError>;
-
-    async fn get_route_stats(
-        &self,
-        addresses: UnicastSourceAndMulticastDestination,
-    ) -> Result<fnet_multicast_admin::RouteStats, GetRouteStatsError>;
-
-    async fn watch_routing_events(&self) -> Result<RoutingEventResult, fidl::Error>;
-
-    /// Asserts that the controller was closed with the `expected_reason`.
-    async fn expect_closed_for_reason(
-        &self,
-        expected_reason: fnet_multicast_admin::TableControllerCloseReason,
-    );
-}
-
-macro_rules! routing_table_controller_impl {
-    ($controller:ident, $controller_proxy:path, $controller_marker:path, $event_type:path, $version:path) => {
-        struct $controller {
-            controller: $controller_proxy,
-        }
-
-        impl $controller {
-            fn new(router_realm: &netemul::TestRealm<'_>) -> Self {
-                Self {
-                    controller: router_realm
-                        .connect_to_protocol::<$controller_marker>()
-                        .expect("connect to protocol"),
-                }
-            }
-        }
-
-        #[async_trait]
-        impl RoutingTableController for $controller {
-            async fn add_route(
-                &self,
-                addresses: UnicastSourceAndMulticastDestination,
-                route: fnet_multicast_admin::Route,
-            ) -> Result<(), AddRouteError> {
-                let fidl_addresses = assert_matches!(addresses, $version(addr) => addr);
-                self.controller
-                    .add_route(&fidl_addresses, &route)
-                    .await
-                    .expect("add_route failed")
-                    .map_err(Into::into)
-            }
-
-            async fn del_route(
-                &self,
-                addresses: UnicastSourceAndMulticastDestination,
-            ) -> Result<(), DelRouteError> {
-                let fidl_addresses = assert_matches!(addresses, $version(addr) => addr);
-                self.controller
-                    .del_route(&fidl_addresses)
-                    .await
-                    .expect("del_route failed")
-                    .map_err(Into::into)
-            }
-
-            async fn get_route_stats(
-                &self,
-                addresses: UnicastSourceAndMulticastDestination,
-            ) -> Result<fnet_multicast_admin::RouteStats, GetRouteStatsError> {
-                let fidl_addresses = assert_matches!(addresses, $version(addr) => addr);
-                self.controller
-                    .get_route_stats(&fidl_addresses)
-                    .await
-                    .expect("get_route_stats failed")
-                    .map_err(Into::into)
-            }
-
-            async fn watch_routing_events(&self) -> Result<RoutingEventResult, fidl::Error> {
-                self.controller.watch_routing_events().await.map(
-                    |(dropped_events, addresses, input_interface, event)| RoutingEventResult {
-                        dropped_events,
-                        addresses: $version(addresses),
-                        input_interface,
-                        event,
-                    },
-                )
-            }
-
-            async fn expect_closed_for_reason(
-                &self,
-                expected_reason: fnet_multicast_admin::TableControllerCloseReason,
-            ) {
-                let $event_type { error: reason } = self
-                    .controller
-                    .take_event_stream()
-                    .try_next()
-                    .await
-                    .expect("failed to read controller event")
-                    .expect("event stream ended unexpectedly");
-                assert_eq!(reason, expected_reason);
-                assert_eq!(self.controller.on_closed().await, Ok(zx::Signals::CHANNEL_PEER_CLOSED));
-            }
-        }
-    };
-}
-
-routing_table_controller_impl!(
-    Ipv4RoutingTableController,
-    fnet_multicast_admin::Ipv4RoutingTableControllerProxy,
-    fnet_multicast_admin::Ipv4RoutingTableControllerMarker,
-    fnet_multicast_admin::Ipv4RoutingTableControllerEvent::OnClose,
-    IpAddr::V4
-);
-routing_table_controller_impl!(
-    Ipv6RoutingTableController,
-    fnet_multicast_admin::Ipv6RoutingTableControllerProxy,
-    fnet_multicast_admin::Ipv6RoutingTableControllerMarker,
-    fnet_multicast_admin::Ipv6RoutingTableControllerEvent::OnClose,
-    IpAddr::V6
-);
 
 /// Adds the `addr` to the `interface`.
 async fn add_address(interface: &netemul::TestInterface<'_>, addr: fnet::Subnet) {
@@ -1152,7 +986,7 @@ struct MulticastForwardingTestOptions {
     };
     "missing route"
 )]
-async fn multicast_forwarding<I: Ip, N: Netstack>(
+async fn multicast_forwarding<I: Ip + FidlMulticastAdminIpExt, N: Netstack>(
     name: &str,
     case_name: &str,
     clients: HashMap<Client, ClientConfig>,
@@ -1168,9 +1002,8 @@ async fn multicast_forwarding<I: Ip, N: Netstack>(
     let test_name = format!("{}_{}", name, case_name);
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let router_realm = create_router_realm::<N>(&test_name, &sandbox);
-    let test_network = MulticastForwardingNetwork::new::<N>(
+    let test_network = MulticastForwardingNetwork::<I>::new::<N>(
         &test_name,
-        I::VERSION,
         &sandbox,
         &router_realm,
         servers,
@@ -1193,12 +1026,12 @@ async fn multicast_forwarding<I: Ip, N: Netstack>(
         })
         .collect();
 
-    let route = fnet_multicast_admin::Route {
-        expected_input_interface: Some(
-            test_network.get_server(route_input_interface).router_interface.id(),
-        ),
-        action: Some(fnet_multicast_admin::Action::OutgoingInterfaces(outgoing_interfaces)),
-        ..Default::default()
+    let route = fnet_multicast_ext::Route {
+        expected_input_interface: test_network
+            .get_server(route_input_interface)
+            .router_interface
+            .id(),
+        action: fnet_multicast_admin::Action::OutgoingInterfaces(outgoing_interfaces),
     };
 
     controller
@@ -1206,6 +1039,7 @@ async fn multicast_forwarding<I: Ip, N: Netstack>(
         .expect("controller not present")
         .add_route(addresses, route)
         .await
+        .expect("failed to send request")
         .expect("add_route error");
 
     match controller_action {
@@ -1244,7 +1078,7 @@ async fn multicast_forwarding<I: Ip, N: Netstack>(
     match expected_event {
         None => {}
         Some(expected_event) => {
-            let RoutingEventResult { dropped_events, addresses, input_interface, event } =
+            let WatchRoutingEventsResponse { dropped_events, addresses, input_interface, event } =
                 controller
                     .expect("controller not present")
                     .watch_routing_events()
@@ -1510,7 +1344,7 @@ struct AddMulticastRouteTestOptions {
     };
     "link-local multicast destination address"
 )]
-async fn add_multicast_route<I: Ip, N: Netstack>(
+async fn add_multicast_route<I: Ip + FidlMulticastAdminIpExt, N: Netstack>(
     name: &str,
     case_name: &str,
     client: ClientConfig,
@@ -1529,9 +1363,8 @@ async fn add_multicast_route<I: Ip, N: Netstack>(
     let test_name = format!("{}_{}", name, case_name);
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let router_realm = create_router_realm::<N>(&test_name, &sandbox);
-    let test_network = MulticastForwardingNetwork::new::<N>(
+    let test_network = MulticastForwardingNetwork::<I>::new::<N>(
         &test_name,
-        I::VERSION,
         &sandbox,
         &router_realm,
         servers,
@@ -1570,7 +1403,7 @@ async fn add_multicast_route<I: Ip, N: Netstack>(
         test_network.send_multicast_packet().await;
         // Wait for the "Missing Route" event to ensure the packet has been
         // queued in the pending table.
-        let RoutingEventResult { dropped_events, addresses, input_interface, event } =
+        let WatchRoutingEventsResponse { dropped_events, addresses, input_interface, event } =
             controller.watch_routing_events().await.expect("watch_routing_events failed");
         assert_eq!(dropped_events, 0);
         assert_eq!(addresses, test_network.default_unicast_source_and_multicast_destination());
@@ -1600,7 +1433,34 @@ async fn add_multicast_route<I: Ip, N: Netstack>(
         ..Default::default()
     };
 
-    assert_eq!(controller.add_route(addresses, route).await, expected_add_route_result);
+    // NB: Circumvent `fnet_multicast_ext::TableControllerProxy` APIs and
+    // interact directly with the FIDL. This allows us to send invalid requests
+    // that the extension library prevents with the type system.
+    #[derive(GenericOverIp)]
+    #[generic_over_ip(I, Ip)]
+    struct ProxyHolder<'a, I: Ip + FidlMulticastAdminIpExt>(&'a I::TableControllerProxy);
+
+    let result = I::map_ip_in(
+        (addresses, ProxyHolder(&controller)),
+        |(addresses, ProxyHolder(controller))| {
+            futures::future::Either::Left(
+                controller
+                    .add_route(&addresses.into(), &route)
+                    .map(|r| r.map(|r| r.map_err(fnet_multicast_ext::AddRouteError::from))),
+            )
+        },
+        |(addresses, ProxyHolder(controller))| {
+            futures::future::Either::Right(
+                controller
+                    .add_route(&addresses.into(), &route)
+                    .map(|r| r.map(|r| r.map_err(fnet_multicast_ext::AddRouteError::from))),
+            )
+        },
+    )
+    .await
+    .expect("send request");
+
+    assert_eq!(result, expected_add_route_result);
 
     if !send_before_route {
         test_network.send_multicast_packet().await;
@@ -1618,15 +1478,14 @@ async fn add_multicast_route<I: Ip, N: Netstack>(
 #[netstack_test]
 #[variant(N, Netstack)]
 #[variant(I, Ip)]
-async fn overwrite_multicast_route<I: Ip, N: Netstack>(name: &str) {
+async fn overwrite_multicast_route<I: Ip + FidlMulticastAdminIpExt, N: Netstack>(name: &str) {
     // Setup a network with one server and two clients.
     // Originally, install a multicast route to forward packets to Client A, and
     // later overwrite it with a multicast route to forward packets to Client B.
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let router_realm = create_router_realm::<N>(name, &sandbox);
-    let test_network = MulticastForwardingNetwork::new::<N>(
+    let test_network = MulticastForwardingNetwork::<I>::new::<N>(
         name,
-        I::VERSION,
         &sandbox,
         &router_realm,
         vec![Server::A],
@@ -1655,14 +1514,15 @@ async fn overwrite_multicast_route<I: Ip, N: Netstack>(name: &str) {
     for (client_with_route, client_without_route) in
         [(Client::A, Client::B), (Client::B, Client::A)]
     {
-        let route = fnet_multicast_admin::Route {
-            expected_input_interface: Some(
-                test_network.get_server(Server::A).router_interface.id(),
-            ),
-            action: Some(route_action_forward_to_client(client_with_route)),
-            ..Default::default()
+        let route = fnet_multicast_ext::Route {
+            expected_input_interface: test_network.get_server(Server::A).router_interface.id(),
+            action: route_action_forward_to_client(client_with_route),
         };
-        controller.add_route(addresses.clone(), route).await.expect("add route should succeed");
+        controller
+            .add_route(addresses.clone(), route)
+            .await
+            .expect("send request")
+            .expect("add route should succeed");
         // Send & receive a multicast packet, verifying the correct client
         // receives the packet.
         test_network
@@ -1677,12 +1537,11 @@ async fn overwrite_multicast_route<I: Ip, N: Netstack>(name: &str) {
 #[netstack_test]
 #[variant(I, Ip)]
 #[variant(N, Netstack)]
-async fn multiple_multicast_controllers<I: Ip, N: Netstack>(name: &str) {
+async fn multiple_multicast_controllers<I: Ip + FidlMulticastAdminIpExt, N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let router_realm = create_router_realm::<N>(name, &sandbox);
-    let test_network = MulticastForwardingNetwork::new::<N>(
+    let test_network = MulticastForwardingNetwork::<I>::new::<N>(
         name,
-        I::VERSION,
         &sandbox,
         &router_realm,
         vec![Server::A],
@@ -1695,9 +1554,11 @@ async fn multiple_multicast_controllers<I: Ip, N: Netstack>(name: &str) {
     test_network.add_default_route(&controller).await;
 
     let closed_controller = test_network.create_multicast_controller();
-    closed_controller
-        .expect_closed_for_reason(fnet_multicast_admin::TableControllerCloseReason::AlreadyInUse)
-        .await;
+    expect_closed_for_reason::<I>(
+        closed_controller,
+        fnet_multicast_admin::TableControllerCloseReason::AlreadyInUse,
+    )
+    .await;
 
     // The closed controller should not impact the already active controller.
     // Consequently, a packet should still be forwardable using the route added
@@ -1712,12 +1573,11 @@ async fn multiple_multicast_controllers<I: Ip, N: Netstack>(name: &str) {
 #[netstack_test]
 #[variant(I, Ip)]
 #[variant(N, Netstack)]
-async fn watch_routing_events_hanging<I: Ip, N: Netstack>(name: &str) {
+async fn watch_routing_events_hanging<I: Ip + FidlMulticastAdminIpExt, N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let router_realm = create_router_realm::<N>(name, &sandbox);
-    let test_network = MulticastForwardingNetwork::new::<N>(
+    let test_network = MulticastForwardingNetwork::<I>::new::<N>(
         name,
-        I::VERSION,
         &sandbox,
         &router_realm,
         vec![Server::A],
@@ -1731,7 +1591,7 @@ async fn watch_routing_events_hanging<I: Ip, N: Netstack>(name: &str) {
     test_network.wait_for_controller_to_start(&controller).await;
 
     let watch_routing_events_fut = async {
-        let RoutingEventResult { dropped_events, addresses, input_interface, event } =
+        let WatchRoutingEventsResponse { dropped_events, addresses, input_interface, event } =
             controller.watch_routing_events().await.expect("watch_routing_events failed");
         assert_eq!(dropped_events, 0);
         assert_eq!(addresses, test_network.default_unicast_source_and_multicast_destination());
@@ -1756,12 +1616,13 @@ async fn watch_routing_events_hanging<I: Ip, N: Netstack>(name: &str) {
 #[netstack_test]
 #[variant(I, Ip)]
 #[variant(N, Netstack)]
-async fn watch_routing_events_already_hanging<I: Ip, N: Netstack>(name: &str) {
+async fn watch_routing_events_already_hanging<I: Ip + FidlMulticastAdminIpExt, N: Netstack>(
+    name: &str,
+) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let router_realm = create_router_realm::<N>(name, &sandbox);
-    let test_network = MulticastForwardingNetwork::new::<N>(
+    let test_network = MulticastForwardingNetwork::<I>::new::<N>(
         name,
-        I::VERSION,
         &sandbox,
         &router_realm,
         vec![Server::A],
@@ -1777,20 +1638,26 @@ async fn watch_routing_events_already_hanging<I: Ip, N: Netstack>(name: &str) {
     // packets should be forwarded.
     test_network.send_and_receive_multicast_packet(hashmap! { Client::A => true }).await;
 
-    async fn watch_routing_events(controller: &Box<dyn RoutingTableController>) {
+    async fn watch_routing_events<I: Ip + FidlMulticastAdminIpExt>(
+        controller: &I::TableControllerProxy,
+    ) {
         let err =
             controller.watch_routing_events().await.expect_err("should fail with PEER_CLOSED");
         let status = assert_matches!(err, fidl::Error::ClientChannelClosed{status, ..} => status);
         assert_eq!(status, zx::Status::PEER_CLOSED);
     }
 
-    let ((), ()) =
-        futures::future::join(watch_routing_events(&controller), watch_routing_events(&controller))
-            .await;
+    let ((), ()) = futures::future::join(
+        watch_routing_events::<I>(&controller),
+        watch_routing_events::<I>(&controller),
+    )
+    .await;
 
-    controller
-        .expect_closed_for_reason(fnet_multicast_admin::TableControllerCloseReason::HangingGetError)
-        .await;
+    expect_closed_for_reason::<I>(
+        controller,
+        fnet_multicast_admin::TableControllerCloseReason::HangingGetError,
+    )
+    .await;
 
     // The routing table should be dropped when the controller is closed. As a
     // result, a packet should no longer be forwarded.
@@ -1800,12 +1667,11 @@ async fn watch_routing_events_already_hanging<I: Ip, N: Netstack>(name: &str) {
 #[netstack_test]
 #[variant(I, Ip)]
 #[variant(N, Netstack)]
-async fn watch_multiple_routing_events<I: Ip, N: Netstack>(name: &str) {
+async fn watch_multiple_routing_events<I: Ip + FidlMulticastAdminIpExt, N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let router_realm = create_router_realm::<N>(name, &sandbox);
-    let test_network = MulticastForwardingNetwork::new::<N>(
+    let test_network = MulticastForwardingNetwork::<I>::new::<N>(
         name,
-        I::VERSION,
         &sandbox,
         &router_realm,
         vec![Server::A],
@@ -1833,16 +1699,17 @@ async fn watch_multiple_routing_events<I: Ip, N: Netstack>(name: &str) {
 
     // Verify both "Missing Route" events are observed in the correct order.
     for dst_addr in DST_ADDRS {
-        let RoutingEventResult { dropped_events, addresses, input_interface, event } = controller
-            .watch_routing_events()
-            .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {
-                panic!("timed out waiting for event")
-            })
-            .await
-            .expect("watch_routing_events failed");
+        let WatchRoutingEventsResponse { dropped_events, addresses, input_interface, event } =
+            controller
+                .watch_routing_events()
+                .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {
+                    panic!("timed out waiting for event")
+                })
+                .await
+                .expect("watch_routing_events failed");
 
         let src_addr = test_network.get_source_address();
-        let dst_addr = dst_addr.address(test_network.version);
+        let dst_addr = dst_addr.address(I::VERSION);
         let expected_addr =
             test_network.create_unicast_source_and_multicast_destination(src_addr, dst_addr);
 
@@ -1859,12 +1726,13 @@ async fn watch_multiple_routing_events<I: Ip, N: Netstack>(name: &str) {
 #[netstack_test]
 #[variant(I, Ip)]
 #[variant(N, Netstack)]
-async fn watch_routing_events_dropped_events<I: Ip, N: Netstack>(name: &str) {
+async fn watch_routing_events_dropped_events<I: Ip + FidlMulticastAdminIpExt, N: Netstack>(
+    name: &str,
+) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let router_realm = create_router_realm::<N>(name, &sandbox);
-    let test_network = MulticastForwardingNetwork::new::<N>(
+    let test_network = MulticastForwardingNetwork::<I>::new::<N>(
         name,
-        I::VERSION,
         &sandbox,
         &router_realm,
         vec![Server::A, Server::B],
@@ -1876,21 +1744,20 @@ async fn watch_routing_events_dropped_events<I: Ip, N: Netstack>(name: &str) {
     let controller = test_network.create_multicast_controller();
 
     let addresses = test_network.default_unicast_source_and_multicast_destination();
-    let route = fnet_multicast_admin::Route {
-        expected_input_interface: Some(test_network.get_server(Server::B).router_interface.id()),
-        action: Some(fnet_multicast_admin::Action::OutgoingInterfaces(vec![
+    let route = fnet_multicast_ext::Route {
+        expected_input_interface: test_network.get_server(Server::B).router_interface.id(),
+        action: fnet_multicast_admin::Action::OutgoingInterfaces(vec![
             fnet_multicast_admin::OutgoingInterfaces {
                 id: test_network.get_client(Client::A).device.router_interface.id(),
                 min_ttl: 1,
             },
-        ])),
-        ..Default::default()
+        ]),
     };
 
-    controller.add_route(addresses, route).await.expect("add_route error");
+    controller.add_route(addresses, route).await.expect("send request").expect("add_route error");
 
-    async fn add_wrong_input_interface_events(
-        test_network: &MulticastForwardingNetwork<'_>,
+    async fn add_wrong_input_interface_events<I: Ip + FidlMulticastAdminIpExt>(
+        test_network: &MulticastForwardingNetwork<'_, I>,
         num: u16,
     ) {
         const WAIT_AFTER_SEND_DURATION: zx::Duration = zx::Duration::from_seconds(5);
@@ -1904,11 +1771,11 @@ async fn watch_routing_events_dropped_events<I: Ip, N: Netstack>(name: &str) {
         netstack_testing_common::sleep(WAIT_AFTER_SEND_DURATION.into_seconds()).await;
     }
 
-    async fn expect_num_dropped_events(
-        controller: &Box<dyn RoutingTableController>,
+    async fn expect_num_dropped_events<I: Ip + FidlMulticastAdminIpExt>(
+        controller: &I::TableControllerProxy,
         expected_num_dropped_events: u64,
     ) {
-        let RoutingEventResult { dropped_events, .. } =
+        let WatchRoutingEventsResponse { dropped_events, .. } =
             controller.watch_routing_events().await.expect("watch_routing_events failed");
         assert_eq!(dropped_events, expected_num_dropped_events);
     }
@@ -1916,15 +1783,15 @@ async fn watch_routing_events_dropped_events<I: Ip, N: Netstack>(name: &str) {
     // Add the maximum number of events to the buffer. No events should be
     // dropped.
     add_wrong_input_interface_events(&test_network, fnet_multicast_admin::MAX_ROUTING_EVENTS).await;
-    expect_num_dropped_events(&controller, 0).await;
+    expect_num_dropped_events::<I>(&controller, 0).await;
 
     // Push the max events buffer over the limit. Events should be dropped.
     add_wrong_input_interface_events(&test_network, 3).await;
-    expect_num_dropped_events(&controller, 2).await;
+    expect_num_dropped_events::<I>(&controller, 2).await;
 
     // Immediately reading the next event should result in the dropped events
     // counter getting reset.
-    expect_num_dropped_events(&controller, 0).await;
+    expect_num_dropped_events::<I>(&controller, 0).await;
 }
 
 #[netstack_test]
@@ -1994,7 +1861,7 @@ async fn watch_routing_events_dropped_events<I: Ip, N: Netstack>(name: &str) {
     Err(DelRouteError::InvalidAddress);
     "link local multicast destination address"
 )]
-async fn del_multicast_route<I: Ip, N: Netstack>(
+async fn del_multicast_route<I: Ip + FidlMulticastAdminIpExt, N: Netstack>(
     name: &str,
     case_name: &str,
     source_address: DeviceAddress,
@@ -2005,9 +1872,8 @@ async fn del_multicast_route<I: Ip, N: Netstack>(
     let test_name = format!("{}_{}", name, case_name);
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let router_realm = create_router_realm::<N>(&test_name, &sandbox);
-    let test_network = MulticastForwardingNetwork::new::<N>(
+    let test_network = MulticastForwardingNetwork::<I>::new::<N>(
         &test_name,
-        I::VERSION,
         &sandbox,
         &router_realm,
         servers,
@@ -2032,7 +1898,10 @@ async fn del_multicast_route<I: Ip, N: Netstack>(
         destination_address.address(I::VERSION),
     );
 
-    assert_eq!(controller.del_route(del_addresses).await, expected_del_route_result);
+    assert_eq!(
+        controller.del_route(del_addresses).await.expect("send_request"),
+        expected_del_route_result
+    );
 
     // After del_route has been called, multicast packets should no longer be
     // forwarded if the route was successfully removed.
@@ -2102,7 +1971,7 @@ async fn del_multicast_route<I: Ip, N: Netstack>(
     GetRouteStatsError::InvalidAddress;
     "link local multicast destination address"
 )]
-async fn get_route_stats_errors<I: Ip, N: Netstack>(
+async fn get_route_stats_errors<I: Ip + FidlMulticastAdminIpExt, N: Netstack>(
     name: &str,
     case_name: &str,
     source_address: DeviceAddress,
@@ -2113,9 +1982,8 @@ async fn get_route_stats_errors<I: Ip, N: Netstack>(
     let test_name = format!("{}_{}", name, case_name);
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let router_realm = create_router_realm::<N>(&test_name, &sandbox);
-    let test_network = MulticastForwardingNetwork::new::<N>(
+    let test_network = MulticastForwardingNetwork::<I>::new::<N>(
         &test_name,
-        I::VERSION,
         &sandbox,
         &router_realm,
         servers,
@@ -2132,18 +2000,20 @@ async fn get_route_stats_errors<I: Ip, N: Netstack>(
         destination_address.address(I::VERSION),
     );
 
-    assert_eq!(controller.get_route_stats(get_route_stats_addresses).await, Err(expected_error));
+    assert_eq!(
+        controller.get_route_stats(get_route_stats_addresses).await.expect("send request"),
+        Err(expected_error)
+    );
 }
 
 #[netstack_test]
 #[variant(I, Ip)]
 #[variant(N, Netstack)]
-async fn get_route_stats<I: Ip, N: Netstack>(name: &str) {
+async fn get_route_stats<I: Ip + FidlMulticastAdminIpExt, N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let router_realm = create_router_realm::<N>(name, &sandbox);
-    let test_network = MulticastForwardingNetwork::new::<N>(
+    let test_network = MulticastForwardingNetwork::<I>::new::<N>(
         name,
-        I::VERSION,
         &sandbox,
         &router_realm,
         vec![Server::A],
@@ -2155,13 +2025,14 @@ async fn get_route_stats<I: Ip, N: Netstack>(name: &str) {
     let controller = test_network.create_multicast_controller();
     test_network.add_default_route(&controller).await;
 
-    async fn get_last_used_timestamp(
-        controller: &Box<dyn RoutingTableController>,
-        addresses: UnicastSourceAndMulticastDestination,
+    async fn get_last_used_timestamp<I: Ip + FidlMulticastAdminIpExt>(
+        controller: &I::TableControllerProxy,
+        addresses: UnicastSourceAndMulticastDestination<I>,
     ) -> i64 {
         controller
             .get_route_stats(addresses)
             .await
+            .expect("send_request")
             .expect("get_route_stats error")
             .last_used
             .expect("last_used missing value")
