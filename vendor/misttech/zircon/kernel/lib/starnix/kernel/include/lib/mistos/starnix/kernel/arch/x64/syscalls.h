@@ -18,8 +18,19 @@ namespace starnix {
 
 class CurrentTask;
 
+fit::result<Errno> sys_access(const CurrentTask& current_task, starnix_uapi::UserCString user_path,
+                              starnix_uapi::FileMode mode);
+
+fit::result<Errno, uint32_t> sys_alarm(const CurrentTask& current_task, uint32_t duration);
+
 fit::result<Errno> sys_arch_prctl(const CurrentTask& current_task, uint32_t code,
                                   starnix_uapi::UserAddress addr);
+
+fit::result<Errno> sys_chmod(const CurrentTask& current_task, starnix_uapi::UserCString user_path,
+                             starnix_uapi::FileMode mode);
+
+fit::result<Errno> sys_chown(const CurrentTask& current_task, starnix_uapi::UserCString user_path,
+                             uid_t owner, gid_t group);
 
 /// The parameter order for `clone` varies by architecture.
 fit::result<Errno, pid_t> sys_clone(const CurrentTask& current_task, uint64_t flags,
