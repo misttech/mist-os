@@ -282,8 +282,7 @@ fit::result<Errno, UserAddress> MemoryManagerState::map_memory(
         update_after_unmap(mm, addr.address, end - addr.address, released_mappings) _EP(result);
   }
 
-  auto mapping = Mapping::New(*mapped_addr, memory, vmo_offset,
-                              MappingFlagsImpl(flags) /*, file_write_guard*/);
+  auto mapping = Mapping::New(*mapped_addr, memory, vmo_offset, MappingFlagsImpl(flags));
   mapping.name_ = ktl::move(name);
   mappings.insert({.start = *mapped_addr, .end = end}, mapping);
 
@@ -1235,9 +1234,9 @@ bool MemoryManager::extend_brk(MemoryManagerState& _state, fbl::RefPtr<MemoryMan
 }
 
 fit::result<Errno> MemoryManager::snapshot_to(fbl::RefPtr<MemoryManager>& target) {
-  // TODO(https://fxbug.dev/42074633): When SNAPSHOT (or equivalent) is supported on pager-backed
-  // VMOs we can remove the hack below (which also won't be performant). For now, as a workaround,
-  // we use SNAPSHOT_AT_LEAST_ON_WRITE on both the child and the parent.
+  // TODO(https://fxbug.dev/42074633): When SNAPSHOT (or equivalent) is supported on
+  // pager-backed VMOs we can remove the hack below (which also won't be performant). For now,
+  // as a workaround, we use SNAPSHOT_AT_LEAST_ON_WRITE on both the child and the parent.
   LTRACE;
 
   struct MemoryWrapper : public fbl::SinglyLinkedListable<ktl::unique_ptr<MemoryWrapper>> {
@@ -1709,8 +1708,8 @@ fit::result<Errno> MemoryManager::set_mapping_name(UserAddress addr, size_t leng
       return add_or_error.take_error();
     last_range_end = add_or_error.value();
 
-    // TODO(b/310255065): We have no place to store names in a way visible to programs outside of
-    // Starnix such as memory analysis tools.
+    // TODO(b/310255065): We have no place to store names in a way visible to programs outside
+    // of Starnix such as memory analysis tools.
 #if STARNIX_ANON_ALLOCS
 #[cfg(not(feature = "alternate_anon_allocs"))]
     {
@@ -1822,7 +1821,6 @@ fit::result<Errno, fbl::RefPtr<MemoryObject>> create_anonymous_mapping_memory(ui
   if (memory.is_error()) {
     switch (memory.error_value()) {
       case ZX_ERR_NO_MEMORY:
-        return fit::error(errno(ENOMEM));
       case ZX_ERR_OUT_OF_RANGE:
         return fit::error(errno(ENOMEM));
       default:
