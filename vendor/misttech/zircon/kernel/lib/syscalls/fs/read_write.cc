@@ -3,75 +3,64 @@
 // found in the LICENSE file.
 
 #include <lib/mistos/linux_uapi/typedefs.h>
+#include <lib/mistos/starnix/kernel/arch/x64/syscalls.h>
+#include <lib/mistos/starnix/kernel/execution/executor.h>
+#include <lib/mistos/starnix/kernel/task/current_task.h>
+#include <lib/mistos/starnix/kernel/vfs/syscalls.h>
+#include <lib/mistos/starnix_uapi/open_flags.h>
+#include <lib/starnix_zircon/task_wrapper.h>
 #include <lib/syscalls/forward.h>
-#include <lib/syscalls/safe-syscall-argument.h>
 #include <lib/user_copy/user_ptr.h>
 #include <trace.h>
 
 #include "../priv.h"
 
-#define LOCAL_TRACE SYSCALLS_GLOBAL_TRACE(0)
+#define LOCAL_TRACE MISTOS_SYSCALLS_GLOBAL_TRACE(0)
 
-long sys_read(unsigned int fd, user_out_ptr<char> buf, size_t count) {
+int64_t sys_a0000_read(unsigned int fd, user_out_ptr<char> buf, size_t count) {
   LTRACEF_LEVEL(2, "fd=%d count=%zu\n", fd, count);
-  return -1;
+  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  return execute_syscall(starnix::sys_read, current_task,
+                         starnix::FdNumber::from_raw(static_cast<uint32_t>(fd)),
+                         starnix_uapi::UserAddress::from_ptr((zx_vaddr_t)(buf.get())), count);
 }
 
-static zx_status_t do_write_to_log(user_in_ptr<const char> ptr, size_t count) {
-#if 0
-  char buf[1024];
-  if (ptr.copy_array_from_user(buf, count) != ZX_OK)
-    return ZX_ERR_INVALID_ARGS;
-
-  // Dump what we can into the persistent dlog, if we have one.
-  persistent_dlog_write({buf, count});
-
-  // This path to serial out arbitrates with the debug log
-  // drainer and/or kernel ll debug path to minimize interleaving
-  // of serial output between various sources
-  dlog_serial_write({buf, count});
-
-  return ZX_OK;
-#endif
-
-  char buf[256];
-  while (count != 0) {
-    size_t i;
-    size_t chunk = count;
-    if (chunk > 256)
-      chunk = 256;
-
-    if (ptr.copy_array_from_user(buf, chunk) != ZX_OK)
-      return ZX_ERR_INVALID_ARGS;
-
-    for (i = 0; i < chunk; i++) {
-      fputc(buf[i], stdout);
-    }
-    ptr = ptr.byte_offset(chunk);
-    count -= chunk;
-  }
-
-  return ZX_OK;
-}
-
-long sys_write(unsigned int fd, user_in_ptr<const char> ptr, size_t count) {
+int64_t sys_a0001_write(unsigned int fd, user_in_ptr<const char> buf, size_t count) {
   LTRACEF_LEVEL(2, "fd=%d count=%zu\n", fd, count);
-  if (fd == 1) {
-    zx_status_t status = do_write_to_log(ptr, count);
-    if (status != ZX_OK) {
-      return -EBADF;
-    }
-    return count;
-  }
-  return 0;
+  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  return execute_syscall(starnix::sys_write, current_task,
+                         starnix::FdNumber::from_raw(static_cast<uint32_t>(fd)),
+                         starnix_uapi::UserAddress::from_ptr((zx_vaddr_t)(buf.get())), count);
 }
 
-long sys_open(user_in_ptr<const char> filename, int flags, umode_t mode) {
-  LTRACEF_LEVEL(2, "\n");
-  return -1;
+int64_t sys_a0002_open(user_in_ptr<const char> filename, int flags, umode_t mode) {
+  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  return execute_syscall(starnix::sys_open, current_task,
+                         starnix_uapi::UserAddress::from_ptr((zx_vaddr_t)filename.get()), flags,
+                         FileMode(mode));
 }
 
-long sys_close(unsigned int fd) {
+int64_t sys_a0003_close(unsigned int fd) {
   LTRACEF_LEVEL(2, "fd=%d\n", fd);
-  return -1;
+  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  return execute_syscall(starnix::sys_close, current_task,
+                         starnix::FdNumber::from_raw(static_cast<uint32_t>(fd)));
+}
+
+int64_t sys_a0017_pread64(unsigned int fd, user_out_ptr<char> buf, size_t count, int64_t pos) {
+  LTRACEF_LEVEL(2, "fd=%d count=%zu pos=%ld\n", fd, count, pos);
+  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  return execute_syscall(starnix::sys_pread64, current_task,
+                         starnix::FdNumber::from_raw(static_cast<uint32_t>(fd)),
+                         starnix_uapi::UserAddress::from_ptr((zx_vaddr_t)(buf.get())), count, pos);
+}
+
+int64_t sys_a0020_writev(unsigned long fd, user_in_ptr<const void> vec, unsigned long vlen) {
+  LTRACEF_LEVEL(2, "fd=%lu count=%lu\n", fd, vlen);
+
+  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  return execute_syscall(starnix::sys_writev, current_task,
+                         starnix::FdNumber::from_raw(static_cast<uint32_t>(fd)),
+                         starnix_uapi::UserAddress::from_ptr((zx_vaddr_t)(vec.get())),
+                         starnix_uapi::UserValue<uint32_t>(static_cast<uint32_t>(vlen)));
 }
