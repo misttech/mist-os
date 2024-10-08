@@ -174,8 +174,11 @@ config("clang_defaults") {
     cflags_cc = [ "-stdlib=libc++" ]
     ldflags = [
       "-stdlib=libc++",
+
+      "--start-no-unused-arguments",
       "-unwindlib=libunwind",
       "-rtlib=compiler-rt",
+      "--end-no-unused-arguments",
     ]
   }
 }
