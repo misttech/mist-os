@@ -701,6 +701,15 @@ pub const RUNNER_PROXY_EVENT_SIGNAL: zx::Signals = zx::Signals::USER_0;
 /// The signal that the kernel raises to indicate that a message has been handled.
 pub const KERNEL_PROXY_EVENT_SIGNAL: zx::Signals = zx::Signals::USER_1;
 
+/// Tells the runner that we have handled the message and are ready to accept more messages.
+pub fn clear_wake_proxy_signal(event: &zx::EventPair) {
+    let (clear_mask, set_mask) = (RUNNER_PROXY_EVENT_SIGNAL, KERNEL_PROXY_EVENT_SIGNAL);
+    match event.signal_peer(clear_mask, set_mask) {
+        Ok(_) => (),
+        Err(e) => log_warn!("Failed to reset wake event state {:?}", e),
+    }
+}
+
 /// Creates a proxy between `remote_channel` and the returned `zx::Channel`.
 ///
 /// The proxying is done by the Starnix runner, and allows messages on the channel to wake
@@ -709,8 +718,8 @@ pub fn create_proxy_for_wake_events(remote_channel: zx::Channel) -> (zx::Channel
     let (local_proxy, kernel_channel) = zx::Channel::create();
     let (resume_event, local_resume_event) = zx::EventPair::create();
 
-    let manager =
-        fuchsia_component::client::connect_to_protocol::<frunner::ManagerMarker>().expect("failed");
+    let manager = fuchsia_component::client::connect_to_protocol_sync::<frunner::ManagerMarker>()
+        .expect("failed");
     manager
         .proxy_wake_channel(frunner::ManagerProxyWakeChannelRequest {
             container_job: Some(
