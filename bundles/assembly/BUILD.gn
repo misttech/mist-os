@@ -409,6 +409,7 @@ assembly_input_bundle("embeddable_eng") {
   testonly = true
   bootfs_files_labels = [
     # tools
+    "//src/bringup/bin/bootpkg:bootfs",
     "//src/devices/bin/driver_tools:bootfs",
     "//src/devices/bin/lsdev:bootfs",
     "//src/diagnostics/iquery:bootfs",
