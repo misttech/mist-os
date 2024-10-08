@@ -216,7 +216,7 @@ class FsNode final
   /// Whether this node is a symbolic link.
   bool is_lnk() const { return info()->mode.is_lnk(); }
 
-  fit::result<Errno, struct stat> stat(const CurrentTask& current_task) const;
+  fit::result<Errno, struct ::stat> stat(const CurrentTask& current_task) const;
 
   // Returns current `FsNodeInfo`.
   starnix_sync::RwLockGuard<FsNodeInfo, BrwLockPi::Reader> info() const { return info_.Read(); }
