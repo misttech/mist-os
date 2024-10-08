@@ -137,7 +137,7 @@ class FramebufferBochsDisplayDriver final : public FramebufferDisplayDriver {
 
 FramebufferBochsDisplayDriver::FramebufferBochsDisplayDriver(
     fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
-    : FramebufferDisplayDriver("framebuffer-intel-display", std::move(start_args),
+    : FramebufferDisplayDriver("framebuffer-bochs-display", std::move(start_args),
                                std::move(driver_dispatcher)) {}
 
 FramebufferBochsDisplayDriver::~FramebufferBochsDisplayDriver() = default;
