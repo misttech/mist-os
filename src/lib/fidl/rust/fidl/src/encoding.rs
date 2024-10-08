@@ -1344,8 +1344,8 @@ impl<T: ResourceTypeMarker, const N: usize> ResourceTypeMarker for Array<T, N> {
     }
 }
 
-unsafe impl<'a, T: ValueTypeMarker, const N: usize, D: ResourceDialect> Encode<Array<T, N>, D>
-    for &'a [T::Owned; N]
+unsafe impl<T: ValueTypeMarker, const N: usize, D: ResourceDialect> Encode<Array<T, N>, D>
+    for &[T::Owned; N]
 where
     for<'q> T::Borrowed<'q>: Encode<T, D>,
 {
@@ -1361,8 +1361,8 @@ where
     }
 }
 
-unsafe impl<'a, T: ResourceTypeMarker, const N: usize, D: ResourceDialect> Encode<Array<T, N>, D>
-    for &'a mut [<T as TypeMarker>::Owned; N]
+unsafe impl<T: ResourceTypeMarker, const N: usize, D: ResourceDialect> Encode<Array<T, N>, D>
+    for &mut [<T as TypeMarker>::Owned; N]
 where
     for<'q> T::Borrowed<'q>: Encode<T, D>,
 {
@@ -1560,8 +1560,8 @@ impl<T: ResourceTypeMarker, const N: usize> ResourceTypeMarker for Vector<T, N> 
     }
 }
 
-unsafe impl<'a, T: ValueTypeMarker, const N: usize, D: ResourceDialect> Encode<Vector<T, N>, D>
-    for &'a [<T as TypeMarker>::Owned]
+unsafe impl<T: ValueTypeMarker, const N: usize, D: ResourceDialect> Encode<Vector<T, N>, D>
+    for &[<T as TypeMarker>::Owned]
 where
     for<'q> T::Borrowed<'q>: Encode<T, D>,
 {
@@ -1577,8 +1577,8 @@ where
     }
 }
 
-unsafe impl<'a, T: ResourceTypeMarker + TypeMarker, const N: usize, D: ResourceDialect>
-    Encode<Vector<T, N>, D> for &'a mut [<T as TypeMarker>::Owned]
+unsafe impl<T: ResourceTypeMarker + TypeMarker, const N: usize, D: ResourceDialect>
+    Encode<Vector<T, N>, D> for &mut [<T as TypeMarker>::Owned]
 where
     for<'q> T::Borrowed<'q>: Encode<T, D>,
 {
@@ -1771,7 +1771,7 @@ impl<const N: usize> ValueTypeMarker for BoundedString<N> {
     }
 }
 
-unsafe impl<'a, const N: usize, D: ResourceDialect> Encode<BoundedString<N>, D> for &'a str {
+unsafe impl<const N: usize, D: ResourceDialect> Encode<BoundedString<N>, D> for &str {
     #[inline]
     unsafe fn encode(
         self,

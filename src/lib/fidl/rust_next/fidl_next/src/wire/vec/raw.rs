@@ -14,7 +14,7 @@ pub struct RawWireVector<'buf, T> {
     ptr: WirePointer<'buf, T>,
 }
 
-impl<'buf, T> Drop for RawWireVector<'buf, T> {
+impl<T> Drop for RawWireVector<'_, T> {
     fn drop(&mut self) {
         unsafe {
             self.as_slice_ptr().drop_in_place();
@@ -22,7 +22,7 @@ impl<'buf, T> Drop for RawWireVector<'buf, T> {
     }
 }
 
-impl<'buf, T> RawWireVector<'buf, T> {
+impl<T> RawWireVector<'_, T> {
     pub fn dangling() -> Self {
         Self { len: u64_le::from_native(0), ptr: WirePointer::dangling() }
     }
