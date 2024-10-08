@@ -4,7 +4,7 @@
 
 use crate::config_management::{self};
 use crate::util::historical_list::Timestamped;
-use fuchsia_async::Time;
+use fuchsia_async::MonotonicInstant;
 use wlan_common::bss::BssDescription;
 use wlan_common::channel::Channel;
 use wlan_common::security::SecurityAuthenticator;
@@ -153,10 +153,10 @@ impl From<fidl_internal::SignalReportIndication> for Signal {
 #[derive(Clone, Debug, PartialEq)]
 pub struct TimestampedSignal {
     pub signal: Signal,
-    pub time: Time,
+    pub time: MonotonicInstant,
 }
 impl Timestamped for TimestampedSignal {
-    fn time(&self) -> Time {
+    fn time(&self) -> MonotonicInstant {
         self.time
     }
 }

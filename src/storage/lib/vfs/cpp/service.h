@@ -33,27 +33,19 @@ class Service : public Vnode {
   template <typename, typename = void>
   struct has_protocol_type : public std::false_type {};
   template <typename T>
-  struct has_protocol_type<T, std::void_t<typename T::ProtocolType>> : public std::true_type{};
+  struct has_protocol_type<T, std::void_t<typename T::ProtocolType>> : public std::true_type {};
   template <typename T>
   static constexpr inline auto has_protocol_type_v = has_protocol_type<T>::value;
-
-  template <typename T>
-  using remove_cvref_t = typename std::remove_reference<typename std::remove_cv<T>::type>::type;
 
   // Returns if |T| could potentially be a protocol connector:
   // - It is not |Service|.
   // - It cannot be converted to the untyped connector.
   template <typename T>
   static constexpr inline auto maybe_protocol_connector =
-      std::conjunction_v<std::negation<std::is_same<remove_cvref_t<T>, Service>>,
+      std::conjunction_v<std::negation<std::is_same<std::remove_cvref_t<T>, Service>>,
                          std::negation<std::is_convertible<T, Connector>>>;
 
  public:
-  // Handler called to bind the provided channel to an implementation of the service. This version
-  // is typed to the exact FIDL protocol the handler will support.
-  template <typename Protocol>
-  using ProtocolConnector = fit::function<zx_status_t(fidl::ServerEnd<Protocol>)>;
-
   // |Vnode| implementation:
   fuchsia_io::NodeProtocolKinds GetProtocols() const final;
   zx::result<fs::VnodeAttributes> GetAttributes() const final;
@@ -84,14 +76,12 @@ class Service : public Vnode {
   template <typename Callable, std::enable_if_t<maybe_protocol_connector<Callable>, bool> = true>
   explicit Service(Callable&& connector)
       : Service([connector = std::forward<Callable>(connector)](zx::channel channel) mutable {
-          static_assert(
-              std::is_same_v<typename fit::callable_traits<remove_cvref_t<Callable>>::return_type,
-                             zx_status_t>,
-              "The protocol connector should return |zx_status_t|.");
-          static_assert(fit::callable_traits<remove_cvref_t<Callable>>::args::size == 1,
+          using CallableTraits = fit::callable_traits<std::remove_cvref_t<Callable>>;
+          static_assert(std::is_same_v<typename CallableTraits::return_type, zx_status_t>,
+                        "The protocol connector should return |zx_status_t|.");
+          static_assert(CallableTraits::args::size == 1,
                         "The protocol connector should take exactly one argument.");
-          using FirstArg =
-              typename fit::callable_traits<remove_cvref_t<Callable>>::args::template at<0>;
+          using FirstArg = CallableTraits::args::template at<0>;
           static_assert(
               has_protocol_type_v<FirstArg>,
               "The first argument of the protocol connector should be |fidl::ServerEnd<T>|.");

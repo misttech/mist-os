@@ -499,7 +499,7 @@ TEST_F(SysfsPowerTest, WakeLockFileWrite) {
 
   EXPECT_TRUE(files::WriteFile("/sys/power/wake_lock", "test1"));
   EXPECT_TRUE(files::WriteFile("/sys/power/wake_lock", "test2\n"));
-  EXPECT_TRUE(files::WriteFile("/sys/power/wake_lock", "test3 10000000000"));
+  EXPECT_TRUE(files::WriteFile("/sys/power/wake_lock", "test3 1000000000000000"));
   EXPECT_FALSE(files::WriteFile("/sys/power/wake_lock", "test4 "));
   EXPECT_FALSE(files::WriteFile("/sys/power/wake_lock", "test5 e"));
 
@@ -510,4 +510,8 @@ TEST_F(SysfsPowerTest, WakeLockFileWrite) {
   EXPECT_NE(wake_locks_str.find("test3"), std::string::npos);
   EXPECT_EQ(wake_locks_str.find("test4"), std::string::npos);
   EXPECT_EQ(wake_locks_str.find("test5"), std::string::npos);
+
+  EXPECT_TRUE(files::WriteFile("/sys/power/wake_unlock", "test1"));
+  EXPECT_TRUE(files::WriteFile("/sys/power/wake_unlock", "test2"));
+  EXPECT_TRUE(files::WriteFile("/sys/power/wake_unlock", "test3"));
 }

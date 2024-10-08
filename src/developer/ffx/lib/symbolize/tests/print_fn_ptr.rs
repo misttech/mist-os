@@ -178,7 +178,7 @@ fn round_up_to(size: u64, align: u64) -> u64 {
 }
 
 fn round_up_to_page_size(size: u64) -> u64 {
-    round_up_to(size, fuchsia_zircon::system_get_page_size() as u64)
+    round_up_to(size, zx::system_get_page_size() as u64)
 }
 
 const NT_GNU_BUILD_ID: u32 = 3;

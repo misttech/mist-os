@@ -1,5 +1,6 @@
 """Implementation of cc_bind_rules rule"""
 
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":providers.bzl", "FuchsiaBindLibraryInfo", "FuchsiaPackageResourcesInfo")
 load(":utils.bzl", "make_resource_struct", "wrap_executable")
 
@@ -73,7 +74,7 @@ fuchsia_driver_bind_bytecode = rule(
         "output": attr.output(
             mandatory = True,
         ),
-    } | _COMMON_ATTR,
+    } | COMPATIBILITY.FUCHSIA_ATTRS | _COMMON_ATTR,
 )
 
 def _fuchsia_driver_bind_bytecode_test_impl(ctx):
@@ -111,5 +112,5 @@ fuchsia_driver_bind_bytecode_test = rule(
             mandatory = True,
             allow_single_file = True,
         ),
-    } | _COMMON_ATTR,
+    } | COMPATIBILITY.FUCHSIA_ATTRS | _COMMON_ATTR,
 )

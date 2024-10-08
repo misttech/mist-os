@@ -106,6 +106,17 @@ template("virtual_device_specification") {
     }
   }
 
+  _cpu = {
+  }
+  if (defined(invoker.cpu)) {
+    _cpu = invoker.cpu
+  } else {
+    _cpu = {
+      count = 4
+      arch = target_cpu
+    }
+  }
+
   file_contents = {
     schema_id = schema_id
     data = {
@@ -113,9 +124,7 @@ template("virtual_device_specification") {
       name = invoker.name
       description = _description
       hardware = {
-        cpu = {
-          arch = target_cpu
-        }
+        cpu = _cpu
         audio = {
           model = "hda"
         }
@@ -125,6 +134,10 @@ template("virtual_device_specification") {
           pointing_device = "touch"
         }
         window_size = emu_window_size
+        vsock = {
+          enabled = false
+          cid = 3
+        }
         memory = _memory
         storage = _storage
       }

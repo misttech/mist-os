@@ -9,6 +9,7 @@ load(
     "CPP_COMPILE_ACTION_NAME",
     "C_COMPILE_ACTION_NAME",
 )
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 
 # buildifier: disable=module-docstring
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
@@ -222,7 +223,7 @@ _clangd_compilation_database = rule(
         ),
         "deps": attr.label_list(aspects = [compilation_db_aspect]),
         "filename": attr.output(),
-    },
+    } | COMPATIBILITY.HOST_ATTRS,
 )
 
 # TODO(https://fxbug.dev/42174048): Revisit the compilation database implementation after a review of alternatives

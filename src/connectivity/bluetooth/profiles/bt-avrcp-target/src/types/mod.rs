@@ -28,7 +28,7 @@ pub(crate) struct NotificationData {
     #[allow(unused)]
     pos_change_interval: u32,
     /// The time when we expect to reply automatically to the responder.
-    expected_response_time: Option<fasync::Time>,
+    expected_response_time: Option<fasync::MonotonicInstant>,
     /// The FIDL responder to send the reply when the notification value changes.
     responder: Option<fidl_avrcp::TargetHandlerWatchNotificationResponder>,
 }
@@ -38,7 +38,7 @@ impl NotificationData {
         event_id: fidl_avrcp::NotificationEvent,
         current_value: Notification,
         pos_change_interval: u32,
-        expected_response_time: Option<fasync::Time>,
+        expected_response_time: Option<fasync::MonotonicInstant>,
         responder: fidl_avrcp::TargetHandlerWatchNotificationResponder,
     ) -> Self {
         Self {
@@ -111,7 +111,9 @@ impl NotificationData {
                 let flag = self.current_value.pos != new_value.pos
                     || self.current_value.status != new_value.status
                     || self.current_value.media_info != new_value.media_info
-                    || self.expected_response_time.is_some_and(|t| fasync::Time::now() >= t);
+                    || self
+                        .expected_response_time
+                        .is_some_and(|t| fasync::MonotonicInstant::now() >= t);
                 Ok(flag)
             }
             fidl_avrcp::NotificationEvent::BattStatusChanged => {

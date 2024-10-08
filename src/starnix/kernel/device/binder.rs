@@ -2978,10 +2978,16 @@ impl ResourceAccessor for RemoteResourceAccessor {
     ) -> Result<FdNumber, Errno> {
         profile_duration!("RemoteAddFile");
         let flags: fbinder::FileFlags = file.flags().into();
-        let handle = file.to_handle(current_task)?;
+        let handle1 = file.to_handle(current_task)?;
+        let handle2 = file.to_handle(current_task)?;
         let response = self.run_file_request(fbinder::FileRequest {
+            add_requests: Some(vec![fbinder::FileHandle {
+                file: handle1,
+                flags: Some(flags),
+                ..fbinder::FileHandle::default()
+            }]),
             add_requests2: Some(vec![fbinder::FileHandle {
-                file: handle,
+                file: handle2,
                 flags: Some(flags),
                 ..fbinder::FileHandle::default()
             }]),
@@ -4691,13 +4697,14 @@ pub mod tests {
     impl BinderProcessFixture {
         fn new(
             locked: &mut Locked<'_, Unlocked>,
-            test_fixture: &TranslateHandlesTestFixture,
+            current_task: &CurrentTask,
+            device: &BinderDevice,
         ) -> Self {
-            let task = create_task(locked, &test_fixture.kernel, "task");
-            let (proc, thread) = test_fixture.device.create_process_and_thread(task.get_pid());
+            let task = create_task(locked, current_task.kernel(), "task");
+            let (proc, thread) = device.create_process_and_thread(task.get_pid());
 
-            mmap_shared_memory(&test_fixture.device, &task, &proc);
-            Self { device: Arc::downgrade(&test_fixture.device), proc, thread, task }
+            mmap_shared_memory(&device, &task, &proc);
+            Self { device: Arc::downgrade(device), proc, thread, task }
         }
 
         fn lock_shared_memory(&self) -> starnix_sync::MappedMutexGuard<'_, SharedMemory> {
@@ -4714,24 +4721,6 @@ pub mod tests {
                 device.procs.write().remove(&self.proc.identifier).release(self.task.kernel());
             }
             OwnedRef::take(&mut self.proc).release(self.task.kernel());
-        }
-    }
-
-    struct TranslateHandlesTestFixture {
-        kernel: Arc<Kernel>,
-        device: BinderDevice,
-        init_task: AutoReleasableTask,
-    }
-
-    impl TranslateHandlesTestFixture {
-        fn new<'l>() -> (Self, Locked<'l, Unlocked>) {
-            let (kernel, init_task) = create_kernel_and_task();
-            let device = BinderDevice::default();
-            (Self { kernel, device, init_task }, Unlocked::new())
-        }
-
-        fn new_process(&self, locked: &mut Locked<'_, Unlocked>) -> BinderProcessFixture {
-            BinderProcessFixture::new(locked, self)
         }
     }
 
@@ -4814,186 +4803,196 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn handle_0_succeeds_when_context_manager_is_set() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        let context_manager =
-            BinderObject::new_context_manager_marker(&sender.proc, BinderObjectFlags::empty());
-        *test.device.context_manager.lock() = Some(context_manager.clone());
-        let (object, owner) =
-            test.device.get_context_manager(&sender.task).expect("failed to find handle 0");
-        assert_eq!(OwnedRef::as_ptr(&sender.proc), TempRef::as_ptr(&owner));
-        assert!(Arc::ptr_eq(&context_manager, &object));
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let context_manager =
+                BinderObject::new_context_manager_marker(&sender.proc, BinderObjectFlags::empty());
+            *device.context_manager.lock() = Some(context_manager.clone());
+            let (object, owner) =
+                device.get_context_manager(&sender.task).expect("failed to find handle 0");
+            assert_eq!(OwnedRef::as_ptr(&sender.proc), TempRef::as_ptr(&owner));
+            assert!(Arc::ptr_eq(&context_manager, &object));
+        });
     }
 
     #[fuchsia::test]
     async fn fail_to_retrieve_non_existing_handle() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        assert!(&sender.proc.lock().handles.get(3).is_none());
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            assert!(&sender.proc.lock().handles.get(3).is_none());
+        });
     }
 
     #[fuchsia::test]
     async fn handle_is_not_dropped_after_transaction_finishes_if_it_already_existed() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let proc_1 = test.new_process(&mut locked);
-        let proc_2 = test.new_process(&mut locked);
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let proc_1 = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let proc_2 = BinderProcessFixture::new(&mut locked, current_task, &device);
 
-        let (transaction_ref, guard) = register_binder_object(
-            &proc_1.proc,
-            UserAddress::from(0xffffffffffffffff),
-            UserAddress::from(0x1111111111111111),
-        );
-        scopeguard::defer! {
-            transaction_ref.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
-            transaction_ref.apply_deferred_refcounts();
-        }
+            let (transaction_ref, guard) = register_binder_object(
+                &proc_1.proc,
+                UserAddress::from(0xffffffffffffffff),
+                UserAddress::from(0x1111111111111111),
+            );
+            scopeguard::defer! {
+                transaction_ref.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
+                transaction_ref.apply_deferred_refcounts();
+            }
 
-        // Insert the transaction once.
-        let _ = proc_2
-            .proc
-            .lock()
-            .handles
-            .insert_for_transaction(guard, &mut RefCountActions::default_released());
+            // Insert the transaction once.
+            let _ = proc_2
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
-        let guard = transaction_ref.inc_strong_checked().expect("inc_strong");
-        // Insert the same object.
-        let handle = proc_2
-            .proc
-            .lock()
-            .handles
-            .insert_for_transaction(guard, &mut RefCountActions::default_released());
+            let guard = transaction_ref.inc_strong_checked().expect("inc_strong");
+            // Insert the same object.
+            let handle = proc_2
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
-        // The object should be present in the handle table until a strong decrement.
-        let (retrieved_object, guard) =
-            proc_2.proc.lock().handles.get(handle.object_index()).expect("valid object");
-        assert!(Arc::ptr_eq(&retrieved_object, &transaction_ref));
-        guard.release(&mut RefCountActions::default_released());
+            // The object should be present in the handle table until a strong decrement.
+            let (retrieved_object, guard) =
+                proc_2.proc.lock().handles.get(handle.object_index()).expect("valid object");
+            assert!(Arc::ptr_eq(&retrieved_object, &transaction_ref));
+            guard.release(&mut RefCountActions::default_released());
 
-        // Drop the transaction reference.
-        proc_2
-            .proc
-            .lock()
-            .handles
-            .dec_strong(handle.object_index(), &mut RefCountActions::default_released())
-            .expect("dec_strong");
+            // Drop the transaction reference.
+            proc_2
+                .proc
+                .lock()
+                .handles
+                .dec_strong(handle.object_index(), &mut RefCountActions::default_released())
+                .expect("dec_strong");
 
-        // The handle should not have been dropped, as it was already in the table beforehand.
-        let (retrieved_object, guard) =
-            proc_2.proc.lock().handles.get(handle.object_index()).expect("valid object");
-        assert!(Arc::ptr_eq(&retrieved_object, &transaction_ref));
-        guard.release(&mut RefCountActions::default_released());
+            // The handle should not have been dropped, as it was already in the table beforehand.
+            let (retrieved_object, guard) =
+                proc_2.proc.lock().handles.get(handle.object_index()).expect("valid object");
+            assert!(Arc::ptr_eq(&retrieved_object, &transaction_ref));
+            guard.release(&mut RefCountActions::default_released());
+        });
     }
 
     #[fuchsia::test]
     async fn handle_is_dropped_after_transaction_finishes() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let proc_1 = test.new_process(&mut locked);
-        let proc_2 = test.new_process(&mut locked);
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let proc_1 = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let proc_2 = BinderProcessFixture::new(&mut locked, current_task, &device);
 
-        let (transaction_ref, guard) = register_binder_object(
-            &proc_1.proc,
-            UserAddress::from(0xffffffffffffffff),
-            UserAddress::from(0x1111111111111111),
-        );
-        scopeguard::defer! {
-            transaction_ref.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
-            transaction_ref.apply_deferred_refcounts();
-        }
+            let (transaction_ref, guard) = register_binder_object(
+                &proc_1.proc,
+                UserAddress::from(0xffffffffffffffff),
+                UserAddress::from(0x1111111111111111),
+            );
+            scopeguard::defer! {
+                transaction_ref.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
+                transaction_ref.apply_deferred_refcounts();
+            }
 
-        // Transactions always take a strong reference to binder objects.
-        let handle = proc_2
-            .proc
-            .lock()
-            .handles
-            .insert_for_transaction(guard, &mut RefCountActions::default_released());
+            // Transactions always take a strong reference to binder objects.
+            let handle = proc_2
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
-        // The object should be present in the handle table until a strong decrement.
-        let (retrieved_object, guard) =
-            proc_2.proc.lock().handles.get(handle.object_index()).expect("valid object");
-        assert!(Arc::ptr_eq(&retrieved_object, &transaction_ref));
-        guard.release(&mut RefCountActions::default_released());
+            // The object should be present in the handle table until a strong decrement.
+            let (retrieved_object, guard) =
+                proc_2.proc.lock().handles.get(handle.object_index()).expect("valid object");
+            assert!(Arc::ptr_eq(&retrieved_object, &transaction_ref));
+            guard.release(&mut RefCountActions::default_released());
 
-        // Drop the transaction reference.
-        proc_2
-            .proc
-            .lock()
-            .handles
-            .dec_strong(handle.object_index(), &mut RefCountActions::default_released())
-            .expect("dec_strong");
+            // Drop the transaction reference.
+            proc_2
+                .proc
+                .lock()
+                .handles
+                .dec_strong(handle.object_index(), &mut RefCountActions::default_released())
+                .expect("dec_strong");
 
-        // The handle should now have been dropped.
-        assert!(proc_2.proc.lock().handles.get(handle.object_index()).is_none());
+            // The handle should now have been dropped.
+            assert!(proc_2.proc.lock().handles.get(handle.object_index()).is_none());
+        });
     }
 
     #[fuchsia::test]
     async fn handle_is_dropped_after_last_weak_ref_released() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let proc_1 = test.new_process(&mut locked);
-        let proc_2 = test.new_process(&mut locked);
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let proc_1 = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let proc_2 = BinderProcessFixture::new(&mut locked, current_task, &device);
 
-        let (transaction_ref, guard) = register_binder_object(
-            &proc_1.proc,
-            UserAddress::from(0xffffffffffffffff),
-            UserAddress::from(0x1111111111111111),
-        );
+            let (transaction_ref, guard) = register_binder_object(
+                &proc_1.proc,
+                UserAddress::from(0xffffffffffffffff),
+                UserAddress::from(0x1111111111111111),
+            );
 
-        // Keep guard to simulate another process keeping a reference.
-        let other_process_guard = transaction_ref.inc_strong_checked();
+            // Keep guard to simulate another process keeping a reference.
+            let other_process_guard = transaction_ref.inc_strong_checked();
 
-        scopeguard::defer! {
-            // Other process releases the object.
-            other_process_guard.release(&mut RefCountActions::default_released());
-            // Ack the initial acquire.
-            transaction_ref.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
-            transaction_ref.apply_deferred_refcounts();
-        }
+            scopeguard::defer! {
+                // Other process releases the object.
+                other_process_guard.release(&mut RefCountActions::default_released());
+                // Ack the initial acquire.
+                transaction_ref.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
+                transaction_ref.apply_deferred_refcounts();
+            }
 
-        // The handle starts with a strong ref.
-        let handle = proc_2
-            .proc
-            .lock()
-            .handles
-            .insert_for_transaction(guard, &mut RefCountActions::default_released());
+            // The handle starts with a strong ref.
+            let handle = proc_2
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
-        // Acquire a weak reference.
-        proc_2
-            .proc
-            .lock()
-            .handles
-            .inc_weak(handle.object_index(), &mut RefCountActions::default_released())
-            .expect("inc_weak");
+            // Acquire a weak reference.
+            proc_2
+                .proc
+                .lock()
+                .handles
+                .inc_weak(handle.object_index(), &mut RefCountActions::default_released())
+                .expect("inc_weak");
 
-        // The object should be present in the handle table.
-        let (retrieved_object, guard) =
-            proc_2.proc.lock().handles.get(handle.object_index()).expect("valid object");
-        assert!(Arc::ptr_eq(&retrieved_object, &transaction_ref));
-        guard.release(&mut RefCountActions::default_released());
+            // The object should be present in the handle table.
+            let (retrieved_object, guard) =
+                proc_2.proc.lock().handles.get(handle.object_index()).expect("valid object");
+            assert!(Arc::ptr_eq(&retrieved_object, &transaction_ref));
+            guard.release(&mut RefCountActions::default_released());
 
-        // Drop the strong reference. The handle should still be present as there is an outstanding
-        // weak reference.
-        proc_2
-            .proc
-            .lock()
-            .handles
-            .dec_strong(handle.object_index(), &mut RefCountActions::default_released())
-            .expect("dec_strong");
-        let (retrieved_object, guard) =
-            proc_2.proc.lock().handles.get(handle.object_index()).expect("valid object");
-        assert!(Arc::ptr_eq(&retrieved_object, &transaction_ref));
-        guard.release(&mut RefCountActions::default_released());
+            // Drop the strong reference. The handle should still be present as there is an outstanding
+            // weak reference.
+            proc_2
+                .proc
+                .lock()
+                .handles
+                .dec_strong(handle.object_index(), &mut RefCountActions::default_released())
+                .expect("dec_strong");
+            let (retrieved_object, guard) =
+                proc_2.proc.lock().handles.get(handle.object_index()).expect("valid object");
+            assert!(Arc::ptr_eq(&retrieved_object, &transaction_ref));
+            guard.release(&mut RefCountActions::default_released());
 
-        // Drop the weak reference. The handle should now be gone, even though the underlying object
-        // is still alive (another process could have references to it).
-        proc_2
-            .proc
-            .lock()
-            .handles
-            .dec_weak(handle.object_index(), &mut RefCountActions::default_released())
-            .expect("dec_weak");
-        assert!(
-            proc_2.proc.lock().handles.get(handle.object_index()).is_none(),
-            "handle should be dropped"
-        );
+            // Drop the weak reference. The handle should now be gone, even though the underlying object
+            // is still alive (another process could have references to it).
+            proc_2
+                .proc
+                .lock()
+                .handles
+                .dec_weak(handle.object_index(), &mut RefCountActions::default_released())
+                .expect("dec_weak");
+            assert!(
+                proc_2.proc.lock().handles.get(handle.object_index()).is_none(),
+                "handle should be dropped"
+            );
+        });
     }
 
     #[fuchsia::test]
@@ -5313,103 +5312,107 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn binder_object_enqueues_release_command_when_dropped() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let proc = test.new_process(&mut locked);
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let proc = BinderProcessFixture::new(&mut locked, current_task, &device);
 
-        const LOCAL_BINDER_OBJECT: LocalBinderObject = LocalBinderObject {
-            weak_ref_addr: UserAddress::const_from(0x0000000000000010),
-            strong_ref_addr: UserAddress::const_from(0x0000000000000100),
-        };
+            const LOCAL_BINDER_OBJECT: LocalBinderObject = LocalBinderObject {
+                weak_ref_addr: UserAddress::const_from(0x0000000000000010),
+                strong_ref_addr: UserAddress::const_from(0x0000000000000100),
+            };
 
-        let (object, guard) = register_binder_object(
-            &proc.proc,
-            LOCAL_BINDER_OBJECT.weak_ref_addr,
-            LOCAL_BINDER_OBJECT.strong_ref_addr,
-        );
+            let (object, guard) = register_binder_object(
+                &proc.proc,
+                LOCAL_BINDER_OBJECT.weak_ref_addr,
+                LOCAL_BINDER_OBJECT.strong_ref_addr,
+            );
 
-        let mut actions = RefCountActions::default();
-        object.ack_acquire(&mut actions).expect("ack_acquire");
-        guard.release(&mut actions);
-        actions.release(());
+            let mut actions = RefCountActions::default();
+            object.ack_acquire(&mut actions).expect("ack_acquire");
+            guard.release(&mut actions);
+            actions.release(());
 
-        assert_matches!(
-            &proc.proc.command_queue.lock().commands.front(),
-            Some(Command::ReleaseRef(LOCAL_BINDER_OBJECT))
-        );
+            assert_matches!(
+                &proc.proc.command_queue.lock().commands.front(),
+                Some(Command::ReleaseRef(LOCAL_BINDER_OBJECT))
+            );
+        });
     }
 
     #[fuchsia::test]
     async fn handle_table_refs() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let proc = test.new_process(&mut locked);
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let proc = BinderProcessFixture::new(&mut locked, current_task, &device);
 
-        let (object, guard) = register_binder_object(
-            &proc.proc,
-            UserAddress::from(0x0000000000000010),
-            UserAddress::from(0x0000000000000100),
-        );
+            let (object, guard) = register_binder_object(
+                &proc.proc,
+                UserAddress::from(0x0000000000000010),
+                UserAddress::from(0x0000000000000100),
+            );
 
-        // Simulate another process keeping a strong reference.
-        let other_process_guard = object.inc_strong_checked();
+            // Simulate another process keeping a strong reference.
+            let other_process_guard = object.inc_strong_checked();
 
-        let mut handle_table = HandleTable::default();
+            let mut handle_table = HandleTable::default();
 
-        // Starts with one strong reference.
-        let handle =
-            handle_table.insert_for_transaction(guard, &mut RefCountActions::default_released());
+            // Starts with one strong reference.
+            let handle = handle_table
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
-        handle_table
-            .inc_strong(handle.object_index(), &mut RefCountActions::default_released())
-            .expect("inc_strong 1");
-        handle_table
-            .inc_strong(handle.object_index(), &mut RefCountActions::default_released())
-            .expect("inc_strong 2");
-        handle_table
-            .inc_weak(handle.object_index(), &mut RefCountActions::default_released())
-            .expect("inc_weak 0");
-        handle_table
-            .dec_strong(handle.object_index(), &mut RefCountActions::default_released())
-            .expect("dec_strong 2");
-        handle_table
-            .dec_strong(handle.object_index(), &mut RefCountActions::default_released())
-            .expect("dec_strong 1");
+            handle_table
+                .inc_strong(handle.object_index(), &mut RefCountActions::default_released())
+                .expect("inc_strong 1");
+            handle_table
+                .inc_strong(handle.object_index(), &mut RefCountActions::default_released())
+                .expect("inc_strong 2");
+            handle_table
+                .inc_weak(handle.object_index(), &mut RefCountActions::default_released())
+                .expect("inc_weak 0");
+            handle_table
+                .dec_strong(handle.object_index(), &mut RefCountActions::default_released())
+                .expect("dec_strong 2");
+            handle_table
+                .dec_strong(handle.object_index(), &mut RefCountActions::default_released())
+                .expect("dec_strong 1");
 
-        // Remove the initial strong reference.
-        handle_table
-            .dec_strong(handle.object_index(), &mut RefCountActions::default_released())
-            .expect("dec_strong 0");
+            // Remove the initial strong reference.
+            handle_table
+                .dec_strong(handle.object_index(), &mut RefCountActions::default_released())
+                .expect("dec_strong 0");
 
-        // Removing more strong references should fail.
-        handle_table
-            .dec_strong(handle.object_index(), &mut RefCountActions::default_released())
-            .expect_err("dec_strong -1");
+            // Removing more strong references should fail.
+            handle_table
+                .dec_strong(handle.object_index(), &mut RefCountActions::default_released())
+                .expect_err("dec_strong -1");
 
-        // The object should still take up an entry in the handle table, as there is 1 weak
-        // reference and it is maintained alive by another process.
-        let (_, guard) = handle_table.get(handle.object_index()).expect("object still exists");
-        guard.release(&mut RefCountActions::default_released());
+            // The object should still take up an entry in the handle table, as there is 1 weak
+            // reference and it is maintained alive by another process.
+            let (_, guard) = handle_table.get(handle.object_index()).expect("object still exists");
+            guard.release(&mut RefCountActions::default_released());
 
-        // Simulate another process droppping its reference.
-        other_process_guard.release(&mut RefCountActions::default_released());
-        object.apply_deferred_refcounts();
-        // Ack the initial acquire.
-        object.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
-        // Ack the subsequent incref from the test.
-        object.ack_incref(&mut RefCountActions::default_released()).expect("ack_incref");
+            // Simulate another process droppping its reference.
+            other_process_guard.release(&mut RefCountActions::default_released());
+            object.apply_deferred_refcounts();
+            // Ack the initial acquire.
+            object.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
+            // Ack the subsequent incref from the test.
+            object.ack_incref(&mut RefCountActions::default_released()).expect("ack_incref");
 
-        // Our weak reference won't keep the object alive.
-        assert!(handle_table.get(handle.object_index()).is_none(), "object should be dead");
+            // Our weak reference won't keep the object alive.
+            assert!(handle_table.get(handle.object_index()).is_none(), "object should be dead");
 
-        // Remove from our table.
-        handle_table
-            .dec_weak(handle.object_index(), &mut RefCountActions::default_released())
-            .expect("dec_weak 0");
-        object.apply_deferred_refcounts();
+            // Remove from our table.
+            handle_table
+                .dec_weak(handle.object_index(), &mut RefCountActions::default_released())
+                .expect("dec_weak 0");
+            object.apply_deferred_refcounts();
 
-        // Another removal attempt will prove the handle has been removed.
-        handle_table
-            .dec_weak(handle.object_index(), &mut RefCountActions::default_released())
-            .expect_err("handle should no longer exist");
+            // Another removal attempt will prove the handle has been removed.
+            handle_table
+                .dec_weak(handle.object_index(), &mut RefCountActions::default_released())
+                .expect_err("handle should no longer exist");
+        });
     }
 
     #[fuchsia::test]
@@ -5687,975 +5690,1010 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn copy_transaction_data_between_processes() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        let receiver = test.new_process(&mut locked);
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
 
-        // Explicitly install a VMO that we can read from later.
-        let memory =
-            MemoryObject::from(zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO"));
-        *receiver.proc.shared_memory.lock() = Some(
-            SharedMemory::map(&memory, BASE_ADDR, VMO_LENGTH).expect("failed to map shared memory"),
-        );
+            // Explicitly install a VMO that we can read from later.
+            let memory = MemoryObject::from(
+                zx::Vmo::create(VMO_LENGTH as u64).expect("failed to create VMO"),
+            );
+            *receiver.proc.shared_memory.lock() = Some(
+                SharedMemory::map(&memory, BASE_ADDR, VMO_LENGTH)
+                    .expect("failed to map shared memory"),
+            );
 
-        // Map some memory for process 1.
-        let data_addr = map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
+            // Map some memory for process 1.
+            let data_addr =
+                map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
 
-        // Write transaction data in process 1.
-        const BINDER_DATA: &[u8; 8] = b"binder!!";
-        let mut transaction_data = vec![];
-        transaction_data.extend(BINDER_DATA);
-        transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
-            hdr: binder_object_header { type_: BINDER_TYPE_HANDLE },
-            flags: 0,
-            __bindgen_anon_1.handle: 0,
-            cookie: 0,
-        }));
-
-        let offsets_addr = data_addr
-            + sender
-                .task
-                .write_memory(data_addr, &transaction_data)
-                .expect("failed to write transaction data");
-
-        // Write the offsets data (where in the data buffer `flat_binder_object`s are).
-        let offsets_data: u64 = BINDER_DATA.len() as u64;
-        sender
-            .task
-            .write_object(UserRef::new(offsets_addr), &offsets_data)
-            .expect("failed to write offsets buffer");
-
-        // Construct the `binder_transaction_data` struct that contains pointers to the data and
-        // offsets buffers.
-        let transaction = binder_transaction_data_sg {
-            transaction_data: binder_transaction_data {
-                code: 1,
+            // Write transaction data in process 1.
+            const BINDER_DATA: &[u8; 8] = b"binder!!";
+            let mut transaction_data = vec![];
+            transaction_data.extend(BINDER_DATA);
+            transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
+                hdr: binder_object_header { type_: BINDER_TYPE_HANDLE },
                 flags: 0,
-                sender_pid: sender.proc.pid,
-                sender_euid: 0,
-                target: binder_transaction_data__bindgen_ty_1 { handle: 0 },
+                __bindgen_anon_1.handle: 0,
                 cookie: 0,
-                data_size: transaction_data.len() as u64,
-                offsets_size: std::mem::size_of::<u64>() as u64,
-                data: binder_transaction_data__bindgen_ty_2 {
-                    ptr: binder_transaction_data__bindgen_ty_2__bindgen_ty_1 {
-                        buffer: data_addr.ptr() as u64,
-                        offsets: offsets_addr.ptr() as u64,
+            }));
+
+            let offsets_addr = data_addr
+                + sender
+                    .task
+                    .write_memory(data_addr, &transaction_data)
+                    .expect("failed to write transaction data");
+
+            // Write the offsets data (where in the data buffer `flat_binder_object`s are).
+            let offsets_data: u64 = BINDER_DATA.len() as u64;
+            sender
+                .task
+                .write_object(UserRef::new(offsets_addr), &offsets_data)
+                .expect("failed to write offsets buffer");
+
+            // Construct the `binder_transaction_data` struct that contains pointers to the data and
+            // offsets buffers.
+            let transaction = binder_transaction_data_sg {
+                transaction_data: binder_transaction_data {
+                    code: 1,
+                    flags: 0,
+                    sender_pid: sender.proc.pid,
+                    sender_euid: 0,
+                    target: binder_transaction_data__bindgen_ty_1 { handle: 0 },
+                    cookie: 0,
+                    data_size: transaction_data.len() as u64,
+                    offsets_size: std::mem::size_of::<u64>() as u64,
+                    data: binder_transaction_data__bindgen_ty_2 {
+                        ptr: binder_transaction_data__bindgen_ty_2__bindgen_ty_1 {
+                            buffer: data_addr.ptr() as u64,
+                            offsets: offsets_addr.ptr() as u64,
+                        },
                     },
                 },
-            },
-            buffers_size: 0,
-        };
+                buffers_size: 0,
+            };
 
-        // Copy the data from process 1 to process 2
-        let security_context = "hello\0".into();
-        let (buffers, transaction_state) = test
-            .device
-            .copy_transaction_buffers(
-                &mut locked,
-                &sender.task,
-                &sender.task,
-                &sender.proc,
-                &sender.thread,
-                &receiver.task,
-                &receiver.proc,
-                &transaction,
-                Some(security_context),
-            )
-            .expect("copy data");
-        let data_buffer = buffers.data;
-        let offsets_buffer = buffers.offsets;
-        let security_context_buffer = buffers.security_context.expect("security_context");
+            // Copy the data from process 1 to process 2
+            let security_context = "hello\0".into();
+            let (buffers, transaction_state) = device
+                .copy_transaction_buffers(
+                    &mut locked,
+                    &sender.task,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    &receiver.task,
+                    &receiver.proc,
+                    &transaction,
+                    Some(security_context),
+                )
+                .expect("copy data");
+            let data_buffer = buffers.data;
+            let offsets_buffer = buffers.offsets;
+            let security_context_buffer = buffers.security_context.expect("security_context");
 
-        // Check that the returned buffers are in-bounds of process 2's shared memory.
-        assert!(data_buffer.address >= BASE_ADDR);
-        assert!(data_buffer.address < BASE_ADDR + VMO_LENGTH);
-        assert!(offsets_buffer.address >= BASE_ADDR);
-        assert!(offsets_buffer.address < BASE_ADDR + VMO_LENGTH);
-        assert!(security_context_buffer.address >= BASE_ADDR);
-        assert!(security_context_buffer.address < BASE_ADDR + VMO_LENGTH);
+            // Check that the returned buffers are in-bounds of process 2's shared memory.
+            assert!(data_buffer.address >= BASE_ADDR);
+            assert!(data_buffer.address < BASE_ADDR + VMO_LENGTH);
+            assert!(offsets_buffer.address >= BASE_ADDR);
+            assert!(offsets_buffer.address < BASE_ADDR + VMO_LENGTH);
+            assert!(security_context_buffer.address >= BASE_ADDR);
+            assert!(security_context_buffer.address < BASE_ADDR + VMO_LENGTH);
 
-        // Verify the contents of the copied data in process 2's shared memory VMO.
-        let mut buffer = [0u8; BINDER_DATA.len() + std::mem::size_of::<flat_binder_object>()];
-        memory
-            .read(&mut buffer, (data_buffer.address - BASE_ADDR) as u64)
-            .expect("failed to read data");
-        assert_eq!(&buffer[..], &transaction_data);
+            // Verify the contents of the copied data in process 2's shared memory VMO.
+            let mut buffer = [0u8; BINDER_DATA.len() + std::mem::size_of::<flat_binder_object>()];
+            memory
+                .read(&mut buffer, (data_buffer.address - BASE_ADDR) as u64)
+                .expect("failed to read data");
+            assert_eq!(&buffer[..], &transaction_data);
 
-        let mut buffer = [0u8; std::mem::size_of::<u64>()];
-        memory
-            .read(&mut buffer, (offsets_buffer.address - BASE_ADDR) as u64)
-            .expect("failed to read offsets");
-        assert_eq!(&buffer[..], offsets_data.as_bytes());
-        let mut buffer = vec![0u8; security_context.len()];
-        memory
-            .read(&mut buffer[..], (security_context_buffer.address - BASE_ADDR) as u64)
-            .expect("failed to read security_context");
-        assert_eq!(&buffer[..], security_context);
-        transaction_state.release(());
+            let mut buffer = [0u8; std::mem::size_of::<u64>()];
+            memory
+                .read(&mut buffer, (offsets_buffer.address - BASE_ADDR) as u64)
+                .expect("failed to read offsets");
+            assert_eq!(&buffer[..], offsets_data.as_bytes());
+            let mut buffer = vec![0u8; security_context.len()];
+            memory
+                .read(&mut buffer[..], (security_context_buffer.address - BASE_ADDR) as u64)
+                .expect("failed to read security_context");
+            assert_eq!(&buffer[..], security_context);
+            transaction_state.release(());
+        });
     }
 
     #[fuchsia::test]
     async fn transaction_translate_binder_leaving_process() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        let receiver = test.new_process(&mut locked);
-        let mut receiver_shared_memory = receiver.lock_shared_memory();
-        let mut allocations =
-            receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let mut receiver_shared_memory = receiver.lock_shared_memory();
+            let mut allocations =
+                receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
-        const BINDER_OBJECT: LocalBinderObject = LocalBinderObject {
-            weak_ref_addr: UserAddress::const_from(0x0000000000000010),
-            strong_ref_addr: UserAddress::const_from(0x0000000000000100),
-        };
+            const BINDER_OBJECT: LocalBinderObject = LocalBinderObject {
+                weak_ref_addr: UserAddress::const_from(0x0000000000000010),
+                strong_ref_addr: UserAddress::const_from(0x0000000000000100),
+            };
 
-        const DATA_PREAMBLE: &[u8; 5] = b"stuff";
+            const DATA_PREAMBLE: &[u8; 5] = b"stuff";
 
-        let mut transaction_data = vec![];
-        transaction_data.extend(DATA_PREAMBLE);
-        let offsets = [transaction_data.len() as binder_uintptr_t];
-        transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
-            hdr.type_: BINDER_TYPE_BINDER,
-            flags: 0,
-            cookie: BINDER_OBJECT.strong_ref_addr.ptr() as u64,
-            __bindgen_anon_1.binder: BINDER_OBJECT.weak_ref_addr.ptr() as u64,
-        }));
+            let mut transaction_data = vec![];
+            transaction_data.extend(DATA_PREAMBLE);
+            let offsets = [transaction_data.len() as binder_uintptr_t];
+            transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
+                hdr.type_: BINDER_TYPE_BINDER,
+                flags: 0,
+                cookie: BINDER_OBJECT.strong_ref_addr.ptr() as u64,
+                __bindgen_anon_1.binder: BINDER_OBJECT.weak_ref_addr.ptr() as u64,
+            }));
 
-        const EXPECTED_HANDLE: Handle = Handle::from_raw(1);
+            const EXPECTED_HANDLE: Handle = Handle::from_raw(1);
 
-        let transaction_state = test
-            .device
-            .translate_objects(
-                &mut locked,
-                &sender.task,
-                &sender.task,
-                &sender.proc,
-                &sender.thread,
-                &receiver.task,
-                &receiver.proc,
-                &offsets,
-                &mut transaction_data,
-                &mut allocations.scatter_gather_buffer,
-            )
-            .expect("failed to translate handles");
+            let transaction_state = device
+                .translate_objects(
+                    &mut locked,
+                    &sender.task,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    &receiver.task,
+                    &receiver.proc,
+                    &offsets,
+                    &mut transaction_data,
+                    &mut allocations.scatter_gather_buffer,
+                )
+                .expect("failed to translate handles");
 
-        // Verify that the new handle was returned in `transaction_state` so that it gets dropped
-        // at the end of the transaction.
-        assert_eq!(transaction_state.state.as_ref().unwrap().handles[0], EXPECTED_HANDLE);
+            // Verify that the new handle was returned in `transaction_state` so that it gets dropped
+            // at the end of the transaction.
+            assert_eq!(transaction_state.state.as_ref().unwrap().handles[0], EXPECTED_HANDLE);
 
-        // Verify that the transaction data was mutated.
-        let mut expected_transaction_data = vec![];
-        expected_transaction_data.extend(DATA_PREAMBLE);
-        expected_transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
-            hdr.type_: BINDER_TYPE_HANDLE,
-            flags: 0,
-            cookie: 0,
-            __bindgen_anon_1.handle: EXPECTED_HANDLE.into(),
-        }));
-        assert_eq!(&expected_transaction_data, &transaction_data);
+            // Verify that the transaction data was mutated.
+            let mut expected_transaction_data = vec![];
+            expected_transaction_data.extend(DATA_PREAMBLE);
+            expected_transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
+                hdr.type_: BINDER_TYPE_HANDLE,
+                flags: 0,
+                cookie: 0,
+                __bindgen_anon_1.handle: EXPECTED_HANDLE.into(),
+            }));
+            assert_eq!(&expected_transaction_data, &transaction_data);
 
-        // Verify that a handle was created in the receiver.
-        let (object, guard) = receiver
-            .proc
-            .lock()
-            .handles
-            .get(EXPECTED_HANDLE.object_index())
-            .expect("expected handle not present");
-        guard.release(&mut RefCountActions::default_released());
-        assert_eq!(object.owner.as_ptr(), OwnedRef::as_ptr(&sender.proc));
-        assert_eq!(object.local, BINDER_OBJECT);
+            // Verify that a handle was created in the receiver.
+            let (object, guard) = receiver
+                .proc
+                .lock()
+                .handles
+                .get(EXPECTED_HANDLE.object_index())
+                .expect("expected handle not present");
+            guard.release(&mut RefCountActions::default_released());
+            assert_eq!(object.owner.as_ptr(), OwnedRef::as_ptr(&sender.proc));
+            assert_eq!(object.local, BINDER_OBJECT);
 
-        // Verify that a strong acquire command is sent to the sender process (on the same thread
-        // that sent the transaction).
-        assert_matches!(
-            &sender.thread.lock().command_queue.commands.front(),
-            Some(Command::AcquireRef(BINDER_OBJECT))
-        );
-        transaction_state.release(());
+            // Verify that a strong acquire command is sent to the sender process (on the same thread
+            // that sent the transaction).
+            assert_matches!(
+                &sender.thread.lock().command_queue.commands.front(),
+                Some(Command::AcquireRef(BINDER_OBJECT))
+            );
+            transaction_state.release(());
+        });
     }
 
     #[fuchsia::test]
     async fn transaction_translate_binder_handle_entering_owning_process() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        let receiver = test.new_process(&mut locked);
-        let mut receiver_shared_memory = receiver.lock_shared_memory();
-        let mut allocations =
-            receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let mut receiver_shared_memory = receiver.lock_shared_memory();
+            let mut allocations =
+                receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
-        let (binder_object, guard) = register_binder_object(
-            &receiver.proc,
-            UserAddress::from(0x0000000000000010),
-            UserAddress::from(0x0000000000000100),
-        );
-        scopeguard::defer! {
-            binder_object.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
-            binder_object.apply_deferred_refcounts();
-        }
-
-        // Pretend the binder object was given to the sender earlier, so it can be sent back.
-        let handle = sender
-            .proc
-            .lock()
-            .handles
-            .insert_for_transaction(guard, &mut RefCountActions::default_released());
-        // Clear the strong reference.
-        scopeguard::defer! {
-            sender.proc.lock().handles.dec_strong(handle.object_index(), &mut RefCountActions::default_released()).expect("dec_strong");
-        }
-
-        const DATA_PREAMBLE: &[u8; 5] = b"stuff";
-
-        let mut transaction_data = vec![];
-        transaction_data.extend(DATA_PREAMBLE);
-        let offsets = [transaction_data.len() as binder_uintptr_t];
-        transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
-            hdr.type_: BINDER_TYPE_HANDLE,
-            flags: 0,
-            cookie: 0,
-            __bindgen_anon_1.handle: handle.into(),
-        }));
-
-        test.device
-            .translate_objects(
-                &mut locked,
-                &sender.task,
-                &sender.task,
-                &sender.proc,
-                &sender.thread,
-                &receiver.task,
+            let (binder_object, guard) = register_binder_object(
                 &receiver.proc,
-                &offsets,
-                &mut transaction_data,
-                &mut allocations.scatter_gather_buffer,
-            )
-            .expect("failed to translate handles")
-            .release(());
+                UserAddress::from(0x0000000000000010),
+                UserAddress::from(0x0000000000000100),
+            );
+            scopeguard::defer! {
+                binder_object.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
+                binder_object.apply_deferred_refcounts();
+            }
 
-        // Verify that the transaction data was mutated.
-        let mut expected_transaction_data = vec![];
-        expected_transaction_data.extend(DATA_PREAMBLE);
-        expected_transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
-            hdr.type_: BINDER_TYPE_BINDER,
-            flags: 0,
-            cookie: binder_object.local.strong_ref_addr.ptr() as u64,
-            __bindgen_anon_1.binder: binder_object.local.weak_ref_addr.ptr() as u64,
-        }));
-        assert_eq!(&expected_transaction_data, &transaction_data);
+            // Pretend the binder object was given to the sender earlier, so it can be sent back.
+            let handle = sender
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
+            // Clear the strong reference.
+            scopeguard::defer! {
+                sender.proc.lock().handles.dec_strong(handle.object_index(), &mut RefCountActions::default_released()).expect("dec_strong");
+            }
+
+            const DATA_PREAMBLE: &[u8; 5] = b"stuff";
+
+            let mut transaction_data = vec![];
+            transaction_data.extend(DATA_PREAMBLE);
+            let offsets = [transaction_data.len() as binder_uintptr_t];
+            transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
+                hdr.type_: BINDER_TYPE_HANDLE,
+                flags: 0,
+                cookie: 0,
+                __bindgen_anon_1.handle: handle.into(),
+            }));
+
+            device
+                .translate_objects(
+                    &mut locked,
+                    &sender.task,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    &receiver.task,
+                    &receiver.proc,
+                    &offsets,
+                    &mut transaction_data,
+                    &mut allocations.scatter_gather_buffer,
+                )
+                .expect("failed to translate handles")
+                .release(());
+
+            // Verify that the transaction data was mutated.
+            let mut expected_transaction_data = vec![];
+            expected_transaction_data.extend(DATA_PREAMBLE);
+            expected_transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
+                hdr.type_: BINDER_TYPE_BINDER,
+                flags: 0,
+                cookie: binder_object.local.strong_ref_addr.ptr() as u64,
+                __bindgen_anon_1.binder: binder_object.local.weak_ref_addr.ptr() as u64,
+            }));
+            assert_eq!(&expected_transaction_data, &transaction_data);
+        });
     }
 
     #[fuchsia::test]
     async fn transaction_translate_binder_handle_passed_between_non_owning_processes() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        let receiver = test.new_process(&mut locked);
-        let owner = test.new_process(&mut locked);
-        let mut receiver_shared_memory = receiver.lock_shared_memory();
-        let mut allocations =
-            receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let owner = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let mut receiver_shared_memory = receiver.lock_shared_memory();
+            let mut allocations =
+                receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
-        let binder_object = LocalBinderObject {
-            weak_ref_addr: UserAddress::from(0x0000000000000010),
-            strong_ref_addr: UserAddress::from(0x0000000000000100),
-        };
+            let binder_object = LocalBinderObject {
+                weak_ref_addr: UserAddress::from(0x0000000000000010),
+                strong_ref_addr: UserAddress::from(0x0000000000000100),
+            };
 
-        const SENDING_HANDLE: Handle = Handle::from_raw(1);
-        const RECEIVING_HANDLE: Handle = Handle::from_raw(2);
+            const SENDING_HANDLE: Handle = Handle::from_raw(1);
+            const RECEIVING_HANDLE: Handle = Handle::from_raw(2);
 
-        // Pretend the binder object was given to the sender earlier.
-        let (_, guard) = BinderObject::new(&owner.proc, binder_object, BinderObjectFlags::empty());
-        let handle = sender
-            .proc
-            .lock()
-            .handles
-            .insert_for_transaction(guard, &mut RefCountActions::default_released());
-        assert_eq!(SENDING_HANDLE, handle);
+            // Pretend the binder object was given to the sender earlier.
+            let (_, guard) =
+                BinderObject::new(&owner.proc, binder_object, BinderObjectFlags::empty());
+            let handle = sender
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
+            assert_eq!(SENDING_HANDLE, handle);
 
-        // Give the receiver another handle so that the input handle number and output handle
-        // number aren't the same.
-        let (_, guard) = BinderObject::new(
-            &owner.proc,
-            LocalBinderObject::default(),
-            BinderObjectFlags::empty(),
-        );
-        receiver
-            .proc
-            .lock()
-            .handles
-            .insert_for_transaction(guard, &mut RefCountActions::default_released());
+            // Give the receiver another handle so that the input handle number and output handle
+            // number aren't the same.
+            let (_, guard) = BinderObject::new(
+                &owner.proc,
+                LocalBinderObject::default(),
+                BinderObjectFlags::empty(),
+            );
+            receiver
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
-        const DATA_PREAMBLE: &[u8; 5] = b"stuff";
+            const DATA_PREAMBLE: &[u8; 5] = b"stuff";
 
-        let mut transaction_data = vec![];
-        transaction_data.extend(DATA_PREAMBLE);
-        let offsets = [transaction_data.len() as binder_uintptr_t];
-        transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
-            hdr.type_: BINDER_TYPE_HANDLE,
-            flags: 0,
-            cookie: 0,
-            __bindgen_anon_1.handle: SENDING_HANDLE.into(),
-        }));
+            let mut transaction_data = vec![];
+            transaction_data.extend(DATA_PREAMBLE);
+            let offsets = [transaction_data.len() as binder_uintptr_t];
+            transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
+                hdr.type_: BINDER_TYPE_HANDLE,
+                flags: 0,
+                cookie: 0,
+                __bindgen_anon_1.handle: SENDING_HANDLE.into(),
+            }));
 
-        let transaction_state = test
-            .device
-            .translate_objects(
-                &mut locked,
-                &sender.task,
-                &sender.task,
-                &sender.proc,
-                &sender.thread,
-                &receiver.task,
-                &receiver.proc,
-                &offsets,
-                &mut transaction_data,
-                &mut allocations.scatter_gather_buffer,
-            )
-            .expect("failed to translate handles");
+            let transaction_state = device
+                .translate_objects(
+                    &mut locked,
+                    &sender.task,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    &receiver.task,
+                    &receiver.proc,
+                    &offsets,
+                    &mut transaction_data,
+                    &mut allocations.scatter_gather_buffer,
+                )
+                .expect("failed to translate handles");
 
-        // Verify that the new handle was returned in `transaction_state` so that it gets dropped
-        // at the end of the transaction.
-        assert_eq!(transaction_state.state.as_ref().unwrap().handles[0], RECEIVING_HANDLE);
+            // Verify that the new handle was returned in `transaction_state` so that it gets dropped
+            // at the end of the transaction.
+            assert_eq!(transaction_state.state.as_ref().unwrap().handles[0], RECEIVING_HANDLE);
 
-        // Verify that the transaction data was mutated.
-        let mut expected_transaction_data = vec![];
-        expected_transaction_data.extend(DATA_PREAMBLE);
-        expected_transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
-            hdr.type_: BINDER_TYPE_HANDLE,
-            flags: 0,
-            cookie: 0,
-            __bindgen_anon_1.handle: RECEIVING_HANDLE.into(),
-        }));
-        assert_eq!(&expected_transaction_data, &transaction_data);
+            // Verify that the transaction data was mutated.
+            let mut expected_transaction_data = vec![];
+            expected_transaction_data.extend(DATA_PREAMBLE);
+            expected_transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
+                hdr.type_: BINDER_TYPE_HANDLE,
+                flags: 0,
+                cookie: 0,
+                __bindgen_anon_1.handle: RECEIVING_HANDLE.into(),
+            }));
+            assert_eq!(&expected_transaction_data, &transaction_data);
 
-        // Verify that a handle was created in the receiver.
-        let (object, guard) = receiver
-            .proc
-            .lock()
-            .handles
-            .get(RECEIVING_HANDLE.object_index())
-            .expect("expected handle not present");
-        guard.release(&mut RefCountActions::default_released());
-        assert_eq!(object.owner.as_ptr(), OwnedRef::as_ptr(&owner.proc));
-        assert_eq!(object.local, binder_object);
-        transaction_state.release(());
+            // Verify that a handle was created in the receiver.
+            let (object, guard) = receiver
+                .proc
+                .lock()
+                .handles
+                .get(RECEIVING_HANDLE.object_index())
+                .expect("expected handle not present");
+            guard.release(&mut RefCountActions::default_released());
+            assert_eq!(object.owner.as_ptr(), OwnedRef::as_ptr(&owner.proc));
+            assert_eq!(object.local, binder_object);
+            transaction_state.release(());
+        });
     }
 
     #[fuchsia::test]
     async fn transaction_translate_binder_handles_with_same_address() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        let receiver = test.new_process(&mut locked);
-        let other_proc = test.new_process(&mut locked);
-        let mut receiver_shared_memory = receiver.lock_shared_memory();
-        let mut allocations =
-            receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let other_proc = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let mut receiver_shared_memory = receiver.lock_shared_memory();
+            let mut allocations =
+                receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
-        let binder_object_addr = LocalBinderObject {
-            weak_ref_addr: UserAddress::from(0x0000000000000010),
-            strong_ref_addr: UserAddress::from(0x0000000000000100),
-        };
+            let binder_object_addr = LocalBinderObject {
+                weak_ref_addr: UserAddress::from(0x0000000000000010),
+                strong_ref_addr: UserAddress::from(0x0000000000000100),
+            };
 
-        const SENDING_HANDLE_SENDER: Handle = Handle::from_raw(1);
-        const SENDING_HANDLE_OTHER: Handle = Handle::from_raw(2);
-        const RECEIVING_HANDLE_SENDER: Handle = Handle::from_raw(2);
-        const RECEIVING_HANDLE_OTHER: Handle = Handle::from_raw(3);
+            const SENDING_HANDLE_SENDER: Handle = Handle::from_raw(1);
+            const SENDING_HANDLE_OTHER: Handle = Handle::from_raw(2);
+            const RECEIVING_HANDLE_SENDER: Handle = Handle::from_raw(2);
+            const RECEIVING_HANDLE_OTHER: Handle = Handle::from_raw(3);
 
-        // Add both objects (sender owned and other owned) to sender handle table.
-        let (_, sender_guard) =
-            BinderObject::new(&sender.proc, binder_object_addr, BinderObjectFlags::empty());
-        let (_, other_guard) =
-            BinderObject::new(&other_proc.proc, binder_object_addr, BinderObjectFlags::empty());
-        assert_eq!(
-            sender
+            // Add both objects (sender owned and other owned) to sender handle table.
+            let (_, sender_guard) =
+                BinderObject::new(&sender.proc, binder_object_addr, BinderObjectFlags::empty());
+            let (_, other_guard) =
+                BinderObject::new(&other_proc.proc, binder_object_addr, BinderObjectFlags::empty());
+            assert_eq!(
+                sender
+                    .proc
+                    .lock()
+                    .handles
+                    .insert_for_transaction(sender_guard, &mut RefCountActions::default_released()),
+                SENDING_HANDLE_SENDER
+            );
+            assert_eq!(
+                sender
+                    .proc
+                    .lock()
+                    .handles
+                    .insert_for_transaction(other_guard, &mut RefCountActions::default_released()),
+                SENDING_HANDLE_OTHER
+            );
+
+            // Give the receiver another handle so that the input handle numbers and output handle
+            // numbers aren't the same.
+            let (_, guard) = BinderObject::new(
+                &other_proc.proc,
+                LocalBinderObject::default(),
+                BinderObjectFlags::empty(),
+            );
+            receiver
                 .proc
                 .lock()
                 .handles
-                .insert_for_transaction(sender_guard, &mut RefCountActions::default_released()),
-            SENDING_HANDLE_SENDER
-        );
-        assert_eq!(
-            sender
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
+
+            const DATA_PREAMBLE: &[u8; 5] = b"stuff";
+
+            let mut transaction_data = vec![];
+            let mut offsets = vec![];
+            transaction_data.extend(DATA_PREAMBLE);
+            offsets.push(transaction_data.len() as binder_uintptr_t);
+            transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
+                hdr.type_: BINDER_TYPE_HANDLE,
+                flags: 0,
+                cookie: 0,
+                __bindgen_anon_1.handle: SENDING_HANDLE_SENDER.into(),
+            }));
+            offsets.push(transaction_data.len() as binder_uintptr_t);
+            transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
+                hdr.type_: BINDER_TYPE_HANDLE,
+                flags: 0,
+                cookie: 0,
+                __bindgen_anon_1.handle: SENDING_HANDLE_OTHER.into(),
+            }));
+
+            let transaction_state = device
+                .translate_objects(
+                    &mut locked,
+                    &sender.task,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    &receiver.task,
+                    &receiver.proc,
+                    &offsets,
+                    &mut transaction_data,
+                    &mut allocations.scatter_gather_buffer,
+                )
+                .expect("failed to translate handles");
+
+            // Verify that the new handles were returned in `transaction_state` so that it gets dropped
+            // at the end of the transaction.
+            assert_eq!(
+                transaction_state.state.as_ref().unwrap().handles[0],
+                RECEIVING_HANDLE_SENDER
+            );
+            assert_eq!(
+                transaction_state.state.as_ref().unwrap().handles[1],
+                RECEIVING_HANDLE_OTHER
+            );
+
+            // Verify that the transaction data was mutated.
+            let mut expected_transaction_data = vec![];
+            expected_transaction_data.extend(DATA_PREAMBLE);
+            expected_transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
+                hdr.type_: BINDER_TYPE_HANDLE,
+                flags: 0,
+                cookie: 0,
+                __bindgen_anon_1.handle: RECEIVING_HANDLE_SENDER.into(),
+            }));
+            expected_transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
+                hdr.type_: BINDER_TYPE_HANDLE,
+                flags: 0,
+                cookie: 0,
+                __bindgen_anon_1.handle: RECEIVING_HANDLE_OTHER.into(),
+            }));
+            assert_eq!(&expected_transaction_data, &transaction_data);
+
+            // Verify that two handles were created in the receiver.
+            let (object, guard) = receiver
                 .proc
                 .lock()
                 .handles
-                .insert_for_transaction(other_guard, &mut RefCountActions::default_released()),
-            SENDING_HANDLE_OTHER
-        );
-
-        // Give the receiver another handle so that the input handle numbers and output handle
-        // numbers aren't the same.
-        let (_, guard) = BinderObject::new(
-            &other_proc.proc,
-            LocalBinderObject::default(),
-            BinderObjectFlags::empty(),
-        );
-        receiver
-            .proc
-            .lock()
-            .handles
-            .insert_for_transaction(guard, &mut RefCountActions::default_released());
-
-        const DATA_PREAMBLE: &[u8; 5] = b"stuff";
-
-        let mut transaction_data = vec![];
-        let mut offsets = vec![];
-        transaction_data.extend(DATA_PREAMBLE);
-        offsets.push(transaction_data.len() as binder_uintptr_t);
-        transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
-            hdr.type_: BINDER_TYPE_HANDLE,
-            flags: 0,
-            cookie: 0,
-            __bindgen_anon_1.handle: SENDING_HANDLE_SENDER.into(),
-        }));
-        offsets.push(transaction_data.len() as binder_uintptr_t);
-        transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
-            hdr.type_: BINDER_TYPE_HANDLE,
-            flags: 0,
-            cookie: 0,
-            __bindgen_anon_1.handle: SENDING_HANDLE_OTHER.into(),
-        }));
-
-        let transaction_state = test
-            .device
-            .translate_objects(
-                &mut locked,
-                &sender.task,
-                &sender.task,
-                &sender.proc,
-                &sender.thread,
-                &receiver.task,
-                &receiver.proc,
-                &offsets,
-                &mut transaction_data,
-                &mut allocations.scatter_gather_buffer,
-            )
-            .expect("failed to translate handles");
-
-        // Verify that the new handles were returned in `transaction_state` so that it gets dropped
-        // at the end of the transaction.
-        assert_eq!(transaction_state.state.as_ref().unwrap().handles[0], RECEIVING_HANDLE_SENDER);
-        assert_eq!(transaction_state.state.as_ref().unwrap().handles[1], RECEIVING_HANDLE_OTHER);
-
-        // Verify that the transaction data was mutated.
-        let mut expected_transaction_data = vec![];
-        expected_transaction_data.extend(DATA_PREAMBLE);
-        expected_transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
-            hdr.type_: BINDER_TYPE_HANDLE,
-            flags: 0,
-            cookie: 0,
-            __bindgen_anon_1.handle: RECEIVING_HANDLE_SENDER.into(),
-        }));
-        expected_transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
-            hdr.type_: BINDER_TYPE_HANDLE,
-            flags: 0,
-            cookie: 0,
-            __bindgen_anon_1.handle: RECEIVING_HANDLE_OTHER.into(),
-        }));
-        assert_eq!(&expected_transaction_data, &transaction_data);
-
-        // Verify that two handles were created in the receiver.
-        let (object, guard) = receiver
-            .proc
-            .lock()
-            .handles
-            .get(RECEIVING_HANDLE_SENDER.object_index())
-            .expect("expected handle not present");
-        guard.release(&mut RefCountActions::default_released());
-        assert_eq!(object.owner.as_ptr(), OwnedRef::as_ptr(&sender.proc));
-        assert_eq!(object.local, binder_object_addr);
-        let (object, guard) = receiver
-            .proc
-            .lock()
-            .handles
-            .get(RECEIVING_HANDLE_OTHER.object_index())
-            .expect("expected handle not present");
-        guard.release(&mut RefCountActions::default_released());
-        assert_eq!(object.owner.as_ptr(), OwnedRef::as_ptr(&other_proc.proc));
-        assert_eq!(object.local, binder_object_addr);
-        transaction_state.release(());
+                .get(RECEIVING_HANDLE_SENDER.object_index())
+                .expect("expected handle not present");
+            guard.release(&mut RefCountActions::default_released());
+            assert_eq!(object.owner.as_ptr(), OwnedRef::as_ptr(&sender.proc));
+            assert_eq!(object.local, binder_object_addr);
+            let (object, guard) = receiver
+                .proc
+                .lock()
+                .handles
+                .get(RECEIVING_HANDLE_OTHER.object_index())
+                .expect("expected handle not present");
+            guard.release(&mut RefCountActions::default_released());
+            assert_eq!(object.owner.as_ptr(), OwnedRef::as_ptr(&other_proc.proc));
+            assert_eq!(object.local, binder_object_addr);
+            transaction_state.release(());
+        });
     }
 
     /// Tests that hwbinder's scatter-gather buffer-fix-up implementation is correct.
     #[fuchsia::test]
     async fn transaction_translate_buffers() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        let receiver = test.new_process(&mut locked);
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
 
-        // Allocate memory in the sender to hold all the buffers that will get submitted to the
-        // binder driver.
-        let sender_addr = map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
-        let mut writer = UserMemoryWriter::new(&sender.task, sender_addr);
+            // Allocate memory in the sender to hold all the buffers that will get submitted to the
+            // binder driver.
+            let sender_addr =
+                map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
+            let mut writer = UserMemoryWriter::new(&sender.task, sender_addr);
 
-        // Serialize a string into memory.
-        const FOO_STR_LEN: i32 = 3;
-        const FOO_STR_PADDED_LEN: u64 = 8;
-        let sender_foo_addr = writer.write(b"foo");
+            // Serialize a string into memory.
+            const FOO_STR_LEN: i32 = 3;
+            const FOO_STR_PADDED_LEN: u64 = 8;
+            let sender_foo_addr = writer.write(b"foo");
 
-        // Pad the next buffer to ensure 8-byte alignment.
-        writer.write(&[0; FOO_STR_PADDED_LEN as usize - FOO_STR_LEN as usize]);
+            // Pad the next buffer to ensure 8-byte alignment.
+            writer.write(&[0; FOO_STR_PADDED_LEN as usize - FOO_STR_LEN as usize]);
 
-        // Serialize a C struct that points to the above string.
-        #[repr(C)]
-        #[derive(IntoBytes, Immutable)]
-        struct Bar {
-            foo_str: UserAddress,
-            len: i32,
-            _padding: u32,
-        }
-        let sender_bar_addr =
-            writer.write_object(&Bar { foo_str: sender_foo_addr, len: FOO_STR_LEN, _padding: 0 });
+            // Serialize a C struct that points to the above string.
+            #[repr(C)]
+            #[derive(IntoBytes, Immutable)]
+            struct Bar {
+                foo_str: UserAddress,
+                len: i32,
+                _padding: u32,
+            }
+            let sender_bar_addr = writer.write_object(&Bar {
+                foo_str: sender_foo_addr,
+                len: FOO_STR_LEN,
+                _padding: 0,
+            });
 
-        // Mark the start of the transaction data.
-        let transaction_data_addr = writer.current_address();
+            // Mark the start of the transaction data.
+            let transaction_data_addr = writer.current_address();
 
-        // Write the buffer object representing the C struct `Bar`.
-        let sender_buffer0_addr = writer.write_object(&binder_buffer_object {
-            hdr: binder_object_header { type_: BINDER_TYPE_PTR },
-            buffer: sender_bar_addr.ptr() as u64,
-            length: std::mem::size_of::<Bar>() as u64,
-            ..binder_buffer_object::default()
-        });
+            // Write the buffer object representing the C struct `Bar`.
+            let sender_buffer0_addr = writer.write_object(&binder_buffer_object {
+                hdr: binder_object_header { type_: BINDER_TYPE_PTR },
+                buffer: sender_bar_addr.ptr() as u64,
+                length: std::mem::size_of::<Bar>() as u64,
+                ..binder_buffer_object::default()
+            });
 
-        // Write the buffer object representing the "foo" string. Its parent is the C struct `Bar`,
-        // which has a pointer to it.
-        let sender_buffer1_addr = writer.write_object(&binder_buffer_object {
-            hdr: binder_object_header { type_: BINDER_TYPE_PTR },
-            buffer: sender_foo_addr.ptr() as u64,
-            length: FOO_STR_LEN as u64,
-            // Mark this buffer as having a parent who references it. The driver will then read
-            // the next two fields.
-            flags: BINDER_BUFFER_FLAG_HAS_PARENT,
-            // The index in the offsets array of the parent buffer.
-            parent: 0,
-            // The location in the parent buffer where a pointer to this object needs to be
-            // fixed up.
-            parent_offset: offset_of!(Bar, foo_str) as u64,
-        });
+            // Write the buffer object representing the "foo" string. Its parent is the C struct `Bar`,
+            // which has a pointer to it.
+            let sender_buffer1_addr = writer.write_object(&binder_buffer_object {
+                hdr: binder_object_header { type_: BINDER_TYPE_PTR },
+                buffer: sender_foo_addr.ptr() as u64,
+                length: FOO_STR_LEN as u64,
+                // Mark this buffer as having a parent who references it. The driver will then read
+                // the next two fields.
+                flags: BINDER_BUFFER_FLAG_HAS_PARENT,
+                // The index in the offsets array of the parent buffer.
+                parent: 0,
+                // The location in the parent buffer where a pointer to this object needs to be
+                // fixed up.
+                parent_offset: offset_of!(Bar, foo_str) as u64,
+            });
 
-        // Write the offsets array.
-        let offsets_addr = writer.current_address();
-        writer.write_object(&((sender_buffer0_addr - transaction_data_addr) as u64));
-        writer.write_object(&((sender_buffer1_addr - transaction_data_addr) as u64));
+            // Write the offsets array.
+            let offsets_addr = writer.current_address();
+            writer.write_object(&((sender_buffer0_addr - transaction_data_addr) as u64));
+            writer.write_object(&((sender_buffer1_addr - transaction_data_addr) as u64));
 
-        let end_data_addr = writer.current_address();
+            let end_data_addr = writer.current_address();
 
-        // Construct the input for the binder driver to process.
-        let input = binder_transaction_data_sg {
-            transaction_data: binder_transaction_data {
-                target: binder_transaction_data__bindgen_ty_1 { handle: 1 },
-                data_size: (offsets_addr - transaction_data_addr) as u64,
-                offsets_size: (end_data_addr - offsets_addr) as u64,
-                data: binder_transaction_data__bindgen_ty_2 {
-                    ptr: binder_transaction_data__bindgen_ty_2__bindgen_ty_1 {
-                        buffer: transaction_data_addr.ptr() as u64,
-                        offsets: offsets_addr.ptr() as u64,
+            // Construct the input for the binder driver to process.
+            let input = binder_transaction_data_sg {
+                transaction_data: binder_transaction_data {
+                    target: binder_transaction_data__bindgen_ty_1 { handle: 1 },
+                    data_size: (offsets_addr - transaction_data_addr) as u64,
+                    offsets_size: (end_data_addr - offsets_addr) as u64,
+                    data: binder_transaction_data__bindgen_ty_2 {
+                        ptr: binder_transaction_data__bindgen_ty_2__bindgen_ty_1 {
+                            buffer: transaction_data_addr.ptr() as u64,
+                            offsets: offsets_addr.ptr() as u64,
+                        },
                     },
+                    ..binder_transaction_data::new_zeroed()
                 },
-                ..binder_transaction_data::new_zeroed()
-            },
-            // Each buffer size must be rounded up to a multiple of 8 to ensure enough
-            // space in the allocated target for 8-byte alignment.
-            buffers_size: std::mem::size_of::<Bar>() as u64 + FOO_STR_PADDED_LEN,
-        };
+                // Each buffer size must be rounded up to a multiple of 8 to ensure enough
+                // space in the allocated target for 8-byte alignment.
+                buffers_size: std::mem::size_of::<Bar>() as u64 + FOO_STR_PADDED_LEN,
+            };
 
-        // Perform the translation and copying.
-        let (buffers, transaction_state) = test
-            .device
-            .copy_transaction_buffers(
-                &mut locked,
-                &sender.task,
-                &sender.task,
-                &sender.proc,
-                &sender.thread,
-                &receiver.task,
-                &receiver.proc,
-                &input,
-                None,
-            )
-            .expect("copy_transaction_buffers");
-        transaction_state.release(());
-        let data_buffer = buffers.data;
+            // Perform the translation and copying.
+            let (buffers, transaction_state) = device
+                .copy_transaction_buffers(
+                    &mut locked,
+                    &sender.task,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    &receiver.task,
+                    &receiver.proc,
+                    &input,
+                    None,
+                )
+                .expect("copy_transaction_buffers");
+            transaction_state.release(());
+            let data_buffer = buffers.data;
 
-        // Read back the translated objects from the receiver's memory.
-        let translated_objects = receiver
-            .task
-            .read_objects_to_array::<binder_buffer_object, 2>(UserRef::new(data_buffer.address))
-            .expect("read output");
+            // Read back the translated objects from the receiver's memory.
+            let translated_objects = receiver
+                .task
+                .read_objects_to_array::<binder_buffer_object, 2>(UserRef::new(data_buffer.address))
+                .expect("read output");
 
-        // Check that the second buffer is the string "foo".
-        let foo_addr = UserAddress::from(translated_objects[1].buffer);
-        let str = receiver.task.read_memory_to_array::<3>(foo_addr).expect("read buffer 1");
-        assert_eq!(&str, b"foo");
+            // Check that the second buffer is the string "foo".
+            let foo_addr = UserAddress::from(translated_objects[1].buffer);
+            let str = receiver.task.read_memory_to_array::<3>(foo_addr).expect("read buffer 1");
+            assert_eq!(&str, b"foo");
 
-        // Check that the first buffer points to the string "foo".
-        let foo_ptr: UserAddress = receiver
-            .task
-            .read_object(UserRef::new(UserAddress::from(translated_objects[0].buffer)))
-            .expect("read buffer 0");
-        assert_eq!(foo_ptr, foo_addr);
+            // Check that the first buffer points to the string "foo".
+            let foo_ptr: UserAddress = receiver
+                .task
+                .read_object(UserRef::new(UserAddress::from(translated_objects[0].buffer)))
+                .expect("read buffer 0");
+            assert_eq!(foo_ptr, foo_addr);
+        });
     }
 
     /// Tests that when the scatter-gather buffer size reported by userspace is too small, we stop
     /// processing and fail, instead of skipping a buffer object that doesn't fit.
     #[fuchsia::test]
     async fn transaction_fails_when_sg_buffer_size_is_too_small() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        let receiver = test.new_process(&mut locked);
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
 
-        // Allocate memory in the sender to hold all the buffers that will get submitted to the
-        // binder driver.
-        let sender_addr = map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
-        let mut writer = UserMemoryWriter::new(&sender.task, sender_addr);
+            // Allocate memory in the sender to hold all the buffers that will get submitted to the
+            // binder driver.
+            let sender_addr =
+                map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
+            let mut writer = UserMemoryWriter::new(&sender.task, sender_addr);
 
-        // Serialize a series of buffers that point to empty data. Each successive buffer is smaller
-        // than the last.
-        let buffer_objects = [8, 7, 6]
-            .iter()
-            .map(|size| binder_buffer_object {
-                hdr: binder_object_header { type_: BINDER_TYPE_PTR },
-                buffer: writer
-                    .write(&{
-                        let mut data = vec![];
-                        data.resize(*size, 0u8);
-                        data
-                    })
-                    .ptr() as u64,
-                length: *size as u64,
-                ..binder_buffer_object::default()
-            })
-            .collect::<Vec<_>>();
+            // Serialize a series of buffers that point to empty data. Each successive buffer is smaller
+            // than the last.
+            let buffer_objects = [8, 7, 6]
+                .iter()
+                .map(|size| binder_buffer_object {
+                    hdr: binder_object_header { type_: BINDER_TYPE_PTR },
+                    buffer: writer
+                        .write(&{
+                            let mut data = vec![];
+                            data.resize(*size, 0u8);
+                            data
+                        })
+                        .ptr() as u64,
+                    length: *size as u64,
+                    ..binder_buffer_object::default()
+                })
+                .collect::<Vec<_>>();
 
-        // Mark the start of the transaction data.
-        let transaction_data_addr = writer.current_address();
+            // Mark the start of the transaction data.
+            let transaction_data_addr = writer.current_address();
 
-        // Write the buffer objects to the transaction payload.
-        let offsets = buffer_objects
-            .into_iter()
-            .map(|buffer_object| {
-                (writer.write_object(&buffer_object) - transaction_data_addr) as u64
-            })
-            .collect::<Vec<_>>();
+            // Write the buffer objects to the transaction payload.
+            let offsets = buffer_objects
+                .into_iter()
+                .map(|buffer_object| {
+                    (writer.write_object(&buffer_object) - transaction_data_addr) as u64
+                })
+                .collect::<Vec<_>>();
 
-        // Write the offsets array.
-        let offsets_addr = writer.current_address();
-        for offset in offsets {
-            writer.write_object(&offset);
-        }
+            // Write the offsets array.
+            let offsets_addr = writer.current_address();
+            for offset in offsets {
+                writer.write_object(&offset);
+            }
 
-        let end_data_addr = writer.current_address();
+            let end_data_addr = writer.current_address();
 
-        // Construct the input for the binder driver to process.
-        let input = binder_transaction_data_sg {
-            transaction_data: binder_transaction_data {
-                target: binder_transaction_data__bindgen_ty_1 { handle: 1 },
-                data_size: (offsets_addr - transaction_data_addr) as u64,
-                offsets_size: (end_data_addr - offsets_addr) as u64,
-                data: binder_transaction_data__bindgen_ty_2 {
-                    ptr: binder_transaction_data__bindgen_ty_2__bindgen_ty_1 {
-                        buffer: transaction_data_addr.ptr() as u64,
-                        offsets: offsets_addr.ptr() as u64,
+            // Construct the input for the binder driver to process.
+            let input = binder_transaction_data_sg {
+                transaction_data: binder_transaction_data {
+                    target: binder_transaction_data__bindgen_ty_1 { handle: 1 },
+                    data_size: (offsets_addr - transaction_data_addr) as u64,
+                    offsets_size: (end_data_addr - offsets_addr) as u64,
+                    data: binder_transaction_data__bindgen_ty_2 {
+                        ptr: binder_transaction_data__bindgen_ty_2__bindgen_ty_1 {
+                            buffer: transaction_data_addr.ptr() as u64,
+                            offsets: offsets_addr.ptr() as u64,
+                        },
                     },
+                    ..binder_transaction_data::new_zeroed()
                 },
-                ..binder_transaction_data::new_zeroed()
-            },
-            // Make the buffers size only fit the first buffer fully (size 8). The remaining space
-            // should be 6 bytes, so that the second buffer doesn't fit but the next one does.
-            buffers_size: 8 + 6,
-        };
+                // Make the buffers size only fit the first buffer fully (size 8). The remaining space
+                // should be 6 bytes, so that the second buffer doesn't fit but the next one does.
+                buffers_size: 8 + 6,
+            };
 
-        // Perform the translation and copying.
-        test.device
-            .copy_transaction_buffers(
-                &mut locked,
-                &sender.task,
-                &sender.task,
-                &sender.proc,
-                &sender.thread,
-                &receiver.task,
-                &receiver.proc,
-                &input,
-                None,
-            )
-            .expect_err("copy_transaction_buffers should fail");
+            // Perform the translation and copying.
+            device
+                .copy_transaction_buffers(
+                    &mut locked,
+                    &sender.task,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    &receiver.task,
+                    &receiver.proc,
+                    &input,
+                    None,
+                )
+                .expect_err("copy_transaction_buffers should fail");
+        });
     }
 
     /// Tests that when a scatter-gather buffer refers to a parent that comes *after* it in the
     /// object list, the transaction fails.
     #[fuchsia::test]
     async fn transaction_fails_when_sg_buffer_parent_is_out_of_order() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        let receiver = test.new_process(&mut locked);
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
 
-        // Allocate memory in the sender to hold all the buffers that will get submitted to the
-        // binder driver.
-        let sender_addr = map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
-        let mut writer = UserMemoryWriter::new(&sender.task, sender_addr);
+            // Allocate memory in the sender to hold all the buffers that will get submitted to the
+            // binder driver.
+            let sender_addr =
+                map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
+            let mut writer = UserMemoryWriter::new(&sender.task, sender_addr);
 
-        // Write the data for two buffer objects.
-        const BUFFER_DATA_LEN: usize = 8;
-        let buf0_addr = writer.write(&[0; BUFFER_DATA_LEN]);
-        let buf1_addr = writer.write(&[0; BUFFER_DATA_LEN]);
+            // Write the data for two buffer objects.
+            const BUFFER_DATA_LEN: usize = 8;
+            let buf0_addr = writer.write(&[0; BUFFER_DATA_LEN]);
+            let buf1_addr = writer.write(&[0; BUFFER_DATA_LEN]);
 
-        // Mark the start of the transaction data.
-        let transaction_data_addr = writer.current_address();
+            // Mark the start of the transaction data.
+            let transaction_data_addr = writer.current_address();
 
-        // Write a buffer object that marks a future buffer as its parent.
-        let sender_buffer0_addr = writer.write_object(&binder_buffer_object {
-            hdr: binder_object_header { type_: BINDER_TYPE_PTR },
-            buffer: buf0_addr.ptr() as u64,
-            length: BUFFER_DATA_LEN as u64,
-            // Mark this buffer as having a parent who references it. The driver will then read
-            // the next two fields.
-            flags: BINDER_BUFFER_FLAG_HAS_PARENT,
-            parent: 0,
-            parent_offset: 0,
-        });
+            // Write a buffer object that marks a future buffer as its parent.
+            let sender_buffer0_addr = writer.write_object(&binder_buffer_object {
+                hdr: binder_object_header { type_: BINDER_TYPE_PTR },
+                buffer: buf0_addr.ptr() as u64,
+                length: BUFFER_DATA_LEN as u64,
+                // Mark this buffer as having a parent who references it. The driver will then read
+                // the next two fields.
+                flags: BINDER_BUFFER_FLAG_HAS_PARENT,
+                parent: 0,
+                parent_offset: 0,
+            });
 
-        // Write a buffer object that acts as the first buffers parent (contains a pointer to the
-        // first buffer).
-        let sender_buffer1_addr = writer.write_object(&binder_buffer_object {
-            hdr: binder_object_header { type_: BINDER_TYPE_PTR },
-            buffer: buf1_addr.ptr() as u64,
-            length: BUFFER_DATA_LEN as u64,
-            ..binder_buffer_object::default()
-        });
+            // Write a buffer object that acts as the first buffers parent (contains a pointer to the
+            // first buffer).
+            let sender_buffer1_addr = writer.write_object(&binder_buffer_object {
+                hdr: binder_object_header { type_: BINDER_TYPE_PTR },
+                buffer: buf1_addr.ptr() as u64,
+                length: BUFFER_DATA_LEN as u64,
+                ..binder_buffer_object::default()
+            });
 
-        // Write the offsets array.
-        let offsets_addr = writer.current_address();
-        writer.write_object(&((sender_buffer0_addr - transaction_data_addr) as u64));
-        writer.write_object(&((sender_buffer1_addr - transaction_data_addr) as u64));
+            // Write the offsets array.
+            let offsets_addr = writer.current_address();
+            writer.write_object(&((sender_buffer0_addr - transaction_data_addr) as u64));
+            writer.write_object(&((sender_buffer1_addr - transaction_data_addr) as u64));
 
-        let end_data_addr = writer.current_address();
+            let end_data_addr = writer.current_address();
 
-        // Construct the input for the binder driver to process.
-        let input = binder_transaction_data_sg {
-            transaction_data: binder_transaction_data {
-                target: binder_transaction_data__bindgen_ty_1 { handle: 1 },
-                data_size: (offsets_addr - transaction_data_addr) as u64,
-                offsets_size: (end_data_addr - offsets_addr) as u64,
-                data: binder_transaction_data__bindgen_ty_2 {
-                    ptr: binder_transaction_data__bindgen_ty_2__bindgen_ty_1 {
-                        buffer: transaction_data_addr.ptr() as u64,
-                        offsets: offsets_addr.ptr() as u64,
+            // Construct the input for the binder driver to process.
+            let input = binder_transaction_data_sg {
+                transaction_data: binder_transaction_data {
+                    target: binder_transaction_data__bindgen_ty_1 { handle: 1 },
+                    data_size: (offsets_addr - transaction_data_addr) as u64,
+                    offsets_size: (end_data_addr - offsets_addr) as u64,
+                    data: binder_transaction_data__bindgen_ty_2 {
+                        ptr: binder_transaction_data__bindgen_ty_2__bindgen_ty_1 {
+                            buffer: transaction_data_addr.ptr() as u64,
+                            offsets: offsets_addr.ptr() as u64,
+                        },
                     },
+                    ..binder_transaction_data::new_zeroed()
                 },
-                ..binder_transaction_data::new_zeroed()
-            },
-            buffers_size: BUFFER_DATA_LEN as u64 * 2,
-        };
+                buffers_size: BUFFER_DATA_LEN as u64 * 2,
+            };
 
-        // Perform the translation and copying.
-        test.device
-            .copy_transaction_buffers(
-                &mut locked,
-                &sender.task,
-                &sender.task,
-                &sender.proc,
-                &sender.thread,
-                &receiver.task,
-                &receiver.proc,
-                &input,
-                None,
-            )
-            .expect_err("copy_transaction_buffers should fail");
+            // Perform the translation and copying.
+            device
+                .copy_transaction_buffers(
+                    &mut locked,
+                    &sender.task,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    &receiver.task,
+                    &receiver.proc,
+                    &input,
+                    None,
+                )
+                .expect_err("copy_transaction_buffers should fail");
+        });
     }
 
     #[fuchsia::test]
     async fn transaction_translate_fd_array() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        let receiver = test.new_process(&mut locked);
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
 
-        // Insert a binder object for the receiver, and grab a handle to it in the sender.
-        const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
-        let (_, guard) = register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
-        let handle = sender
-            .proc
-            .lock()
-            .handles
-            .insert_for_transaction(guard, &mut RefCountActions::default_released());
+            // Insert a binder object for the receiver, and grab a handle to it in the sender.
+            const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
+            let (_, guard) =
+                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+            let handle = sender
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
-        // Open a file in the sender process that we won't be using. It is there to occupy a file
-        // descriptor so that the translation doesn't happen to use the same FDs for receiver and
-        // sender, potentially hiding a bug.
-        sender.task.add_file(PanickingFile::new_file(&sender.task), FdFlags::empty()).unwrap();
+            // Open a file in the sender process that we won't be using. It is there to occupy a file
+            // descriptor so that the translation doesn't happen to use the same FDs for receiver and
+            // sender, potentially hiding a bug.
+            sender.task.add_file(PanickingFile::new_file(&sender.task), FdFlags::empty()).unwrap();
 
-        // Open two files in the sender process. These will be sent in the transaction.
-        let files = [PanickingFile::new_file(&sender.task), PanickingFile::new_file(&sender.task)];
-        let sender_fds = files
-            .iter()
-            .map(|file| sender.task.add_file(file.clone(), FdFlags::CLOEXEC).expect("add file"))
-            .collect::<Vec<_>>();
+            // Open two files in the sender process. These will be sent in the transaction.
+            let files =
+                [PanickingFile::new_file(&sender.task), PanickingFile::new_file(&sender.task)];
+            let sender_fds = files
+                .iter()
+                .map(|file| sender.task.add_file(file.clone(), FdFlags::CLOEXEC).expect("add file"))
+                .collect::<Vec<_>>();
 
-        // Ensure that the receiver task has no file descriptors.
-        assert!(receiver.task.files.get_all_fds().is_empty(), "receiver already has files");
+            // Ensure that the receiver task has no file descriptors.
+            assert!(receiver.task.files.get_all_fds().is_empty(), "receiver already has files");
 
-        // Allocate memory in the sender to hold all the buffers that will get submitted to the
-        // binder driver.
-        let sender_addr = map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
-        let mut writer = UserMemoryWriter::new(&sender.task, sender_addr);
+            // Allocate memory in the sender to hold all the buffers that will get submitted to the
+            // binder driver.
+            let sender_addr =
+                map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
+            let mut writer = UserMemoryWriter::new(&sender.task, sender_addr);
 
-        // Serialize a simple buffer. This will ensure that the FD array being translated is not at
-        // the beginning of the buffer, exercising the offset math.
-        let sender_padding_addr = writer.write(&[0; 8]);
+            // Serialize a simple buffer. This will ensure that the FD array being translated is not at
+            // the beginning of the buffer, exercising the offset math.
+            let sender_padding_addr = writer.write(&[0; 8]);
 
-        // Serialize a C struct with an fd array.
-        #[repr(C)]
-        #[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
-        struct Bar {
-            len: u32,
-            fds: [u32; 2],
-            _padding: u32,
-        }
-        let sender_bar_addr = writer.write_object(&Bar {
-            len: 2,
-            fds: [sender_fds[0].raw() as u32, sender_fds[1].raw() as u32],
-            _padding: 0,
-        });
+            // Serialize a C struct with an fd array.
+            #[repr(C)]
+            #[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
+            struct Bar {
+                len: u32,
+                fds: [u32; 2],
+                _padding: u32,
+            }
+            let sender_bar_addr = writer.write_object(&Bar {
+                len: 2,
+                fds: [sender_fds[0].raw() as u32, sender_fds[1].raw() as u32],
+                _padding: 0,
+            });
 
-        // Mark the start of the transaction data.
-        let transaction_data_addr = writer.current_address();
+            // Mark the start of the transaction data.
+            let transaction_data_addr = writer.current_address();
 
-        // Write the buffer object representing the padding.
-        let sender_padding_buffer_addr = writer.write_object(&binder_buffer_object {
-            hdr: binder_object_header { type_: BINDER_TYPE_PTR },
-            buffer: sender_padding_addr.ptr() as u64,
-            length: 8,
-            ..binder_buffer_object::default()
-        });
+            // Write the buffer object representing the padding.
+            let sender_padding_buffer_addr = writer.write_object(&binder_buffer_object {
+                hdr: binder_object_header { type_: BINDER_TYPE_PTR },
+                buffer: sender_padding_addr.ptr() as u64,
+                length: 8,
+                ..binder_buffer_object::default()
+            });
 
-        // Write the buffer object representing the C struct `Bar`.
-        let sender_buffer_addr = writer.write_object(&binder_buffer_object {
-            hdr: binder_object_header { type_: BINDER_TYPE_PTR },
-            buffer: sender_bar_addr.ptr() as u64,
-            length: std::mem::size_of::<Bar>() as u64,
-            ..binder_buffer_object::default()
-        });
+            // Write the buffer object representing the C struct `Bar`.
+            let sender_buffer_addr = writer.write_object(&binder_buffer_object {
+                hdr: binder_object_header { type_: BINDER_TYPE_PTR },
+                buffer: sender_bar_addr.ptr() as u64,
+                length: std::mem::size_of::<Bar>() as u64,
+                ..binder_buffer_object::default()
+            });
 
-        // Write the fd array object that tells the kernel where the file descriptors are in the
-        // `Bar` buffer.
-        let sender_fd_array_addr = writer.write_object(&binder_fd_array_object {
-            hdr: binder_object_header { type_: BINDER_TYPE_FDA },
-            pad: 0,
-            num_fds: sender_fds.len() as u64,
-            // The index in the offsets array of the parent buffer.
-            parent: 1,
-            // The location in the parent buffer where the FDs are, which need to be duped.
-            parent_offset: offset_of!(Bar, fds) as u64,
-        });
+            // Write the fd array object that tells the kernel where the file descriptors are in the
+            // `Bar` buffer.
+            let sender_fd_array_addr = writer.write_object(&binder_fd_array_object {
+                hdr: binder_object_header { type_: BINDER_TYPE_FDA },
+                pad: 0,
+                num_fds: sender_fds.len() as u64,
+                // The index in the offsets array of the parent buffer.
+                parent: 1,
+                // The location in the parent buffer where the FDs are, which need to be duped.
+                parent_offset: offset_of!(Bar, fds) as u64,
+            });
 
-        // Write the offsets array.
-        let offsets_addr = writer.current_address();
-        writer.write_object(&((sender_padding_buffer_addr - transaction_data_addr) as u64));
-        writer.write_object(&((sender_buffer_addr - transaction_data_addr) as u64));
-        writer.write_object(&((sender_fd_array_addr - transaction_data_addr) as u64));
+            // Write the offsets array.
+            let offsets_addr = writer.current_address();
+            writer.write_object(&((sender_padding_buffer_addr - transaction_data_addr) as u64));
+            writer.write_object(&((sender_buffer_addr - transaction_data_addr) as u64));
+            writer.write_object(&((sender_fd_array_addr - transaction_data_addr) as u64));
 
-        let end_data_addr = writer.current_address();
+            let end_data_addr = writer.current_address();
 
-        // Construct the input for the binder driver to process.
-        let input = binder_transaction_data_sg {
-            transaction_data: binder_transaction_data {
-                target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
-                data_size: (offsets_addr - transaction_data_addr) as u64,
-                offsets_size: (end_data_addr - offsets_addr) as u64,
-                data: binder_transaction_data__bindgen_ty_2 {
-                    ptr: binder_transaction_data__bindgen_ty_2__bindgen_ty_1 {
-                        buffer: transaction_data_addr.ptr() as u64,
-                        offsets: offsets_addr.ptr() as u64,
+            // Construct the input for the binder driver to process.
+            let input = binder_transaction_data_sg {
+                transaction_data: binder_transaction_data {
+                    target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
+                    data_size: (offsets_addr - transaction_data_addr) as u64,
+                    offsets_size: (end_data_addr - offsets_addr) as u64,
+                    data: binder_transaction_data__bindgen_ty_2 {
+                        ptr: binder_transaction_data__bindgen_ty_2__bindgen_ty_1 {
+                            buffer: transaction_data_addr.ptr() as u64,
+                            offsets: offsets_addr.ptr() as u64,
+                        },
                     },
+                    ..binder_transaction_data::new_zeroed()
                 },
-                ..binder_transaction_data::new_zeroed()
-            },
-            buffers_size: std::mem::size_of::<Bar>() as u64 + 8,
-        };
+                buffers_size: std::mem::size_of::<Bar>() as u64 + 8,
+            };
 
-        // Perform the translation and copying.
-        test.device
-            .handle_transaction(&mut locked, &sender.task, &sender.proc, &sender.thread, input)
-            .expect("transaction queued");
+            // Perform the translation and copying.
+            device
+                .handle_transaction(&mut locked, &sender.task, &sender.proc, &sender.thread, input)
+                .expect("transaction queued");
 
-        // Get the data buffer out of the receiver's queue.
-        let data_buffer = match receiver
-            .proc
-            .command_queue
-            .lock()
-            .commands
-            .pop_front()
-            .expect("the transaction should be queued on the process")
-        {
-            Command::Transaction {
-                data: TransactionData { buffers: TransactionBuffers { data, .. }, .. },
-                ..
-            } => data,
-            _ => panic!("unexpected command in process queue"),
-        };
+            // Get the data buffer out of the receiver's queue.
+            let data_buffer = match receiver
+                .proc
+                .command_queue
+                .lock()
+                .commands
+                .pop_front()
+                .expect("the transaction should be queued on the process")
+            {
+                Command::Transaction {
+                    data: TransactionData { buffers: TransactionBuffers { data, .. }, .. },
+                    ..
+                } => data,
+                _ => panic!("unexpected command in process queue"),
+            };
 
-        // Start reading from the receiver's memory, which holds the translated transaction.
-        let mut reader =
-            UserMemoryCursor::new(&receiver.task, data_buffer.address, data_buffer.length as u64)
-                .expect("create memory cursor");
+            // Start reading from the receiver's memory, which holds the translated transaction.
+            let mut reader = UserMemoryCursor::new(
+                &receiver.task,
+                data_buffer.address,
+                data_buffer.length as u64,
+            )
+            .expect("create memory cursor");
 
-        // Skip the first object, it was only there to pad the next one.
-        reader.read_object::<binder_buffer_object>().expect("read padding buffer");
+            // Skip the first object, it was only there to pad the next one.
+            reader.read_object::<binder_buffer_object>().expect("read padding buffer");
 
-        // Read back the buffer object representing `Bar`.
-        let bar_buffer_object =
-            reader.read_object::<binder_buffer_object>().expect("read bar buffer object");
-        let translated_bar = receiver
-            .task
-            .read_object::<Bar>(UserRef::new(UserAddress::from(bar_buffer_object.buffer)))
-            .expect("read Bar");
+            // Read back the buffer object representing `Bar`.
+            let bar_buffer_object =
+                reader.read_object::<binder_buffer_object>().expect("read bar buffer object");
+            let translated_bar = receiver
+                .task
+                .read_object::<Bar>(UserRef::new(UserAddress::from(bar_buffer_object.buffer)))
+                .expect("read Bar");
 
-        // Verify that the fds have been translated.
-        let (receiver_file, receiver_fd_flags) = receiver
-            .task
-            .files
-            .get_allowing_opath_with_flags(FdNumber::from_raw(translated_bar.fds[0] as i32))
-            .expect("FD not found in receiver");
-        assert!(
-            Arc::ptr_eq(&receiver_file, &files[0]),
-            "FD in receiver does not refer to the same file as sender"
-        );
-        assert_eq!(receiver_fd_flags, FdFlags::CLOEXEC);
-        let (receiver_file, receiver_fd_flags) = receiver
-            .task
-            .files
-            .get_allowing_opath_with_flags(FdNumber::from_raw(translated_bar.fds[1] as i32))
-            .expect("FD not found in receiver");
-        assert!(
-            Arc::ptr_eq(&receiver_file, &files[1]),
-            "FD in receiver does not refer to the same file as sender"
-        );
-        assert_eq!(receiver_fd_flags, FdFlags::CLOEXEC);
-
-        // Release the buffer in the receiver and verify that the associated FDs have been closed.
-        receiver.proc.handle_free_buffer(data_buffer.address).expect("failed to free buffer");
-        assert!(
-            receiver
+            // Verify that the fds have been translated.
+            let (receiver_file, receiver_fd_flags) = receiver
                 .task
                 .files
-                .get_allowing_opath(FdNumber::from_raw(translated_bar.fds[0] as i32))
-                .expect_err("file should be closed")
-                == EBADF
-        );
-        assert!(
-            receiver
+                .get_allowing_opath_with_flags(FdNumber::from_raw(translated_bar.fds[0] as i32))
+                .expect("FD not found in receiver");
+            assert!(
+                Arc::ptr_eq(&receiver_file, &files[0]),
+                "FD in receiver does not refer to the same file as sender"
+            );
+            assert_eq!(receiver_fd_flags, FdFlags::CLOEXEC);
+            let (receiver_file, receiver_fd_flags) = receiver
                 .task
                 .files
-                .get_allowing_opath(FdNumber::from_raw(translated_bar.fds[1] as i32))
-                .expect_err("file should be closed")
-                == EBADF
-        );
+                .get_allowing_opath_with_flags(FdNumber::from_raw(translated_bar.fds[1] as i32))
+                .expect("FD not found in receiver");
+            assert!(
+                Arc::ptr_eq(&receiver_file, &files[1]),
+                "FD in receiver does not refer to the same file as sender"
+            );
+            assert_eq!(receiver_fd_flags, FdFlags::CLOEXEC);
+
+            // Release the buffer in the receiver and verify that the associated FDs have been closed.
+            receiver.proc.handle_free_buffer(data_buffer.address).expect("failed to free buffer");
+            assert!(
+                receiver
+                    .task
+                    .files
+                    .get_allowing_opath(FdNumber::from_raw(translated_bar.fds[0] as i32))
+                    .expect_err("file should be closed")
+                    == EBADF
+            );
+            assert!(
+                receiver
+                    .task
+                    .files
+                    .get_allowing_opath(FdNumber::from_raw(translated_bar.fds[1] as i32))
+                    .expect_err("file should be closed")
+                    == EBADF
+            );
+        });
     }
     #[fuchsia::test]
     async fn transaction_receiver_exits_after_getting_fd_array() {
-        let _init_task = {
-            let (test, mut locked) = TranslateHandlesTestFixture::new();
-            let sender = test.new_process(&mut locked);
-            let receiver = test.new_process(&mut locked);
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
 
             // Insert a binder object for the receiver, and grab a handle to it in the sender.
             const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
@@ -6764,275 +6802,283 @@ pub mod tests {
             };
 
             // Perform the translation and copying.
-            test.device
+            device
                 .handle_transaction(&mut locked, &sender.task, &sender.proc, &sender.thread, input)
                 .expect("transaction queued");
-
-            // Clean up without calling BC_FREE_BUFFER. Should not panic.
-            let TranslateHandlesTestFixture { init_task, .. } = test;
-            init_task
-        };
+        });
     }
 
     #[fuchsia::test]
     async fn transaction_fd_array_sender_cancels() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        let receiver = test.new_process(&mut locked);
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
 
-        // Insert a binder object for the receiver, and grab a handle to it in the sender.
-        const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
-        let (_, guard) = register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
-        let handle = sender
-            .proc
-            .lock()
-            .handles
-            .insert_for_transaction(guard, &mut RefCountActions::default_released());
+            // Insert a binder object for the receiver, and grab a handle to it in the sender.
+            const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
+            let (_, guard) =
+                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+            let handle = sender
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
-        // Open a file in the sender process that we won't be using. It is there to occupy a file
-        // descriptor so that the translation doesn't happen to use the same FDs for receiver and
-        // sender, potentially hiding a bug.
-        sender.task.add_file(PanickingFile::new_file(&sender.task), FdFlags::empty()).unwrap();
+            // Open a file in the sender process that we won't be using. It is there to occupy a file
+            // descriptor so that the translation doesn't happen to use the same FDs for receiver and
+            // sender, potentially hiding a bug.
+            sender.task.add_file(PanickingFile::new_file(&sender.task), FdFlags::empty()).unwrap();
 
-        // Open two files in the sender process. These will be sent in the transaction.
-        let files = [PanickingFile::new_file(&sender.task), PanickingFile::new_file(&sender.task)];
-        let sender_fds = files
-            .into_iter()
-            .map(|file| sender.task.add_file(file, FdFlags::CLOEXEC).expect("add file"))
-            .collect::<Vec<_>>();
+            // Open two files in the sender process. These will be sent in the transaction.
+            let files =
+                [PanickingFile::new_file(&sender.task), PanickingFile::new_file(&sender.task)];
+            let sender_fds = files
+                .into_iter()
+                .map(|file| sender.task.add_file(file, FdFlags::CLOEXEC).expect("add file"))
+                .collect::<Vec<_>>();
 
-        // Ensure that the receiver task has no file descriptors.
-        assert!(receiver.task.files.get_all_fds().is_empty(), "receiver already has files");
+            // Ensure that the receiver task has no file descriptors.
+            assert!(receiver.task.files.get_all_fds().is_empty(), "receiver already has files");
 
-        // Allocate memory in the sender to hold all the buffers that will get submitted to the
-        // binder driver.
-        let sender_addr = map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
-        let mut writer = UserMemoryWriter::new(&sender.task, sender_addr);
+            // Allocate memory in the sender to hold all the buffers that will get submitted to the
+            // binder driver.
+            let sender_addr =
+                map_memory(&mut locked, &sender.task, UserAddress::default(), *PAGE_SIZE);
+            let mut writer = UserMemoryWriter::new(&sender.task, sender_addr);
 
-        // Serialize a simple buffer. This will ensure that the FD array being translated is not at
-        // the beginning of the buffer, exercising the offset math.
-        let sender_padding_addr = writer.write(&[0; 8]);
+            // Serialize a simple buffer. This will ensure that the FD array being translated is not at
+            // the beginning of the buffer, exercising the offset math.
+            let sender_padding_addr = writer.write(&[0; 8]);
 
-        // Serialize a C struct with an fd array.
-        #[repr(C)]
-        #[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
-        struct Bar {
-            len: u32,
-            fds: [u32; 2],
-            _padding: u32,
-        }
-        let sender_bar_addr = writer.write_object(&Bar {
-            len: 2,
-            fds: [sender_fds[0].raw() as u32, sender_fds[1].raw() as u32],
-            _padding: 0,
-        });
+            // Serialize a C struct with an fd array.
+            #[repr(C)]
+            #[derive(IntoBytes, KnownLayout, FromBytes, Immutable)]
+            struct Bar {
+                len: u32,
+                fds: [u32; 2],
+                _padding: u32,
+            }
+            let sender_bar_addr = writer.write_object(&Bar {
+                len: 2,
+                fds: [sender_fds[0].raw() as u32, sender_fds[1].raw() as u32],
+                _padding: 0,
+            });
 
-        // Mark the start of the transaction data.
-        let transaction_data_addr = writer.current_address();
+            // Mark the start of the transaction data.
+            let transaction_data_addr = writer.current_address();
 
-        // Write the buffer object representing the padding.
-        let sender_padding_buffer_addr = writer.write_object(&binder_buffer_object {
-            hdr: binder_object_header { type_: BINDER_TYPE_PTR },
-            buffer: sender_padding_addr.ptr() as u64,
-            length: 8,
-            ..binder_buffer_object::default()
-        });
+            // Write the buffer object representing the padding.
+            let sender_padding_buffer_addr = writer.write_object(&binder_buffer_object {
+                hdr: binder_object_header { type_: BINDER_TYPE_PTR },
+                buffer: sender_padding_addr.ptr() as u64,
+                length: 8,
+                ..binder_buffer_object::default()
+            });
 
-        // Write the buffer object representing the C struct `Bar`.
-        let sender_buffer_addr = writer.write_object(&binder_buffer_object {
-            hdr: binder_object_header { type_: BINDER_TYPE_PTR },
-            buffer: sender_bar_addr.ptr() as u64,
-            length: std::mem::size_of::<Bar>() as u64,
-            ..binder_buffer_object::default()
-        });
+            // Write the buffer object representing the C struct `Bar`.
+            let sender_buffer_addr = writer.write_object(&binder_buffer_object {
+                hdr: binder_object_header { type_: BINDER_TYPE_PTR },
+                buffer: sender_bar_addr.ptr() as u64,
+                length: std::mem::size_of::<Bar>() as u64,
+                ..binder_buffer_object::default()
+            });
 
-        // Write the fd array object that tells the kernel where the file descriptors are in the
-        // `Bar` buffer.
-        let sender_fd_array_addr = writer.write_object(&binder_fd_array_object {
-            hdr: binder_object_header { type_: BINDER_TYPE_FDA },
-            pad: 0,
-            num_fds: sender_fds.len() as u64,
-            // The index in the offsets array of the parent buffer.
-            parent: 1,
-            // The location in the parent buffer where the FDs are, which need to be duped.
-            parent_offset: offset_of!(Bar, fds) as u64,
-        });
+            // Write the fd array object that tells the kernel where the file descriptors are in the
+            // `Bar` buffer.
+            let sender_fd_array_addr = writer.write_object(&binder_fd_array_object {
+                hdr: binder_object_header { type_: BINDER_TYPE_FDA },
+                pad: 0,
+                num_fds: sender_fds.len() as u64,
+                // The index in the offsets array of the parent buffer.
+                parent: 1,
+                // The location in the parent buffer where the FDs are, which need to be duped.
+                parent_offset: offset_of!(Bar, fds) as u64,
+            });
 
-        // Write the offsets array.
-        let offsets_addr = writer.current_address();
-        writer.write_object(&((sender_padding_buffer_addr - transaction_data_addr) as u64));
-        writer.write_object(&((sender_buffer_addr - transaction_data_addr) as u64));
-        writer.write_object(&((sender_fd_array_addr - transaction_data_addr) as u64));
+            // Write the offsets array.
+            let offsets_addr = writer.current_address();
+            writer.write_object(&((sender_padding_buffer_addr - transaction_data_addr) as u64));
+            writer.write_object(&((sender_buffer_addr - transaction_data_addr) as u64));
+            writer.write_object(&((sender_fd_array_addr - transaction_data_addr) as u64));
 
-        let end_data_addr = writer.current_address();
+            let end_data_addr = writer.current_address();
 
-        // Construct the input for the binder driver to process.
-        let input = binder_transaction_data_sg {
-            transaction_data: binder_transaction_data {
-                target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
-                data_size: (offsets_addr - transaction_data_addr) as u64,
-                offsets_size: (end_data_addr - offsets_addr) as u64,
-                data: binder_transaction_data__bindgen_ty_2 {
-                    ptr: binder_transaction_data__bindgen_ty_2__bindgen_ty_1 {
-                        buffer: transaction_data_addr.ptr() as u64,
-                        offsets: offsets_addr.ptr() as u64,
+            // Construct the input for the binder driver to process.
+            let input = binder_transaction_data_sg {
+                transaction_data: binder_transaction_data {
+                    target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
+                    data_size: (offsets_addr - transaction_data_addr) as u64,
+                    offsets_size: (end_data_addr - offsets_addr) as u64,
+                    data: binder_transaction_data__bindgen_ty_2 {
+                        ptr: binder_transaction_data__bindgen_ty_2__bindgen_ty_1 {
+                            buffer: transaction_data_addr.ptr() as u64,
+                            offsets: offsets_addr.ptr() as u64,
+                        },
                     },
+                    ..binder_transaction_data::new_zeroed()
                 },
-                ..binder_transaction_data::new_zeroed()
-            },
-            buffers_size: std::mem::size_of::<Bar>() as u64 + 8,
-        };
+                buffers_size: std::mem::size_of::<Bar>() as u64 + 8,
+            };
 
-        // Perform the translation and copying.
-        let (_, transient_state) = test
-            .device
-            .copy_transaction_buffers(
-                &mut locked,
-                &sender.task,
-                &sender.task,
-                &sender.proc,
-                &sender.thread,
-                &receiver.task,
-                &receiver.proc,
-                &input,
-                None,
-            )
-            .expect("copy_transaction_buffers");
+            // Perform the translation and copying.
+            let (_, transient_state) = device
+                .copy_transaction_buffers(
+                    &mut locked,
+                    &sender.task,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    &receiver.task,
+                    &receiver.proc,
+                    &input,
+                    None,
+                )
+                .expect("copy_transaction_buffers");
 
-        // The receiver should have the fd.
-        let fd = transient_state.state.as_ref().unwrap().owned_fds[0];
-        assert!(receiver.task.files.get_allowing_opath(fd).is_ok(), "file should be translated");
+            // The receiver should have the fd.
+            let fd = transient_state.state.as_ref().unwrap().owned_fds[0];
+            assert!(
+                receiver.task.files.get_allowing_opath(fd).is_ok(),
+                "file should be translated"
+            );
 
-        // Release the result, which should close the fds in the receiver.
-        transient_state.release(());
-        assert!(
-            receiver.task.files.get_allowing_opath(fd).expect_err("file should be closed") == EBADF
-        );
+            // Release the result, which should close the fds in the receiver.
+            transient_state.release(());
+            assert!(
+                receiver.task.files.get_allowing_opath(fd).expect_err("file should be closed")
+                    == EBADF
+            );
+        });
     }
 
     #[fuchsia::test]
     async fn transaction_translation_fails_on_invalid_handle() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        let receiver = test.new_process(&mut locked);
-        let mut receiver_shared_memory = receiver.lock_shared_memory();
-        let mut allocations =
-            receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let mut receiver_shared_memory = receiver.lock_shared_memory();
+            let mut allocations =
+                receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
-        let mut transaction_data = vec![];
-        transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
-            hdr.type_: BINDER_TYPE_HANDLE,
-            flags: 0,
-            cookie: 0,
-            __bindgen_anon_1.handle: 42,
-        }));
+            let mut transaction_data = vec![];
+            transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
+                hdr.type_: BINDER_TYPE_HANDLE,
+                flags: 0,
+                cookie: 0,
+                __bindgen_anon_1.handle: 42,
+            }));
 
-        let transaction_ref_error = test
-            .device
-            .translate_objects(
-                &mut locked,
-                &sender.task,
-                &sender.task,
-                &sender.proc,
-                &sender.thread,
-                &receiver.task,
-                &receiver.proc,
-                &[0 as binder_uintptr_t],
-                &mut transaction_data,
-                &mut allocations.scatter_gather_buffer,
-            )
-            .expect_err("translate handles unexpectedly succeeded");
+            let transaction_ref_error = device
+                .translate_objects(
+                    &mut locked,
+                    &sender.task,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    &receiver.task,
+                    &receiver.proc,
+                    &[0 as binder_uintptr_t],
+                    &mut transaction_data,
+                    &mut allocations.scatter_gather_buffer,
+                )
+                .expect_err("translate handles unexpectedly succeeded");
 
-        assert_eq!(transaction_ref_error, TransactionError::Failure);
+            assert_eq!(transaction_ref_error, TransactionError::Failure);
+        });
     }
 
     #[fuchsia::test]
     async fn transaction_translation_fails_on_invalid_object_type() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        let receiver = test.new_process(&mut locked);
-        let mut receiver_shared_memory = receiver.lock_shared_memory();
-        let mut allocations =
-            receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let mut receiver_shared_memory = receiver.lock_shared_memory();
+            let mut allocations =
+                receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
-        let mut transaction_data = vec![];
-        transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
-            hdr.type_: BINDER_TYPE_WEAK_HANDLE,
-            flags: 0,
-            cookie: 0,
-            __bindgen_anon_1.handle: 42,
-        }));
+            let mut transaction_data = vec![];
+            transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
+                hdr.type_: BINDER_TYPE_WEAK_HANDLE,
+                flags: 0,
+                cookie: 0,
+                __bindgen_anon_1.handle: 42,
+            }));
 
-        let transaction_ref_error = test
-            .device
-            .translate_objects(
-                &mut locked,
-                &sender.task,
-                &sender.task,
-                &sender.proc,
-                &sender.thread,
-                &receiver.task,
-                &receiver.proc,
-                &[0 as binder_uintptr_t],
-                &mut transaction_data,
-                &mut allocations.scatter_gather_buffer,
-            )
-            .expect_err("translate handles unexpectedly succeeded");
+            let transaction_ref_error = device
+                .translate_objects(
+                    &mut locked,
+                    &sender.task,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    &receiver.task,
+                    &receiver.proc,
+                    &[0 as binder_uintptr_t],
+                    &mut transaction_data,
+                    &mut allocations.scatter_gather_buffer,
+                )
+                .expect_err("translate handles unexpectedly succeeded");
 
-        assert_eq!(transaction_ref_error, TransactionError::Malformed(errno!(EINVAL)));
+            assert_eq!(transaction_ref_error, TransactionError::Malformed(errno!(EINVAL)));
+        });
     }
 
     #[fuchsia::test]
     async fn transaction_drop_references_on_failed_transaction() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        let receiver = test.new_process(&mut locked);
-        let mut receiver_shared_memory = receiver.lock_shared_memory();
-        let mut allocations =
-            receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let mut receiver_shared_memory = receiver.lock_shared_memory();
+            let mut allocations =
+                receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
-        let binder_object = LocalBinderObject {
-            weak_ref_addr: UserAddress::from(0x0000000000000010),
-            strong_ref_addr: UserAddress::from(0x0000000000000100),
-        };
+            let binder_object = LocalBinderObject {
+                weak_ref_addr: UserAddress::from(0x0000000000000010),
+                strong_ref_addr: UserAddress::from(0x0000000000000100),
+            };
 
-        let mut transaction_data = vec![];
-        transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
-            hdr.type_: BINDER_TYPE_BINDER,
-            flags: 0,
-            cookie: binder_object.strong_ref_addr.ptr() as u64,
-            __bindgen_anon_1.binder: binder_object.weak_ref_addr.ptr() as u64,
-        }));
-        transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
-            hdr.type_: BINDER_TYPE_HANDLE,
-            flags: 0,
-            cookie: 0,
-            __bindgen_anon_1.handle: 42,
-        }));
+            let mut transaction_data = vec![];
+            transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
+                hdr.type_: BINDER_TYPE_BINDER,
+                flags: 0,
+                cookie: binder_object.strong_ref_addr.ptr() as u64,
+                __bindgen_anon_1.binder: binder_object.weak_ref_addr.ptr() as u64,
+            }));
+            transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
+                hdr.type_: BINDER_TYPE_HANDLE,
+                flags: 0,
+                cookie: 0,
+                __bindgen_anon_1.handle: 42,
+            }));
 
-        test.device
-            .translate_objects(
-                &mut locked,
-                &sender.task,
-                &sender.task,
-                &sender.proc,
-                &sender.thread,
-                &receiver.task,
-                &receiver.proc,
-                &[
-                    0 as binder_uintptr_t,
-                    std::mem::size_of::<flat_binder_object>() as binder_uintptr_t,
-                ],
-                &mut transaction_data,
-                &mut allocations.scatter_gather_buffer,
-            )
-            .expect_err("translate handles unexpectedly succeeded");
+            device
+                .translate_objects(
+                    &mut locked,
+                    &sender.task,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    &receiver.task,
+                    &receiver.proc,
+                    &[
+                        0 as binder_uintptr_t,
+                        std::mem::size_of::<flat_binder_object>() as binder_uintptr_t,
+                    ],
+                    &mut transaction_data,
+                    &mut allocations.scatter_gather_buffer,
+                )
+                .expect_err("translate handles unexpectedly succeeded");
 
-        // Ensure that the handle created in the receiving process is not present.
-        assert!(
-            receiver.proc.lock().handles.get(0).is_none(),
-            "handle present when it should have been dropped"
-        );
+            // Ensure that the handle created in the receiving process is not present.
+            assert!(
+                receiver.proc.lock().handles.get(0).is_none(),
+                "handle present when it should have been dropped"
+            );
+        });
     }
 
     // Open the binder device, which creates an instance of the binder device associated with
@@ -7063,1049 +7109,1113 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn close_binder() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let binder_driver = BinderDevice::default();
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let binder_driver = BinderDevice::default();
 
-        let binder_fd = open_binder_fd(&mut locked, &current_task, &binder_driver);
-        let binder_connection =
-            binder_fd.downcast_file::<BinderConnection>().expect("must be a BinderConnection");
-        let identifier = binder_connection.identifier;
+            let binder_fd = open_binder_fd(&mut locked, &current_task, &binder_driver);
+            let binder_connection =
+                binder_fd.downcast_file::<BinderConnection>().expect("must be a BinderConnection");
+            let identifier = binder_connection.identifier;
 
-        // Ensure that the binder driver has created process state.
-        binder_driver
-            .find_process(identifier)
-            .expect("failed to find process")
-            .release(current_task.kernel());
+            // Ensure that the binder driver has created process state.
+            binder_driver
+                .find_process(identifier)
+                .expect("failed to find process")
+                .release(current_task.kernel());
 
-        // Close the file descriptor.
-        std::mem::drop(binder_fd);
-        current_task.trigger_delayed_releaser();
+            // Close the file descriptor.
+            std::mem::drop(binder_fd);
+            current_task.trigger_delayed_releaser();
 
-        // Verify that the process state no longer exists.
-        binder_driver.find_process(identifier).expect_err("process was not cleaned up");
+            // Verify that the process state no longer exists.
+            binder_driver.find_process(identifier).expect_err("process was not cleaned up");
+        });
     }
 
     #[fuchsia::test]
     async fn flush_kicks_threads() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let binder_driver = BinderDevice::default();
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let binder_driver = BinderDevice::default();
 
-        // Open the binder device, which creates an instance of the binder device associated with
-        // the process.
-        let binder_fd = open_binder_fd(&mut locked, &current_task, &binder_driver);
-        let binder_connection =
-            binder_fd.downcast_file::<BinderConnection>().expect("must be a BinderConnection");
-        let binder_proc = binder_connection.proc(&current_task).unwrap();
-        let binder_thread = binder_proc.lock().find_or_register_thread(binder_proc.pid);
+            // Open the binder device, which creates an instance of the binder device associated with
+            // the process.
+            let binder_fd = open_binder_fd(&mut locked, &current_task, &binder_driver);
+            let binder_connection =
+                binder_fd.downcast_file::<BinderConnection>().expect("must be a BinderConnection");
+            let binder_proc = binder_connection.proc(&current_task).unwrap();
+            let binder_thread = binder_proc.lock().find_or_register_thread(binder_proc.pid);
 
-        let thread = std::thread::spawn({
-            let task = current_task.weak_task();
-            let binder_proc = WeakRef::from(&binder_proc);
-            move || {
-                let task = if let Some(task) = task.upgrade() {
-                    task
-                } else {
-                    return;
-                };
-                let binder_proc = if let Some(binder_proc) = binder_proc.upgrade() {
-                    binder_proc
-                } else {
-                    return;
-                };
-                // Wait for the task to start waiting.
-                while !task.read().is_blocked() {
-                    std::thread::sleep(std::time::Duration::from_millis(10));
+            let thread = std::thread::spawn({
+                let task = current_task.weak_task();
+                let binder_proc = WeakRef::from(&binder_proc);
+                move || {
+                    let task = if let Some(task) = task.upgrade() {
+                        task
+                    } else {
+                        return;
+                    };
+                    let binder_proc = if let Some(binder_proc) = binder_proc.upgrade() {
+                        binder_proc
+                    } else {
+                        return;
+                    };
+                    // Wait for the task to start waiting.
+                    while !task.read().is_blocked() {
+                        std::thread::sleep(std::time::Duration::from_millis(10));
+                    }
+                    // Do the kick.
+                    binder_proc.kick_all_threads();
                 }
-                // Do the kick.
-                binder_proc.kick_all_threads();
-            }
-        });
+            });
 
-        let read_buffer_addr =
-            map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
-        let bytes_read = binder_driver
-            .handle_thread_read(
-                &current_task,
-                &binder_proc,
-                &binder_thread,
-                &UserBuffer { address: read_buffer_addr, length: *PAGE_SIZE as usize },
-            )
-            .unwrap();
-        assert_eq!(bytes_read, 0);
-        thread.join().expect("join");
-        binder_thread.release(current_task.kernel());
-        binder_proc.release(current_task.kernel());
+            let read_buffer_addr =
+                map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE);
+            let bytes_read = binder_driver
+                .handle_thread_read(
+                    &current_task,
+                    &binder_proc,
+                    &binder_thread,
+                    &UserBuffer { address: read_buffer_addr, length: *PAGE_SIZE as usize },
+                )
+                .unwrap();
+            assert_eq!(bytes_read, 0);
+            thread.join().expect("join");
+            binder_thread.release(current_task.kernel());
+            binder_proc.release(current_task.kernel());
+        });
     }
 
     #[fuchsia::test]
     async fn decrementing_refs_on_dead_binder_succeeds() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let owner = test.new_process(&mut locked);
-        let client = test.new_process(&mut locked);
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let owner = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let client = BinderProcessFixture::new(&mut locked, current_task, &device);
 
-        // Register an object with the owner.
-        let guard = owner.proc.lock().find_or_register_object(
-            &owner.thread,
-            LocalBinderObject {
-                weak_ref_addr: UserAddress::from(0x0000000000000001),
-                strong_ref_addr: UserAddress::from(0x0000000000000002),
-            },
-            BinderObjectFlags::empty(),
-        );
+            // Register an object with the owner.
+            let guard = owner.proc.lock().find_or_register_object(
+                &owner.thread,
+                LocalBinderObject {
+                    weak_ref_addr: UserAddress::from(0x0000000000000001),
+                    strong_ref_addr: UserAddress::from(0x0000000000000002),
+                },
+                BinderObjectFlags::empty(),
+            );
 
-        // Keep a weak reference to the object.
-        let weak_object = Arc::downgrade(&guard.binder_object);
+            // Keep a weak reference to the object.
+            let weak_object = Arc::downgrade(&guard.binder_object);
 
-        // Insert a handle to the object in the client. This also retains a strong reference.
-        let handle = client
-            .proc
-            .lock()
-            .handles
-            .insert_for_transaction(guard, &mut RefCountActions::default_released());
+            // Insert a handle to the object in the client. This also retains a strong reference.
+            let handle = client
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
-        // Grab a weak reference.
-        client
-            .proc
-            .lock()
-            .handles
-            .inc_weak(handle.object_index(), &mut RefCountActions::default_released())
-            .expect("inc_weak");
+            // Grab a weak reference.
+            client
+                .proc
+                .lock()
+                .handles
+                .inc_weak(handle.object_index(), &mut RefCountActions::default_released())
+                .expect("inc_weak");
 
-        // Now the owner process dies.
-        std::mem::drop(owner);
+            // Now the owner process dies.
+            std::mem::drop(owner);
 
-        // Confirm that the object is considered dead. The representation is still alive, but the
-        // owner is dead.
-        let (object, guard) = client
-            .proc
-            .lock()
-            .handles
-            .get(handle.object_index())
-            .expect("expected handle not present");
-        guard.release(&mut RefCountActions::default_released());
-        assert!(object.owner.upgrade().is_none(), "owner should be dead");
-        std::mem::drop(object);
+            // Confirm that the object is considered dead. The representation is still alive, but the
+            // owner is dead.
+            let (object, guard) = client
+                .proc
+                .lock()
+                .handles
+                .get(handle.object_index())
+                .expect("expected handle not present");
+            guard.release(&mut RefCountActions::default_released());
+            assert!(object.owner.upgrade().is_none(), "owner should be dead");
+            std::mem::drop(object);
 
-        // Decrement the weak reference. This should prove that the handle is still occupied.
-        client
-            .proc
-            .lock()
-            .handles
-            .dec_weak(handle.object_index(), &mut RefCountActions::default_released())
-            .expect("dec_weak");
+            // Decrement the weak reference. This should prove that the handle is still occupied.
+            client
+                .proc
+                .lock()
+                .handles
+                .dec_weak(handle.object_index(), &mut RefCountActions::default_released())
+                .expect("dec_weak");
 
-        // Decrement the last strong reference.
-        client
-            .proc
-            .lock()
-            .handles
-            .dec_strong(handle.object_index(), &mut RefCountActions::default_released())
-            .expect("dec_strong");
+            // Decrement the last strong reference.
+            client
+                .proc
+                .lock()
+                .handles
+                .dec_strong(handle.object_index(), &mut RefCountActions::default_released())
+                .expect("dec_strong");
 
-        // Confirm that now the handle has been removed from the table.
-        assert!(
-            client.proc.lock().handles.get(handle.object_index()).is_none(),
-            "handle should have been dropped"
-        );
+            // Confirm that now the handle has been removed from the table.
+            assert!(
+                client.proc.lock().handles.get(handle.object_index()).is_none(),
+                "handle should have been dropped"
+            );
 
-        // Now the binder object representation should also be gone.
-        assert!(weak_object.upgrade().is_none(), "object should be dead");
+            // Now the binder object representation should also be gone.
+            assert!(weak_object.upgrade().is_none(), "object should be dead");
+        });
     }
 
     #[fuchsia::test]
     async fn death_notification_fires_when_process_dies() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        let receiver = test.new_process(&mut locked);
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
 
-        // Register an object with the owner.
-        let guard = sender.proc.lock().find_or_register_object(
-            &sender.thread,
-            LocalBinderObject {
-                weak_ref_addr: UserAddress::from(0x0000000000000001),
-                strong_ref_addr: UserAddress::from(0x0000000000000002),
-            },
-            BinderObjectFlags::empty(),
-        );
+            // Register an object with the owner.
+            let guard = sender.proc.lock().find_or_register_object(
+                &sender.thread,
+                LocalBinderObject {
+                    weak_ref_addr: UserAddress::from(0x0000000000000001),
+                    strong_ref_addr: UserAddress::from(0x0000000000000002),
+                },
+                BinderObjectFlags::empty(),
+            );
 
-        // Insert a handle to the object in the client. This also retains a strong reference.
-        let handle = receiver
-            .proc
-            .lock()
-            .handles
-            .insert_for_transaction(guard, &mut RefCountActions::default_released());
+            // Insert a handle to the object in the client. This also retains a strong reference.
+            let handle = receiver
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
-        const DEATH_NOTIFICATION_COOKIE: binder_uintptr_t = 0xDEADBEEF;
+            const DEATH_NOTIFICATION_COOKIE: binder_uintptr_t = 0xDEADBEEF;
 
-        // Register a death notification handler.
-        receiver
-            .proc
-            .handle_request_death_notification(handle, DEATH_NOTIFICATION_COOKIE)
-            .expect("request death notification");
+            // Register a death notification handler.
+            receiver
+                .proc
+                .handle_request_death_notification(handle, DEATH_NOTIFICATION_COOKIE)
+                .expect("request death notification");
 
-        // Now the owner process dies.
-        std::mem::drop(sender);
+            // Now the owner process dies.
+            std::mem::drop(sender);
 
-        // The client process should have a notification waiting.
-        assert_matches!(
-            receiver.proc.command_queue.lock().commands.front(),
-            Some(Command::DeadBinder(DEATH_NOTIFICATION_COOKIE))
-        );
+            // The client process should have a notification waiting.
+            assert_matches!(
+                receiver.proc.command_queue.lock().commands.front(),
+                Some(Command::DeadBinder(DEATH_NOTIFICATION_COOKIE))
+            );
+        });
     }
 
     #[fuchsia::test]
     async fn death_notification_fires_when_request_for_death_notification_is_made_on_dead_binder() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        let receiver = test.new_process(&mut locked);
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
 
-        // Register an object with the sender.
-        let guard = sender.proc.lock().find_or_register_object(
-            &sender.thread,
-            LocalBinderObject {
-                weak_ref_addr: UserAddress::from(0x0000000000000001),
-                strong_ref_addr: UserAddress::from(0x0000000000000002),
-            },
-            BinderObjectFlags::empty(),
-        );
+            // Register an object with the sender.
+            let guard = sender.proc.lock().find_or_register_object(
+                &sender.thread,
+                LocalBinderObject {
+                    weak_ref_addr: UserAddress::from(0x0000000000000001),
+                    strong_ref_addr: UserAddress::from(0x0000000000000002),
+                },
+                BinderObjectFlags::empty(),
+            );
 
-        // Insert a handle to the object in the receiver. This also retains a strong reference.
-        let handle = receiver
-            .proc
-            .lock()
-            .handles
-            .insert_for_transaction(guard, &mut RefCountActions::default_released());
+            // Insert a handle to the object in the receiver. This also retains a strong reference.
+            let handle = receiver
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
-        // Now the sender process dies.
-        std::mem::drop(sender);
+            // Now the sender process dies.
+            std::mem::drop(sender);
 
-        const DEATH_NOTIFICATION_COOKIE: binder_uintptr_t = 0xDEADBEEF;
+            const DEATH_NOTIFICATION_COOKIE: binder_uintptr_t = 0xDEADBEEF;
 
-        // Register a death notification handler.
-        receiver
-            .proc
-            .handle_request_death_notification(handle, DEATH_NOTIFICATION_COOKIE)
-            .expect("request death notification");
+            // Register a death notification handler.
+            receiver
+                .proc
+                .handle_request_death_notification(handle, DEATH_NOTIFICATION_COOKIE)
+                .expect("request death notification");
 
-        // The receiver thread should not have a notification, as the calling thread is not allowed
-        // to receive it, or else a deadlock may occur if the thread is in the middle of a
-        // transaction. Since there is only one thread, check the process command queue.
-        assert_matches!(
-            receiver.proc.command_queue.lock().commands.front(),
-            Some(Command::DeadBinder(DEATH_NOTIFICATION_COOKIE))
-        );
+            // The receiver thread should not have a notification, as the calling thread is not allowed
+            // to receive it, or else a deadlock may occur if the thread is in the middle of a
+            // transaction. Since there is only one thread, check the process command queue.
+            assert_matches!(
+                receiver.proc.command_queue.lock().commands.front(),
+                Some(Command::DeadBinder(DEATH_NOTIFICATION_COOKIE))
+            );
+        });
     }
 
     #[fuchsia::test]
     async fn death_notification_is_cleared_before_process_dies() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let owner = test.new_process(&mut locked);
-        let client = test.new_process(&mut locked);
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let owner = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let client = BinderProcessFixture::new(&mut locked, current_task, &device);
 
-        // Register an object with the owner.
-        let guard = owner.proc.lock().find_or_register_object(
-            &owner.thread,
-            LocalBinderObject {
-                weak_ref_addr: UserAddress::from(0x0000000000000001),
-                strong_ref_addr: UserAddress::from(0x0000000000000002),
-            },
-            BinderObjectFlags::empty(),
-        );
+            // Register an object with the owner.
+            let guard = owner.proc.lock().find_or_register_object(
+                &owner.thread,
+                LocalBinderObject {
+                    weak_ref_addr: UserAddress::from(0x0000000000000001),
+                    strong_ref_addr: UserAddress::from(0x0000000000000002),
+                },
+                BinderObjectFlags::empty(),
+            );
 
-        // Insert a handle to the object in the client. This also retains a strong reference.
-        let handle = client
-            .proc
-            .lock()
-            .handles
-            .insert_for_transaction(guard, &mut RefCountActions::default_released());
+            // Insert a handle to the object in the client. This also retains a strong reference.
+            let handle = client
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
-        let death_notification_cookie = 0xDEADBEEF;
+            let death_notification_cookie = 0xDEADBEEF;
 
-        // Register a death notification handler.
-        client
-            .proc
-            .handle_request_death_notification(handle, death_notification_cookie)
-            .expect("request death notification");
+            // Register a death notification handler.
+            client
+                .proc
+                .handle_request_death_notification(handle, death_notification_cookie)
+                .expect("request death notification");
 
-        // Now clear the death notification handler.
-        client
-            .proc
-            .handle_clear_death_notification(handle, death_notification_cookie)
-            .expect("clear death notification");
+            // Now clear the death notification handler.
+            client
+                .proc
+                .handle_clear_death_notification(handle, death_notification_cookie)
+                .expect("clear death notification");
 
-        // Check that the client received an acknowlgement
-        {
-            let mut queue = client.proc.command_queue.lock();
-            assert_eq!(queue.commands.len(), 1);
-            assert!(matches!(queue.commands[0], Command::ClearDeathNotificationDone(_)));
+            // Check that the client received an acknowlgement
+            {
+                let mut queue = client.proc.command_queue.lock();
+                assert_eq!(queue.commands.len(), 1);
+                assert!(matches!(queue.commands[0], Command::ClearDeathNotificationDone(_)));
 
-            // Clear the command queue.
-            queue.commands.clear();
-        }
+                // Clear the command queue.
+                queue.commands.clear();
+            }
 
-        // Pretend the client thread is waiting for commands, so that it can be scheduled commands.
-        let fake_waiter = Waiter::new();
-        {
-            let mut state = client.thread.lock();
-            state.registration = RegistrationState::Main;
-            state.command_queue.waiters.wait_async(&fake_waiter);
-        }
+            // Pretend the client thread is waiting for commands, so that it can be scheduled commands.
+            let fake_waiter = Waiter::new();
+            {
+                let mut state = client.thread.lock();
+                state.registration = RegistrationState::Main;
+                state.command_queue.waiters.wait_async(&fake_waiter);
+            }
 
-        // Now the owner process dies.
-        std::mem::drop(owner);
+            // Now the owner process dies.
+            std::mem::drop(owner);
 
-        // The client thread should have no notification.
-        assert!(client.thread.lock().command_queue.is_empty());
+            // The client thread should have no notification.
+            assert!(client.thread.lock().command_queue.is_empty());
 
-        // The client process should have no notification.
-        assert!(client.proc.command_queue.lock().commands.is_empty());
+            // The client process should have no notification.
+            assert!(client.proc.command_queue.lock().commands.is_empty());
+        });
     }
 
     #[fuchsia::test]
     async fn send_fd_in_transaction() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        let receiver = test.new_process(&mut locked);
-        let mut receiver_shared_memory = receiver.lock_shared_memory();
-        let mut allocations =
-            receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let mut receiver_shared_memory = receiver.lock_shared_memory();
+            let mut allocations =
+                receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
-        // Open a file in the sender process.
-        let file = PanickingFile::new_file(&sender.task);
-        let sender_fd = sender.task.add_file(file.clone(), FdFlags::CLOEXEC).expect("add file");
+            // Open a file in the sender process.
+            let file = PanickingFile::new_file(&sender.task);
+            let sender_fd = sender.task.add_file(file.clone(), FdFlags::CLOEXEC).expect("add file");
 
-        // Send the fd in a transaction. `flags` and `cookie` are set so that we can ensure binder
-        // driver doesn't touch them/passes them through.
-        let mut transaction_data = struct_with_union_into_bytes!(flat_binder_object {
-            hdr.type_: BINDER_TYPE_FD,
-            flags: 42,
-            cookie: 51,
-            __bindgen_anon_1.handle: sender_fd.raw() as u32,
+            // Send the fd in a transaction. `flags` and `cookie` are set so that we can ensure binder
+            // driver doesn't touch them/passes them through.
+            let mut transaction_data = struct_with_union_into_bytes!(flat_binder_object {
+                hdr.type_: BINDER_TYPE_FD,
+                flags: 42,
+                cookie: 51,
+                __bindgen_anon_1.handle: sender_fd.raw() as u32,
+            });
+            let offsets = [0];
+
+            let transient_transaction_state = device
+                .translate_objects(
+                    &mut locked,
+                    &sender.task,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    &receiver.task,
+                    &receiver.proc,
+                    &offsets,
+                    &mut transaction_data,
+                    &mut allocations.scatter_gather_buffer,
+                )
+                .expect("failed to translate handles");
+
+            // Simulate success by converting the transient state.
+            let transaction_state = transient_transaction_state.into_state();
+
+            // The receiver should now have a file.
+            let receiver_fd = receiver
+                .task
+                .files
+                .get_all_fds()
+                .first()
+                .cloned()
+                .expect("receiver should have FD");
+
+            // The FD should have the same flags.
+            assert_eq!(
+                receiver.task.files.get_fd_flags_allowing_opath(receiver_fd).expect("get flags"),
+                FdFlags::CLOEXEC
+            );
+
+            // The FD should point to the same file.
+            assert!(
+                Arc::ptr_eq(
+                    &receiver
+                        .task
+                        .files
+                        .get_allowing_opath(receiver_fd)
+                        .expect("receiver should have FD"),
+                    &file
+                ),
+                "FDs from sender and receiver don't point to the same file"
+            );
+
+            let expected_transaction_data = struct_with_union_into_bytes!(flat_binder_object {
+                hdr.type_: BINDER_TYPE_FD,
+                flags: 42,
+                cookie: 51,
+                __bindgen_anon_1.handle: receiver_fd.raw() as u32,
+            });
+
+            assert_eq!(expected_transaction_data, transaction_data);
+            transaction_state.release(());
         });
-        let offsets = [0];
-
-        let transient_transaction_state = test
-            .device
-            .translate_objects(
-                &mut locked,
-                &sender.task,
-                &sender.task,
-                &sender.proc,
-                &sender.thread,
-                &receiver.task,
-                &receiver.proc,
-                &offsets,
-                &mut transaction_data,
-                &mut allocations.scatter_gather_buffer,
-            )
-            .expect("failed to translate handles");
-
-        // Simulate success by converting the transient state.
-        let transaction_state = transient_transaction_state.into_state();
-
-        // The receiver should now have a file.
-        let receiver_fd =
-            receiver.task.files.get_all_fds().first().cloned().expect("receiver should have FD");
-
-        // The FD should have the same flags.
-        assert_eq!(
-            receiver.task.files.get_fd_flags_allowing_opath(receiver_fd).expect("get flags"),
-            FdFlags::CLOEXEC
-        );
-
-        // The FD should point to the same file.
-        assert!(
-            Arc::ptr_eq(
-                &receiver
-                    .task
-                    .files
-                    .get_allowing_opath(receiver_fd)
-                    .expect("receiver should have FD"),
-                &file
-            ),
-            "FDs from sender and receiver don't point to the same file"
-        );
-
-        let expected_transaction_data = struct_with_union_into_bytes!(flat_binder_object {
-            hdr.type_: BINDER_TYPE_FD,
-            flags: 42,
-            cookie: 51,
-            __bindgen_anon_1.handle: receiver_fd.raw() as u32,
-        });
-
-        assert_eq!(expected_transaction_data, transaction_data);
-        transaction_state.release(());
     }
 
     #[fuchsia::test]
     async fn cleanup_fd_in_failed_transaction() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        let receiver = test.new_process(&mut locked);
-        let mut receiver_shared_memory = receiver.lock_shared_memory();
-        let mut allocations =
-            receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let mut receiver_shared_memory = receiver.lock_shared_memory();
+            let mut allocations =
+                receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
-        // Open a file in the sender process.
-        let sender_fd = sender
-            .task
-            .add_file(PanickingFile::new_file(&sender.task), FdFlags::CLOEXEC)
-            .expect("add file");
+            // Open a file in the sender process.
+            let sender_fd = sender
+                .task
+                .add_file(PanickingFile::new_file(&sender.task), FdFlags::CLOEXEC)
+                .expect("add file");
 
-        // Send the fd in a transaction.
-        let mut transaction_data = struct_with_union_into_bytes!(flat_binder_object {
-            hdr.type_: BINDER_TYPE_FD,
-            flags: 0,
-            cookie: 0,
-            __bindgen_anon_1.handle: sender_fd.raw() as u32,
+            // Send the fd in a transaction.
+            let mut transaction_data = struct_with_union_into_bytes!(flat_binder_object {
+                hdr.type_: BINDER_TYPE_FD,
+                flags: 0,
+                cookie: 0,
+                __bindgen_anon_1.handle: sender_fd.raw() as u32,
+            });
+            let offsets = [0];
+
+            let transaction_state = device
+                .translate_objects(
+                    &mut locked,
+                    &sender.task,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    &receiver.task,
+                    &receiver.proc,
+                    &offsets,
+                    &mut transaction_data,
+                    &mut allocations.scatter_gather_buffer,
+                )
+                .expect("failed to translate handles");
+
+            assert!(!receiver.task.files.get_all_fds().is_empty(), "receiver should have a file");
+
+            // Simulate an error, which will release the transaction state.
+            transaction_state.release(());
+
+            assert!(
+                receiver.task.files.get_all_fds().is_empty(),
+                "receiver should not have any files"
+            );
         });
-        let offsets = [0];
-
-        let transaction_state = test
-            .device
-            .translate_objects(
-                &mut locked,
-                &sender.task,
-                &sender.task,
-                &sender.proc,
-                &sender.thread,
-                &receiver.task,
-                &receiver.proc,
-                &offsets,
-                &mut transaction_data,
-                &mut allocations.scatter_gather_buffer,
-            )
-            .expect("failed to translate handles");
-
-        assert!(!receiver.task.files.get_all_fds().is_empty(), "receiver should have a file");
-
-        // Simulate an error, which will release the transaction state.
-        transaction_state.release(());
-
-        assert!(receiver.task.files.get_all_fds().is_empty(), "receiver should not have any files");
     }
 
     #[fuchsia::test]
     async fn cleanup_refs_in_successful_transaction() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        let receiver = test.new_process(&mut locked);
-        let mut receiver_shared_memory = receiver.lock_shared_memory();
-        let mut allocations =
-            receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let mut receiver_shared_memory = receiver.lock_shared_memory();
+            let mut allocations =
+                receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
-        const BINDER_OBJECT: LocalBinderObject = LocalBinderObject {
-            weak_ref_addr: UserAddress::const_from(0x0000000000000010),
-            strong_ref_addr: UserAddress::const_from(0x0000000000000100),
-        };
+            const BINDER_OBJECT: LocalBinderObject = LocalBinderObject {
+                weak_ref_addr: UserAddress::const_from(0x0000000000000010),
+                strong_ref_addr: UserAddress::const_from(0x0000000000000100),
+            };
 
-        const DATA_PREAMBLE: &[u8; 5] = b"stuff";
+            const DATA_PREAMBLE: &[u8; 5] = b"stuff";
 
-        let mut transaction_data = vec![];
-        transaction_data.extend(DATA_PREAMBLE);
-        let offsets = [transaction_data.len() as binder_uintptr_t];
-        transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
-            hdr.type_: BINDER_TYPE_BINDER,
-            flags: 0,
-            cookie: BINDER_OBJECT.strong_ref_addr.ptr() as u64,
-            __bindgen_anon_1.binder: BINDER_OBJECT.weak_ref_addr.ptr() as u64,
-        }));
+            let mut transaction_data = vec![];
+            transaction_data.extend(DATA_PREAMBLE);
+            let offsets = [transaction_data.len() as binder_uintptr_t];
+            transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
+                hdr.type_: BINDER_TYPE_BINDER,
+                flags: 0,
+                cookie: BINDER_OBJECT.strong_ref_addr.ptr() as u64,
+                __bindgen_anon_1.binder: BINDER_OBJECT.weak_ref_addr.ptr() as u64,
+            }));
 
-        const EXPECTED_HANDLE: Handle = Handle::from_raw(1);
+            const EXPECTED_HANDLE: Handle = Handle::from_raw(1);
 
-        let transaction_state = test
-            .device
-            .translate_objects(
-                &mut locked,
-                &sender.task,
-                &sender.task,
-                &sender.proc,
-                &sender.thread,
-                &receiver.task,
-                &receiver.proc,
-                &offsets,
-                &mut transaction_data,
-                &mut allocations.scatter_gather_buffer,
-            )
-            .expect("failed to translate handles");
+            let transaction_state = device
+                .translate_objects(
+                    &mut locked,
+                    &sender.task,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    &receiver.task,
+                    &receiver.proc,
+                    &offsets,
+                    &mut transaction_data,
+                    &mut allocations.scatter_gather_buffer,
+                )
+                .expect("failed to translate handles");
 
-        let (object, guard) = receiver
-            .proc
-            .lock()
-            .handles
-            .get(EXPECTED_HANDLE.object_index())
-            .expect("expected handle not present");
-        guard.release(&mut RefCountActions::default_released());
-        object.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
+            let (object, guard) = receiver
+                .proc
+                .lock()
+                .handles
+                .get(EXPECTED_HANDLE.object_index())
+                .expect("expected handle not present");
+            guard.release(&mut RefCountActions::default_released());
+            object.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
 
-        // Verify that a strong acquire command is sent to the sender process (on the same thread
-        // that sent the transaction).
-        assert_matches!(
-            sender.thread.lock().command_queue.commands.front(),
-            Some(Command::AcquireRef(BINDER_OBJECT))
-        );
-        sender.thread.lock().command_queue.commands.pop_front().unwrap();
+            // Verify that a strong acquire command is sent to the sender process (on the same thread
+            // that sent the transaction).
+            assert_matches!(
+                sender.thread.lock().command_queue.commands.front(),
+                Some(Command::AcquireRef(BINDER_OBJECT))
+            );
+            sender.thread.lock().command_queue.commands.pop_front().unwrap();
 
-        // Simulate a successful transaction by converting the transient state.
-        let transaction_state = transaction_state.into_state();
-        transaction_state.release(());
+            // Simulate a successful transaction by converting the transient state.
+            let transaction_state = transaction_state.into_state();
+            transaction_state.release(());
 
-        // Verify that a strong release command is sent to the sender process.
-        assert_matches!(
-            &sender.proc.command_queue.lock().commands.front(),
-            Some(Command::ReleaseRef(BINDER_OBJECT))
-        );
+            // Verify that a strong release command is sent to the sender process.
+            assert_matches!(
+                &sender.proc.command_queue.lock().commands.front(),
+                Some(Command::ReleaseRef(BINDER_OBJECT))
+            );
+        });
     }
 
     #[fuchsia::test]
     async fn transaction_error_dispatch() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let proc = test.new_process(&mut locked);
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let proc = BinderProcessFixture::new(&mut locked, current_task, &device);
 
-        TransactionError::Malformed(errno!(EINVAL)).dispatch(&proc.thread).expect("no error");
-        assert_matches!(
-            proc.thread.lock().command_queue.pop_front(),
-            Some(Command::Error(val)) if val == EINVAL.return_value() as i32
-        );
+            TransactionError::Malformed(errno!(EINVAL)).dispatch(&proc.thread).expect("no error");
+            assert_matches!(
+                proc.thread.lock().command_queue.pop_front(),
+                Some(Command::Error(val)) if val == EINVAL.return_value() as i32
+            );
 
-        TransactionError::Failure.dispatch(&proc.thread).expect("no error");
-        assert_matches!(proc.thread.lock().command_queue.pop_front(), Some(Command::FailedReply));
+            TransactionError::Failure.dispatch(&proc.thread).expect("no error");
+            assert_matches!(
+                proc.thread.lock().command_queue.pop_front(),
+                Some(Command::FailedReply)
+            );
 
-        TransactionError::Dead.dispatch(&proc.thread).expect("no error");
-        assert_matches!(
-            proc.thread.lock().command_queue.pop_front(),
-            Some(Command::DeadReply { pop_transaction: false })
-        );
+            TransactionError::Dead.dispatch(&proc.thread).expect("no error");
+            assert_matches!(
+                proc.thread.lock().command_queue.pop_front(),
+                Some(Command::DeadReply { pop_transaction: false })
+            );
+        });
     }
 
     #[fuchsia::test]
     async fn next_oneway_transaction_scheduled_after_buffer_freed() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        let receiver = test.new_process(&mut locked);
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
 
-        // Insert a binder object for the receiver, and grab a handle to it in the sender.
-        const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
-        let (object, guard) =
-            register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
-        let handle = sender
-            .proc
-            .lock()
-            .handles
-            .insert_for_transaction(guard, &mut RefCountActions::default_released());
+            // Insert a binder object for the receiver, and grab a handle to it in the sender.
+            const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
+            let (object, guard) =
+                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+            let handle = sender
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
-        // Construct a oneway transaction to send from the sender to the receiver.
-        const FIRST_TRANSACTION_CODE: u32 = 42;
-        let transaction = binder_transaction_data_sg {
-            transaction_data: binder_transaction_data {
-                code: FIRST_TRANSACTION_CODE,
-                flags: transaction_flags_TF_ONE_WAY,
-                target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
-                ..binder_transaction_data::default()
-            },
-            buffers_size: 0,
-        };
+            // Construct a oneway transaction to send from the sender to the receiver.
+            const FIRST_TRANSACTION_CODE: u32 = 42;
+            let transaction = binder_transaction_data_sg {
+                transaction_data: binder_transaction_data {
+                    code: FIRST_TRANSACTION_CODE,
+                    flags: transaction_flags_TF_ONE_WAY,
+                    target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
+                    ..binder_transaction_data::default()
+                },
+                buffers_size: 0,
+            };
 
-        // Submit the transaction.
-        test.device
-            .handle_transaction(
-                &mut locked,
-                &sender.task,
-                &sender.proc,
-                &sender.thread,
-                transaction,
-            )
-            .expect("failed to handle the transaction");
+            // Submit the transaction.
+            device
+                .handle_transaction(
+                    &mut locked,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    transaction,
+                )
+                .expect("failed to handle the transaction");
 
-        // The thread is ineligible to take the command (not sleeping) so check the process queue.
-        assert_matches!(
-            receiver.proc.command_queue.lock().commands.front(),
-            Some(Command::OnewayTransaction(TransactionData { code: FIRST_TRANSACTION_CODE, .. }))
-        );
+            // The thread is ineligible to take the command (not sleeping) so check the process queue.
+            assert_matches!(
+                receiver.proc.command_queue.lock().commands.front(),
+                Some(Command::OnewayTransaction(TransactionData {
+                    code: FIRST_TRANSACTION_CODE,
+                    ..
+                }))
+            );
 
-        // The object should not have the transaction queued on it, as it was immediately scheduled.
-        // But it should be marked as handling a oneway.
-        assert!(
-            object.lock().handling_oneway_transaction,
-            "object oneway queue should be marked as being handled"
-        );
+            // The object should not have the transaction queued on it, as it was immediately scheduled.
+            // But it should be marked as handling a oneway.
+            assert!(
+                object.lock().handling_oneway_transaction,
+                "object oneway queue should be marked as being handled"
+            );
 
-        // Queue another transaction.
-        const SECOND_TRANSACTION_CODE: u32 = 43;
-        let transaction = binder_transaction_data_sg {
-            transaction_data: binder_transaction_data {
-                code: SECOND_TRANSACTION_CODE,
-                flags: transaction_flags_TF_ONE_WAY,
-                target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
-                ..binder_transaction_data::default()
-            },
-            buffers_size: 0,
-        };
-        test.device
-            .handle_transaction(
-                &mut locked,
-                &sender.task,
-                &sender.proc,
-                &sender.thread,
-                transaction,
-            )
-            .expect("transaction queued");
+            // Queue another transaction.
+            const SECOND_TRANSACTION_CODE: u32 = 43;
+            let transaction = binder_transaction_data_sg {
+                transaction_data: binder_transaction_data {
+                    code: SECOND_TRANSACTION_CODE,
+                    flags: transaction_flags_TF_ONE_WAY,
+                    target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
+                    ..binder_transaction_data::default()
+                },
+                buffers_size: 0,
+            };
+            device
+                .handle_transaction(
+                    &mut locked,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    transaction,
+                )
+                .expect("transaction queued");
 
-        // There should now be an entry in the queue.
-        assert_eq!(object.lock().oneway_transactions.len(), 1);
+            // There should now be an entry in the queue.
+            assert_eq!(object.lock().oneway_transactions.len(), 1);
 
-        // The process queue should be unchanged. Simulate dispatching the command.
-        let buffer_addr = match receiver
-            .proc
-            .command_queue
-            .lock()
-            .commands
-            .pop_front()
-            .expect("the first oneway transaction should be queued on the process")
-        {
-            Command::OnewayTransaction(TransactionData {
-                code: FIRST_TRANSACTION_CODE,
-                buffers: TransactionBuffers { data, .. },
-                ..
-            }) => data.address,
-            _ => panic!("unexpected command in process queue"),
-        };
+            // The process queue should be unchanged. Simulate dispatching the command.
+            let buffer_addr = match receiver
+                .proc
+                .command_queue
+                .lock()
+                .commands
+                .pop_front()
+                .expect("the first oneway transaction should be queued on the process")
+            {
+                Command::OnewayTransaction(TransactionData {
+                    code: FIRST_TRANSACTION_CODE,
+                    buffers: TransactionBuffers { data, .. },
+                    ..
+                }) => data.address,
+                _ => panic!("unexpected command in process queue"),
+            };
 
-        // Now the receiver issues the `BC_FREE_BUFFER` command, which should queue up the next
-        // oneway transaction, guaranteeing sequential execution.
-        receiver.proc.handle_free_buffer(buffer_addr).expect("failed to free buffer");
+            // Now the receiver issues the `BC_FREE_BUFFER` command, which should queue up the next
+            // oneway transaction, guaranteeing sequential execution.
+            receiver.proc.handle_free_buffer(buffer_addr).expect("failed to free buffer");
 
-        assert!(object.lock().oneway_transactions.is_empty(), "oneway queue should now be empty");
-        assert!(
-            object.lock().handling_oneway_transaction,
-            "object oneway queue should still be marked as being handled"
-        );
+            assert!(
+                object.lock().oneway_transactions.is_empty(),
+                "oneway queue should now be empty"
+            );
+            assert!(
+                object.lock().handling_oneway_transaction,
+                "object oneway queue should still be marked as being handled"
+            );
 
-        // The process queue should have a new transaction. Simulate dispatching the command.
-        let buffer_addr = match receiver
-            .proc
-            .command_queue
-            .lock()
-            .commands
-            .pop_front()
-            .expect("the second oneway transaction should be queued on the process")
-        {
-            Command::OnewayTransaction(TransactionData {
-                code: SECOND_TRANSACTION_CODE,
-                buffers: TransactionBuffers { data, .. },
-                ..
-            }) => data.address,
-            _ => panic!("unexpected command in process queue"),
-        };
+            // The process queue should have a new transaction. Simulate dispatching the command.
+            let buffer_addr = match receiver
+                .proc
+                .command_queue
+                .lock()
+                .commands
+                .pop_front()
+                .expect("the second oneway transaction should be queued on the process")
+            {
+                Command::OnewayTransaction(TransactionData {
+                    code: SECOND_TRANSACTION_CODE,
+                    buffers: TransactionBuffers { data, .. },
+                    ..
+                }) => data.address,
+                _ => panic!("unexpected command in process queue"),
+            };
 
-        // Now the receiver issues the `BC_FREE_BUFFER` command, which should end oneway handling.
-        receiver.proc.handle_free_buffer(buffer_addr).expect("failed to free buffer");
+            // Now the receiver issues the `BC_FREE_BUFFER` command, which should end oneway handling.
+            receiver.proc.handle_free_buffer(buffer_addr).expect("failed to free buffer");
 
-        assert!(object.lock().oneway_transactions.is_empty(), "oneway queue should still be empty");
-        assert!(
-            !object.lock().handling_oneway_transaction,
-            "object oneway queue should no longer be marked as being handled"
-        );
+            assert!(
+                object.lock().oneway_transactions.is_empty(),
+                "oneway queue should still be empty"
+            );
+            assert!(
+                !object.lock().handling_oneway_transaction,
+                "object oneway queue should no longer be marked as being handled"
+            );
+        });
     }
 
     #[fuchsia::test]
     async fn synchronous_transactions_bypass_oneway_transaction_queue() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        let receiver = test.new_process(&mut locked);
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
 
-        // Insert a binder object for the receiver, and grab a handle to it in the sender.
-        const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
-        let (object, guard) =
-            register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
-        let handle = sender
-            .proc
-            .lock()
-            .handles
-            .insert_for_transaction(guard, &mut RefCountActions::default_released());
+            // Insert a binder object for the receiver, and grab a handle to it in the sender.
+            const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
+            let (object, guard) =
+                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+            let handle = sender
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
-        // Construct a oneway transaction to send from the sender to the receiver.
-        const ONEWAY_TRANSACTION_CODE: u32 = 42;
-        let transaction = binder_transaction_data_sg {
-            transaction_data: binder_transaction_data {
-                code: ONEWAY_TRANSACTION_CODE,
-                flags: transaction_flags_TF_ONE_WAY,
-                target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
-                ..binder_transaction_data::default()
-            },
-            buffers_size: 0,
-        };
+            // Construct a oneway transaction to send from the sender to the receiver.
+            const ONEWAY_TRANSACTION_CODE: u32 = 42;
+            let transaction = binder_transaction_data_sg {
+                transaction_data: binder_transaction_data {
+                    code: ONEWAY_TRANSACTION_CODE,
+                    flags: transaction_flags_TF_ONE_WAY,
+                    target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
+                    ..binder_transaction_data::default()
+                },
+                buffers_size: 0,
+            };
 
-        // Submit the transaction twice so that the queue is populated.
-        test.device
-            .handle_transaction(
-                &mut locked,
-                &sender.task,
-                &sender.proc,
-                &sender.thread,
-                transaction,
-            )
-            .expect("failed to handle the transaction");
-        test.device
-            .handle_transaction(
-                &mut locked,
-                &sender.task,
-                &sender.proc,
-                &sender.thread,
-                transaction,
-            )
-            .expect("failed to handle the transaction");
+            // Submit the transaction twice so that the queue is populated.
+            device
+                .handle_transaction(
+                    &mut locked,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    transaction,
+                )
+                .expect("failed to handle the transaction");
+            device
+                .handle_transaction(
+                    &mut locked,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    transaction,
+                )
+                .expect("failed to handle the transaction");
 
-        // The thread is ineligible to take the command (not sleeping) so check (and dequeue)
-        // the process queue.
-        assert_matches!(
-            receiver.proc.command_queue.lock().commands.pop_front(),
-            Some(Command::OnewayTransaction(TransactionData { code: ONEWAY_TRANSACTION_CODE, .. }))
-        );
+            // The thread is ineligible to take the command (not sleeping) so check (and dequeue)
+            // the process queue.
+            assert_matches!(
+                receiver.proc.command_queue.lock().commands.pop_front(),
+                Some(Command::OnewayTransaction(TransactionData {
+                    code: ONEWAY_TRANSACTION_CODE,
+                    ..
+                }))
+            );
 
-        // The object should also have the second transaction queued on it.
-        assert!(
-            object.lock().handling_oneway_transaction,
-            "object oneway queue should be marked as being handled"
-        );
-        assert_eq!(
-            object.lock().oneway_transactions.len(),
-            1,
-            "object oneway queue should have second transaction queued"
-        );
+            // The object should also have the second transaction queued on it.
+            assert!(
+                object.lock().handling_oneway_transaction,
+                "object oneway queue should be marked as being handled"
+            );
+            assert_eq!(
+                object.lock().oneway_transactions.len(),
+                1,
+                "object oneway queue should have second transaction queued"
+            );
 
-        // Queue a synchronous (request/response) transaction.
-        const SYNC_TRANSACTION_CODE: u32 = 43;
-        let transaction = binder_transaction_data_sg {
-            transaction_data: binder_transaction_data {
-                code: SYNC_TRANSACTION_CODE,
-                target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
-                ..binder_transaction_data::default()
-            },
-            buffers_size: 0,
-        };
-        test.device
-            .handle_transaction(
-                &mut locked,
-                &sender.task,
-                &sender.proc,
-                &sender.thread,
-                transaction,
-            )
-            .expect("sync transaction queued");
+            // Queue a synchronous (request/response) transaction.
+            const SYNC_TRANSACTION_CODE: u32 = 43;
+            let transaction = binder_transaction_data_sg {
+                transaction_data: binder_transaction_data {
+                    code: SYNC_TRANSACTION_CODE,
+                    target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
+                    ..binder_transaction_data::default()
+                },
+                buffers_size: 0,
+            };
+            device
+                .handle_transaction(
+                    &mut locked,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    transaction,
+                )
+                .expect("sync transaction queued");
 
-        assert_eq!(
-            object.lock().oneway_transactions.len(),
-            1,
-            "oneway queue should not have grown"
-        );
+            assert_eq!(
+                object.lock().oneway_transactions.len(),
+                1,
+                "oneway queue should not have grown"
+            );
 
-        // The process queue should now have the synchronous transaction queued.
-        assert_matches!(
-            receiver.proc.command_queue.lock().commands.pop_front(),
-            Some(Command::Transaction {
-                data: TransactionData { code: SYNC_TRANSACTION_CODE, .. },
-                ..
-            })
-        );
+            // The process queue should now have the synchronous transaction queued.
+            assert_matches!(
+                receiver.proc.command_queue.lock().commands.pop_front(),
+                Some(Command::Transaction {
+                    data: TransactionData { code: SYNC_TRANSACTION_CODE, .. },
+                    ..
+                })
+            );
+        });
     }
 
     #[fuchsia::test]
     async fn dead_reply_when_transaction_recipient_proc_dies() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        let receiver = test.new_process(&mut locked);
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
 
-        // Insert a binder object for the receiver, and grab a handle to it in the sender.
-        const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
-        let (_, guard) = register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
-        let handle = sender
-            .proc
-            .lock()
-            .handles
-            .insert_for_transaction(guard, &mut RefCountActions::default_released());
+            // Insert a binder object for the receiver, and grab a handle to it in the sender.
+            const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
+            let (_, guard) =
+                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+            let handle = sender
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
-        // Construct a synchronous transaction to send from the sender to the receiver.
-        const FIRST_TRANSACTION_CODE: u32 = 42;
-        let transaction = binder_transaction_data_sg {
-            transaction_data: binder_transaction_data {
-                code: FIRST_TRANSACTION_CODE,
-                target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
-                ..binder_transaction_data::default()
-            },
-            buffers_size: 0,
-        };
+            // Construct a synchronous transaction to send from the sender to the receiver.
+            const FIRST_TRANSACTION_CODE: u32 = 42;
+            let transaction = binder_transaction_data_sg {
+                transaction_data: binder_transaction_data {
+                    code: FIRST_TRANSACTION_CODE,
+                    target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
+                    ..binder_transaction_data::default()
+                },
+                buffers_size: 0,
+            };
 
-        // Submit the transaction.
-        test.device
-            .handle_transaction(
-                &mut locked,
-                &sender.task,
-                &sender.proc,
-                &sender.thread,
-                transaction,
-            )
-            .expect("failed to handle the transaction");
+            // Submit the transaction.
+            device
+                .handle_transaction(
+                    &mut locked,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    transaction,
+                )
+                .expect("failed to handle the transaction");
 
-        // Check that there are no commands waiting for the sending thread.
-        assert!(sender.thread.lock().command_queue.is_empty());
+            // Check that there are no commands waiting for the sending thread.
+            assert!(sender.thread.lock().command_queue.is_empty());
 
-        // Check that the receiving process has a transaction scheduled.
-        assert_matches!(
-            receiver.proc.command_queue.lock().commands.front(),
-            Some(Command::Transaction { .. })
-        );
+            // Check that the receiving process has a transaction scheduled.
+            assert_matches!(
+                receiver.proc.command_queue.lock().commands.front(),
+                Some(Command::Transaction { .. })
+            );
 
-        // Drop the receiving process.
-        std::mem::drop(receiver);
+            // Drop the receiving process.
+            std::mem::drop(receiver);
 
-        // Check that there is a dead reply command for the sending thread.
-        assert_matches!(
-            sender.thread.lock().command_queue.commands.front(),
-            Some(Command::DeadReply { pop_transaction: true })
-        );
-        assert_matches!(sender.thread.lock().transactions.pop(), Some(TransactionRole::Sender));
+            // Check that there is a dead reply command for the sending thread.
+            assert_matches!(
+                sender.thread.lock().command_queue.commands.front(),
+                Some(Command::DeadReply { pop_transaction: true })
+            );
+            assert_matches!(sender.thread.lock().transactions.pop(), Some(TransactionRole::Sender));
+        });
     }
 
     #[fuchsia::test]
     async fn dead_reply_when_transaction_recipient_thread_dies() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        let receiver = test.new_process(&mut locked);
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
 
-        // Insert a binder object for the receiver, and grab a handle to it in the sender.
-        const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
-        let (_, guard) = register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
-        let handle = sender
-            .proc
-            .lock()
-            .handles
-            .insert_for_transaction(guard, &mut RefCountActions::default_released());
+            // Insert a binder object for the receiver, and grab a handle to it in the sender.
+            const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
+            let (_, guard) =
+                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+            let handle = sender
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
-        // Construct a synchronous transaction to send from the sender to the receiver.
-        const FIRST_TRANSACTION_CODE: u32 = 42;
-        let transaction = binder_transaction_data_sg {
-            transaction_data: binder_transaction_data {
-                code: FIRST_TRANSACTION_CODE,
-                target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
-                ..binder_transaction_data::default()
-            },
-            buffers_size: 0,
-        };
+            // Construct a synchronous transaction to send from the sender to the receiver.
+            const FIRST_TRANSACTION_CODE: u32 = 42;
+            let transaction = binder_transaction_data_sg {
+                transaction_data: binder_transaction_data {
+                    code: FIRST_TRANSACTION_CODE,
+                    target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
+                    ..binder_transaction_data::default()
+                },
+                buffers_size: 0,
+            };
 
-        // Submit the transaction.
-        test.device
-            .handle_transaction(
-                &mut locked,
-                &sender.task,
-                &sender.proc,
-                &sender.thread,
-                transaction,
-            )
-            .expect("failed to handle the transaction");
+            // Submit the transaction.
+            device
+                .handle_transaction(
+                    &mut locked,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    transaction,
+                )
+                .expect("failed to handle the transaction");
 
-        // Check that there are no commands waiting for the sending thread.
-        assert!(sender.thread.lock().command_queue.is_empty());
+            // Check that there are no commands waiting for the sending thread.
+            assert!(sender.thread.lock().command_queue.is_empty());
 
-        // Check that the receiving process has a transaction scheduled.
-        assert_matches!(
-            receiver.proc.command_queue.lock().commands.front(),
-            Some(Command::Transaction { .. })
-        );
+            // Check that the receiving process has a transaction scheduled.
+            assert_matches!(
+                receiver.proc.command_queue.lock().commands.front(),
+                Some(Command::Transaction { .. })
+            );
 
-        // Drop the receiving process.
-        std::mem::drop(receiver);
+            // Drop the receiving process.
+            std::mem::drop(receiver);
 
-        // Check that there is a dead reply command for the sending thread.
-        assert_matches!(
-            sender.thread.lock().command_queue.commands.front(),
-            Some(Command::DeadReply { pop_transaction: true })
-        );
-        assert_matches!(sender.thread.lock().transactions.pop(), Some(TransactionRole::Sender));
+            // Check that there is a dead reply command for the sending thread.
+            assert_matches!(
+                sender.thread.lock().command_queue.commands.front(),
+                Some(Command::DeadReply { pop_transaction: true })
+            );
+            assert_matches!(sender.thread.lock().transactions.pop(), Some(TransactionRole::Sender));
+        });
     }
 
     #[fuchsia::test]
     async fn dead_reply_when_transaction_recipient_thread_dies_while_processing_reply() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        let receiver = test.new_process(&mut locked);
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
 
-        // Insert a binder object for the receiver, and grab a handle to it in the sender.
-        const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
-        let (_, guard) = register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
-        let handle = sender
-            .proc
-            .lock()
-            .handles
-            .insert_for_transaction(guard, &mut RefCountActions::default_released());
+            // Insert a binder object for the receiver, and grab a handle to it in the sender.
+            const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
+            let (_, guard) =
+                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+            let handle = sender
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
-        // Construct a synchronous transaction to send from the sender to the receiver.
-        const FIRST_TRANSACTION_CODE: u32 = 42;
-        let transaction = binder_transaction_data_sg {
-            transaction_data: binder_transaction_data {
-                code: FIRST_TRANSACTION_CODE,
-                target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
-                ..binder_transaction_data::default()
-            },
-            buffers_size: 0,
-        };
+            // Construct a synchronous transaction to send from the sender to the receiver.
+            const FIRST_TRANSACTION_CODE: u32 = 42;
+            let transaction = binder_transaction_data_sg {
+                transaction_data: binder_transaction_data {
+                    code: FIRST_TRANSACTION_CODE,
+                    target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
+                    ..binder_transaction_data::default()
+                },
+                buffers_size: 0,
+            };
 
-        // Make the receiver thread look eligible for transactions.
-        // Pretend the client thread is waiting for commands, so that it can be scheduled commands.
-        let fake_waiter = Waiter::new();
-        {
-            let mut thread_state = receiver.thread.lock();
-            thread_state.registration = RegistrationState::Main;
-            thread_state.command_queue.waiters.wait_async(&fake_waiter);
-        }
+            // Make the receiver thread look eligible for transactions.
+            // Pretend the client thread is waiting for commands, so that it can be scheduled commands.
+            let fake_waiter = Waiter::new();
+            {
+                let mut thread_state = receiver.thread.lock();
+                thread_state.registration = RegistrationState::Main;
+                thread_state.command_queue.waiters.wait_async(&fake_waiter);
+            }
 
-        // Submit the transaction.
-        test.device
-            .handle_transaction(
-                &mut locked,
-                &sender.task,
-                &sender.proc,
-                &sender.thread,
-                transaction,
-            )
-            .expect("failed to handle the transaction");
+            // Submit the transaction.
+            device
+                .handle_transaction(
+                    &mut locked,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    transaction,
+                )
+                .expect("failed to handle the transaction");
 
-        // Check that there are no commands waiting for the sending thread.
-        assert!(sender.thread.lock().command_queue.is_empty());
+            // Check that there are no commands waiting for the sending thread.
+            assert!(sender.thread.lock().command_queue.is_empty());
 
-        // Check that the receiving process has a transaction scheduled.
-        assert_matches!(
-            receiver.proc.command_queue.lock().commands.front(),
-            Some(Command::Transaction { .. })
-        );
+            // Check that the receiving process has a transaction scheduled.
+            assert_matches!(
+                receiver.proc.command_queue.lock().commands.front(),
+                Some(Command::Transaction { .. })
+            );
 
-        // Have the thread dequeue the command.
-        let read_buffer_addr =
-            map_memory(&mut locked, &receiver.task, UserAddress::default(), *PAGE_SIZE);
-        test.device
-            .handle_thread_read(
-                &receiver.task,
-                &receiver.proc,
-                &receiver.thread,
-                &UserBuffer { address: read_buffer_addr, length: *PAGE_SIZE as usize },
-            )
-            .expect("read command");
+            // Have the thread dequeue the command.
+            let read_buffer_addr =
+                map_memory(&mut locked, &receiver.task, UserAddress::default(), *PAGE_SIZE);
+            device
+                .handle_thread_read(
+                    &receiver.task,
+                    &receiver.proc,
+                    &receiver.thread,
+                    &UserBuffer { address: read_buffer_addr, length: *PAGE_SIZE as usize },
+                )
+                .expect("read command");
 
-        // The thread should now have an empty command list and an ongoing transaction.
-        assert!(receiver.thread.lock().command_queue.is_empty());
-        assert!(!receiver.thread.lock().transactions.is_empty());
+            // The thread should now have an empty command list and an ongoing transaction.
+            assert!(receiver.thread.lock().command_queue.is_empty());
+            assert!(!receiver.thread.lock().transactions.is_empty());
 
-        // Drop the receiving process and thread.
-        std::mem::drop(receiver);
+            // Drop the receiving process and thread.
+            std::mem::drop(receiver);
 
-        // Check that there is a dead reply command for the sending thread.
-        assert_matches!(
-            sender.thread.lock().command_queue.commands.front(),
-            Some(Command::DeadReply { pop_transaction: true })
-        );
-        assert_matches!(sender.thread.lock().transactions.pop(), Some(TransactionRole::Sender));
+            // Check that there is a dead reply command for the sending thread.
+            assert_matches!(
+                sender.thread.lock().command_queue.commands.front(),
+                Some(Command::DeadReply { pop_transaction: true })
+            );
+            assert_matches!(sender.thread.lock().transactions.pop(), Some(TransactionRole::Sender));
+        });
     }
 
     #[fuchsia::test]
     async fn failed_reply_when_transaction_reply_is_too_big() {
-        let (test, mut locked) = TranslateHandlesTestFixture::new();
-        let sender = test.new_process(&mut locked);
-        let receiver = test.new_process(&mut locked);
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let device = BinderDevice::default();
+            let sender = BinderProcessFixture::new(&mut locked, current_task, &device);
+            let receiver = BinderProcessFixture::new(&mut locked, current_task, &device);
 
-        // Insert a binder object for the receiver, and grab a handle to it in the sender.
-        const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
-        let (_, guard) = register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
-        let handle = sender
-            .proc
-            .lock()
-            .handles
-            .insert_for_transaction(guard, &mut RefCountActions::default_released());
+            // Insert a binder object for the receiver, and grab a handle to it in the sender.
+            const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
+            let (_, guard) =
+                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+            let handle = sender
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
-        // Construct a synchronous transaction to send from the sender to the receiver.
-        const FIRST_TRANSACTION_CODE: u32 = 42;
-        let transaction = binder_transaction_data_sg {
-            transaction_data: binder_transaction_data {
-                code: FIRST_TRANSACTION_CODE,
-                target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
-                ..binder_transaction_data::default()
-            },
-            buffers_size: 0,
-        };
+            // Construct a synchronous transaction to send from the sender to the receiver.
+            const FIRST_TRANSACTION_CODE: u32 = 42;
+            let transaction = binder_transaction_data_sg {
+                transaction_data: binder_transaction_data {
+                    code: FIRST_TRANSACTION_CODE,
+                    target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
+                    ..binder_transaction_data::default()
+                },
+                buffers_size: 0,
+            };
 
-        // Make the receiver thread look eligible for transactions.
-        // Pretend the client thread is waiting for commands, so that it can be scheduled commands.
-        let fake_waiter = Waiter::new();
-        {
-            let mut thread_state = receiver.thread.lock();
-            thread_state.registration = RegistrationState::Main;
-            thread_state.command_queue.waiters.wait_async(&fake_waiter);
-        }
+            // Make the receiver thread look eligible for transactions.
+            // Pretend the client thread is waiting for commands, so that it can be scheduled commands.
+            let fake_waiter = Waiter::new();
+            {
+                let mut thread_state = receiver.thread.lock();
+                thread_state.registration = RegistrationState::Main;
+                thread_state.command_queue.waiters.wait_async(&fake_waiter);
+            }
 
-        // Submit the transaction.
-        test.device
-            .handle_transaction(
-                &mut locked,
-                &sender.task,
-                &sender.proc,
-                &sender.thread,
-                transaction,
-            )
-            .expect("failed to handle the transaction");
+            // Submit the transaction.
+            device
+                .handle_transaction(
+                    &mut locked,
+                    &sender.task,
+                    &sender.proc,
+                    &sender.thread,
+                    transaction,
+                )
+                .expect("failed to handle the transaction");
 
-        // Check that there are no commands waiting for the sending thread.
-        assert!(sender.thread.lock().command_queue.is_empty());
+            // Check that there are no commands waiting for the sending thread.
+            assert!(sender.thread.lock().command_queue.is_empty());
 
-        // Check that the receiving process has a transaction scheduled.
-        assert_matches!(
-            receiver.proc.command_queue.lock().commands.front(),
-            Some(Command::Transaction { .. })
-        );
+            // Check that the receiving process has a transaction scheduled.
+            assert_matches!(
+                receiver.proc.command_queue.lock().commands.front(),
+                Some(Command::Transaction { .. })
+            );
 
-        // Have the thread dequeue the command.
-        let read_buffer_addr =
-            map_memory(&mut locked, &receiver.task, UserAddress::default(), *PAGE_SIZE);
-        test.device
-            .handle_thread_read(
-                &receiver.task,
-                &receiver.proc,
-                &receiver.thread,
-                &UserBuffer { address: read_buffer_addr, length: *PAGE_SIZE as usize },
-            )
-            .expect("read command");
+            // Have the thread dequeue the command.
+            let read_buffer_addr =
+                map_memory(&mut locked, &receiver.task, UserAddress::default(), *PAGE_SIZE);
+            device
+                .handle_thread_read(
+                    &receiver.task,
+                    &receiver.proc,
+                    &receiver.thread,
+                    &UserBuffer { address: read_buffer_addr, length: *PAGE_SIZE as usize },
+                )
+                .expect("read command");
 
-        // The thread should now have an empty command list and an ongoing transaction.
-        assert!(receiver.thread.lock().command_queue.is_empty());
-        assert!(!receiver.thread.lock().transactions.is_empty());
+            // The thread should now have an empty command list and an ongoing transaction.
+            assert!(receiver.thread.lock().command_queue.is_empty());
+            assert!(!receiver.thread.lock().transactions.is_empty());
 
-        // Respond to the transaction with too much data.
-        let reply = binder_transaction_data_sg {
-            transaction_data: binder_transaction_data {
-                code: FIRST_TRANSACTION_CODE,
-                ..binder_transaction_data::default()
-            },
-            buffers_size: (u64::MAX / 2) & !7,
-        };
+            // Respond to the transaction with too much data.
+            let reply = binder_transaction_data_sg {
+                transaction_data: binder_transaction_data {
+                    code: FIRST_TRANSACTION_CODE,
+                    ..binder_transaction_data::default()
+                },
+                buffers_size: (u64::MAX / 2) & !7,
+            };
 
-        // Submit the reply.
-        assert_eq!(
-            test.device
-                .handle_reply(&mut locked, &receiver.task, &receiver.proc, &receiver.thread, reply)
-                .expect_err("transaction should have failed"),
-            TransactionError::Failure
-        );
+            // Submit the reply.
+            assert_eq!(
+                device
+                    .handle_reply(
+                        &mut locked,
+                        &receiver.task,
+                        &receiver.proc,
+                        &receiver.thread,
+                        reply
+                    )
+                    .expect_err("transaction should have failed"),
+                TransactionError::Failure
+            );
 
-        assert!(receiver.thread.lock().transactions.is_empty());
-        assert_matches!(sender.thread.lock().command_queue.pop_front(), Some(Command::FailedReply));
+            assert!(receiver.thread.lock().transactions.is_empty());
+            assert_matches!(
+                sender.thread.lock().command_queue.pop_front(),
+                Some(Command::FailedReply)
+            );
+        });
     }
 
     #[fuchsia::test]
     async fn connect_to_multiple_binder() {
-        let (_kernel, task, mut locked) = create_kernel_task_and_unlocked();
-        let driver = BinderDevice::default();
+        spawn_kernel_and_run(|mut locked, current_task| {
+            let driver = BinderDevice::default();
 
-        // Opening the driver twice from the same task must succeed.
-        let _d1 = open_binder_fd(&mut locked, &task, &driver);
-        let _d2 = open_binder_fd(&mut locked, &task, &driver);
+            // Opening the driver twice from the same task must succeed.
+            let _d1 = open_binder_fd(&mut locked, &current_task, &driver);
+            let _d2 = open_binder_fd(&mut locked, &current_task, &driver);
+        });
     }
 
     pub type TestFdTable = BTreeMap<i32, fbinder::FileHandle>;
@@ -8155,12 +8265,6 @@ pub mod tests {
                         fds.insert(fd, file);
                         response.add_responses.get_or_insert_with(Vec::new).push(fd);
                     }
-                    for file in payload.add_requests2.unwrap_or(vec![]) {
-                        let fd = next_fd;
-                        next_fd += 1;
-                        fds.insert(fd, file);
-                        response.add_responses.get_or_insert_with(Vec::new).push(fd);
-                    }
                     responder.send(Ok(response))?;
                 }
                 fbinder::ProcessAccessorRequest::_UnknownMethod { ordinal, .. } => {
@@ -8198,72 +8302,74 @@ pub mod tests {
             process_accessor_client_end.into_channel(),
         );
 
-        let (kernel, task, mut locked) = create_kernel_task_and_unlocked();
-        let process =
-            fuchsia_runtime::process_self().duplicate(zx::Rights::SAME_RIGHTS).expect("process");
-        let remote_binder_task =
-            RemoteResourceAccessor { process_accessor, process, kernel: kernel.clone() };
-        let mut vector = Vec::with_capacity(vector_size);
-        for i in 0..vector_size {
-            vector.push((i & 255) as u8);
-        }
-        let other_vector = remote_binder_task
-            .read_memory_to_vec((vector.as_ptr() as u64).into(), vector_size)
-            .expect("read_memory");
-        assert_eq!(vector[1], 1);
-        assert_eq!(vector, other_vector);
-        vector.clear();
-        vector.resize(vector_size, 0);
-        remote_binder_task
-            .write_memory((vector.as_ptr() as u64).into(), &other_vector)
-            .expect("read_memory");
-        assert_eq!(vector[1], 1);
-        assert_eq!(vector, other_vector);
-
-        let mut locked = locked.cast_locked::<ResourceAccessorAddFile>();
-        let fd0 = remote_binder_task
-            .add_file_with_flags(
-                &mut locked,
-                &task,
-                new_null_file(&task, OpenFlags::RDWR),
-                FdFlags::empty(),
-            )
-            .expect("add_file_with_flags");
-        assert_eq!(fd0.raw(), 0);
-        let fd1 = remote_binder_task
-            .add_file_with_flags(
-                &mut locked,
-                &task,
-                new_null_file(&task, OpenFlags::WRONLY),
-                FdFlags::empty(),
-            )
-            .expect("add_file_with_flags");
-        assert_eq!(fd1.raw(), 1);
-        let fd2 = remote_binder_task
-            .add_file_with_flags(
-                &mut locked,
-                &task,
-                new_null_file(&task, OpenFlags::RDONLY),
-                FdFlags::empty(),
-            )
-            .expect("add_file_with_flags");
-        assert_eq!(fd2.raw(), 2);
-
-        assert_eq!(remote_binder_task.close_fd(fd1), Ok(()));
-        let (handle, flags) =
-            remote_binder_task.get_file_with_flags(&task, fd0).expect("get_file_with_flags");
-        assert_eq!(flags, FdFlags::empty());
-        assert_eq!(handle.flags(), OpenFlags::RDWR);
-
-        assert_eq!(
+        spawn_kernel_and_run(|locked, task| {
+            let process = fuchsia_runtime::process_self()
+                .duplicate(zx::Rights::SAME_RIGHTS)
+                .expect("process");
+            let remote_binder_task =
+                RemoteResourceAccessor { process_accessor, process, kernel: task.kernel().clone() };
+            let mut vector = Vec::with_capacity(vector_size);
+            for i in 0..vector_size {
+                vector.push((i & 255) as u8);
+            }
+            let other_vector = remote_binder_task
+                .read_memory_to_vec((vector.as_ptr() as u64).into(), vector_size)
+                .expect("read_memory");
+            assert_eq!(vector[1], 1);
+            assert_eq!(vector, other_vector);
+            vector.clear();
+            vector.resize(vector_size, 0);
             remote_binder_task
-                .get_file_with_flags(&task, FdNumber::from_raw(3))
-                .expect_err("bad fd"),
-            errno!(EBADF)
-        );
+                .write_memory((vector.as_ptr() as u64).into(), &other_vector)
+                .expect("read_memory");
+            assert_eq!(vector[1], 1);
+            assert_eq!(vector, other_vector);
 
-        std::mem::drop(remote_binder_task);
-        let fds = process_accessor_thread.join().expect("join").expect("fds");
-        assert_eq!(fds.len(), 1);
+            let mut locked = locked.cast_locked::<ResourceAccessorAddFile>();
+            let fd0 = remote_binder_task
+                .add_file_with_flags(
+                    &mut locked,
+                    &task,
+                    new_null_file(&task, OpenFlags::RDWR),
+                    FdFlags::empty(),
+                )
+                .expect("add_file_with_flags");
+            assert_eq!(fd0.raw(), 0);
+            let fd1 = remote_binder_task
+                .add_file_with_flags(
+                    &mut locked,
+                    &task,
+                    new_null_file(&task, OpenFlags::WRONLY),
+                    FdFlags::empty(),
+                )
+                .expect("add_file_with_flags");
+            assert_eq!(fd1.raw(), 1);
+            let fd2 = remote_binder_task
+                .add_file_with_flags(
+                    &mut locked,
+                    &task,
+                    new_null_file(&task, OpenFlags::RDONLY),
+                    FdFlags::empty(),
+                )
+                .expect("add_file_with_flags");
+            assert_eq!(fd2.raw(), 2);
+
+            assert_eq!(remote_binder_task.close_fd(fd1), Ok(()));
+            let (handle, flags) =
+                remote_binder_task.get_file_with_flags(&task, fd0).expect("get_file_with_flags");
+            assert_eq!(flags, FdFlags::empty());
+            assert_eq!(handle.flags(), OpenFlags::RDWR);
+
+            assert_eq!(
+                remote_binder_task
+                    .get_file_with_flags(&task, FdNumber::from_raw(3))
+                    .expect_err("bad fd"),
+                errno!(EBADF)
+            );
+
+            std::mem::drop(remote_binder_task);
+            let fds = process_accessor_thread.join().expect("join").expect("fds");
+            assert_eq!(fds.len(), 1);
+        });
     }
 }

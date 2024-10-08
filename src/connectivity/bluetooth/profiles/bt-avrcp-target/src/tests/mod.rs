@@ -291,7 +291,7 @@ async fn setup(
 /// Tests that passthrough commands are routed to the right MediaSession.
 fn test_listen_to_media_sessions() -> Result<(), Error> {
     let mut exec = fasync::TestExecutor::new_with_fake_time();
-    exec.set_fake_time(fasync::Time::from_nanos(555555555));
+    exec.set_fake_time(fasync::MonotonicInstant::from_nanos(555555555));
 
     let test_fut = async {
         let (session1_id, session2_id, watcher_client, target_proxy, media_sessions) =
@@ -360,7 +360,7 @@ fn test_listen_to_media_sessions() -> Result<(), Error> {
 /// fake client (usually AVRCP component) sending procedures and verifies the results.
 fn test_media_and_avrcp_listener() -> Result<(), Error> {
     let mut exec = fasync::TestExecutor::new_with_fake_time();
-    exec.set_fake_time(fasync::Time::from_nanos(555555555));
+    exec.set_fake_time(fasync::MonotonicInstant::from_nanos(555555555));
 
     let test_fut = async {
         let (session1_id, session2_id, watcher_client, target_proxy, media_sessions) =
@@ -502,7 +502,7 @@ fn test_media_and_avrcp_listener() -> Result<(), Error> {
     assert_eq!(Poll::Pending, r0);
 
     // Fast forward time by 10 seconds (555555555 + 1e10).
-    exec.set_fake_time(fasync::Time::from_nanos(10555555555));
+    exec.set_fake_time(fasync::MonotonicInstant::from_nanos(10555555555));
     let _ = exec.wake_expired_timers();
     let r1 = exec.run_until_stalled(&mut test_fut).map_err(|e| format!("{}", e));
 

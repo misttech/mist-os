@@ -111,12 +111,15 @@ struct fdio : protected fbl::RefCounted<fdio>, protected fbl::Recyclable<fdio> {
   }
   static zx::result<fdio_ptr> create(zx::handle handle);
   static zx::result<fdio_ptr> create(fidl::ClientEnd<fuchsia_io::Node> node,
-                                     fuchsia_io::wire::NodeInfoDeprecated info);
+                                     fuchsia_io::wire::Representation representation);
 
   // Waits for a |fuchsia.io/Node.OnOpen| event on channel.
-  static zx::result<fdio_ptr> create_with_on_open(fidl::ClientEnd<fuchsia_io::Node> node);
+  static zx::result<fdio_ptr> create_with_on_open_deprecated(
+      fidl::ClientEnd<fuchsia_io::Node> node);
 
-  virtual zx::result<fdio_ptr> open(std::string_view path, fuchsia_io::wire::OpenFlags flags);
+  virtual zx::result<fdio_ptr> open_deprecated(std::string_view path,
+                                               fuchsia_io::wire::OpenFlags flags);
+  virtual zx::result<fdio_ptr> open(std::string_view path, fuchsia_io::Flags flags);
   virtual zx_status_t clone(zx_handle_t* out_handle) = 0;
 
   // |unwrap| releases the underlying handle if applicable.  The caller must ensure there are no

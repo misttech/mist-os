@@ -27,6 +27,8 @@ class ZirconExceptionWatcher {
 
   // New exception handling that uses the exception tokens.
   virtual void OnException(zx::exception exception_token, zx_exception_info_t exception_info) {}
+
+  virtual ~ZirconExceptionWatcher() = default;
 };
 
 }  // namespace debug

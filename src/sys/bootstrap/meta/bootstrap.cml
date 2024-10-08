@@ -4,10 +4,6 @@
 {
     children: [
         {
-            name: "archivist",
-            url: "fuchsia-boot:///archivist#meta/archivist.cm",
-        },
-        {
             name: "critical-services",
             url: "fuchsia-boot:///critical-services#meta/critical-services.cm",
 
@@ -26,39 +22,9 @@
     ],
     offer: [
         {
+            config: [ "fuchsia.diagnostics.ExceptionHandlerAvailable" ],
             from: "parent",
             to: "#critical-services",
-            config: [ "fuchsia.diagnostics.ExceptionHandlerAvailable" ],
-        },
-        {
-            from: "parent",
-            to: "#archivist",
-            config: [
-                "fuchsia.diagnostics.AllowSerialLogs",
-                "fuchsia.diagnostics.BindServices",
-                "fuchsia.diagnostics.ComponentInitialInterests",
-                "fuchsia.diagnostics.DenySerialLogs",
-                "fuchsia.diagnostics.LogsMaxCachedOriginalBytes",
-                "fuchsia.diagnostics.MaximumConcurrentSnapshotsPerReader",
-                "fuchsia.diagnostics.NumThreads",
-            ],
-        },
-
-        // Disable the required offer for Archivist
-        {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
-            from: "void",
-            to: "#archivist",
-            availability: "optional",
-        },
-        {
-            protocol: "fuchsia.tracing.provider.Registry",
-            from: "parent",
-            to: "#archivist",
-            availability: "optional",
         },
         {
             protocol: [ "fuchsia.boot.WriteOnlyLog" ],
@@ -132,40 +98,6 @@
             to: "#critical-services",
             subdir: "input",
         },
-
-        // -- Archivist offers below here --
-
-        // Required events
-        {
-            event_stream: "stopped",
-            from: "parent",
-            to: "#archivist",
-        },
-        {
-            event_stream: "capability_requested",
-            from: "parent",
-            to: "#archivist",
-        },
-        {
-            protocol: [
-                "fuchsia.boot.ReadOnlyLog",
-                "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.component.PersistenceBinder",
-                "fuchsia.component.SamplerBinder",
-            ],
-            from: "parent",
-            to: "#archivist",
-
-            // Weak to resolve dependency cycles
-            dependency: "weak",
-        },
-        {
-            protocol: [ "fuchsia.component.DetectBinder" ],
-            from: "parent",
-            to: "#archivist",
-            dependency: "weak",
-            availability: "optional",
-        },
         {
             protocol: [
                 "fuchsia.diagnostics.host.ArchiveAccessor",
@@ -173,15 +105,6 @@
             ],
             from: "#archivist",
             to: "self/toolbox",
-        },
-
-        // -- End Archivist offers --
-        // TODO(https://fxbug.dev/324494668): remove this when Netstack2 is gone.
-        {
-            directory: "netstack-diagnostics",
-            from: "parent",
-            to: "#archivist",
-            availability: "optional",
         },
     ],
     expose: [

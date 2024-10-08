@@ -983,7 +983,7 @@ impl RecoveryViewAssistant {
                                 metrics::RecoveryEventMetricDimensionResult::OtaStarted
                             );
 
-                            let start_time = fasync::Time::now();
+                            let start_time = fasync::MonotonicInstant::now();
 
                             // Even if stop fails, try to update anyway.
                             println!("Stopping running OTAs...");
@@ -994,7 +994,7 @@ impl RecoveryViewAssistant {
                             println!("Starting OTA process and waiting...");
                             let res = ota_manager.start_and_wait_for_result().await;
 
-                            let end_time = fasync::Time::now();
+                            let end_time = fasync::MonotonicInstant::now();
                             let elapsed_time = (end_time - start_time).into_seconds();
 
                             match res {
@@ -1317,10 +1317,9 @@ fn make_app_assistant_fut(
         let config = UiConfig::take_from_startup_handle();
         let display_rotation = match config.display_rotation {
             0 => DisplayRotation::Deg0,
+            90 => DisplayRotation::Deg90,
             180 => DisplayRotation::Deg180,
-            // Carnelian uses an inverted z-axis for rotation
-            90 => DisplayRotation::Deg270,
-            270 => DisplayRotation::Deg90,
+            270 => DisplayRotation::Deg270,
             val => {
                 eprintln!("Invalid display_rotation {}, defaulting to 0 degrees", val);
                 DisplayRotation::Deg0

@@ -31,6 +31,7 @@
         compatible = "fuchsia,sample-device";
         interrupts = <0 IRQ1_SPI IRQ1_MODE
                       1 IRQ2_PPI IRQ2_MODE>;
+        interrupt-names = "interrupt-first", "interrupt-second";
         reg = <0x0 0x1 0x0 0x1>;
     };
 
@@ -38,6 +39,7 @@
         compatible = "fuchsia,sample-device";
         interrupts-extended = <&gic 0 IRQ3_SPI IRQ3_MODE
                                &gic 1 IRQ4_PPI IRQ4_MODE>;
+        interrupt-names = "interrupt-first", "interrupt-second";
         reg = <0x0 0x2 0x0 0x1>;
     };
 

@@ -32,7 +32,6 @@ gpt
 hid
 hid-input-report
 i2c
-?live-usb
 ?memfs
 ?minfs
 netdevice-migration

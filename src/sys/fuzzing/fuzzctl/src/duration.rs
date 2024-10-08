@@ -5,7 +5,7 @@
 /// This module exists to abstract away the differences between the dev host and target versions
 /// of `fuchsia_async::Duration`.
 ///
-/// In particular, on development hosts `fuchsia_async::{Duration, Time}` are actually
+/// In particular, on development hosts `fuchsia_async::{Duration, MonotonicInstant}` are actually
 /// `std::time::{Duration, Instant}`.
 pub use self::platform::{deadline_after, Duration};
 
@@ -45,7 +45,7 @@ mod platform {
     }
 
     /// Provides a deadline after `timeout` nanoseconds that a `fuchsia_async::Timer` can wait until.
-    pub fn deadline_after(timeout: Option<i64>) -> Option<fuchsia_async::Time> {
+    pub fn deadline_after(timeout: Option<i64>) -> Option<fuchsia_async::MonotonicInstant> {
         timeout.and_then(|nanos| OsTime::now().checked_add(OsDuration::from_nanos(nanos as u64)))
     }
 }
@@ -56,7 +56,7 @@ mod platform {
     use fuchsia_async::DurationExt;
 
     /// Provides a deadline after `timeout` nanoseconds that a `fuchsia_async::Timer` can wait until.
-    pub fn deadline_after(timeout: Option<i64>) -> Option<fuchsia_async::Time> {
+    pub fn deadline_after(timeout: Option<i64>) -> Option<fuchsia_async::MonotonicInstant> {
         timeout.map(|nanos| Duration::from_nanos(nanos).after_now())
     }
 }

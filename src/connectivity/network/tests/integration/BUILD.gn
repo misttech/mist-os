@@ -76,8 +76,10 @@ tests = [
     package_deps = [
       "//src/power/broker:component",
       "//src/power/system-activity-governor/fake:component",
+      "//src/power/testing/fake-suspend",
     ]
-    subpackages = [ "//src/power/system-activity-governor:config-no-suspender" ]
+    subpackages =
+        [ "//src/power/system-activity-governor:config-use-suspender" ]
   },
   {
     label = "product-flow"

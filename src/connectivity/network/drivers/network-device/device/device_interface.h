@@ -90,8 +90,6 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
                   CompleteRxCompleter::Sync& completer) override;
   void CompleteTx(netdriver::wire::NetworkDeviceIfcCompleteTxRequest* request, fdf::Arena& arena,
                   CompleteTxCompleter::Sync& completer) override;
-  void Snoop(netdriver::wire::NetworkDeviceIfcSnoopRequest* request, fdf::Arena& arena,
-             SnoopCompleter::Sync& completer) override;
   void DelegateRxLease(netdriver::wire::NetworkDeviceIfcDelegateRxLeaseRequest* request,
                        fdf::Arena& arena, DelegateRxLeaseCompleter::Sync& completer) override;
 

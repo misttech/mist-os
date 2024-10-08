@@ -129,7 +129,7 @@ pub mod ip {
         Ipv4AddrConfig, Ipv4DeviceConfigurationAndFlags, Ipv4DeviceConfigurationUpdate,
         Ipv6AddrManualConfig, Ipv6DeviceConfiguration, Ipv6DeviceConfigurationAndFlags,
         Ipv6DeviceConfigurationUpdate, Lifetime, SetIpAddressPropertiesError, SlaacConfiguration,
-        TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
+        SlaacConfigurationUpdate, TemporarySlaacAddressConfiguration, UpdateIpConfigurationError,
     };
     pub use netstack3_ip::multicast_forwarding::{
         ForwardMulticastRouteError, MulticastForwardingDisabledError, MulticastForwardingEvent,

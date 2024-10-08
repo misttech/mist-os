@@ -8,10 +8,11 @@
 //build/components/fuchsia_structured_config.gni.)
 """
 
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":fuchsia_fidl_cc_library.bzl", "fuchsia_fidl_cc_library")
 load(":fuchsia_fidl_library.bzl", "fuchsia_fidl_library")
 load(":providers.bzl", "FuchsiaComponentManifestInfo", "FuchsiaPackageResourcesInfo", "FuchsiaStructuredConfigInfo")
-load(":utils.bzl", "make_resource_struct", "with_fuchsia_constraint")
+load(":utils.bzl", "make_resource_struct")
 
 #####
 # cvf
@@ -71,7 +72,7 @@ _cvf = rule(
             allow_single_file = True,
             mandatory = True,
         ),
-    },
+    } | COMPATIBILITY.HOST_ATTRS,
 )
 
 ###############################
@@ -118,7 +119,7 @@ _fidl_config_client_lib_source = rule(
             doc = """Name for the generated FIDL library.""",
             mandatory = True,
         ),
-    },
+    } | COMPATIBILITY.HOST_ATTRS,
 )
 
 ###############################
@@ -185,7 +186,7 @@ _cpp_config_client_lib_source = rule(
             allow_single_file = True,
             default = "@fuchsia_clang//:bin/clang-format",
         ),
-    },
+    } | COMPATIBILITY.FUCHSIA_ATTRS,
 )
 
 ##################################
@@ -252,7 +253,6 @@ def fuchsia_structured_config_cpp_elf_lib(
         cm_label,
         namespace = "",
         fidl_library_name = "cf.sc.internal",
-        target_compatible_with = [],
         tags = ["manual"],
         **kwargs):
     """Defines a C++ configuration client library for a Fuchsia ELF component.
@@ -264,7 +264,6 @@ def fuchsia_structured_config_cpp_elf_lib(
         If not specified, the target name is used.
       fidl_library_name: Name of the generated FIDL library.
         If not specified, the default (cf.sc.internal) is used.
-      target_compatible_with: Typical bazel semantic.
       tags: Typical bazel semantic.
       **kwargs: Additional common bazel kwargs to forward to all rules.
     """
@@ -283,7 +282,6 @@ def fuchsia_structured_config_cpp_elf_lib(
         cm_label = cm_label,
         fidl_name = fidl_library_name,
         tags = tags,
-        target_compatible_with = target_compatible_with,
         **kwargs
     )
 
@@ -295,7 +293,6 @@ def fuchsia_structured_config_cpp_elf_lib(
         fidl_library_name = fidl_library_name,
         cm_label = cm_label,
         tags = tags,
-        target_compatible_with = target_compatible_with,
         **kwargs
     )
 
@@ -307,7 +304,6 @@ def fuchsia_structured_config_cpp_elf_lib(
         library = fidl_library_name,
         cc_bindings = ["cpp"],
         tags = tags,
-        target_compatible_with = target_compatible_with,
         **kwargs
     )
 
@@ -317,7 +313,6 @@ def fuchsia_structured_config_cpp_elf_lib(
         binding_type = "cpp",
         library = ":" + fidl_library_target,
         tags = tags,
-        target_compatible_with = target_compatible_with,
         **kwargs
     )
 
@@ -329,6 +324,5 @@ def fuchsia_structured_config_cpp_elf_lib(
             "@fuchsia_sdk//pkg/inspect",
         ],
         tags = tags,
-        target_compatible_with = with_fuchsia_constraint(target_compatible_with),
         **kwargs
     )

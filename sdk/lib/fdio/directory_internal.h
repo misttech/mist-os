@@ -10,12 +10,12 @@
 
 namespace fdio_internal {
 
-zx_status_t fdio_open_at(fidl::UnownedClientEnd<fuchsia_io::Directory> directory,
-                         std::string_view path, fuchsia_io::wire::OpenFlags flags,
-                         fidl::ServerEnd<fuchsia_io::Node> request);
+zx_status_t open_at_deprecated(fidl::UnownedClientEnd<fuchsia_io::Directory> directory,
+                               std::string_view path, fuchsia_io::wire::OpenFlags flags,
+                               fidl::ServerEnd<fuchsia_io::Node> request);
 
-zx_status_t fdio_open3_at(fidl::UnownedClientEnd<fuchsia_io::Directory> directory,
-                          std::string_view path, fuchsia_io::wire::Flags flags, zx::channel object);
+zx_status_t open_at(fidl::UnownedClientEnd<fuchsia_io::Directory> directory, std::string_view path,
+                    fuchsia_io::Flags flags, zx::channel object);
 
 }  // namespace fdio_internal
 

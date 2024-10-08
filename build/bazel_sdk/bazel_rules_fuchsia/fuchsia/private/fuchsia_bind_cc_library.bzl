@@ -4,6 +4,7 @@
 
 """A cc_library generated from a bind library."""
 
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":providers.bzl", "FuchsiaBindLibraryInfo")
 load("@bazel_skylib//lib:paths.bzl", "paths")
 
@@ -49,7 +50,7 @@ _codegen = rule(
             allow_files = False,
             providers = [FuchsiaBindLibraryInfo],
         ),
-    },
+    } | COMPATIBILITY.FUCHSIA_ATTRS,
 )
 
 def fuchsia_bind_cc_library(name, library, deps = [], tags = [], **kwargs):

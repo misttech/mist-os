@@ -60,6 +60,12 @@ pub struct CategoryId(NonZeroU32);
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub struct ClassId(NonZeroU32);
 
+impl Into<u32> for ClassId {
+    fn into(self) -> u32 {
+        self.0.into()
+    }
+}
+
 /// The set of permissions that may be granted to sources accessing targets of a particular class,
 /// as defined in an SELinux policy.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -149,7 +155,7 @@ pub struct ClassInfo<'a> {
     /// The name of the class.
     pub class_name: &'a [u8],
     /// The class identifier.
-    pub class_id: u32,
+    pub class_id: ClassId,
 }
 
 #[derive(Debug)]
@@ -182,10 +188,7 @@ impl<PS: ParseStrategy> Policy<PS> {
             .parsed_policy()
             .classes()
             .iter()
-            .map(|class| ClassInfo {
-                class_name: class.name_bytes(),
-                class_id: class.id().0.into(),
-            })
+            .map(|class| ClassInfo { class_name: class.name_bytes(), class_id: class.id() })
             .collect()
     }
 

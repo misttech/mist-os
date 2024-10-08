@@ -301,6 +301,7 @@ mod tests {
         let valid_femu = r#"{"emulator_configuration":{"device":{"audio":{"model":"hda"},"cpu":{
             "architecture":"x64","count":0},"memory":{"quantity":8192,"units":"megabytes"},
             "pointing_device":"mouse","screen":{"height":800,"width":1280,"units":"pixels"},
+            "vsock":{"enabled":false,"cid":3},
             "storage":{"quantity":2,"units":"gigabytes"}},"flags":{"args":[],"envs":{},"features":[],
             "kernel_args":[],"options":[]},"guest":{"fvm_image":"/path/to/fvm.blk","kernel_image":
             "/path/to/multiboot.bin","zbi_image":"/path/to/fuchsia.zbi"},"host":{"acceleration":
@@ -349,6 +350,51 @@ mod tests {
         assert_eq!(value.unwrap().get("pid").unwrap().as_i64().unwrap(), 123456);
 
         remove_file(&file_path).expect("Problem removing serialized file during test.");
+        let mut file = File::create(&file_path)?;
+        write!(file, "{}", &valid_femu)?;
+        let box_engine = read_from_disk(&emu_instances.get_instance_dir(name, false)?);
+        assert!(box_engine.is_ok(), "{:?}", box_engine.err());
+        match box_engine? {
+            EngineOption::DoesExist(data) => assert_eq!(data.get_engine_type(), EngineType::Femu),
+            other => panic!("Expected DoesExist, got {other:?}"),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_no_vsock() -> Result<()> {
+        let temp_dir = tempdir().expect("Couldn't get a temporary directory for testing.");
+
+        let instance_root = PathBuf::from(temp_dir.path());
+        let emu_instances = EmulatorInstances::new(instance_root.clone());
+        // Create a test directory in TempFile::tempdir.
+        let name = "test_no_vsock";
+        let temp_path = instance_root.join(name);
+        let file_path = temp_path.join(SERIALIZE_FILE_NAME);
+        create_dir_all(&temp_path)?;
+
+        // Note: This string is a currently valid and complete instance of a FEMU config as it
+        // would be serialized to disk. The test on this string should fail if a change (to the
+        // EmulatorConfiguration data structure, for example) would break deserialization of
+        // existing emulation instances. If your change causes this test to fail, consider wrapping
+        // the fields you changed in Option<foo>, or providing a default value for the field to
+        // deserialize with. Do not simply update this text to match your change, or users will
+        // see [Broken] emulators on their next update. Wait until the field has had time to "bake"
+        // before updating this text for your changes.
+        let valid_femu = r#"{"emulator_configuration":{"device":{"audio":{"model":"hda"},"cpu":{
+            "architecture":"x64","count":0},"memory":{"quantity":8192,"units":"megabytes"},
+            "pointing_device":"mouse","screen":{"height":800,"width":1280,"units":"pixels"},
+            "storage":{"quantity":2,"units":"gigabytes"}},"flags":{"args":[],"envs":{},"features":[],
+            "kernel_args":[],"options":[]},"guest":{"fvm_image":"/path/to/fvm.blk","kernel_image":
+            "/path/to/multiboot.bin","zbi_image":"/path/to/fuchsia.zbi"},"host":{"acceleration":
+            "hyper","architecture":"x64","gpu":"auto","log":"/path/to/emulator.log","networking"
+            :"tap","os":"linux","port_map":{}},"runtime":{"console":"none","debugger":false,
+            "dry_run":false,"headless":true,"hidpi_scaling":false,"instance_directory":"/some/dir",
+            "log_level":"info","mac_address":"52:54:47:5e:82:ef","name":"fuchsia-emulator",
+            "startup_timeout":{"secs":60,"nanos":0},"template":"/path/to/config","upscript":null}},
+            "pid":657042,"engine_type":"femu"}"#;
+
         let mut file = File::create(&file_path)?;
         write!(file, "{}", &valid_femu)?;
         let box_engine = read_from_disk(&emu_instances.get_instance_dir(name, false)?);

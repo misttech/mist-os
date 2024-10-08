@@ -24,7 +24,6 @@
 #include "sdmmc-root-device.h"
 #include "sdmmc-rpmb-device.h"
 #include "src/devices/block/lib/common/include/common.h"
-#include "src/devices/power/lib/from-fidl/cpp/from-fidl.h"
 #include "tools/power_config/lib/cpp/power_config.h"
 
 namespace sdmmc {
@@ -293,7 +292,7 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
     {
       const fuchsia_hardware_power::PowerElementConfiguration& config_fidl =
           power_configs->power_elements()[i];
-      zx::result result = power::from_fidl::CreatePowerElementConfiguration(config_fidl);
+      zx::result result = fdf_power::PowerElementConfiguration::FromFidl(config_fidl);
       if (result.is_error()) {
         FDF_SLOG(ERROR, "Failed to parse power element configuration.", KV("index", i),
                  KV("status", result.status_string()));
@@ -1070,6 +1069,8 @@ zx_status_t SdmmcBlockDevice::SuspendPower() {
     return status;
   }
 
+// TODO(b/368636358): Re-enable actual hardware power state manipulation.
+#if 0
   if (zx_status_t status = sdmmc_->MmcSelectCard(/*select=*/false); status != ZX_OK) {
     FDF_LOGL(ERROR, logger(), "Failed to (de-)SelectCard before sleep: %s",
              zx_status_get_string(status));
@@ -1080,6 +1081,7 @@ zx_status_t SdmmcBlockDevice::SuspendPower() {
     FDF_LOGL(ERROR, logger(), "Failed to sleep: %s", zx_status_get_string(status));
     return status;
   }
+#endif
 
   trace_async_id_ = TRACE_NONCE();
   TRACE_ASYNC_BEGIN("sdmmc", "suspend", trace_async_id_);
@@ -1094,6 +1096,8 @@ zx_status_t SdmmcBlockDevice::ResumePower() {
     return ZX_OK;
   }
 
+// TODO(b/368636358): Re-enable actual hardware power state manipulation.
+#if 0
   if (zx_status_t status = sdmmc_->MmcSleepOrAwake(/*sleep=*/false); status != ZX_OK) {
     FDF_LOGL(ERROR, logger(), "Failed to awake: %s", zx_status_get_string(status));
     return status;
@@ -1103,6 +1107,7 @@ zx_status_t SdmmcBlockDevice::ResumePower() {
     FDF_LOGL(ERROR, logger(), "Failed to SelectCard after awake: %s", zx_status_get_string(status));
     return status;
   }
+#endif
 
   TRACE_ASYNC_END("sdmmc", "suspend", trace_async_id_);
   power_suspended_ = false;

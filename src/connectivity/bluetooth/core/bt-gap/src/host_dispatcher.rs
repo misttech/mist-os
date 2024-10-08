@@ -84,7 +84,7 @@ pub enum DiscoveryState {
     Discovering {
         session: Weak<DiscoverySession>,
         discovery_proxy: DiscoverySessionProxy,
-        started: fasync::Time,
+        started: fasync::MonotonicInstant,
         discovery_on_closed_task: fasync::Task<()>,
         discovery_stopped_receiver: Shared<oneshot::Receiver<()>>,
         discovery_stopped_sender: oneshot::Sender<()>,
@@ -126,7 +126,7 @@ impl DiscoveryState {
                 discovery_stopped_receiver,
                 discovery_stopped_sender,
             };
-            return Some(fasync::Time::now() - started);
+            return Some(fasync::MonotonicInstant::now() - started);
         }
         None
     }
@@ -611,7 +611,7 @@ impl HostDispatcher {
     fn make_start_discovery_task(
         &self,
         session: Arc<DiscoverySession>,
-        started: fasync::Time,
+        started: fasync::MonotonicInstant,
     ) -> fasync::Task<()> {
         let hd = self.clone();
         fasync::Task::spawn(async move {
@@ -666,7 +666,7 @@ impl HostDispatcher {
         }
 
         let session = Arc::new(DiscoverySession { dispatcher_state: self.state.clone() });
-        let started = fasync::Time::now();
+        let started = fasync::MonotonicInstant::now();
         let (session_sender, session_receiver) = oneshot::channel();
         let session_receiver = session_receiver.shared();
         let (discovery_stopped_sender, discovery_stopped_receiver) = oneshot::channel();
@@ -1046,7 +1046,7 @@ impl HostDispatcher {
                 // Stop the old discovery task, and restart discovery on the new host.
                 drop(start_discovery_task);
                 let session = Arc::new(DiscoverySession { dispatcher_state: self.state.clone() });
-                let started = fasync::Time::now();
+                let started = fasync::MonotonicInstant::now();
                 let start_discovery_task = self.make_start_discovery_task(session, started);
                 self.state.write().discovery = DiscoveryState::Pending {
                     session_receiver,

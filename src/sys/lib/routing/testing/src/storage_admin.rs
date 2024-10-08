@@ -8,6 +8,7 @@ use cm_rust_testing::*;
 use fidl_fuchsia_io as fio;
 use moniker::Moniker;
 use std::marker::PhantomData;
+use zx_status::Status;
 
 pub struct CommonStorageAdminTest<T: RoutingTestModelBuilder> {
     builder: PhantomData<T>,
@@ -79,7 +80,6 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 vec!["c"].try_into().unwrap(),
                 CheckUse::StorageAdmin {
                     storage_relation: Moniker::try_from(vec!["b"]).unwrap(),
-                    from_cm_namespace: false,
                     storage_subdir: None,
                     expected_res: ExpectedResult::Ok,
                 },
@@ -152,7 +152,6 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 vec!["b", "c"].try_into().unwrap(),
                 CheckUse::StorageAdmin {
                     storage_relation: Moniker::try_from(vec!["c"]).unwrap(),
-                    from_cm_namespace: false,
                     storage_subdir: Some("foo/bar".to_string()),
                     expected_res: ExpectedResult::Ok,
                 },
@@ -234,7 +233,6 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
             vec!["b"].try_into().unwrap(),
             CheckUse::StorageAdmin {
                 storage_relation: Moniker::try_from(vec!["d"]).unwrap(),
-                from_cm_namespace: false,
                 storage_subdir: None,
                 expected_res: ExpectedResult::Ok,
             },
@@ -302,7 +300,6 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 Moniker::root(),
                 CheckUse::StorageAdmin {
                     storage_relation: Moniker::try_from(vec!["b"]).unwrap(),
-                    from_cm_namespace: false,
                     storage_subdir: None,
                     expected_res: ExpectedResult::Ok,
                 },
@@ -366,9 +363,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 Moniker::root(),
                 CheckUse::StorageAdmin {
                     storage_relation: Moniker::try_from(vec!["b"]).unwrap(),
-                    from_cm_namespace: false,
                     storage_subdir: None,
-                    expected_res: ExpectedResult::ErrWithNoEpitaph,
+                    expected_res: ExpectedResult::Err(Status::NOT_FOUND),
                 },
             )
             .await;
@@ -424,9 +420,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 vec!["b"].try_into().unwrap(),
                 CheckUse::StorageAdmin {
                     storage_relation: Moniker::try_from(vec!["b"]).unwrap(),
-                    from_cm_namespace: false,
                     storage_subdir: None,
-                    expected_res: ExpectedResult::ErrWithNoEpitaph,
+                    expected_res: ExpectedResult::Err(Status::NOT_FOUND),
                 },
             )
             .await;
@@ -511,9 +506,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 vec!["b"].try_into().unwrap(),
                 CheckUse::StorageAdmin {
                     storage_relation: Moniker::try_from(vec!["d"]).unwrap(),
-                    from_cm_namespace: false,
                     storage_subdir: None,
-                    expected_res: ExpectedResult::ErrWithNoEpitaph,
+                    expected_res: ExpectedResult::Err(Status::NOT_FOUND),
                 },
             )
             .await;
@@ -575,9 +569,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 Moniker::root(),
                 CheckUse::StorageAdmin {
                     storage_relation: Moniker::try_from(vec!["b"]).unwrap(),
-                    from_cm_namespace: false,
                     storage_subdir: None,
-                    expected_res: ExpectedResult::ErrWithNoEpitaph,
+                    expected_res: ExpectedResult::Err(Status::NOT_FOUND),
                 },
             )
             .await;
@@ -630,9 +623,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 vec!["b"].try_into().unwrap(),
                 CheckUse::StorageAdmin {
                     storage_relation: Moniker::try_from(vec!["b"]).unwrap(),
-                    from_cm_namespace: false,
                     storage_subdir: None,
-                    expected_res: ExpectedResult::ErrWithNoEpitaph,
+                    expected_res: ExpectedResult::Err(Status::NOT_FOUND),
                 },
             )
             .await;
@@ -714,9 +706,8 @@ impl<T: RoutingTestModelBuilder> CommonStorageAdminTest<T> {
                 vec!["b"].try_into().unwrap(),
                 CheckUse::StorageAdmin {
                     storage_relation: Moniker::try_from(vec!["d"]).unwrap(),
-                    from_cm_namespace: false,
                     storage_subdir: None,
-                    expected_res: ExpectedResult::ErrWithNoEpitaph,
+                    expected_res: ExpectedResult::Err(Status::NOT_FOUND),
                 },
             )
             .await;

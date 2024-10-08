@@ -106,7 +106,7 @@ class LazyDir : public vfs::Node {
   std::vector<LazyEntry> entries_ __TA_GUARDED(mutex_);  // To keep memory of entry names alive.
   std::vector<vfs_internal_lazy_entry_t> entries_internal_
       __TA_GUARDED(mutex_);  // Pointers to above entries.
-} ZX_DEPRECATED_SINCE(1, 16, "Use PseudoDir or RemoteDir instead.");
+};
 
 }  // namespace vfs
 

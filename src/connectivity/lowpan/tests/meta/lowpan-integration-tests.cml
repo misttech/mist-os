@@ -56,13 +56,5 @@
             from: "#lowpanservice",
             to: "#drivers",
         },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#drivers",
-                "#lowpanservice",
-            ],
-        },
     ],
 }

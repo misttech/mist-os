@@ -137,8 +137,8 @@ void SimInterface::OnScanResult(OnScanResultRequestView request,
 }
 
 void SimInterface::OnScanEnd(OnScanEndRequestView request, OnScanEndCompleter::Sync& completer) {
-  auto& end = request->end;
-  auto results = scan_results_.find(end.txn_id);
+  auto& end = request;
+  auto results = scan_results_.find(end->txn_id());
 
   // Verify that we started a scan on this interface
   ZX_ASSERT(results != scan_results_.end());
@@ -146,17 +146,17 @@ void SimInterface::OnScanEnd(OnScanEndRequestView request, OnScanEndCompleter::S
   // Verify that the scan hasn't already received a completion notice
   ZX_ASSERT(!results->second.result_code);
 
-  results->second.result_code = end.code;
+  results->second.result_code = end->code();
   completer.Reply();
 }
 
 void SimInterface::ConnectConf(ConnectConfRequestView request,
                                ConnectConfCompleter::Sync& completer) {
   ZX_ASSERT(assoc_ctx_.state == AssocContext::kAssociating);
-  auto& resp = request->resp;
-  stats_.connect_results.push_back(resp);
+  auto connect_conf = fidl::ToNatural(*request);
+  stats_.connect_results.push_back(connect_conf);
 
-  if (resp.result_code == wlan_ieee80211::StatusCode::kSuccess) {
+  if (request->result_code() == wlan_ieee80211::StatusCode::kSuccess) {
     assoc_ctx_.state = AssocContext::kAssociated;
     stats_.connect_successes++;
   } else {

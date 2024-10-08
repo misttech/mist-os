@@ -179,7 +179,7 @@ async fn unwrap_zxcrypt_key(wrapped_key: &[u8]) -> Result<Vec<u8>, zx::Status> {
     Err(zx::Status::IO_DATA_INTEGRITY)
 }
 
-async fn create_zxcrypt_key() -> Result<(u64, Vec<u8>, Vec<u8>), zx::Status> {
+async fn create_zxcrypt_key() -> Result<([u8; 16], Vec<u8>, Vec<u8>), zx::Status> {
     let policy = get_policy().await.map_err(|_| zx::Status::INTERNAL)?;
     let sources = unseal_sources(policy);
 
@@ -210,7 +210,7 @@ async fn create_zxcrypt_key() -> Result<(u64, Vec<u8>, Vec<u8>), zx::Status> {
         let mut header_and_key = header.as_bytes().to_vec();
         header_and_key.extend(wrapped);
 
-        Ok((0, header_and_key, unwrapped_key))
+        Ok(([0; 16], header_and_key, unwrapped_key))
     } else {
         tracing::warn!("No keys sources to create zxcrypt key");
         Err(zx::Status::INTERNAL)
@@ -230,9 +230,12 @@ async fn with_crypt_service<R, Fut: Future<Output = Result<R, Error>>>(
                     create_zxcrypt_key()
                         .await
                         .as_ref()
-                        .map(|(id, w, u)| (*id, &w[..], &u[..]))
+                        .map(|(id, w, u)| (id, &w[..], &u[..]))
                         .map_err(|s| s.into_raw()),
                 )?,
+                CryptRequest::CreateKeyWithId { responder, .. } => {
+                    responder.send(Err(zx::Status::BAD_PATH.into_raw()))?
+                }
                 CryptRequest::UnwrapKey { responder, key, .. } => responder.send(
                     unwrap_zxcrypt_key(&key)
                         .await
@@ -303,8 +306,12 @@ mod tests {
             assert_eq!(version, ZXCRYPT_VERSION);
 
             // Check that we can unwrap the returned key.
-            let unwrapped_key2 =
-                crypt.unwrap_key(0, 0, &key).await.unwrap().expect("unwrap_key failed");
+            let wrapping_key_id_0 = [0; 16];
+            let unwrapped_key2 = crypt
+                .unwrap_key(&wrapping_key_id_0, 0, &key)
+                .await
+                .unwrap()
+                .expect("unwrap_key failed");
 
             assert_eq!(unwrapped_key, unwrapped_key2);
             Ok(())

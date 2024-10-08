@@ -54,6 +54,7 @@ forensics
 ?mdns-util
 ?mediasession
 ?memory_monitor
+?memory_monitor2
 ?memory_sampler
 ?metrics-logger-standalone
 ?nc

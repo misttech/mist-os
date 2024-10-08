@@ -117,12 +117,9 @@ async fn single_storage_user() {
     let dir_proxy = directory.into_proxy().unwrap();
     let storage_user_moniker_with_instances = storage_users.into_iter().next().unwrap();
     storage_admin
-        .open_component_storage(
-            &storage_user_moniker_with_instances,
-            fio::OpenFlags::RIGHT_READABLE,
-            fio::ModeType::empty(),
-            node_server,
-        )
+        .open_storage(&storage_user_moniker_with_instances, node_server)
+        .await
+        .expect("transport error")
         .expect("open component storage");
     let filenames: HashSet<_> = fuchsia_fs::directory::readdir_recursive(&dir_proxy, None)
         .map_ok(|dir_entry| dir_entry.name)

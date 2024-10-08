@@ -8,6 +8,9 @@
 #include <lib/driver/devicetree/visitors/driver-visitor.h>
 #include <lib/driver/devicetree/visitors/interrupt-parser.h>
 
+#include <optional>
+#include <string>
+
 namespace arm_gic_dt {
 
 class ArmGicVisitor : public fdf_devicetree::DriverVisitor {
@@ -18,11 +21,15 @@ class ArmGicVisitor : public fdf_devicetree::DriverVisitor {
                      const devicetree::PropertyDecoder& decoder) override;
 
  private:
+  // `interrupt_names` must either be empty or have the same size as
+  // `interrupts`.
   zx::result<> ParseInterrupts(fdf_devicetree::Node& node,
-                               std::vector<fdf_devicetree::PropertyValue>& interrupts);
+                               std::vector<fdf_devicetree::PropertyValue>& interrupts,
+                               const std::vector<fdf_devicetree::PropertyValue>& interrupt_names);
 
   zx::result<> ParseInterrupt(fdf_devicetree::Node& child, fdf_devicetree::ReferenceNode& parent,
-                              fdf_devicetree::PropertyCells interrupt_cells);
+                              fdf_devicetree::PropertyCells interrupt_cells,
+                              std::optional<std::string> interrupt_name);
 
   fdf_devicetree::InterruptParser interrupt_parser_;
 };

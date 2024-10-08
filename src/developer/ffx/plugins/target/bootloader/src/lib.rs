@@ -24,7 +24,7 @@ use fidl_fuchsia_developer_ffx::{
     FastbootInterface as FidlFastbootInterface, TargetInfo, TargetProxy, TargetRebootState,
     TargetState,
 };
-use fuchsia_async::{Time, Timer};
+use fuchsia_async::{MonotonicInstant, Timer};
 use std::io::{stdin, Write};
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -87,7 +87,7 @@ impl FfxMain for BootloaderTool {
                     .user_message("Error converting 1 seconds to Duration")?;
 
                 let once = Once::new();
-                let start = Time::now();
+                let start = MonotonicInstant::now();
                 loop {
                     // Get the info again since the target changed state
                     info = self
@@ -100,7 +100,9 @@ impl FfxMain for BootloaderTool {
                         break;
                     }
 
-                    if Time::now() - start > fuchsia_async::Duration::from_secs(WAIT_WARN_SECS) {
+                    if MonotonicInstant::now() - start
+                        > fuchsia_async::Duration::from_secs(WAIT_WARN_SECS)
+                    {
                         once.call_once(|| {
                             let _ = writeln!(
                                 writer,

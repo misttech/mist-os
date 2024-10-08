@@ -26,7 +26,7 @@ static const clock_id_t clock_ids[] = {
 static const std::vector<fuchsia_hardware_platform_bus::Metadata> clock_metadata{
     []() {
       fuchsia_hardware_platform_bus::Metadata ret;
-      ret.type() = DEVICE_METADATA_CLOCK_IDS;
+      ret.id() = std::to_string(DEVICE_METADATA_CLOCK_IDS);
       ret.data() =
           std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&clock_ids),
                                reinterpret_cast<const uint8_t*>(&clock_ids) + sizeof(clock_ids));

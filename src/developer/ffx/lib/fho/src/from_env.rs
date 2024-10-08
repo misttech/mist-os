@@ -9,6 +9,7 @@ use ffx_command::{return_bug, return_user_error, FfxCommandLine, FfxContext, Res
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
 use ffx_fidl::VersionInfo;
+use ffx_target::ssh_connector::SshConnector;
 use ffx_target::TargetInfoQuery;
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
 use fidl_fuchsia_developer_ffx as ffx_fidl;
@@ -401,6 +402,50 @@ impl<T: TryFromEnv> Connector<T> {
 impl<T: TryFromEnv> TryFromEnv for Connector<T> {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         Ok(Connector { env: env.clone(), _connects_to: Default::default() })
+    }
+}
+
+pub struct DirectTargetConnector<T: TryFromEnv> {
+    pub inner: Connector<T>,
+    connector: Rc<Overnet<SshConnector>>,
+}
+
+#[async_trait(?Send)]
+impl<T: TryFromEnv> TryFromEnv for DirectTargetConnector<T> {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
+        // Configure the environment to use a direct connector
+        let connector: Rc<Overnet<SshConnector>> =
+            Rc::new(Overnet::<ffx_target::ssh_connector::SshConnector>::new(&env.context).await?);
+        let direct_env = FhoEnvironment {
+            ffx: env.ffx.clone(),
+            context: env.context.clone(),
+            injector: env.injector.clone(),
+            behavior: FhoConnectionBehavior::DirectConnector(connector.clone()),
+            lookup: env.lookup.clone(),
+        };
+        Ok(DirectTargetConnector {
+            connector,
+            inner: Connector { env: direct_env, _connects_to: Default::default() },
+        })
+    }
+}
+
+impl<T: TryFromEnv> DirectTargetConnector<T> {
+    /// Try to get a `T` from the environment. Will wait for the target to
+    /// appear if it is non-responsive. If that occurs, `log_target_wait` will
+    /// be called prior to waiting.
+    pub async fn try_connect(
+        &self,
+        log_target_wait: impl FnMut(&Option<String>, &Option<crate::Error>) -> Result<()>,
+    ) -> Result<T> {
+        self.inner.try_connect(log_target_wait).await
+    }
+
+    pub async fn get_address(&self) -> Option<std::net::SocketAddr> {
+        self.connector.device_address().await
+    }
+    pub async fn get_ssh_host_address(&self) -> Option<String> {
+        self.connector.host_ssh_address().await
     }
 }
 
@@ -797,6 +842,7 @@ mod tests {
            fn wrap_connection_errors(&self, e: crate::Error) -> LocalBoxFuture<'_, crate::Error>;
            fn device_address(&self) -> LocalBoxFuture<'_, Option<std::net::SocketAddr>>;
            fn target_spec(&self) -> Option<String>;
+           fn host_ssh_address(&self) -> LocalBoxFuture<'_, Option<String>>;
         }
     }
 

@@ -29,7 +29,7 @@ pub mod fidl {
     use anyhow::{format_err, Error};
     use async_trait::async_trait;
     use fidl_fuchsia_fido_report::{Message as FidoMessage, SecurityKeyDeviceProxy};
-    use fuchsia_async::{Time, TimeoutExt};
+    use fuchsia_async::{MonotonicInstant, TimeoutExt};
 
     use futures::TryFutureExt;
     use lazy_static::lazy_static;
@@ -67,7 +67,7 @@ pub mod fidl {
                 .proxy
                 .get_message(channel_id)
                 .map_err(|err| format_err!("FIDL error getting message: {:?}", err))
-                .on_timeout(Time::after(*FIDL_TIMEOUT), || {
+                .on_timeout(MonotonicInstant::after(*FIDL_TIMEOUT), || {
                     Err(format_err!("FIDL timeout on GetMessage"))
                 })
                 .await
@@ -91,7 +91,7 @@ pub mod fidl {
                 .proxy
                 .send_message(message)
                 .map_err(|err| format_err!("FIDL error sending message: {:?}", err))
-                .on_timeout(Time::after(*FIDL_TIMEOUT), || {
+                .on_timeout(MonotonicInstant::after(*FIDL_TIMEOUT), || {
                     Err(format_err!("FIDL timeout on SendMessage"))
                 })
                 .await

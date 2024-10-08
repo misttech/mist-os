@@ -249,7 +249,8 @@ async fn sampler_inspect_test() {
         if hierarchy.get_child("sampler_executor_stats").is_none()
             || hierarchy.get_child("metrics_sent").is_none()
         {
-            fasync::Timer::new(fasync::Time::after(zx::Duration::from_millis(100))).await;
+            fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_millis(100)))
+                .await;
             continue;
         }
         break hierarchy;

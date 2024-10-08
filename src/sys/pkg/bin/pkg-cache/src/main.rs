@@ -43,6 +43,7 @@ mod reboot;
 mod required_blobs;
 mod retained_packages_service;
 mod root_dir;
+mod upgradable_packages;
 
 use root_dir::{RootDir, RootDirCache, RootDirFactory};
 
@@ -120,8 +121,12 @@ async fn main_inner() -> Result<(), Error> {
     // TODO(https://fxbug.dev/331302451) Use the all_packages_executable config value instead of the
     // presence of file data/pkgfs_disable_executability_restrictions in the system_image package to
     // determine whether executability should be enforced.
-    let pkg_cache_config::Config { all_packages_executable: _, use_fxblob, use_system_image } =
-        config;
+    let pkg_cache_config::Config {
+        all_packages_executable: _,
+        use_fxblob,
+        use_system_image,
+        enable_upgradable_packages,
+    } = config;
     let builder = blobfs::Client::builder().readable().writable().executable();
     let blobfs = if use_fxblob { builder.use_creator().use_reader() } else { builder }
         .build()
@@ -196,6 +201,10 @@ async fn main_inner() -> Result<(), Error> {
     .context("creating root dir helpers")?;
     inspector.root().record_lazy_child("open-packages", open_packages.record_lazy_inspect());
 
+    let upgradable_packages = enable_upgradable_packages.then(|| {
+        Arc::new(upgradable_packages::UpgradablePackages::new(Arc::clone(&cache_packages)))
+    });
+
     // Use VFS to serve the out dir because ServiceFs does not support OPEN_RIGHT_EXECUTABLE and
     // pkgfs/{packages|system} require it.
     let svc_dir = vfs::pseudo_directory! {};
@@ -207,6 +216,7 @@ async fn main_inner() -> Result<(), Error> {
         let open_packages = open_packages.clone();
         let base_packages = Arc::clone(&base_packages);
         let cache_packages = Arc::clone(&cache_packages);
+        let upgradable_packages = upgradable_packages.clone();
         let scope = scope.clone();
         let cobalt_sender = cobalt_sender.clone();
         let cache_inspect_id = Arc::new(AtomicU32::new(0));
@@ -222,6 +232,7 @@ async fn main_inner() -> Result<(), Error> {
                         root_dir_factory.clone(),
                         Arc::clone(&base_packages),
                         Arc::clone(&cache_packages),
+                        upgradable_packages.clone(),
                         executability_restrictions,
                         scope.clone(),
                         open_packages.clone(),
@@ -268,6 +279,7 @@ async fn main_inner() -> Result<(), Error> {
     {
         let blobfs = blobfs.clone();
         let base_packages = Arc::clone(&base_packages);
+        let upgradable_packages = upgradable_packages.clone();
         let open_packages = open_packages.clone();
         let commit_status_provider =
             fuchsia_component::client::connect_to_protocol::<CommitStatusProviderMarker>()
@@ -281,6 +293,7 @@ async fn main_inner() -> Result<(), Error> {
                         blobfs.clone(),
                         Arc::clone(&base_packages),
                         Arc::clone(&cache_packages),
+                        upgradable_packages.clone(),
                         Arc::clone(&package_index),
                         open_packages.clone(),
                         commit_status_provider.clone(),
@@ -298,6 +311,7 @@ async fn main_inner() -> Result<(), Error> {
         let authenticator = authenticator.clone();
         let open_packages = open_packages.clone();
         let scope = scope.clone();
+        let upgradable_packages = upgradable_packages.clone();
         let () = svc_dir
             .add_entry(
                 fidl_fuchsia_pkg::PackageResolverMarker::PROTOCOL_NAME,
@@ -309,6 +323,7 @@ async fn main_inner() -> Result<(), Error> {
                             authenticator.clone(),
                             open_packages.clone(),
                             scope.clone(),
+                            upgradable_packages.clone(),
                         )
                         .unwrap_or_else(|e| {
                             error!("failed to serve package resolver request: {:#}", e)
@@ -323,6 +338,7 @@ async fn main_inner() -> Result<(), Error> {
         let authenticator = authenticator.clone();
         let open_packages = open_packages.clone();
         let scope = scope.clone();
+        let upgradable_packages = upgradable_packages.clone();
         let () = svc_dir
             .add_entry(
                 fidl_fuchsia_component_resolution::ResolverMarker::PROTOCOL_NAME,
@@ -334,6 +350,7 @@ async fn main_inner() -> Result<(), Error> {
                             authenticator.clone(),
                             open_packages.clone(),
                             scope.clone(),
+                            upgradable_packages.clone(),
                         )
                         .unwrap_or_else(|e| {
                             error!("failed to serve component resolver request: {:#}", e)
@@ -402,12 +419,13 @@ async fn serve_base_package_if_present(
 ) -> anyhow::Result<fio::DirectoryProxy> {
     let (proxy, server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>().context("create proxy")?;
-    match base_resolver::package::resolve_base_package(
+    match base_resolver::package::resolve_package(
         &url,
         server,
         base_packages,
         open_packages,
         scope,
+        &None,
     )
     .await
     {

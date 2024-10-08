@@ -4,6 +4,7 @@
 
 use crate::base_packages::{BasePackages, CachePackages};
 use crate::index::PackageIndex;
+use crate::upgradable_packages::UpgradablePackages;
 use anyhow::{anyhow, Error};
 use fidl::endpoints::ServerEnd;
 use fidl::prelude::*;
@@ -39,6 +40,7 @@ pub(crate) async fn serve(
     root_dir_factory: crate::RootDirFactory,
     base_packages: Arc<BasePackages>,
     cache_packages: Arc<CachePackages>,
+    upgradable_packages: Option<Arc<UpgradablePackages>>,
     executability_restrictions: system_image::ExecutabilityRestrictions,
     scope: package_directory::ExecutionScope,
     open_packages: crate::RootDirCache,
@@ -133,7 +135,15 @@ pub(crate) async fn serve(
                         Status::INTERNAL.into_raw()
                     }))?;
                 }
-                PackageCacheRequest::SetUpgradableUrls { .. } => todo!(),
+                PackageCacheRequest::SetUpgradableUrls { pinned_urls, responder } => {
+                    let res = if let Some(upgradable_packages) = &upgradable_packages {
+                        upgradable_packages.set_upgradable_urls(pinned_urls, base_packages.as_ref())
+                    } else {
+                        error!("SetUpgradableUrls called but upgradable packages are not enabled in pkg-cache");
+                        Err(fpkg::SetUpgradableUrlsError::Internal)
+                    };
+                    responder.send(res)?;
+                }
                 PackageCacheRequest::_UnknownMethod { ordinal, .. } => {
                     warn!("unknown method called, ordinal: {ordinal}")
                 }

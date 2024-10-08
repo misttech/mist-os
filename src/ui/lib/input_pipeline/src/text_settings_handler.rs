@@ -316,7 +316,7 @@ mod tests {
         // after asking the server to hand out the modified settings.  So, we loop with an
         // expectation that at some point the settings get applied.  To avoid a long timeout
         // we quit the loop if nothing happened after a generous amount of time.
-        let deadline = fuchsia_async::Time::after(zx::Duration::from_seconds(5));
+        let deadline = fuchsia_async::MonotonicInstant::after(zx::Duration::from_seconds(5));
         let autorepeat: autorepeater::Settings = Default::default();
         loop {
             let result = handler.clone().handle_unhandled_input_event(unhandled_key_event()).await;
@@ -330,9 +330,11 @@ mod tests {
             if vec![expected] == result {
                 break;
             }
-            fuchsia_async::Timer::new(fuchsia_async::Time::after(zx::Duration::from_millis(10)))
-                .await;
-            let now = fuchsia_async::Time::now();
+            fuchsia_async::Timer::new(fuchsia_async::MonotonicInstant::after(
+                zx::Duration::from_millis(10),
+            ))
+            .await;
+            let now = fuchsia_async::MonotonicInstant::now();
             assert!(now < deadline, "the settings did not get applied, was: {:?}", &result);
         }
     }

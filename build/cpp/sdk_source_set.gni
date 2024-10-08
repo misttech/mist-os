@@ -96,9 +96,6 @@ template("sdk_source_set") {
   # Remove categories that should not be used in new targets.
   valid_categories_for_error_message = valid_categories - [ "internal" ]
 
-  # TODO(https://fxbug.dev/365996258): Remove third_party uses and delete.
-  valid_categories += [ "experimental" ]
-
   # TODO(https://fxbug.dev/331991540): Remove once Firmware SDK no longer uses.
   valid_categories += [ "firmware_sdk" ]
 
@@ -129,26 +126,18 @@ template("sdk_source_set") {
 
   sdk_id = "sdk://${sdk_root_path}"
 
-  is_exempt_from_unstable_allowlist = false
-  if (invoker.category == "internal" || invoker.category == "firmware_sdk" ||
-      # TODO(https://fxbug.dev/365996258): Remove third_party uses and delete.
-      invoker.category == "experimental") {
+  if (invoker.category == "internal" ||
+      # TODO(https://fxbug.dev/331991540): Remove once no longer used.
+      invoker.category == "firmware_sdk") {
     assert(!defined(invoker.stable) || !invoker.stable)
     is_stable = false
     is_exempt_from_unstable_allowlist = true
   } else {
     assert(defined(invoker.stable), "Must specify stability.")
     is_stable = invoker.stable
+    is_exempt_from_unstable_allowlist = false
   }
   assert(!is_stable || invoker.category == "partner")
-
-  # Only stable library has API validation
-  if (is_stable) {
-    api_reference = "${sdk_name}.api"
-    if (defined(invoker.api)) {
-      api_reference = invoker.api
-    }
-  }
 
   # Create the native target (source_set or static_library) for the GN build
   main_target_name = target_name
@@ -396,20 +385,25 @@ template("sdk_source_set") {
     # category. Thus, allow "firmware_sdk" in this template then convert it
     # to "internal" for the atom.
     # TODO(https://fxbug.dev/331991540): Determine an appropriate solution for
-    # building the firmware SDK.
+    # building the firmware SDK and simply forward `category` above.
     category = invoker.category
-    if (category == "firmware_sdk" ||
-        # TODO(https://fxbug.dev/365996258): Remove third_party uses and delete.
-        category == "experimental") {
+    if (category == "firmware_sdk") {
       category = "internal"
     }
 
     id = sdk_id
 
-    if (defined(api_reference)) {
-      api = api_reference
+    if (is_stable) {
+      api = "${sdk_name}.api"
+      if (defined(invoker.api)) {
+        api = invoker.api
+      }
 
       api_contents = sdk_header_files
+    } else {
+      assert(
+          !defined(invoker.api),
+          "Unstable targets do not require/support modification acknowledgement.")
     }
 
     meta = {

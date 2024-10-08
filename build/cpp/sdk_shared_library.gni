@@ -176,19 +176,6 @@ template("sdk_shared_library") {
 
   no_headers = defined(invoker.no_headers) && invoker.no_headers
 
-  if (!no_headers) {
-    # TODO(https://fxbug.dev/366221510): Move this to where it is used.
-    if (defined(invoker.api)) {
-      api_reference = invoker.api
-    } else {
-      api_reference = "${atom_name}.api"
-    }
-  } else {
-    assert(
-        !defined(invoker.api),
-        "`no_header` targets do not require/support modification acknowledgement.")
-  }
-
   main_target_name = target_name
   metadata_target_name = "${target_name}_sdk_metadata"
   manifest_target_name = "${target_name}_sdk_manifest"
@@ -478,9 +465,15 @@ template("sdk_shared_library") {
 
     category = invoker.category
 
-    if (defined(api_reference)) {
-      assert(!no_headers)
-      api = api_reference
+    if (no_headers) {
+      assert(
+          !defined(invoker.api) && sdk_header_files == [],
+          "`no_headers` targets do not require/support modification acknowledgement.")
+    } else {
+      api = "${atom_name}.api"
+      if (defined(invoker.api)) {
+        api = invoker.api
+      }
 
       api_contents = sdk_header_files
     }

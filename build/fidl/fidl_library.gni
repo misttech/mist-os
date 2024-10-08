@@ -608,14 +608,6 @@ template("fidl_library") {
 
   if (defined(invoker.sdk_category)) {
     sdk_category = invoker.sdk_category
-    if (is_stable) {
-      api_reference = "$library_name.api"
-      if (defined(invoker.api)) {
-        api_reference = invoker.api
-      }
-    } else {
-      not_needed(invoker, [ "api" ])
-    }
 
     # Process sources.
     file_base = "fidl/$library_name"
@@ -688,14 +680,23 @@ template("fidl_library") {
 
       category = sdk_category
 
-      if (defined(api_reference)) {
-        api = api_reference
+      if (is_stable) {
+        if (defined(invoker.api)) {
+          api = invoker.api
+        } else {
+          api = "$library_name.api"
+        }
+
         api_contents = [
           {
             source = summary_file_json
             dest = "fidl/$library_name"
           },
         ]
+      } else {
+        assert(
+            !defined(invoker.api),
+            "Unstable libraries do not require/support modification acknowledgement.")
       }
 
       meta = {

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/power/system-activity-governor/meta/no-suspending-token-for-test-sag.shard.cml",
         "inspect/offer.shard.cml",
         "syslog/offer.shard.cml",
     ],
@@ -75,6 +76,12 @@
             protocol: [ "fuchsia.starnix.runner.Manager" ],
             from: "#runner",
             to: [ "#kernel" ],
+        },
+        {
+            protocol: [ "fuchsia.fxfs.CryptManagement" ],
+            from: "parent",
+            to: [ "#container" ],
+            availability: "optional",
         },
         {
             protocol: [ "fuchsia.power.broker.Topology" ],

@@ -104,7 +104,7 @@ fuchsia_hardware_thermal::wire::ThermalDeviceInfo thermal_config_ddr = {
 
 static const std::vector<fpbus::Metadata> thermal_metadata_pll{
     {{
-        .type = DEVICE_METADATA_THERMAL_CONFIG,
+        .id = std::to_string(DEVICE_METADATA_THERMAL_CONFIG),
         .data = std::vector<uint8_t>(
             reinterpret_cast<const uint8_t*>(&thermal_config_pll),
             reinterpret_cast<const uint8_t*>(&thermal_config_pll) + sizeof(thermal_config_pll)),
@@ -113,7 +113,7 @@ static const std::vector<fpbus::Metadata> thermal_metadata_pll{
 
 static const std::vector<fpbus::Metadata> thermal_metadata_ddr{
     {{
-        .type = DEVICE_METADATA_THERMAL_CONFIG,
+        .id = std::to_string(DEVICE_METADATA_THERMAL_CONFIG),
         .data = std::vector<uint8_t>(
             reinterpret_cast<const uint8_t*>(&thermal_config_ddr),
             reinterpret_cast<const uint8_t*>(&thermal_config_ddr) + sizeof(thermal_config_ddr)),

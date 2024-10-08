@@ -9,11 +9,11 @@
         bind: 'meta/bind/parent-driver.bindbc',
     },
     capabilities: [
-        { service: 'fuchsia.examples.gizmo.Service' },
+        { service: 'fuchsia.hardware.i2c.Service' },
     ],
     expose: [
         {
-            service: 'fuchsia.examples.gizmo.Service',
+            service: 'fuchsia.hardware.i2c.Service',
             from: 'self',
         },
     ],

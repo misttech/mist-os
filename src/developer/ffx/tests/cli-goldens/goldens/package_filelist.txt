@@ -3,6 +3,7 @@ ffx/package/archive.golden
 ffx/package/archive/add.golden
 ffx/package/archive/cat.golden
 ffx/package/archive/create.golden
+ffx/package/archive/edit.golden
 ffx/package/archive/extract.golden
 ffx/package/archive/list.golden
 ffx/package/archive/remove.golden

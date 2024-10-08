@@ -69,6 +69,10 @@
 		fdio_open_at;
 		fdio_open_fd;
 		fdio_open_fd_at;
+		fdio_open3;
+		fdio_open3_at;
+		fdio_open3_fd;
+		fdio_open3_fd_at;
 		fdio_pipe_half;
 		fdio_service_connect;
 		fdio_service_connect_at;

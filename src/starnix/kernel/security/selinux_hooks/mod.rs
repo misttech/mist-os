@@ -14,14 +14,16 @@ use crate::vfs::{
 };
 use linux_uapi::XATTR_NAME_SELINUX;
 use selinux::permission_check::{PermissionCheck, PermissionCheckResult};
+use selinux::policy::FsUseType;
 use selinux::{
-    ClassPermission, FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions, InitialSid,
-    Permission, ProcessPermission, SecurityId, SecurityPermission, SecurityServer,
+    ClassPermission, FileClass, FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions,
+    InitialSid, Permission, ProcessPermission, SecurityId, SecurityPermission, SecurityServer,
 };
 use starnix_logging::{log_debug, log_error, log_warn, track_stub};
 use starnix_sync::Mutex;
 use starnix_uapi::arc_key::WeakKey;
 use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::ownership::WeakRef;
 use starnix_uapi::unmount_flags::UnmountFlags;
@@ -94,21 +96,42 @@ pub(super) fn fs_node_init_with_dentry(
         FileSystemLabelingScheme::Mountpoint => label.sid,
         // fs_use_xattr-labelling defers to the security attribute on the file node, with fall-back
         // behaviours for missing and invalid labels.
-        FileSystemLabelingScheme::FsUse { def_sid, .. } => {
-            let attr = fs_node.ops().get_xattr(
-                fs_node,
-                current_task,
-                XATTR_NAME_SELINUX.to_bytes().into(),
-                SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE,
-            );
-            match attr {
-                Ok(ValueOrSize::Value(security_context)) => security_server
-                    .security_context_to_sid((&security_context).into())
-                    .unwrap_or(SecurityId::initial(InitialSid::Unlabeled)),
+        FileSystemLabelingScheme::FsUse { fs_use_type, def_sid, root_sid, .. } => {
+            match fs_use_type {
+                FsUseType::Xattr => {
+                    // Determine the SID from the "security.selinux" attribute.
+                    let attr = fs_node.ops().get_xattr(
+                        fs_node,
+                        current_task,
+                        XATTR_NAME_SELINUX.to_bytes().into(),
+                        SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE,
+                    );
+                    match attr {
+                        Ok(ValueOrSize::Value(security_context)) => security_server
+                            .security_context_to_sid((&security_context).into())
+                            .unwrap_or(SecurityId::initial(InitialSid::Unlabeled)),
+                        _ => {
+                            // TODO: https://fxbug.dev/334094811 - Determine how to handle errors besides
+                            // `ENODATA` (no such xattr).
+                            def_sid
+                        }
+                    }
+                }
                 _ => {
-                    // TODO: https://fxbug.dev/334094811 - Determine how to handle errors besides
-                    // `ENODATA` (no such xattr).
-                    def_sid
+                    if dir_entry.parent().is_none() {
+                        // This is the root node of an "fs_use_task"/"fs_use_trans"-labeled
+                        // filesystem.
+                        root_sid
+                    } else {
+                        // This is a non-root node if an "fs_use_task"/"fs_use_trans"-labeled
+                        // filesystem. Because these labeling schemes are only intended for use
+                        // with pseudo or temporary filesystems, all nodes should have been created
+                        // at run-time, and therefore labeled by `fs_node_init_on_create()`.
+                        // If an unlabeled node is somehow encountered then log a warning and treat
+                        // it in the same way as an "fs_use_xattr" node that is missing the xattr.
+                        log_warn!("Unlabeled node in {} ({:?}-labeled) filesystem", fs.name(), fs_use_type);
+                        def_sid
+                    }
                 }
             }
         }
@@ -133,18 +156,41 @@ fn make_fs_node_security_xattr(
         .ok_or_else(|| errno!(EINVAL))
 }
 
+fn file_class_from_file_mode(mode: FileMode) -> FileClass {
+    if mode.is_lnk() {
+        FileClass::Link
+    } else if mode.is_reg() || mode.is_dir() {
+        FileClass::File
+    } else if mode.is_chr() {
+        FileClass::Character
+    } else if mode.is_blk() {
+        FileClass::Block
+    } else if mode.is_fifo() {
+        FileClass::Fifo
+    } else if mode.is_sock() {
+        FileClass::Socket
+    } else {
+        panic!("Unrecognized file mode {:?}!", mode);
+    }
+}
+
 /// Called by file-system implementations when creating the `FsNode` for a new file.
 pub(super) fn fs_node_init_on_create(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     new_node: &FsNode,
-    _parent: &FsNode,
+    parent: &FsNode,
 ) -> Result<Option<FsNodeSecurityXattr>, Errno> {
     // By definition this is a new `FsNode` so should not have already been labeled
     // (unless we're working in the context of overlayfs and affected by
     // https://fxbug.dev/369067922).
     if new_node.info().security_state.label.is_initialized() {
         track_stub!(TODO("https://fxbug.dev/369067922"), "new FsNode already labeled");
+    }
+
+    // TODO: https://fxbug.dev/349117435 - Remove this workaround once "bpf" is correctly "genfscon"-labelled.
+    if new_node.fs().name() == "bpf" {
+        return Ok(None);
     }
 
     // If the creating task's "fscreate" attribute is set then it overrides the normal process
@@ -154,13 +200,48 @@ pub(super) fn fs_node_init_on_create(
         return Ok(Some(make_fs_node_security_xattr(security_server, fscreate_sid)?));
     }
 
-    // TODO: https://fxbug.dev/355180447 - Apply dynamic labeling scheme (i.e. "fs_use_trans",
-    // etc.) to determine the SID for the new file node, and apply it to the node.
-    // If the labeling scheme is "fs_use_xattr" then return an `FsNodeSecurityXattr` value describing the
-    // value that the caller should set on the new node.
-    // For static labeling schemes there is nothing to do here.
+    let fs = new_node.fs();
+    let label = match &*fs.security_state.state.0.lock() {
+        FileSystemLabelState::Unlabeled { .. } => {
+            return Ok(None);
+        }
+        FileSystemLabelState::Labeled { label } => label.clone(),
+    };
 
-    return Ok(None);
+    // Compute both the SID to store on the in-memory node and the xattr to persist on-disk
+    // (or None if this circumstance is such that there's no xattr to persist).
+    let (sid, xattr) = match label.scheme {
+        FileSystemLabelingScheme::Mountpoint => {
+            return Ok(None);
+        }
+        FileSystemLabelingScheme::FsUse { fs_use_type, .. } => {
+            let current_task_sid = current_task.read().security_state.attrs.current_sid;
+            if fs_use_type == FsUseType::Task {
+                // TODO: https://fxbug.dev/355180447 - verify that this is how fs_use_task is
+                // supposed to work (https://selinuxproject.org/page/NB_ComputingSecurityContexts).
+                (current_task_sid, None)
+            } else {
+                let parent_sid = fs_node_effective_sid(parent);
+                let sid = security_server
+                    .compute_new_file_sid(
+                        current_task_sid,
+                        parent_sid,
+                        file_class_from_file_mode(new_node.info().mode),
+                    )
+                    // TODO: https://fxbug.dev/355180447 - is EPERM right here? What does it mean
+                    // for compute_new_file_sid to have failed?
+                    .map_err(|_| errno!(EPERM))?;
+                let xattr = (fs_use_type == FsUseType::Xattr)
+                    .then(|| make_fs_node_security_xattr(security_server, sid))
+                    .transpose()?;
+                (sid, xattr)
+            }
+        }
+    };
+
+    set_cached_sid(new_node, sid);
+
+    Ok(xattr)
 }
 
 /// Returns the Security Context corresponding to the SID with which `FsNode`

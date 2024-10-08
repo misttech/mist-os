@@ -56,7 +56,8 @@ pub struct PackageArchiveExtractCommand {
 }
 
 #[derive(Eq, ArgsInfo, FromArgs, PartialEq, Debug)]
-/// add a file (<file_to_add>) to an existing package archive (<archive>), overwriting the archive
+/// add a file (<file_to_add>) to an existing package archive (<archive>),
+/// placing the resulting archive in <output>
 #[argh(subcommand, name = "add")]
 pub struct PackageArchiveAddCommand {
     /// package archive
@@ -93,7 +94,28 @@ pub struct PackageArchiveRemoveCommand {
     #[argh(option, short = 'f')]
     pub file_to_remove: PathBuf,
 
-    /// file to add to the package archive
+    /// the name of the resulting archive. Can be the same as <archive> to
+    /// overwrite <archive>
+    #[argh(option, short = 'o')]
+    pub output: PathBuf,
+}
+
+#[derive(Eq, ArgsInfo, FromArgs, PartialEq, Debug)]
+/// edit the metadata of an existing package archive (<archive>), placing the
+/// resulting archive in <output>
+#[argh(subcommand, name = "edit")]
+pub struct PackageArchiveEditCommand {
+    /// package archive
+    #[argh(option, short = 'a')]
+    pub archive: PathBuf,
+
+    /// if specified, change the name of the package (i.e., what appears in
+    /// meta/package) to <package_name>.
+    #[argh(option)]
+    pub package_name: Option<String>,
+
+    /// the name of the resulting archive. Can be the same as <archive> to
+    /// overwrite <archive>
     #[argh(option, short = 'o')]
     pub output: PathBuf,
 }

@@ -92,6 +92,7 @@
 #define PDEV_PID_VIOLET             0x12
 #define PDEV_PID_KOLA               0x13
 #define PDEV_PID_IRIS               0x14
+#define PDEV_PID_LILAC              0x15
 
 #define PDEV_DID_GAUSS_AUDIO_IN     0x01
 #define PDEV_DID_GAUSS_AUDIO_OUT    0x02

@@ -12,24 +12,24 @@ use netstack3_core::{AtomicInstant, Instant};
 use crate::bindings::util::IntoFidl;
 use crate::bindings::{zx, InspectableValue, Inspector};
 
-/// A thin wrapper around `fuchsia_async::Time` that implements `core::Instant`.
+/// A thin wrapper around `fuchsia_async::MonotonicInstant` that implements `core::Instant`.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug)]
-pub(crate) struct StackTime(fasync::Time);
+pub(crate) struct StackTime(fasync::MonotonicInstant);
 
 impl StackTime {
-    /// Construct a new [`StackTime`] from the given [`fasync::Time`].
-    pub(crate) fn new(time: fasync::Time) -> StackTime {
+    /// Construct a new [`StackTime`] from the given [`fasync::MonotonicInstant`].
+    pub(crate) fn new(time: fasync::MonotonicInstant) -> StackTime {
         StackTime(time)
     }
 
     /// Construct a new [`StackTime`] at the current time.
     pub(crate) fn now() -> StackTime {
-        StackTime(fasync::Time::now())
+        StackTime(fasync::MonotonicInstant::now())
     }
 
     /// Construct a new [`StackTime`] from a [`zx::MonotonicInstant`].
     pub(crate) fn from_zx(time: zx::MonotonicInstant) -> StackTime {
-        StackTime(fasync::Time::from_zx(time))
+        StackTime(fasync::MonotonicInstant::from_zx(time))
     }
 
     /// Convert [`StackTime`] into a [`zx::MonotonicInstant`].
@@ -38,8 +38,8 @@ impl StackTime {
         time.into_zx()
     }
 
-    /// Convert [`StackTime`] into a [`fasync::Time`]
-    pub(crate) fn into_fuchsia_time(self) -> fasync::Time {
+    /// Convert [`StackTime`] into a [`fasync::MonotonicInstant`]
+    pub(crate) fn into_fuchsia_time(self) -> fasync::MonotonicInstant {
         let StackTime(time) = self;
         time
     }
@@ -54,13 +54,13 @@ impl Instant for StackTime {
     }
 
     fn checked_add(&self, duration: Duration) -> Option<StackTime> {
-        Some(StackTime(fasync::Time::from_nanos(
+        Some(StackTime(fasync::MonotonicInstant::from_nanos(
             self.0.into_nanos().checked_add(i64::try_from(duration.as_nanos()).ok()?)?,
         )))
     }
 
     fn checked_sub(&self, duration: Duration) -> Option<StackTime> {
-        Some(StackTime(fasync::Time::from_nanos(
+        Some(StackTime(fasync::MonotonicInstant::from_nanos(
             self.0.into_nanos().checked_sub(i64::try_from(duration.as_nanos()).ok()?)?,
         )))
     }
@@ -96,7 +96,7 @@ impl AtomicInstant<StackTime> for AtomicStackTime {
     }
 
     fn load(&self, ordering: Ordering) -> StackTime {
-        StackTime(fasync::Time::from_nanos(self.0.load(ordering)))
+        StackTime(fasync::MonotonicInstant::from_nanos(self.0.load(ordering)))
     }
 
     fn store(&self, instant: StackTime, ordering: Ordering) {
@@ -114,9 +114,9 @@ mod tests {
 
     #[test]
     fn atomic_stack_time() {
-        let t1 = StackTime(fasync::Time::from_nanos(1));
-        let t2 = StackTime(fasync::Time::from_nanos(1));
-        let t3 = StackTime(fasync::Time::from_nanos(1));
+        let t1 = StackTime(fasync::MonotonicInstant::from_nanos(1));
+        let t2 = StackTime(fasync::MonotonicInstant::from_nanos(1));
+        let t3 = StackTime(fasync::MonotonicInstant::from_nanos(1));
         let time = AtomicStackTime::new(t1);
         assert_eq!(time.load(Ordering::Relaxed), t1);
         time.store(t2, Ordering::Relaxed);

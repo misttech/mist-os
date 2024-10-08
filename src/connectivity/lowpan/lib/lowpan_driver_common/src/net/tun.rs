@@ -510,7 +510,7 @@ impl NetworkInterface for TunNetworkInterface {
             .set_configuration(
                 &fnetifadmin::Configuration {
                     ipv6: Some(fnetifadmin::Ipv6Configuration {
-                        forwarding: Some(enabled),
+                        unicast_forwarding: Some(enabled),
                         multicast_forwarding: Some(enabled),
                         ..Default::default()
                     }),
@@ -537,7 +537,7 @@ impl NetworkInterface for TunNetworkInterface {
             .set_configuration(
                 &fnetifadmin::Configuration {
                     ipv4: Some(fnetifadmin::Ipv4Configuration {
-                        forwarding: Some(enabled),
+                        unicast_forwarding: Some(enabled),
                         multicast_forwarding: Some(false),
                         ..Default::default()
                     }),

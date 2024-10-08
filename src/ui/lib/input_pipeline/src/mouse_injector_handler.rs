@@ -556,7 +556,7 @@ impl MouseInjectorHandler {
                     let injectors = self.inner().injectors.values().cloned().collect::<Vec<_>>();
                     for injector in injectors {
                         let events = &[pointerinjector::Event {
-                            timestamp: Some(fuchsia_async::Time::now().into_nanos()),
+                            timestamp: Some(fuchsia_async::MonotonicInstant::now().into_nanos()),
                             data: Some(pointerinjector::Data::Viewport(new_viewport.clone())),
                             trace_flow_id: Some(fuchsia_trace::Id::new().into()),
                             ..Default::default()

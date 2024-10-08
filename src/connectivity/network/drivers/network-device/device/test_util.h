@@ -263,8 +263,6 @@ class FakeNetworkDeviceImpl
   void ReleaseVmo(
       fuchsia_hardware_network_driver::wire::NetworkDeviceImplReleaseVmoRequest* request,
       fdf::Arena& arena, ReleaseVmoCompleter::Sync& completer) override;
-  void SetSnoop(fuchsia_hardware_network_driver::wire::NetworkDeviceImplSetSnoopRequest* request,
-                fdf::Arena& arena, SetSnoopCompleter::Sync& completer) override;
 
   fit::function<zx::unowned_vmo(uint8_t)> VmoGetter();
 
@@ -426,8 +424,6 @@ class FakeNetworkDeviceIfc : public fdf::WireServer<netdriver::NetworkDeviceIfc>
                   CompleteRxCompleter::Sync& completer) override;
   void CompleteTx(netdriver::wire::NetworkDeviceIfcCompleteTxRequest* request, fdf::Arena& arena,
                   CompleteTxCompleter::Sync& completer) override;
-  void Snoop(netdriver::wire::NetworkDeviceIfcSnoopRequest* request, fdf::Arena& arena,
-             SnoopCompleter::Sync& completer) override;
   void DelegateRxLease(netdriver::wire::NetworkDeviceIfcDelegateRxLeaseRequest* request,
                        fdf::Arena& arena, DelegateRxLeaseCompleter::Sync& completer) override;
 
@@ -447,9 +443,6 @@ class FakeNetworkDeviceIfc : public fdf::WireServer<netdriver::NetworkDeviceIfc>
   fit::function<void(netdriver::wire::NetworkDeviceIfcCompleteTxRequest*, fdf::Arena&,
                      CompleteTxCompleter::Sync&)>
       complete_tx_;
-  fit::function<void(netdriver::wire::NetworkDeviceIfcSnoopRequest*, fdf::Arena&,
-                     SnoopCompleter::Sync&)>
-      snoop_;
   fit::function<void(netdriver::wire::NetworkDeviceIfcDelegateRxLeaseRequest*, fdf::Arena&,
                      DelegateRxLeaseCompleter::Sync&)>
       delegate_rx_lease_;

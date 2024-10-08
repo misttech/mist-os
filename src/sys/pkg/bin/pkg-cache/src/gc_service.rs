@@ -4,6 +4,7 @@
 
 use crate::base_packages::{BasePackages, CachePackages};
 use crate::index::PackageIndex;
+use crate::upgradable_packages::UpgradablePackages;
 use anyhow::{anyhow, Context as _};
 use fidl_fuchsia_space::{
     ErrorCode as SpaceErrorCode, ManagerRequest as SpaceManagerRequest,
@@ -20,6 +21,7 @@ pub async fn serve(
     blobfs: blobfs::Client,
     base_packages: Arc<BasePackages>,
     cache_packages: Arc<CachePackages>,
+    upgradable_packages: Option<Arc<UpgradablePackages>>,
     package_index: Arc<async_lock::RwLock<PackageIndex>>,
     open_packages: crate::RootDirCache,
     commit_status_provider: CommitStatusProviderProxy,
@@ -37,6 +39,7 @@ pub async fn serve(
                 &blobfs,
                 base_packages.as_ref(),
                 cache_packages.as_ref(),
+                upgradable_packages.as_deref(),
                 &package_index,
                 &open_packages,
                 &event_pair,
@@ -51,6 +54,7 @@ async fn gc(
     blobfs: &blobfs::Client,
     base_packages: &BasePackages,
     cache_packages: &CachePackages,
+    upgradable_packages: Option<&UpgradablePackages>,
     package_index: &Arc<async_lock::RwLock<PackageIndex>>,
     open_packages: &crate::RootDirCache,
     event_pair: &zx::EventPair,
@@ -102,6 +106,12 @@ async fn gc(
         let () = cache_packages.list_blobs().iter().for_each(|blob| {
             eligible_blobs.remove(blob);
         });
+
+        if let Some(upgradable_packages) = upgradable_packages {
+            let () = upgradable_packages.list_blobs(blobfs).await.iter().for_each(|blob| {
+                eligible_blobs.remove(blob);
+            });
+        }
 
         let () = protect_open_blobs(&mut eligible_blobs, open_packages).await;
 

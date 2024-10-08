@@ -291,7 +291,8 @@
       "third_party/boringssl/**": true,
       "third_party/chre/**": true,
       "third_party/chromiumos-xorg-conf/**": true,
-      "third_party/cobalt/**": true,
+      // Cobalt is frequently updated by Fuchsia developers.
+      "third_party/cobalt/**": false,
       "third_party/cobalt_config/**": true,
       "third_party/colorama/**": true,
       "third_party/crashpad/**": true,

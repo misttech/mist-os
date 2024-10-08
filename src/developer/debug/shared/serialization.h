@@ -84,6 +84,8 @@ class Serializer {
 
   // Reads or writes bytes.
   virtual void SerializeBytes(void* data, uint32_t size) = 0;
+
+  virtual ~Serializer();
 };
 
 }  // namespace debug

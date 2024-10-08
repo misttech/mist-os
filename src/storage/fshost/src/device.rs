@@ -94,6 +94,8 @@ pub trait Device: Send + Sync {
 /// A nand device.
 #[derive(Debug)]
 pub struct NandDevice {
+    // Nand devices don't actually support the block protocol, but we re-use the BlockDevice type
+    // for convenience.
     block_device: BlockDevice,
 }
 
@@ -146,23 +148,23 @@ impl Device for NandDevice {
     }
 
     async fn partition_label(&mut self) -> Result<&str, Error> {
-        self.block_device.partition_label().await
+        Err(anyhow!("not supported by nand device"))
     }
 
     async fn partition_type(&mut self) -> Result<&[u8; 16], Error> {
-        self.block_device.partition_type().await
+        Err(anyhow!("not supported by nand device"))
     }
 
     async fn partition_instance(&mut self) -> Result<&[u8; 16], Error> {
-        self.block_device.partition_instance().await
+        Err(anyhow!("not supported by nand device"))
     }
 
-    async fn resize(&mut self, target_size_bytes: u64) -> Result<u64, Error> {
-        self.block_device.resize(target_size_bytes).await
+    async fn resize(&mut self, _target_size_bytes: u64) -> Result<u64, Error> {
+        Err(anyhow!("not supported by nand device"))
     }
 
-    async fn set_partition_max_bytes(&mut self, max_bytes: u64) -> Result<(), Error> {
-        self.block_device.set_partition_max_bytes(max_bytes).await
+    async fn set_partition_max_bytes(&mut self, _max_bytes: u64) -> Result<(), Error> {
+        Err(anyhow!("not supported by nand device"))
     }
 
     fn controller(&self) -> &ControllerProxy {
@@ -174,15 +176,15 @@ impl Device for NandDevice {
     }
 
     fn block_connector(&self) -> Result<Box<dyn BlockConnector>, Error> {
-        self.block_device.block_connector()
+        Err(anyhow!("not supported by nand device"))
     }
 
     fn block_proxy(&self) -> Result<BlockProxy, Error> {
-        self.block_device.block_proxy()
+        Err(anyhow!("not supported by nand device"))
     }
 
     fn volume_proxy(&self) -> Result<VolumeProxy, Error> {
-        self.block_device.volume_proxy()
+        Err(anyhow!("not supported by nand device"))
     }
 }
 

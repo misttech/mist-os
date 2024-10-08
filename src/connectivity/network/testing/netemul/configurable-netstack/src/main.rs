@@ -369,7 +369,7 @@ async fn configure_interface(
     let _prev_config = control
         .set_configuration(&fnet_interfaces_admin::Configuration {
             ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
-                forwarding: enable_ipv4_forwarding,
+                unicast_forwarding: enable_ipv4_forwarding,
                 arp: Some(fnet_interfaces_admin::ArpConfiguration {
                     nud: Some(fnet_interfaces_admin::NudConfiguration {
                         max_multicast_solicitations: ipv4_multicast_neighbor_solicitations,
@@ -380,7 +380,7 @@ async fn configure_interface(
                 ..Default::default()
             }),
             ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
-                forwarding: enable_ipv6_forwarding,
+                unicast_forwarding: enable_ipv6_forwarding,
                 ndp: Some(fnet_interfaces_admin::NdpConfiguration {
                     nud: Some(fnet_interfaces_admin::NudConfiguration {
                         max_multicast_solicitations: ipv6_multicast_neighbor_solicitations,

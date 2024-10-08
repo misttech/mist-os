@@ -6,7 +6,7 @@ import("//build/python/python_mobly_test.gni")
 import("//build/testing/environments.gni")
 
 if (is_host) {
-  python_mobly_test("x64_emu_test_fc") {
+  python_mobly_test("x64_emu_test") {
     main_source = "test_fuchsia_device.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -20,13 +20,12 @@ if (is_host) {
         product_name = "default-fuchsia"
       }
     }
-    transport = "fuchsia-controller"
 
     # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
     environments = [ aemu_env ]
   }
 
-  python_mobly_test("x64_nuc_test_fc") {
+  python_mobly_test("x64_nuc_test") {
     main_source = "test_fuchsia_device.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -40,11 +39,10 @@ if (is_host) {
         product_name = "default-fuchsia"
       }
     }
-    transport = "fuchsia-controller"
     environments = [ nuc11_env ]
   }
 
-  python_mobly_test("vim3_test_fc") {
+  python_mobly_test("vim3_test") {
     main_source = "test_fuchsia_device.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -58,11 +56,10 @@ if (is_host) {
         product_name = "default-fuchsia"
       }
     }
-    transport = "fuchsia-controller"
     environments = [ vim3_env ]
   }
 
-  python_mobly_test("nelson_test_fc") {
+  python_mobly_test("nelson_test") {
     main_source = "test_fuchsia_device.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -76,7 +73,6 @@ if (is_host) {
         product_name = "elaine"
       }
     }
-    transport = "fuchsia-controller"
     environments = [ nelson_env ]
   }
 }
@@ -85,9 +81,9 @@ if (is_host) {
 group("tests") {
   testonly = true
   public_deps = [
-    ":nelson_test_fc($host_toolchain)",
-    ":vim3_test_fc($host_toolchain)",
-    ":x64_emu_test_fc($host_toolchain)",
-    ":x64_nuc_test_fc($host_toolchain)",
+    ":nelson_test($host_toolchain)",
+    ":vim3_test($host_toolchain)",
+    ":x64_emu_test($host_toolchain)",
+    ":x64_nuc_test($host_toolchain)",
   ]
 }

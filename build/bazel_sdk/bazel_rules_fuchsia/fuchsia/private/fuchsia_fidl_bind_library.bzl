@@ -4,6 +4,7 @@
 
 """A fuchsia_bind_library backed by a FIDL library."""
 
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":fuchsia_bind_library.bzl", "fuchsia_bind_library")
 load(":providers.bzl", "FuchsiaFidlLibraryInfo")
 load("@bazel_skylib//lib:paths.bzl", "paths")
@@ -48,7 +49,7 @@ _bindlibgen = rule(
             allow_files = False,
             providers = [FuchsiaFidlLibraryInfo],
         ),
-    },
+    } | COMPATIBILITY.FUCHSIA_ATTRS,
 )
 
 def fuchsia_fidl_bind_library(name, library, **kwargs):

@@ -55,6 +55,7 @@ fuchsia_cc_driver(
         "@fuchsia_sdk//pkg/driver_runtime_cpp",
         "@fuchsia_sdk//pkg/fit-promise",
         "@fuchsia_sdk//pkg/mmio",
+        "@fuchsia_sdk//pkg/trace",
         "@fuchsia_sdk//pkg/zx",
     ],
 )
@@ -115,6 +116,7 @@ fuchsia_cc_test(
         "@fuchsia_sdk//pkg/driver_testing_cpp",
         "@fuchsia_sdk//pkg/fit-promise",
         "@fuchsia_sdk//pkg/mmio",
+        "@fuchsia_sdk//pkg/trace",
         "@fuchsia_sdk//pkg/zx",
         "@internal_sdk//pkg/mock-mmio-reg",
     ],

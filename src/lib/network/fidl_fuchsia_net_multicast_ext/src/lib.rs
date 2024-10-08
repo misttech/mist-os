@@ -38,7 +38,7 @@ pub trait TableControllerProxy<I: FidlMulticastAdminIpExt> {
     fn add_route(
         &self,
         addresses: UnicastSourceAndMulticastDestination<I>,
-        route: &fnet_multicast_admin::Route,
+        route: Route,
     ) -> impl futures::Future<Output = Result<Result<(), AddRouteError>, fidl::Error>>;
 
     fn del_route(
@@ -146,9 +146,10 @@ impl TableControllerProxy<Ipv4> for fnet_multicast_admin::Ipv4RoutingTableContro
     fn add_route(
         &self,
         addresses: UnicastSourceAndMulticastDestination<Ipv4>,
-        route: &fnet_multicast_admin::Route,
+        route: Route,
     ) -> impl futures::Future<Output = Result<Result<(), AddRouteError>, fidl::Error>> {
-        self.add_route(&addresses.into(), route).map_ok(|inner| inner.map_err(AddRouteError::from))
+        self.add_route(&addresses.into(), &route.into())
+            .map_ok(|inner| inner.map_err(AddRouteError::from))
     }
 
     fn del_route(
@@ -173,9 +174,10 @@ impl TableControllerProxy<Ipv6> for fnet_multicast_admin::Ipv6RoutingTableContro
     fn add_route(
         &self,
         addresses: UnicastSourceAndMulticastDestination<Ipv6>,
-        route: &fnet_multicast_admin::Route,
+        route: Route,
     ) -> impl futures::Future<Output = Result<Result<(), AddRouteError>, fidl::Error>> {
-        self.add_route(&addresses.into(), route).map_ok(|inner| inner.map_err(AddRouteError::from))
+        self.add_route(&addresses.into(), &route.into())
+            .map_ok(|inner| inner.map_err(AddRouteError::from))
     }
 
     fn del_route(

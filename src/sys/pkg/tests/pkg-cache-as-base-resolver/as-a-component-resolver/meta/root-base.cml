@@ -23,13 +23,14 @@
     ],
     offer: [
         {
-            from: "#pkg-cache-config",
-            to: "#pkg-cache",
             config: [
                 "fuchsia.pkgcache.AllPackagesExecutable",
+                "fuchsia.pkgcache.EnableUpgradablePackages",
                 "fuchsia.pkgcache.UseFxblob",
                 "fuchsia.pkgcache.UseSystemImage",
             ],
+            from: "#pkg-cache-config",
+            to: "#pkg-cache",
         },
         {
             directory: "pkg",

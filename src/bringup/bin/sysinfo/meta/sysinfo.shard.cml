@@ -27,6 +27,11 @@
             from: "#archivist",
             to: "#sysinfo",
         },
+        {
+            protocol: "fuchsia.sysinfo.SysInfo",
+            from: "#sysinfo",
+            to: "self/toolbox",
+        },
     ],
     expose: [
         {

@@ -24,6 +24,7 @@
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/fidl/cpp/binding_set.h>
+#include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/stdcompat/span.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
 #include <lib/sys/cpp/testing/service_directory_provider.h>
@@ -35,7 +36,6 @@
 #include <zircon/types.h>
 
 #include <array>
-#include <iostream>
 #include <memory>
 #include <string_view>
 #include <utility>
@@ -51,15 +51,12 @@
 #include "lib/zx/result.h"
 #include "lib/zx/time.h"
 #include "src/storage/lib/block_client/cpp/remote_block_device.h"
-#include "src/storage/lib/paver/astro.h"
 #include "src/storage/lib/paver/kola.h"
 #include "src/storage/lib/paver/luis.h"
 #include "src/storage/lib/paver/nelson.h"
 #include "src/storage/lib/paver/sherlock.h"
 #include "src/storage/lib/paver/system_shutdown_state.h"
 #include "src/storage/lib/paver/test/test-utils.h"
-#include "src/storage/lib/paver/utils.h"
-#include "src/storage/lib/paver/vim3.h"
 #include "src/storage/lib/paver/x64.h"
 
 namespace paver {
@@ -79,7 +76,6 @@ using device_watcher::RecursiveWaitForFile;
 using driver_integration_test::IsolatedDevmgr;
 using fuchsia_system_state::SystemPowerState;
 using fuchsia_system_state::SystemStateTransition;
-using paver::BlockWatcherPauser;
 using paver::PartitionSpec;
 
 // New Type GUID's
@@ -99,7 +95,6 @@ constexpr uint8_t kVbMetaBType[GPT_GUID_LEN] = GUID_VBMETA_B_VALUE;
 constexpr uint8_t kVbMetaRType[GPT_GUID_LEN] = GUID_VBMETA_R_VALUE;
 constexpr uint8_t kFvmType[GPT_GUID_LEN] = GUID_FVM_VALUE;
 constexpr uint8_t kEmptyType[GPT_GUID_LEN] = GUID_EMPTY_VALUE;
-constexpr uint8_t kSysConfigType[GPT_GUID_LEN] = GUID_SYS_CONFIG_VALUE;
 constexpr uint8_t kAbrMetaType[GPT_GUID_LEN] = GUID_ABR_META_VALUE;
 constexpr uint8_t kStateLinuxGuid[GPT_GUID_LEN] = GUID_LINUX_FILESYSTEM_DATA_VALUE;
 
@@ -425,22 +420,16 @@ class FakeSystemStateTransition final : public fidl::WireServer<SystemStateTrans
 
 class FakeSvc {
  public:
-  explicit FakeSvc(async_dispatcher_t* dispatcher, IsolatedDevmgr& devmgr) {
+  explicit FakeSvc(async_dispatcher_t* dispatcher) {
     zx::result server_end = fidl::CreateEndpoints(&root_);
     ASSERT_OK(server_end);
-    async::PostTask(dispatcher, [dispatcher, &devmgr = devmgr,
+    async::PostTask(dispatcher, [dispatcher,
                                  &fake_system_shutdown_state = fake_system_shutdown_state_,
                                  server_end = std::move(server_end.value())]() mutable {
       component::OutgoingDirectory outgoing{dispatcher};
       ASSERT_OK(outgoing.AddUnmanagedProtocol<SystemStateTransition>(
           [&fake_system_shutdown_state, dispatcher](fidl::ServerEnd<SystemStateTransition> server) {
             fidl::BindServer(dispatcher, std::move(server), &fake_system_shutdown_state);
-          }));
-
-      // Forward protocol(s) to devmgr
-      ASSERT_OK(outgoing.AddUnmanagedProtocol<fuchsia_fshost::BlockWatcher>(
-          [&devmgr](fidl::ServerEnd<fuchsia_fshost::BlockWatcher> server_end) {
-            ASSERT_OK(component::ConnectAt(devmgr.fshost_svc_dir(), std::move(server_end)));
           }));
 
       ASSERT_OK(outgoing.Serve(std::move(server_end)));
@@ -801,10 +790,7 @@ TEST_F(EfiDevicePartitionerTests, OnStopRebootBootloader) {
   ASSERT_NO_FATAL_FAILURE(CreateDisk(64 * kGibibyte, &gpt_dev));
 
   {
-    auto pauser = BlockWatcherPauser::Create(GetSvcRoot());
-    ASSERT_OK(pauser);
-
-    FakeSvc fake_svc(loop_.dispatcher(), devmgr_);
+    FakeSvc fake_svc(loop_.dispatcher());
     zx::result svc = fake_svc.svc();
     EXPECT_OK(svc);
 
@@ -836,10 +822,7 @@ TEST_F(EfiDevicePartitionerTests, OnStopRebootRecovery) {
   std::unique_ptr<BlockDevice> gpt_dev;
   ASSERT_NO_FATAL_FAILURE(CreateDisk(64 * kGibibyte, &gpt_dev));
   {
-    auto pauser = BlockWatcherPauser::Create(GetSvcRoot());
-    ASSERT_OK(pauser);
-
-    FakeSvc fake_svc(loop_.dispatcher(), devmgr_);
+    FakeSvc fake_svc(loop_.dispatcher());
     zx::result svc = fake_svc.svc();
     EXPECT_OK(svc);
 
@@ -984,13 +967,6 @@ class SherlockPartitionerTests : public GptDevicePartitionerTests {
  protected:
   SherlockPartitionerTests() : GptDevicePartitionerTests("sherlock", 512) {}
 
-  IsolatedDevmgr::Args BaseDevmgrArgs() override {
-    IsolatedDevmgr::Args args;
-    // Needed for InitializePartitionTable
-    args.disable_block_watcher = false;
-    return args;
-  }
-
   // Create a DevicePartition for a device.
   zx::result<std::unique_ptr<paver::DevicePartitioner>> CreatePartitioner(BlockDevice* gpt) {
     fidl::ClientEnd<fuchsia_io::Directory> svc_root = GetSvcRoot();
@@ -1014,17 +990,6 @@ TEST_F(SherlockPartitionerTests, InitializeWithoutGptFails) {
   ASSERT_NOT_OK(CreatePartitioner(nullptr));
 }
 
-TEST_F(SherlockPartitionerTests, InitializeWithoutFvmSucceeds) {
-  std::unique_ptr<BlockDevice> gpt_dev;
-  ASSERT_NO_FATAL_FAILURE(CreateDisk(32 * kGibibyte, &gpt_dev));
-
-  // Set up a valid GPT.
-  std::unique_ptr<gpt::GptDevice> gpt;
-  ASSERT_NO_FATAL_FAILURE(CreateGptDevice(gpt_dev.get(), &gpt));
-
-  ASSERT_OK(CreatePartitioner(nullptr));
-}
-
 TEST_F(SherlockPartitionerTests, AddPartitionNotSupported) {
   std::unique_ptr<BlockDevice> gpt_dev;
   ASSERT_NO_FATAL_FAILURE(CreateDisk(64 * kMebibyte, &gpt_dev));
@@ -1034,81 +999,6 @@ TEST_F(SherlockPartitionerTests, AddPartitionNotSupported) {
 
   ASSERT_STATUS(status->AddPartition(PartitionSpec(paver::Partition::kZirconB)),
                 ZX_ERR_NOT_SUPPORTED);
-}
-
-TEST_F(SherlockPartitionerTests, InitializePartitionTable) {
-  std::unique_ptr<BlockDevice> gpt_dev;
-  constexpr uint64_t kBlockCount = 0x748034;
-  ASSERT_NO_FATAL_FAILURE(CreateDisk(kBlockCount * block_size_, &gpt_dev));
-  {
-    // Pause the block watcher while we write partitions to the disk.
-    // This is to avoid the block watcher seeing an intermediate state of the partition table
-    // and incorrectly treating it as an MBR.
-    // The watcher is automatically resumed when this goes out of scope.
-    auto pauser = paver::BlockWatcherPauser::Create(GetSvcRoot());
-    ASSERT_OK(pauser);
-
-    std::unique_ptr<gpt::GptDevice> gpt;
-    ASSERT_NO_FATAL_FAILURE(CreateGptDevice(gpt_dev.get(), &gpt));
-
-    const PartitionDescription kStartingPartitions[] = {
-        {"bootloader", kDummyType, 0x22, 0x2000},   {"reserved", kDummyType, 0x12000, 0x20000},
-        {"env", kDummyType, 0x36000, 0x4000},       {"fts", kDummyType, 0x3E000, 0x2000},
-        {"factory", kDummyType, 0x44000, 0x10000},  {"recovery", kDummyType, 0x58000, 0x10000},
-        {"boot", kDummyType, 0x6C000, 0x10000},     {"system", kDummyType, 0x80000, 0x278000},
-        {"cache", kDummyType, 0x2FC000, 0x400000},  {"fct", kDummyType, 0x700000, 0x20000},
-        {"sysconfig", kDummyType, 0x724000, 0x800}, {"migration", kDummyType, 0x728800, 0x3800},
-        {"buf", kDummyType, 0x730000, 0x18000},
-    };
-
-    for (const auto& part : cpp20::span(kStartingPartitions)) {
-      ASSERT_OK(
-          gpt->AddPartition(part.name, part.type, GetRandomGuid(), part.start, part.length, 0),
-          "%s", part.name);
-    }
-
-    ASSERT_OK(gpt->Sync());
-  }
-
-  zx::result status = CreatePartitioner(gpt_dev.get());
-  ASSERT_OK(status);
-  std::unique_ptr<paver::DevicePartitioner>& partitioner = status.value();
-
-  ASSERT_OK(partitioner->InitPartitionTables());
-
-  // Ensure the final partition layout looks like we expect it to.
-  std::unique_ptr<gpt::GptDevice> gpt;
-  ASSERT_NO_FATAL_FAILURE(CreateGptDevice(gpt_dev.get(), &gpt));
-  const PartitionDescription kFinalPartitions[] = {
-      {"bootloader", kDummyType, 0x22, 0x2000},
-      {GUID_SYS_CONFIG_NAME, kSysConfigType, 0x2022, 0x678},
-      {GUID_ABR_META_NAME, kAbrMetaType, 0x269A, 0x8},
-      {GUID_VBMETA_A_NAME, kVbMetaAType, 0x26A2, 0x80},
-      {GUID_VBMETA_B_NAME, kVbMetaBType, 0x2722, 0x80},
-      {GUID_VBMETA_R_NAME, kVbMetaRType, 0x27A2, 0x80},
-      {"migration", kDummyType, 0x2822, 0x3800},
-      {"reserved", kDummyType, 0x12000, 0x20000},
-      {"env", kDummyType, 0x36000, 0x4000},
-      {"fts", kDummyType, 0x3E000, 0x2000},
-      {"factory", kDummyType, 0x44000, 0x10000},
-      {"recovery", kZirconRType, 0x54000, 0x10000},
-      {"boot", kZirconAType, 0x64000, 0x10000},
-      {"system", kZirconBType, 0x74000, 0x10000},
-      {GUID_FVM_NAME, kFvmType, 0x84000, 0x668000},
-      {"fct", kDummyType, 0x6EC000, 0x20000},
-      {"buffer", kDummyType, 0x70C000, 0x18000},
-  };
-  ASSERT_NO_FATAL_FAILURE(EnsurePartitionsMatch(gpt.get(), kFinalPartitions));
-
-  // Make sure we can find the important partitions.
-  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kZirconA)));
-  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kZirconB)));
-  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kZirconR)));
-  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kAbrMeta)));
-  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kVbMetaA)));
-  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kVbMetaB)));
-  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kVbMetaR)));
-  EXPECT_OK(partitioner->FindPartition(PartitionSpec(paver::Partition::kFuchsiaVolumeManager)));
 }
 
 TEST_F(SherlockPartitionerTests, FindPartitionNewGuids) {
@@ -1575,9 +1465,6 @@ class NelsonPartitionerTests : public GptDevicePartitionerTests {
 
   void TestBootloaderWrite(const PartitionSpec& spec, uint8_t tpl_a_expected,
                            uint8_t tpl_b_expected) {
-    auto pauser = paver::BlockWatcherPauser::Create(GetSvcRoot());
-    ASSERT_OK(pauser);
-
     std::unique_ptr<BlockDevice> gpt_dev, boot0, boot1;
     ASSERT_NO_FATAL_FAILURE(InitializeBlockDeviceForBootloaderTest(&gpt_dev, &boot0, &boot1));
 
@@ -1615,9 +1502,6 @@ class NelsonPartitionerTests : public GptDevicePartitionerTests {
 
   void TestBootloaderRead(const PartitionSpec& spec, uint8_t tpl_a_data, uint8_t tpl_b_data,
                           zx::result<>* out_status, uint8_t* out) {
-    auto pauser = paver::BlockWatcherPauser::Create(GetSvcRoot());
-    ASSERT_OK(pauser);
-
     std::unique_ptr<BlockDevice> gpt_dev, boot0, boot1;
     ASSERT_NO_FATAL_FAILURE(InitializeBlockDeviceForBootloaderTest(&gpt_dev, &boot0, &boot1));
 
@@ -1670,9 +1554,6 @@ class NelsonPartitionerTests : public GptDevicePartitionerTests {
   void InitializeBlockDeviceForBootloaderTest(std::unique_ptr<BlockDevice>* gpt_dev,
                                               std::unique_ptr<BlockDevice>* boot0,
                                               std::unique_ptr<BlockDevice>* boot1) {
-    auto pauser = paver::BlockWatcherPauser::Create(GetSvcRoot());
-    ASSERT_OK(pauser);
-
     ASSERT_NO_FATAL_FAILURE(CreateDisk(64 * kMebibyte, gpt_dev));
     static const std::vector<PartitionDescription> kNelsonBootloaderTestPartitions = {
         {"tpl_a", kDummyType, kTplSlotAOffset, kUserTplBlockCount},

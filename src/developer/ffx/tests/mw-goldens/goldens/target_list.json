@@ -36,11 +36,28 @@
         "addresses": {
           "type": "array",
           "items": {
-            "type": "string"
+            "$ref": "#/definitions/JsonTargetAddress"
           }
         },
         "is_default": {
           "type": "boolean"
+        }
+      }
+    },
+    "JsonTargetAddress": {
+      "type": "object",
+      "required": [
+        "ip",
+        "ssh_port"
+      ],
+      "properties": {
+        "ip": {
+          "type": "string"
+        },
+        "ssh_port": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
         }
       }
     }

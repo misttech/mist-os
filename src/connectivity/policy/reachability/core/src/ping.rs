@@ -31,7 +31,7 @@ where
     >(&socket, &addr, PING_MESSAGE.as_bytes());
 
     for seq in SEQ_MIN..=SEQ_MAX {
-        let deadline = fasync::Time::after(TIMEOUT);
+        let deadline = fasync::MonotonicInstant::after(TIMEOUT);
         let () = sink
             .send(seq)
             .map_err(anyhow::Error::new)

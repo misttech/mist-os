@@ -30,6 +30,7 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.space:fuchsia.space_rust",
     "//sdk/fidl/fuchsia.update:fuchsia.update_rust",
     "//sdk/rust/zx",
+    "//src/lib/async-utils",
     "//src/lib/cobalt/rust/builders",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
@@ -40,6 +41,7 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
+    "//src/lib/fuchsia-sync",
     "//src/lib/fuchsia-url",
     "//src/lib/trace/rust:trace",
     "//src/lib/trace/rust:trace-provider",
@@ -99,6 +101,7 @@ rustc_binary("bin") {
     "src/retained_packages_service.rs",
     "src/root_dir.rs",
     "src/test_utils.rs",
+    "src/upgradable_packages.rs",
   ]
 
   visibility = [
@@ -135,6 +138,7 @@ fuchsia_structured_config_values2("config_values_from_gn") {
 
     # LINT.ThenChange(/src/sys/pkg/testing/blobfs-ramdisk/BUILD.gn)
     use_system_image = true
+    enable_upgradable_packages = false
   }
   visibility = [ ":*" ]
 }
@@ -149,6 +153,7 @@ fuchsia_structured_config_values2("config_values_from_gn-ignore-system-image") {
     # TODO(https://fxbug.dev/42081210) Recovery should use fxblob if available.
     use_fxblob = false
     use_system_image = false
+    enable_upgradable_packages = false
   }
   visibility = [ ":*" ]
 }
@@ -161,6 +166,7 @@ fuchsia_structured_config_values2("config_values_from_gn-cpp-blobfs") {
     all_packages_executable = false
     use_fxblob = false
     use_system_image = true
+    enable_upgradable_packages = false
   }
   visibility = [ ":*" ]
 }
@@ -173,6 +179,7 @@ fuchsia_structured_config_values2("config_values_from_gn-fxblob") {
     all_packages_executable = false
     use_fxblob = true
     use_system_image = true
+    enable_upgradable_packages = false
   }
   visibility = [ ":*" ]
 }

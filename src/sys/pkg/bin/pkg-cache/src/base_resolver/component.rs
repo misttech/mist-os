@@ -4,6 +4,7 @@
 
 use super::context_authenticator::ContextAuthenticator;
 use super::ResolverError;
+use crate::upgradable_packages::UpgradablePackages;
 use anyhow::Context as _;
 use fidl::endpoints::Proxy as _;
 use futures::stream::TryStreamExt as _;
@@ -23,6 +24,7 @@ pub(crate) async fn serve_request_stream(
     authenticator: ContextAuthenticator,
     open_packages: crate::RootDirCache,
     scope: package_directory::ExecutionScope,
+    upgradable_packages: Option<Arc<UpgradablePackages>>,
 ) -> anyhow::Result<()> {
     while let Some(request) =
         stream.try_next().await.context("failed to read request from FIDL stream")?
@@ -37,6 +39,7 @@ pub(crate) async fn serve_request_stream(
                             authenticator.clone(),
                             &open_packages,
                             scope.clone(),
+                            &upgradable_packages,
                         )
                         .await
                         .map_err(|e| {
@@ -65,6 +68,7 @@ pub(crate) async fn serve_request_stream(
                             authenticator.clone(),
                             &open_packages,
                             scope.clone(),
+                            &upgradable_packages,
                         )
                         .await
                         .map_err(|e| {
@@ -95,6 +99,7 @@ async fn resolve(
     authenticator: ContextAuthenticator,
     open_packages: &crate::RootDirCache,
     scope: package_directory::ExecutionScope,
+    upgradable_packages: &Option<Arc<UpgradablePackages>>,
 ) -> Result<fcomponent_resolution::Component, ResolverError> {
     let url = fuchsia_url::ComponentUrl::parse(url)?;
     let (package, server_end) =
@@ -109,6 +114,7 @@ async fn resolve(
         authenticator,
         open_packages,
         scope,
+        upgradable_packages,
     )
     .await?;
     resolve_from_package(&url, package, fcomponent_resolution::Context { bytes: context.bytes })
@@ -122,6 +128,7 @@ async fn resolve_with_context(
     authenticator: ContextAuthenticator,
     open_packages: &crate::RootDirCache,
     scope: package_directory::ExecutionScope,
+    upgradable_packages: &Option<Arc<UpgradablePackages>>,
 ) -> Result<fcomponent_resolution::Component, ResolverError> {
     let url = fuchsia_url::ComponentUrl::parse(url)?;
     let (package, server_end) =
@@ -134,6 +141,7 @@ async fn resolve_with_context(
         authenticator,
         open_packages,
         scope,
+        upgradable_packages,
     )
     .await?;
     resolve_from_package(&url, package, fcomponent_resolution::Context { bytes: context.bytes })
@@ -213,6 +221,7 @@ mod tests {
                 ContextAuthenticator::new(),
                 &crate::root_dir::new_test(blobfs::Client::new_test().0).await.1,
                 package_directory::ExecutionScope::new(),
+                &None,
             )
             .await,
             Err(ResolverError::AbsoluteUrlRequired)

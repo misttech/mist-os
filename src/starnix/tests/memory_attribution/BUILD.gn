@@ -94,6 +94,7 @@ fuchsia_test_package("starnix_memory_attribution_test") {
     ":mmap_anonymous_then_sleep_package",
     ":thread_group_leader_killed_package",
     "//src/starnix/containers/debian:debian_package",
+    "//src/power/system-activity-governor/fake:package",
   ]
 
   subpackages += starnix_test_subpackages

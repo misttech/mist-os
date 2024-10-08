@@ -863,9 +863,6 @@ void IgcDriver::ReleaseVmo(netdriver::wire::NetworkDeviceImplReleaseVmoRequest* 
   completer.buffer(arena).Reply();
 }
 
-void IgcDriver::SetSnoop(netdriver::wire::NetworkDeviceImplSetSnoopRequest* request,
-                         fdf::Arena& arena, SetSnoopCompleter::Sync& completer) {}
-
 constexpr netdev::wire::FrameType kRxTypes[] = {netdev::wire::FrameType::kEthernet};
 constexpr netdev::wire::FrameTypeSupport kTxTypes[] = {{
     .type = netdev::wire::FrameType::kEthernet,

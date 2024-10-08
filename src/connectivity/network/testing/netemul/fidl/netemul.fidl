@@ -115,6 +115,8 @@ closed protocol Sandbox {
                                 1: protocol fuchsia.component.name;
                                 /// The name of the exposed capability.
                                 2: configuration fuchsia.component.name;
+                                /// The name of the exposed service.
+                                3: service fuchsia.component.name;
                             };
                         };
 

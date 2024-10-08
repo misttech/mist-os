@@ -466,12 +466,6 @@ void FakeNetworkDeviceImpl::ReleaseVmo(
   completer.buffer(arena).Reply();
 }
 
-void FakeNetworkDeviceImpl::SetSnoop(
-    fuchsia_hardware_network_driver::wire::NetworkDeviceImplSetSnoopRequest* request,
-    fdf::Arena& arena, SetSnoopCompleter::Sync& completer) {
-  // Do nothing , only auto-snooping is allowed.
-}
-
 fit::function<zx::unowned_vmo(uint8_t)> FakeNetworkDeviceImpl::VmoGetter() {
   return [this](uint8_t id) { return zx::unowned_vmo(vmos_[id]); };
 }
@@ -574,13 +568,6 @@ void FakeNetworkDeviceIfc::CompleteTx(netdriver::wire::NetworkDeviceIfcCompleteT
                                       fdf::Arena& arena, CompleteTxCompleter::Sync& completer) {
   if (complete_tx_) {
     complete_tx_(request, arena, completer);
-  }
-}
-
-void FakeNetworkDeviceIfc::Snoop(netdriver::wire::NetworkDeviceIfcSnoopRequest* request,
-                                 fdf::Arena& arena, SnoopCompleter::Sync& completer) {
-  if (snoop_) {
-    snoop_(request, arena, completer);
   }
 }
 

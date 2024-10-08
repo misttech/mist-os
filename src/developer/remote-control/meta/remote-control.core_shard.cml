@@ -11,6 +11,12 @@
     ],
     offer: [
         {
+            config: "fuchsia.rcs.UseDefaultIdentity",
+            from: "void",
+            to: "#remote-control",
+            availability: "optional",
+        },
+        {
             directory: "dev-class",
             from: "void",
             as: "dev-overnet-usb",

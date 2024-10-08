@@ -11,7 +11,7 @@ const METADATA_MAX_SIZE uint32 = 0x1000;
 closed protocol Metadata {
     /// Recieves the metadata that the driver has been given.
     strict GetMetadata(struct {
-        type uint32;
+        id string:MAX;
     }) -> (struct {
         data vector<uint8>:METADATA_MAX_SIZE;
     });

@@ -152,7 +152,6 @@ Symbols:
   - { Name: _zx_syscall_test_widening_unsigned_narrow, Type: Func }
   - { Name: _zx_syscall_test_widening_unsigned_wide, Type: Func }
   - { Name: _zx_syscall_test_wrapper, Type: Func }
-  - { Name: _zx_system_create_processor_power_level_transition_handler, Type: Func }
   - { Name: _zx_system_get_dcache_line_size, Type: Func }
   - { Name: _zx_system_get_event, Type: Func }
   - { Name: _zx_system_get_features, Type: Func }
@@ -165,7 +164,8 @@ Symbols:
   - { Name: _zx_system_mexec_payload_get, Type: Func }
   - { Name: _zx_system_powerctl, Type: Func }
   - { Name: _zx_system_set_performance_info, Type: Func }
-  - { Name: _zx_system_set_processor_power_level_domain, Type: Func }
+  - { Name: _zx_system_set_processor_power_domain, Type: Func }
+  - { Name: _zx_system_set_processor_power_state, Type: Func }
   - { Name: _zx_system_suspend_enter, Type: Func }
   - { Name: _zx_task_create_exception_channel, Type: Func }
   - { Name: _zx_task_kill, Type: Func }
@@ -362,7 +362,6 @@ Symbols:
   - { Name: zx_syscall_test_widening_unsigned_narrow, Type: Func, Weak: true }
   - { Name: zx_syscall_test_widening_unsigned_wide, Type: Func, Weak: true }
   - { Name: zx_syscall_test_wrapper, Type: Func, Weak: true }
-  - { Name: zx_system_create_processor_power_level_transition_handler, Type: Func, Weak: true }
   - { Name: zx_system_get_dcache_line_size, Type: Func, Weak: true }
   - { Name: zx_system_get_event, Type: Func, Weak: true }
   - { Name: zx_system_get_features, Type: Func, Weak: true }
@@ -375,7 +374,8 @@ Symbols:
   - { Name: zx_system_mexec_payload_get, Type: Func, Weak: true }
   - { Name: zx_system_powerctl, Type: Func, Weak: true }
   - { Name: zx_system_set_performance_info, Type: Func, Weak: true }
-  - { Name: zx_system_set_processor_power_level_domain, Type: Func, Weak: true }
+  - { Name: zx_system_set_processor_power_domain, Type: Func, Weak: true }
+  - { Name: zx_system_set_processor_power_state, Type: Func, Weak: true }
   - { Name: zx_system_suspend_enter, Type: Func, Weak: true }
   - { Name: zx_task_create_exception_channel, Type: Func, Weak: true }
   - { Name: zx_task_kill, Type: Func, Weak: true }

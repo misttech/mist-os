@@ -159,7 +159,7 @@ impl PlaybackRate {
     /// Returns Some(0) if the current position is negative.
     /// Returns None if the current position cannot be calculated.
     pub fn current_position(&self) -> Option<u32> {
-        media_timeline_fn_to_position(self.0, fasync::Time::now().into_nanos())
+        media_timeline_fn_to_position(self.0, fasync::MonotonicInstant::now().into_nanos())
     }
 
     /// Given a duration in playback time, returns the equal duration in reference time
@@ -751,7 +751,7 @@ mod tests {
     /// Tests correctness of conversion to fidl_avrcp::PlayStatus.
     fn test_play_status() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(900000000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(900000000));
 
         let mut play_status: ValidPlayStatus = Default::default();
         assert_eq!(play_status.get_playback_status(), fidl_avrcp::PlaybackStatus::Stopped);
@@ -979,7 +979,7 @@ mod tests {
     #[fuchsia::test]
     fn test_default_playback_rate_song_position() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(900000000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(900000000));
 
         let playback_rate = PlaybackRate::default();
         let pos = playback_rate.current_position();

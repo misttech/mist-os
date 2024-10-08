@@ -170,7 +170,7 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn no_message() {
-        let initial = fasync::Time::from_nanos(0);
+        let initial = fasync::MonotonicInstant::from_nanos(0);
         TestExecutor::advance_to(initial).await;
         const DURATION_NANOS: i64 = 1_000_000;
         let idle_duration = Duration::from_nanos(DURATION_NANOS);
@@ -190,7 +190,7 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn strong_control_handle_blocks_stalling() {
-        let initial = fasync::Time::from_nanos(0);
+        let initial = fasync::MonotonicInstant::from_nanos(0);
         TestExecutor::advance_to(initial).await;
         const DURATION_NANOS: i64 = 1_000_000;
         let idle_duration = Duration::from_nanos(DURATION_NANOS);
@@ -224,7 +224,7 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn weak_control_handle() {
-        let initial = fasync::Time::from_nanos(0);
+        let initial = fasync::MonotonicInstant::from_nanos(0);
         TestExecutor::advance_to(initial).await;
         const DURATION_NANOS: i64 = 1_000_000;
         let idle_duration = Duration::from_nanos(DURATION_NANOS);
@@ -249,7 +249,7 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn one_message() {
-        let initial = fasync::Time::from_nanos(0);
+        let initial = fasync::MonotonicInstant::from_nanos(0);
         TestExecutor::advance_to(initial).await;
         const DURATION_NANOS: i64 = 1_000_000;
         let idle_duration = Duration::from_nanos(DURATION_NANOS);
@@ -291,7 +291,7 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn pending_reply_blocks_stalling() {
-        let initial = fasync::Time::from_nanos(0);
+        let initial = fasync::MonotonicInstant::from_nanos(0);
         TestExecutor::advance_to(initial).await;
         const DURATION_NANOS: i64 = 1_000_000;
         let idle_duration = Duration::from_nanos(DURATION_NANOS);
@@ -334,7 +334,7 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn completed_stream() {
-        let initial = fasync::Time::from_nanos(0);
+        let initial = fasync::MonotonicInstant::from_nanos(0);
         TestExecutor::advance_to(initial).await;
         const DURATION_NANOS: i64 = 1_000_000;
         let idle_duration = Duration::from_nanos(DURATION_NANOS);
@@ -368,7 +368,7 @@ mod tests {
     /// back to the user, who can then pass it back to `component_manager` in practice.
     #[fuchsia::test(allow_stalls = false)]
     async fn end_to_end() {
-        let initial = fasync::Time::from_nanos(0);
+        let initial = fasync::MonotonicInstant::from_nanos(0);
         TestExecutor::advance_to(initial).await;
         use fidl_fuchsia_component_client_test::{ServiceAMarker, ServiceARequest};
 

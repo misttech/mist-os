@@ -26,6 +26,8 @@ namespace fdf_devicetree {
 
 constexpr const char kPhandleProp[] = "phandle";
 
+NodeManager::~NodeManager() = default;
+
 Node::Node(Node *parent, const std::string_view name, devicetree::Properties properties,
            uint32_t id, NodeManager *manager)
     : parent_(parent), name_(name), id_(id), manager_(manager) {

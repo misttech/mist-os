@@ -177,7 +177,7 @@ async fn query_network_activity(
 }
 
 struct NetworkActivitySample {
-    time_stamp: fasync::Time,
+    time_stamp: fasync::MonotonicInstant,
     rx_bytes: u64,
     tx_bytes: u64,
     rx_frames: u64,
@@ -271,11 +271,11 @@ pub struct NetworkActivityLogger {
 
     /// Start time for the logger; used to calculate elapsed time.
     /// This is an exclusive start.
-    start_time: fasync::Time,
+    start_time: fasync::MonotonicInstant,
 
     /// Time at which the logger will stop.
     /// This is an exclusive end.
-    end_time: fasync::Time,
+    end_time: fasync::MonotonicInstant,
 }
 
 impl NetworkActivityLogger {
@@ -287,9 +287,9 @@ impl NetworkActivityLogger {
         client_id: String,
         output_samples_to_syslog: bool,
     ) -> Self {
-        let start_time = fasync::Time::now();
-        let end_time = duration_ms.map_or(fasync::Time::INFINITE, |ms| {
-            fasync::Time::now() + zx::Duration::from_millis(ms as i64)
+        let start_time = fasync::MonotonicInstant::now();
+        let end_time = duration_ms.map_or(fasync::MonotonicInstant::INFINITE, |ms| {
+            fasync::MonotonicInstant::now() + zx::Duration::from_millis(ms as i64)
         });
 
         let inspect = InspectData::new(client_inspect);
@@ -309,10 +309,10 @@ impl NetworkActivityLogger {
     pub async fn log_network_activities(mut self) {
         let mut interval = fasync::Interval::new(self.interval);
         // Start querying network ports. Logging will start at the next interval.
-        self.log_network_activity(fasync::Time::now()).await;
+        self.log_network_activity(fasync::MonotonicInstant::now()).await;
 
         while let Some(()) = interval.next().await {
-            let now = fasync::Time::now();
+            let now = fasync::MonotonicInstant::now();
             if now >= self.end_time {
                 break;
             }
@@ -320,7 +320,7 @@ impl NetworkActivityLogger {
         }
     }
 
-    async fn log_network_activity(&mut self, now: fasync::Time) {
+    async fn log_network_activity(&mut self, now: fasync::MonotonicInstant) {
         match query_network_activity(
             self.ports.borrow().values().cloned().collect::<Vec<fhwnet::PortProxy>>(),
         )
@@ -484,7 +484,7 @@ pub mod tests {
     impl Runner {
         fn new() -> Self {
             let executor = fasync::TestExecutor::new_with_fake_time();
-            executor.set_fake_time(fasync::Time::from_nanos(0));
+            executor.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
             let inspector = inspect::Inspector::default();
             let inspect_root = inspector.root().create_child("MetricsLogger");

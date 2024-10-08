@@ -278,6 +278,26 @@ impl<'a> TestRealm<'a> {
         .context(S::DEBUG_NAME)
     }
 
+    /// Connects to a protocol from a child within the realm.
+    pub fn connect_to_protocol_from_child<S>(&self, child: &str) -> Result<S::Proxy>
+    where
+        S: fidl::endpoints::DiscoverableProtocolMarker,
+    {
+        (|| {
+            let (proxy, server_end) =
+                fidl::endpoints::create_proxy::<S>().context("create proxy")?;
+            let () = self
+                .connect_to_protocol_from_child_at_path_with_server_end(
+                    S::PROTOCOL_NAME,
+                    child,
+                    server_end,
+                )
+                .context("connect to protocol name with server end")?;
+            Result::Ok(proxy)
+        })()
+        .with_context(|| format!("{} from {child}", S::DEBUG_NAME))
+    }
+
     /// Opens the diagnostics directory of a component.
     pub fn open_diagnostics_directory(&self, child_name: &str) -> Result<fio::DirectoryProxy> {
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
@@ -295,6 +315,20 @@ impl<'a> TestRealm<'a> {
     ) -> Result {
         self.realm
             .connect_to_protocol(S::PROTOCOL_NAME, None, server_end.into_channel())
+            .context("connect to protocol")
+    }
+
+    /// Connects to a protocol from a child at a path within the realm.
+    pub fn connect_to_protocol_from_child_at_path_with_server_end<
+        S: fidl::endpoints::DiscoverableProtocolMarker,
+    >(
+        &self,
+        protocol_path: &str,
+        child: &str,
+        server_end: fidl::endpoints::ServerEnd<S>,
+    ) -> Result {
+        self.realm
+            .connect_to_protocol(protocol_path, Some(child), server_end.into_channel())
             .context("connect to protocol")
     }
 
@@ -711,7 +745,7 @@ impl<'a> TestRealm<'a> {
         fnet_routes_ext::admin::get_table_id::<I>(&main_route_table)
             .await
             .expect("failed to get_table_id")
-            .into()
+            .get()
     }
 }
 
@@ -1777,32 +1811,34 @@ impl<'a> TestInterface<'a> {
 
         let fnet_interfaces_admin::Configuration { ipv4, ipv6, .. } = config;
         if let Some(fnet_interfaces_admin::Ipv4Configuration {
-            forwarding,
+            unicast_forwarding,
             multicast_forwarding,
             ..
         }) = ipv4
         {
             let fnet_interfaces_admin::Ipv4Configuration {
-                forwarding: previous_forwarding,
+                unicast_forwarding: previous_unicast_forwarding,
                 multicast_forwarding: previous_multicast_forwarding,
                 ..
             } = previous_ipv4.ok_or_else(|| anyhow!("IPv4 configuration not supported"))?;
-            verify_config_changed(previous_forwarding, forwarding).context("IPv4 forwarding")?;
+            verify_config_changed(previous_unicast_forwarding, unicast_forwarding)
+                .context("IPv4 unicast forwarding")?;
             verify_config_changed(previous_multicast_forwarding, multicast_forwarding)
                 .context("IPv4 multicast forwarding")?;
         }
         if let Some(fnet_interfaces_admin::Ipv6Configuration {
-            forwarding,
+            unicast_forwarding,
             multicast_forwarding,
             ..
         }) = ipv6
         {
             let fnet_interfaces_admin::Ipv6Configuration {
-                forwarding: previous_forwarding,
+                unicast_forwarding: previous_unicast_forwarding,
                 multicast_forwarding: previous_multicast_forwarding,
                 ..
             } = previous_ipv6.ok_or_else(|| anyhow!("IPv6 configuration not supported"))?;
-            verify_config_changed(previous_forwarding, forwarding).context("IPv6 forwarding")?;
+            verify_config_changed(previous_unicast_forwarding, unicast_forwarding)
+                .context("IPv6 unicast forwarding")?;
             verify_config_changed(previous_multicast_forwarding, multicast_forwarding)
                 .context("IPv6 multicast forwarding")?;
         }
@@ -1813,7 +1849,7 @@ impl<'a> TestInterface<'a> {
     pub async fn set_ipv6_forwarding_enabled(&self, enabled: bool) -> Result<()> {
         self.set_configuration(fnet_interfaces_admin::Configuration {
             ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
-                forwarding: Some(enabled),
+                unicast_forwarding: Some(enabled),
                 ..Default::default()
             }),
             ..Default::default()
@@ -1825,7 +1861,7 @@ impl<'a> TestInterface<'a> {
     pub async fn set_ipv4_forwarding_enabled(&self, enabled: bool) -> Result<()> {
         self.set_configuration(fnet_interfaces_admin::Configuration {
             ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
-                forwarding: Some(enabled),
+                unicast_forwarding: Some(enabled),
                 ..Default::default()
             }),
             ..Default::default()
@@ -1895,6 +1931,25 @@ impl<'a> TestInterface<'a> {
     /// Returns the previous configuration value, if reported by the API.
     pub async fn set_dad_transmits(&self, dad_transmits: u16) -> Result<Option<u16>> {
         set_dad_transmits(self.control(), dad_transmits).await
+    }
+
+    /// Sets whether temporary SLAAC address generation is enabled
+    /// or disabled on this interface.
+    pub async fn set_temporary_address_generation_enabled(&self, enabled: bool) -> Result<()> {
+        self.set_configuration(fnet_interfaces_admin::Configuration {
+            ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
+                ndp: Some(fnet_interfaces_admin::NdpConfiguration {
+                    slaac: Some(fnet_interfaces_admin::SlaacConfiguration {
+                        temporary_address: Some(enabled),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        })
+        .await
     }
 }
 

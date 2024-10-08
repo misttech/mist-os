@@ -57,8 +57,8 @@ pub mod device {
     };
     pub use crate::internal::device::slaac::{
         InnerSlaacTimerId, SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses,
-        SlaacAddrsMutAndConfig, SlaacBindingsContext, SlaacConfiguration, SlaacContext,
-        SlaacCounters, SlaacState, SlaacTimerId, TemporarySlaacAddressConfiguration,
+        SlaacAddrsMutAndConfig, SlaacBindingsContext, SlaacConfiguration, SlaacConfigurationUpdate,
+        SlaacContext, SlaacCounters, SlaacState, SlaacTimerId, TemporarySlaacAddressConfiguration,
         SLAAC_MIN_REGEN_ADVANCE,
     };
     pub use crate::internal::device::state::{
@@ -187,6 +187,7 @@ pub mod multicast_forwarding {
     pub use crate::internal::multicast_forwarding::api::{
         MulticastForwardingApi, MulticastForwardingDisabledError,
     };
+    pub use crate::internal::multicast_forwarding::counters::MulticastForwardingCounters;
     pub use crate::internal::multicast_forwarding::packet_queue::MulticastForwardingPendingPackets;
     pub use crate::internal::multicast_forwarding::route::{
         ForwardMulticastRouteError, MulticastRoute, MulticastRouteKey, MulticastRouteStats,

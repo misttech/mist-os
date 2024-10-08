@@ -8,7 +8,12 @@
 
 fdio::~fdio() = default;
 
-zx::result<fdio_ptr> fdio::open(std::string_view path, fuchsia_io::wire::OpenFlags flags) {
+zx::result<fdio_ptr> fdio::open_deprecated(std::string_view path,
+                                           fuchsia_io::wire::OpenFlags flags) {
+  return zx::error(ZX_ERR_NOT_SUPPORTED);
+}
+
+zx::result<fdio_ptr> fdio::open(std::string_view path, fuchsia_io::Flags flags) {
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 

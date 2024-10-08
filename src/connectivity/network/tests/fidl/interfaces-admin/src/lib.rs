@@ -10,21 +10,26 @@ use fidl_fuchsia_net_ext::IntoExt;
 use finterfaces_admin::GrantForInterfaceAuthorization;
 use fnet_interfaces_ext::admin::TerminalError;
 use fuchsia_async::net::{DatagramSocket, UdpSocket};
-use fuchsia_async::{self as fasync, TimeoutExt as _};
+use fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _};
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
-use net_declare::{fidl_ip, fidl_mac, fidl_subnet, std_ip, std_ip_v6, std_socket_addr};
+use net_declare::{
+    fidl_ip, fidl_mac, fidl_subnet, net_subnet_v6, std_ip, std_ip_v6, std_socket_addr,
+};
 use net_types::ip::{Ip, IpAddress as _, IpVersion, Ipv4, Ipv6};
-use netemul::{InterfaceConfig, RealmUdpSocket as _};
+use netemul::{InterfaceConfig, RealmUdpSocket as _, TestFakeEndpoint};
+use netstack_testing_common::constants::ipv6 as ipv6_consts;
 use netstack_testing_common::devices::{
     add_pure_ip_interface, create_ip_tun_port, create_tun_device, create_tun_port_with,
     install_device, TUN_DEFAULT_PORT_ID,
 };
 use netstack_testing_common::interfaces::{self, add_address_wait_assigned, TestInterfaceExt as _};
+use netstack_testing_common::ndp::{send_ra_with_router_lifetime, wait_for_router_solicitation};
 use netstack_testing_common::realms::{
     Netstack, NetstackVersion, TestRealmExt as _, TestSandboxExt as _,
 };
 use netstack_testing_common::ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT;
 use netstack_testing_macros::netstack_test;
+use packet_formats::icmp::ndp::options::{NdpOptionBuilder, PrefixInformation};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto as _;
 use std::ops::Not as _;
@@ -1256,7 +1261,7 @@ async fn add_address_and_detach<N: Netstack>(
         },
     )
     .map_ok(|()| panic!("address deleted after detaching and closing channel"))
-    .on_timeout(fuchsia_async::Time::after(zx::Duration::from_millis(100)), || Ok(()))
+    .on_timeout(fuchsia_async::MonotonicInstant::after(zx::Duration::from_millis(100)), || Ok(()))
     .await
     .expect("wait for address to not be removed");
 
@@ -1610,7 +1615,7 @@ async fn device_control_owns_interfaces_lifetimes<N: Netstack>(name: &str, detac
 
         let ((), (), ()) = futures::future::join3(watcher_fut, ports_fut, control_closed_fut)
             .on_timeout(
-                fuchsia_async::Time::after(
+                fuchsia_async::MonotonicInstant::after(
                     netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
                 ),
                 || ((), (), ()),
@@ -2347,7 +2352,7 @@ async fn link_state_interface_state_interaction<N: Netstack>(name: &str) {
                 }
             })
             .on_timeout(
-                fuchsia_async::Time::after(
+                fuchsia_async::MonotonicInstant::after(
                     netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
                 ),
                 || (),
@@ -2773,7 +2778,7 @@ async fn control_owns_interface_lifetime<N: Netstack>(name: &str, detach: bool) 
 
         let ((), ()) = futures::future::join(watcher_fut, root_control_fut)
             .on_timeout(
-                fuchsia_async::Time::after(
+                fuchsia_async::MonotonicInstant::after(
                     netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
                 ),
                 || ((), ()),
@@ -2801,9 +2806,9 @@ async fn control_owns_interface_lifetime<N: Netstack>(name: &str, detach: bool) 
 
 #[derive(Default, Debug, PartialEq)]
 struct IpForwarding {
-    v4: Option<bool>,
+    v4_unicast: Option<bool>,
     v4_multicast: Option<bool>,
-    v6: Option<bool>,
+    v6_unicast: Option<bool>,
     v6_multicast: Option<bool>,
 }
 
@@ -2820,9 +2825,9 @@ impl IpForwarding {
             }
         }
         IpForwarding {
-            v4: false_if_none(self.v4),
+            v4_unicast: false_if_none(self.v4_unicast),
             v4_multicast: false_if_none(self.v4_multicast),
-            v6: false_if_none(self.v6),
+            v6_unicast: false_if_none(self.v6_unicast),
             v6_multicast: false_if_none(self.v6_multicast),
         }
     }
@@ -2834,23 +2839,23 @@ impl IpForwarding {
             val.and(Some(false))
         }
         IpForwarding {
-            v4: false_if_some(self.v4),
+            v4_unicast: false_if_some(self.v4_unicast),
             v4_multicast: false_if_some(self.v4_multicast),
-            v6: false_if_some(self.v6),
+            v6_unicast: false_if_some(self.v6_unicast),
             v6_multicast: false_if_some(self.v6_multicast),
         }
     }
 
     fn as_configuration(&self) -> finterfaces_admin::Configuration {
-        let IpForwarding { v4, v4_multicast, v6, v6_multicast } = *self;
+        let IpForwarding { v4_unicast, v4_multicast, v6_unicast, v6_multicast } = *self;
         finterfaces_admin::Configuration {
             ipv4: Some(finterfaces_admin::Ipv4Configuration {
-                forwarding: v4,
+                unicast_forwarding: v4_unicast,
                 multicast_forwarding: v4_multicast,
                 ..Default::default()
             }),
             ipv6: Some(finterfaces_admin::Ipv6Configuration {
-                forwarding: v6,
+                unicast_forwarding: v6_unicast,
                 multicast_forwarding: v6_multicast,
                 ..Default::default()
             }),
@@ -2867,67 +2872,67 @@ async fn get_ip_forwarding(iface: &fnet_interfaces_ext::admin::Control) -> IpFor
         .expect("error getting configuration");
 
     let finterfaces_admin::Ipv4Configuration {
-        forwarding: v4,
+        unicast_forwarding: v4_unicast,
         multicast_forwarding: v4_multicast,
         ..
     } = ipv4_config.expect("IPv4 configuration should be populated");
     let finterfaces_admin::Ipv6Configuration {
-        forwarding: v6,
+        unicast_forwarding: v6_unicast,
         multicast_forwarding: v6_multicast,
         ..
     } = ipv6_config.expect("IPv6 configuration should be populated");
 
-    IpForwarding { v4, v4_multicast, v6, v6_multicast }
+    IpForwarding { v4_unicast, v4_multicast, v6_unicast, v6_multicast }
 }
 
 #[netstack_test]
 #[variant(N, Netstack)]
 #[test_case(
-    IpForwarding { v4: None, v4_multicast: None, v6: None, v6_multicast: None },
+    IpForwarding { v4_unicast: None, v4_multicast: None, v6_unicast: None, v6_multicast: None },
     None
 ; "set_none")]
 #[test_case(
-    IpForwarding { v4: Some(false), v4_multicast: None, v6: Some(false), v6_multicast: None },
+    IpForwarding { v4_unicast: Some(false), v4_multicast: None, v6_unicast: Some(false), v6_multicast: None },
     None
 ; "set_ip_false")]
 #[test_case(
-    IpForwarding { v4: Some(true), v4_multicast: None, v6: Some(false), v6_multicast: None },
+    IpForwarding { v4_unicast: Some(true), v4_multicast: None, v6_unicast: Some(false), v6_multicast: None },
     Some(finterfaces_admin::ControlSetConfigurationError::Ipv4ForwardingUnsupported)
 ; "set_ipv4_true")]
 #[test_case(
-    IpForwarding { v4: Some(false), v4_multicast: None, v6: Some(true), v6_multicast: None },
+    IpForwarding { v4_unicast: Some(false), v4_multicast: None, v6_unicast: Some(true), v6_multicast: None },
     Some(finterfaces_admin::ControlSetConfigurationError::Ipv6ForwardingUnsupported)
 ; "set_ipv6_true")]
 #[test_case(
-    IpForwarding { v4: Some(true), v4_multicast: None, v6: Some(true), v6_multicast: None },
+    IpForwarding { v4_unicast: Some(true), v4_multicast: None, v6_unicast: Some(true), v6_multicast: None },
     Some(finterfaces_admin::ControlSetConfigurationError::Ipv4ForwardingUnsupported)
 ; "set_ip_true")]
 #[test_case(
-    IpForwarding { v4: None, v4_multicast: Some(false), v6: None, v6_multicast: Some(false) },
+    IpForwarding { v4_unicast: None, v4_multicast: Some(false), v6_unicast: None, v6_multicast: Some(false) },
     None
 ; "set_multicast_ip_false")]
 #[test_case(
-    IpForwarding { v4: None, v4_multicast: Some(true), v6: None, v6_multicast: Some(false) },
+    IpForwarding { v4_unicast: None, v4_multicast: Some(true), v6_unicast: None, v6_multicast: Some(false) },
     Some(finterfaces_admin::ControlSetConfigurationError::Ipv4MulticastForwardingUnsupported)
 ; "set_multicast_ipv4_true")]
 #[test_case(
-    IpForwarding { v4: None, v4_multicast: Some(false), v6: None, v6_multicast: Some(true) },
+    IpForwarding { v4_unicast: None, v4_multicast: Some(false), v6_unicast: None, v6_multicast: Some(true) },
     Some(finterfaces_admin::ControlSetConfigurationError::Ipv6MulticastForwardingUnsupported)
 ; "set_multicast_ipv6_true")]
 #[test_case(
-    IpForwarding { v4: None, v4_multicast: Some(true), v6: None, v6_multicast: Some(true) },
+    IpForwarding { v4_unicast: None, v4_multicast: Some(true), v6_unicast: None, v6_multicast: Some(true) },
     Some(finterfaces_admin::ControlSetConfigurationError::Ipv4MulticastForwardingUnsupported)
 ; "set_multicast_ip_true")]
 #[test_case(
-    IpForwarding { v4: Some(true), v4_multicast: Some(false), v6: Some(true), v6_multicast: Some(false) },
+    IpForwarding { v4_unicast: Some(true), v4_multicast: Some(false), v6_unicast: Some(true), v6_multicast: Some(false) },
     Some(finterfaces_admin::ControlSetConfigurationError::Ipv4ForwardingUnsupported)
 ; "set_ip_true_and_multicast_ip_false")]
 #[test_case(
-    IpForwarding { v4: Some(false), v4_multicast: Some(true), v6: Some(false), v6_multicast: Some(true) },
+    IpForwarding { v4_unicast: Some(false), v4_multicast: Some(true), v6_unicast: Some(false), v6_multicast: Some(true) },
     Some(finterfaces_admin::ControlSetConfigurationError::Ipv4MulticastForwardingUnsupported)
 ; "set_ip_false_and_multicast_ip_true")]
 #[test_case(
-    IpForwarding { v4: Some(true), v4_multicast: Some(true), v6: Some(true), v6_multicast: Some(true) },
+    IpForwarding { v4_unicast: Some(true), v4_multicast: Some(true), v6_unicast: Some(true), v6_multicast: Some(true) },
     Some(finterfaces_admin::ControlSetConfigurationError::Ipv4ForwardingUnsupported)
 ; "set_ip_and_multicast_ip_true")]
 async fn get_set_forwarding_loopback<N: Netstack>(
@@ -2974,18 +2979,18 @@ async fn get_set_forwarding_loopback<N: Netstack>(
 
 #[netstack_test]
 #[variant(N, Netstack)]
-#[test_case(IpForwarding { v4: None, v4_multicast: None, v6: None, v6_multicast: None }; "set_none")]
-#[test_case(IpForwarding { v4: Some(false), v4_multicast: None, v6: Some(false), v6_multicast: None }; "set_ip_false")]
-#[test_case(IpForwarding { v4: Some(true), v4_multicast: None, v6: Some(false), v6_multicast: None }; "set_ipv4_true")]
-#[test_case(IpForwarding { v4: Some(false), v4_multicast: None, v6: Some(true), v6_multicast: None }; "set_ipv6_true")]
-#[test_case(IpForwarding { v4: Some(true), v4_multicast: None, v6: Some(true), v6_multicast: None }; "set_ip_true")]
-#[test_case(IpForwarding { v4: None, v4_multicast: Some(false), v6: None, v6_multicast: Some(false) }; "set_multicast_ip_false")]
-#[test_case(IpForwarding { v4: None, v4_multicast: Some(true), v6: None, v6_multicast: Some(false) }; "set_multicast_ipv4_true")]
-#[test_case(IpForwarding { v4: None, v4_multicast: Some(false), v6: None, v6_multicast: Some(true) }; "set_multicast_ipv6_true")]
-#[test_case(IpForwarding { v4: None, v4_multicast: Some(true), v6: None, v6_multicast: Some(true) }; "set_multicast_ip_true")]
-#[test_case(IpForwarding { v4: Some(true), v4_multicast: Some(false), v6: Some(true), v6_multicast: Some(false) }; "set_ip_true_and_multicast_ip_false")]
-#[test_case(IpForwarding { v4: Some(false), v4_multicast: Some(true), v6: Some(false), v6_multicast: Some(true) }; "set_ip_false_and_multicast_ip_true")]
-#[test_case(IpForwarding { v4: Some(true), v4_multicast: Some(true), v6: Some(true), v6_multicast: Some(true) }; "set_ip_and_multicast_ip_true")]
+#[test_case(IpForwarding { v4_unicast: None, v4_multicast: None, v6_unicast: None, v6_multicast: None }; "set_none")]
+#[test_case(IpForwarding { v4_unicast: Some(false), v4_multicast: None, v6_unicast: Some(false), v6_multicast: None }; "set_ip_false")]
+#[test_case(IpForwarding { v4_unicast: Some(true), v4_multicast: None, v6_unicast: Some(false), v6_multicast: None }; "set_ipv4_true")]
+#[test_case(IpForwarding { v4_unicast: Some(false), v4_multicast: None, v6_unicast: Some(true), v6_multicast: None }; "set_ipv6_true")]
+#[test_case(IpForwarding { v4_unicast: Some(true), v4_multicast: None, v6_unicast: Some(true), v6_multicast: None }; "set_ip_true")]
+#[test_case(IpForwarding { v4_unicast: None, v4_multicast: Some(false), v6_unicast: None, v6_multicast: Some(false) }; "set_multicast_ip_false")]
+#[test_case(IpForwarding { v4_unicast: None, v4_multicast: Some(true), v6_unicast: None, v6_multicast: Some(false) }; "set_multicast_ipv4_true")]
+#[test_case(IpForwarding { v4_unicast: None, v4_multicast: Some(false), v6_unicast: None, v6_multicast: Some(true) }; "set_multicast_ipv6_true")]
+#[test_case(IpForwarding { v4_unicast: None, v4_multicast: Some(true), v6_unicast: None, v6_multicast: Some(true) }; "set_multicast_ip_true")]
+#[test_case(IpForwarding { v4_unicast: Some(true), v4_multicast: Some(false), v6_unicast: Some(true), v6_multicast: Some(false) }; "set_ip_true_and_multicast_ip_false")]
+#[test_case(IpForwarding { v4_unicast: Some(false), v4_multicast: Some(true), v6_unicast: Some(false), v6_multicast: Some(true) }; "set_ip_false_and_multicast_ip_true")]
+#[test_case(IpForwarding { v4_unicast: Some(true), v4_multicast: Some(true), v6_unicast: Some(true), v6_multicast: Some(true) }; "set_ip_and_multicast_ip_true")]
 async fn get_set_forwarding<N: Netstack>(name: &str, forwarding_config: IpForwarding) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create netstack realm");
@@ -3054,9 +3059,9 @@ async fn get_set_forwarding<N: Netstack>(name: &str, forwarding_config: IpForwar
     // interface/protocol.
     let reverse_if_some = |val: Option<bool>| val.map(bool::not);
     let reversed_forwarding_config = IpForwarding {
-        v4: reverse_if_some(forwarding_config.v4),
+        v4_unicast: reverse_if_some(forwarding_config.v4_unicast),
         v4_multicast: reverse_if_some(forwarding_config.v4_multicast),
-        v6: reverse_if_some(forwarding_config.v6),
+        v6_unicast: reverse_if_some(forwarding_config.v6_unicast),
         v6_multicast: reverse_if_some(forwarding_config.v6_multicast),
     };
     set_ip_forwarding(
@@ -3637,6 +3642,168 @@ async fn dad_transmits<N: Netstack>(name: &str) {
         .expect("set configuration error");
     assert_eq!(transmits_from_config(update), get_expectation(DEFAULT_DAD_TRANSMITS));
     assert_eq!(get_transmits().await, get_expectation(WANT_TRANSMITS));
+}
+
+#[netstack_test]
+#[variant(N, Netstack)]
+async fn temporary_address_generation<N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
+    let network = sandbox.create_network(name).await.expect("create network");
+    let iface = realm.join_network(&network, "client").await.expect("join network");
+
+    let set_and_assert = |want| {
+        let iface_ref = &iface;
+        async move {
+            iface_ref
+                .set_temporary_address_generation_enabled(want)
+                .await
+                .expect("set temporary address generation");
+            let config = iface_ref
+                .control()
+                .get_configuration()
+                .await
+                .expect("get configuration")
+                .expect("get configuration FIDL");
+            let got = config
+                .ipv6
+                .and_then(|x| x.ndp)
+                .and_then(|x| x.slaac)
+                .and_then(|finterfaces_admin::SlaacConfiguration { temporary_address, .. }| {
+                    temporary_address
+                })
+                .expect("temporary address enabled configuration missing");
+            assert_eq!(got, want);
+        }
+    };
+    set_and_assert(false).await;
+
+    let fake_ep = network.create_fake_endpoint().expect("create fake endpoint");
+    wait_for_router_solicitation(&fake_ep).await;
+
+    async fn send_ra(
+        fake_ep: &TestFakeEndpoint<'_>,
+        prefix: net_types::ip::Subnet<net_types::ip::Ipv6Addr>,
+    ) {
+        let options = [NdpOptionBuilder::PrefixInformation(PrefixInformation::new(
+            prefix.prefix(),
+            false, /* on_link_flag */
+            true,  /* autonomous_address_configuration_flag */
+            99999, /* valid_lifetime */
+            99999, /* preferred_lifetime */
+            prefix.network(),
+        ))];
+        send_ra_with_router_lifetime(fake_ep, 0, &options, ipv6_consts::LINK_LOCAL_ADDR)
+            .await
+            .expect("failed to send router advertisement");
+    }
+    const PREFIX1: net_types::ip::Subnet<net_types::ip::Ipv6Addr> =
+        net_subnet_v6!("2001:db8:1::/64");
+    const PREFIX2: net_types::ip::Subnet<net_types::ip::Ipv6Addr> =
+        net_subnet_v6!("2001:db8:2::/64");
+    send_ra(&fake_ep, PREFIX1).await;
+    send_ra(&fake_ep, PREFIX2).await;
+
+    let interface_state = realm
+        .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
+        .expect("failed to connect to fuchsia.net.interfaces/State");
+    fnet_interfaces_ext::wait_interface_with_id(
+        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+            &interface_state,
+            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::All,
+        )
+        .expect("error getting interface state event stream"),
+        &mut fnet_interfaces_ext::InterfaceState::<()>::Unknown(iface.id()),
+        |iface| {
+            // When temporary address assignment is enabled, the expected
+            // order of events is the following:
+            //
+            // 1. Stable addr for PREFIX1 is tentative.
+            // 2. Stable addr for PREFIX2 is tentative.
+            // 3. Stable addr for PREFIX1 is assigned and temporary addr
+            //    for PREFIX1 is tentative.
+            // 4. Stable addr for PREFIX2 is assigned and temporary addr
+            //    for PREFIX2 is tentative.
+            //
+            // In order to ensure that temporary addresses are not generated,
+            // we wait for the stable PREFIX2 addr to be fully assigned, but
+            // look for addresses from PREFIX1 as soon as they're tentative
+            // and expect to not see more than 1.
+            let (prefix1_count, prefix2_assigned_count) = iface.properties.addresses.iter().fold(
+                (0, 0),
+                |(prefix1_count, prefix2_assigned_count),
+                 &fnet_interfaces_ext::Address {
+                     addr: fnet::Subnet { addr, prefix_len: _ },
+                     valid_until: _,
+                     assignment_state,
+                 }| {
+                    match addr {
+                        fnet::IpAddress::Ipv4(fnet::Ipv4Address { .. }) => {}
+                        fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr }) => {
+                            let addr = net_types::ip::Ipv6Addr::from_bytes(addr);
+                            if PREFIX1.contains(&addr) {
+                                return (prefix1_count + 1, prefix2_assigned_count);
+                            } else if PREFIX2.contains(&addr)
+                                && assignment_state
+                                    == fnet_interfaces::AddressAssignmentState::Assigned
+                            {
+                                return (prefix1_count, prefix2_assigned_count + 1);
+                            }
+                        }
+                    }
+                    (prefix1_count, prefix2_assigned_count)
+                },
+            );
+            assert!(prefix1_count <= 1, "should not generate more than 1 address for prefix 1");
+            assert!(
+                prefix2_assigned_count <= 1,
+                "should not generate more than 1 address for prefix 2"
+            );
+            (prefix1_count == 1 && prefix2_assigned_count == 1).then_some(())
+        },
+    )
+    .map_err(anyhow::Error::from)
+    .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {
+        Err(anyhow::anyhow!("timed out"))
+    })
+    .await
+    .expect("failed to wait for stable SLAAC addresses to be generated");
+
+    set_and_assert(true).await;
+    send_ra(&fake_ep, PREFIX1).await;
+    fnet_interfaces_ext::wait_interface_with_id(
+        iface.get_interface_event_stream().expect("error getting interface state event stream"),
+        &mut fnet_interfaces_ext::InterfaceState::<()>::Unknown(iface.id()),
+        |iface| {
+            (iface
+                .properties
+                .addresses
+                .iter()
+                .filter_map(
+                    |&fnet_interfaces_ext::Address {
+                         addr: fnet::Subnet { addr, prefix_len: _ },
+                         valid_until: _,
+                         assignment_state: _,
+                     }| {
+                        match addr {
+                            fnet::IpAddress::Ipv4(fnet::Ipv4Address { .. }) => None,
+                            fnet::IpAddress::Ipv6(fnet::Ipv6Address { addr }) => PREFIX1
+                                .contains(&net_types::ip::Ipv6Addr::from_bytes(addr))
+                                .then_some(()),
+                        }
+                    },
+                )
+                .count()
+                == 2)
+                .then_some(())
+        },
+    )
+    .map_err(anyhow::Error::from)
+    .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {
+        Err(anyhow::anyhow!("timed out"))
+    })
+    .await
+    .expect("failed to wait for stable and temporary SLAAC addresses to be generated");
 }
 
 #[netstack_test]

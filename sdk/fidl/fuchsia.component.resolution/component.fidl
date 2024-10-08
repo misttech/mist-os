@@ -69,18 +69,12 @@ type Component = resource table {
 // accommodate additional component context information, if any.
 
 /// The maximum number of bytes for a `Context`.
-@available(added=9)
 const MAX_RESOLUTION_CONTEXT_SIZE uint32 = 8192;
-@available(removed=9)
-const MAX_RESOLUTION_CONTEXT_LENGTH uint32 = 8192;
 
 /// A component resolution context, used when resolving component URLs relative
 /// to another component. The context is stored in a byte array that persists a
 /// value used by the target `Resolver` to locate and resolve a component by
 /// relative path (for example, by a subpackage name).
-@available(added=9)
 type Context = struct {
     bytes vector<uint8>:MAX_RESOLUTION_CONTEXT_SIZE;
 };
-@available(replaced=9)
-alias Context = vector<uint8>:MAX_RESOLUTION_CONTEXT_LENGTH;

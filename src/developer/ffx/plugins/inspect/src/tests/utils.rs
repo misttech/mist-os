@@ -116,7 +116,7 @@ pub fn setup_fake_rcs() -> RemoteControlProxy {
                     flags: _,
                     responder,
                 } => {
-                    assert_eq!(moniker, "core/remote-control");
+                    assert_eq!(moniker, "toolbox");
                     assert_eq!(capability_set, rcs::OpenDirType::NamespaceDir);
                     assert_eq!(capability_name, "svc/fuchsia.sys2.RealmQuery.root");
                     let querier = Arc::clone(&querier);
@@ -154,7 +154,7 @@ pub fn setup_fake_rcs_with_embedded_archive_accessor(
                     flags: _,
                     responder,
                 } => {
-                    if moniker == "core/remote-control" {
+                    if moniker == "toolbox" {
                         assert_eq!(capability_set, rcs::OpenDirType::NamespaceDir);
                         assert_eq!(capability_name, "svc/fuchsia.sys2.RealmQuery.root");
                         let querier = Arc::clone(&querier);

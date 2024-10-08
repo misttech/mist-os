@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
+
 # buildifier: disable=module-docstring
 def _print_debug_info_impl(ctx):
     sdk = ctx.toolchains["//fuchsia:toolchain"]
@@ -80,6 +82,6 @@ print_debug_info = rule(
             cfg = "exec",
             allow_single_file = True,
         ),
-    },
+    } | COMPATIBILITY.HOST_ATTRS,
     executable = True,
 )

@@ -128,7 +128,6 @@ source_set("parent_device_dfv2") {
 
   deps = [
     "//sdk/lib/driver/power/cpp",
-    "//src/devices/power/lib/from-fidl/cpp",
     "//src/graphics/magma/lib/magma/platform:thread",
     "//src/graphics/magma/lib/magma/platform/zircon:interrupt",
     "//src/graphics/magma/lib/magma/platform/zircon:mmio",

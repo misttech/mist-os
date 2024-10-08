@@ -2549,11 +2549,12 @@ mod tests {
                 _vmo: &Arc<zx::Vmo>,
                 _vmo_offset: u64,
                 opts: WriteOptions,
-            ) {
+            ) -> fake_block_server::WriteAction {
                 assert_eq!(
                     opts.contains(WriteOptions::FORCE_ACCESS),
                     self.0.load(Ordering::Relaxed)
                 );
+                fake_block_server::WriteAction::Write
             }
         }
 

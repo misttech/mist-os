@@ -28,7 +28,7 @@ use netstack3_core::{InstantContext as _, StackStateBuilder, TimerId};
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_ip::device::{
     IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv4DeviceTimerId,
-    Ipv6DeviceConfigurationUpdate, Ipv6DeviceTimerId, SlaacConfiguration,
+    Ipv6DeviceConfigurationUpdate, Ipv6DeviceTimerId, SlaacConfigurationUpdate,
 };
 use netstack3_ip::gmp::{
     IgmpTimerId, MldTimerId, IGMP_DEFAULT_UNSOLICITED_REPORT_INTERVAL,
@@ -227,10 +227,10 @@ fn test_mld_enable_disable_integration() {
                     dad_transmits: Some(None),
                     max_router_solicitations: Some(None),
                     // Auto-generate a link-local address.
-                    slaac_config: Some(SlaacConfiguration {
-                        enable_stable_addresses: true,
+                    slaac_config: SlaacConfigurationUpdate {
+                        enable_stable_addresses: Some(true),
                         ..Default::default()
-                    }),
+                    },
                     ip_config: IpDeviceConfigurationUpdate {
                         ip_enabled: Some(ip_enabled),
                         gmp_enabled: Some(gmp_enabled),

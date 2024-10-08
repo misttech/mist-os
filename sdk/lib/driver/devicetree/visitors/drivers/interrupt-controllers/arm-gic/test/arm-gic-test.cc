@@ -52,6 +52,10 @@ TEST(ArmGicVisitorTest, TestInterruptProperty) {
       EXPECT_EQ(static_cast<uint32_t>(IRQ2_PPI) + 16, *(*irq)[1].irq());
       EXPECT_EQ(static_cast<uint32_t>(IRQ1_MODE_FUCHSIA), static_cast<uint32_t>(*(*irq)[0].mode()));
       EXPECT_EQ(static_cast<uint32_t>(IRQ2_MODE_FUCHSIA), static_cast<uint32_t>(*(*irq)[1].mode()));
+      ASSERT_TRUE((*irq)[0].name().has_value());
+      EXPECT_EQ("interrupt-first", *(*irq)[0].name());
+      ASSERT_TRUE((*irq)[1].name().has_value());
+      EXPECT_EQ("interrupt-second", *(*irq)[1].name());
 
       node_tested_count++;
     }
@@ -66,6 +70,10 @@ TEST(ArmGicVisitorTest, TestInterruptProperty) {
       EXPECT_EQ(static_cast<uint32_t>(IRQ4_PPI) + 16, *(*irq)[1].irq());
       EXPECT_EQ(static_cast<uint32_t>(IRQ3_MODE_FUCHSIA), static_cast<uint32_t>(*(*irq)[0].mode()));
       EXPECT_EQ(static_cast<uint32_t>(IRQ4_MODE_FUCHSIA), static_cast<uint32_t>(*(*irq)[1].mode()));
+      ASSERT_TRUE((*irq)[0].name().has_value());
+      EXPECT_EQ("interrupt-first", *(*irq)[0].name());
+      ASSERT_TRUE((*irq)[1].name().has_value());
+      EXPECT_EQ("interrupt-second", *(*irq)[1].name());
 
       node_tested_count++;
     }
@@ -80,6 +88,8 @@ TEST(ArmGicVisitorTest, TestInterruptProperty) {
       EXPECT_EQ(static_cast<uint32_t>(IRQ6_SPI) + 32, *(*irq)[1].irq());
       EXPECT_EQ(static_cast<uint32_t>(IRQ5_MODE_FUCHSIA), static_cast<uint32_t>(*(*irq)[0].mode()));
       EXPECT_EQ(static_cast<uint32_t>(IRQ6_MODE_FUCHSIA), static_cast<uint32_t>(*(*irq)[1].mode()));
+      ASSERT_FALSE((*irq)[0].name().has_value());
+      ASSERT_FALSE((*irq)[1].name().has_value());
 
       node_tested_count++;
     }

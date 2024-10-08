@@ -707,17 +707,20 @@ async fn test_close_data_race<N: Netstack>(name: &str) {
                 // Wait on a short timer with an exponential backoff to reduce log noise
                 // when running the test (which can cause timeouts due to slowness in
                 // the logging framework).
-                let () = fuchsia_async::Timer::new(fuchsia_async::Time::after(write_wait_interval))
-                    .await;
+                let () = fuchsia_async::Timer::new(fuchsia_async::MonotonicInstant::after(
+                    write_wait_interval,
+                ))
+                .await;
                 write_wait_interval = write_wait_interval * 2;
             }
         };
 
         let id = dev.id();
         let drop_fut = async move {
-            let () =
-                fuchsia_async::Timer::new(fuchsia_async::Time::after(zx::Duration::from_millis(3)))
-                    .await;
+            let () = fuchsia_async::Timer::new(fuchsia_async::MonotonicInstant::after(
+                zx::Duration::from_millis(3),
+            ))
+            .await;
             std::mem::drop(dev);
         };
 
@@ -1320,7 +1323,10 @@ async fn watcher<N: Netstack>(name: &str) {
                 let event = event.expect("watcher event stream ended");
                 Some(event)
             })
-            .on_timeout(fuchsia_async::Time::after(zx::Duration::from_millis(50)), || None)
+            .on_timeout(
+                fuchsia_async::MonotonicInstant::after(zx::Duration::from_millis(50)),
+                || None,
+            )
             .map(|e| match e {
                 Some(e) => panic!("did not block but yielded {:?}", e),
                 None => (),

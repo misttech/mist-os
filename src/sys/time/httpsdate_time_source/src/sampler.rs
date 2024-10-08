@@ -39,7 +39,7 @@ impl HttpsDateClient for NetworkTimeClient {
     ) -> Result<zx::MonotonicInstant, HttpsDateError> {
         let utc = self
             .get_network_time(uri.clone())
-            .on_timeout(fasync::Time::after(https_timeout), || {
+            .on_timeout(fasync::MonotonicInstant::after(https_timeout), || {
                 Err(HttpsDateError::new(HttpsDateErrorType::NetworkError)
                     .with_source(format_err!("Timed out after {:?}", https_timeout)))
             })

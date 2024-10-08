@@ -390,7 +390,7 @@ impl SavedNetworksManagerApi for SavedNetworksManager {
                         network.perf_stats.connect_failures.add(
                             bssid,
                             ConnectFailure {
-                                time: fasync::Time::now(),
+                                time: fasync::MonotonicInstant::now(),
                                 reason: FailureReason::CredentialRejected,
                                 bssid,
                             },
@@ -400,7 +400,7 @@ impl SavedNetworksManagerApi for SavedNetworksManager {
                         network.perf_stats.connect_failures.add(
                             bssid,
                             ConnectFailure {
-                                time: fasync::Time::now(),
+                                time: fasync::MonotonicInstant::now(),
                                 reason: FailureReason::GeneralFailure,
                                 bssid,
                             },
@@ -1079,7 +1079,7 @@ mod tests {
         let network_id = NetworkIdentifier::try_from("foo", SecurityType::None).unwrap();
         let credential = Credential::None;
         let bssid = types::Bssid::from([1; 6]);
-        let before_recording = fasync::Time::now();
+        let before_recording = fasync::MonotonicInstant::now();
 
         // Verify that recording connect result does not save the network.
         saved_networks
@@ -1158,7 +1158,7 @@ mod tests {
         let network_id = NetworkIdentifier::try_from("foo", SecurityType::None).unwrap();
         let credential = Credential::None;
         let bssid = types::Bssid::from([0; 6]);
-        let before_recording = fasync::Time::now();
+        let before_recording = fasync::MonotonicInstant::now();
 
         // Verify that recording connect result does not save the network.
         saved_networks
@@ -1236,7 +1236,7 @@ mod tests {
             .expect("Failed to get saved network")
             .perf_stats
             .past_connections
-            .get_recent_for_network(fasync::Time::INFINITE_PAST);
+            .get_recent_for_network(fasync::MonotonicInstant::INFINITE_PAST);
         assert_variant!(recent_connections.as_slice(), [connection_data] => {
             assert_eq!(connection_data, &data);
         })

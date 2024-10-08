@@ -166,11 +166,11 @@ zx_status_t AddI2cBus(const I2cBus& bus,
   auto& data = i2c_metadata_fidl.value();
   std::vector<fpbus::Metadata> i2c_metadata{
       {{
-          .type = DEVICE_METADATA_I2C_CHANNELS,
+          .id = std::to_string(DEVICE_METADATA_I2C_CHANNELS),
           .data = std::move(data),
       }},
       {{
-          .type = DEVICE_METADATA_PRIVATE,
+          .id = std::to_string(DEVICE_METADATA_PRIVATE),
           .data = std::vector<uint8_t>(
               reinterpret_cast<const uint8_t*>(&bus.delay),
               reinterpret_cast<const uint8_t*>(&bus.delay) + sizeof(bus.delay)),

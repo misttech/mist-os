@@ -906,6 +906,10 @@ impl Url {
         url::Url::parse(&self.0).ok().map(|u| u.scheme().into())
     }
 
+    pub fn resource(&self) -> Option<String> {
+        url::Url::parse(&self.0).ok().map(|u| u.fragment().map(str::to_string)).flatten()
+    }
+
     pub fn as_str(&self) -> &str {
         &*self.0
     }

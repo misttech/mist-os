@@ -194,7 +194,7 @@ impl Session {
 /// Implements the [ObexServerHandler] to handle OBEX requests from remote
 /// MNS OBEX client.
 struct ServerHandler {
-    notification_sender: UnboundedSender<(Notification, fasync::Time)>,
+    notification_sender: UnboundedSender<(Notification, fasync::MonotonicInstant)>,
     // Expected to be `Some<T>` until the OBEX CONNECT operation is completed, after which it will
     // be `None`.
     obex_connection_notifier: Option<oneshot::Sender<Result<(), Error>>>,
@@ -203,7 +203,7 @@ struct ServerHandler {
 impl ServerHandler {
     /// Creates a new OBEX server handler for Message Notification Server and an [UnboundedReceiver]
     /// for notifications received through the PUT operation from the peer.
-    fn new() -> (Self, UnboundedReceiver<(Notification, fasync::Time)>) {
+    fn new() -> (Self, UnboundedReceiver<(Notification, fasync::MonotonicInstant)>) {
         let (notification_sender, notification_receiver) = mpsc::unbounded();
         (Self { notification_sender, obex_connection_notifier: None }, notification_receiver)
     }
@@ -313,7 +313,7 @@ impl ObexServerHandler for ServerHandler {
     /// Checks if the put request is the SendEvent from MAP v1.4.3
     /// Section 5.1.
     async fn put(&mut self, data: Vec<u8>, headers: HeaderSet) -> Result<(), ObexOperationError> {
-        let received_time = fasync::Time::now();
+        let received_time = fasync::MonotonicInstant::now();
         // Check connection ID.
         if !headers.contains_header(&HeaderIdentifier::ConnectionId) {
             return Err(new_operation_error(

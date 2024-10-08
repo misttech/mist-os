@@ -10,9 +10,7 @@ use futures::StreamExt as _;
 use starnix_core::device::kobject::DeviceMetadata;
 use starnix_core::device::{DeviceMode, DeviceOps};
 use starnix_core::fs::sysfs::DeviceDirectory;
-use starnix_core::power::{
-    create_proxy_for_wake_events, KERNEL_PROXY_EVENT_SIGNAL, RUNNER_PROXY_EVENT_SIGNAL,
-};
+use starnix_core::power::{clear_wake_proxy_signal, create_proxy_for_wake_events};
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::{FileOps, FsNode, FsString};
 use starnix_logging::log_warn;
@@ -24,7 +22,6 @@ use starnix_uapi::time::timeval_from_time;
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{input_id, BUS_VIRTUAL};
 use std::sync::Arc;
-use zx::Peered;
 use {
     fidl_fuchsia_ui_input3 as fuiinput, fidl_fuchsia_ui_policy as fuipolicy,
     fidl_fuchsia_ui_views as fuiviews, fuchsia_async as fasync, starnix_uapi as uapi, zx,
@@ -237,10 +234,7 @@ impl InputDevice {
         loop {
             let next_event_future = local_listener_stream.next();
 
-            let (clear_mask, set_mask) = (RUNNER_PROXY_EVENT_SIGNAL, KERNEL_PROXY_EVENT_SIGNAL);
-            local_resume_event.as_ref().map(|e| {
-                let _ = e.signal_peer(clear_mask, set_mask);
-            });
+            local_resume_event.as_ref().map(clear_wake_proxy_signal);
 
             match next_event_future.await {
                 Some(Ok(fuipolicy::MediaButtonsListenerRequest::OnEvent { event, responder })) => {

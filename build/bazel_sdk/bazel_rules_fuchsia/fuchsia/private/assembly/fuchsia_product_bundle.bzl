@@ -4,6 +4,7 @@
 
 """Rule that creates a product bundle for flashing, emulating, or updating a Fuchsia product to a target device."""
 
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_product_bundle_inputs", "get_ffx_scrutiny_inputs")
 load(
     "//fuchsia/private:fuchsia_debug_symbols.bzl",
@@ -847,5 +848,5 @@ _build_fuchsia_product_bundle = rule(
             providers = [FuchsiaScrutinyConfigInfo],
             default = "//fuchsia/private/assembly/goldens:userdebug_recovery",
         ),
-    },
+    } | COMPATIBILITY.HOST_ATTRS,
 )

@@ -4,6 +4,7 @@
 
 """Rule for declaring a FIDL library"""
 
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_ATTRS", "fail_missing_api_level", "get_fuchsia_api_level")
 load(":fuchsia_fidl_cc_library.bzl", "fuchsia_fidl_cc_library", "get_cc_lib_name")
 load(":providers.bzl", "FuchsiaFidlLibraryInfo")
@@ -84,7 +85,7 @@ _fidl_library = rule(
             doc = "list of FIDL CC binding types that this library will generate",
             mandatory = False,
         ),
-    } | FUCHSIA_API_LEVEL_ATTRS,
+    } | COMPATIBILITY.HOST_ATTRS | FUCHSIA_API_LEVEL_ATTRS,
     outputs = {
         # The intermediate representation of the library, to be consumed by bindings
         # generators.

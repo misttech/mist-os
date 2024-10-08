@@ -108,13 +108,13 @@
     {
       "kind": {
         "Option": {
-          "arg_name": "since-monotonic"
+          "arg_name": "since-boot"
         }
       },
       "optionality": "optional",
-      "long": "--since-monotonic",
+      "long": "--since-boot",
       "short": null,
-      "description": "show only logs after a certain time (as a monotonic timestamp: seconds from the target's boot time).",
+      "description": "show only logs after a certain time (as a boot timestamp: seconds from the target's boot time).",
       "hidden": false
     },
     {
@@ -132,13 +132,13 @@
     {
       "kind": {
         "Option": {
-          "arg_name": "until-monotonic"
+          "arg_name": "until-boot"
         }
       },
       "optionality": "optional",
-      "long": "--until-monotonic",
+      "long": "--until-boot",
       "short": null,
-      "description": "show only logs until a certain time (as a monotonic timestamp: seconds since the target's boot time).",
+      "description": "show only logs until a certain time (as a a boot timestamp: seconds since the target's boot time).",
       "hidden": false
     },
     {
@@ -190,7 +190,7 @@
       "optionality": "optional",
       "long": "--clock",
       "short": null,
-      "description": "how to display log timestamps. Options are \"utc\", \"local\", or \"monotonic\" (i.e. nanos since target boot). Default is monotonic.",
+      "description": "how to display log timestamps. Options are \"utc\", \"local\", or \"boot\" (i.e. nanos since target boot). Default is boot.",
       "hidden": false
     },
     {
@@ -202,7 +202,7 @@
       "optionality": "optional",
       "long": "--symbolize",
       "short": null,
-      "description": "configure symbolization options. Valid options are: - pretty (default): pretty concise symbolization - off: disables all symbolization - classic: traiditional, non-prettified symbolization",
+      "description": "configure symbolization options. Valid options are: - pretty (default): pretty concise symbolization - off: disables all symbolization - classic: traditional, non-prettified symbolization",
       "hidden": false
     },
     {

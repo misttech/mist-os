@@ -130,7 +130,7 @@ TEST(LoggerTest, CreateAndLog) {
 
   svc_binding2.Bind(svc.server.TakeChannel(), loop.dispatcher());
 
-  auto logger = fdf::Logger::Create(*ns, loop.dispatcher(), kName, FUCHSIA_LOG_INFO, false);
+  auto logger = fdf::Logger::Create2(*ns, loop.dispatcher(), kName, FUCHSIA_LOG_INFO, false);
   ASSERT_FALSE(logger->IsNoOp());
   loop.RunUntilIdle();
 
@@ -172,7 +172,7 @@ TEST(LoggerTest, Create_NoLogSink) {
   svc.server.TakeChannel().reset();
 
   // Setup logger.
-  auto logger = fdf::Logger::Create(*ns, loop.dispatcher(), kName, FUCHSIA_LOG_INFO, true);
+  auto logger = fdf::Logger::Create2(*ns, loop.dispatcher(), kName, FUCHSIA_LOG_INFO, true);
   ASSERT_TRUE(logger->IsNoOp());
 }
 
@@ -206,7 +206,7 @@ TEST(LoggerTest, SetSeverity) {
 
   svc_binding2.Bind(svc.server.TakeChannel(), loop.dispatcher());
 
-  auto logger = fdf::Logger::Create(*ns, loop.dispatcher(), kName, FUCHSIA_LOG_INFO, false);
+  auto logger = fdf::Logger::Create2(*ns, loop.dispatcher(), kName, FUCHSIA_LOG_INFO, false);
   ASSERT_FALSE(logger->IsNoOp());
   loop.RunUntilIdle();
 

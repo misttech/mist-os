@@ -41,7 +41,7 @@ async fn verify_main_process_critical_default_denied() -> Result<(), Error> {
 
     // component_manager should still be running. Observe this by not seeing component_manager exit
     // within COMPONENT_MANAGER_DEATH_TIMEOUT seconds.
-    let timer = fasync::Timer::new(fasync::Time::after(zx::Duration::from_seconds(
+    let timer = fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_seconds(
         COMPONENT_MANAGER_DEATH_TIMEOUT,
     )));
 
@@ -83,7 +83,7 @@ async fn verify_main_process_critical_nonzero_flag_used() -> Result<(), Error> {
     // component_manager's job in this case because the critical component exited with a 0 return
     // code. Observe this by not seeing component_manager exit within
     // COMPONENT_MANAGER_DEATH_TIMEOUT seconds.
-    let timer = fasync::Timer::new(fasync::Time::after(zx::Duration::from_seconds(
+    let timer = fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_seconds(
         COMPONENT_MANAGER_DEATH_TIMEOUT,
     )));
 

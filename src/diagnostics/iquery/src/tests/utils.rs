@@ -215,7 +215,8 @@ impl<'a> CommandAssertion<'a> {
                     }
                 }
             }
-            fasync::Timer::new(fasync::Time::after(zx::Duration::from_millis(100))).await;
+            fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_millis(100)))
+                .await;
         }
     }
 

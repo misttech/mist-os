@@ -51,6 +51,9 @@ pub struct VirtualDeviceInfo {
     /// Details of the Central Processing Unit (CPU).
     pub cpu: String,
 
+    /// Count of Central Processing Units present.
+    pub cpu_count: usize,
+
     /// Details about any audio devices included in the virtual device.
     pub audio: String,
 
@@ -86,6 +89,7 @@ impl From<VirtualDeviceV1> for VirtualDeviceInfo {
             name: value.name.clone(),
             description: value.description.clone(),
             cpu: value.hardware.cpu.arch.to_string(),
+            cpu_count: value.hardware.cpu.count,
             audio: value.hardware.audio.model.to_string(),
             storage_bytes: value.hardware.storage.as_bytes().unwrap_or(0),
             pointing_device: value.hardware.inputs.pointing_device.to_string(),

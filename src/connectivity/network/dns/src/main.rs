@@ -85,8 +85,8 @@ impl QueryStats {
         Self { inner: Mutex::new(VecDeque::new()) }
     }
 
-    async fn finish_query(&self, start_time: fasync::Time, result: QueryResult<'_>) {
-        let end_time = fasync::Time::now();
+    async fn finish_query(&self, start_time: fasync::MonotonicInstant, result: QueryResult<'_>) {
+        let end_time = fasync::MonotonicInstant::now();
         let finish = move |window: &mut QueryWindow| {
             let elapsed_time = end_time - start_time;
             match result {
@@ -251,7 +251,7 @@ impl FailureStats {
 }
 
 struct QueryWindow {
-    start: fasync::Time,
+    start: fasync::MonotonicInstant,
     success_count: u64,
     failure_count: u64,
     success_elapsed_time: zx::Duration,
@@ -261,7 +261,7 @@ struct QueryWindow {
 }
 
 impl QueryWindow {
-    fn new(start: fasync::Time) -> Self {
+    fn new(start: fasync::MonotonicInstant) -> Self {
         Self {
             start,
             success_count: 0,
@@ -808,7 +808,7 @@ fn create_ip_lookup_fut<T: ResolverLookup>(
                         Err(std::net::AddrParseError { .. }) => {}
                     };
                     let resolver = resolver.read();
-                    let start_time = fasync::Time::now();
+                    let start_time = fasync::MonotonicInstant::now();
                     let (ret1, ret2, ret3) = futures::future::join3(
                         futures::future::OptionFuture::from(
                             ipv4_lookup.then(|| resolver.lookup(hostname, RecordType::A)),
@@ -2056,8 +2056,8 @@ mod tests {
         result: QueryResult<'_>,
         delay: zx::Duration,
     ) {
-        let start_time = fasync::Time::now();
-        let () = exec.set_fake_time(fasync::Time::after(delay));
+        let start_time = fasync::MonotonicInstant::now();
+        let () = exec.set_fake_time(fasync::MonotonicInstant::after(delay));
         let update_stats = stats.finish_query(start_time, result);
         let mut update_stats = pin!(update_stats);
         assert!(exec.run_until_stalled(&mut update_stats).is_ready());
@@ -2071,7 +2071,7 @@ mod tests {
     fn test_query_stats_inspect_average() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         const START_NANOS: i64 = 1_234_567;
-        let () = exec.set_fake_time(fasync::Time::from_nanos(START_NANOS));
+        let () = exec.set_fake_time(fasync::MonotonicInstant::from_nanos(START_NANOS));
 
         let stats = Arc::new(QueryStats::new());
         let inspector = fuchsia_inspect::Inspector::default();
@@ -2091,7 +2091,7 @@ mod tests {
                 Ok(/*addresses*/ NON_ZERO_USIZE_ONE),
                 SUCCESSFUL_QUERY_DURATION,
             );
-            let () = exec.set_fake_time(fasync::Time::after(
+            let () = exec.set_fake_time(fasync::MonotonicInstant::after(
                 STAT_WINDOW_DURATION - SUCCESSFUL_QUERY_DURATION,
             ));
         }
@@ -2131,7 +2131,7 @@ mod tests {
     fn test_query_stats_inspect_error_counters() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         const START_NANOS: i64 = 1_234_567;
-        let () = exec.set_fake_time(fasync::Time::from_nanos(START_NANOS));
+        let () = exec.set_fake_time(fasync::MonotonicInstant::from_nanos(START_NANOS));
 
         let stats = Arc::new(QueryStats::new());
         let inspector = fuchsia_inspect::Inspector::default();
@@ -2176,7 +2176,7 @@ mod tests {
     fn test_query_stats_inspect_no_records_found() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         const START_NANOS: i64 = 1_234_567;
-        let () = exec.set_fake_time(fasync::Time::from_nanos(START_NANOS));
+        let () = exec.set_fake_time(fasync::MonotonicInstant::from_nanos(START_NANOS));
 
         let stats = Arc::new(QueryStats::new());
         let inspector = fuchsia_inspect::Inspector::default();
@@ -2241,7 +2241,7 @@ mod tests {
     fn test_query_stats_resolved_address_counts() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         const START_NANOS: i64 = 1_234_567;
-        exec.set_fake_time(fasync::Time::from_nanos(START_NANOS));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(START_NANOS));
 
         let stats = Arc::new(QueryStats::new());
         let inspector = fuchsia_inspect::Inspector::default();
@@ -2300,7 +2300,7 @@ mod tests {
     fn test_query_stats_inspect_oldest_stats_erased() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         const START_NANOS: i64 = 1_234_567;
-        let () = exec.set_fake_time(fasync::Time::from_nanos(START_NANOS));
+        let () = exec.set_fake_time(fasync::MonotonicInstant::from_nanos(START_NANOS));
 
         let stats = Arc::new(QueryStats::new());
         let inspector = fuchsia_inspect::Inspector::default();
@@ -2309,7 +2309,8 @@ mod tests {
         for _ in 0..STAT_WINDOW_COUNT {
             let () =
                 run_fake_lookup(&mut exec, stats.clone(), Err(&ResolveErrorKind::Timeout), DELAY);
-            let () = exec.set_fake_time(fasync::Time::after(STAT_WINDOW_DURATION - DELAY));
+            let () =
+                exec.set_fake_time(fasync::MonotonicInstant::after(STAT_WINDOW_DURATION - DELAY));
         }
         for _ in 0..STAT_WINDOW_COUNT {
             let () = run_fake_lookup(
@@ -2318,7 +2319,8 @@ mod tests {
                 Ok(/*addresses*/ NON_ZERO_USIZE_ONE),
                 DELAY,
             );
-            let () = exec.set_fake_time(fasync::Time::after(STAT_WINDOW_DURATION - DELAY));
+            let () =
+                exec.set_fake_time(fasync::MonotonicInstant::after(STAT_WINDOW_DURATION - DELAY));
         }
         // All the failed queries should be erased from the stats as they are
         // now out of date.

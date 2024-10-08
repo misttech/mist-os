@@ -49,12 +49,6 @@ parser.add_argument(
     default=None,
     help="path to FFX subtools path.",
 )
-# TODO(b/369445945): will be deleted after removing "transport" arg from all of "python_mobly_tests()"
-parser.add_argument(
-    "--transport",
-    default=None,
-    help="value to use in mobly config for host->device transport type.",
-)
 parser.add_argument(
     "--multi-device",
     action="store_const",

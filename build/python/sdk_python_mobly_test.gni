@@ -11,7 +11,6 @@ import("//build/sdk/sdk_atom.gni")
 # ```
 # python_mobly_test("my-test") {
 #   main_source = "main.py"
-#   transport = "fuchsia-controller"
 #   testonly = false  # Required for SDK inclusion.
 # }
 #

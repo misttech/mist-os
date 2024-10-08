@@ -60,8 +60,9 @@ impl Key {
         // key.  The unwrapped key consists of 64 bytes for the XTS key which is made up of two 32
         // bytes Aes256 keys, one for the data and one for the IV/tweak, followed by 16 bytes which
         // make up the IV.
+        let wrapping_key_id_0 = [0; 16];
         let unwrapped_key = crypt
-            .unwrap_key(0, 0, &data[..std::mem::size_of::<ZxcryptHeaderAndKey>()])
+            .unwrap_key(&wrapping_key_id_0, 0, &data[..std::mem::size_of::<ZxcryptHeaderAndKey>()])
             .await?
             .map_err(zx::Status::from_raw)?;
 

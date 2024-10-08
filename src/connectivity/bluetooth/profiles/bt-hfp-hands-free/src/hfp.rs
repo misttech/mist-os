@@ -180,7 +180,7 @@ where
         peer_id: PeerId,
         protocol: Option<Vec<ProtocolDescriptor>>,
     ) -> SearchResultTimer {
-        let time = fasync::Time::after(SEARCH_RESULT_CONNECT_DELAY_DURATION);
+        let time = fasync::MonotonicInstant::after(SEARCH_RESULT_CONNECT_DELAY_DURATION);
         let timer = fasync::Timer::new(time);
 
         let fut = FutureExt::map(timer, move |_| (peer_id, protocol));

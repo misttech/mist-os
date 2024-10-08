@@ -338,7 +338,8 @@ impl PlatformMetrics {
 
         self.inner.borrow_mut().throttle_debounce_task = Some(fasync::Task::local(async move {
             info!("Starting throttle debounce timer ({:?})", throttle_debounce_timeout);
-            fasync::Timer::new(fasync::Time::after(throttle_debounce_timeout.into())).await;
+            fasync::Timer::new(fasync::MonotonicInstant::after(throttle_debounce_timeout.into()))
+                .await;
             info!("Throttling debounce timer expired");
 
             // File a crash report with the signature "fuchsia-thermal-throttle".

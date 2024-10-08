@@ -68,6 +68,10 @@ Symbols:
   - { Name: fdio_ns_unbind, Type: Func }
   - { Name: fdio_null_create, Type: Func }
   - { Name: fdio_open, Type: Func }
+  - { Name: fdio_open3, Type: Func }
+  - { Name: fdio_open3_at, Type: Func }
+  - { Name: fdio_open3_fd, Type: Func }
+  - { Name: fdio_open3_fd_at, Type: Func }
   - { Name: fdio_open_at, Type: Func }
   - { Name: fdio_open_fd, Type: Func }
   - { Name: fdio_open_fd_at, Type: Func }

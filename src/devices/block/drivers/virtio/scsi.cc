@@ -305,7 +305,7 @@ void ScsiDevice::QueueCommand(uint8_t target, uint16_t lun, iovec cdb, bool is_w
     request_desc = request_queue_.AllocDescChain(/*count=*/descriptor_chain_length, &id);
   }
 
-  auto* request_buffers = &io_slot->request_buffer;
+  auto* request_buffers = io_slot->request_buffer.get();
   // virtio-scsi requests have a 'request' region, an optional data-out region, a 'response'
   // region, and an optional data-in region. Allocate and fill them and then execute the request.
   const auto request_offset = 0ull;
@@ -313,7 +313,7 @@ void ScsiDevice::QueueCommand(uint8_t target, uint16_t lun, iovec cdb, bool is_w
   const auto response_offset = data_out_offset + data_out.iov_len;
   const auto data_in_offset = response_offset + sizeof(struct virtio_scsi_resp_cmd);
 
-  auto* const request_buffers_addr = reinterpret_cast<uint8_t*>(io_buffer_virt(request_buffers));
+  auto* const request_buffers_addr = reinterpret_cast<uint8_t*>(request_buffers->virt());
   auto* const request =
       reinterpret_cast<struct virtio_scsi_req_cmd*>(request_buffers_addr + request_offset);
   auto* const data_out_region = reinterpret_cast<uint8_t*>(request_buffers_addr + data_out_offset);
@@ -328,7 +328,7 @@ void ScsiDevice::QueueCommand(uint8_t target, uint16_t lun, iovec cdb, bool is_w
   request->id = scsi_transport_tag_++;
 
   vring_desc* tail_desc;
-  request_desc->addr = io_buffer_phys(request_buffers) + request_offset;
+  request_desc->addr = request_buffers->phys() + request_offset;
   request_desc->len = sizeof(*request);
   request_desc->flags = VRING_DESC_F_NEXT;
   auto next_id = request_desc->next;
@@ -336,21 +336,21 @@ void ScsiDevice::QueueCommand(uint8_t target, uint16_t lun, iovec cdb, bool is_w
   if (data_out.iov_len) {
     memcpy(data_out_region, data_out.iov_base, data_out.iov_len);
     auto* data_out_desc = request_queue_.DescFromIndex(next_id);
-    data_out_desc->addr = io_buffer_phys(request_buffers) + data_out_offset;
+    data_out_desc->addr = request_buffers->phys() + data_out_offset;
     data_out_desc->len = static_cast<uint32_t>(data_out.iov_len);
     data_out_desc->flags = VRING_DESC_F_NEXT;
     next_id = data_out_desc->next;
   }
 
   auto* response_desc = request_queue_.DescFromIndex(next_id);
-  response_desc->addr = io_buffer_phys(request_buffers) + response_offset;
+  response_desc->addr = request_buffers->phys() + response_offset;
   response_desc->len = sizeof(*response);
   response_desc->flags = VRING_DESC_F_WRITE;
 
   if (data_in.iov_len) {
     response_desc->flags |= VRING_DESC_F_NEXT;
     auto* data_in_desc = request_queue_.DescFromIndex(response_desc->next);
-    data_in_desc->addr = io_buffer_phys(request_buffers) + data_in_offset;
+    data_in_desc->addr = request_buffers->phys() + data_in_offset;
     data_in_desc->len = static_cast<uint32_t>(data_in.iov_len);
     data_in_desc->flags = VRING_DESC_F_WRITE;
     tail_desc = data_in_desc;
@@ -475,9 +475,11 @@ zx_status_t ScsiDevice::Init() {
     request_buffers_size_ =
         (SCSI_SECTOR_SIZE * std::min(config_.max_sectors, SCSI_MAX_XFER_SECTORS)) +
         (sizeof(struct virtio_scsi_req_cmd) + sizeof(struct virtio_scsi_resp_cmd));
+    const size_t buffer_size = fbl::round_up(request_buffers_size_, zx_system_get_page_size());
+    auto buffer_factory = dma_buffer::CreateBufferFactory();
     for (int i = 0; i < MAX_IOS; i++) {
-      auto status = io_buffer_init(&scsi_io_slot_table_[i].request_buffer, bti().get(),
-                                   /*size=*/request_buffers_size_, IO_BUFFER_RW | IO_BUFFER_CONTIG);
+      auto status = buffer_factory->CreateContiguous(bti(), buffer_size, 0,
+                                                     &scsi_io_slot_table_[i].request_buffer);
       if (status) {
         zxlogf(ERROR, "failed to allocate queue working memory");
         return status;
@@ -516,9 +518,6 @@ void ScsiDevice::DdkRelease() {
   {
     fbl::AutoLock lock(&lock_);
     worker_thread_should_exit_ = true;
-    for (int i = 0; i < MAX_IOS; i++) {
-      io_buffer_release(&scsi_io_slot_table_[i].request_buffer);
-    }
   }
   thrd_join(worker_thread_, nullptr);
   Release();

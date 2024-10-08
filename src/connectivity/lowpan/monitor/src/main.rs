@@ -16,7 +16,7 @@ async fn main() -> Result<(), Error> {
 
     // Attempt to launch lowpan-ot-driver
     loop {
-        let last_launch_attempt_timestamp = fasync::Time::now();
+        let last_launch_attempt_timestamp = fasync::MonotonicInstant::now();
 
         let binder_proxy = fuchsia_component::client::connect_to_protocol::<
             fidl_fuchsia_component::BinderMarker,
@@ -27,7 +27,7 @@ async fn main() -> Result<(), Error> {
 
         binder_proxy.on_closed().await?;
 
-        if (fasync::Time::now() - last_launch_attempt_timestamp).into_minutes()
+        if (fasync::MonotonicInstant::now() - last_launch_attempt_timestamp).into_minutes()
             >= RETRY_COUNTER_RESET_PERIOD_MIN
         {
             retry_counter = 0;
@@ -45,7 +45,7 @@ async fn main() -> Result<(), Error> {
 
         tracing::info!("lowpan-monitor detects the termination of lowpan-ot-driver (failed {} times), restarting in {} sec", retry_counter, retry_delay_backoff_sec);
 
-        fasync::Timer::new(fasync::Time::after(zx::Duration::from_seconds(
+        fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_seconds(
             retry_delay_backoff_sec,
         )))
         .await;

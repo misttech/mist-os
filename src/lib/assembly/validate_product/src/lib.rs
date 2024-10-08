@@ -13,7 +13,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::fs::File;
 use std::path::PathBuf;
-use version_history::AbiRevision;
+use version_history::{AbiRevision, AbiRevisionError};
 
 /// Validate a product config.
 pub fn validate_product(
@@ -124,8 +124,23 @@ pub fn validate_package(manifest: &PackageManifest) -> Result<(), PackageValidat
     let abi_revision = AbiRevision::try_from(raw_abi_revision.as_slice())
         .map_err(|e| PackageValidationError::InvalidAbiRevisionFile(e))?;
 
-    if let Err(err) = version_history_data::HISTORY.check_abi_revision_for_runtime(abi_revision) {
-        return Err(PackageValidationError::UnsupportedAbiRevision(err));
+    match version_history_data::HISTORY.check_abi_revision_for_runtime(abi_revision) {
+        Ok(()) => {}
+        Err(AbiRevisionError::PlatformMismatch { .. })
+        | Err(AbiRevisionError::UnstableMismatch { .. })
+        | Err(AbiRevisionError::Malformed { .. }) => {
+            // TODO(https://fxbug.dev/347724655): Make these cases errors.
+            eprintln!(
+                "Unsupported platform ABI revision: 0x{}.
+This will become an error soon! See https://fxbug.dev/347724655",
+                abi_revision
+            );
+        }
+        Err(e @ AbiRevisionError::TooNew { .. })
+        | Err(e @ AbiRevisionError::Retired { .. })
+        | Err(e @ AbiRevisionError::Invalid) => {
+            return Err(PackageValidationError::UnsupportedAbiRevision(e))
+        }
     }
 
     Ok(())

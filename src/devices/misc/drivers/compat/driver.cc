@@ -724,7 +724,7 @@ zx::result<> Driver::LoadDriver(zx::vmo loader_vmo, zx::vmo driver_vmo) {
   }
 
   // Create our logger.
-  auto logger = fdf::Logger::Create(*incoming(), dispatcher(), note->payload.name);
+  auto logger = fdf::Logger::Create2(*incoming(), dispatcher(), note->payload.name);
 
   // Move the logger over into a shared_ptr instead of unique_ptr so we can pass it to the global
   // logging manager and compat::Device.

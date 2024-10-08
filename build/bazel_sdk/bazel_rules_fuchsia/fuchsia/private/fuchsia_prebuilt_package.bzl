@@ -4,6 +4,7 @@
 
 """Implement fuchsia_prebuilt_package() rule."""
 
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private/workflows:fuchsia_package_tasks.bzl", "fuchsia_package_tasks")
 load(":providers.bzl", "FuchsiaComponentInfo", "FuchsiaDebugSymbolInfo", "FuchsiaPackageInfo", "FuchsiaPackagedComponentInfo")
 load("@bazel_skylib//rules:select_file.bzl", "select_file")
@@ -192,7 +193,7 @@ _unpack_prebuilt_package = rule(
             executable = True,
             cfg = "exec",
         ),
-    },
+    } | COMPATIBILITY.HOST_ATTRS,
 )
 
 def _pack_prebuilt_package_impl(ctx):
@@ -268,7 +269,7 @@ _pack_prebuilt_package = rule(
             doc = "test components in this package",
             default = [],
         ),
-    },
+    } | COMPATIBILITY.HOST_ATTRS,
 )
 
 def _make_prebuilt_package(

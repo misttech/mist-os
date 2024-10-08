@@ -64,7 +64,7 @@ impl AudioControl for CodecAudioControl {
             });
         };
         self.connection = Some(connection);
-        start_request(Ok(fuchsia_async::Time::now().into()));
+        start_request(Ok(fuchsia_async::MonotonicInstant::now().into()));
         Ok(())
     }
 
@@ -83,7 +83,7 @@ impl AudioControl for CodecAudioControl {
             });
         };
         self.connection = None;
-        stop_request(Ok(fuchsia_async::Time::now().into()));
+        stop_request(Ok(fuchsia_async::MonotonicInstant::now().into()));
         Ok(())
     }
 

@@ -63,13 +63,13 @@ zx_status_t Nelson::ClkInit() {
 
   const std::vector<fpbus::Metadata> clock_metadata{
       {{
-          .type = DEVICE_METADATA_CLOCK_IDS,
+          .id = std::to_string(DEVICE_METADATA_CLOCK_IDS),
           .data = std::vector<uint8_t>(
               reinterpret_cast<const uint8_t*>(&clock_ids),
               reinterpret_cast<const uint8_t*>(&clock_ids) + sizeof(clock_ids)),
       }},
       {{
-          .type = DEVICE_METADATA_CLOCK_INIT,
+          .id = std::to_string(DEVICE_METADATA_CLOCK_INIT),
           .data = encoded_metadata.value(),
       }},
   };

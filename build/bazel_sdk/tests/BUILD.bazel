@@ -12,6 +12,7 @@ test_suite(
         ":licenses_tests",
         "//fuchsia/api_levels:tests",
         "//fuchsia/debug_symbols:tests",
+        "//fuchsia/devicetree:tests",
         "//fuchsia/drivers:tests",
         "//fuchsia/packaging:tests",
         "//fuchsia/utils:tests",

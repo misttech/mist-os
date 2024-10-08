@@ -20,6 +20,8 @@
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/lib/mmio/test-helper.h"
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+
 constexpr uint32_t kVid = 1;
 constexpr uint32_t kPid = 1;
 constexpr char kName[] = "test device";
@@ -273,7 +275,6 @@ TEST(PDevTest, GetBoardInfo) {
   ASSERT_EQ(kVid, board_info->vid);
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 TEST(PDevTest, GetPowerConfiguration) {
   fuchsia_hardware_power::PowerElement fidl_element{{.name = "test power element", .levels = {{}}}};
   fuchsia_hardware_power::PowerElementConfiguration fidl_config{
@@ -294,4 +295,5 @@ TEST(PDevTest, GetPowerConfiguration) {
   ASSERT_TRUE(config.element.levels.empty());
   ASSERT_TRUE(config.dependencies.empty());
 }
-#endif
+
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(HEAD)

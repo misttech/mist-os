@@ -42,7 +42,10 @@ extern "C" {
     ) -> bool;
 }
 
-fn create_named_deadline_rust(deadline: &DeadlineId<'_>, duration: zx::Duration) -> fasync::Time {
+fn create_named_deadline_rust(
+    deadline: &DeadlineId<'_>,
+    duration: zx::Duration,
+) -> fasync::MonotonicInstant {
     let mut time: zx_time_t = 0;
     let time_valid = unsafe {
         create_named_deadline(
@@ -56,7 +59,7 @@ fn create_named_deadline_rust(deadline: &DeadlineId<'_>, duration: zx::Duration)
     };
     match time_valid {
         true => zx::MonotonicInstant::from_nanos(time).into(),
-        false => fasync::Time::now() + duration,
+        false => fasync::MonotonicInstant::now() + duration,
     }
 }
 

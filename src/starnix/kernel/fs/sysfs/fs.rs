@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::bpf::program::BPF_PROG_TYPE_FUSE;
 use crate::device::kobject::KObjectHandle;
 use crate::fs::sysfs::cgroup::CgroupDirectoryNode;
 use crate::fs::sysfs::{
@@ -9,8 +10,8 @@ use crate::fs::sysfs::{
 };
 use crate::task::{CurrentTask, NetstackDevicesDirectory};
 use crate::vfs::{
-    CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNodeInfo, FsStr,
-    PathBuilder, StaticDirectoryBuilder, StubEmptyFile, SymlinkNode,
+    BytesFile, CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
+    FsNodeInfo, FsStr, PathBuilder, StaticDirectoryBuilder, StubEmptyFile, SymlinkNode,
 };
 use starnix_logging::bug_ref;
 use starnix_sync::{Locked, Unlocked};
@@ -59,7 +60,25 @@ impl SysFs {
                 ),
             );
             dir.subdir(current_task, "fuse", 0o755, |dir| {
-                dir.subdir(current_task, "connections", 0o755, |_| ())
+                dir.subdir(current_task, "connections", 0o755, |_| ());
+                dir.subdir(current_task, "features", 0o755, |dir| {
+                    dir.node(
+                        "fuse_bpf",
+                        fs.create_node(
+                            current_task,
+                            BytesFile::new_node(b"supported\n".to_vec()),
+                            FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                        ),
+                    );
+                });
+                dir.node(
+                    "bpf_prog_type_fuse",
+                    fs.create_node(
+                        current_task,
+                        BytesFile::new_node(format!("{}\n", BPF_PROG_TYPE_FUSE).into_bytes()),
+                        FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                    ),
+                );
             });
             dir.subdir(current_task, "nmfs", 0o755, |_| ());
         });

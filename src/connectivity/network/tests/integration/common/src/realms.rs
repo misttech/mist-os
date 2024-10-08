@@ -172,11 +172,13 @@ impl ManagementAgent {
             Self::NetCfg(NetCfgVersion::Basic) => &[
                 fnet_dhcpv6::PrefixProviderMarker::PROTOCOL_NAME,
                 fnet_masquerade::FactoryMarker::PROTOCOL_NAME,
+                fnet_name::DnsServerWatcherMarker::PROTOCOL_NAME,
             ],
             Self::NetCfg(NetCfgVersion::Advanced) => &[
                 fnet_dhcpv6::PrefixProviderMarker::PROTOCOL_NAME,
                 fnet_virtualization::ControlMarker::PROTOCOL_NAME,
                 fnet_masquerade::FactoryMarker::PROTOCOL_NAME,
+                fnet_name::DnsServerWatcherMarker::PROTOCOL_NAME,
             ],
         }
     }

@@ -7,7 +7,7 @@ use fidl::endpoints::RequestStream as _;
 use fidl_examples_canvas_clientrequesteddraw::{
     BoundingBox, InstanceRequest, InstanceRequestStream, Point,
 };
-use fuchsia_async::{Time, Timer};
+use fuchsia_async::{MonotonicInstant, Timer};
 use fuchsia_component::server::ServiceFs;
 
 use futures::future::join;
@@ -84,7 +84,7 @@ async fn run_server(stream: InstanceRequestStream) -> Result<(), Error> {
             // [START diff_4]
             // Our server sends one update per second, but only if the client has declared that it
             // is ready to receive one.
-            Timer::new(Time::after(zx::Duration::from_seconds(1))).await;
+            Timer::new(MonotonicInstant::after(zx::Duration::from_seconds(1))).await;
             let mut state = state_ref.lock().unwrap();
             if !state.changed || !state.ready {
                 continue;

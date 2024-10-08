@@ -209,7 +209,6 @@ class FakeNetworkDeviceImpl : public ddk::NetworkDeviceImplProtocol<FakeNetworkD
     EXPECT_TRUE(slot.is_valid()) << "vmo " << static_cast<uint32_t>(vmo_id) << " already released";
     slot.reset();
   }
-  void NetworkDeviceImplSetSnoop(bool snoop) { /* do nothing , only auto-snooping is allowed */ }
 
   fit::function<zx::unowned_vmo(uint8_t)> VmoGetter();
 

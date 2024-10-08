@@ -44,10 +44,10 @@ pub enum CommandStatus {
 #[derive(FfxTool)]
 pub struct ServerStartTool {
     #[command]
-    cmd: StartCommand,
+    pub cmd: StartCommand,
     #[with(daemon_protocol())]
-    repos: ffx::RepositoryRegistryProxy,
-    context: EnvironmentContext,
+    pub repos: ffx::RepositoryRegistryProxy,
+    pub context: EnvironmentContext,
     pub target_proxy_connector: Connector<TargetProxy>,
     pub rcs_proxy_connector: Connector<RemoteControlProxy>,
 }
@@ -89,8 +89,12 @@ impl FfxMain for ServerStartTool {
                 // Validate the cmd args before processing. This allows good error messages to
                 // be presented to the user when running in Background mode. If the server is
                 // already running, this returns Ok.
-                if let Some(running) =
-                    serve_impl_validate_args(&server::to_serve_command(&self.cmd), &self.context)?
+                if let Some(running) = serve_impl_validate_args(
+                    &server::to_serve_command(&self.cmd),
+                    &self.rcs_proxy_connector,
+                    &self.context,
+                )
+                .await?
                 {
                     // The server that matches the cmd is already running.
                     writeln!(

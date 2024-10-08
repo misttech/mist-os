@@ -608,8 +608,6 @@ zx_status_t Device::NetDevPrepareVmo(uint8_t vmo_id, zx::vmo vmo, uint8_t* mappe
 
 void Device::NetDevReleaseVmo(uint8_t vmo_id) { brcmf_release_vmo(drvr(), vmo_id); }
 
-void Device::NetDevSetSnoopEnabled(bool snoop) {}
-
 void Device::DestroyAllIfaces(fit::callback<void()>&& on_complete) {
   std::lock_guard<std::mutex> lock(lock_);
 

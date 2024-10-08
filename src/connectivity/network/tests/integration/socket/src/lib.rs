@@ -491,7 +491,7 @@ impl UdpSendMsgPreflightTestIpExt for net_types::ip::Ipv4 {
     fn forwarding_config() -> fnet_interfaces_admin::Configuration {
         fnet_interfaces_admin::Configuration {
             ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
-                forwarding: Some(true),
+                unicast_forwarding: Some(true),
                 ..Default::default()
             }),
             ..Default::default()
@@ -527,7 +527,7 @@ impl UdpSendMsgPreflightTestIpExt for net_types::ip::Ipv6 {
     fn forwarding_config() -> fnet_interfaces_admin::Configuration {
         fnet_interfaces_admin::Configuration {
             ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
-                forwarding: Some(true),
+                unicast_forwarding: Some(true),
                 ..Default::default()
             }),
             ..Default::default()
@@ -2315,7 +2315,7 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
             .and_then(|f| {
                 futures::future::ready(f.context("frame stream ended unexpectedly").map(Some))
             })
-            .on_timeout(fasync::Time::after(zx::Duration::from_millis(50)), || Ok(None))
+            .on_timeout(fasync::MonotonicInstant::after(zx::Duration::from_millis(50)), || Ok(None))
             .await
             .context("failed to read frame")?)
     }

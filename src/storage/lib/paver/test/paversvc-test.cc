@@ -50,7 +50,6 @@
 #include "src/storage/lib/paver/paver.h"
 #include "src/storage/lib/paver/sherlock.h"
 #include "src/storage/lib/paver/test/test-utils.h"
-#include "src/storage/lib/paver/utils.h"
 #include "src/storage/lib/paver/vim3.h"
 #include "src/storage/lib/paver/x64.h"
 
@@ -1973,10 +1972,6 @@ class PaverServiceBlockTest : public PaverServiceTest {
 
     ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr_));
 
-    // Forward the block watcher FIDL interface from the devmgr.
-    fake_svc_.ForwardServiceTo(fidl::DiscoverableProtocolName<fuchsia_fshost::BlockWatcher>,
-                               devmgr_.fshost_svc_dir());
-
     ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform/ram-disk/ramctl")
                   .status_value());
     StartPaver(devmgr_.devfs_root().duplicate(), std::move(fake_svc_.svc_chan()));
@@ -2055,14 +2050,10 @@ class PaverServiceGptDeviceTest : public PaverServiceTest {
  protected:
   void SpawnIsolatedDevmgr(const char* board_name) {
     driver_integration_test::IsolatedDevmgr::Args args;
-    args.disable_block_watcher = false;
+    args.disable_block_watcher = true;
 
     args.board_name = board_name;
     ASSERT_OK(driver_integration_test::IsolatedDevmgr::Create(&args, &devmgr_));
-
-    // Forward the block watcher FIDL interface from the devmgr.
-    fake_svc_.ForwardServiceTo(fidl::DiscoverableProtocolName<fuchsia_fshost::BlockWatcher>,
-                               devmgr_.fshost_svc_dir());
 
     ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform/ram-disk/ramctl")
                   .status_value());
@@ -2095,13 +2086,6 @@ class PaverServiceGptDeviceTest : public PaverServiceTest {
 
   void InitializeStartingGPTPartitions(const BlockDevice* gpt_dev,
                                        const std::vector<PartitionDescription>& init_partitions) {
-    // Pause the block watcher while we write partitions to the disk.
-    // This is to avoid the block watcher seeing an intermediate state of the partition table
-    // and incorrectly treating it as an MBR.
-    // The watcher is automatically resumed when this goes out of scope.
-    auto pauser = paver::BlockWatcherPauser::Create(GetSvcRoot());
-    ASSERT_OK(pauser);
-
     zx::result new_connection_result = GetNewConnections(gpt_dev->block_controller_interface());
     ASSERT_OK(new_connection_result);
     DeviceAndController& new_connection = new_connection_result.value();

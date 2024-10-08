@@ -16,7 +16,10 @@ use std::time::Duration;
 
 use assert_matches::assert_matches;
 use const_unwrap::const_unwrap_option;
-use net_declare::{fidl_mac, fidl_subnet, std_ip_v4, std_ip_v6};
+use fidl_fuchsia_net_multicast_ext::{
+    self as fnet_multicast_ext, FidlMulticastAdminIpExt, TableControllerProxy,
+};
+use net_declare::{fidl_mac, fidl_subnet, net_ip_v6, std_ip_v4, std_ip_v6};
 use net_types::ip::{Ip, IpAddress, IpVersion, Ipv4, Ipv6};
 use net_types::{AddrAndPortFormatter, Witness as _};
 use netstack_testing_common::realms::{Netstack3, TestSandboxExt as _};
@@ -27,6 +30,7 @@ use packet_formats::ip::IpProto;
 use test_case::test_case;
 use {
     fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext,
+    fidl_fuchsia_net_multicast_admin as fnet_multicast_admin,
     fidl_fuchsia_posix_socket as fposix_socket, fidl_fuchsia_posix_socket_raw as fposix_socket_raw,
 };
 
@@ -555,6 +559,79 @@ async fn inspect_routes(name: &str) {
 }
 
 #[netstack_test]
+async fn inspect_multicast_routes(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let realm =
+        sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create realm");
+    let network = sandbox.create_network("network").await.expect("create network failed");
+
+    let dev1 = realm.join_network(&network, "DEV1").await.expect("join network failed");
+    let dev2 = realm.join_network(&network, "DEV2").await.expect("join network failed");
+
+    // Enable multicast routing for IPv6, but not IPv4. This allows us to assert
+    // on the shape of inspect data for both enabled/disabled states.
+    let controller = realm
+        .connect_to_protocol::<<Ipv6 as FidlMulticastAdminIpExt>::TableControllerMarker>()
+        .expect("failed to connect to Ipv6 multicast admin");
+
+    // Add an arbitrary multicast route to ensure we have interesting data.
+    TableControllerProxy::<Ipv6>::add_route(
+        &controller,
+        fnet_multicast_ext::UnicastSourceAndMulticastDestination {
+            unicast_source: net_ip_v6!("2001:db8::1"),
+            multicast_destination: net_ip_v6!("ff0e::1"),
+        },
+        fnet_multicast_ext::Route {
+            expected_input_interface: dev1.id(),
+            action: fnet_multicast_admin::Action::OutgoingInterfaces(vec![
+                fnet_multicast_admin::OutgoingInterfaces { id: dev2.id(), min_ttl: 0 },
+            ]),
+        },
+    )
+    .await
+    .expect("send request failed")
+    .expect("add multicast route failed");
+
+    let data =
+        get_inspect_data(&realm, "netstack", "root", constants::inspect::DEFAULT_INSPECT_TREE_NAME)
+            .await
+            .expect("inspect data should be present");
+
+    let data =
+        data.get_child("MulticastForwarding").expect("multicast forwarding data should be present");
+
+    // Debug print the tree to make debugging easier in case of failures.
+    println!("Got inspect data: {:#?}", data);
+    diagnostics_assertions::assert_data_tree!(data, "MulticastForwarding": {
+        "IPv4": {
+            ForwardingEnabled: false,
+        },
+        "IPv6": {
+            ForwardingEnabled: true,
+            "Routes": {
+                "0": {
+                    SourceAddress: "2001:db8::1",
+                    DestinationAddress: "ff0e::1",
+                    InputInterface: dev1.id(),
+                    "ForwardingTargets": {
+                        "0": {
+                            OutputInterface: dev2.id(),
+                            MinTTL: 0u64,
+                        },
+                    },
+                    "Statistics": {
+                        LastUsed: diagnostics_assertions::NonZeroUintProperty,
+                    }
+                },
+            },
+            "PendingRoutes": {
+                NumRoutes: 0u64,
+            },
+        },
+    })
+}
+
+#[netstack_test]
 async fn inspect_devices(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
@@ -609,6 +686,7 @@ async fn inspect_devices(name: &str) {
                     Configuration: {
                         "GmpEnabled": false,
                         "ForwardingEnabled": false,
+                        "MulticastForwardingEnabled": false,
                     },
                 },
                 IPv6: {
@@ -623,6 +701,7 @@ async fn inspect_devices(name: &str) {
                     Configuration: {
                         "GmpEnabled": false,
                         "ForwardingEnabled": false,
+                        "MulticastForwardingEnabled": false,
                     },
                 },
                 Counters: {
@@ -665,6 +744,7 @@ async fn inspect_devices(name: &str) {
                     Configuration: {
                         "GmpEnabled": true,
                         "ForwardingEnabled": false,
+                        "MulticastForwardingEnabled": false,
                     },
                 },
                 IPv6: {
@@ -681,6 +761,7 @@ async fn inspect_devices(name: &str) {
                     Configuration: {
                         "GmpEnabled": true,
                         "ForwardingEnabled": false,
+                        "MulticastForwardingEnabled": false,
                     },
                 },
                 NetworkDevice: {
@@ -756,7 +837,19 @@ async fn inspect_counters(name: &str) {
     println!("Got inspect data: {:#?}", data);
     diagnostics_assertions::assert_data_tree!(data, "root": contains {
         "Counters": {
-            "Bindings": contains {},
+            "Bindings": {
+                "Power": {
+                    DroppedRxLeases: 0u64,
+                },
+                "MulticastAdmin": {
+                    "V4": {
+                        DroppedRoutingEvents: 0u64,
+                    },
+                    "V6": {
+                        DroppedRoutingEvents: 0u64,
+                    },
+                },
+            },
             "Device": {
                 "Rx": {
                     TotalFrames: 1u64,
@@ -883,6 +976,7 @@ async fn inspect_counters(name: &str) {
                     UnspecifiedDst: 0u64,
                     UnspecifiedSrc: 0u64,
                     Dropped: 0u64,
+                    MulticastNoInterest: 0u64,
                 },
                 "Forwarding": {
                     Forwarded: 0u64,
@@ -918,6 +1012,7 @@ async fn inspect_counters(name: &str) {
                     DroppedNonUnicastSrc: 0u64,
                     DroppedExtensionHeader: 0u64,
                     DroppedLoopedBackDadProbe: 0u64,
+                    MulticastNoInterest: 0u64,
                 },
                 "Forwarding": {
                     Forwarded: 0u64,
@@ -932,6 +1027,46 @@ async fn inspect_counters(name: &str) {
                     NeedMoreFragments: 0u64,
                     InvalidFragment: 0u64,
                     CacheFull: 0u64,
+                },
+            },
+            "MulticastForwarding": {
+                "V4": {
+                    PacketsReceived: 0u64,
+                    PacketsForwarded: 0u64,
+                    "PacketsNotForwardedWithReason": {
+                        InvalidKey: 0u64,
+                        ForwardingDisabledOnInputDevice: 0u64,
+                        ForwardingDisabledForStack: 0u64,
+                        WrongInputDevice: 0u64,
+                    },
+                    PendingPackets: 0u64,
+                    PendingPacketsForwarded: 0u64,
+                    "PendingPacketsNotForwardedWithReason": {
+                        QueueFull: 0u64,
+                        ForwardingDisabledOnInputDevice: 0u64,
+                        WrongInputDevice: 0u64,
+                        GarbageCollected: 0u64,
+                    },
+                    PendingTableGcRuns: 0u64,
+                },
+                "V6": {
+                    PacketsReceived: 0u64,
+                    PacketsForwarded: 0u64,
+                    "PacketsNotForwardedWithReason": {
+                        InvalidKey: 0u64,
+                        ForwardingDisabledOnInputDevice: 0u64,
+                        ForwardingDisabledForStack: 0u64,
+                        WrongInputDevice: 0u64,
+                    },
+                    PendingPackets: 0u64,
+                    PendingPacketsForwarded: 0u64,
+                    "PendingPacketsNotForwardedWithReason": {
+                        QueueFull: 0u64,
+                        ForwardingDisabledOnInputDevice: 0u64,
+                        WrongInputDevice: 0u64,
+                        GarbageCollected: 0u64,
+                    },
+                    PendingTableGcRuns: 0u64,
                 },
             },
             "RawIpSockets": {

@@ -502,8 +502,6 @@ void NetdeviceMigration::NetworkDeviceImplReleaseVmo(uint8_t id) __TA_EXCLUDES(v
   }
 }
 
-void NetdeviceMigration::NetworkDeviceImplSetSnoop(bool snoop) {}
-
 void NetdeviceMigration::NetworkPortGetInfo(port_base_info_t* out_info) { *out_info = port_info_; }
 
 void NetdeviceMigration::NetworkPortGetStatus(port_status_t* out_status)

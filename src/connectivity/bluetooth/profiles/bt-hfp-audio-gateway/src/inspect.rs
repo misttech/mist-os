@@ -182,11 +182,11 @@ impl ServiceLevelConnectionInspect {
         &self.procedures.inspect_node
     }
 
-    pub fn connected(&mut self, at: fasync::Time) {
+    pub fn connected(&mut self, at: fasync::MonotonicInstant) {
         self.connected_at = Some(self.inspect_node.create_time_at("connected_at", at.into()));
     }
 
-    pub fn initialized(&mut self, at: fasync::Time) {
+    pub fn initialized(&mut self, at: fasync::MonotonicInstant) {
         self.initialized_at = Some(self.inspect_node.create_time_at("initialized_at", at.into()));
     }
 
@@ -348,7 +348,7 @@ mod tests {
     #[test]
     fn service_level_connection_inspect_tree() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(1230000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(1230000));
         let inspect = inspect::Inspector::default();
 
         let mut slc =
@@ -385,9 +385,9 @@ mod tests {
             extended_errors: true,
             ..SlcState::default()
         };
-        slc.initialized(fasync::Time::now());
+        slc.initialized(fasync::MonotonicInstant::now());
         slc.update_slc_state(&state);
-        slc.connected(fasync::Time::now());
+        slc.connected(fasync::MonotonicInstant::now());
         assert_data_tree!(inspect, root: {
             slc: {
                 connected_at: 1230000i64,

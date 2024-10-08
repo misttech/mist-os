@@ -34,11 +34,6 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: "#netstack",
-        },
-        {
             storage: "cache",
             from: "parent",
             to: [ "#netstack" ],

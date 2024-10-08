@@ -20,7 +20,11 @@ from honeydew.interfaces.affordances.bluetooth.profiles import (
     bluetooth_gap,
 )
 from honeydew.interfaces.affordances.ui import screenshot, user_input
-from honeydew.interfaces.affordances.wlan import wlan, wlan_policy
+from honeydew.interfaces.affordances.wlan import (
+    wlan,
+    wlan_policy,
+    wlan_policy_ap,
+)
 from honeydew.interfaces.auxiliary_devices import (
     power_switch as power_switch_interface,
 )
@@ -269,7 +273,16 @@ class FuchsiaDevice(abc.ABC):
         """Returns a WlanPolicy affordance object.
 
         Returns:
-            wlanPolicy.WlanPolicy object
+            wlan_policy.WlanPolicy object
+        """
+
+    @properties.Affordance
+    @abc.abstractmethod
+    def wlan_policy_ap(self) -> wlan_policy_ap.WlanPolicyAp:
+        """Returns a WlanPolicyAp affordance object.
+
+        Returns:
+            wlan_policy_ap.WlanPolicyAp object
         """
 
     @properties.Affordance

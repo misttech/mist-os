@@ -14,6 +14,10 @@ pub type zx_addr_t = usize;
 pub type zx_stream_seek_origin_t = u32;
 pub type zx_clock_t = u32;
 pub type zx_duration_t = i64;
+pub type zx_duration_mono_t = i64;
+pub type zx_duration_mono_ticks_t = i64;
+pub type zx_duration_boot_t = i64;
+pub type zx_duration_boot_ticks_t = i64;
 pub type zx_futex_t = AtomicI32;
 pub type zx_gpaddr_t = usize;
 pub type zx_guest_option_t = u32;
@@ -25,6 +29,10 @@ pub type zx_koid_t = u64;
 pub type zx_obj_type_t = u32;
 pub type zx_object_info_topic_t = u32;
 pub type zx_info_maps_type_t = u32;
+pub type zx_instant_boot_t = i64;
+pub type zx_instant_boot_ticks_t = i64;
+pub type zx_instant_mono_t = i64;
+pub type zx_instant_mono_ticks_t = i64;
 pub type zx_iob_allocate_id_options_t = u32;
 pub type zx_off_t = u64;
 pub type zx_paddr_t = usize;
@@ -687,7 +695,6 @@ pub const ZX_RSRC_FLAG_EXCLUSIVE: zx_rsrc_flags_t = 0x00010000;
 // Topics for CPU performance info syscalls
 pub const ZX_CPU_PERF_SCALE: u32 = 1;
 pub const ZX_CPU_DEFAULT_PERF_SCALE: u32 = 2;
-pub const ZX_PROCESSOR_POWER_DOMAIN_POWER_LEVEL: u32 = 3;
 
 // Cache policy flags.
 pub const ZX_CACHE_POLICY_CACHED: u32 = 0;
@@ -2005,7 +2012,7 @@ struct_decl_macro! {
         pub datalen: u16,
         pub severity: u8,
         pub flags: u8,
-        pub timestamp: zx_time_t,
+        pub timestamp: zx_instant_boot_t,
         pub pid: u64,
         pub tid: u64,
         pub data: [u8; ZX_LOG_RECORD_DATA_MAX],
@@ -2247,17 +2254,27 @@ pub struct zx_processor_power_level_transition_t {
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct zx_packet_processor_power_level_transition_request_t {
-    pub power_domain: u64,
+    pub domain_id: u32,
+    pub options: u32,
+    pub control_interface: u64,
     pub control_argument: u64,
-    pub context: u64,
     pub reserved: u64,
 }
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct zx_processor_power_level_transition_info_t {
-    pub power_domain: u64,
-    pub context: u64,
+pub struct zx_processor_power_state_t {
+    pub domain_id: u32,
+    pub options: u32,
+    pub control_interface: u64,
+    pub control_argument: u64,
+}
+
+#[repr(C)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct zx_processor_power_domain_t {
+    pub domain_id: u32,
+    pub cpus: zx_cpu_set_t,
 }
 
 multiconst!(u32, [

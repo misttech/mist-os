@@ -8,16 +8,14 @@ use starnix_logging::{log_debug, log_error, log_warn};
 use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, from_status_like_fdio};
-use zx::{self as zx, AsHandleRef, HandleBased, HandleRef, Peered};
+use zx::{self as zx, AsHandleRef, HandleBased, HandleRef};
 use {fidl_fuchsia_hardware_hrtimer as fhrtimer, fuchsia_async as fasync};
 
 use std::collections::BinaryHeap;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Arc, Weak};
 
-use crate::power::{
-    create_proxy_for_wake_events, OnWakeOps, KERNEL_PROXY_EVENT_SIGNAL, RUNNER_PROXY_EVENT_SIGNAL,
-};
+use crate::power::{clear_wake_proxy_signal, create_proxy_for_wake_events, OnWakeOps};
 use crate::task::{CurrentTask, HandleWaitCanceler, TargetTime, WaitCanceler};
 use crate::vfs::timer::TimerOps;
 
@@ -115,14 +113,7 @@ struct HrTimerManagerState {
 impl HrTimerManagerState {
     /// Clears the `EVENT_SIGNALED` signal on the hrtimer event.
     fn reset_wake_event(&mut self) {
-        self.wake_event.as_ref().map(|e| {
-            match e.signal_peer(RUNNER_PROXY_EVENT_SIGNAL, KERNEL_PROXY_EVENT_SIGNAL) {
-                Ok(_) => {}
-                Err(e) => {
-                    log_warn!("Failed to reset wake event state {:?}", e);
-                }
-            }
-        });
+        self.wake_event.as_ref().map(clear_wake_proxy_signal);
     }
 }
 
@@ -226,8 +217,11 @@ impl HrTimerManager {
                     }
 
                     let mut guard = self.lock();
-                    // Remove the expired HrTimer from the heap.
-                    guard.timer_heap.retain(|t| !Arc::ptr_eq(&t.hr_timer, &hrtimer_ref));
+                    // Remove the expired HrTimer from the heap, but only actually remove it if the
+                    // deadline has not changed.
+                    guard.timer_heap.retain(|t| {
+                        !(t.deadline == new_deadline && Arc::ptr_eq(&t.hr_timer, &hrtimer_ref))
+                    });
 
                     if guard.timer_heap.is_empty() && !*hrtimer_ref.is_interval.lock() {
                         // Only clear the timer event if there are no more timers to start.
@@ -324,6 +318,7 @@ impl HrTimerManager {
         deadline: zx::MonotonicInstant,
     ) -> Result<(), Errno> {
         let mut guard = self.lock();
+
         let new_timer_node = HrTimerNode::new(deadline, wake_source, new_timer.clone());
         // If the deadline of a timer changes, this function will be called to update the order of
         // the `timer_heap`.

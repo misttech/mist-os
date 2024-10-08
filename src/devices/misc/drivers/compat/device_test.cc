@@ -41,7 +41,7 @@ class DeviceTest : public ::testing::Test {
     auto ns = CreateNamespace(std::move(svc->client));
     ASSERT_EQ(ZX_OK, ns.status_value());
 
-    auto logger = fdf::Logger::Create(*ns, dispatcher(), "test-logger", FUCHSIA_LOG_INFO, false);
+    auto logger = fdf::Logger::Create2(*ns, dispatcher(), "test-logger", FUCHSIA_LOG_INFO, false);
     logger_ = std::shared_ptr<fdf::Logger>(logger.release());
   }
 

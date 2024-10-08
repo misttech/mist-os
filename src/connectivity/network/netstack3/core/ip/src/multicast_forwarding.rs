@@ -14,6 +14,7 @@
 //! routing table(s).
 
 pub(crate) mod api;
+pub(crate) mod counters;
 pub(crate) mod packet_queue;
 pub(crate) mod route;
 pub(crate) mod state;
@@ -22,12 +23,14 @@ use core::sync::atomic::Ordering;
 
 use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
 use netstack3_base::{
-    AnyDevice, AtomicInstant, DeviceIdContext, EventContext, FrameDestination, HandleableTimer,
-    InstantBindingsTypes, InstantContext, TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
+    AnyDevice, AtomicInstant, CounterContext, DeviceIdContext, EventContext, FrameDestination,
+    HandleableTimer, InstantBindingsTypes, InstantContext, TimerBindingsTypes, TimerContext,
+    WeakDeviceIdentifier,
 };
 use packet_formats::ip::IpPacket;
 use zerocopy::SplitByteSlice;
 
+use crate::internal::multicast_forwarding::counters::MulticastForwardingCounters;
 use crate::internal::multicast_forwarding::packet_queue::QueuePacketOutcome;
 use crate::internal::multicast_forwarding::route::{
     Action, MulticastRouteEntry, MulticastRouteTargets,
@@ -76,7 +79,7 @@ pub enum MulticastForwardingTimerId<I: Ip> {
 impl<
         I: IpLayerIpExt,
         BC: MulticastForwardingBindingsContext<I, CC::DeviceId>,
-        CC: MulticastForwardingStateContext<I, BC>,
+        CC: MulticastForwardingStateContext<I, BC> + CounterContext<MulticastForwardingCounters<I>>,
     > HandleableTimer<CC, BC> for MulticastForwardingTimerId<I>
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, _: BC::UniqueTimerId) {
@@ -87,9 +90,15 @@ impl<
                     // there are no resources to GC now.
                     MulticastForwardingState::Disabled => {}
                     MulticastForwardingState::Enabled(state) => {
-                        ctx.with_pending_table_mut(state, |pending_table| {
-                            pending_table.run_garbage_collection(bindings_ctx);
-                        })
+                        ctx.increment(|counters: &MulticastForwardingCounters<I>| {
+                            &counters.pending_table_gc
+                        });
+                        let removed_count = ctx.with_pending_table_mut(state, |pending_table| {
+                            pending_table.run_garbage_collection(bindings_ctx)
+                        });
+                        ctx.add(removed_count, |counters: &MulticastForwardingCounters<I>| {
+                            &counters.pending_packet_drops_gc
+                        });
                     }
                 })
             }
@@ -190,23 +199,30 @@ pub(crate) fn lookup_multicast_route_or_stash_packet<I, B, CC, BC>(
 where
     I: IpLayerIpExt,
     B: SplitByteSlice,
-    CC: MulticastForwardingStateContext<I, BC> + MulticastForwardingDeviceContext<I>,
+    CC: MulticastForwardingStateContext<I, BC>
+        + MulticastForwardingDeviceContext<I>
+        + CounterContext<MulticastForwardingCounters<I>>,
     BC: MulticastForwardingBindingsContext<I, CC::DeviceId>,
 {
+    core_ctx.increment(|counters: &MulticastForwardingCounters<I>| &counters.rx);
     // Short circuit if the packet's addresses don't constitute a valid
     // multicast route key (e.g. src is not unicast, or dst is not multicast).
     let key = MulticastRouteKey::new(packet.src_ip(), packet.dst_ip())?;
+    core_ctx.increment(|counters: &MulticastForwardingCounters<I>| &counters.no_tx_invalid_key);
 
     // Short circuit if the device has forwarding disabled.
     if !core_ctx.is_device_multicast_forwarding_enabled(dev) {
-        // TODO(https://fxbug.dev/352570820): Increment a counter.
+        core_ctx
+            .increment(|counters: &MulticastForwardingCounters<I>| &counters.no_tx_disabled_dev);
         return None;
     }
 
     core_ctx.with_state(|state, ctx| {
         // Short circuit if forwarding is disabled stack-wide.
         let Some(state) = state.enabled() else {
-            // TODO(https://fxbug.dev/352570820): Increment a counter.
+            ctx.increment(|counters: &MulticastForwardingCounters<I>| {
+                &counters.no_tx_disabled_stack_wide
+            });
             return None;
         };
         ctx.with_route_table(state, |route_table, ctx| {
@@ -216,7 +232,9 @@ where
             }) = route_table.get(&key)
             {
                 if dev != input_interface {
-                    // TODO(https://fxbug.dev/352570820): Increment a counter.
+                    ctx.increment(|counters: &MulticastForwardingCounters<I>| {
+                        &counters.no_tx_wrong_dev
+                    });
                     bindings_ctx.on_event(
                         MulticastForwardingEvent::WrongInputInterface {
                             key,
@@ -231,34 +249,32 @@ where
                 stats.last_used.store_max(bindings_ctx.now(), Ordering::Relaxed);
 
                 match action {
-                    // TODO(https://fxbug.dev/352570820): Increment a counter.
-                    Action::Forward(targets) => return Some(targets.clone()),
+                    Action::Forward(targets) => {
+                        ctx.increment(|counters: &MulticastForwardingCounters<I>| &counters.tx);
+                        return Some(targets.clone());
+                    }
                 }
             }
-            // TODO(https://fxbug.dev/352570820): Increment a counter.
-            ctx.with_pending_table_mut(state, |pending_table| {
-                match pending_table.try_queue_packet(
-                    bindings_ctx,
-                    key.clone(),
-                    packet,
-                    dev,
-                    frame_dst,
-                ) {
-                    QueuePacketOutcome::QueuedInNewQueue => {
-                        bindings_ctx.on_event(
-                            MulticastForwardingEvent::MissingRoute {
-                                key,
-                                input_interface: dev.clone(),
-                            }
-                            .into(),
-                        );
-                    }
-                    QueuePacketOutcome::QueuedInExistingQueue => {}
-                    QueuePacketOutcome::ExistingQueueFull => {
-                        // TODO(https://fxbug.dev/352570820): Increment a counter.
-                    }
+            ctx.increment(|counters: &MulticastForwardingCounters<I>| &counters.pending_packets);
+            match ctx.with_pending_table_mut(state, |pending_table| {
+                pending_table.try_queue_packet(bindings_ctx, key.clone(), packet, dev, frame_dst)
+            }) {
+                QueuePacketOutcome::QueuedInNewQueue => {
+                    bindings_ctx.on_event(
+                        MulticastForwardingEvent::MissingRoute {
+                            key,
+                            input_interface: dev.clone(),
+                        }
+                        .into(),
+                    );
                 }
-            });
+                QueuePacketOutcome::QueuedInExistingQueue => {}
+                QueuePacketOutcome::ExistingQueueFull => {
+                    ctx.increment(|counters: &MulticastForwardingCounters<I>| {
+                        &counters.pending_packet_drops_queue_full
+                    });
+                }
+            }
             return None;
         })
     })
@@ -347,6 +363,7 @@ mod testutil {
         // The list of packets sent by the netstack.
         pub(crate) sent_packets: Vec<SentPacket<I, D>>,
         counters: IpCounters<I>,
+        multicast_forwarding_counters: MulticastForwardingCounters<I>,
     }
 
     impl<I: IpLayerIpExt, D: FakeStrongDeviceId> FakeCoreCtxState<I, D> {
@@ -368,6 +385,14 @@ mod testutil {
     {
         fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
             cb(&self.counters)
+        }
+    }
+
+    impl<I: IpLayerIpExt, D: FakeStrongDeviceId> CounterContext<MulticastForwardingCounters<I>>
+        for FakeCoreCtxState<I, D>
+    {
+        fn with_counters<O, F: FnOnce(&MulticastForwardingCounters<I>) -> O>(&self, cb: F) -> O {
+            cb(&self.multicast_forwarding_counters)
         }
     }
 
@@ -653,6 +678,7 @@ mod tests {
             FRAME_DST,
         );
 
+        // Verify that multicast routing events are generated.
         let mut expected_events = vec![];
         if !right_key {
             expected_events.push(IpLayerEvent::MulticastForwarding(
@@ -684,6 +710,16 @@ mod tests {
             };
             assert_eq!(api.get_route_stats(&expected_key), Ok(Some(expected_stats)));
         }
+
+        // Verify that counters are updated.
+        api.core_ctx().with_counters(|counters: &MulticastForwardingCounters<I>| {
+            assert_eq!(counters.rx.get(), 1);
+            assert_eq!(counters.tx.get(), if lookup_succeeded { 1 } else { 0 });
+            assert_eq!(counters.no_tx_disabled_dev.get(), if dev_enabled { 0 } else { 1 });
+            assert_eq!(counters.no_tx_disabled_stack_wide.get(), if enabled { 0 } else { 1 });
+            assert_eq!(counters.no_tx_wrong_dev.get(), if right_dev { 0 } else { 1 });
+            assert_eq!(counters.pending_packets.get(), if right_key { 0 } else { 1 });
+        });
 
         lookup_succeeded
     }

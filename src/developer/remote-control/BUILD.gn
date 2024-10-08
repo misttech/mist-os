@@ -27,6 +27,15 @@ group("tests") {
   ]
 }
 
+fuchsia_component_manifest("manifest") {
+  component_name = "remote-control"
+  manifest = "meta/remote-control.cml"
+}
+
+fuchsia_structured_config_rust_lib("remote_control_config") {
+  cm_label = ":manifest"
+}
+
 rustc_library("lib") {
   name = "remote-control"
   edition = "2021"
@@ -52,6 +61,7 @@ rustc_library("lib") {
     "//src/sys/lib/component_debug",
     "//src/sys/lib/moniker",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]
@@ -74,6 +84,7 @@ rustc_binary("bin") {
 
   deps = [
     ":lib",
+    ":remote_control_config",
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.hardware.overnet:fuchsia.hardware.overnet_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",

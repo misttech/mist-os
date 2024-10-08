@@ -29,6 +29,8 @@
 #include <zircon/rights.h>
 #include <zircon/syscalls.h>
 
+#include "lib/driver/power/cpp/element-description-builder.h"
+
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 
 namespace fdf_power {
@@ -149,6 +151,98 @@ fit::result<Error> RegisterDependencyToken(
     return fit::error(Error::INVALID_ARGS);
   }
   return fit::success();
+}
+
+fit::result<Error> GetTokensFromSag(ElementDependencyMap& dependencies, TokenMap& tokens,
+                                    const fidl::ClientEnd<fuchsia_io::Directory>& svcs_dir) {
+  zx::result<fidl::ClientEnd<fuchsia_power_system::ActivityGovernor>> governor_connect =
+      component::ConnectAt<fuchsia_power_system::ActivityGovernor>(svcs_dir);
+  if (governor_connect.is_error()) {
+    return fit::error(Error::ACTIVITY_GOVERNOR_UNAVAILABLE);
+  }
+
+  fidl::WireSyncClient<fuchsia_power_system::ActivityGovernor> governor;
+  governor.Bind(std::move(governor_connect.value()));
+  fidl::WireResult<fuchsia_power_system::ActivityGovernor::GetPowerElements> elements =
+      governor->GetPowerElements();
+  if (!elements.ok()) {
+    if (elements.is_peer_closed()) {
+      return fit::error(Error::ACTIVITY_GOVERNOR_UNAVAILABLE);
+    }
+    return fit::error(Error::ACTIVITY_GOVERNOR_REQUEST);
+  }
+
+  // Track the parents we find so we can remove them from dependencies after
+  // we finish iterating over the list of them
+  std::vector<ParentElement> found_parents = {};
+
+  for (const auto& [parent, deps] : dependencies) {
+    if (parent.type() != ParentElement::Type::kSag) {
+      continue;
+    }
+
+    // TODO(https://fxbug.dev/328527451): We should be respecting assertive vs
+    // opportunistic deps here. For the very short term we know what these will
+    // be for all clients, but very soon we should modify the return types and
+    // return the right tokens.
+    switch (parent.GetSag().value()) {
+      case SagElement::kExecutionState:
+        if (elements->has_execution_state() &&
+            elements->execution_state().has_opportunistic_dependency_token()) {
+          zx::event copy;
+          elements->execution_state().opportunistic_dependency_token().duplicate(
+              ZX_RIGHT_SAME_RIGHTS, &copy);
+          tokens.emplace(std::make_pair(parent, std::move(copy)));
+        } else {
+          return fit::error(Error::DEPENDENCY_NOT_FOUND);
+        }
+        break;
+      case SagElement::kExecutionResumeLatency:
+        if (elements->has_execution_resume_latency() &&
+            elements->execution_resume_latency().has_assertive_dependency_token()) {
+          zx::event copy;
+          elements->execution_resume_latency().assertive_dependency_token().duplicate(
+              ZX_RIGHT_SAME_RIGHTS, &copy);
+          tokens.emplace(std::make_pair(parent, std::move(copy)));
+        } else {
+          return fit::error(Error::DEPENDENCY_NOT_FOUND);
+        }
+        break;
+      case SagElement::kWakeHandling:
+        if (elements->has_wake_handling() &&
+            elements->wake_handling().has_assertive_dependency_token()) {
+          zx::event copy;
+          elements->wake_handling().assertive_dependency_token().duplicate(ZX_RIGHT_SAME_RIGHTS,
+                                                                           &copy);
+          tokens.emplace(std::make_pair(parent, std::move(copy)));
+        } else {
+          return fit::error(Error::DEPENDENCY_NOT_FOUND);
+        }
+        break;
+      case SagElement::kApplicationActivity:
+        if (elements->has_application_activity() &&
+            elements->application_activity().has_assertive_dependency_token()) {
+          zx::event copy;
+          elements->application_activity().assertive_dependency_token().duplicate(
+              ZX_RIGHT_SAME_RIGHTS, &copy);
+          tokens.emplace(std::make_pair(parent, std::move(copy)));
+        } else {
+          return fit::error(Error::DEPENDENCY_NOT_FOUND);
+        }
+        break;
+      default:
+        return fit::error(Error::INVALID_ARGS);
+    }
+
+    // Record that we found this parent
+    found_parents.push_back(parent);
+  }
+
+  // Remove the parents we found
+  for (const ParentElement& found : found_parents) {
+    dependencies.erase(found);
+  }
+  return zx::ok();
 }
 
 }  // namespace
@@ -345,98 +439,15 @@ fit::result<Error, TokenMap> GetDependencyTokens(const PowerElementConfiguration
     }
   }
 
-  if (!have_sag_dep) {
-    return zx::ok(std::move(tokens));
-  }
-
   // Deal with any system activity governor tokens we might need
-  zx::result<fidl::ClientEnd<fuchsia_power_system::ActivityGovernor>> governor_connect =
-      component::ConnectAt<fuchsia_power_system::ActivityGovernor>(svcs_dir);
-  if (governor_connect.is_error()) {
-    return fit::error(Error::ACTIVITY_GOVERNOR_UNAVAILABLE);
-  }
-  fidl::WireSyncClient<fuchsia_power_system::ActivityGovernor> governor;
-  governor.Bind(std::move(governor_connect.value()));
-
-  fidl::WireResult<fuchsia_power_system::ActivityGovernor::GetPowerElements> elements =
-      governor->GetPowerElements();
-  if (!elements.ok()) {
-    if (elements.is_peer_closed()) {
-      return fit::error(Error::ACTIVITY_GOVERNOR_UNAVAILABLE);
+  if (have_sag_dep) {
+    fit::result<Error> sag_token_result = GetTokensFromSag(dependencies, tokens, svcs_dir);
+    if (sag_token_result.is_error()) {
+      return zx::error(sag_token_result.take_error());
     }
-    return fit::error(Error::ACTIVITY_GOVERNOR_REQUEST);
   }
 
-  // Track the parents we find so we can remove them from dependencies after
-  // we finish iterating over the list of them
-  std::vector<ParentElement> found_parents = {};
-
-  for (const auto& [parent, deps] : dependencies) {
-    if (parent.type() != ParentElement::Type::kSag) {
-      continue;
-    }
-
-    // TODO(https://fxbug.dev/328527451): We should be respecting assertive vs
-    // opportunistic deps here. For the very short term we know what these will
-    // be for all clients, but very soon we should modify the return types and
-    // return the right tokens.
-    switch (parent.GetSag().value()) {
-      case SagElement::kExecutionState:
-        if (elements->has_execution_state() &&
-            elements->execution_state().has_opportunistic_dependency_token()) {
-          zx::event copy;
-          elements->execution_state().opportunistic_dependency_token().duplicate(
-              ZX_RIGHT_SAME_RIGHTS, &copy);
-          tokens.emplace(std::make_pair(parent, std::move(copy)));
-        } else {
-          return fit::error(Error::DEPENDENCY_NOT_FOUND);
-        }
-        break;
-      case SagElement::kExecutionResumeLatency:
-        if (elements->has_execution_resume_latency() &&
-            elements->execution_resume_latency().has_assertive_dependency_token()) {
-          zx::event copy;
-          elements->execution_resume_latency().assertive_dependency_token().duplicate(
-              ZX_RIGHT_SAME_RIGHTS, &copy);
-          tokens.emplace(std::make_pair(parent, std::move(copy)));
-        } else {
-          return fit::error(Error::DEPENDENCY_NOT_FOUND);
-        }
-        break;
-      case SagElement::kWakeHandling:
-        if (elements->has_wake_handling() &&
-            elements->wake_handling().has_assertive_dependency_token()) {
-          zx::event copy;
-          elements->wake_handling().assertive_dependency_token().duplicate(ZX_RIGHT_SAME_RIGHTS,
-                                                                           &copy);
-          tokens.emplace(std::make_pair(parent, std::move(copy)));
-        } else {
-          return fit::error(Error::DEPENDENCY_NOT_FOUND);
-        }
-        break;
-      case SagElement::kApplicationActivity:
-        if (elements->has_application_activity() &&
-            elements->application_activity().has_assertive_dependency_token()) {
-          zx::event copy;
-          elements->application_activity().assertive_dependency_token().duplicate(
-              ZX_RIGHT_SAME_RIGHTS, &copy);
-          tokens.emplace(std::make_pair(parent, std::move(copy)));
-        } else {
-          return fit::error(Error::DEPENDENCY_NOT_FOUND);
-        }
-        break;
-      default:
-        return fit::error(Error::INVALID_ARGS);
-    }
-
-    // Record that we found this parent
-    found_parents.push_back(parent);
-  }
-
-  // Remove the parents we found and check if we found them all
-  for (const ParentElement& found : found_parents) {
-    dependencies.erase(found);
-  }
+  // Check if we found all the tokens we needed
   if (dependencies.size() > 0) {
     return fit::error(Error::DEPENDENCY_NOT_FOUND);
   }

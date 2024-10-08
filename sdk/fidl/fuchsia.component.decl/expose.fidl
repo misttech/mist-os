@@ -14,8 +14,6 @@ type Expose = flexible union {
     3: directory ExposeDirectory;
     4: runner ExposeRunner;
     5: resolver ExposeResolver;
-    @available(removed=13)
-    6: event_stream ExposeEventStream;
     @available(added=HEAD)
     7: dictionary ExposeDictionary;
     @available(added=20)
@@ -171,11 +169,6 @@ type ExposeRunner = table {
 
     /// (Required) The name by which the capability is being exposed.
     4: target_name name;
-
-    /// (Optional, defaults to `REQUIRED`) The availability of this capability.
-    /// See [`Availability`].
-    @available(added=11, removed=12)
-    5: availability Availability;
 };
 
 /// Declares a resolver exposed to a component's containing realm, such as a
@@ -205,39 +198,6 @@ type ExposeResolver = table {
 
     /// (Required) The name by which the capability is being exposed.
     4: target_name name;
-
-    /// (Optional, defaults to `REQUIRED`) The availability of this capability.
-    /// See [`Availability`].
-    @available(added=11, removed=12)
-    5: availability Availability;
-};
-
-/// Declares an event stream exposed to a component's containing realm, such as
-/// an event stream exposed by the component or one of its children at runtime.
-@available(removed=13)
-type ExposeEventStream = table {
-    /// (Required) The provider of the capability relative to the component
-    /// itself. Must be `child`, or `framework`.
-    1: source Ref;
-
-    /// (Required) The name of the event stream
-    2: source_name name;
-
-    /// (Required) When an event is exposed from framework, the scope is
-    /// required and allows one to define the child (or array of children) which
-    /// the event is about.
-    3: scope vector<Ref>:MAX;
-
-    /// (Required) The destination to which the event stream is exposed.
-    4: target Ref;
-
-    /// (Required) The name by which the capability is being exposed.
-    5: target_name name;
-
-    /// (Optional, defaults to `REQUIRED`) The availability of this capability.
-    /// See [`Availability`].
-    @available(added=11)
-    6: availability Availability;
 };
 
 /// Declares a dictionary exposed to a component's containing realm, such as

@@ -141,7 +141,6 @@
 
 			sdio_d0_d3_cfg: sdio-d0-d3-cfg{
 				pins = <A311D_GPIOX(0) A311D_GPIOX(1) A311D_GPIOX(2) A311D_GPIOX(3)>;
-				input-enable;
 				bias-disable;
 				function = <0 1>;
 				drive-strength-microamp = <0 4000>;
@@ -149,7 +148,6 @@
 
 			sdio_clk_cfg: sdio-clk-cfg{
 				pins = <A311D_GPIOX(4)>;
-				input-enable;
 				bias-disable;
 				function = <0 1>;
 				drive-strength-microamp = <0 4000>;
@@ -157,7 +155,6 @@
 
 			sdio_cmd_cfg: sdio-cmd-cfg{
 				pins = <A311D_GPIOX(5)>;
-				input-enable;
 				bias-disable;
 				function = <0 1>;
 				drive-strength-microamp = <0 4000>;

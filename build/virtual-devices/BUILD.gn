@@ -19,6 +19,10 @@ if (board_is_emu) {
     name = "${device_name}-recommended"
     description = "Recommended configuration for running this product"
     output = "$root_build_dir/virtual_device_recommended.json"
+    cpu = {
+      arch = target_cpu
+      count = 4
+    }
   }
 
   # Add the Minimum configuration
@@ -30,6 +34,10 @@ if (board_is_emu) {
     memory = {
       quantity = 2048
       units = "megabytes"
+    }
+    cpu = {
+      arch = target_cpu
+      count = 2
     }
   }
 
@@ -46,6 +54,10 @@ if (board_is_emu) {
     memory = {
       quantity = 28
       units = "gigabytes"
+    }
+    cpu = {
+      arch = target_cpu
+      count = 8
     }
   }
 }

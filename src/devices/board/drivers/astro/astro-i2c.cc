@@ -105,7 +105,7 @@ zx_status_t AddI2cBus(const I2cBus& bus,
 
   std::vector<fpbus::Metadata> i2c_metadata{
       {{
-          .type = DEVICE_METADATA_I2C_CHANNELS,
+          .id = std::to_string(DEVICE_METADATA_I2C_CHANNELS),
           .data = std::move(data),
       }},
   };

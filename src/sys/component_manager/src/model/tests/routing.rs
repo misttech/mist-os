@@ -1084,7 +1084,7 @@ async fn destroying_instance_blocks_on_routing() {
     // Give the destroy action some time to complete. Sleeping is not an ideal testing strategy,
     // but it helps add confidence to the test because it makes it more likely the test would
     // fail if the destroy action is not correctly blocking on the routing task.
-    fasync::Timer::new(fasync::Time::after(zx::Duration::from_seconds(5))).await;
+    fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_seconds(5))).await;
 
     // Wait until routing reaches resolution. It should get here because `Destroy` should not
     // cancel the routing task.
@@ -3214,7 +3214,7 @@ async fn use_anonymized_aggregate_service() {
 #[fuchsia::test(allow_stalls = false)]
 async fn source_component_stopping_when_routing() {
     // Use mock time in this test.
-    let initial = fasync::Time::from_nanos(0);
+    let initial = fasync::MonotonicInstant::from_nanos(0);
     TestExecutor::advance_to(initial).await;
 
     let components = vec![(

@@ -7,6 +7,7 @@ Updates the Fuchsia platform version.
 """
 
 import argparse
+import fileinput
 import json
 import os
 import secrets
@@ -27,7 +28,7 @@ def _generate_random_abi_revision(already_used: set[int]) -> int:
 
 
 def update_version_history(
-    fuchsia_api_level: int, version_history_path: str
+    new_api_level: int, version_history_path: str
 ) -> bool:
     """Updates version_history.json to include the given Fuchsia API level.
 
@@ -38,11 +39,9 @@ def update_version_history(
         with open(version_history_path, "r+") as f:
             version_history = json.load(f)
             versions = version_history["data"]["api_levels"]
-            if str(fuchsia_api_level) in versions:
+            if str(new_api_level) in versions:
                 print(
-                    "error: Fuchsia API level {fuchsia_api_level} is already defined.".format(
-                        fuchsia_api_level=fuchsia_api_level
-                    ),
+                    f"error: Fuchsia API level {new_api_level} is already defined.",
                     file=sys.stderr,
                 )
                 return False
@@ -58,7 +57,7 @@ def update_version_history(
             abi_revision = _generate_random_abi_revision(
                 set(int(v["abi_revision"], 16) for v in versions.values())
             )
-            versions[str(fuchsia_api_level)] = dict(
+            versions[str(new_api_level)] = dict(
                 # Print `abi_revision` in hex, with a leading 0x, with capital
                 # letters, padded to 16 chars.
                 abi_revision=f"0x{abi_revision:016X}",
@@ -72,10 +71,8 @@ def update_version_history(
             return True
     except FileNotFoundError:
         print(
-            """error: Unable to open '{path}'.
-Did you run this script from the root of the source tree?""".format(
-                path=version_history_path
-            ),
+            f"""error: Unable to open '{version_history_path}'.
+Did you run this script from the root of the source tree?""",
             file=sys.stderr,
         )
         return False
@@ -90,19 +87,52 @@ def _create_owners_file(level_dir_path: str) -> None:
         f.write("include /sdk/history/FROZEN_API_LEVEL_OWNERS\n")
 
 
+def _update_availability_levels(
+    new_api_level: int, availability_levels_file: str
+) -> bool:
+    """Adds the given Fuchsia API level to the C preprocessor defines file.
+
+    Assumes lines are sorted in decreasing order of API level.
+    """
+    # Look for the most recent line and replace it with the line for the new
+    # level and itself.
+    last_api_level = new_api_level - 1
+    line_format = "#define FUCHSIA_INTERNAL_LEVEL_{level}_() {level}"
+    most_recent_api_level_line = line_format.format(level=last_api_level)
+    new_line = line_format.format(level=new_api_level)
+
+    try:
+        with fileinput.FileInput(availability_levels_file, inplace=True) as f:
+            for line in f:
+                print(
+                    line.replace(
+                        most_recent_api_level_line,
+                        f"{new_line}\n{most_recent_api_level_line}",
+                    ),
+                    end="",
+                )
+        return True
+    except FileNotFoundError:
+        print(
+            f"""error: Unable to open '{availability_levels_file}'.
+Did you run this script from the root of the source tree?""",
+            file=sys.stderr,
+        )
+        return False
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--new-api-level", type=int, required=True)
-    parser.add_argument("--sdk-version-history", required=True)
-    parser.add_argument("--fidl-compatibility-doc-path", required=True)
-    parser.add_argument("--root-source-dir")
-    parser.add_argument("--stamp-file")
+    parser.add_argument("--sdk-version-history-path", required=True)
+    parser.add_argument("--availability-levels-file-path", required=True)
+    parser.add_argument("--root-source-dir", required=True)
 
     args = parser.parse_args()
 
     new_level = args.new_api_level
 
-    if not update_version_history(new_level, args.sdk_version_history):
+    if not update_version_history(new_level, args.sdk_version_history_path):
         return 1
 
     level_dir_path = os.path.join(
@@ -117,24 +147,32 @@ def main() -> int:
 
     _create_owners_file(level_dir_path)
 
-    # TODO(https://fxbug.dev/349622444): Automate this.
-    # TODO(https://fxbug.dev/349622444): If this is automated, enable building
-    # with `FUCHSIA_INTERNAL_LEVEL_NEXT_()` undefined to ensure there are no
-    # stray instances of `NEXT` that have not been converted to the new level.
+    # TODO(https://fxbug.dev/349622444): Enable building with
+    # `FUCHSIA_INTERNAL_LEVEL_NEXT_()` undefined to ensure there are no stray
+    # instances of `NEXT` that have not been converted to the new level.
     # Otherwise, perhaps use a preprocessor condition. This would avoid the need
-    # to regenerate `levels_file` twice but would include a preprocessor
-    # condition in the production code. Do the same for the Rust macros.
-    levels_file = "zircon/system/public/zircon/availability_levels.inc"
+    # to regenerate `availability_levels_file_path` twice but would include a
+    # preprocessor condition in the production code. Do the same for the Rust
+    # macros.
     sysroot_api_file = "zircon/public/sysroot/sdk/sysroot.api"
-    print(
-        f"Add `#define FUCHSIA_INTERNAL_LEVEL_{new_level}_() {new_level}` to `//{levels_file}`, run `fx build zircon/public/sysroot/sdk:sysroot_sdk_verify_api`, and follow the instructions to update `//{sysroot_api_file}`."
-    )
+    if not _update_availability_levels(
+        new_level, args.availability_levels_file_path
+    ):
+        return 1
 
     # Before printing, rebase the paths to what a developer would use from `//`.
-    history = os.path.relpath(args.sdk_version_history, args.root_source_dir)
+    history = os.path.relpath(
+        args.sdk_version_history_path, args.root_source_dir
+    )
     level_dir = os.path.relpath(level_dir_path, args.root_source_dir)
+    availability_levels_file = os.path.relpath(
+        args.availability_levels_file_path, args.root_source_dir
+    )
     print(
-        f"Then run `git add -u {history} {levels_file} {sysroot_api_file} && git add {level_dir}`."
+        f"""
+API level {new_level} has been added.
+Now run `fx build //zircon/public/sysroot/sdk:sysroot_sdk_verify_api`, and follow the instructions to update `//{sysroot_api_file}` (unless `update_goldens=true`).
+Then run `git add -u {history} {availability_levels_file} {sysroot_api_file} && git add {level_dir}`."""
     )
     return 0
 

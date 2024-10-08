@@ -54,6 +54,12 @@ fuchsia_component("counter") {
   ]
 }
 
+fuchsia_component("counter-alternative") {
+  testonly = true
+  manifest = "meta/counter-alternative.cml"
+  deps = [ ":bin" ]
+}
+
 fuchsia_component("devfs-subdir-user") {
   testonly = true
   manifest = "meta/devfs-subdir-user.cml"

@@ -8,7 +8,7 @@ use crate::storage_factory::{DefaultLoader, NoneT};
 use crate::UpdateState;
 use anyhow::{format_err, Context, Error};
 use fidl_fuchsia_stash::{StoreAccessorProxy, Value};
-use fuchsia_async::{Duration, Task, Time, Timer};
+use fuchsia_async::{Duration, MonotonicInstant, Task, Timer};
 use futures::channel::mpsc::UnboundedSender;
 use futures::future::OptionFuture;
 use futures::lock::{Mutex, MutexGuard};
@@ -224,7 +224,7 @@ impl DeviceStorage {
                     let inspect_handle = Arc::clone(&inspect_handle);
                     // Each key has an independent flush queue.
                     Task::spawn(async move {
-                        let mut next_allowed_flush = Time::now();
+                        let mut next_allowed_flush = MonotonicInstant::now();
                         let mut next_flush_timer = OptionFuture::from(None).fuse();
                         let flush_requested = flush_receiver.fuse();
                         futures::pin_mut!(flush_requested);
@@ -242,7 +242,7 @@ impl DeviceStorage {
                                             &stash_proxy,
                                             Arc::clone(&inspect_handle),
                                             key.to_string()).await;
-                                        next_allowed_flush = Time::now() + MIN_FLUSH_INTERVAL;
+                                        next_allowed_flush = MonotonicInstant::now() + MIN_FLUSH_INTERVAL;
                                     }
                                 }
                                 complete => break,
@@ -874,7 +874,7 @@ mod tests {
         // Custom executor for this test so that we can advance the clock arbitrarily and verify the
         // state of the executor at any given point.
         let mut executor = TestExecutor::new_with_fake_time();
-        let start_time = Time::from_nanos(0);
+        let start_time = MonotonicInstant::from_nanos(0);
         executor.set_fake_time(start_time);
 
         let (stash_proxy, mut stash_stream) =

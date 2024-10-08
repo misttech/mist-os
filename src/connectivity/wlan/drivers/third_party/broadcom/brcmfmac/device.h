@@ -108,7 +108,6 @@ class Device : public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl>,
   zx_status_t NetDevPrepareVmo(uint8_t vmo_id, zx::vmo vmo, uint8_t* mapped_address,
                                size_t mapped_size) override;
   void NetDevReleaseVmo(uint8_t vmo_id) override;
-  void NetDevSetSnoopEnabled(bool snoop) override;
 
   virtual zx_status_t LoadFirmware(const char* path, zx_handle_t* fw, size_t* size) = 0;
   virtual zx_status_t DeviceGetMetadata(uint32_t type, void* buf, size_t buflen,

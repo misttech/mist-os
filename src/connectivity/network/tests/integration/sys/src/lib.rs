@@ -327,9 +327,7 @@ where
             NetstackVersion::ProdNetstack3 | NetstackVersion::Netstack3 => {
                 // Retrieve the inspect payload from the archivist.
                 let mut archive_reader = diagnostics_reader::ArchiveReader::new();
-                let archive_reader = archive_reader
-                    .add_selectors(selectors)
-                    .retry(diagnostics_reader::RetryConfig::EMPTY);
+                let archive_reader = archive_reader.add_selectors(selectors);
                 archive_reader
                     .snapshot::<diagnostics_reader::Inspect>()
                     .await

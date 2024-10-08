@@ -5,7 +5,7 @@
 use super::super::timer::{TimerHandle, TimerHeap};
 use super::packets::{PacketReceiver, PacketReceiverMap, ReceiverRegistration};
 use super::scope::ScopeRef;
-use super::time::Time;
+use super::time::MonotonicInstant;
 use crate::atomic_future::{AtomicFuture, AttemptPollResult};
 use crossbeam::queue::SegQueue;
 use fuchsia_sync::Mutex;
@@ -60,7 +60,7 @@ static ACTIVE_EXECUTORS: AtomicUsize = AtomicUsize::new(0);
 
 pub(crate) struct Executor {
     pub(super) port: zx::Port,
-    monotonic_timers: Arc<TimerHeap<Time>>,
+    monotonic_timers: Arc<TimerHeap<MonotonicInstant>>,
     pub(super) done: AtomicBool,
     is_local: bool,
     receivers: Mutex<PacketReceiverMap<Arc<dyn PacketReceiver>>>,
@@ -251,14 +251,14 @@ impl Executor {
         receiver.receive_packet(packet);
     }
 
-    pub fn now(&self) -> Time {
+    pub fn now(&self) -> MonotonicInstant {
         match &self.time {
-            ExecutorTime::RealTime => Time::from_zx(zx::MonotonicInstant::get()),
-            ExecutorTime::FakeTime(t) => Time::from_nanos(t.load(Ordering::Relaxed)),
+            ExecutorTime::RealTime => MonotonicInstant::from_zx(zx::MonotonicInstant::get()),
+            ExecutorTime::FakeTime(t) => MonotonicInstant::from_nanos(t.load(Ordering::Relaxed)),
         }
     }
 
-    pub fn set_fake_time(&self, new: Time) {
+    pub fn set_fake_time(&self, new: MonotonicInstant) {
         match &self.time {
             ExecutorTime::RealTime => {
                 panic!("Error: called `set_fake_time` on an executor using actual time.")
@@ -512,7 +512,7 @@ impl Executor {
     }
 
     /// Returns the monotonic timers.
-    pub fn monotonic_timers(&self) -> &TimerHeap<Time> {
+    pub fn monotonic_timers(&self) -> &TimerHeap<MonotonicInstant> {
         &self.monotonic_timers
     }
 }
@@ -595,7 +595,7 @@ impl EHandle {
         }
     }
 
-    pub(crate) fn register_timer(&self, time: Time, handle: TimerHandle) {
+    pub(crate) fn register_timer(&self, time: MonotonicInstant, handle: TimerHandle) {
         let executor = self.root_scope.executor();
         executor.monotonic_timers.add_timer(time, handle);
     }

@@ -277,6 +277,28 @@ if (is_kernel) {
     "SMP_MAX_CPUS=$smp_max_cpus",
   ]
 
+  config("instrumented-stack-size") {
+    # Note: Using this extra variable to capture whether the stack size should
+    # be increased or not, is due to GN's limitation on treating unevaluated parts
+    # of an expression as unused (e.g. a || b, would flag `b` as unused if `a` is true).
+    increase_stack_size = false
+
+    # Lockdep enabled.
+    if (enable_lock_dep || enable_lock_dep_metadata_only ||
+        scheduler_lock_spin_tracing_enabled || lock_tracing_enabled) {
+      increase_stack_size = true
+    }
+
+    # Variant considered instrumentation.
+    if (toolchain_variant.tags + [ "instrumented" ] - [ "instrumented" ] !=
+        toolchain_variant.tags) {
+      increase_stack_size = true
+    }
+    if (increase_stack_size) {
+      defines = [ "CUSTOM_DEFAULT_STACK_SIZE=16384" ]
+    }
+  }
+
   # This is the top config for all kernel code.
   config("kernel_config") {
     configs = [
@@ -293,10 +315,13 @@ if (is_kernel) {
 
       # include/lib/counters.h and kernel.ld depend on -fdata-sections.
       "//build/config/zircon:data_sections",
-    ]
 
-    # Provides checks for maximum supported kernel sizes.
-    configs += [ ":kernel_image_max_size" ]
+      # Provides checks for maximum supported kernel sizes.
+      ":kernel_image_max_size",
+
+      # Overrides default stack size for instrumented builds.
+      ":instrumented-stack-size",
+    ]
 
     # TODO(https://fxbug.dev/42101573): This dependency is conditional because when built
     # with GCC the kernel uses function scoped statics requiring dynamic
@@ -383,16 +408,12 @@ if (is_kernel) {
         "WITH_LOCK_DEP=1",
         "LOCK_DEP_ENABLED_FEATURE_LEVEL=2",
       ]
-      configs =
-          [ "//build/config/zircon/instrumentation:instrumented-stack-size" ]
     } else if (enable_lock_dep_metadata_only ||
                scheduler_lock_spin_tracing_enabled || lock_tracing_enabled) {
       defines += [
         "WITH_LOCK_DEP=1",
         "LOCK_DEP_ENABLED_FEATURE_LEVEL=1",
       ]
-      configs =
-          [ "//build/config/zircon/instrumentation:instrumented-stack-size" ]
     }
     if (enable_lock_dep_tests) {
       defines += [ "WITH_LOCK_DEP_TESTS=1" ]

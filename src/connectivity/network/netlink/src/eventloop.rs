@@ -214,17 +214,20 @@ impl<
             route_clients,
             unified_request_stream,
         } = self;
+        let mut v4_route_table_map = crate::route_tables::RouteTableMap::<Ipv4>::new();
+        let mut v6_route_table_map = crate::route_tables::RouteTableMap::<Ipv6>::new();
 
         let (routes_v4_result, routes_v6_result, interfaces_result) = futures::join!(
             async {
                 match included_workers.routes_v4 {
                     EventLoopComponent::Present(()) => {
-                        let (worker, stream) = routes::RoutesWorkerState::<Ipv4>::create(
+                        let (worker, map, stream) = routes::RoutesWorker::<Ipv4>::create(
                             v4_routes_set_provider.get_ref(),
                             v4_routes_state.get_ref(),
                         )
                         .await
                         .context("create v4 routes worker")?;
+                        v4_route_table_map = map;
                         Ok::<_, Error>((EventLoopComponent::Present(worker), stream.left_stream()))
                     }
                     EventLoopComponent::Absent(omitted) => Ok((
@@ -236,12 +239,13 @@ impl<
             async {
                 match included_workers.routes_v6 {
                     EventLoopComponent::Present(()) => {
-                        let (worker, stream) = routes::RoutesWorkerState::<Ipv6>::create(
+                        let (worker, map, stream) = routes::RoutesWorker::<Ipv6>::create(
                             v6_routes_set_provider.get_ref(),
                             v6_routes_state.get_ref(),
                         )
                         .await
                         .context("create v6 routes worker")?;
+                        v6_route_table_map = map;
                         Ok::<_, Error>((EventLoopComponent::Present(worker), stream.left_stream()))
                     }
                     EventLoopComponent::Absent(omitted) => Ok((
@@ -321,6 +325,8 @@ impl<
             interfaces_proxy,
             v4_routes_set_provider,
             v6_routes_set_provider,
+            v4_route_table_map,
+            v6_route_table_map,
             unified_request_stream,
         })
     }
@@ -355,8 +361,8 @@ pub(crate) struct EventLoopState<
     S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
     E: EventLoopSpec,
 > {
-    routes_v4_worker: EventLoopComponent<routes::RoutesWorkerState<Ipv4>, E::RoutesV4Worker>,
-    routes_v6_worker: EventLoopComponent<routes::RoutesWorkerState<Ipv6>, E::RoutesV6Worker>,
+    routes_v4_worker: EventLoopComponent<routes::RoutesWorker<Ipv4>, E::RoutesV4Worker>,
+    routes_v6_worker: EventLoopComponent<routes::RoutesWorker<Ipv6>, E::RoutesV6Worker>,
     interfaces_worker:
         EventLoopComponent<interfaces::InterfacesWorkerState<H, S>, E::InterfacesWorker>,
 
@@ -368,6 +374,8 @@ pub(crate) struct EventLoopState<
         EventLoopComponent<fnet_routes_admin::RouteTableV6Proxy, E::V6RoutesSetProvider>,
 
     rules_worker: rules::RuleTable,
+    v4_route_table_map: crate::route_tables::RouteTableMap<Ipv4>,
+    v6_route_table_map: crate::route_tables::RouteTableMap<Ipv6>,
     unified_pending_request: Option<UnifiedPendingRequest<S>>,
     unified_request_stream: mpsc::Receiver<UnifiedRequest<S>>,
     unified_event_stream: futures::stream::Fuse<BoxStream<'static, Result<UnifiedEvent, Error>>>,
@@ -398,6 +406,8 @@ impl<
             interfaces_proxy,
             v4_routes_set_provider,
             v6_routes_set_provider,
+            v4_route_table_map,
+            v6_route_table_map,
         } = self;
 
         let mut unified_request_stream = unified_request_stream.chain(futures::stream::pending());
@@ -427,6 +437,7 @@ impl<
 
                         routes_v4_worker.get_mut()
                         .handle_route_watcher_event(
+                            v4_route_table_map,
                             route_clients.get_ref(),
                             event,
                             pending_request_args.cloned())
@@ -441,6 +452,7 @@ impl<
 
                         routes_v6_worker.get_mut()
                         .handle_route_watcher_event(
+                            v6_route_table_map,
                             route_clients.get_ref(),
                             event,
                             pending_request_args.cloned()
@@ -468,12 +480,12 @@ impl<
                     }
                     UnifiedRequest::RoutesV4Request(request) => {
                         let request = routes_v4_worker.get_mut()
-                            .handle_request(interfaces_proxy.get_ref(), v4_routes_set_provider.get_ref(), request).await;
+                            .handle_request(v4_route_table_map, interfaces_proxy.get_ref(), v4_routes_set_provider.get_ref(), request).await;
                         *unified_pending_request = request.map(UnifiedPendingRequest::RoutesV4);
                     }
                     UnifiedRequest::RoutesV6Request(request) => {
                         let request = routes_v6_worker.get_mut()
-                            .handle_request(interfaces_proxy.get_ref(), v6_routes_set_provider.get_ref(), request).await;
+                            .handle_request(v6_route_table_map, interfaces_proxy.get_ref(), v6_routes_set_provider.get_ref(), request).await;
                         *unified_pending_request = request.map(UnifiedPendingRequest::RoutesV6);
                     }
                     UnifiedRequest::RuleRequest(request, completer) => {
@@ -488,11 +500,11 @@ impl<
         *unified_pending_request = pending_request.and_then(|pending| match pending {
             UnifiedPendingRequest::RoutesV4(pending_request) => routes_v4_worker
                 .get_mut()
-                .handle_pending_request(pending_request)
+                .handle_pending_request(v4_route_table_map, pending_request)
                 .map(UnifiedPendingRequest::RoutesV4),
             UnifiedPendingRequest::RoutesV6(pending_request) => routes_v6_worker
                 .get_mut()
-                .handle_pending_request(pending_request)
+                .handle_pending_request(v6_route_table_map, pending_request)
                 .map(UnifiedPendingRequest::RoutesV6),
             UnifiedPendingRequest::Interfaces(pending_request) => interfaces_worker
                 .get_mut()

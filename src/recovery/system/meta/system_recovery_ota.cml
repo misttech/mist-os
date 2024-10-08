@@ -82,7 +82,6 @@
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.fshost.Admin",
-                "fuchsia.logger.LogSink",
                 "fuchsia.net.name.Lookup",
                 "fuchsia.paver.Paver",
                 "fuchsia.posix.socket.Provider",
@@ -129,7 +128,6 @@
             protocol: [
                 "fuchsia.boot.Arguments",
                 "fuchsia.cobalt.LoggerFactory",
-                "fuchsia.logger.LogSink",
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.net.name.Lookup",
                 "fuchsia.paver.Paver",

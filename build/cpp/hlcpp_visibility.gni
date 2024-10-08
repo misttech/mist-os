@@ -2,6 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+declare_args() {
+  # Extra vendor-specific targets that may use the deprecated bindings.
+  vendor_hlcpp_visibility = []
+}
+
 hlcpp_visibility = [
   # Dependencies between SDK FIDL libraries.
   "//sdk/fidl/*",
@@ -360,3 +365,5 @@ hlcpp_visibility = [
   "//zircon/kernel/lib/devicetree/tests:*",
   "//zircon/system/ulib/ktrace/*",
 ]
+
+hlcpp_visibility += vendor_hlcpp_visibility

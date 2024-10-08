@@ -11,7 +11,7 @@ use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_dir_
 use fuchsia_component::server::ServiceFs;
 use fuchsia_tee_manager_config::TAConfig;
 use futures::prelude::*;
-use tee_internal::binding::TEE_ERROR_TARGET_DEAD;
+use tee_internal::Error as TeeError;
 use vfs::file::vmo::read_only;
 use vfs::file::File;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
@@ -86,7 +86,7 @@ async fn run_application(mut request: TAConnectRequest, config: TAConfig) {
                     Err(_) => responder.send(
                         0,
                         ftee::OpResult {
-                            return_code: Some(TEE_ERROR_TARGET_DEAD as u64),
+                            return_code: Some(TeeError::TargetDead as u64),
                             return_origin: Some(ftee::ReturnOrigin::TrustedOs),
                             ..Default::default()
                         },
@@ -102,7 +102,7 @@ async fn run_application(mut request: TAConnectRequest, config: TAConfig) {
                 let _ = match ta.invoke_command(session_id, command_id, parameter_set).await {
                     Ok(result) => responder.send(overwrite_return_origin(result)),
                     Err(_) => responder.send(ftee::OpResult {
-                        return_code: Some(TEE_ERROR_TARGET_DEAD as u64),
+                        return_code: Some(TeeError::TargetDead as u64),
                         return_origin: Some(ftee::ReturnOrigin::TrustedOs),
                         ..Default::default()
                     }),

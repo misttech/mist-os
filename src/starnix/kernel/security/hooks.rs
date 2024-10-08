@@ -155,11 +155,11 @@ pub fn task_alloc(task: &Task, clone_flags: u64) -> TaskState {
 /// `task`'s security attributes, even if the task's security attributes change. Called for the
 /// /proc/<pid> `FsNode`s when they are created. Corresponds to the `task_to_inode` hook.
 pub fn task_to_fs_node(current_task: &CurrentTask, task: &TempRef<'_, Task>, fs_node: &FsNode) {
-    if_selinux_else(
-        current_task,
-        |_| selinux_hooks::task::fs_node_init_with_task(task, &fs_node),
-        || (),
-    );
+    // The fs_node_init_with_task hook doesn't require any policy-specific information. Only check
+    // if SElinux is enabled before running it.
+    if current_task.kernel().security_state.state.is_some() {
+        selinux_hooks::task::fs_node_init_with_task(task, &fs_node);
+    }
 }
 
 /// Returns `TaskState` for a new `Task`, based on that of the provided `context`.

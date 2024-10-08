@@ -13,9 +13,9 @@ rustc_library("wlan-frame-writer") {
   with_unit_tests = true
 
   deps = [
+    "//sdk/lib/driver/runtime/rust",
     "//src/connectivity/wlan/lib/common/rust:wlan-common",
     "//src/connectivity/wlan/lib/frame_writer/macro:wlan-frame-writer-macro",
-    "//src/devices/bin/driver_runtime/rust:fdf_rust_lib",
     "//third_party/rust_crates:zerocopy",
   ]
 

@@ -113,6 +113,8 @@ class PlatformDevice : public PlatformDeviceType,
   void GetNodeDeviceInfo(GetNodeDeviceInfoCompleter::Sync& completer) override;
   void GetBoardInfo(GetBoardInfoCompleter::Sync& completer) override;
   void GetMetadata(GetMetadataRequestView request, GetMetadataCompleter::Sync& completer) override;
+  void GetMetadata2(GetMetadata2RequestView request,
+                    GetMetadata2Completer::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
@@ -121,6 +123,17 @@ class PlatformDevice : public PlatformDeviceType,
   zx_status_t Start();
 
  private:
+  // Allows for `std::string_view`'s to be used when searching an unordered map that uses
+  // `std::string` as its key.
+  struct MetadataIdHash {
+    using hash_type = std::hash<std::string_view>;
+    using is_transparent = void;
+
+    std::size_t operator()(const char* str) const { return hash_type{}(str); }
+    std::size_t operator()(std::string_view str) const { return hash_type{}(str); }
+    std::size_t operator()(std::string const& str) const { return hash_type{}(str); }
+  };
+
   // *flags* contains zero or more PDEV_ADD_* flags from the platform bus protocol.
   explicit PlatformDevice(zx_device_t* parent, PlatformBus* bus, Type type,
                           inspect::Node inspect_node, fuchsia_hardware_platform_bus::Node node);
@@ -143,7 +156,7 @@ class PlatformDevice : public PlatformDeviceType,
   fdf::OutgoingDirectory outgoing_;
   fdf::ServerBindingGroup<fuchsia_hardware_platform_bus::PlatformBus> bus_bindings_;
   fidl::ServerBindingGroup<fuchsia_hardware_platform_device::Device> device_bindings_;
-  std::unordered_map<uint32_t, std::vector<uint8_t>> metadata_;
+  std::unordered_map<std::string, std::vector<uint8_t>, MetadataIdHash, std::equal_to<>> metadata_;
 
   // Contains the vectors used when creating interrupts. `interrupt_vectors_`
   // must be above `inspector_`. This is to ensure that `interrupt_vectors_` is

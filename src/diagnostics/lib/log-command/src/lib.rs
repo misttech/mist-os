@@ -65,8 +65,8 @@ pub enum TimeFormat {
     Utc,
     // Local time
     Local,
-    // Monotonic time
-    Monotonic,
+    // Boot time
+    Boot,
 }
 
 impl std::str::FromStr for TimeFormat {
@@ -77,11 +77,10 @@ impl std::str::FromStr for TimeFormat {
         match lower.as_str() {
             "local" => Ok(TimeFormat::Local),
             "utc" => Ok(TimeFormat::Utc),
-            "monotonic" => Ok(TimeFormat::Monotonic),
-            _ => Err(format!(
-                "'{}' is not a valid value: must be one of 'local', 'utc', 'monotonic'",
-                s
-            )),
+            "boot" => Ok(TimeFormat::Boot),
+            _ => {
+                Err(format!("'{}' is not a valid value: must be one of 'local', 'utc', 'boot'", s))
+            }
         }
     }
 }
@@ -214,19 +213,19 @@ pub struct LogCommand {
     #[argh(option, from_str_fn(parse_time))]
     pub since: Option<DetailedDateTime>,
 
-    /// show only logs after a certain time (as a monotonic
+    /// show only logs after a certain time (as a boot
     /// timestamp: seconds from the target's boot time).
     #[argh(option, from_str_fn(parse_seconds_string_as_duration))]
-    pub since_monotonic: Option<Duration>,
+    pub since_boot: Option<Duration>,
 
     /// show only logs until a certain time (exclusive)
     #[argh(option, from_str_fn(parse_time))]
     pub until: Option<DetailedDateTime>,
 
-    /// show only logs until a certain time (as a monotonic
+    /// show only logs until a certain time (as a a boot
     /// timestamp: seconds since the target's boot time).
     #[argh(option, from_str_fn(parse_seconds_string_as_duration))]
-    pub until_monotonic: Option<Duration>,
+    pub until_boot: Option<Duration>,
 
     /// hide the tag field from output (does not exclude any log messages)
     #[argh(switch)]
@@ -252,15 +251,15 @@ pub struct LogCommand {
     pub show_full_moniker: bool,
 
     /// how to display log timestamps.
-    /// Options are "utc", "local", or "monotonic" (i.e. nanos since target boot).
-    /// Default is monotonic.
-    #[argh(option, default = "TimeFormat::Monotonic")]
+    /// Options are "utc", "local", or "boot" (i.e. nanos since target boot).
+    /// Default is boot.
+    #[argh(option, default = "TimeFormat::Boot")]
     pub clock: TimeFormat,
 
     /// configure symbolization options. Valid options are:
     /// - pretty (default): pretty concise symbolization
     /// - off: disables all symbolization
-    /// - classic: traiditional, non-prettified symbolization
+    /// - classic: traditional, non-prettified symbolization
     #[cfg(not(target_os = "fuchsia"))]
     #[argh(option, default = "SymbolizeMode::Pretty")]
     pub symbolize: SymbolizeMode,
@@ -312,7 +311,7 @@ impl Default for LogCommand {
             exclude_tags: vec![],
             hide_tags: false,
             hide_file: false,
-            clock: TimeFormat::Monotonic,
+            clock: TimeFormat::Boot,
             no_color: false,
             kernel: false,
             severity: Severity::Info,
@@ -320,9 +319,9 @@ impl Default for LogCommand {
             force_select: false,
             force_set_severity: false,
             since: None,
-            since_monotonic: None,
+            since_boot: None,
             until: None,
-            until_monotonic: None,
+            until_boot: None,
             sub_command: None,
             select: vec![],
             set_severity: vec![],

@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.usb.descriptor/cpp/wire.h>
 #include <lib/ddk/binding_driver.h>
+#include <lib/ddk/metadata.h>
 #include <lib/fit/defer.h>
 #include <lib/zx/clock.h>
 
@@ -28,7 +29,11 @@ zx_status_t Dwc3::Create(void* ctx, zx_device_t* parent) {
     return status;
   }
 
-  if (zx_status_t status = dev->DdkAdd("dwc3"); status != ZX_OK) {
+  if (zx_status_t status =
+          dev->DdkAdd(ddk::DeviceAddArgs("dwc3")
+                          .forward_metadata(parent, DEVICE_METADATA_MAC_ADDRESS)
+                          .forward_metadata(parent, DEVICE_METADATA_SERIAL_NUMBER));
+      status != ZX_OK) {
     zxlogf(ERROR, "DdkAdd failed: %s", zx_status_get_string(status));
     return status;
   }

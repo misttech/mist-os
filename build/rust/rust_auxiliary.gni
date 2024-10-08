@@ -120,6 +120,22 @@ template("rust_auxiliary") {
       data_keys = [ "rlib" ]
       walk_keys = [ "rust_barrier" ]
     }
+
+    # rustdoc only needs to work with rmeta, so we tell it to
+    # use the rmeta to avoid having to download rlibs with remote building.
+    _deps_file_rmeta = "$_deps_file.rmeta"
+    action(_deps_file_rmeta) {
+      forward_variables_from(invoker, [ "testonly" ])
+      script = "//build/rust/deps_to_rmeta.sh"
+      _dep_input = "$target_gen_dir/$_deps_file"
+      deps = [ ":${_deps_file}" ]
+      inputs = [ _dep_input ]
+      outputs = [ "$target_gen_dir/$target_name" ]
+      args = [
+        rebase_path(_dep_input, root_build_dir),
+        rebase_path(outputs[0], root_build_dir),
+      ]
+    }
   } else {
     not_needed([ "_invoker_deps" ])
   }
@@ -162,7 +178,7 @@ template("rust_auxiliary") {
 
       deps = _invoker_deps
       deps += [
-        ":$_deps_file",
+        ":$_deps_file_rmeta",
         ":$_transdeps_file",
       ]
       if (defined(invoker.non_rust_deps)) {
@@ -171,7 +187,7 @@ template("rust_auxiliary") {
       mnemonic = "CLIPPY"
 
       inputs = [
-        "$target_gen_dir/$_deps_file",
+        "$target_gen_dir/$_deps_file_rmeta",
         "$target_gen_dir/$_transdeps_file",
       ]
       script = "//build/rust/clippy_wrapper.sh"
@@ -186,7 +202,7 @@ template("rust_auxiliary") {
         "--jq",
         rebase_path(_jq, root_build_dir),
         "--deps",
-        rebase_path("$target_gen_dir/$_deps_file", root_build_dir),
+        rebase_path("$target_gen_dir/$_deps_file_rmeta", root_build_dir),
         "--transdeps",
         rebase_path("$target_gen_dir/$_transdeps_file", root_build_dir),
       ]
@@ -287,7 +303,7 @@ template("rust_auxiliary") {
       script = "//build/rust/rustdoc_wrapper.py"
       mnemonic = "DOC"
       deps = _invoker_deps + [
-               ":$_deps_file",
+               ":$_deps_file_rmeta",
                ":$_transdeps_file",
              ]
 
@@ -332,7 +348,7 @@ template("rust_auxiliary") {
       args = [
         "--touch",
         rebase_path(_rustdoc_stamp_output, root_build_dir),
-        "@$_rebased_target_gen_dir/$_deps_file",
+        "@$_rebased_target_gen_dir/$_deps_file_rmeta",
         "--extern-html-root-url=$_extern_html_root_url",
       ]
       if (defined(aliased_deps)) {

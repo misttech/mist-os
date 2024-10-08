@@ -27,7 +27,7 @@ static const gpio_pin_t gpio_pins[] = {
 static const std::vector<fpbus::Metadata> gpio_metadata{
     []() {
       fpbus::Metadata ret;
-      ret.type() = DEVICE_METADATA_GPIO_PINS;
+      ret.id() = std::to_string(DEVICE_METADATA_GPIO_PINS);
       ret.data() =
           std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&gpio_pins),
                                reinterpret_cast<const uint8_t*>(&gpio_pins) + sizeof(gpio_pins));

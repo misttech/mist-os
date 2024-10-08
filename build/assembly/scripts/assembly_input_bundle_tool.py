@@ -31,6 +31,7 @@ BOOTFS_COMPILED_PACKAGE_ALLOWLIST = [
     "fshost",
     "for-test2",
     "root",
+    "toolbox",
 ]  # test package
 
 

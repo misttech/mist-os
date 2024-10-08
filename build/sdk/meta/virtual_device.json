@@ -138,6 +138,23 @@
                                         "units"
                                     ],
                                     "type": "object"
+                                },
+                                "vsock": {
+                                    "additionalProperties": false,
+                                    "description": "The details for the vsock device for interacting with the virtual device.",
+                                    "properties": {
+                                        "enabled": {
+                                            "type": "boolean"
+                                        },
+                                        "cid": {
+                                            "type": "number"
+                                        }
+                                    },
+                                    "required": [
+                                        "enabled",
+                                        "cid"
+                                    ],
+                                    "type": "object"
                                 }
                             },
                             "required": [
@@ -145,7 +162,8 @@
                                 "inputs",
                                 "memory",
                                 "storage",
-                                "window_size"
+                                "window_size",
+                                "cpu"
                             ],
                             "type": "object"
                         }

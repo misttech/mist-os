@@ -116,7 +116,7 @@ pub enum FailureReason {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ConnectFailure {
     /// For determining whether this connection failure is still relevant
-    pub time: fasync::Time,
+    pub time: fasync::MonotonicInstant,
     /// The reason that connection failed
     pub reason: FailureReason,
     /// The BSSID that we failed to connect to
@@ -124,7 +124,7 @@ pub struct ConnectFailure {
 }
 
 impl Timestamped for ConnectFailure {
-    fn time(&self) -> fasync::Time {
+    fn time(&self) -> fasync::MonotonicInstant {
         self.time
     }
 }
@@ -134,7 +134,7 @@ impl Timestamped for ConnectFailure {
 pub struct PastConnectionData {
     pub bssid: client_types::Bssid,
     /// Time at which the connection was ended
-    pub disconnect_time: fasync::Time,
+    pub disconnect_time: fasync::MonotonicInstant,
     /// The time that the connection was up - from established to disconnected.
     pub connection_uptime: zx::Duration,
     /// Cause of disconnect or failure to connect
@@ -148,7 +148,7 @@ pub struct PastConnectionData {
 impl PastConnectionData {
     pub fn new(
         bssid: client_types::Bssid,
-        disconnect_time: fasync::Time,
+        disconnect_time: fasync::MonotonicInstant,
         connection_uptime: zx::Duration,
         disconnect_reason: client_types::DisconnectReason,
         signal_at_disconnect: client_types::Signal,
@@ -166,7 +166,7 @@ impl PastConnectionData {
 }
 
 impl Timestamped for PastConnectionData {
-    fn time(&self) -> fasync::Time {
+    fn time(&self) -> fasync::MonotonicInstant {
         self.disconnect_time
     }
 }
@@ -209,7 +209,7 @@ where
 
     /// Retrieve list of Data entries to any BSS with a time more recent than earliest_time, sorted
     /// from oldest to newest. May be empty.
-    pub fn get_recent_for_network(&self, earliest_time: fasync::Time) -> Vec<T> {
+    pub fn get_recent_for_network(&self, earliest_time: fasync::MonotonicInstant) -> Vec<T> {
         let mut recents: Vec<T> = vec![];
         for bssid in self.0.keys() {
             recents.append(&mut self.get_list_for_bss(bssid).get_recent(earliest_time));
@@ -1095,7 +1095,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_connect_failures_by_bssid_add_and_get() {
         let mut connect_failures = HistoricalListsByBssid::new();
-        let curr_time = fasync::Time::now();
+        let curr_time = fasync::MonotonicInstant::now();
 
         // Add two failures for BSSID_1
         let bssid_1 = client_types::Bssid::from([1; 6]);
@@ -1160,7 +1160,7 @@ mod tests {
         let mut connect_failures = HistoricalList::new(NUM_CONNECTION_RESULTS_PER_BSS);
 
         // Get time before adding so we can get back everything we added.
-        let curr_time = fasync::Time::now();
+        let curr_time = fasync::MonotonicInstant::now();
         assert!(connect_failures.get_recent(curr_time).is_empty());
         let bssid = client_types::Bssid::from([1; 6]);
         let failure =
@@ -1172,14 +1172,14 @@ mod tests {
         assert_eq!(FailureReason::GeneralFailure, result_list[0].reason);
         assert_eq!(bssid, result_list[0].bssid);
         // Should not get any results if we request denials older than the specified time.
-        let later_time = fasync::Time::now();
+        let later_time = fasync::MonotonicInstant::now();
         assert!(connect_failures.get_recent(later_time).is_empty());
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_failure_list_add_when_full() {
         let mut connect_failures = HistoricalList::new(NUM_CONNECTION_RESULTS_PER_BSS);
-        let curr_time = fasync::Time::now();
+        let curr_time = fasync::MonotonicInstant::now();
 
         // Add to list, exceeding the capacity by one entry
         for i in 0..connect_failures.0.capacity() + 1 {
@@ -1199,7 +1199,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_past_connections_by_bssid_add_and_get() {
         let mut past_connections_list = HistoricalListsByBssid::new();
-        let curr_time = fasync::Time::now();
+        let curr_time = fasync::MonotonicInstant::now();
 
         // Add two past_connections for BSSID_1
         let mut data_1_bssid_1 = random_connection_data();
@@ -1257,7 +1257,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_past_connections_list_add_when_full() {
         let mut past_connections_list = PastConnectionList::default();
-        let curr_time = fasync::Time::now();
+        let curr_time = fasync::MonotonicInstant::now();
 
         // Add to list, exceeding the capacity by one entry
         for i in 0..past_connections_list.0.capacity() + 1 {
@@ -1276,7 +1276,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_past_connections_list_add_and_get() {
         let mut past_connections_list = PastConnectionList::default();
-        let curr_time = fasync::Time::now();
+        let curr_time = fasync::MonotonicInstant::now();
         assert!(past_connections_list.get_recent(curr_time).is_empty());
 
         let mut past_connection_data = random_connection_data();

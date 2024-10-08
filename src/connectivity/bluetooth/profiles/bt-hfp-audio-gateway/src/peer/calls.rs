@@ -33,7 +33,7 @@ struct CallEntry {
     /// Current state.
     state: CallState,
     /// Time of the last update to the call's `state`.
-    state_updated_at: fasync::Time,
+    state_updated_at: fasync::MonotonicInstant,
     /// Direction of the call.
     direction: Direction,
     /// Inspect node
@@ -68,7 +68,7 @@ impl Inspect for &mut CallEntry {
 
 impl CallEntry {
     pub fn new(proxy: CallProxy, number: Number, state: CallState, direction: Direction) -> Self {
-        let state_updated_at = fasync::Time::now();
+        let state_updated_at = fasync::MonotonicInstant::now();
         Self {
             proxy,
             number,
@@ -82,7 +82,7 @@ impl CallEntry {
     /// Update the state. `state_updated_at` is changed only if self.state != state.
     pub fn set_state(&mut self, state: CallState) {
         if self.state != state {
-            self.state_updated_at = fasync::Time::now();
+            self.state_updated_at = fasync::MonotonicInstant::now();
             self.state = state;
             self.inspect.set_call_state(state);
         }

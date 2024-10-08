@@ -564,13 +564,36 @@ pub struct InstalledRoute<I: Ip> {
     /// The route's effective properties.
     pub effective_properties: EffectiveRouteProperties,
     /// The table which this route belongs to.
-    pub table_id: u32,
+    pub table_id: TableId,
 }
 
 impl<I: Ip> InstalledRoute<I> {
     /// Tests if the [`InstalledRoute`] matches the given route and table_id.
-    pub fn matches_route_and_table_id(&self, route: &Route<I>, table_id: u32) -> bool {
+    pub fn matches_route_and_table_id(&self, route: &Route<I>, table_id: TableId) -> bool {
         &self.route == route && self.table_id == table_id
+    }
+}
+
+/// A newtype representing the ID of a route table.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
+pub struct TableId(u32);
+
+impl TableId {
+    /// Constructs a new table ID.
+    pub const fn new(id: u32) -> Self {
+        Self(id)
+    }
+
+    /// Extracts the table ID.
+    pub const fn get(self) -> u32 {
+        let Self(id) = self;
+        id
+    }
+}
+
+impl Display for TableId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.get())
     }
 }
 
@@ -585,7 +608,7 @@ pub enum InstalledRouteRequiredFields {
     WithinRoute(#[from] RoutePropertiesRequiredFields),
     #[error(transparent)]
     WithinEffectiveProperties(#[from] EffectiveRoutePropertiesRequiredFields),
-    #[error("fuchsia.net.rotues/InstalledRouteV#.table_id")]
+    #[error("fuchsia.net.routes/InstalledRouteV#.table_id")]
     TableId,
 }
 
@@ -611,9 +634,9 @@ impl TryFrom<fnet_routes::InstalledRouteV4> for InstalledRoute<Ipv4> {
                 .map_err(|e: FidlConversionError<_>| {
                     e.map_unset_fields(InstalledRouteRequiredFields::WithinEffectiveProperties)
                 })?,
-            table_id: installed_route.table_id.ok_or(FidlConversionError::RequiredFieldUnset(
-                InstalledRouteRequiredFields::TableId,
-            ))?,
+            table_id: TableId(installed_route.table_id.ok_or(
+                FidlConversionError::RequiredFieldUnset(InstalledRouteRequiredFields::TableId),
+            )?),
         })
     }
 }
@@ -640,9 +663,9 @@ impl TryFrom<fnet_routes::InstalledRouteV6> for InstalledRoute<Ipv6> {
                 .map_err(|e: FidlConversionError<_>| {
                     e.map_unset_fields(InstalledRouteRequiredFields::WithinEffectiveProperties)
                 })?,
-            table_id: installed_route.table_id.ok_or(FidlConversionError::RequiredFieldUnset(
-                InstalledRouteRequiredFields::TableId,
-            ))?,
+            table_id: TableId(installed_route.table_id.ok_or(
+                FidlConversionError::RequiredFieldUnset(InstalledRouteRequiredFields::TableId),
+            )?),
         })
     }
 }
@@ -654,7 +677,7 @@ impl TryFrom<InstalledRoute<Ipv4>> for fnet_routes::InstalledRouteV4 {
         Ok(fnet_routes::InstalledRouteV4 {
             route: Some(route.try_into()?),
             effective_properties: Some(effective_properties.into()),
-            table_id: Some(table_id),
+            table_id: Some(table_id.get()),
             ..Default::default()
         })
     }
@@ -667,7 +690,7 @@ impl TryFrom<InstalledRoute<Ipv6>> for fnet_routes::InstalledRouteV6 {
         Ok(fnet_routes::InstalledRouteV6 {
             route: Some(route.try_into()?),
             effective_properties: Some(effective_properties.into()),
-            table_id: Some(table_id),
+            table_id: Some(table_id.get()),
             ..Default::default()
         })
     }
@@ -1140,7 +1163,7 @@ mod tests {
     use test_case::test_case;
     use {fidl_fuchsia_net as _, zx_status};
 
-    const ARBITRARY_TABLE_ID: u32 = 0;
+    const ARBITRARY_TABLE_ID: TableId = TableId::new(0);
 
     /// Allows types to provided an arbitrary but valid value for tests.
     trait ArbitraryTestValue {
@@ -1235,7 +1258,7 @@ mod tests {
                 effective_properties: Some(
                     fnet_routes::EffectiveRouteProperties::arbitrary_test_value(),
                 ),
-                table_id: Some(ARBITRARY_TABLE_ID),
+                table_id: Some(ARBITRARY_TABLE_ID.get()),
                 ..Default::default()
             }
         }
@@ -1248,7 +1271,7 @@ mod tests {
                 effective_properties: Some(
                     fnet_routes::EffectiveRouteProperties::arbitrary_test_value(),
                 ),
-                table_id: Some(ARBITRARY_TABLE_ID),
+                table_id: Some(ARBITRARY_TABLE_ID.get()),
                 ..Default::default()
             }
         }
@@ -1561,7 +1584,7 @@ mod tests {
                 effective_properties: Some(
                     fnet_routes::EffectiveRouteProperties::arbitrary_test_value(),
                 ),
-                table_id: Some(ARBITRARY_TABLE_ID),
+                table_id: Some(ARBITRARY_TABLE_ID.get()),
                 ..Default::default()
             }),
             Err(FidlConversionError::RequiredFieldUnset(InstalledRouteRequiredFields::Route))
@@ -1576,7 +1599,7 @@ mod tests {
                 effective_properties: Some(
                     fnet_routes::EffectiveRouteProperties::arbitrary_test_value(),
                 ),
-                table_id: Some(ARBITRARY_TABLE_ID),
+                table_id: Some(ARBITRARY_TABLE_ID.get()),
                 ..Default::default()
             }),
             Err(FidlConversionError::RequiredFieldUnset(InstalledRouteRequiredFields::Route))
@@ -1589,7 +1612,7 @@ mod tests {
             InstalledRoute::try_from(fnet_routes::InstalledRouteV4 {
                 route: Some(fnet_routes::RouteV4::arbitrary_test_value()),
                 effective_properties: None,
-                table_id: Some(ARBITRARY_TABLE_ID),
+                table_id: Some(ARBITRARY_TABLE_ID.get()),
                 ..Default::default()
             }),
             Err(FidlConversionError::RequiredFieldUnset(
@@ -1604,7 +1627,7 @@ mod tests {
             InstalledRoute::try_from(fnet_routes::InstalledRouteV6 {
                 route: Some(fnet_routes::RouteV6::arbitrary_test_value()),
                 effective_properties: None,
-                table_id: Some(ARBITRARY_TABLE_ID),
+                table_id: Some(ARBITRARY_TABLE_ID.get()),
                 ..Default::default()
             }),
             Err(FidlConversionError::RequiredFieldUnset(
@@ -1620,7 +1643,7 @@ mod tests {
             effective_properties: Some(
                 fnet_routes::EffectiveRouteProperties::arbitrary_test_value(),
             ),
-            table_id: Some(ARBITRARY_TABLE_ID),
+            table_id: Some(ARBITRARY_TABLE_ID.get()),
             ..Default::default()
         };
         let local_type = InstalledRoute {
@@ -1641,7 +1664,7 @@ mod tests {
             effective_properties: Some(
                 fnet_routes::EffectiveRouteProperties::arbitrary_test_value(),
             ),
-            table_id: Some(ARBITRARY_TABLE_ID),
+            table_id: Some(ARBITRARY_TABLE_ID.get()),
             ..Default::default()
         };
         let local_type = InstalledRoute {

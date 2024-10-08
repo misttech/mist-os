@@ -99,6 +99,30 @@ impl DnsServers {
         self.consolidate_filter_map(|x| x.address)
     }
 
+    /// Returns a consolidated list of [`DnsServer_`] structs.
+    ///
+    /// The servers will be returned deduplicated by their address and sorted by the source
+    /// that each server was learned from. The servers will be sorted in most to least
+    /// preferred order, with the most preferred server first. The preference of the servers
+    /// is NDP, DHCPv4, DHCPv6 then Static, where NDP is the most preferred. No ordering is
+    /// guaranteed across servers from different sources of the same source-kind, but ordering
+    /// within a source is maintained.
+    ///
+    /// Example, say we had servers SA1 and SA2 set for DHCPv6 interface A, and SB1 and SB2
+    /// for DHCPv6 interface B. The consolidated list will be either one of [SA1, SA2, SB1, SB2]
+    /// or [SB1, SB2, SA1, SA2]. Notice how the ordering across sources (DHCPv6 interface A vs
+    /// DHCPv6 interface B) is not fixed, but the ordering within the source ([SA1, SA2] for DHCPv6
+    /// interface A and [SB1, SB2] for DHCPv6 interface B) is maintained.
+    ///
+    /// Note, if multiple `DnsServer_`s have the same address but different sources, only
+    /// the `DnsServer_` with the most preferred source will be present in the consolidated
+    /// list of servers.
+    // TODO(https://fxbug.dev/42133571): Consider ordering across sources of the
+    // same source-kind based on some metric.
+    pub fn consolidated_dns_servers(&self) -> Vec<DnsServer_> {
+        self.consolidate_filter_map(|x| Some(x))
+    }
+
     /// Returns a consolidated list of servers, with the mapping function `f` applied.
     ///
     /// See `consolidated` for details on ordering.

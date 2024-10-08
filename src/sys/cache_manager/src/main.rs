@@ -332,8 +332,9 @@ mod tests {
 
     /// Advance the TestExecutor by |time_step| and wake expired timers.
     fn advance_time_and_wake(exec: &mut TestExecutor, time_step: &Duration) {
-        let new_time =
-            fasync::Time::from_nanos(exec.now().into_nanos() + time_step.clone().into_nanos());
+        let new_time = fasync::MonotonicInstant::from_nanos(
+            exec.now().into_nanos() + time_step.clone().into_nanos(),
+        );
         exec.set_fake_time(new_time);
         exec.wake_expired_timers();
     }

@@ -36,6 +36,8 @@ class NodeManager {
   virtual uint32_t GetPublishIndex(uint32_t node_id) = 0;
 
   virtual zx::result<> ChangePublishOrder(uint32_t node_id, uint32_t new_index) = 0;
+
+  virtual ~NodeManager();
 };
 
 // Node represents the nodes in the device tree along with it's properties.

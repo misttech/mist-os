@@ -218,7 +218,7 @@ zx::result<> SpmiVisitor::ParseController(fdf_devicetree::Node& node) {
   }
 
   fuchsia_hardware_platform_bus::Metadata pbus_metadata{{
-      .type = fuchsia_hardware_spmi::kControllerInfoMetadataType,
+      .id = std::to_string(fuchsia_hardware_spmi::kControllerInfoMetadataType),
       .data = *std::move(metadata),
   }};
   node.AddMetadata(std::move(pbus_metadata));

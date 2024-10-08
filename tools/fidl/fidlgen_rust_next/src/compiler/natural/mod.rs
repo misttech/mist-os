@@ -52,7 +52,7 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
                 write!(out, "Option<{}>", compiler.config.resource_bindings.handle.natural_path)?;
             }
         }
-        Type::Request { nullable, .. } => {
+        Type::Endpoint { nullable, .. } => {
             if !*nullable {
                 write!(out, "{}", compiler.config.resource_bindings.server_end.natural_path)?;
             } else {

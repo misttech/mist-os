@@ -43,11 +43,11 @@ impl DuplexDataStreamInspect {
         self.outbound.start();
     }
 
-    pub fn record_inbound_transfer(&mut self, bytes: usize, at: fasync::Time) {
+    pub fn record_inbound_transfer(&mut self, bytes: usize, at: fasync::MonotonicInstant) {
         self.inbound.record_transferred(bytes, at);
     }
 
-    pub fn record_outbound_transfer(&mut self, bytes: usize, at: fasync::Time) {
+    pub fn record_outbound_transfer(&mut self, bytes: usize, at: fasync::MonotonicInstant) {
         self.outbound.record_transferred(bytes, at);
     }
 }
@@ -263,7 +263,7 @@ mod tests {
     #[test]
     fn duplex_data_stream_inspect_tree_updates_when_changed() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(1_234_567));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(1_234_567));
 
         let inspect = inspect::Inspector::default();
         let mut stream =
@@ -301,7 +301,7 @@ mod tests {
 
         exec.set_fake_time(zx::Duration::from_seconds(1).after_now());
         // An inbound transfer should have no impact on the outbound stats.
-        stream.record_inbound_transfer(500, fasync::Time::now());
+        stream.record_inbound_transfer(500, fasync::MonotonicInstant::now());
         assert_data_tree!(inspect, root: {
             inbound_stream: {
                 bytes_per_second_current: 500u64,
@@ -318,7 +318,7 @@ mod tests {
         });
 
         exec.set_fake_time(zx::Duration::from_seconds(1).after_now());
-        stream.record_outbound_transfer(250, fasync::Time::now());
+        stream.record_outbound_transfer(250, fasync::MonotonicInstant::now());
         assert_data_tree!(inspect, root: {
             inbound_stream: {
                 bytes_per_second_current: 500u64, // 500 bytes in 1 second

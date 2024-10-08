@@ -117,6 +117,7 @@ _partner_idk_unstable_source_sets_list = [
   "//sdk/lib/driver/metadata/cpp",
   "//src/lib/memory_barriers:memory_barriers",
   "//sdk/lib/driver/power/cpp",
+  "//sdk/lib/driver/platform-device/cpp",
 
   # keep-sorted: end
 ]
@@ -127,6 +128,7 @@ _partner_idk_unstable_source_sets_list_testonly = [
   # keep-sorted: begin
   "//sdk/lib/driver/fake-bti/cpp",
   "//sdk/lib/driver/fake-object/cpp",
+  "//sdk/lib/driver/fake-platform-device/cpp",
   "//sdk/lib/driver/fake-resource/cpp",
 
   # keep-sorted: end

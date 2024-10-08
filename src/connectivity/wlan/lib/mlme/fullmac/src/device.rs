@@ -131,7 +131,9 @@ impl DeviceOps for FullmacDevice {
             .context("FIDL error on Reconnect")
     }
     fn roam(&self, req: fidl_fullmac::WlanFullmacImplRoamRequest) -> anyhow::Result<()> {
-        self.fullmac_impl_sync_proxy.roam(&req, zx::Time::INFINITE).context("FIDL error on Roam")
+        self.fullmac_impl_sync_proxy
+            .roam(&req, zx::MonotonicInstant::INFINITE)
+            .context("FIDL error on Roam")
     }
     fn auth_resp(&self, resp: fidl_fullmac::WlanFullmacImplAuthRespRequest) -> anyhow::Result<()> {
         self.fullmac_impl_sync_proxy

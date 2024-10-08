@@ -638,7 +638,11 @@ async fn set_brightness(
 ) {
     let value = num_traits::clamp(value, 0.0, 1.0);
     let current_value = get_current_brightness(backlight.clone()).await;
-    if (current_value - value).abs() >= BRIGHTNESS_MINIMUM_CHANGE {
+    // When brightness is 0, this is a special case that we need to handle,
+    // screen should be turned off unconditionally.
+    let more_than_minimal_change_or_off =
+        (current_value - value).abs() >= BRIGHTNESS_MINIMUM_CHANGE || value == 0.0;
+    if more_than_minimal_change_or_off {
         let mut set_brightness_abort_handle = set_brightness_abort_handle.lock().await;
         if let Some(handle) = set_brightness_abort_handle.take() {
             handle.abort();
@@ -691,7 +695,15 @@ async fn set_brightness_slowly(
     assert!(current_value <= 1.0);
     let current_sender_channel = current_sender_channel.clone();
     let difference = to_value - current_value;
-    if difference.abs() < BRIGHTNESS_MINIMUM_CHANGE as f64 {
+    if to_value == 0.0 && difference.abs() == 0.0 {
+        set_current_brightness(backlight.clone(), current_value).await;
+        current_sender_channel.lock().await.send_value(current_value as f32);
+        *LAST_SET_BRIGHTNESS.lock().await = to_value as f32;
+        return;
+    }
+    // If `to_value` is zero, we should unconditionally set the new brightness to
+    // turn off the backlight completely.
+    if to_value != 0.0 && difference.abs() < BRIGHTNESS_MINIMUM_CHANGE as f64 {
         return;
     }
     let mut time_per_step =
@@ -1064,7 +1076,7 @@ mod tests {
     fn test_set_brightness_slowly_send_value() {
         // Need to use a TestExecutor with fake time to run past the timeouts without delay
         let mut exec = TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         let control = block_on(generate_control_struct(400.0, 0.5));
         let (channel_sender, mut channel_receiver) = futures::channel::mpsc::unbounded::<f32>();
@@ -1112,7 +1124,7 @@ mod tests {
     fn test_set_brightness_slowly_long_timeout() {
         // Need to use a TestExecutor with fake time to run past the timeouts without delay
         let mut exec = TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         let control = block_on(generate_control_struct(400.0, 0.5));
         let (channel_sender, mut channel_receiver) = futures::channel::mpsc::unbounded::<f32>();

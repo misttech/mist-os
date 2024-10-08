@@ -1376,10 +1376,12 @@ mod tests {
 
         repo_client.update().await.unwrap();
 
-        assert_eq!(
-            repo_client.list_packages().await.unwrap().sort(),
-            pb_client.list_packages().await.unwrap().sort(),
-        );
+        let mut repo_pkgs = repo_client.list_packages().await.unwrap();
+        repo_pkgs.sort();
+        let mut pb_pkgs = pb_client.list_packages().await.unwrap();
+        pb_pkgs.sort();
+
+        assert_eq!(repo_pkgs, pb_pkgs);
 
         for entry in std::fs::read_dir(pb_blobs_dir.join("1")).unwrap() {
             let entry = entry.unwrap();

@@ -159,9 +159,13 @@ if (current_toolchain == default_toolchain) {
 
   group("tests") {
     testonly = true
-    deps = [
-      # causing OOM in qemu: b/362322143
-      # ":fuchsia-boot-resolver-integration-tests"
-    ]
+
+    deps = []
+
+    # In debug mode, this test can cause flaky OOMs since it loads a test
+    # bootfs which is very large.
+    if (!is_debug) {
+      deps += [ ":fuchsia-boot-resolver-integration-tests" ]
+    }
   }
 }

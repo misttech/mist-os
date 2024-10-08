@@ -90,6 +90,19 @@ pub(crate) fn routes(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
     inspector
 }
 
+/// Publishes netstack3 multicast forwarding diagnostics data to Inspect.
+pub(crate) fn multicast_forwarding(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
+    let inspector = fuchsia_inspect::Inspector::new(Default::default());
+    let mut bindings_inspector = FuchsiaInspector::<BindingsCtx>::new(inspector.root());
+    bindings_inspector.record_child("IPv4", |inspector| {
+        ctx.api().multicast_forwarding::<Ipv4>().inspect(inspector);
+    });
+    bindings_inspector.record_child("IPv6", |inspector| {
+        ctx.api().multicast_forwarding::<Ipv6>().inspect(inspector);
+    });
+    inspector
+}
+
 pub(crate) fn devices(ctx: &mut Ctx) -> fuchsia_inspect::Inspector {
     // Snapshot devices out so we're not holding onto the devices lock for too
     // long.

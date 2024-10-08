@@ -144,10 +144,11 @@ async fn graceful_stop_guest<P: PlatformServices>(
         arguments::GuestType::Termina => send_stop_rpc(services, guest).await,
     }?;
 
-    let start = fasync::Time::now();
+    let start = fasync::MonotonicInstant::now();
     println!("Waiting for guest to stop");
 
-    let unresponsive_help_delay = fasync::Time::now() + std::time::Duration::from_secs(10).into();
+    let unresponsive_help_delay =
+        fasync::MonotonicInstant::now() + std::time::Duration::from_secs(10).into();
     let guest_closed =
         guest_endpoint.on_closed().on_timeout(unresponsive_help_delay, || Err(Status::TIMED_OUT));
 
@@ -161,7 +162,7 @@ async fn graceful_stop_guest<P: PlatformServices>(
     }
     .map_err(|err| anyhow!("failed to wait on guest stop signal: {}", err))?;
 
-    let stop_time_nanos = get_time_nanos(fasync::Time::now() - start);
+    let stop_time_nanos = get_time_nanos(fasync::MonotonicInstant::now() - start);
     Ok(StopResult { status: StopStatus::Graceful, stop_time_nanos })
 }
 
@@ -170,10 +171,10 @@ async fn force_stop_guest(
     manager: GuestManagerProxy,
 ) -> Result<StopResult, Error> {
     println!("Forcing {} to stop", guest.to_string());
-    let start = fasync::Time::now();
+    let start = fasync::MonotonicInstant::now();
     manager.force_shutdown().await?;
 
-    let stop_time_nanos = get_time_nanos(fasync::Time::now() - start);
+    let stop_time_nanos = get_time_nanos(fasync::MonotonicInstant::now() - start);
     Ok(StopResult { status: StopStatus::Forced, stop_time_nanos })
 }
 
@@ -200,7 +201,7 @@ mod test {
     #[test]
     fn graceful_stop_waits_for_shutdown() {
         let mut executor = fasync::TestExecutor::new_with_fake_time();
-        executor.set_fake_time(fuchsia_async::Time::now());
+        executor.set_fake_time(fuchsia_async::MonotonicInstant::now());
 
         let (manager_proxy, mut manager_stream) = create_proxy_and_stream::<GuestManagerMarker>()
             .expect("failed to create GuestManager request stream");
@@ -243,7 +244,7 @@ mod test {
 
         // One nano past the helpful message timeout.
         let duration = std::time::Duration::from_secs(10) + std::time::Duration::from_nanos(1);
-        executor.set_fake_time(fasync::Time::after((duration).into()));
+        executor.set_fake_time(fasync::MonotonicInstant::after((duration).into()));
 
         // Waiting for CHANNEL_PEER_CLOSED timed out (printing the helpful message), but then
         // a new indefinite wait began as the channel is still not closed.

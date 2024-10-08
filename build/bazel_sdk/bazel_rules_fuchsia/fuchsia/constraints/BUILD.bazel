@@ -6,10 +6,16 @@
 
 load("@bazel_skylib//lib:selects.bzl", "selects")
 load("//:api_version.bzl", "INTERNAL_ONLY_VALID_TARGET_APIS")
-load(":target_compatibility.bzl", "define_host_can_build_fuchsia_flag")
+load(":target_compatibility.bzl", "COMPATIBILITY", "define_host_can_build_fuchsia_flag")
 
 package(
     default_visibility = ["//:__subpackages__"],
+)
+
+filegroup(
+    name = "bzl_srcs",
+    srcs = glob(["*.bzl"]),
+    visibility = ["//fuchsia:__pkg__"],
 )
 
 # An internal flag used by the "can_host_build_fuchsia" condition below.
@@ -128,3 +134,25 @@ selects.config_setting_group(
         "riscv64",
     ]
 ]
+
+# This is a stub target specifying a `target_compatible_with` clause effectively constraining the
+# acceptable exec build platform to linux-amd64.
+#
+# For more context see `COMPATIBILITY`, `COMPATIBILITY.HOST_DEPS` in
+# `//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/constraints/target_compatibility.bzl`.
+filegroup(
+    name = "check_host_compatibility",
+    target_compatible_with = COMPATIBILITY.HOST_CONDITION,
+    visibility = ["//visibility:public"],
+)
+
+# This is a stub target constraining the target os to fuchsia and the exec build platform to
+# linux-amd64 via `target_compatible_with` -- effectively a superset of `:check_host_compatibility`.
+#
+# For more context see `COMPATIBILITY`, `COMPATIBILITY.FUCHSIA_DEPS` in
+# `//build/bazel_sdk/bazel_rules_fuchsia/fuchsia/constraints/target_compatibility.bzl`.
+filegroup(
+    name = "check_fuchsia_compatibility",
+    target_compatible_with = COMPATIBILITY.FUCHSIA_CONDITION,
+    visibility = ["//visibility:public"],
+)

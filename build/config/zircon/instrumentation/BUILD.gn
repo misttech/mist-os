@@ -20,7 +20,3 @@ config("ubsan-trap") {
     }
   }
 }
-
-config("instrumented-stack-size") {
-  defines = [ "CUSTOM_DEFAULT_STACK_SIZE=16384" ]
-}

@@ -51,9 +51,7 @@ type Configuration = table {
     1: ipv4 @generated_name("Ipv4Configuration") table {
         /// Controls whether or not IPv4 unicast packets may be forwarded if not
         /// destined to the host.
-        /// TODO(https://fxbug.dev/42052564): Rename this field to
-        /// unicast_forwarding.
-        1: forwarding bool;
+        1: unicast_forwarding bool;
 
         /// Controls whether or not IPv4 multicast packets may be forwarded.
         2: multicast_forwarding bool;
@@ -88,9 +86,7 @@ type Configuration = table {
     2: ipv6 @generated_name("Ipv6Configuration") table {
         /// Controls whether or not IPv6 unicast packets may be forwarded if not
         /// destined to the host.
-        /// TODO(https://fxbug.dev/42052564): Rename this field to
-        /// unicast_forwarding.
-        1: forwarding bool;
+        1: unicast_forwarding bool;
 
         /// Controls whether or not IPv6 multicast packets may be forwarded.
         2: multicast_forwarding bool;
@@ -116,6 +112,18 @@ type Configuration = table {
             1: nud NudConfiguration;
             /// Duplicate Address Detection over NDP configuration.
             2: dad DadConfiguration;
+            /// SLAAC (Stateless Address Auto-configuration) configuration.
+            3: slaac @generated_name("SlaacConfiguration") table {
+                /// Controls whether temporary addresses as described in
+                /// [RFC 4941] are generated.
+                ///
+                /// Note that assigned SLAAC temporary addresses will remain
+                /// assigned when this configuration goes from enabled to
+                /// disabled.
+                ///
+                /// [RFC 4941]: https://datatracker.ietf.org/doc/html/rfc4941
+                1: temporary_address bool;
+            };
         };
     };
 };

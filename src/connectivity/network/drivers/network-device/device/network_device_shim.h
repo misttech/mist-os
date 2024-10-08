@@ -50,8 +50,6 @@ class NetworkDeviceShim : public fdf::WireServer<netdriver::NetworkDeviceImpl>,
                   PrepareVmoCompleter::Sync& completer) override;
   void ReleaseVmo(netdriver::wire::NetworkDeviceImplReleaseVmoRequest* request, fdf::Arena& arena,
                   ReleaseVmoCompleter::Sync& completer) override;
-  void SetSnoop(netdriver::wire::NetworkDeviceImplSetSnoopRequest* request, fdf::Arena& arena,
-                SetSnoopCompleter::Sync& completer) override;
 
   // NetworkDeviceIfc implementation.
   void NetworkDeviceIfcPortStatusChanged(uint8_t port_id, const port_status_t* new_status);
@@ -60,7 +58,6 @@ class NetworkDeviceShim : public fdf::WireServer<netdriver::NetworkDeviceImpl>,
   void NetworkDeviceIfcRemovePort(uint8_t port_id);
   void NetworkDeviceIfcCompleteRx(const rx_buffer_t* rx_list, size_t rx_count);
   void NetworkDeviceIfcCompleteTx(const tx_result_t* tx_list, size_t tx_count);
-  void NetworkDeviceIfcSnoop(const rx_buffer_t* rx_list, size_t rx_count);
   void NetworkDeviceIfcDelegateRxLease(const delegated_rx_lease_t* delegated);
 
  private:

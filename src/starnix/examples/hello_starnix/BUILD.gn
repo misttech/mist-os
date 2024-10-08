@@ -4,13 +4,9 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
+import("//src/starnix/build/starnix_linux_executable.gni")
 
-config("config") {
-  asmflags = [ "-fPIC" ]
-}
-
-executable("bin") {
-  output_name = "hello_starnix"
+starnix_linux_executable("hello_starnix") {
   if (current_cpu == "x64") {
     sources = [ "hello_x64.S" ]
   } else if (current_cpu == "arm64") {
@@ -20,26 +16,26 @@ executable("bin") {
   }
 
   disable_syslog_backend = true
+  emit_tool_path = false
 
-  if (is_mistos) {
-    configs += [
-      "//build/config/mistos:no_cpp_standard_library",
-      "//build/config/mistos:static-pie-config",
-      ":config",
-    ]
-  } else {
-    configs += [
-      "//build/config/fuchsia:no_cpp_standard_library",
-      "//build/config/fuchsia:static-pie-config",
-      ":config",
-    ]
-  }
+  ldflags = [
+    "-nostdlib",
+    "-nostartfiles",
+    "-static",
+
+    # There are several flags that are not being used when linking a static binary.
+    # Disable the warning.
+    "-Wno-unused-command-line-argument",
+  ]
+
+  exclude_toolchain_tags = [ "instrumented" ]
 }
 
-fuchsia_package_with_single_component("hello_starnix") {
+fuchsia_package_with_single_component("hello_starnix_pkg") {
+  package_name = "hello_starnix"
   component_name = "hello_starnix"
   manifest = "meta/hello_starnix.cml"
-  deps = [ ":bin" ]
+  deps = [ ":hello_starnix" ]
 }
 
 rustc_binary("hello_starnix_integration_test_bin") {
@@ -71,7 +67,7 @@ fuchsia_test_component("hello_starnix_integration") {
 fuchsia_test_package("hello_starnix_integration_test") {
   test_components = [ ":hello_starnix_integration" ]
   subpackages = [
-    ":hello_starnix",
+    ":hello_starnix_pkg",
     "//src/starnix/kernel:starnix_kernel_package",
     "//src/starnix/containers/empty_container",
   ]
@@ -79,8 +75,5 @@ fuchsia_test_package("hello_starnix_integration_test") {
 
 group("tests") {
   testonly = true
-
-  if (current_cpu != "riscv64") {
-    deps = [ ":hello_starnix_integration_test" ]
-  }
+  deps = [ ":hello_starnix_integration_test" ]
 }

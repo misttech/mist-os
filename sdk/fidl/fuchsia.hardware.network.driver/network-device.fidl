@@ -80,16 +80,6 @@ library fuchsia.hardware.network.driver;
 using fuchsia.hardware.network;
 using zx;
 
-/// Disables automatic snooping for the device.
-///
-/// The generic NetworkDevice layer typically automatically copies all tx
-/// traffic to any snooping clients. Devices may turn off that behavior by
-/// setting the `FEATURE_NO_AUTO_SNOOP` flag.
-///
-/// Devices that disable auto-snooping SHOULD use the [`NetworkDeviceIfc.Snoop`]
-/// interface method to expose any tx frames they receive.
-const FEATURE_NO_AUTO_SNOOP uint32 = 0x01;
-
 /// Maximum number of disjoint parts a buffer may have.
 // NOTE: the number 4 should cover the most common use case for split buffers: 1
 // contiguous buffer for header, 1 contiguous buffer for data, 0 or 1 contiguous
@@ -318,9 +308,9 @@ const MAX_TX_RESULTS uint32 = 8188;
 ///
 /// At the time of writing, FIDL messages are limited to 65 KiB. In the current
 /// FIDL wire format, the maximum size of an `RxBuffer` is 104 bytes, and the
-/// fixed overhead of the `CompleteRx` and `Snoop` requests is 32 bytes (16 for
-/// the FIDL message header + 16 for the vector), so we selected the maximum N
-/// where 32 + N * 104 <= 65 KiB.
+/// fixed overhead of the `CompleteRx` request is 32 bytes (16 for the FIDL
+/// message header + 16 for the vector), so we selected the maximum N where 32
+/// + N * 104 <= 65 KiB.
 const MAX_RX_BUFFERS uint32 = 629;
 
 @transport("Driver")
@@ -398,24 +388,6 @@ closed protocol NetworkDeviceIfc {
     /// + request `tx` transmit results.
     strict CompleteTx(struct {
         tx vector<TxResult>:MAX_TX_RESULTS;
-    });
-    /// Notifies interface of a snooped tx frame.
-    ///
-    /// Typically used by implementations that have the
-    /// [`FEATURE_NO_AUTO_SNOOP`] bit set in [`DeviceInfo.device_features`].
-    /// Implementations that generate transmit traffic internally should use
-    /// `Snoop` regardless of `FEATURE_NO_AUTO_SNOOP` being set.
-    ///
-    /// Snooped frames are *ALWAYS* outbound frames that are being fed back into
-    /// the interface for traffic snooping. Device implementations need to call
-    /// [`NetworkDeviceIfc.Snoop`] ONLY if [`NetworkDeviceImpl.SetSnoop`] was
-    /// set to `true` by the interface, otherwise any buffers in `Snoop` will be
-    /// ignored.
-    ///
-    /// + request `rx` snooped transmit frames to be looped back as incoming
-    /// data.
-    strict Snoop(struct {
-        rx vector<RxBuffer>:MAX_RX_BUFFERS;
     });
 
     /// Transfers a receive wake lease up to the application.
@@ -677,15 +649,6 @@ closed protocol NetworkDeviceImpl {
     strict ReleaseVmo(struct {
         id VmoId;
     }) -> ();
-    /// Informs the device that it should start or stop reporting snooped
-    /// transmit frames through [`NetworkDeviceIfc.Snoop`].
-    ///
-    /// + request `snoop` if `true` device should start reporting snooping
-    /// frames. If `false` device should stop reporting snooped frames. Upon
-    /// initialization, device assumes `snop` is `false`.
-    strict SetSnoop(struct {
-        snoop bool;
-    });
 };
 
 /// Provide NetworkDeviceImpl as a service so that it can be discovered and used by DFv1 children.

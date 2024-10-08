@@ -106,7 +106,8 @@ impl EmuShowTool {
 mod tests {
     use super::*;
     use emulator_instance::{
-        write_to_disk, EmulatorInstanceData, EngineState, FlagData, NetworkingMode,
+        write_to_disk, EmulatorInstanceData, EmulatorInstanceInfo, EngineState, FlagData,
+        NetworkingMode,
     };
     use ffx_config::ConfigLevel;
     use ffx_emulator_config::VirtualDeviceInfo;
@@ -126,8 +127,9 @@ mod tests {
         let machine_writer =
             <EmuShowTool as FfxMain>::Writer::new_test(Some(Format::JsonPretty), &machine_buffers);
 
-        let data = EmulatorInstanceData::new_with_state("one_instance", EngineState::Running);
+        let mut data = EmulatorInstanceData::new_with_state("one_instance", EngineState::Running);
         let instance_dir = emu_instances.get_instance_dir("one_instance", true)?;
+        data.get_emulator_configuration_mut().device.cpu.count = 2;
         write_to_disk(&data, &instance_dir)?;
         tool.cmd.name = Some("one_instance".to_string());
 
@@ -164,6 +166,7 @@ mod tests {
                         "The virtual device used to launch the one_instance emulator.".into(),
                     ),
                     cpu: "x64".into(),
+                    cpu_count: 2,
                     audio: "none".into(),
                     storage_bytes: 0,
                     pointing_device: "none".into(),
@@ -238,7 +241,8 @@ mod tests {
             context: env.context.clone(),
         };
 
-        let data = EmulatorInstanceData::new_with_state("one_instance", EngineState::Running);
+        let mut data = EmulatorInstanceData::new_with_state("one_instance", EngineState::Running);
+        data.get_emulator_configuration_mut().device.cpu.count = 2;
         let emu_instances = EmulatorInstances::new(PathBuf::from(env.isolate_root.path()));
         let instance_dir = emu_instances
             .get_instance_dir("one_instance", true)
@@ -268,6 +272,7 @@ mod tests {
                     "The virtual device used to launch the one_instance emulator.".into(),
                 ),
                 cpu: "x64".into(),
+                cpu_count: 2,
                 audio: "none".into(),
                 storage_bytes: 0,
                 pointing_device: "none".into(),

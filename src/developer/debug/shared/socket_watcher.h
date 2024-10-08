@@ -18,6 +18,8 @@ class SocketWatcher {
   virtual void OnSocketReadable(zx_handle_t socket_handle) {}
   virtual void OnSocketWritable(zx_handle_t socket_handle) {}
   virtual void OnSocketError(zx_handle_t socket_handle) {}
+
+  virtual ~SocketWatcher() = default;
 };
 
 }  // namespace debug

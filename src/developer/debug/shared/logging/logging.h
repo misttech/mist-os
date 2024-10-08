@@ -75,6 +75,8 @@ class LogBackend {
   // Set the backend to |backend|. If |enable_syslog| is true, logs will also be sent to the syslog.
   static void Set(LogBackend* backend, bool enable_syslog);
   static void Unset();
+
+  virtual ~LogBackend();
 };
 
 }  // namespace debug

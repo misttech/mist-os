@@ -16,6 +16,13 @@ use std::collections::HashMap;
 pub struct Cpu {
     /// Target CPU architecture.
     pub arch: CpuArchitecture,
+    /// Count of CPUs present. For backwards compatibility, defaults to 4 when deserializing old data.
+    #[serde(default = "default_cpu_count")]
+    pub count: usize,
+}
+
+fn default_cpu_count() -> usize {
+    4
 }
 
 /// Details of virtual input devices, such as mice.
@@ -38,6 +45,16 @@ pub struct Screen {
     pub height: usize,
     pub width: usize,
     pub units: ScreenUnits,
+}
+
+/// Details of the virtual device's vsock interface, if any.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+pub struct VsockDevice {
+    /// Whether the vsock device is enabled.
+    pub enabled: bool,
+
+    /// The context id the kernel should associate with the vsock.
+    pub cid: u32,
 }
 
 /// A generic data structure for indicating quantities of data.
@@ -76,6 +93,9 @@ pub struct Hardware {
 
     /// The size of the virtual device's screen, measured in pixels.
     pub window_size: Screen,
+
+    /// Details about the vsock device.
+    pub vsock: VsockDevice,
 }
 
 /// Description of a virtual (rather than physical) hardware device.
@@ -166,6 +186,10 @@ mod tests {
                     "storage": {
                         "quantity": 1,
                         "units": "gigabytes"
+                    },
+                    "vsock": {
+                        "enabled": true,
+                        "cid": 3
                     }
                 },
                 "start_up_args_template": "/path/to/args"
@@ -206,6 +230,10 @@ mod tests {
                     "storage": {
                         "quantity": 1,
                         "units": "gigabytes"
+                    },
+                    "vsock": {
+                        "enabled": true,
+                        "cid": 3
                     }
                 },
                 "start_up_args_template": "/path/to/args"

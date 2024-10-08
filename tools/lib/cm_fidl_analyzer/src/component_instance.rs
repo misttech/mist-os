@@ -15,6 +15,7 @@ use cm_rust::{CapabilityDecl, CollectionDecl, ComponentDecl, ExposeDecl, OfferDe
 use cm_types::{Name, Url};
 use config_encoder::ConfigFields;
 use moniker::{ChildName, Moniker};
+use router_error::RouterError;
 use routing::bedrock::program_output_dict::build_program_output_dictionary;
 use routing::bedrock::sandbox_construction::{build_component_sandbox, ComponentSandbox};
 use routing::bedrock::structured_dict::ComponentInput;
@@ -24,7 +25,7 @@ use routing::component_instance::{
     TopInstanceInterface, WeakExtendedInstanceInterface,
 };
 use routing::environment::RunnerRegistry;
-use routing::error::ComponentInstanceError;
+use routing::error::{ComponentInstanceError, ErrorReporter, RouteRequestErrorInfo};
 use routing::policy::GlobalPolicyChecker;
 use routing::resolving::{ComponentAddress, ComponentResolutionContext};
 use sandbox::Dict;
@@ -169,6 +170,12 @@ impl ComponentInstanceForAnalyzer {
             &new_program_router,
             &new_outgoing_dir_router,
         );
+        #[derive(Clone)]
+        struct NullErrorReporter {}
+        #[async_trait]
+        impl ErrorReporter for NullErrorReporter {
+            async fn report(&self, _: &RouteRequestErrorInfo, _: &RouterError) {}
+        }
         let sandbox = build_component_sandbox(
             &self_,
             children_component_output_dictionary_routers,
@@ -180,6 +187,7 @@ impl ComponentInstanceForAnalyzer {
             build_framework_dictionary(&self_),
             build_capability_sourced_capabilities_dictionary(&self_, &decl),
             declared_dictionaries,
+            NullErrorReporter {},
         );
         self_.sandbox.append(&sandbox);
         self_

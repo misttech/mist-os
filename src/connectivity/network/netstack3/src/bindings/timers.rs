@@ -21,7 +21,7 @@ use crate::bindings::util::{NeedsDataNotifier, NeedsDataWatcher};
 pub(crate) use scheduled_instant::ScheduledInstant;
 
 /// A special time that is used as a marker for an unscheduled timer.
-const UNSCHEDULED_SENTINEL: fasync::Time = fasync::Time::INFINITE;
+const UNSCHEDULED_SENTINEL: fasync::MonotonicInstant = fasync::MonotonicInstant::INFINITE;
 
 /// The maximum number of timers that will fire without yielding to the
 /// executor.
@@ -157,7 +157,9 @@ impl<T: Clone + Send + Sync + Debug + 'static> TimerDispatcher<T> {
         let mut guard = inner.lock();
         let TimerDispatcherState { heap, notifier: _, watcher: _ } = &mut *guard;
         heap.retain(|TimeAndValue { time, value }| {
-            let current = fasync::Time::from_nanos(value.scheduled.load(atomic::Ordering::SeqCst));
+            let current = fasync::MonotonicInstant::from_nanos(
+                value.scheduled.load(atomic::Ordering::SeqCst),
+            );
             // Retain all the entries that are still valid.
             match ScheduledEntryValidity::new(current, *time) {
                 ScheduledEntryValidity::Valid | ScheduledEntryValidity::ValidForLaterTime => {
@@ -180,7 +182,7 @@ impl<T: Clone + Send + Sync + Debug + 'static> TimerDispatcher<T> {
     async fn check_timer_heap<H: FnMut(T, UniqueTimerId<T>)>(
         handler: &mut H,
         inner: &CoreMutex<TimerDispatcherState<T>>,
-    ) -> (fasync::Time, usize) {
+    ) -> (fasync::MonotonicInstant, usize) {
         let mut fired_count = 0;
         loop {
             let (dispatch, unique_id) = {
@@ -191,7 +193,7 @@ impl<T: Clone + Send + Sync + Debug + 'static> TimerDispatcher<T> {
                     // Nothing to wait for.
                     return (UNSCHEDULED_SENTINEL, heap_len);
                 };
-                if !front.should_fire_at(fasync::Time::now()) {
+                if !front.should_fire_at(fasync::MonotonicInstant::now()) {
                     // Wait until the time at the front of the heap to fire.
                     return (front.time, heap_len);
                 }
@@ -234,7 +236,7 @@ struct TimerDispatcherInner<T> {
 ///
 /// Its `Ord` implementation is tuned to make [`BinaryHeap`] a min heap.
 struct TimeAndValue<T> {
-    time: fasync::Time,
+    time: fasync::MonotonicInstant,
     value: T,
 }
 
@@ -277,7 +279,10 @@ enum ScheduledEntryValidity {
 impl ScheduledEntryValidity {
     /// Evaluates the validity of a scheduled entry with `current_value` and
     /// cached `scheduled_entry`.
-    fn new(current_value: fasync::Time, scheduled_entry: fasync::Time) -> Self {
+    fn new(
+        current_value: fasync::MonotonicInstant,
+        scheduled_entry: fasync::MonotonicInstant,
+    ) -> Self {
         if current_value == UNSCHEDULED_SENTINEL {
             return Self::Invalid;
         }
@@ -310,7 +315,7 @@ impl<T: Clone> TimerScheduledEntry<T> {
                 UniqueTimerId(Arc::downgrade(&timer_state)),
             ),
             Err(next) => {
-                let next = fasync::Time::from_nanos(next);
+                let next = fasync::MonotonicInstant::from_nanos(next);
                 match ScheduledEntryValidity::new(next, scheduled_for) {
                     // If the timer state is  valid for a later time, we need to
                     // put it back into the heap to be fired later.
@@ -328,7 +333,7 @@ impl<T: Clone> TimerScheduledEntry<T> {
     }
 
     /// Returns whether this entry should fire for the current time.
-    fn should_fire_at(&self, now: fasync::Time) -> bool {
+    fn should_fire_at(&self, now: fasync::MonotonicInstant) -> bool {
         self.time <= now
     }
 }
@@ -384,7 +389,7 @@ impl<T> Debug for Timer<T> {
         // type T.
         let Self { state, heap: _, _no_clone: _ } = self;
         let TimerState { scheduled, dispatch: _, gc_generation: _ } = &**state;
-        let scheduled = ScheduledInstant::new(fasync::Time::from_nanos(
+        let scheduled = ScheduledInstant::new(fasync::MonotonicInstant::from_nanos(
             scheduled.load(atomic::Ordering::Relaxed),
         ));
         f.debug_struct("Timer").field("scheduled", &scheduled).finish_non_exhaustive()
@@ -399,9 +404,9 @@ impl<T> Drop for Timer<T> {
 }
 
 impl<T> Timer<T> {
-    pub(crate) fn schedule(&mut self, when: fasync::Time) -> Option<ScheduledInstant> {
+    pub(crate) fn schedule(&mut self, when: fasync::MonotonicInstant) -> Option<ScheduledInstant> {
         let prev = self.state.scheduled.swap(when.into_nanos(), atomic::Ordering::SeqCst);
-        let prev = fasync::Time::from_nanos(prev);
+        let prev = fasync::MonotonicInstant::from_nanos(prev);
 
         // CRITICAL SECTION HERE.
         //
@@ -460,7 +465,7 @@ impl<T> Timer<T> {
     }
 
     pub(crate) fn scheduled_time(&self) -> Option<ScheduledInstant> {
-        ScheduledInstant::new(fasync::Time::from_nanos(
+        ScheduledInstant::new(fasync::MonotonicInstant::from_nanos(
             self.state.scheduled.load(atomic::Ordering::SeqCst),
         ))
     }
@@ -485,7 +490,7 @@ const MIN_TARGET_HEAP_SIZE: usize = 10;
 struct TimerWaiter {
     timers: BinaryHeap<TimeAndValue<fasync::Timer>>,
     selected: Option<TimeAndValue<fasync::Timer>>,
-    wakeup: fasync::Time,
+    wakeup: fasync::MonotonicInstant,
     /// The target heap size controls when we let go of expired fasync::Timers
     /// instead of reusing them.
     target_heap_size: usize,
@@ -514,7 +519,7 @@ impl TimerWaiter {
     /// Note that an `INFINITE_FUTURE` wakeup time will cause `TimerWaiter` to
     /// behave like a terminated future, i.e., `FusedFuture::is_terminated` is
     /// `true` and polling it may panic.
-    fn set(&mut self, new_wakeup: fasync::Time) {
+    fn set(&mut self, new_wakeup: fasync::MonotonicInstant) {
         let Self { timers, selected, wakeup, target_heap_size: _ } = self;
         if std::mem::replace(wakeup, new_wakeup) == new_wakeup {
             return;
@@ -618,10 +623,10 @@ mod scheduled_instant {
 
     /// A time that stands as a witness for a valid schedule time.
     ///
-    /// It can only be constructed with an [`fasync::Time`] that is not
+    /// It can only be constructed with an [`fasync::MonotonicInstant`] that is not
     /// `INFINITE_FUTURE`.
     #[derive(Eq, PartialEq)]
-    pub(crate) struct ScheduledInstant(fasync::Time);
+    pub(crate) struct ScheduledInstant(fasync::MonotonicInstant);
 
     impl std::fmt::Debug for ScheduledInstant {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -633,12 +638,12 @@ mod scheduled_instant {
     impl ScheduledInstant {
         /// Constructs a new `ScheduledInstant` if `time` is not
         /// `INFINITE_FUTURE`.
-        pub(super) fn new(time: fasync::Time) -> Option<Self> {
+        pub(super) fn new(time: fasync::MonotonicInstant) -> Option<Self> {
             (time != UNSCHEDULED_SENTINEL).then_some(Self(time))
         }
     }
 
-    impl From<ScheduledInstant> for fasync::Time {
+    impl From<ScheduledInstant> for fasync::MonotonicInstant {
         fn from(ScheduledInstant(value): ScheduledInstant) -> Self {
             value
         }
@@ -664,10 +669,10 @@ mod tests {
 
     impl TimerWaiter {
         #[track_caller]
-        fn assert_timers<I: IntoIterator<Item = fasync::Time>>(
+        fn assert_timers<I: IntoIterator<Item = fasync::MonotonicInstant>>(
             &self,
             expect_heap: I,
-            expect_selected: Option<fasync::Time>,
+            expect_selected: Option<fasync::MonotonicInstant>,
         ) {
             let Self { timers, selected, wakeup: _, target_heap_size: _ } = self;
             // Collect times and compare sorted vecs.
@@ -703,11 +708,11 @@ mod tests {
         }
     }
 
-    const T0: fasync::Time = fasync::Time::from_nanos(0);
-    const T1: fasync::Time = fasync::Time::from_nanos(1);
-    const T2: fasync::Time = fasync::Time::from_nanos(2);
-    const T3: fasync::Time = fasync::Time::from_nanos(3);
-    const T4: fasync::Time = fasync::Time::from_nanos(4);
+    const T0: fasync::MonotonicInstant = fasync::MonotonicInstant::from_nanos(0);
+    const T1: fasync::MonotonicInstant = fasync::MonotonicInstant::from_nanos(1);
+    const T2: fasync::MonotonicInstant = fasync::MonotonicInstant::from_nanos(2);
+    const T3: fasync::MonotonicInstant = fasync::MonotonicInstant::from_nanos(3);
+    const T4: fasync::MonotonicInstant = fasync::MonotonicInstant::from_nanos(4);
 
     #[derive(Debug, Eq, PartialEq, Clone)]
     enum TimerId {
@@ -914,7 +919,7 @@ mod tests {
         assert_eq!(t.heap_len(), 1);
 
         let mut reschedule = || {
-            let prev: fasync::Time = timer.cancel().unwrap().into();
+            let prev: fasync::MonotonicInstant = timer.cancel().unwrap().into();
             assert_eq!(timer.schedule(prev + zx::Duration::from_seconds(1)), None);
         };
 

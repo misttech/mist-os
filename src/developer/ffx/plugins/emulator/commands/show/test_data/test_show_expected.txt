@@ -17,6 +17,7 @@ Device:
   "name": "one_instance_device",
   "description": "The virtual device used to launch the one_instance emulator.",
   "cpu": "x64",
+  "cpu_count": 2,
   "audio": "none",
   "storage_bytes": 0,
   "pointing_device": "none",

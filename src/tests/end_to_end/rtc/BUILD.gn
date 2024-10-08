@@ -18,7 +18,6 @@ python_mobly_test("rtc_conformance_test") {
     "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test_no_testonly",
   ]
 
-  transport = "fuchsia-controller"
   enable_hermetic_exe = true
   environments = [ vim3_env ]
 

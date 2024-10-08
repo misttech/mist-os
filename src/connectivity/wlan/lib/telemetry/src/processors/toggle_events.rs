@@ -25,7 +25,7 @@ pub struct ToggleLogger {
     current_state: Option<ClientConnectionsToggleEvent>,
     /// The last time wlan was toggled off, or None if it hasn't been. Used to determine if WLAN
     /// was turned on right after being turned off.
-    time_stopped: Option<fasync::Time>,
+    time_stopped: Option<fasync::MonotonicInstant>,
 }
 
 impl ToggleLogger {
@@ -48,7 +48,7 @@ impl ToggleLogger {
             event_type: std::format!("{:?}", event_type)
         });
 
-        let curr_time = fasync::Time::now();
+        let curr_time = fasync::MonotonicInstant::now();
         match &event_type {
             ClientConnectionsToggleEvent::Enabled => {
                 // If connections were just disabled before this, log a metric for the quick wifi
@@ -148,7 +148,7 @@ mod tests {
             ToggleLogger::new(test_helper.cobalt_1dot1_proxy.clone(), &inspect_node);
 
         // Start with client connections enabled.
-        let mut test_time = fasync::Time::from_nanos(123);
+        let mut test_time = fasync::MonotonicInstant::from_nanos(123);
         let event = ClientConnectionsToggleEvent::Enabled;
         run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
@@ -184,7 +184,7 @@ mod tests {
             ToggleLogger::new(test_helper.cobalt_1dot1_proxy.clone(), &inspect_node);
 
         // Start with client connections enabled.
-        let mut test_time = fasync::Time::from_nanos(123);
+        let mut test_time = fasync::MonotonicInstant::from_nanos(123);
         let event = ClientConnectionsToggleEvent::Enabled;
         run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
@@ -216,7 +216,7 @@ mod tests {
             ToggleLogger::new(test_helper.cobalt_1dot1_proxy.clone(), &inspect_node);
 
         // Start with client connections enabled.
-        let mut test_time = fasync::Time::from_nanos(123);
+        let mut test_time = fasync::MonotonicInstant::from_nanos(123);
         let event = ClientConnectionsToggleEvent::Enabled;
         run_log_toggle_event(&mut test_helper, &mut toggle_logger, event);
 

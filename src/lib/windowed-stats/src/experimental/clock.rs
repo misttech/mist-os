@@ -53,7 +53,7 @@ impl QuantaExt for Quanta {
 }
 
 /// A point in time.
-pub type Timestamp = fuchsia_async::Time;
+pub type Timestamp = fuchsia_async::MonotonicInstant;
 
 pub trait TimestampExt {
     /// Calculates the number of quanta between zero and the current timestamp.
@@ -293,7 +293,7 @@ mod tests {
     #[test]
     fn timed_sample_now() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(3_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(3_000_000_000));
         let timed_sample = TimedSample::now(1u64);
         let (timestamp, sample) = timed_sample.into();
         assert_eq!(timestamp, Timestamp::from_nanos(3_000_000_000));

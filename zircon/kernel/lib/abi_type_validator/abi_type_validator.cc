@@ -403,10 +403,12 @@ VALIDATE_FIELD_OFFSET_SIZE(zx_packet_page_request_t, length, 16, 8);
 VALIDATE_FIELD_OFFSET_SIZE(zx_packet_page_request_t, reserved1, 24, 8);
 
 VALIDATE_TYPE_SIZE_ALIGNMENT(zx_packet_processor_power_level_transition_request_t, 32, 8);
-VALIDATE_FIELD_OFFSET_SIZE(zx_packet_processor_power_level_transition_request_t, target, 0, 8);
-VALIDATE_FIELD_OFFSET_SIZE(zx_packet_processor_power_level_transition_request_t, control_argument,
+VALIDATE_FIELD_OFFSET_SIZE(zx_packet_processor_power_level_transition_request_t, domain_id, 0, 4);
+VALIDATE_FIELD_OFFSET_SIZE(zx_packet_processor_power_level_transition_request_t, options, 4, 4);
+VALIDATE_FIELD_OFFSET_SIZE(zx_packet_processor_power_level_transition_request_t, control_interface,
                            8, 8);
-VALIDATE_FIELD_OFFSET_SIZE(zx_packet_processor_power_level_transition_request_t, context, 16, 8);
+VALIDATE_FIELD_OFFSET_SIZE(zx_packet_processor_power_level_transition_request_t, control_argument,
+                           16, 8);
 VALIDATE_FIELD_OFFSET_SIZE(zx_packet_processor_power_level_transition_request_t, reserved, 24, 8);
 
 VALIDATE_TYPE_SIZE_ALIGNMENT(zx_sched_deadline_params_t, 24, 8);

@@ -64,7 +64,7 @@ impl RuntimeUtcMonitor {
     async fn execute(self) {
         let mut last_logged = self.initial;
         loop {
-            fasync::Timer::new(fasync::Time::after(POLL_DELAY)).await;
+            fasync::Timer::new(fasync::MonotonicInstant::after(POLL_DELAY)).await;
             // Only log UTC when we reach a new minute.
             let current = Utc::now();
             if current.hour() != last_logged.hour() || current.minute() != last_logged.minute() {
@@ -129,7 +129,7 @@ impl ClockMonitor {
         let generation_change_fut = async {
             let mut last_logged = self.initial_generation;
             loop {
-                fasync::Timer::new(fasync::Time::after(POLL_DELAY)).await;
+                fasync::Timer::new(fasync::MonotonicInstant::after(POLL_DELAY)).await;
                 if let Ok(details) = self.clock.get_details() {
                     if details.generation_counter != last_logged {
                         info!(

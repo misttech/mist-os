@@ -45,7 +45,7 @@ impl SystemController {
                 SystemControllerRequest::Shutdown { responder } => {
                     let timeout = zx::Duration::from(self.request_timeout);
                     fasync::Task::spawn(async move {
-                        fasync::Timer::new(fasync::Time::after(timeout)).await;
+                        fasync::Timer::new(fasync::MonotonicInstant::after(timeout)).await;
                         panic!("Component manager did not complete shutdown in allowed time.");
                     })
                     .detach();
@@ -205,7 +205,7 @@ mod tests {
         #[async_trait]
         impl Hook for StopHook {
             async fn on(self: Arc<Self>, _event: &Event) -> Result<(), ModelError> {
-                fasync::Timer::new(fasync::Time::after(zx::Duration::from_seconds(
+                fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_seconds(
                     EVENT_PAUSE_SECONDS.into(),
                 )))
                 .await;
@@ -268,7 +268,7 @@ mod tests {
 
         assert_eq!(std::task::Poll::Pending, exec.run_until_stalled(&mut test_logic));
 
-        let new_time = fasync::Time::from_nanos(
+        let new_time = fasync::MonotonicInstant::from_nanos(
             exec.now().into_nanos() + zx::Duration::from_seconds(TIMEOUT_SECONDS).into_nanos(),
         );
 

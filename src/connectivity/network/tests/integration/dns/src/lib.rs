@@ -206,6 +206,7 @@ impl DnsCheckType {
     // Determine whether the DNS servers are present given the CheckType.
     async fn evaluate_check<
         'a,
+        M: Manager,
         F: Unpin + FusedFuture + Future<Output = Result<component_events::events::Stopped>>,
     >(
         self,
@@ -233,7 +234,9 @@ impl DnsCheckType {
                 // Poll DnsServerWatcher hanging get until we
                 // get the servers we want or after too long.
                 let dns_server_watcher = realm
-                    .connect_to_protocol::<net_name::DnsServerWatcherMarker>()
+                    .connect_to_protocol_from_child::<net_name::DnsServerWatcherMarker>(
+                        M::MANAGEMENT_AGENT.get_component_name(),
+                    )
                     .expect("failed to connect to DnsServerWatcher");
                 poll_dns_server_watcher(
                     &dns_server_watcher,
@@ -309,7 +312,7 @@ async fn discovered_ndp_dns<M: Manager, N: Netstack>(name: &str, check_type: Dns
         wait_for_component_stopped(&client_realm, M::MANAGEMENT_AGENT.get_component_name(), None)
             .fuse();
     let mut wait_for_netmgr = pin!(wait_for_netmgr);
-    check_type.evaluate_check(&client_realm, &mut wait_for_netmgr, &expect).await
+    check_type.evaluate_check::<M, _>(&client_realm, &mut wait_for_netmgr, &expect).await
 }
 
 /// Tests that DHCPv4 exposes DNS servers discovered through DHCPv4 and NetworkManager
@@ -436,7 +439,7 @@ async fn discovered_dhcpv4_dns<M: Manager, N: Netstack>(name: &str, check_type: 
                 )
                 .fuse();
                 let mut wait_for_netmgr = pin!(wait_for_netmgr);
-                check_type.evaluate_check(client_realm, &mut wait_for_netmgr, &expect).await
+                check_type.evaluate_check::<M, _>(client_realm, &mut wait_for_netmgr, &expect).await
             }
             .boxed_local()
         },
@@ -607,7 +610,7 @@ async fn discovered_dhcpv6_dns<M: Manager, N: Netstack>(name: &str, check_type: 
                 )
                 .fuse();
                 let mut wait_for_netmgr = pin!(wait_for_netmgr);
-                check_type.evaluate_check(client_realm, &mut wait_for_netmgr, &expect).await
+                check_type.evaluate_check::<M, _>(client_realm, &mut wait_for_netmgr, &expect).await
             }
             .boxed_local()
         },

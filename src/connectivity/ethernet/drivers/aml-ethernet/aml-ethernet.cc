@@ -67,10 +67,15 @@ void AmlEthernet::ResetPhy(ResetPhyCompleter::Sync& completer) {
 }
 
 zx_status_t AmlEthernet::InitPdev() {
-  pdev_ = ddk::PDevFidl::FromFragment(parent());
-  if (!pdev_.is_valid()) {
-    zxlogf(ERROR, "Could not get PDEV protocol");
-    return ZX_ERR_NO_RESOURCES;
+  {
+    zx::result pdev_client =
+        DdkConnectFragmentFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(parent_,
+                                                                                          "pdev");
+    if (pdev_client.is_error()) {
+      zxlogf(ERROR, "Failed to connect to platform device: %s", pdev_client.status_string());
+      return pdev_client.status_value();
+    }
+    pdev_ = fdf::PDev{std::move(pdev_client.value())};
   }
 
   // Not needed on vim3.
@@ -94,20 +99,22 @@ zx_status_t AmlEthernet::InitPdev() {
   gpios_[PHY_INTR].Bind(std::move(gpio_int.value()));
 
   // Map amlogic peripheral control registers.
-  zx_status_t status = pdev_.MapMmio(MMIO_PERIPH, &periph_mmio_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "aml-dwmac: could not map periph mmio: %d", status);
-    return status;
+  zx::result periph_mmio = pdev_.MapMmio(MMIO_PERIPH);
+  if (periph_mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map periph mmio: %s", periph_mmio.status_string());
+    return periph_mmio.status_value();
   }
+  periph_mmio_ = std::move(periph_mmio.value());
 
   // Map HHI regs (clocks and power domains).
-  status = pdev_.MapMmio(MMIO_HHI, &hhi_mmio_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "aml-dwmac: could not map hiu mmio: %d", status);
-    return status;
+  zx::result hhi_mmio = pdev_.MapMmio(MMIO_HHI);
+  if (hhi_mmio.is_error()) {
+    zxlogf(ERROR, "Failed to map hiu mmio: %s", hhi_mmio.status_string());
+    return hhi_mmio.status_value();
   }
+  hhi_mmio_ = std::move(hhi_mmio.value());
 
-  return status;
+  return ZX_OK;
 }
 
 zx_status_t AmlEthernet::Bind() {
@@ -126,16 +133,15 @@ zx_status_t AmlEthernet::Bind() {
     }
   }
 
-  pdev_board_info_t board;
   bool is_vim3 = false;
-  zx_status_t status = pdev_.GetBoardInfo(&board);
+  zx::result board = pdev_.GetBoardInfo();
 
-  if (status != ZX_OK || board.pid != PDEV_PID_AV400) {
+  if (board.is_error() || board->pid != PDEV_PID_AV400) {
     // Initialize AMLogic peripheral registers associated with dwmac.
     // Sorry about the magic...rtfm
     periph_mmio_->Write32(0x1621, PER_ETH_REG0);
-    if (status == ZX_OK) {
-      is_vim3 = ((board.vid == PDEV_VID_KHADAS) && (board.pid == PDEV_PID_VIM3));
+    if (board.is_ok()) {
+      is_vim3 = ((board->vid == PDEV_VID_KHADAS) && (board->pid == PDEV_PID_VIM3));
     }
 
     if (!is_vim3) {
@@ -156,7 +162,7 @@ zx_status_t AmlEthernet::Bind() {
   if (i2c_.is_valid()) {
     // WOL reset enable to MCU
     uint8_t write_buf[2] = {MCU_I2C_REG_BOOT_EN_WOL, MCU_I2C_REG_BOOT_EN_WOL_RESET_ENABLE};
-    status = i2c_.WriteSync(write_buf, sizeof(write_buf));
+    zx_status_t status = i2c_.WriteSync(write_buf, sizeof(write_buf));
     if (status) {
       zxlogf(ERROR, "aml-ethernet: WOL reset enable to MCU failed: %d", status);
       return status;
@@ -215,9 +221,8 @@ zx_status_t AmlEthernet::Create(void* ctx, zx_device_t* parent) {
   if (status != ZX_OK) {
     zxlogf(ERROR, "aml-ethernet driver failed to get added: %d", status);
     return status;
-  } else {
-    zxlogf(INFO, "aml-ethernet driver added");
   }
+  zxlogf(INFO, "aml-ethernet driver added");
 
   // eth_device intentionally leaked as it is now held by DevMgr
   [[maybe_unused]] auto ptr = eth_device.release();

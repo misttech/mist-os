@@ -9,7 +9,7 @@ use crate::{FATFS_INFO_NAME, MAX_FILENAME_LEN};
 use anyhow::Error;
 use fatfs::{DefaultTimeProvider, FsOptions, LossyOemCpConverter};
 use fidl_fuchsia_io as fio;
-use fuchsia_async::{Task, Time, Timer};
+use fuchsia_async::{MonotonicInstant, Task, Timer};
 use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::sync::{Arc, LockResult, Mutex, MutexGuard};
@@ -76,7 +76,7 @@ impl FatFilesystemInner {
 
 pub struct FatFilesystem {
     inner: Mutex<FatFilesystemInner>,
-    dirty_task: Mutex<Option<(Time, Task<()>)>>,
+    dirty_task: Mutex<Option<(MonotonicInstant, Task<()>)>>,
     fs_id: Event,
 }
 
@@ -126,7 +126,7 @@ impl FatFilesystem {
     /// Mark the filesystem as dirty. This will cause the disk to automatically be flushed after
     /// one second, and cancel any previous pending flushes.
     pub fn mark_dirty(self: &Pin<Arc<Self>>) {
-        let deadline = Time::after(Duration::from_seconds(1));
+        let deadline = MonotonicInstant::after(Duration::from_seconds(1));
         match &mut *self.dirty_task.lock().unwrap() {
             Some((time, _)) => *time = deadline,
             x @ None => {
@@ -139,7 +139,7 @@ impl FatFilesystem {
                             {
                                 let mut task = this.dirty_task.lock().unwrap();
                                 deadline = task.as_ref().unwrap().0;
-                                if Time::now() >= deadline {
+                                if MonotonicInstant::now() >= deadline {
                                     *task = None;
                                     break;
                                 }
@@ -222,7 +222,7 @@ mod tests {
         }
         // Wait some time for the flush to happen. Don't hold the lock while waiting, otherwise
         // the flush will get stuck waiting on the lock.
-        Timer::new(Time::after(Duration::from_millis(1500))).await;
+        Timer::new(MonotonicInstant::after(Duration::from_millis(1500))).await;
         {
             let fs_lock = fs.filesystem().lock().unwrap();
             assert_eq!(fs_lock.filesystem.as_ref().unwrap().is_dirty(), false);

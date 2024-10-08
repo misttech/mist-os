@@ -193,7 +193,6 @@ mod happy_mod {
 Some well-known crates have adopted aliases or alias formation rules. Those are:
 
 - `fuchsia_async` may be aliased to `fasync`.
-- `fuchsia_zircon` may be aliased to `zx`.
 - `fidl_fuchsia_*` prefixes may be aliased to `f*`, e.g.:
   - `use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;`
   - `use fidl_fuchsia_net_routes as fnet_routes;`

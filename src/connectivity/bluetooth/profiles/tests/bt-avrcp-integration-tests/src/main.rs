@@ -211,7 +211,7 @@ async fn remote_initiates_connection_to_avrcp(mut tf: AvrcpIntegrationTest) {
     // We wait `MAX_AVRCP_CONNECTION_ESTABLISHMENT` millis before attempting to connect, as per
     // AVRCP 1.6.2, Section 4.1.1, to avoid conflict.
     const MAX_AVRCP_CONNECTION_ESTABLISHMENT: zx::Duration = zx::Duration::from_millis(1000);
-    fasync::Timer::new(fasync::Time::after(MAX_AVRCP_CONNECTION_ESTABLISHMENT)).await;
+    fasync::Timer::new(fasync::MonotonicInstant::after(MAX_AVRCP_CONNECTION_ESTABLISHMENT)).await;
 
     // Mock peer attempts to connect to AVRCP.
     let params = l2cap_connect_parameters(Psm::AVCTP, fidl_bt::ChannelMode::Basic);

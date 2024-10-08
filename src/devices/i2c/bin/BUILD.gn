@@ -28,6 +28,7 @@ executable("i2cutil") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp",
     "//sdk/lib/component/incoming/cpp",
+    "//src/lib/fxl",
     "//zircon/system/ulib/zx",
   ]
 }

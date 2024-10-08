@@ -17,7 +17,7 @@ use fidl_fuchsia_recovery_ui::{
     FactoryResetCountdownRequestStream, FactoryResetCountdownState,
     FactoryResetCountdownWatchResponder,
 };
-use fuchsia_async::{Duration, Task, Time, TimeoutExt, Timer};
+use fuchsia_async::{Duration, MonotonicInstant, Task, TimeoutExt, Timer};
 use fuchsia_inspect::health::Reporter;
 use futures::StreamExt;
 use metrics_registry::*;
@@ -72,8 +72,8 @@ use {fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_io as fio, zx}
 enum FactoryResetState {
     Disallowed,
     Idle,
-    ButtonCountdown { deadline: Time },
-    ResetCountdown { deadline: Time },
+    ButtonCountdown { deadline: MonotonicInstant },
+    ResetCountdown { deadline: MonotonicInstant },
     Resetting,
 }
 
@@ -293,11 +293,11 @@ impl FactoryResetHandler {
     /// Handles waiting for the reset button to be held down long enough to start
     /// the factory reset countdown.
     async fn start_button_countdown(self: &Rc<Self>) -> Result<(), Error> {
-        let deadline = Time::after(BUTTON_TIMEOUT);
+        let deadline = MonotonicInstant::after(BUTTON_TIMEOUT);
         self.set_factory_reset_state(FactoryResetState::ButtonCountdown { deadline });
 
         // Wait for button timeout
-        Timer::new(Time::after(BUTTON_TIMEOUT)).await;
+        Timer::new(MonotonicInstant::after(BUTTON_TIMEOUT)).await;
 
         // Make sure the buttons are still held
         match self.factory_reset_state() {
@@ -318,11 +318,11 @@ impl FactoryResetHandler {
     /// Handles waiting for the reset countdown to complete before resetting the
     /// device.
     async fn start_reset_countdown(self: &Rc<Self>) -> Result<(), Error> {
-        let deadline = Time::after(RESET_TIMEOUT);
+        let deadline = MonotonicInstant::after(RESET_TIMEOUT);
         self.set_factory_reset_state(FactoryResetState::ResetCountdown { deadline });
 
         // Wait for reset timeout
-        Timer::new(Time::after(RESET_TIMEOUT)).await;
+        Timer::new(MonotonicInstant::after(RESET_TIMEOUT)).await;
 
         // Make sure the buttons are still held
         match self.factory_reset_state() {
@@ -628,7 +628,7 @@ mod tests {
         assert_matches!(handler_state, FactoryResetState::ButtonCountdown { deadline: _ });
 
         // Skip ahead 500ms for the ButtonCountdown
-        executor.set_fake_time(Time::after(Duration::from_millis(500)));
+        executor.set_fake_time(MonotonicInstant::after(Duration::from_millis(500)));
         executor.wake_expired_timers();
 
         // After the ButtonCountdown the reset_handler enters the
@@ -639,7 +639,7 @@ mod tests {
         assert_matches!(handler_state, FactoryResetState::ResetCountdown { deadline: _ });
 
         // Skip ahead 10s for the ResetCountdown
-        executor.set_fake_time(Time::after(Duration::from_seconds(10)));
+        executor.set_fake_time(MonotonicInstant::after(Duration::from_seconds(10)));
         executor.wake_expired_timers();
 
         // After the ResetCountdown the reset_handler enters the
@@ -765,7 +765,7 @@ mod tests {
         let test_node = inspector.root().create_child("test_node");
         let reset_handler = FactoryResetHandler::new(&test_node, metrics::MetricsLogger::default());
 
-        let deadline = Time::after(BUTTON_TIMEOUT);
+        let deadline = MonotonicInstant::after(BUTTON_TIMEOUT);
         *reset_handler.factory_reset_state.borrow_mut() =
             FactoryResetState::ButtonCountdown { deadline };
 
@@ -783,7 +783,7 @@ mod tests {
         let reset_handler = FactoryResetHandler::new(&test_node, metrics::MetricsLogger::default());
 
         *reset_handler.factory_reset_state.borrow_mut() =
-            FactoryResetState::ResetCountdown { deadline: Time::now() };
+            FactoryResetState::ResetCountdown { deadline: MonotonicInstant::now() };
 
         // Calling handle_reset_countdown_event should reset the handler
         // to the idle state

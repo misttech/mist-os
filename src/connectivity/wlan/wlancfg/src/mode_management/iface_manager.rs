@@ -59,7 +59,7 @@ struct ClientIfaceContainer {
     client_state_machine: Option<Box<dyn client_fsm::ClientApi + Send>>,
     security_support: fidl_common::SecuritySupport,
     /// The time of the last scan for roaming or new connection on this iface.
-    last_roam_time: fasync::Time,
+    last_roam_time: fasync::MonotonicInstant,
     status: StateMachineStatusReader<client_fsm::Status>,
 }
 
@@ -291,7 +291,7 @@ impl IfaceManagerService {
             config: None,
             client_state_machine: None,
             security_support,
-            last_roam_time: fasync::Time::now(),
+            last_roam_time: fasync::MonotonicInstant::now(),
             status,
         })
     }
@@ -532,7 +532,7 @@ impl IfaceManagerService {
             }
         }
 
-        client_iface.last_roam_time = fasync::Time::now();
+        client_iface.last_roam_time = fasync::MonotonicInstant::now();
         self.clients.push(client_iface);
         Ok(())
     }
@@ -614,7 +614,7 @@ impl IfaceManagerService {
                 client.config = Some(connect_selection.target.network);
                 client.status = status;
                 client.client_state_machine = Some(new_client);
-                client.last_roam_time = fasync::Time::now();
+                client.last_roam_time = fasync::MonotonicInstant::now();
                 break;
             }
         }
@@ -1859,7 +1859,7 @@ mod tests {
             config: None,
             client_state_machine: None,
             security_support: fake_security_support(),
-            last_roam_time: fasync::Time::now(),
+            last_roam_time: fasync::MonotonicInstant::now(),
             status,
         };
         let phy_manager = FakePhyManager {
@@ -6276,7 +6276,7 @@ mod tests {
             config: None,
             client_state_machine: None,
             security_support: fake_security_support(),
-            last_roam_time: fasync::Time::now(),
+            last_roam_time: fasync::MonotonicInstant::now(),
             status,
         };
 

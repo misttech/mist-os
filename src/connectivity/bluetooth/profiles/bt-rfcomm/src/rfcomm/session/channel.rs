@@ -142,13 +142,14 @@ impl FlowController for SimpleController {
         let num_bytes = data.information.len();
         let user_data_frame = Frame::make_user_data_frame(self.role, self.dlci, data, None);
         if self.outgoing_sender.send(user_data_frame).await.is_ok() {
-            self.stream_inspect.record_outbound_transfer(num_bytes, fasync::Time::now());
+            self.stream_inspect
+                .record_outbound_transfer(num_bytes, fasync::MonotonicInstant::now());
         };
     }
 
     async fn receive_data_from_peer(&mut self, data: FlowControlledData, client: &Channel) {
         if let Ok(num_bytes) = client.write(&data.user_data.information[..]) {
-            self.stream_inspect.record_inbound_transfer(num_bytes, fasync::Time::now());
+            self.stream_inspect.record_inbound_transfer(num_bytes, fasync::MonotonicInstant::now());
         }
     }
 }
@@ -227,7 +228,8 @@ impl CreditFlowController {
         if self.outgoing_sender.send(frame).await.is_ok() {
             if data_size != 0 {
                 self.credits.decrement_local();
-                self.stream_inspect.record_outbound_transfer(data_size, fasync::Time::now());
+                self.stream_inspect
+                    .record_outbound_transfer(data_size, fasync::MonotonicInstant::now());
             }
             self.credits.replenish_remote(credits_to_replenish.unwrap_or(0) as usize);
         }
@@ -263,8 +265,10 @@ impl FlowController for CreditFlowController {
 
         if !user_data.is_empty() {
             let _ = client.write(&user_data.information[..]);
-            self.stream_inspect
-                .record_inbound_transfer(user_data.information.len(), fasync::Time::now());
+            self.stream_inspect.record_inbound_transfer(
+                user_data.information.len(),
+                fasync::MonotonicInstant::now(),
+            );
 
             if self.credits.decrement_remote() {
                 trace!("Remote credit count is low. Sending empty frame");
@@ -552,7 +556,7 @@ mod tests {
     /// Creates and returns a CreditFlowController with the initial `credits`. Uses
     /// an executor set at the provided `time`.
     fn setup_credit_flow_controller(
-        time: fasync::Time,
+        time: fasync::MonotonicInstant,
         credits: Credits,
     ) -> (fasync::TestExecutor, inspect::Inspector, CreditFlowController, mpsc::Receiver<Frame>)
     {
@@ -764,7 +768,7 @@ mod tests {
         let initial_credits = Credits::new(2, 7);
         let (mut exec, _inspect, mut flow_controller, mut outgoing_frames) =
             setup_credit_flow_controller(
-                /* initial_time= */ fasync::Time::from_nanos(0),
+                /* initial_time= */ fasync::MonotonicInstant::from_nanos(0),
                 initial_credits,
             );
         // The endpoints of the RFCOMM channel. The local end is managed by the RFCOMM
@@ -973,7 +977,7 @@ mod tests {
     #[test]
     fn session_channel_inspect_updates_when_established() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(7_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(7_000_000));
 
         // Set up and establish a channel with inspect.
         let dlci = DLCI::try_from(8).unwrap();
@@ -1022,7 +1026,7 @@ mod tests {
 
     #[test]
     fn credit_flow_controller_inspect_updates_after_data_exchange() {
-        let initial_time = fasync::Time::from_nanos(987_000_000);
+        let initial_time = fasync::MonotonicInstant::from_nanos(987_000_000);
         let initial_credits = Credits::new(50, 70);
         let (mut exec, inspect, mut flow_controller, mut outgoing_frames) =
             setup_credit_flow_controller(initial_time, initial_credits);

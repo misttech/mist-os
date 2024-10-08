@@ -16,12 +16,12 @@ zx_library("fake-bti") {
 
   sources = [ "fake-bti.cc" ]
   public_deps = [
-    # Note: technically this dependency isn't necessary in the ZN build,
-    # but if it is missing the fake-bti --> fake-object dependency is
-    # not properly captured in the metadata passed to the GN build.
-    # This will become moot when both libraries are migrated to that
-    # build.
     "//sdk/lib/fdio",
+
+    # The following line is required in order to ensure that the metadata in the
+    # @internal_sdk contains the `fake-bti` --> `fake-object` dependency.
+    # Without it, use of this library in the Bazel SDK fails to find
+    # `fake_object::FakeHandleTable()` and others during linking.
     "//src/devices/testing/fake-object",
   ]
   deps = [

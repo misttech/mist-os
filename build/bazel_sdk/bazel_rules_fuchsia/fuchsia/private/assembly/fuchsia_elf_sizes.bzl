@@ -4,6 +4,7 @@
 
 """Rule for creating a ELF sizes summary file for a Fuchsia image."""
 
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":providers.bzl", "FuchsiaProductImageInfo")
 load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
 
@@ -76,5 +77,5 @@ fuchsia_elf_sizes = rule(
             executable = True,
             cfg = "exec",
         ),
-    },
+    } | COMPATIBILITY.HOST_ATTRS,
 )

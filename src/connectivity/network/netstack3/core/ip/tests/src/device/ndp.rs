@@ -55,7 +55,7 @@ use netstack3_ip::device::{
     IpDeviceConfigurationUpdate, IpDeviceStateContext, Ipv4DeviceConfigurationUpdate,
     Ipv6AddrConfig, Ipv6AddressFlags, Ipv6AddressState, Ipv6DeviceConfigurationContext,
     Ipv6DeviceConfigurationUpdate, Ipv6DeviceHandler, Ipv6DeviceTimerId, Lifetime, OpaqueIid,
-    OpaqueIidNonce, SlaacBindingsContext, SlaacConfig, SlaacConfiguration, SlaacContext,
+    OpaqueIidNonce, SlaacBindingsContext, SlaacConfig, SlaacConfigurationUpdate, SlaacContext,
     SlaacTimerId, TemporarySlaacAddressConfiguration, TemporarySlaacConfig,
     MAX_RTR_SOLICITATION_DELAY, RTR_SOLICITATION_INTERVAL,
 };
@@ -143,10 +143,10 @@ fn setup_net() -> (
         local_mac(),
         Ipv4DeviceConfigurationUpdate::default(),
         Ipv6DeviceConfigurationUpdate {
-            slaac_config: Some(SlaacConfiguration {
-                enable_stable_addresses: true,
+            slaac_config: SlaacConfigurationUpdate {
+                enable_stable_addresses: Some(true),
                 ..Default::default()
-            }),
+            },
             ..Default::default()
         },
     );
@@ -155,10 +155,10 @@ fn setup_net() -> (
         remote_mac(),
         Ipv4DeviceConfigurationUpdate::default(),
         Ipv6DeviceConfigurationUpdate {
-            slaac_config: Some(SlaacConfiguration {
-                enable_stable_addresses: true,
+            slaac_config: SlaacConfigurationUpdate {
+                enable_stable_addresses: Some(true),
                 ..Default::default()
-            }),
+            },
             ..Default::default()
         },
     );
@@ -330,10 +330,10 @@ fn test_dad_duplicate_address_detected_solicitation() {
     let update = Ipv6DeviceConfigurationUpdate {
         // Doesn't matter as long as we perform DAD.
         dad_transmits: Some(NonZeroU16::new(1)),
-        slaac_config: Some(SlaacConfiguration {
-            enable_stable_addresses: true,
+        slaac_config: SlaacConfigurationUpdate {
+            enable_stable_addresses: Some(true),
             ..Default::default()
-        }),
+        },
         ip_config: IpDeviceConfigurationUpdate { ip_enabled: Some(true), ..Default::default() },
         ..Default::default()
     };
@@ -1174,10 +1174,10 @@ fn test_host_send_router_solicitations() {
             Ipv6DeviceConfigurationUpdate {
                 // Test expects to send 3 RSs.
                 max_router_solicitations: Some(NonZeroU8::new(3)),
-                slaac_config: Some(SlaacConfiguration {
-                    enable_stable_addresses: true,
+                slaac_config: SlaacConfigurationUpdate {
+                    enable_stable_addresses: Some(true),
                     ..Default::default()
-                }),
+                },
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
                     ..Default::default()
@@ -1281,10 +1281,10 @@ fn test_host_send_router_solicitations() {
             &device_id,
             Ipv6DeviceConfigurationUpdate {
                 max_router_solicitations: Some(NonZeroU8::new(2)),
-                slaac_config: Some(SlaacConfiguration {
-                    enable_stable_addresses: true,
+                slaac_config: SlaacConfigurationUpdate {
+                    enable_stable_addresses: Some(true),
                     ..Default::default()
-                }),
+                },
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
                     ..Default::default()
@@ -1684,7 +1684,7 @@ fn single_static_and_temporary<
 }
 
 fn initialize_with_temporary_addresses_enabled(
-) -> (FakeCtx, DeviceId<FakeBindingsCtx>, SlaacConfiguration) {
+) -> (FakeCtx, DeviceId<FakeBindingsCtx>, SlaacConfigurationUpdate) {
     set_logger_for_test();
     let config = Ipv6::TEST_ADDRS;
     let mut ctx = FakeCtx::default();
@@ -1704,8 +1704,8 @@ fn initialize_with_temporary_addresses_enabled(
     let max_valid_lifetime = Duration::from_secs(60 * 60);
     let max_preferred_lifetime = Duration::from_secs(30 * 60);
     let idgen_retries = 3;
-    let slaac_config = SlaacConfiguration {
-        temporary_address_configuration: Some(TemporarySlaacAddressConfiguration {
+    let slaac_config = SlaacConfigurationUpdate {
+        temporary_address_configuration: Some(TemporarySlaacAddressConfiguration::Enabled {
             temp_valid_lifetime: NonZeroDuration::new(max_valid_lifetime).unwrap(),
             temp_preferred_lifetime: NonZeroDuration::new(max_preferred_lifetime).unwrap(),
             temp_idgen_retries: idgen_retries,
@@ -1718,10 +1718,7 @@ fn initialize_with_temporary_addresses_enabled(
         .device_ip::<Ipv6>()
         .update_configuration(
             &device,
-            Ipv6DeviceConfigurationUpdate {
-                slaac_config: Some(slaac_config),
-                ..Default::default()
-            },
+            Ipv6DeviceConfigurationUpdate { slaac_config, ..Default::default() },
         )
         .unwrap();
     (ctx, device, slaac_config)
@@ -1729,19 +1726,18 @@ fn initialize_with_temporary_addresses_enabled(
 
 #[test]
 fn test_host_stateless_address_autoconfiguration_multiple_prefixes() {
-    let (mut ctx, device, _): (_, _, SlaacConfiguration) =
+    let (mut ctx, device, _): (_, _, SlaacConfigurationUpdate) =
         initialize_with_temporary_addresses_enabled();
 
     let mut api = ctx.core_api().device_ip::<Ipv6>();
-    let config = api.get_configuration(&device);
     let _: Ipv6DeviceConfigurationUpdate = api
         .update_configuration(
             &device,
             Ipv6DeviceConfigurationUpdate {
-                slaac_config: Some(SlaacConfiguration {
-                    enable_stable_addresses: true,
-                    ..config.config.slaac_config
-                }),
+                slaac_config: SlaacConfigurationUpdate {
+                    enable_stable_addresses: Some(true),
+                    ..Default::default()
+                },
                 ..Default::default()
             },
         )
@@ -1843,8 +1839,17 @@ fn test_host_generate_temporary_slaac_address(
     set_logger_for_test();
     let (mut ctx, device, slaac_config) = initialize_with_temporary_addresses_enabled();
 
-    let max_valid_lifetime =
-        slaac_config.temporary_address_configuration.unwrap().temp_valid_lifetime.get();
+    let max_valid_lifetime = assert_matches!(
+        slaac_config,
+        SlaacConfigurationUpdate {
+            temporary_address_configuration: Some(TemporarySlaacAddressConfiguration::Enabled {
+                temp_valid_lifetime,
+                temp_preferred_lifetime: _,
+                temp_idgen_retries: _,
+            }),
+            enable_stable_addresses: _,
+        } => temp_valid_lifetime.get()
+    );
     let config = Ipv6::TEST_ADDRS;
 
     let src_mac = config.remote_mac;
@@ -2113,10 +2118,10 @@ fn test_host_slaac_address_deprecate_while_tentative() {
             Ipv6DeviceConfigurationUpdate {
                 // Doesn't matter as long as we perform DAD.
                 dad_transmits: Some(NonZeroU16::new(1)),
-                slaac_config: Some(SlaacConfiguration {
-                    enable_stable_addresses: true,
+                slaac_config: SlaacConfigurationUpdate {
+                    enable_stable_addresses: Some(true),
                     ..Default::default()
-                }),
+                },
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
                     ..Default::default()
@@ -2323,10 +2328,10 @@ fn test_host_static_slaac_valid_lifetime_updates() {
         .update_configuration(
             &device,
             Ipv6DeviceConfigurationUpdate {
-                slaac_config: Some(SlaacConfiguration {
-                    enable_stable_addresses: true,
+                slaac_config: SlaacConfigurationUpdate {
+                    enable_stable_addresses: Some(true),
                     ..Default::default()
-                }),
+                },
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
                     ..Default::default()
@@ -2432,8 +2437,8 @@ fn test_host_temporary_slaac_regenerates_address_on_dad_failure() {
 
     let idgen_retries = 3;
 
-    let slaac_config = SlaacConfiguration {
-        temporary_address_configuration: Some(TemporarySlaacAddressConfiguration {
+    let slaac_config = SlaacConfigurationUpdate {
+        temporary_address_configuration: Some(TemporarySlaacAddressConfiguration::Enabled {
             temp_valid_lifetime: NonZeroDuration::new(MAX_VALID_LIFETIME).unwrap(),
             temp_preferred_lifetime: NonZeroDuration::new(MAX_PREFERRED_LIFETIME).unwrap(),
             temp_idgen_retries: idgen_retries,
@@ -2449,7 +2454,7 @@ fn test_host_temporary_slaac_regenerates_address_on_dad_failure() {
             Ipv6DeviceConfigurationUpdate {
                 // Doesn't matter as long as we perform DAD.
                 dad_transmits: Some(NonZeroU16::new(1)),
-                slaac_config: Some(slaac_config),
+                slaac_config,
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
                     ..Default::default()
@@ -2569,8 +2574,8 @@ fn test_host_temporary_slaac_gives_up_after_dad_failures() {
     const MAX_PREFERRED_LIFETIME: Duration = Duration::from_secs(5000);
 
     let idgen_retries = 3;
-    let slaac_config = SlaacConfiguration {
-        temporary_address_configuration: Some(TemporarySlaacAddressConfiguration {
+    let slaac_config = SlaacConfigurationUpdate {
+        temporary_address_configuration: Some(TemporarySlaacAddressConfiguration::Enabled {
             temp_valid_lifetime: NonZeroDuration::new(MAX_VALID_LIFETIME).unwrap(),
             temp_preferred_lifetime: NonZeroDuration::new(MAX_PREFERRED_LIFETIME).unwrap(),
             temp_idgen_retries: idgen_retries,
@@ -2586,7 +2591,7 @@ fn test_host_temporary_slaac_gives_up_after_dad_failures() {
             Ipv6DeviceConfigurationUpdate {
                 // Doesn't matter as long as we perform DAD.
                 dad_transmits: Some(NonZeroU16::new(1)),
-                slaac_config: Some(slaac_config),
+                slaac_config,
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
                     ..Default::default()
@@ -2693,8 +2698,8 @@ fn test_host_temporary_slaac_deprecate_before_regen() {
 
     const MAX_VALID_LIFETIME: Duration = Duration::from_secs(15000);
     const MAX_PREFERRED_LIFETIME: Duration = Duration::from_secs(5000);
-    let slaac_config = SlaacConfiguration {
-        temporary_address_configuration: Some(TemporarySlaacAddressConfiguration {
+    let slaac_config = SlaacConfigurationUpdate {
+        temporary_address_configuration: Some(TemporarySlaacAddressConfiguration::Enabled {
             temp_valid_lifetime: NonZeroDuration::new(MAX_VALID_LIFETIME).unwrap(),
             temp_preferred_lifetime: NonZeroDuration::new(MAX_PREFERRED_LIFETIME).unwrap(),
             temp_idgen_retries: 0,
@@ -2708,7 +2713,7 @@ fn test_host_temporary_slaac_deprecate_before_regen() {
         .update_configuration(
             &device,
             Ipv6DeviceConfigurationUpdate {
-                slaac_config: Some(slaac_config),
+                slaac_config,
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
                     ..Default::default()
@@ -2886,8 +2891,8 @@ fn test_host_temporary_slaac_config_update_skips_regen() {
 
     const MAX_VALID_LIFETIME: Duration = Duration::from_secs(15000);
     let max_preferred_lifetime = Duration::from_secs(5000);
-    let slaac_config = SlaacConfiguration {
-        temporary_address_configuration: Some(TemporarySlaacAddressConfiguration {
+    let slaac_config = SlaacConfigurationUpdate {
+        temporary_address_configuration: Some(TemporarySlaacAddressConfiguration::Enabled {
             temp_valid_lifetime: NonZeroDuration::new(MAX_VALID_LIFETIME).unwrap(),
             temp_preferred_lifetime: NonZeroDuration::new(max_preferred_lifetime).unwrap(),
             temp_idgen_retries: 1,
@@ -2903,7 +2908,7 @@ fn test_host_temporary_slaac_config_update_skips_regen() {
             Ipv6DeviceConfigurationUpdate {
                 // Perform DAD for later addresses.
                 dad_transmits: Some(NonZeroU16::new(1)),
-                slaac_config: Some(slaac_config),
+                slaac_config,
                 ..Default::default()
             },
         )
@@ -2966,8 +2971,8 @@ fn test_host_temporary_slaac_config_update_skips_regen() {
             .unwrap();
 
     let max_preferred_lifetime = max_preferred_lifetime * 4 / 5;
-    let slaac_config = SlaacConfiguration {
-        temporary_address_configuration: Some(TemporarySlaacAddressConfiguration {
+    let slaac_config = SlaacConfigurationUpdate {
+        temporary_address_configuration: Some(TemporarySlaacAddressConfiguration::Enabled {
             temp_valid_lifetime: NonZeroDuration::new(MAX_VALID_LIFETIME).unwrap(),
             temp_preferred_lifetime: NonZeroDuration::new(max_preferred_lifetime).unwrap(),
             temp_idgen_retries: 1,
@@ -2979,10 +2984,7 @@ fn test_host_temporary_slaac_config_update_skips_regen() {
         .device_ip::<Ipv6>()
         .update_configuration(
             &device,
-            Ipv6DeviceConfigurationUpdate {
-                slaac_config: Some(slaac_config),
-                ..Default::default()
-            },
+            Ipv6DeviceConfigurationUpdate { slaac_config, ..Default::default() },
         )
         .unwrap();
 
@@ -3040,11 +3042,21 @@ fn test_host_temporary_slaac_lifetime_updates_respect_max() {
     let (mut ctx, device, config) = initialize_with_temporary_addresses_enabled();
     let now = ctx.bindings_ctx.now();
     let start = now;
-    let temporary_address_config = config.temporary_address_configuration.unwrap();
-
-    let max_valid_lifetime = temporary_address_config.temp_valid_lifetime;
+    let (max_valid_lifetime, max_preferred_lifetime) = assert_matches!(
+        config,
+        SlaacConfigurationUpdate {
+            temporary_address_configuration: Some(TemporarySlaacAddressConfiguration::Enabled {
+                temp_valid_lifetime,
+                temp_preferred_lifetime,
+                temp_idgen_retries: _,
+            }),
+            enable_stable_addresses: _,
+        } => (
+            temp_valid_lifetime,
+            temp_preferred_lifetime,
+        )
+    );
     let max_valid_until = now.checked_add(max_valid_lifetime.get()).unwrap();
-    let max_preferred_lifetime = temporary_address_config.temp_preferred_lifetime;
     let max_preferred_until = now.checked_add(max_preferred_lifetime.get()).unwrap();
 
     let interface_identifier = OpaqueIid::new(
@@ -3138,8 +3150,8 @@ fn test_host_temporary_slaac_lifetime_updates_respect_max() {
     // the next router advertisement is reeived.
     let max_valid_lifetime = max_preferred_lifetime;
     let idgen_retries = 3;
-    let slaac_config = SlaacConfiguration {
-        temporary_address_configuration: Some(TemporarySlaacAddressConfiguration {
+    let slaac_config = SlaacConfigurationUpdate {
+        temporary_address_configuration: Some(TemporarySlaacAddressConfiguration::Enabled {
             temp_valid_lifetime: max_valid_lifetime,
             temp_preferred_lifetime: max_preferred_lifetime,
             temp_idgen_retries: idgen_retries,
@@ -3152,10 +3164,7 @@ fn test_host_temporary_slaac_lifetime_updates_respect_max() {
         .device_ip::<Ipv6>()
         .update_configuration(
             &device,
-            Ipv6DeviceConfigurationUpdate {
-                slaac_config: Some(slaac_config),
-                ..Default::default()
-            },
+            Ipv6DeviceConfigurationUpdate { slaac_config, ..Default::default() },
         )
         .unwrap();
 
@@ -3207,10 +3216,10 @@ fn test_remove_stable_slaac_address() {
         .update_configuration(
             &device,
             Ipv6DeviceConfigurationUpdate {
-                slaac_config: Some(SlaacConfiguration {
-                    enable_stable_addresses: true,
+                slaac_config: SlaacConfigurationUpdate {
+                    enable_stable_addresses: Some(true),
                     ..Default::default()
-                }),
+                },
                 ip_config: IpDeviceConfigurationUpdate {
                     ip_enabled: Some(true),
                     ..Default::default()

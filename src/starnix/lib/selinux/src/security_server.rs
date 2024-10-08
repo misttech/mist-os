@@ -7,8 +7,8 @@ use crate::permission_check::PermissionCheck;
 use crate::policy::metadata::HandleUnknown;
 use crate::policy::parser::ByValue;
 use crate::policy::{
-    parse_policy_by_value, AccessVector, AccessVectorComputer, FsUseLabelAndType, FsUseType,
-    Policy, SecurityContext,
+    parse_policy_by_value, AccessVector, AccessVectorComputer, ClassId, FsUseLabelAndType,
+    FsUseType, Policy, SecurityContext,
 };
 use crate::sync::Mutex;
 use crate::{
@@ -327,7 +327,7 @@ impl SecurityServer {
     }
 
     /// Returns the class identifier of a class, if it exists.
-    pub fn class_id_by_name(&self, name: &str) -> Result<u32, ()> {
+    pub fn class_id_by_name(&self, name: &str) -> Result<ClassId, ()> {
         let locked_state = self.state.lock();
         Ok(locked_state
             .policy

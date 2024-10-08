@@ -2,10 +2,11 @@ load(
     "@fuchsia_sdk//fuchsia:defs.bzl",
     "fuchsia_component_manifest_shard",
 )
+load("@fuchsia_sdk//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 
 fuchsia_component_manifest_shard(
     name = "{{name}}",
     include_path = "{{include_path}}",
     src = "{{source}}",
-    target_compatible_with = [ "@platforms//os:fuchsia" ],
+    target_compatible_with = COMPATIBILITY.FUCHSIA_CONDITION,
 )

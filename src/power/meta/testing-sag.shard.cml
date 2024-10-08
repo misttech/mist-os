@@ -14,7 +14,10 @@
     ],
     offer: [
         {
-            config: [ "fuchsia.power.UseSuspender" ],
+            config: [
+                "fuchsia.power.UseSuspender",
+                "fuchsia.power.WaitForSuspendingToken",
+            ],
             from: "void",
             to: "#system-activity-governor",
             availability: "optional",

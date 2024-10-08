@@ -11,6 +11,8 @@
 
 #include <filesystem>
 
+#include "src/lib/fxl/strings/string_number_conversions.h"
+
 // LINT.IfChange
 constexpr char kUsageSummary[] = R"""(
 Usage:
@@ -184,7 +186,6 @@ static zx_status_t transact(fidl::WireSyncClient<fuchsia_hardware_i2c::Device> c
   segment_start[n_segments] = n_elements + 1;
 
   auto write_data = std::make_unique<fidl::VectorView<uint8_t>[]>(n_writes);
-  auto read_lengths = std::make_unique<uint32_t[]>(n_segments - n_writes);
   auto is_write = std::make_unique<bool[]>(n_segments);
 
   fidl::Arena arena;
@@ -221,15 +222,17 @@ static zx_status_t transact(fidl::WireSyncClient<fuchsia_hardware_i2c::Device> c
         write_cnt++;
         element_cnt += write_len;
       } else {
-        auto status = convert_args(&argv[3 + element_cnt], 1, &read_lengths[read_cnt]);
-        if (status != ZX_OK) {
+        uint32_t read_length = 0;
+        bool success = fxl::StringToNumberWithError(argv[3 + element_cnt], &read_length,
+                                                    /*base=*/fxl::Base::k10);
+        if (!success) {
+          fprintf(stderr, "Invalid read length \"%s\"", argv[3 + element_cnt]);
           usage(false);
-          return status;
+          return ZX_ERR_INVALID_ARGS;
         }
         transactions[segment_cnt] =
             fuchsia_hardware_i2c::wire::Transaction::Builder(arena)
-                .data_transfer(
-                    fuchsia_hardware_i2c::wire::DataTransfer::WithReadSize(read_lengths[read_cnt]))
+                .data_transfer(fuchsia_hardware_i2c::wire::DataTransfer::WithReadSize(read_length))
                 .Build();
         read_cnt++;
         element_cnt++;

@@ -14,4 +14,6 @@ Serializer& Serializer::operator|(std::string& val) {
   return *this;
 }
 
+Serializer::~Serializer() = default;
+
 }  // namespace debug

@@ -106,11 +106,11 @@ pub struct GpuUsageLogger {
 
     /// Start time for the logger; used to calculate elapsed time.
     /// This is an exclusive start.
-    start_time: fasync::Time,
+    start_time: fasync::MonotonicInstant,
 
     /// Time at which the logger will stop.
     /// This is an exclusive end.
-    end_time: fasync::Time,
+    end_time: fasync::MonotonicInstant,
 }
 
 impl GpuUsageLogger {
@@ -133,9 +133,9 @@ impl GpuUsageLogger {
         }
 
         let driver_names: Vec<String> = drivers.iter().map(|c| c.name().to_string()).collect();
-        let start_time = fasync::Time::now();
-        let end_time = duration_ms.map_or(fasync::Time::INFINITE, |ms| {
-            fasync::Time::now() + zx::Duration::from_millis(ms as i64)
+        let start_time = fasync::MonotonicInstant::now();
+        let end_time = duration_ms.map_or(fasync::MonotonicInstant::INFINITE, |ms| {
+            fasync::MonotonicInstant::now() + zx::Duration::from_millis(ms as i64)
         });
         let inspect = InspectData::new(client_inspect, driver_names);
 
@@ -154,10 +154,10 @@ impl GpuUsageLogger {
     pub async fn log_gpu_usages(mut self) {
         let mut interval = fasync::Interval::new(self.interval);
         // Start polling gpu proxy. Logging will start at the next interval.
-        self.log_gpu_usage(fasync::Time::now()).await;
+        self.log_gpu_usage(fasync::MonotonicInstant::now()).await;
 
         while let Some(()) = interval.next().await {
-            let now = fasync::Time::now();
+            let now = fasync::MonotonicInstant::now();
             if now >= self.end_time {
                 break;
             }
@@ -165,7 +165,7 @@ impl GpuUsageLogger {
         }
     }
 
-    async fn log_gpu_usage(&mut self, now: fasync::Time) {
+    async fn log_gpu_usage(&mut self, now: fasync::MonotonicInstant) {
         // Execute a query to each driver.
         let queries = FuturesUnordered::new();
         let mut driver_names = Vec::new();
@@ -376,7 +376,7 @@ pub mod tests {
     impl Runner {
         fn new() -> Self {
             let executor = fasync::TestExecutor::new_with_fake_time();
-            executor.set_fake_time(fasync::Time::from_nanos(0));
+            executor.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
             let inspector = inspect::Inspector::default();
             let inspect_root = inspector.root().create_child("MetricsLogger");

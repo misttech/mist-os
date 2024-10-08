@@ -44,6 +44,25 @@ if (is_host) {
         [ "//src/developer/ffx/plugins/driver:ffx_driver_tool_test_data" ]
   }
 
+  python_mobly_test("wlan_policy_ap_test_fc") {
+    main_source = "test_wlan_policy_ap.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+      "//third_party/antlion",
+    ]
+    honeydew_config = {
+      affordances = {
+        wlan = {
+          implementation = "fuchsia-controller"
+        }
+      }
+    }
+    environments = [ wlan_vim3_ap_env ]
+    test_data_deps =
+        [ "//src/developer/ffx/plugins/driver:ffx_driver_tool_test_data" ]
+  }
+
   python_mobly_test("wlan_policy_test_fc") {
     main_source = "test_wlan_policy.py"
     sources = [ "utils.py" ]
@@ -117,6 +136,7 @@ group("core_vim3_unstable_sl4f_tests") {
   testonly = true
   public_deps = [
     ":test_wlan_sl4f",
+    ":wlan_policy_ap_test_fc($host_toolchain)",
     ":wlan_policy_test_fc($host_toolchain)",
     ":wlan_test_fc($host_toolchain)",
   ]
@@ -136,6 +156,7 @@ group("tests") {
   public_deps = [
     ":test_wlan_policy_sl4f",
     ":test_wlan_sl4f",
+    ":wlan_policy_ap_test_fc($host_toolchain)",
     ":wlan_policy_test_fc($host_toolchain)",
     ":wlan_test_fc($host_toolchain)",
   ]

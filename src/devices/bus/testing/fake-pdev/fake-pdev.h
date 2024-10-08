@@ -26,6 +26,20 @@ using Mmio = std::variant<MmioInfo, fdf::MmioBuffer>;
 
 class FakePDevFidl : public fidl::WireServer<fuchsia_hardware_platform_device::Device> {
  public:
+  // Allows for `std::string_view`'s to be used when searching an unordered map that uses
+  // `std::string` as its key.
+  struct MetadataIdHash {
+    using hash_type = std::hash<std::string_view>;
+    using is_transparent = void;
+
+    std::size_t operator()(const char* str) const { return hash_type{}(str); }
+    std::size_t operator()(std::string_view str) const { return hash_type{}(str); }
+    std::size_t operator()(std::string const& str) const { return hash_type{}(str); }
+  };
+
+  using MetadataMap =
+      std::unordered_map<std::string, std::vector<uint8_t>, MetadataIdHash, std::equal_to<>>;
+
   struct Config {
     // If true, a bti will be generated lazily if it does not exist.
     bool use_fake_bti = false;
@@ -68,9 +82,7 @@ class FakePDevFidl : public fidl::WireServer<fuchsia_hardware_platform_device::D
     return ZX_OK;
   }
 
-  void set_metadata(std::unordered_map<uint32_t, std::vector<uint8_t>> metadata) {
-    metadata_ = std::move(metadata);
-  }
+  void set_metadata(MetadataMap metadata) { metadata_ = std::move(metadata); }
 
  private:
   void GetMmioById(GetMmioByIdRequestView request, GetMmioByIdCompleter::Sync& completer) override;
@@ -90,13 +102,15 @@ class FakePDevFidl : public fidl::WireServer<fuchsia_hardware_platform_device::D
   void GetBoardInfo(GetBoardInfoCompleter::Sync& completer) override;
   void GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) override;
   void GetMetadata(GetMetadataRequestView request, GetMetadataCompleter::Sync& completer) override;
+  void GetMetadata2(GetMetadata2RequestView request,
+                    GetMetadata2Completer::Sync& completer) override;
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
   Config config_;
   fidl::ServerBindingGroup<fuchsia_hardware_platform_device::Device> binding_group_;
-  std::unordered_map<uint32_t, std::vector<uint8_t>> metadata_;
+  MetadataMap metadata_;
 };
 
 }  // namespace fake_pdev

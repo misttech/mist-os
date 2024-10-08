@@ -418,7 +418,7 @@ impl AutoClient {
     }
 
     async fn wait_before_reconnecting() {
-        fasync::Timer::new(fasync::Time::after(AUTO_CLIENT_SSE_RECONNECT_DELAY)).await
+        fasync::Timer::new(fasync::MonotonicInstant::after(AUTO_CLIENT_SSE_RECONNECT_DELAY)).await
     }
 }
 

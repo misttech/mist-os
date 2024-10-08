@@ -214,7 +214,7 @@ impl Backlight {
                     tracing::info!("Backlight power on scheduled");
                     receiver.await?
                 } else {
-                    // No-op. Already off.
+                    display_power.set_display_power_and_log_errors(false).await?;
                     drop(power_state);
                     Ok(())
                 }
@@ -241,7 +241,7 @@ impl Backlight {
     }
 
     fn make_scheduled_updates_task(&self, delay: zx::Duration) -> fasync::Task<()> {
-        let time = fasync::Time::after(delay);
+        let time = fasync::MonotonicInstant::after(delay);
         tracing::trace!("Setting timer for {:?}", &time);
         let timer = fasync::Timer::new(time);
         let self_ = self.clone();
@@ -956,7 +956,10 @@ mod dual_state_tests {
 
             h.backlight.set(0.0).await.unwrap();
             assert_eq!(h.backlight.get().await.unwrap(), 0.0);
-            assert_eq!(h.fake_display_power_service.last_set_display_power_value().await, None);
+            assert_eq!(
+                h.fake_display_power_service.last_set_display_power_value().await,
+                Some(false)
+            );
         })
         .unwrap();
     }

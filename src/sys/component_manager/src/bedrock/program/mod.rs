@@ -400,11 +400,11 @@ pub mod tests {
         controller.serve();
 
         let stop_timer = Box::pin(async move {
-            let timer = fasync::Timer::new(fasync::Time::after(stop_timeout));
+            let timer = fasync::Timer::new(fasync::MonotonicInstant::after(stop_timeout));
             timer.await;
         });
         let kill_timer = Box::pin(async move {
-            let timer = fasync::Timer::new(fasync::Time::after(kill_timeout));
+            let timer = fasync::Timer::new(fasync::MonotonicInstant::after(kill_timeout));
             timer.await;
         });
         let program_koid = program.koid();
@@ -442,11 +442,11 @@ pub mod tests {
         let kill_timeout = zx::Duration::from_millis(1);
 
         let stop_timer = Box::pin(async move {
-            let timer = fasync::Timer::new(fasync::Time::after(stop_timeout));
+            let timer = fasync::Timer::new(fasync::MonotonicInstant::after(stop_timeout));
             timer.await;
         });
         let kill_timer = Box::pin(async move {
-            let timer = fasync::Timer::new(fasync::Time::after(kill_timeout));
+            let timer = fasync::Timer::new(fasync::MonotonicInstant::after(kill_timeout));
             timer.await;
         });
 
@@ -500,11 +500,11 @@ pub mod tests {
 
         // Create the stop call that we expect to stop the component.
         let stop_timer = Box::pin(async move {
-            let timer = fasync::Timer::new(fasync::Time::after(stop_timeout));
+            let timer = fasync::Timer::new(fasync::MonotonicInstant::after(stop_timeout));
             timer.await;
         });
         let kill_timer = Box::pin(async move {
-            let timer = fasync::Timer::new(fasync::Time::after(kill_timeout));
+            let timer = fasync::Timer::new(fasync::MonotonicInstant::after(kill_timeout));
             timer.await;
         });
         let program_koid = program.koid();
@@ -517,8 +517,9 @@ pub mod tests {
 
         // Advance the clock beyond where the future to close the channel
         // should fire.
-        let new_time =
-            fasync::Time::from_nanos(exec.now().into_nanos() + component_stop_delay.into_nanos());
+        let new_time = fasync::MonotonicInstant::from_nanos(
+            exec.now().into_nanos() + component_stop_delay.into_nanos(),
+        );
         exec.set_fake_time(new_time);
         exec.wake_expired_timers();
 
@@ -590,11 +591,11 @@ pub mod tests {
         let mut mock_controller_future = Box::pin(controller.into_serve_future());
 
         let stop_timer = Box::pin(async move {
-            let timer = fasync::Timer::new(fasync::Time::after(stop_timeout));
+            let timer = fasync::Timer::new(fasync::MonotonicInstant::after(stop_timeout));
             timer.await;
         });
         let kill_timer = Box::pin(async move {
-            let timer = fasync::Timer::new(fasync::Time::after(kill_timeout));
+            let timer = fasync::Timer::new(fasync::MonotonicInstant::after(kill_timeout));
             timer.await;
         });
         let program_koid = program.koid();
@@ -614,8 +615,9 @@ pub mod tests {
         drop(check_msgs);
 
         // Roll time passed the stop timeout.
-        let mut new_time =
-            fasync::Time::from_nanos(exec.now().into_nanos() + stop_timeout.into_nanos());
+        let mut new_time = fasync::MonotonicInstant::from_nanos(
+            exec.now().into_nanos() + stop_timeout.into_nanos(),
+        );
         exec.set_fake_time(new_time);
         exec.wake_expired_timers();
 
@@ -641,7 +643,9 @@ pub mod tests {
         drop(check_msgs);
 
         // Roll time beyond the kill timeout period
-        new_time = fasync::Time::from_nanos(exec.now().into_nanos() + kill_timeout.into_nanos());
+        new_time = fasync::MonotonicInstant::from_nanos(
+            exec.now().into_nanos() + kill_timeout.into_nanos(),
+        );
         exec.set_fake_time(new_time);
         exec.wake_expired_timers();
 
@@ -686,11 +690,11 @@ pub mod tests {
         controller.serve();
 
         let stop_timer = Box::pin(async move {
-            let timer = fasync::Timer::new(fasync::Time::after(stop_timeout));
+            let timer = fasync::Timer::new(fasync::MonotonicInstant::after(stop_timeout));
             timer.await;
         });
         let kill_timer = Box::pin(async move {
-            let timer = fasync::Timer::new(fasync::Time::after(kill_timeout));
+            let timer = fasync::Timer::new(fasync::MonotonicInstant::after(kill_timeout));
             timer.await;
         });
         let mut stop_fut = Box::pin(program.stop_or_kill_with_timeout(stop_timer, kill_timer));
@@ -700,15 +704,18 @@ pub mod tests {
         assert!(exec.run_until_stalled(&mut stop_fut).is_pending());
 
         // Roll time passed the stop timeout.
-        let mut new_time =
-            fasync::Time::from_nanos(exec.now().into_nanos() + stop_timeout.into_nanos());
+        let mut new_time = fasync::MonotonicInstant::from_nanos(
+            exec.now().into_nanos() + stop_timeout.into_nanos(),
+        );
         exec.set_fake_time(new_time);
         exec.wake_expired_timers();
         assert!(exec.run_until_stalled(&mut stop_fut).is_pending());
 
         // Roll forward to where the mock controller should have closed the
         // controller channel.
-        new_time = fasync::Time::from_nanos(exec.now().into_nanos() + kill_resp_delay.into_nanos());
+        new_time = fasync::MonotonicInstant::from_nanos(
+            exec.now().into_nanos() + kill_resp_delay.into_nanos(),
+        );
         exec.set_fake_time(new_time);
         exec.wake_expired_timers();
 
@@ -761,11 +768,11 @@ pub mod tests {
         controller.serve();
 
         let stop_timer = Box::pin(async move {
-            let timer = fasync::Timer::new(fasync::Time::after(stop_timeout));
+            let timer = fasync::Timer::new(fasync::MonotonicInstant::after(stop_timeout));
             timer.await;
         });
         let kill_timer = Box::pin(async move {
-            let timer = fasync::Timer::new(fasync::Time::after(kill_timeout));
+            let timer = fasync::Timer::new(fasync::MonotonicInstant::after(kill_timeout));
             timer.await;
         });
         let epitaph_fut = program.on_terminate();
@@ -778,7 +785,8 @@ pub mod tests {
 
         // Roll time passed the stop timeout and beyond when the controller
         // will close the channel
-        let new_time = fasync::Time::from_nanos(exec.now().into_nanos() + resp_delay.into_nanos());
+        let new_time =
+            fasync::MonotonicInstant::from_nanos(exec.now().into_nanos() + resp_delay.into_nanos());
         exec.set_fake_time(new_time);
         exec.wake_expired_timers();
 

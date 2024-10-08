@@ -35,15 +35,6 @@
             to: "#echo_test_coll",
         },
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#echo_server",
-                "#echo_test_coll",
-                "#hermetic_test_coll",
-            ],
-        },
-        {
             event_stream: [ "capability_requested" ],
             from: "parent",
             to: "#echo_test_coll",

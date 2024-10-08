@@ -7,7 +7,6 @@
 use crate::device::android::bootloader_message_store::AndroidBootloaderMessageStore;
 #[cfg(not(feature = "starnix_lite"))]
 use crate::device::binder::BinderDevice;
-use crate::device::device_mapper::DeviceMapperRegistry;
 #[cfg(not(feature = "starnix_lite"))]
 use crate::device::framebuffer::{AspectRatio, Framebuffer};
 use crate::device::remote_block_device::RemoteBlockDeviceRegistry;
@@ -152,9 +151,6 @@ pub struct Kernel {
 
     /// The data directory of the container.
     pub container_data_dir: Option<fio::DirectorySynchronousProxy>,
-
-    /// The registry of active device mapper devices.
-    pub device_mapper_registry: Arc<DeviceMapperRegistry>,
 
     /// The registry of block devices backed by a remote fuchsia.io file.
     pub remote_block_device_registry: Arc<RemoteBlockDeviceRegistry>,
@@ -366,7 +362,6 @@ impl Kernel {
             device_registry: Default::default(),
             container_svc,
             container_data_dir,
-            device_mapper_registry: Default::default(),
             remote_block_device_registry: Default::default(),
             #[cfg(not(feature = "starnix_lite"))]
             bootloader_message_store: OnceCell::new(),

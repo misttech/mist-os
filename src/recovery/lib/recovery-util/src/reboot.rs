@@ -30,8 +30,10 @@ impl RebootImpl {
         println!("Rebooting after {:?} seconds...", delay_seconds.unwrap_or(0));
 
         if let Some(delay) = delay_seconds {
-            fasync::Timer::new(fasync::Time::after(Duration::from_seconds(delay.try_into()?)))
-                .await;
+            fasync::Timer::new(fasync::MonotonicInstant::after(Duration::from_seconds(
+                delay.try_into()?,
+            )))
+            .await;
         }
 
         // TODO(b/239569913): Update with a recovery-specific reboot reason.
@@ -105,14 +107,14 @@ mod test {
         let delay_seconds = 1;
         let (proxy, mut receiver) = create_mock_powercontrol_server().unwrap();
 
-        let start_time = fasync::Time::now();
+        let start_time = fasync::MonotonicInstant::now();
         let reboot = RebootImpl::default();
         reboot.request_reboot_with_proxy(Some(delay_seconds), proxy).await.unwrap();
 
         let reboot_reason =
             receiver.next().on_timeout(Duration::from_seconds(5), || None).await.unwrap();
 
-        let end_time = fasync::Time::now();
+        let end_time = fasync::MonotonicInstant::now();
 
         assert!((end_time - start_time).into_seconds() >= delay_seconds.try_into().unwrap());
         assert_eq!(reboot_reason, powercontrol::RebootReason::FactoryDataReset);

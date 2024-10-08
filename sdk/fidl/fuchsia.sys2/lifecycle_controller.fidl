@@ -112,7 +112,7 @@ type CreateError = flexible enum {
 };
 
 /// Mutates the component instance state in a realm.
-@discoverable
+@discoverable(server="platform")
 closed protocol LifecycleController {
     /// Starts the instance identified by the given moniker. Relative
     /// monikers must start with "./".
@@ -185,99 +185,4 @@ closed protocol LifecycleController {
         parent_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
         child fuchsia.component.decl.ChildRef;
     }) -> () error DestroyError;
-
-    // ---------------------------------------------------------------
-    // The methods below are considered deprecated and will be removed
-    // in an upcoming API release.
-    // ---------------------------------------------------------------
-
-    /// Starts the instance identified by the given moniker. Relative
-    /// monikers must start with "./".
-    ///
-    /// The function returns once the instance has been started.
-    @available(added=7, deprecated=11, removed=12, note="Use StartInstance instead")
-    strict Start(struct {
-        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
-    }) -> (struct {
-        result StartResult;
-    }) error fuchsia.component.Error;
-
-    /// Stops the instance identified by the given moniker. Relative
-    /// monikers must start with "./".
-    ///
-    /// The function returns once the instance has been stopped.
-    ///
-    /// Note: `is_recursive` is no longer supported by component manager.
-    ///       Setting it to true will return Error::Unsupported.
-    @available(added=7, deprecated=11, removed=12, note="Use StopInstance instead")
-    strict Stop(struct {
-        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
-        is_recursive bool;
-    }) -> () error fuchsia.component.Error;
-
-    /// Resolves the instance identified by the given moniker. Relative
-    /// monikers must start with "./".
-    ///
-    /// The function returns once the instance has been resolved
-    @available(added=7, deprecated=11, removed=12, note="Use ResolveInstance instead")
-    strict Resolve(struct {
-        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
-    }) -> () error fuchsia.component.Error;
-
-    /// Unresolves the component designated by the provided moniker. Relative
-    /// monikers must start with "./".
-    ///
-    /// The function returns once the component successfully unresolves, or the
-    /// operation fails.
-    @available(added=7, deprecated=11, removed=12, note="Use UnresolveInstance instead")
-    strict Unresolve(struct {
-        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
-    }) -> () error fuchsia.component.Error;
-
-    /// Creates a new child instance under a collection. This method is similar to
-    /// [`fuchsia.component/Realm.CreateChild`].
-    ///
-    /// `parent_moniker` is the moniker of the instance that owns the collection.
-    ///
-    /// The function returns once the child instance has been added to the topology.
-    @available(added=7, deprecated=11, removed=12, note="Use CreateInstance instead")
-    strict CreateChild(resource struct {
-        parent_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
-        collection fuchsia.component.decl.CollectionRef;
-        decl fuchsia.component.decl.Child;
-        args fuchsia.component.CreateChildArgs;
-    }) -> () error fuchsia.component.Error;
-
-    /// Destroys a child instance under a collection. This method is similar to
-    /// [`fuchsia.component/Realm.DestroyChild`].
-    ///
-    /// `parent_moniker` is the moniker of the instance that owns the collection.
-    ///
-    /// The function returns once the child instance no longer exists in the topology.
-    @available(added=7, deprecated=11, removed=12, note="Use DestroyInstance instead")
-    strict DestroyChild(struct {
-        parent_moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
-        child fuchsia.component.decl.ChildRef;
-    }) -> () error fuchsia.component.Error;
-
-    /// Opens a [`fuchsia.sys2/StorageAdmin`] protocol for the exposed storage capability of an
-    /// instance identified by its moniker. This protocol is served by component manager.
-    ///
-    /// TODO(https://fxbug.dev/42180039): Move this function to [`fuchsia.sys2/RealmQuery`]
-    @available(added=11, deprecated=11, removed=12)
-    strict GetStorageAdmin(resource struct {
-        moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
-        capability string:fuchsia.component.MAX_CAPABILITY_ID_LENGTH;
-        admin_server server_end:StorageAdmin;
-    }) -> () error fuchsia.component.Error;
-};
-
-/// Describes the result of the Start command.
-@available(added=7, deprecated=11, removed=12, note="Use StartInstance instead")
-type StartResult = strict enum {
-    /// The instance was started.
-    STARTED = 0;
-
-    /// The instance was already running.
-    ALREADY_STARTED = 1;
 };

@@ -635,7 +635,7 @@
 
 			hdmi-hotplug-detect-pins {
 				bias-pull-down;
-				input-enable;
+				output-disable;
 				phandle = <0x30>;
 				pins = <0x4e>;
 			};
@@ -688,7 +688,6 @@
 				bias-disable;
 				drive-strength-microamp = <0x00 0xfa0>;
 				function = <0x00 0x01>;
-				input-enable;
 				phandle = <0x1f>;
 				pins = <0x3c>;
 			};
@@ -697,7 +696,6 @@
 				bias-disable;
 				drive-strength-microamp = <0x00 0xfa0>;
 				function = <0x00 0x01>;
-				input-enable;
 				phandle = <0x20>;
 				pins = <0x3d>;
 			};
@@ -706,7 +704,6 @@
 				bias-disable;
 				drive-strength-microamp = <0x00 0xfa0>;
 				function = <0x00 0x01>;
-				input-enable;
 				phandle = <0x1e>;
 				pins = <0x38 0x39 0x3a 0x3b>;
 			};

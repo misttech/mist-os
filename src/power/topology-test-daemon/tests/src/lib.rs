@@ -55,7 +55,7 @@ macro_rules! block_until_inspect_matches {
                     }
                 }
             }
-            fasync::Timer::new(fasync::Time::after(RESTART_DELAY)).await;
+            fasync::Timer::new(fasync::MonotonicInstant::after(RESTART_DELAY)).await;
         }
     }};
 }
@@ -208,6 +208,17 @@ async fn create_test_env() -> TestEnv {
             Route::new()
                 .capability(Capability::configuration("fuchsia.power.UseSuspender"))
                 .from(&config_no_suspender_ref)
+                .to(&system_activity_governor_ref),
+        )
+        .await
+        .unwrap();
+
+    // Offer capabilities from void to system-activity-governor.
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::configuration("fuchsia.power.WaitForSuspendingToken"))
+                .from(Ref::void())
                 .to(&system_activity_governor_ref),
         )
         .await

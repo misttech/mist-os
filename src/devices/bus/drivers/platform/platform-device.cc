@@ -501,21 +501,29 @@ void PlatformDevice::DdkInit(ddk::InitTxn txn) {
         return;
       }
 
-      auto metadata_type = metadata.type();
-      ZX_ASSERT(metadata_type.has_value());
+      auto metadata_id = metadata.id();
+      ZX_ASSERT(metadata_id.has_value());
       auto metadata_data = metadata.data();
       ZX_ASSERT(metadata_data.has_value());
 
       // TODO(b/341981272): Remove `DdkAddMetadata()` once all drivers bound to platform devices do
       // not use `device_get_metadata()` to retrieve metadata. They should be using
       // fuchsia.hardware.platform.device/Device::GetMetadata().
-      zx_status_t status =
-          DdkAddMetadata(metadata_type.value(), metadata_data->data(), metadata_data->size());
-      if (status != ZX_OK) {
-        return txn.Reply(status);
+      errno = 0;
+      char* metadata_id_end{};
+      const char* metadata_id_start = metadata_id.value().c_str();
+      auto metadata_type =
+          static_cast<uint32_t>(std::strtol(metadata_id_start, &metadata_id_end, 10));
+      if (!metadata_id.value().empty() && errno == 0 && *metadata_id_end == '\0') {
+        zx_status_t status =
+            DdkAddMetadata(metadata_type, metadata_data->data(), metadata_data->size());
+        if (status != ZX_OK) {
+          txn.Reply(status);
+          return;
+        }
       }
 
-      metadata_.emplace(metadata_type.value(), metadata_data.value());
+      metadata_.emplace(metadata_id.value(), metadata_data.value());
     }
 
     for (size_t i = 0; i < boot_metadata_count; i++) {
@@ -540,7 +548,7 @@ void PlatformDevice::DdkInit(ddk::InitTxn txn) {
           zxlogf(WARNING, "%s failed to add metadata for new device", __func__);
         }
 
-        metadata_.emplace(metadata_zbi_type.value(),
+        metadata_.emplace(std::to_string(metadata_zbi_type.value()),
                           std::vector<uint8_t>{data->begin(), data->end()});
       }
     }
@@ -744,12 +752,23 @@ void PlatformDevice::GetBoardInfo(GetBoardInfoCompleter::Sync& completer) {
 
 void PlatformDevice::GetMetadata(GetMetadataRequestView request,
                                  GetMetadataCompleter::Sync& completer) {
-  auto metadata = metadata_.find(request->type);
+  auto id = std::to_string(request->type);
+  auto metadata = metadata_.find(id);
   if (metadata == metadata_.end()) {
     completer.ReplyError(ZX_ERR_NOT_FOUND);
     return;
   }
   completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(metadata->second));
+}
+
+void PlatformDevice::GetMetadata2(GetMetadata2RequestView request,
+                                  GetMetadata2Completer::Sync& completer) {
+  if (auto metadata = metadata_.find(request->id.get()); metadata != metadata_.end()) {
+    completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(metadata->second));
+    return;
+  }
+
+  completer.ReplyError(ZX_ERR_NOT_FOUND);
 }
 
 void PlatformDevice::handle_unknown_method(

@@ -30,7 +30,7 @@ constexpr bool IsValid(const fuchsia_hardware_platform_bus::Smc& smc) {
 }
 
 constexpr bool IsValid(const fuchsia_hardware_platform_bus::Metadata& meta) {
-  return (meta.data() != std::nullopt) && (meta.type() != std::nullopt);
+  return (meta.data() != std::nullopt) && (meta.id() != std::nullopt);
 }
 
 constexpr bool IsValid(const fuchsia_hardware_platform_bus::BootMetadata& meta) {

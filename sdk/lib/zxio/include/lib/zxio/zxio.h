@@ -58,10 +58,10 @@ ZXIO_EXPORT zx_status_t zxio_create(zx_handle_t handle, zxio_storage_t* storage)
 // fuchsia.io.Node/OnOpen event such as from zxio_open_async.
 //
 // Always consumes |handle|. |handle| must refer to a channel object.
+// TODO(https://fxbug.dev/324111518): Mark this function as deprecated once all callers have been
+// migrated to |zxio_create_with_on_representation|.
 ZXIO_EXPORT zx_status_t zxio_create_with_on_open(zx_handle_t handle, zxio_storage_t* storage);
 
-// EXPERIMENTAL: This is not widely supported.
-//
 // Like zxio_create for channel objects expecting an incoming
 // fuchsia.io.Node/OnRepresentation event.
 //

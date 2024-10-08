@@ -18,7 +18,6 @@ product_assembly_configuration("minimal_boot_user") {
       ]
     }
     storage = {
-      live_usb_enabled = false
       filesystems = {
         volume = {
           fvm = {

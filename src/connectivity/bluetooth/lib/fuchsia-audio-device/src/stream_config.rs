@@ -368,7 +368,7 @@ impl SoftStreamConfig {
                     responder.drop_without_shutdown();
                     return Ok(());
                 }
-                let time = fasync::Time::now();
+                let time = fasync::MonotonicInstant::now();
                 let plug_state = PlugState {
                     plugged: Some(true),
                     plug_state_time: Some(time.into_nanos() as i64),
@@ -444,7 +444,7 @@ impl SoftStreamConfig {
                 }
             }
             RingBufferRequest::Start { responder } => {
-                let time = fasync::Time::now();
+                let time = fasync::MonotonicInstant::now();
                 self.inspect.record_vmo_status(&format!("started @ {time:?}"));
                 match self.frame_vmo.lock().start(time.into()) {
                     Ok(()) => responder.send(time.into_nanos() as i64)?,
@@ -459,7 +459,10 @@ impl SoftStreamConfig {
                     if !stopped {
                         info!("Stopping an unstarted ring buffer");
                     }
-                    self.inspect.record_vmo_status(&format!("stopped @ {:?}", fasync::Time::now()));
+                    self.inspect.record_vmo_status(&format!(
+                        "stopped @ {:?}",
+                        fasync::MonotonicInstant::now()
+                    ));
                     responder.send()?;
                 }
                 Err(e) => {
@@ -643,7 +646,7 @@ pub(crate) mod tests {
             &mut ring_buffer.get_vmo(88200, clock_recovery_notifications_per_ring),
         ); // 2 seconds.
 
-        exec.set_fake_time(fasync::Time::from_nanos(42));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(42));
         let _ = exec.wake_expired_timers();
         let start_time = exec.run_until_stalled(&mut ring_buffer.start());
         if let Poll::Ready(s) = start_time {
@@ -659,7 +662,7 @@ pub(crate) mod tests {
 
         // Now advance in between notifications, with a 2 seconds total in the ring buffer
         // and 10 notifications per ring we can get watch notifications every 200 msecs.
-        exec.set_fake_time(fasync::Time::after(zx::Duration::from_millis(201)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(zx::Duration::from_millis(201)));
         let _ = exec.wake_expired_timers();
         // Each frame is 100ms, there should be two of them ready now.
         assert_eq!(2, frames_ready(&mut exec, &mut frame_stream));
@@ -670,7 +673,7 @@ pub(crate) mod tests {
         let mut position_info = ring_buffer.watch_clock_recovery_position_info();
         let result = exec.run_until_stalled(&mut position_info);
         assert!(!result.is_ready());
-        exec.set_fake_time(fasync::Time::after(zx::Duration::from_millis(201)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(zx::Duration::from_millis(201)));
         let _ = exec.wake_expired_timers();
         assert_eq!(2, frames_ready(&mut exec, &mut frame_stream));
         let result = exec.run_until_stalled(&mut position_info);
@@ -680,7 +683,7 @@ pub(crate) mod tests {
         let mut position_info = ring_buffer.watch_clock_recovery_position_info();
         let result = exec.run_until_stalled(&mut position_info);
         assert!(!result.is_ready());
-        exec.set_fake_time(fasync::Time::after(zx::Duration::from_millis(201)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(zx::Duration::from_millis(201)));
         let _ = exec.wake_expired_timers();
         assert_eq!(2, frames_ready(&mut exec, &mut frame_stream));
         let result = exec.run_until_stalled(&mut position_info);

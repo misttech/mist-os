@@ -375,8 +375,22 @@ impl AbiRevisionPolicy {
             };
         };
 
-        let Err(abi_error) = version_history.check_abi_revision_for_runtime(abi_revision) else {
-            return Ok(());
+        let abi_error = match version_history.check_abi_revision_for_runtime(abi_revision) {
+            Ok(()) => return Ok(()),
+            Err(AbiRevisionError::PlatformMismatch { .. })
+            | Err(AbiRevisionError::UnstableMismatch { .. })
+            | Err(AbiRevisionError::Malformed { .. }) => {
+                // TODO(https://fxbug.dev/347724655): Make this an error.
+                warn!(
+                    "Unsupported platform ABI revision: 0x{}.
+This will become an error soon! See https://fxbug.dev/347724655",
+                    abi_revision
+                );
+                return Ok(());
+            }
+            Err(e @ AbiRevisionError::TooNew { .. })
+            | Err(e @ AbiRevisionError::Retired { .. })
+            | Err(e @ AbiRevisionError::Invalid) => e,
         };
 
         if only_warn {
@@ -817,7 +831,7 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use fidl_fuchsia_io as fio;
-    use version_history::{ApiLevel, Version};
+    use version_history::{ApiLevel, Version, VersionVec};
 
     const FOO_PKG_URL: &str = "fuchsia-pkg://fuchsia.com/foo#meta/foo.cm";
 
@@ -1285,13 +1299,13 @@ mod tests {
     #[test]
     fn abi_revision_policy_check_compatibility_empty_allowlist() -> Result<(), Error> {
         const UNKNOWN_ABI: AbiRevision = AbiRevision::from_u64(0x404);
-        const UNSUPPORTED_ABI: AbiRevision = AbiRevision::from_u64(0x15);
+        const RETIRED_ABI: AbiRevision = AbiRevision::from_u64(0x15);
         const SUPPORTED_ABI: AbiRevision = AbiRevision::from_u64(0x16);
 
         const VERSIONS: &[Version] = &[
             Version {
                 api_level: ApiLevel::from_u32(5),
-                abi_revision: UNSUPPORTED_ABI,
+                abi_revision: RETIRED_ABI,
                 status: version_history::Status::Unsupported,
             },
             Version {
@@ -1314,20 +1328,20 @@ mod tests {
                 &Moniker::parse_str("/foo")?,
                 Some(UNKNOWN_ABI)
             ),
-            Err(CompatibilityCheckError::AbiRevisionInvalid(AbiRevisionError::Unknown {
+            Err(CompatibilityCheckError::AbiRevisionInvalid(AbiRevisionError::TooNew {
                 abi_revision: UNKNOWN_ABI,
-                supported_versions: vec![VERSIONS[1].clone()],
-            })),
+                supported_versions: VersionVec(vec![VERSIONS[1].clone()])
+            }))
         );
         assert_eq!(
             policy.check_compatibility(
                 &version_history,
                 &Moniker::parse_str("/foo")?,
-                Some(UNSUPPORTED_ABI)
+                Some(RETIRED_ABI)
             ),
-            Err(CompatibilityCheckError::AbiRevisionInvalid(AbiRevisionError::Unsupported {
+            Err(CompatibilityCheckError::AbiRevisionInvalid(AbiRevisionError::Retired {
                 version: VERSIONS[0].clone(),
-                supported_versions: vec![VERSIONS[1].clone()],
+                supported_versions: VersionVec(vec![VERSIONS[1].clone()]),
             })),
         );
         assert_eq!(
@@ -1345,13 +1359,13 @@ mod tests {
     #[test]
     fn abi_revision_policy_check_compatibility_allowlist() -> Result<(), Error> {
         const UNKNOWN_ABI: AbiRevision = AbiRevision::from_u64(0x404);
-        const UNSUPPORTED_ABI: AbiRevision = AbiRevision::from_u64(0x15);
+        const RETIRED_ABI: AbiRevision = AbiRevision::from_u64(0x15);
         const SUPPORTED_ABI: AbiRevision = AbiRevision::from_u64(0x16);
 
         const VERSIONS: &[Version] = &[
             Version {
                 api_level: ApiLevel::from_u32(5),
-                abi_revision: UNSUPPORTED_ABI,
+                abi_revision: RETIRED_ABI,
                 status: version_history::Status::Unsupported,
             },
             Version {
@@ -1378,20 +1392,20 @@ mod tests {
                 &Moniker::parse_str("/bar")?,
                 Some(UNKNOWN_ABI)
             ),
-            Err(CompatibilityCheckError::AbiRevisionInvalid(AbiRevisionError::Unknown {
+            Err(CompatibilityCheckError::AbiRevisionInvalid(AbiRevisionError::TooNew {
                 abi_revision: UNKNOWN_ABI,
-                supported_versions: vec![VERSIONS[1].clone()],
-            })),
+                supported_versions: VersionVec(vec![VERSIONS[1].clone()])
+            }))
         );
         assert_eq!(
             policy.check_compatibility(
                 &version_history,
                 &Moniker::parse_str("/bar")?,
-                Some(UNSUPPORTED_ABI)
+                Some(RETIRED_ABI)
             ),
-            Err(CompatibilityCheckError::AbiRevisionInvalid(AbiRevisionError::Unsupported {
+            Err(CompatibilityCheckError::AbiRevisionInvalid(AbiRevisionError::Retired {
                 version: VERSIONS[0].clone(),
-                supported_versions: vec![VERSIONS[1].clone()],
+                supported_versions: VersionVec(vec![VERSIONS[1].clone()]),
             })),
         );
         assert_eq!(
@@ -1420,7 +1434,7 @@ mod tests {
             policy.check_compatibility(
                 &version_history,
                 &Moniker::parse_str("/foo/baz")?,
-                Some(UNSUPPORTED_ABI)
+                Some(RETIRED_ABI)
             ),
             Ok(())
         );

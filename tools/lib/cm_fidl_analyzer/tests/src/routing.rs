@@ -1647,27 +1647,17 @@ mod tests {
         let b_component =
             test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
 
-        let route_map = test.model.check_resolver(&b_component);
+        let route_result = test.model.check_resolver(&b_component);
 
-        assert_eq!(route_map.using_node, Moniker::parse_str("b").unwrap());
-        assert_eq!(route_map.capability, Some("base".parse().unwrap()));
-        assert!(route_map.error.is_none());
+        assert_eq!(route_result.using_node, Moniker::parse_str("b").unwrap());
+        assert_eq!(route_result.capability, Some("base".parse().unwrap()));
+        assert!(route_result.error.is_none());
         assert_eq!(
-            route_map.route,
-            vec![
-                RouteSegment::RegisterBy {
-                    moniker: Moniker::root(),
-                    capability: RegistrationDecl::Resolver(registration_decl)
-                },
-                RouteSegment::ExposeBy {
-                    moniker: vec!["c"].try_into().unwrap(),
-                    capability: expose_decl
-                },
-                RouteSegment::DeclareBy {
-                    moniker: vec!["c"].try_into().unwrap(),
-                    capability: resolver_decl,
-                }
-            ]
+            route_result.source,
+            Some(CapabilitySource::Component(ComponentSource {
+                capability: resolver_decl.into(),
+                moniker: vec!["c"].try_into().unwrap(),
+            })),
         );
     }
 
@@ -1717,20 +1707,17 @@ mod tests {
         let c_component =
             test.look_up_instance(&vec!["b", "c"].try_into().unwrap()).await.expect("c instance");
 
-        let route_map = test.model.check_resolver(&c_component);
+        let route_result = test.model.check_resolver(&c_component);
 
-        assert_eq!(route_map.using_node, Moniker::parse_str("b/c").unwrap());
-        assert_eq!(route_map.capability, Some("base".parse().unwrap()));
-        assert!(route_map.error.is_none());
+        assert_eq!(route_result.using_node, Moniker::parse_str("b/c").unwrap());
+        assert_eq!(route_result.capability, Some("base".parse().unwrap()));
+        assert!(route_result.error.is_none());
         assert_eq!(
-            route_map.route,
-            vec![
-                RouteSegment::RegisterBy {
-                    moniker: Moniker::root(),
-                    capability: RegistrationDecl::Resolver(registration_decl)
-                },
-                RouteSegment::DeclareBy { moniker: Moniker::root(), capability: resolver_decl }
-            ]
+            route_result.source,
+            Some(CapabilitySource::Component(ComponentSource {
+                capability: resolver_decl.into(),
+                moniker: Moniker::root(),
+            })),
         );
     }
 
@@ -1817,20 +1804,17 @@ mod tests {
         let b_component =
             test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
 
-        let route_map = test.model.check_resolver(&b_component);
+        let route_result = test.model.check_resolver(&b_component);
 
-        assert_eq!(route_map.using_node, Moniker::parse_str("b").unwrap());
-        assert_eq!(route_map.capability, Some("test".parse().unwrap()));
-        assert!(route_map.error.is_none());
+        assert_eq!(route_result.using_node, Moniker::parse_str("b").unwrap());
+        assert_eq!(route_result.capability, Some("test".parse().unwrap()));
+        assert!(route_result.error.is_none());
         assert_eq!(
-            route_map.route,
-            vec![
-                RouteSegment::RegisterBy {
-                    moniker: Moniker::root(),
-                    capability: RegistrationDecl::Resolver(resolver_registration)
-                },
-                RouteSegment::DeclareBy { moniker: Moniker::root(), capability: resolver_decl }
-            ]
+            route_result.source,
+            Some(CapabilitySource::Component(ComponentSource {
+                capability: resolver_decl.into(),
+                moniker: Moniker::root(),
+            })),
         );
     }
 
@@ -2038,16 +2022,7 @@ mod tests {
                 target_decl: TargetDecl::ResolverFromEnvironment("base".to_string()),
                 capability: Some("base_resolver".parse().unwrap()),
                 error: None,
-                route: vec![
-                    RouteSegment::RegisterBy {
-                        moniker: Moniker::root(),
-                        capability: RegistrationDecl::Resolver(resolver_registration_decl)
-                    },
-                    RouteSegment::DeclareBy {
-                        moniker: Moniker::root(),
-                        capability: resolver_decl.clone()
-                    }
-                ],
+                route: vec![],
                 source: Some(CapabilitySource::Component(ComponentSource {
                     capability: ComponentCapability::Resolver(match resolver_decl {
                         CapabilityDecl::Resolver(decl) => decl,

@@ -50,11 +50,10 @@ impl ResourceRemovalWorker {
         }
 
         let report_stream_result = |result| match result {
-            StreamResult::Done { created, item } => {
-                handler.report_item(State::Finished(fasync::Time::now() - created), &item)
-            }
+            StreamResult::Done { created, item } => handler
+                .report_item(State::Finished(fasync::MonotonicInstant::now() - created), &item),
             StreamResult::Pending { count, created, item } => {
-                let duration = fasync::Time::now() - created;
+                let duration = fasync::MonotonicInstant::now() - created;
                 let state = if count >= STUCK_THRESHOLD {
                     State::Stuck(duration)
                 } else {
@@ -120,13 +119,13 @@ impl ResourceRemovalWorker {
 }
 
 enum StreamResult {
-    Done { created: fasync::Time, item: ResourceItemInfo },
-    Pending { count: usize, created: fasync::Time, item: ResourceItemInfo },
+    Done { created: fasync::MonotonicInstant, item: ResourceItemInfo },
+    Pending { count: usize, created: fasync::MonotonicInstant, item: ResourceItemInfo },
 }
 
 fn item_stream(item: ResourceItem) -> impl Stream<Item = StreamResult> {
     let ResourceItem { fut, info } = item;
-    let created = fasync::Time::now();
+    let created = fasync::MonotonicInstant::now();
     let interval = fasync::Interval::new(ACTION_INTERVAL);
     let mut count = 0;
     let last = StreamResult::Done { created, item: info.clone() };
@@ -309,8 +308,8 @@ mod tests {
     #[test]
     fn reports_actions() {
         let mut executor = fasync::TestExecutor::new_with_fake_time();
-        let start = fasync::Time::now();
-        let duration = || fasync::Time::now() - start;
+        let start = fasync::MonotonicInstant::now();
+        let duration = || fasync::MonotonicInstant::now() - start;
         let handler = SnoopingHandler::default();
         let (worker, sink) = ResourceRemovalWorker::new();
         let fut = worker.run_with_handler(&handler);
@@ -332,7 +331,7 @@ mod tests {
         }
         // Now observe all the Pending actions.
         for _ in 0..(STUCK_THRESHOLD - 1) {
-            executor.set_fake_time(fasync::Time::now() + ACTION_INTERVAL);
+            executor.set_fake_time(fasync::MonotonicInstant::now() + ACTION_INTERVAL);
             assert!(executor.wake_expired_timers());
             assert_eq!(executor.run_until_stalled(&mut fut), Poll::Pending);
             handler.assert_action::<ResourceA>(State::Pending(duration()));
@@ -340,7 +339,7 @@ mod tests {
 
         // Beyond the threshold, we observe the stuck state.
         for _ in 0..2 {
-            executor.set_fake_time(fasync::Time::now() + ACTION_INTERVAL);
+            executor.set_fake_time(fasync::MonotonicInstant::now() + ACTION_INTERVAL);
             assert!(executor.wake_expired_timers());
             assert_eq!(executor.run_until_stalled(&mut fut), Poll::Pending);
             handler.assert_action::<ResourceA>(State::Stuck(duration()));
@@ -389,8 +388,8 @@ mod tests {
     #[should_panic(expected = "resource removal worker closed with stuck pending resource")]
     fn shutdown_panics_if_pending() {
         let mut executor = fasync::TestExecutor::new_with_fake_time();
-        let start = fasync::Time::now();
-        let duration = || fasync::Time::now() - start;
+        let start = fasync::MonotonicInstant::now();
+        let duration = || fasync::MonotonicInstant::now() - start;
         let handler = SnoopingHandler::default();
         let (worker, sink) = ResourceRemovalWorker::new();
         let fut = worker.run_with_handler(&handler);
@@ -405,14 +404,14 @@ mod tests {
 
         // Now observe all the Pending actions.
         for _ in 0..(STUCK_THRESHOLD - 1) {
-            executor.set_fake_time(fasync::Time::now() + ACTION_INTERVAL);
+            executor.set_fake_time(fasync::MonotonicInstant::now() + ACTION_INTERVAL);
             assert!(executor.wake_expired_timers());
             assert_eq!(executor.run_until_stalled(&mut fut), Poll::Pending);
             handler.assert_action::<ResourceA>(State::Pending(duration()));
         }
 
         // Panic here after we go over the interval threshold.
-        executor.set_fake_time(fasync::Time::now() + ACTION_INTERVAL);
+        executor.set_fake_time(fasync::MonotonicInstant::now() + ACTION_INTERVAL);
         assert!(executor.wake_expired_timers());
         let _ = executor.run_until_stalled(&mut fut);
         drop(completer);

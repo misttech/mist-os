@@ -222,9 +222,9 @@ async fn enable_forwarding(
 ) {
     let id = get_interface_with_mac(interface_mac_address).await;
     let fnet_interfaces_admin::Configuration { ipv4, ipv6, .. } = get_interface_config(id).await;
-    let fnet_interfaces_admin::Ipv4Configuration { forwarding: ipv4_forwarding, .. } =
+    let fnet_interfaces_admin::Ipv4Configuration { unicast_forwarding: ipv4_forwarding, .. } =
         ipv4.expect("extract ipv4 configuration");
-    let fnet_interfaces_admin::Ipv6Configuration { forwarding: ipv6_forwarding, .. } =
+    let fnet_interfaces_admin::Ipv6Configuration { unicast_forwarding: ipv6_forwarding, .. } =
         ipv6.expect("extract ipv6 configuration");
     assert_eq!(ipv4_forwarding, Some(expected_ipv4_forwarding));
     assert_eq!(ipv6_forwarding, Some(expected_ipv6_forwarding));

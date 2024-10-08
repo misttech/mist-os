@@ -64,6 +64,6 @@ async fn main() {
 
     info!("Done");
     loop {
-        fasync::Timer::new(fasync::Time::after(zx::Duration::from_hours(1))).await;
+        fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_hours(1))).await;
     }
 }

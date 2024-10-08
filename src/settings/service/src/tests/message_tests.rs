@@ -289,7 +289,7 @@ fn test_timeout() {
     });
 
     loop {
-        let new_time = fuchsia_async::Time::from_nanos(
+        let new_time = fuchsia_async::MonotonicInstant::from_nanos(
             executor.now().into_nanos() + zx::Duration::from_millis(timeout_ms).into_nanos(),
         );
         match executor.run_until_stalled(&mut fut) {

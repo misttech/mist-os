@@ -22,8 +22,9 @@ use linux_uapi::{
     bpf_func_id_BPF_FUNC_ringbuf_submit, bpf_func_id_BPF_FUNC_skb_adjust_room,
     bpf_func_id_BPF_FUNC_skb_change_head, bpf_func_id_BPF_FUNC_skb_change_proto,
     bpf_func_id_BPF_FUNC_skb_load_bytes_relative, bpf_func_id_BPF_FUNC_skb_pull_data,
-    bpf_func_id_BPF_FUNC_skb_store_bytes, bpf_sock, bpf_sock_addr, bpf_sockopt, bpf_user_pt_regs_t,
-    uref, xdp_md,
+    bpf_func_id_BPF_FUNC_skb_store_bytes, bpf_func_id_BPF_FUNC_trace_printk, bpf_sock,
+    bpf_sock_addr, bpf_sockopt, bpf_user_pt_regs_t, fuse_bpf_arg, fuse_bpf_args,
+    fuse_entry_bpf_out, fuse_entry_out, uref, xdp_md,
 };
 use once_cell::sync::Lazy;
 use starnix_logging::track_stub;
@@ -110,6 +111,20 @@ fn bpf_map_delete_elem(
 ) -> BpfValue {
     track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_map_delete_elem");
     u64::MAX.into()
+}
+
+const TRACE_PRINTK: &'static str = "trace_printk";
+
+fn bpf_trace_printk(
+    _context: &mut HelperFunctionContext<'_>,
+    _fmt: BpfValue,
+    _fmt_size: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_trace_printk");
+    0.into()
 }
 
 const KTIME_GET_NS_NAME: &'static str = "ktime_get_ns";
@@ -484,6 +499,20 @@ pub static BPF_HELPERS: Lazy<Vec<(BpfTypeFilter, EbpfHelper<HelperFunctionContex
                             Type::ConstPtrToMapParameter,
                             Type::MapKeyParameter { map_ptr_index: 0 },
                         ],
+                        return_value: Type::unknown_written_scalar_value(),
+                        invalidate_array_bounds: false,
+                    },
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelper {
+                    index: bpf_func_id_BPF_FUNC_trace_printk,
+                    name: TRACE_PRINTK,
+                    function_pointer: Arc::new(bpf_trace_printk),
+                    signature: FunctionSignature {
+                        // TODO("https://fxbug.dev/287120494"): Specify arguments
+                        args: vec![],
                         return_value: Type::unknown_written_scalar_value(),
                         invalidate_array_bounds: false,
                     },
@@ -986,6 +1015,26 @@ static BPF_SOCKOPT_ARGS: Lazy<Vec<Type>> = Lazy::new(|| build_bpf_args::<bpf_soc
 
 static BPF_SOCK_ADDR_ARGS: Lazy<Vec<Type>> = Lazy::new(|| build_bpf_args::<bpf_sock_addr>());
 
+static BPF_FUSE_ARGS: Lazy<Vec<Type>> = Lazy::new(|| {
+    let mut builder = ArgBuilder::default();
+    builder.add_field(FieldType {
+        offset: (std::mem::offset_of!(fuse_bpf_args, out_args)
+            + std::mem::offset_of!(fuse_bpf_arg, value))
+        .try_into()
+        .unwrap(),
+        field_type: Box::new(build_bpf_args::<fuse_entry_out>().into_iter().nth(0).unwrap()),
+    });
+    builder.add_field(FieldType {
+        offset: (std::mem::offset_of!(fuse_bpf_args, out_args)
+            + std::mem::size_of::<fuse_bpf_arg>()
+            + std::mem::offset_of!(fuse_bpf_arg, value))
+        .try_into()
+        .unwrap(),
+        field_type: Box::new(build_bpf_args::<fuse_entry_bpf_out>().into_iter().nth(0).unwrap()),
+    });
+    builder.build::<fuse_bpf_args>()
+});
+
 #[repr(C)]
 #[derive(Copy, Clone, IntoBytes, Immutable, KnownLayout, FromBytes)]
 struct TraceEntry {
@@ -1020,6 +1069,7 @@ pub fn get_bpf_args(program_type: ProgramType) -> &'static [Type] {
         ProgramType::CgroupSock => &BPF_SOCK_ARGS,
         ProgramType::CgroupSockopt => &BPF_SOCKOPT_ARGS,
         ProgramType::CgroupSockAddr => &BPF_SOCK_ADDR_ARGS,
+        ProgramType::Fuse => &BPF_FUSE_ARGS,
         ProgramType::Unknown(_) => &[],
     }
 }

@@ -4,6 +4,6 @@
 {
     program: {
         runner: "starnix_container",
-        binary: "bin/hello_starnix",
+        binary: "data/tests/hello_starnix",
     },
 }

@@ -24,7 +24,7 @@ use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_ip::device::testutil::with_assigned_ipv6_addr_subnets;
 use netstack3_ip::device::{
     InnerSlaacTimerId, IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
-    SlaacConfiguration, TemporarySlaacAddressConfiguration, SLAAC_MIN_REGEN_ADVANCE,
+    SlaacConfigurationUpdate, TemporarySlaacAddressConfiguration, SLAAC_MIN_REGEN_ADVANCE,
 };
 use netstack3_ip::icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT;
 use netstack3_ip::{self as ip};
@@ -95,14 +95,16 @@ fn integration_remove_all_addresses_on_ipv6_disable() {
         .update_configuration(
             &device_id,
             Ipv6DeviceConfigurationUpdate {
-                slaac_config: Some(SlaacConfiguration {
-                    enable_stable_addresses: true,
-                    temporary_address_configuration: Some(TemporarySlaacAddressConfiguration {
-                        temp_valid_lifetime: ONE_HOUR,
-                        temp_preferred_lifetime: ONE_HOUR,
-                        temp_idgen_retries: 0,
-                    }),
-                }),
+                slaac_config: SlaacConfigurationUpdate {
+                    enable_stable_addresses: Some(true),
+                    temporary_address_configuration: Some(
+                        TemporarySlaacAddressConfiguration::Enabled {
+                            temp_valid_lifetime: ONE_HOUR,
+                            temp_preferred_lifetime: ONE_HOUR,
+                            temp_idgen_retries: 0,
+                        },
+                    ),
+                },
                 ..Default::default()
             },
         )

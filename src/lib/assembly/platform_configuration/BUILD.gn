@@ -32,6 +32,7 @@ rustc_library("platform_configuration") {
     "src/subsystems/intl.rs",
     "src/subsystems/kernel.rs",
     "src/subsystems/media.rs",
+    "src/subsystems/memory_monitor.rs",
     "src/subsystems/paravirtualization.rs",
     "src/subsystems/power.rs",
     "src/subsystems/radar.rs",

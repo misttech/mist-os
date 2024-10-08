@@ -60,7 +60,9 @@ mod tests {
 
         // Set the time so that the timer is still going, so we should neither call reboot nor
         // observe the reboot service was called.
-        executor.set_fake_time(fasync::Time::after(Duration::from_secs(timer_duration - 1).into()));
+        executor.set_fake_time(fasync::MonotonicInstant::after(
+            Duration::from_secs(timer_duration - 1).into(),
+        ));
         assert!(!executor.wake_expired_timers());
         match executor.run_until_stalled(&mut reboot_fut) {
             Poll::Ready(res) => panic!("future unexpectedly completed with response: {res:?}"),
@@ -73,7 +75,7 @@ mod tests {
 
         // Once the timer completes, we should complete the reboot call and observe we called the
         // reboot service with the given reboot reason.
-        executor.set_fake_time(fasync::Time::after(Duration::from_secs(1).into()));
+        executor.set_fake_time(fasync::MonotonicInstant::after(Duration::from_secs(1).into()));
         assert!(executor.wake_expired_timers());
         match executor.run_until_stalled(&mut recv) {
             Poll::Ready(res) => panic!("future unexpectedly completed with response: {res:?}"),

@@ -76,11 +76,6 @@ class FuchsiaControllerTests(unittest.TestCase):
                 "target_wait",
                 autospec=True,
             ) as mock_target_wait,
-            mock.patch.object(
-                fuchsia_controller.Context,
-                "target_add",
-                autospec=True,
-            ) as mock_target_add,
         ):
             self.fuchsia_controller_obj_with_device_ip = (
                 fuchsia_controller_transport.FuchsiaController(
@@ -90,7 +85,6 @@ class FuchsiaControllerTests(unittest.TestCase):
                 )
             )
         mock_target_wait.assert_called()
-        mock_target_add.assert_called()
 
     def test_create_context(self) -> None:
         """Test case for fuchsia_controller_transport.create_context()."""

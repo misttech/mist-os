@@ -59,6 +59,7 @@ pub(super) async fn update_configuration(
     ClientState { shutdown_sender: _, routers: configured_routers, route_set }: &mut ClientState,
     configuration: fnet_dhcp_ext::Configuration,
     dns_servers: &mut DnsServers,
+    dns_server_watch_responders: &mut dns::DnsServerWatchResponders,
     control: &fnet_interfaces_ext::admin::Control,
     lookup_admin: &fnet_name::LookupAdminProxy,
 ) {
@@ -89,6 +90,7 @@ pub(super) async fn update_configuration(
     dns::update_servers(
         lookup_admin,
         dns_servers,
+        dns_server_watch_responders,
         DnsServersUpdateSource::Dhcpv4 { interface_id: interface_id.get() },
         new_dns_servers
             .iter()
@@ -187,6 +189,7 @@ pub(super) async fn stop_client(
     mut state: ClientState,
     configuration_streams: &mut ConfigurationStreamMap,
     dns_servers: &mut DnsServers,
+    dns_server_watch_responders: &mut dns::DnsServerWatchResponders,
     control: &fnet_interfaces_ext::admin::Control,
     lookup_admin: &fnet_name::LookupAdminProxy,
     already_observed_exit: AlreadyObservedClientExit,
@@ -198,6 +201,7 @@ pub(super) async fn stop_client(
         &mut state,
         fnet_dhcp_ext::Configuration::default(),
         dns_servers,
+        dns_server_watch_responders,
         control,
         lookup_admin,
     )

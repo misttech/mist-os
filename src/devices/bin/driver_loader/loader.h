@@ -28,15 +28,22 @@ namespace driver_loader {
 
 class Loader {
  public:
-  static std::unique_ptr<Loader> Create(async_dispatcher_t* dispatcher);
+  using Linker = ld::RemoteDynamicLinker<>;
+  using DriverStartAddr = Linker::size_type;
+  using LoadDriverHandler =
+      fit::function<void(zx::unowned_channel bootstrap_sender, DriverStartAddr addr)>;
 
-  // Loads the executable |exec| with |vdso| into |process|, and begins the execution on |thread|.
+  // If |load_driver_handler_for_testing| is provided, it will be called each time a driver has been
+  // loaded. This allows tests to inject custom bootstrap behavior.
+  static std::unique_ptr<Loader> Create(async_dispatcher_t* dispatcher,
+                                        LoadDriverHandler load_driver_handler_for_testing = {});
+
+  // Launches the |exec| driver host binary into |process|.
   zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> Start(
-      zx::process process, zx::thread thread, zx::vmar root_vmar, zx::vmo exec, zx::vmo vdso,
-      fidl::ClientEnd<fuchsia_io::Directory> lib_dir, zx::channel bootstrap_receiver);
+      zx::process process, zx::vmar root_vmar, zx::vmo exec, zx::vmo vdso,
+      fidl::ClientEnd<fuchsia_io::Directory> lib_dir);
 
  private:
-  using Linker = ld::RemoteDynamicLinker<>;
   using RemoteModule = ld::RemoteLoadModule<>;
 
   inline static const size_t kPageSize = zx_system_get_page_size();
@@ -57,8 +64,9 @@ class Loader {
 
     static zx::result<std::unique_ptr<ProcessState>> Create(
         ld::RemoteAbiStub<>::Ptr remote_abi_stub, zx::process process, zx::thread thread,
-        zx::vmar root_vmar, const ProcessStartArgs& process_start_args,
-        Linker::InitModuleList preloaded_modules);
+        zx::vmar root_vmar, zx::channel bootstrap_sender,
+        LoadDriverHandler load_driver_handler_for_testing,
+        const ProcessStartArgs& process_start_args, Linker::InitModuleList preloaded_modules);
 
     // fidl::WireServer<fuchsia_driver_loader::DriverHost>
     void LoadDriver(LoadDriverRequestView request, LoadDriverCompleter::Sync& completer) override;
@@ -75,8 +83,6 @@ class Loader {
     zx_status_t Start(zx::channel bootstrap_receiver);
 
    private:
-    using DriverStartAddr = Linker::size_type;
-
     // TODO(https://fxbug.dev/357948288): this is a placeholder until we can sub in
     // the actual start function signature.
     static constexpr std::string_view kDriverStartSymbol = "DriverStart";
@@ -98,6 +104,11 @@ class Loader {
     zx::thread thread_;
     zx::vmar root_vmar_;
 
+    // Connection to the started driver host process for sending bootstrap messages.
+    zx::channel bootstrap_sender_;
+    // Handler to call after a driver is loaded.
+    LoadDriverHandler load_driver_handler_for_testing_;
+
     ProcessStartArgs process_start_args_;
 
     // Stack for the initial thread allocated by |AllocateStack|.
@@ -109,8 +120,10 @@ class Loader {
   };
 
   // Use |Create| instead.
-  explicit Loader(async_dispatcher_t* dispatcher, Diagnostics& diag, zx::vmo stub_ld_vmo)
+  explicit Loader(async_dispatcher_t* dispatcher, LoadDriverHandler load_driver_handler_for_testing,
+                  Diagnostics& diag, zx::vmo stub_ld_vmo)
       : dispatcher_(dispatcher),
+        load_driver_handler_for_testing_(std::move(load_driver_handler_for_testing)),
         remote_abi_stub_(ld::RemoteAbiStub<>::Create(diag, std::move(stub_ld_vmo), kPageSize)) {}
 
   // Retrieves the vmo for |libname| from |lib_dir|.
@@ -140,6 +153,7 @@ class Loader {
   }
 
   async_dispatcher_t* dispatcher_ = nullptr;
+  LoadDriverHandler load_driver_handler_for_testing_;
   ld::RemoteAbiStub<>::Ptr remote_abi_stub_;
 
   fbl::DoublyLinkedList<std::unique_ptr<ProcessState>> started_processes_;

@@ -26,6 +26,8 @@ use starnix_uapi::{
 };
 use zerocopy::{FromBytes, Immutable, IntoBytes};
 
+pub const BPF_PROG_TYPE_FUSE: u32 = 0x77777777;
+
 /// The different type of BPF programs.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ProgramType {
@@ -39,6 +41,8 @@ pub enum ProgramType {
     CgroupSock,
     CgroupSockopt,
     CgroupSockAddr,
+    /// Custom id for Fuse
+    Fuse,
     /// Unhandled program type.
     Unknown(u32),
 }
@@ -57,6 +61,7 @@ impl From<u32> for ProgramType {
             bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK => Self::CgroupSock,
             bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCKOPT => Self::CgroupSockopt,
             bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK_ADDR => Self::CgroupSockAddr,
+            BPF_PROG_TYPE_FUSE => Self::Fuse,
             program_type @ _ => {
                 track_stub!(
                     TODO("https://fxbug.dev/324043750"),

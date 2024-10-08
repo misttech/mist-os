@@ -18,6 +18,7 @@ use packet_formats::ethernet::{
 use packet_formats::icmp::ndp::options::{NdpOption, NdpOptionBuilder};
 use packet_formats::icmp::ndp::{
     NeighborAdvertisement, NeighborSolicitation, OptionSequenceBuilder, RouterAdvertisement,
+    RouterSolicitation,
 };
 use packet_formats::icmp::{IcmpMessage, IcmpPacketBuilder, IcmpUnusedCode};
 use packet_formats::ip::Ipv6Proto;
@@ -248,4 +249,30 @@ pub async fn assert_dad_success(
         dad_state(state_stream).await,
         Ok(fidl_fuchsia_net_interfaces::AddressAssignmentState::Assigned)
     );
+}
+
+/// Wait for a router solicitation message.
+pub async fn wait_for_router_solicitation(fake_ep: &netemul::TestFakeEndpoint<'_>) {
+    let () = fake_ep
+        .frame_stream()
+        .try_filter_map(|(data, dropped)| {
+            assert_eq!(dropped, 0);
+            future::ok(
+                parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
+                    net_types::ip::Ipv6,
+                    _,
+                    RouterSolicitation,
+                    _,
+                >(&data, EthernetFrameLengthCheck::NoCheck, |_| {})
+                .map_or(None, |_| Some(())),
+            )
+        })
+        .try_next()
+        .map(|r| r.context("error getting OnData event"))
+        .on_timeout(crate::ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {
+            Err(anyhow::anyhow!("timed out waiting for RS packet"))
+        })
+        .await
+        .unwrap()
+        .expect("failed to get next OnData event");
 }

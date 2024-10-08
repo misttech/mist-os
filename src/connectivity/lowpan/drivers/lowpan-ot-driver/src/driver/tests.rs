@@ -87,12 +87,12 @@ where
         // before moving on.
         driver_clone
             .wait_for_state(DriverState::is_active)
-            .on_timeout(fasync::Time::after(DEFAULT_TEST_TIMEOUT), || {
+            .on_timeout(fasync::MonotonicInstant::after(DEFAULT_TEST_TIMEOUT), || {
                 panic!("Initialization timed out");
             })
             .await;
         app_task
-            .on_timeout(fasync::Time::after(DEFAULT_TEST_TIMEOUT), || {
+            .on_timeout(fasync::MonotonicInstant::after(DEFAULT_TEST_TIMEOUT), || {
                 panic!("App task timed out");
             })
             .await;

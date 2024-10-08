@@ -18,14 +18,25 @@ type KeyPurpose = flexible enum {
 @discoverable
 closed protocol Crypt {
     /// Creates a new key wrapped with the key identified by `wrapping_key_id`.  `owner` identifies
-    /// the owner of the key and must be supplied to `UnwrapKeys`.  The crypt service chooses a
-    /// `wrapping_key_id` which must be supplied to UnwrapKeys.  The `wrapping_key_id` has no
+    /// the owner of the key and must be supplied to `UnwrapKey`.  The crypt service chooses a
+    /// `wrapping_key_id` which must be supplied to UnwrapKey.  The `wrapping_key_id` has no
     /// meaning to Fxfs.
     strict CreateKey(struct {
         owner uint64;
         purpose KeyPurpose;
     }) -> (struct {
-        wrapping_key_id uint64;
+        wrapping_key_id array<uint8, 16>;
+        wrapped_key vector<uint8>:132;
+        unwrapped_key vector<uint8>:80;
+    }) error zx.Status;
+
+    /// Creates a new key wrapped with the key identified by `wrapping_key_id`.  `owner` identifies
+    /// the owner of the key and must be supplied to `UnwrapKey` along with  `wrapping_key_id`.
+    /// The `wrapping_key_id` has no meaning to Fxfs.
+    strict CreateKeyWithId(struct {
+        owner uint64;
+        wrapping_key_id array<uint8, 16>;
+    }) -> (struct {
         wrapped_key vector<uint8>:132;
         unwrapped_key vector<uint8>:80;
     }) error zx.Status;
@@ -35,7 +46,7 @@ closed protocol Crypt {
     /// incorrect key or owner will not fail; it will just return an unwrapped key that won't
     /// actually decrpyt the data.
     strict UnwrapKey(struct {
-        wrapping_key_id uint64;
+        wrapping_key_id array<uint8, 16>;
         owner uint64;
         key vector<uint8>:132;
     }) -> (struct {
@@ -44,8 +55,8 @@ closed protocol Crypt {
 };
 
 type CryptSettings = table {
-    1: active_data_wrapping_key_id uint64;
-    2: active_metadata_wrapping_key_id uint64;
+    1: active_data_wrapping_key_id array<uint8, 16>;
+    2: active_metadata_wrapping_key_id array<uint8, 16>;
 };
 
 @discoverable
@@ -54,7 +65,7 @@ closed protocol CryptManagement {
     /// for unwrapping keys (Crypt::UnwrapKeys) but won't be used for wrapping keys until
     /// CryptManagement::SetActiveKeys is called.
     strict AddWrappingKey(struct {
-        wrapping_key_id uint64;
+        wrapping_key_id array<uint8, 16>;
         key vector<uint8>:32;
     }) -> () error zx.Status;
 
@@ -62,14 +73,14 @@ closed protocol CryptManagement {
     /// describes which active key to modify.
     strict SetActiveKey(struct {
         purpose KeyPurpose;
-        wrapping_key_id uint64;
+        wrapping_key_id array<uint8, 16>;
     }) -> () error zx.Status;
 
     /// Forgets a wrapping key, preventing its use for future key-unwrapping.  All future calls to
     /// Crypt::UnwrapKeys with that wrapping key ID will fail.
     /// If either the data or metadata part of the key is active, an error is returned.
     strict ForgetWrappingKey(struct {
-        wrapping_key_id uint64;
+        wrapping_key_id array<uint8, 16>;
     }) -> () error zx.Status;
 };
 

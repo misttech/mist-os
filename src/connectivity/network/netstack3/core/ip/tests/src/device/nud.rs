@@ -41,7 +41,7 @@ use netstack3_core::testutil::{
 };
 use netstack3_core::{IpExt, UnlockedCoreCtx};
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
-use netstack3_ip::device::{Ipv6DeviceConfigurationUpdate, SlaacConfiguration};
+use netstack3_ip::device::{Ipv6DeviceConfigurationUpdate, SlaacConfigurationUpdate};
 use netstack3_ip::icmp::{self, REQUIRED_NDP_IP_PACKET_HOP_LIMIT};
 use netstack3_ip::nud::{
     self, Delay, DynamicNeighborState, DynamicNeighborUpdateSource, Incomplete, NeighborState,
@@ -288,10 +288,10 @@ fn ipv6_integration() {
         .update_configuration(
             &device_id,
             Ipv6DeviceConfigurationUpdate {
-                slaac_config: Some(SlaacConfiguration {
-                    enable_stable_addresses: true,
+                slaac_config: SlaacConfigurationUpdate {
+                    enable_stable_addresses: Some(true),
                     ..Default::default()
-                }),
+                },
                 ..Default::default()
             },
         )

@@ -143,8 +143,9 @@ mod tests {
 
         // We should observe no new events when both the system is not committed and we are within
         // the warning duration.
-        executor
-            .set_fake_time(fasync::Time::after((WARNING_DURATION - Duration::from_secs(1)).into()));
+        executor.set_fake_time(fasync::MonotonicInstant::after(
+            (WARNING_DURATION - Duration::from_secs(1)).into(),
+        ));
         assert!(!executor.wake_expired_timers());
         match executor.run_until_stalled(&mut fut) {
             Poll::Ready(res) => panic!("future unexpectedly completed with: {res:?}"),
@@ -153,7 +154,7 @@ mod tests {
         observer.assert_events(&[CommitEvent::Begin]);
 
         // Once we hit the warning duration, we should get a warning event.
-        executor.set_fake_time(fasync::Time::after(zx::Duration::from_seconds(1)));
+        executor.set_fake_time(fasync::MonotonicInstant::after(zx::Duration::from_seconds(1)));
         assert!(executor.wake_expired_timers());
         match executor.run_until_stalled(&mut fut) {
             Poll::Ready(res) => panic!("future unexpectedly completed with: {res:?}"),

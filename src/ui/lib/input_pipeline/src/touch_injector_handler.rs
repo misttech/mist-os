@@ -460,7 +460,7 @@ impl TouchInjectorHandler {
                         self.mutable_state.borrow_mut().injectors.values().cloned().collect();
                     for injector in injectors {
                         let events = &[pointerinjector::Event {
-                            timestamp: Some(fuchsia_async::Time::now().into_nanos()),
+                            timestamp: Some(fuchsia_async::MonotonicInstant::now().into_nanos()),
                             data: Some(pointerinjector::Data::Viewport(new_viewport.clone())),
                             trace_flow_id: Some(fuchsia_trace::Id::new().into()),
                             ..Default::default()

@@ -7,26 +7,27 @@
 use anyhow::Error;
 
 use tee_internal::binding::{TEE_Param, TEE_Result};
-
-pub type SessionContext = *mut ::std::os::raw::c_void;
+use tee_internal::{
+    param_list_to_binding_mut, Error as TeeError, Param, ParamTypes, Result as TeeResult,
+    SessionContext,
+};
 
 pub trait TAInterface {
-    fn create(&self) -> TEE_Result;
+    fn create(&self) -> TeeResult;
     fn destroy(&self);
     fn open_session(
         &self,
-        param_types: u32,
-        params: *mut TEE_Param,
-        session_context: *mut SessionContext,
-    ) -> TEE_Result;
+        param_types: ParamTypes,
+        params: &mut [Param; 4],
+    ) -> TeeResult<SessionContext>;
     fn close_session(&self, session_context: SessionContext);
     fn invoke_command(
         &self,
         session_context: SessionContext,
         command_id: u32,
-        param_types: u32,
-        params: *mut TEE_Param,
-    ) -> TEE_Result;
+        param_types: ParamTypes,
+        params: &mut [Param; 4],
+    ) -> TeeResult;
 }
 
 struct TAFunctions {
@@ -47,8 +48,11 @@ struct TAFunctions {
 }
 
 impl TAInterface for TAFunctions {
-    fn create(&self) -> TEE_Result {
-        (self.create_fn)()
+    fn create(&self) -> TeeResult {
+        match TeeError::from_tee_result((self.create_fn)()) {
+            None => Ok(()),
+            Some(error) => Err(error),
+        }
     }
 
     fn destroy(&self) {
@@ -57,11 +61,19 @@ impl TAInterface for TAFunctions {
 
     fn open_session(
         &self,
-        param_types: u32,
-        params: *mut TEE_Param,
-        session_context: *mut SessionContext,
-    ) -> TEE_Result {
-        (self.open_session_fn)(param_types, params, session_context)
+        param_types: ParamTypes,
+        params: &mut [Param; 4],
+    ) -> TeeResult<SessionContext> {
+        let mut session_context = SessionContext::from_value(0);
+        let result = (self.open_session_fn)(
+            param_types.as_u32(),
+            param_list_to_binding_mut(params).as_mut_ptr(),
+            &mut session_context,
+        );
+        match TeeError::from_tee_result(result) {
+            None => Ok(session_context),
+            Some(error) => Err(error),
+        }
     }
 
     fn close_session(&self, session_context: SessionContext) {
@@ -72,10 +84,19 @@ impl TAInterface for TAFunctions {
         &self,
         session_context: SessionContext,
         command_id: u32,
-        param_types: u32,
-        params: *mut TEE_Param,
-    ) -> TEE_Result {
-        (self.invoke_command_fn)(session_context, command_id, param_types, params)
+        param_types: ParamTypes,
+        params: &mut [Param; 4],
+    ) -> TeeResult {
+        let result = (self.invoke_command_fn)(
+            session_context,
+            command_id,
+            param_types.as_u32(),
+            param_list_to_binding_mut(params).as_mut_ptr(),
+        );
+        match TeeError::from_tee_result(result) {
+            None => Ok(()),
+            Some(error) => Err(error),
+        }
     }
 }
 

@@ -64,6 +64,7 @@ use crate::internal::icmp::{
     Icmpv4State, Icmpv4StateBuilder, Icmpv6ErrorKind, Icmpv6State, Icmpv6StateBuilder,
 };
 use crate::internal::ipv6::Ipv6PacketAction;
+use crate::internal::multicast_forwarding::counters::MulticastForwardingCounters;
 use crate::internal::multicast_forwarding::route::{
     MulticastRouteIpExt, MulticastRouteTarget, MulticastRouteTargets,
 };
@@ -914,6 +915,7 @@ pub trait IpLayerContext<
     + IcmpErrorHandler<I, BC>
     + MulticastForwardingStateContext<I, BC>
     + MulticastForwardingDeviceContext<I>
+    + CounterContext<MulticastForwardingCounters<I>>
 {
 }
 
@@ -926,7 +928,8 @@ impl<
             + IpDeviceSendContext<I, BC>
             + IcmpErrorHandler<I, BC>
             + MulticastForwardingStateContext<I, BC>
-            + MulticastForwardingDeviceContext<I>,
+            + MulticastForwardingDeviceContext<I>
+            + CounterContext<MulticastForwardingCounters<I>>,
     > IpLayerContext<I, BC> for CC
 {
 }
@@ -1770,6 +1773,10 @@ pub struct IpCounters<I: IpLayerIpExt> {
     pub tx_illegal_loopback_address: Counter,
     /// Version specific rx counters.
     pub version_rx: I::RxCounters,
+    /// Count of incoming IP multicast packets that were dropped because
+    /// The stack doesn't have any sockets that belong to the multicast group,
+    /// and the stack isn't configured to forward the multicast packet.
+    pub multicast_no_interest: Counter,
 }
 
 /// IPv4-specific Rx counters.
@@ -1891,6 +1898,7 @@ pub struct IpStateInner<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateB
     // TODO(https://fxbug.dev/355059838): Explore the option to let Bindings create the main table.
     main_table_id: RoutingTableId<I, D>,
     multicast_forwarding: RwLock<MulticastForwardingState<I, D, BT>>,
+    multicast_forwarding_counters: MulticastForwardingCounters<I>,
     fragment_cache: Mutex<IpPacketFragmentCache<I, BT>>,
     pmtu_cache: Mutex<PmtuCache<I, BT>>,
     counters: IpCounters<I>,
@@ -1909,6 +1917,11 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateBindingsTypes> IpSta
     /// Gets the IP counters.
     pub fn counters(&self) -> &IpCounters<I> {
         &self.counters
+    }
+
+    /// Gets the multicast forwarding counters.
+    pub fn multicast_forwarding_counters(&self) -> &MulticastForwardingCounters<I> {
+        &self.multicast_forwarding_counters
     }
 
     /// Gets the aggregate raw IP socket counters.
@@ -1946,6 +1959,7 @@ impl<
             )))),
             main_table_id,
             multicast_forwarding: Default::default(),
+            multicast_forwarding_counters: Default::default(),
             fragment_cache: Mutex::new(
                 IpPacketFragmentCache::new::<NestedIntoCoreTimerCtx<CC, _>>(bindings_ctx),
             ),
@@ -2135,11 +2149,13 @@ fn dispatch_receive_ipv4_packet<
     transparent_override: Option<TransparentLocalDelivery<Ipv4>>,
     broadcast_marker: Option<<Ipv4 as BroadcastIpExt>::BroadcastMarker>,
 ) -> Result<(), IcmpErrorSender<'b, Ipv4, CC::DeviceId>> {
-    core_ctx.increment(|counters| &counters.dispatch_receive_ip_packet);
+    core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.dispatch_receive_ip_packet);
 
     match frame_dst {
         Some(FrameDestination::Individual { local: false }) => {
-            core_ctx.increment(|counters| &counters.dispatch_receive_ip_packet_other_host);
+            core_ctx.increment(|counters: &IpCounters<Ipv4>| {
+                &counters.dispatch_receive_ip_packet_other_host
+            });
         }
         Some(FrameDestination::Individual { local: true })
         | Some(FrameDestination::Multicast)
@@ -2229,11 +2245,13 @@ fn dispatch_receive_ipv6_packet<
     // parse_metadata argument which corresponds to a single extension
     // header rather than all of the IPv6 headers.
 
-    core_ctx.increment(|counters| &counters.dispatch_receive_ip_packet);
+    core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.dispatch_receive_ip_packet);
 
     match frame_dst {
         Some(FrameDestination::Individual { local: false }) => {
-            core_ctx.increment(|counters| &counters.dispatch_receive_ip_packet_other_host);
+            core_ctx.increment(|counters: &IpCounters<Ipv6>| {
+                &counters.dispatch_receive_ip_packet_other_host
+            });
         }
         Some(FrameDestination::Individual { local: true })
         | Some(FrameDestination::Multicast)
@@ -3029,7 +3047,7 @@ pub fn receive_ipv4_packet<
             // forwarding hook.
             match internal_forwarding {
                 InternalForwarding::Used(outbound_device) => {
-                    core_ctx.increment(|counters| &counters.forward);
+                    core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.forward);
                     match core_ctx.filter_handler().forwarding_hook(
                         &mut packet,
                         device,
@@ -3162,11 +3180,12 @@ pub fn receive_ipv6_packet<
             header_len: _,
             action,
         }) if must_send_icmp && action.should_send_icmp(&dst_ip) => {
-            core_ctx.increment(|counters| &counters.parameter_problem);
+            core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.parameter_problem);
             let dst_ip = match SpecifiedAddr::new(dst_ip) {
                 Some(ip) => ip,
                 None => {
-                    core_ctx.increment(|counters| &counters.unspecified_destination);
+                    core_ctx
+                        .increment(|counters: &IpCounters<Ipv6>| &counters.unspecified_destination);
                     debug!("receive_ipv6_packet: Received packet with unspecified destination IP address; dropping");
                     return;
                 }
@@ -3174,7 +3193,9 @@ pub fn receive_ipv6_packet<
             let src_ip = match UnicastAddr::new(src_ip) {
                 Some(ip) => ip,
                 None => {
-                    core_ctx.increment(|counters| &counters.version_rx.non_unicast_source);
+                    core_ctx.increment(|counters: &IpCounters<Ipv6>| {
+                        &counters.version_rx.non_unicast_source
+                    });
                     trace!("receive_ipv6_packet: Cannot send ICMP error in response to packet with non unicast source IP address");
                     return;
                 }
@@ -3423,7 +3444,7 @@ pub fn receive_ipv6_packet<
                     // forwarding hook.
                     match internal_forwarding {
                         InternalForwarding::Used(outbound_device) => {
-                            core_ctx.increment(|counters| &counters.forward);
+                            core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.forward);
                             match core_ctx.filter_handler().forwarding_hook(
                                 &mut packet,
                                 device,
@@ -3637,7 +3658,7 @@ where
             address_status @ (Ipv4PresentAddressStatus::Unicast
             | Ipv4PresentAddressStatus::LoopbackSubnet),
         ) => {
-            core_ctx.increment(|counters| &counters.deliver_unicast);
+            core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.deliver_unicast);
             ReceivePacketAction::Deliver {
                 address_status,
                 internal_forwarding: InternalForwarding::NotUsed,
@@ -3658,7 +3679,8 @@ where
             address_status @ (Ipv4PresentAddressStatus::LimitedBroadcast
             | Ipv4PresentAddressStatus::SubnetBroadcast),
         ) => {
-            core_ctx.increment(|counters| &counters.version_rx.deliver_broadcast);
+            core_ctx
+                .increment(|counters: &IpCounters<Ipv4>| &counters.version_rx.deliver_broadcast);
             ReceivePacketAction::Deliver {
                 address_status,
                 internal_forwarding: InternalForwarding::NotUsed,
@@ -3752,7 +3774,7 @@ where
             )
         }
         Some(address_status @ Ipv6PresentAddressStatus::UnicastAssigned) => {
-            core_ctx.increment(|counters| &counters.deliver_unicast);
+            core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.deliver_unicast);
             ReceivePacketAction::Deliver {
                 address_status,
                 internal_forwarding: InternalForwarding::NotUsed,
@@ -3789,7 +3811,8 @@ where
             // address. NS and NA packets should be addressed to a multicast
             // address that we would have joined during DAD so that we can
             // receive those packets.
-            core_ctx.increment(|counters| &counters.version_rx.drop_for_tentative);
+            core_ctx
+                .increment(|counters: &IpCounters<Ipv6>| &counters.version_rx.drop_for_tentative);
             ReceivePacketAction::Drop { reason: DropReason::Tentative }
         }
         None => receive_ip_packet_action_common::<Ipv6, _, _, _>(
@@ -3829,15 +3852,14 @@ fn receive_ip_multicast_packet_action<
     match (targets, address_status) {
         (Some(targets), address_status) => {
             if address_status.is_some() {
-                core_ctx.increment(|counters| &counters.deliver_multicast);
+                core_ctx.increment(|counters: &IpCounters<I>| &counters.deliver_multicast);
             }
-            // TODO(https://fxbug.dev/352570820): Increment Counters.
             ReceivePacketAction::MulticastForward { targets, address_status, dst_ip }
         }
         (None, Some(address_status)) => {
             // If the address was present on the device (e.g. the host is a
             // member of the multicast group), fallback to local delivery.
-            core_ctx.increment(|counters| &counters.deliver_multicast);
+            core_ctx.increment(|counters: &IpCounters<I>| &counters.deliver_multicast);
             ReceivePacketAction::Deliver {
                 address_status,
                 internal_forwarding: InternalForwarding::NotUsed,
@@ -3852,7 +3874,7 @@ fn receive_ip_multicast_packet_action<
             //     address
             //
             // As such, drop the packet
-            // TODO(https://fxbug.dev/352570820): Increment Counters.
+            core_ctx.increment(|counters: &IpCounters<I>| &counters.multicast_no_interest);
             ReceivePacketAction::Drop { reason: DropReason::MulticastNoInterest }
         }
     }
@@ -3899,7 +3921,7 @@ fn receive_ip_packet_action_common<
         // case is a Destination Unreachable message, we interpret the RFC text
         // to mean that, consistent with IPv4's behavior, we should silently
         // discard the packet in this case.
-        core_ctx.increment(|counters| &counters.forwarding_disabled);
+        core_ctx.increment(|counters: &IpCounters<I>| &counters.forwarding_disabled);
         return ReceivePacketAction::Drop { reason: DropReason::ForwardingDisabledInboundIface };
     }
     // Per https://www.rfc-editor.org/rfc/rfc4291.html#section-2.5.2:
@@ -3940,11 +3962,11 @@ fn receive_ip_packet_action_common<
         },
     ) {
         Some(dst) => {
-            core_ctx.increment(|counters| &counters.forward);
+            core_ctx.increment(|counters: &IpCounters<I>| &counters.forward);
             ReceivePacketAction::Forward { original_dst: dst_ip, dst }
         }
         None => {
-            core_ctx.increment(|counters| &counters.no_route_to_host);
+            core_ctx.increment(|counters: &IpCounters<I>| &counters.no_route_to_host);
             ReceivePacketAction::SendNoRouteToDest { dst: dst_ip }
         }
     }

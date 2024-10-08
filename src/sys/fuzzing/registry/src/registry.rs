@@ -327,7 +327,10 @@ mod tests {
 
     // Delays the calling future for the given number of |milliseconds|.
     async fn delay_ms(milliseconds: i64) {
-        fasync::Timer::new(fasync::Time::after(zx::Duration::from_millis(milliseconds))).await;
+        fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_millis(
+            milliseconds,
+        )))
+        .await;
     }
 
     // Unit tests.

@@ -725,7 +725,7 @@ ffx log --force-set-severity.
     }
 
     #[fuchsia::test]
-    async fn logger_shows_logs_since_specific_timestamp_monotonic() {
+    async fn logger_shows_logs_since_specific_timestamp_boot() {
         logger_dump_test(
             TestEnvironmentConfig {
                 messages: vec![
@@ -737,8 +737,8 @@ ffx log --force-set-severity.
             },
             LogCommand {
                 clock: TimeFormat::Utc,
-                since_monotonic: Some(parse_seconds_string_as_duration("1").unwrap()),
-                until_monotonic: Some(parse_seconds_string_as_duration("5").unwrap()),
+                since_boot: Some(parse_seconds_string_as_duration("1").unwrap()),
+                until_boot: Some(parse_seconds_string_as_duration("5").unwrap()),
                 ..LogCommand::default()
             },
             "[1970-01-01 00:00:03.000][ffx] INFO: Hello world!\u{1b}[m\n",

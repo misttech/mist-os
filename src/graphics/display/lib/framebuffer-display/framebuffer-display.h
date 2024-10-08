@@ -97,7 +97,7 @@ class FramebufferDisplay : public HeapServer,
  private:
   bool IsBanjoDisplayConfigSupported(const display_config_t& banjo_display_config);
 
-  void OnPeriodicVSync();
+  void OnPeriodicVSync(async_dispatcher_t* dispatcher, async::TaskBase* task, zx_status_t status);
 
   fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem_;
 
@@ -110,6 +110,7 @@ class FramebufferDisplay : public HeapServer,
       buffer_collections_;
 
   async_dispatcher_t& dispatcher_;
+  async::TaskMethod<FramebufferDisplay, &FramebufferDisplay::OnPeriodicVSync> vsync_task_{this};
 
   // protects only framebuffer_key_
   fbl::Mutex framebuffer_key_mtx_;

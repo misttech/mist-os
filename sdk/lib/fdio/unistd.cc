@@ -228,6 +228,47 @@ zx::result<fdio_ptr> open_at_impl(int dirfd, const char* path, fio::OpenFlags fl
   if (flags & fio::OpenFlags::kNodeReference) {
     flags &= fio::wire::kOpenFlagsAllowedWithNodeReference;
   }
+  return iodir->open_deprecated(clean, flags);
+}
+
+zx::result<fdio_ptr> open3_at_impl(int dirfd, const char* path, fio::Flags flags,
+                                   OpenAtOptions options) {
+  if (path == nullptr) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+  if (path[0] == '\0') {
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+
+  fdio_internal::PathBuffer clean_buffer;
+  bool has_ending_slash;
+  const bool cleaned = CleanPath(path, &clean_buffer, &has_ending_slash);
+  if (!cleaned) {
+    return zx::error(ZX_ERR_BAD_PATH);
+  }
+
+  std::string_view clean = clean_buffer;
+
+  // Some callers such as the fdio_open_..._at() family do not permit absolute paths.
+  if (!options.allow_absolute_path && cpp20::starts_with(clean, '/')) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  const fdio_ptr iodir = fdio_iodir(dirfd, clean);
+  if (iodir == nullptr) {
+    return zx::error(ZX_ERR_BAD_HANDLE);
+  }
+
+  if (has_ending_slash) {
+    // If the path ends in a slash, we must be opening a directory.
+    if (options.disallow_directory) {
+      return zx::error(ZX_ERR_NOT_FILE);
+    }
+    flags |= fio::Flags::kProtocolDirectory;
+  } else if (options.disallow_directory) {
+    // Only allow opening non-directory protocols (files/symlinks).
+    flags |= fio::Flags::kProtocolFile | fio::Flags::kProtocolSymlink;
+  }
   return iodir->open(clean, flags);
 }
 
@@ -368,7 +409,7 @@ zx::result<fdio_ptr> opendir_containing_at(int dirfd, const char* path, NameBuff
     base = ".";
   }
 
-  return iodir->open(base, posix_flags_to_fio(O_RDONLY | O_DIRECTORY));
+  return iodir->open_deprecated(base, posix_flags_to_fio(O_RDONLY | O_DIRECTORY));
 }
 
 zx_status_t stat_impl(const fdio_ptr& io, struct stat* s) {

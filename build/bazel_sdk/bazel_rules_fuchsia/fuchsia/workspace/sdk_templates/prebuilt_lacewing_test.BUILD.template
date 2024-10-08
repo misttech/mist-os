@@ -3,10 +3,12 @@ load(
     "//fuchsia/private:fuchsia_prebuilt_lacewing_test.bzl",
     "fuchsia_prebuilt_lacewing_test",
 )
+load("@fuchsia_sdk//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 
 fuchsia_prebuilt_lacewing_test(
     name = "{{name}}",
     test_binary = "{{test_binary}}",
     data = [{{data}}],
     deprecation = {{deprecation}},
+    target_compatible_with = COMPATIBILITY.HOST_CONDITION,
 )

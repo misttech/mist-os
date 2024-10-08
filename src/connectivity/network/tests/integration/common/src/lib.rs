@@ -148,24 +148,14 @@ pub async fn get_inspect_data(
     let moniker = realm.get_moniker().await.context("calling get moniker")?;
     let realm_moniker = selectors::sanitize_string_for_selectors(&moniker);
     let mut archive_reader = diagnostics_reader::ArchiveReader::new();
-    let _archive_reader_ref = archive_reader
-        .add_selector(
-            diagnostics_reader::ComponentSelector::new(vec![
-                NETEMUL_SANDBOX_MONIKER.into(),
-                realm_moniker.into_owned(),
-                component_moniker.into(),
-            ])
-            .with_tree_selector(tree_selector.into()),
-        )
-        // Enable `retry on empty` to prevent races in test realm bringup where
-        // we may end up reaching `ArchiveReader` before it has observed
-        // the component starting.
-        //
-        // Eventually there will be support for lifecycle streams, with which it
-        // will be possible to wait on the event of Archivist obtaining a handle
-        // to the component's diagnostics, and then request the snapshot of
-        // inspect data once that event is received.
-        .retry(diagnostics_reader::RetryConfig::EMPTY);
+    let _archive_reader_ref = archive_reader.add_selector(
+        diagnostics_reader::ComponentSelector::new(vec![
+            NETEMUL_SANDBOX_MONIKER.into(),
+            realm_moniker.into_owned(),
+            component_moniker.into(),
+        ])
+        .with_tree_selector(tree_selector.into()),
+    );
 
     // Loop to wait for the component to begin publishing inspect data after it
     // starts.

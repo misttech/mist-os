@@ -970,6 +970,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.bluetooth.bredr/ProfileSearchRequest.full_uuid",
+        "ordinal": "4",
+        "type": "fuchsia.bluetooth/Uuid"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.bluetooth.bredr/ProfileSearchRequest.results",
         "ordinal": "3",
         "type": "client_end:fuchsia.bluetooth.bredr/SearchResults"

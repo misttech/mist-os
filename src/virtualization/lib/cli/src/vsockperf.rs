@@ -172,7 +172,7 @@ impl fmt::Display for VsockPerfResult {
     }
 }
 
-fn get_time_delta_nanos(before: fasync::Time, after: fasync::Time) -> i64 {
+fn get_time_delta_nanos(before: fasync::MonotonicInstant, after: fasync::MonotonicInstant) -> i64 {
     #[cfg(target_os = "fuchsia")]
     {
         (after - before).into_nanos()
@@ -249,7 +249,8 @@ async fn warmup_and_data_corruption_check(socket: &mut fasync::Socket) -> Result
             return Err(anyhow!("failed to write full packet"));
         }
 
-        let timeout = fasync::Time::now() + std::time::Duration::from_millis(100).into();
+        let timeout =
+            fasync::MonotonicInstant::now() + std::time::Duration::from_millis(100).into();
         select! {
             () = fasync::Timer::new(timeout).fuse() => {
                 return Err(anyhow!("warmup timed out waiting 100ms for a packet echoed"));
@@ -272,7 +273,7 @@ async fn wait_for_magic_numbers(
     mut numbers: HashSet<u8>,
     control_socket: &mut fasync::Socket,
 ) -> Result<(), Error> {
-    let timeout = fasync::Time::now() + std::time::Duration::from_secs(5).into();
+    let timeout = fasync::MonotonicInstant::now() + std::time::Duration::from_secs(5).into();
     let mut magic_buf = [0u8];
     loop {
         select! {
@@ -302,8 +303,8 @@ async fn wait_for_magic_numbers(
 async fn read_single_stream(
     total_size: usize,
     socket: &mut fasync::Socket,
-) -> Result<fasync::Time, Error> {
-    let timeout = fasync::Time::now() + std::time::Duration::from_secs(10).into();
+) -> Result<fasync::MonotonicInstant, Error> {
+    let timeout = fasync::MonotonicInstant::now() + std::time::Duration::from_secs(10).into();
     let mut buffer = [0u8; LATENCY_CHECK_SIZE_BYTES]; // 4 KiB
     let segments = total_size / buffer.len();
 
@@ -318,14 +319,14 @@ async fn read_single_stream(
         }
     }
 
-    Ok(fasync::Time::now())
+    Ok(fasync::MonotonicInstant::now())
 }
 
 async fn write_single_stream(
     total_size: usize,
     socket: &mut fasync::Socket,
-) -> Result<fasync::Time, Error> {
-    let timeout = fasync::Time::now() + std::time::Duration::from_secs(10).into();
+) -> Result<fasync::MonotonicInstant, Error> {
+    let timeout = fasync::MonotonicInstant::now() + std::time::Duration::from_secs(10).into();
     let buffer = [0u8; LATENCY_CHECK_SIZE_BYTES]; // 4 KiB
     let segments = total_size / buffer.len();
 
@@ -341,7 +342,7 @@ async fn write_single_stream(
         }
     }
 
-    Ok(fasync::Time::now())
+    Ok(fasync::MonotonicInstant::now())
 }
 
 async fn write_read_high_throughput(
@@ -377,7 +378,7 @@ async fn run_single_stream_bidirectional_test(
     let mut tx_durations: Vec<u64> = Vec::new();
 
     for i in 0..100 {
-        let before = fasync::Time::now();
+        let before = fasync::MonotonicInstant::now();
 
         let (write_finish, read_finish) = try_join!(
             write_single_stream(total_size, &mut write_socket),
@@ -428,11 +429,11 @@ async fn run_single_stream_unidirectional_round_trip_test(
     let mut durations: Vec<u64> = Vec::new();
 
     for i in 0..100 {
-        let before = fasync::Time::now();
+        let before = fasync::MonotonicInstant::now();
 
         write_read_high_throughput(total_size, &mut data_socket).await?;
 
-        let after = fasync::Time::now();
+        let after = fasync::MonotonicInstant::now();
         durations.push(
             get_time_delta_nanos(before, after)
                 .try_into()
@@ -480,7 +481,7 @@ async fn run_multi_stream_unidirectional_round_trip_test(
     let mut durations: Vec<u64> = Vec::new();
 
     for i in 0..50 {
-        let before = fasync::Time::now();
+        let before = fasync::MonotonicInstant::now();
 
         try_join!(
             write_read_high_throughput(total_size, &mut data_socket1),
@@ -490,7 +491,7 @@ async fn run_multi_stream_unidirectional_round_trip_test(
             write_read_high_throughput(total_size, &mut data_socket5)
         )?;
 
-        let after = fasync::Time::now();
+        let after = fasync::MonotonicInstant::now();
         durations.push(
             get_time_delta_nanos(before, after)
                 .try_into()
@@ -525,7 +526,7 @@ async fn run_latency_test(
 
     println!("Starting latency test...");
     for i in 0..10000 {
-        let before = fasync::Time::now();
+        let before = fasync::MonotonicInstant::now();
         let timeout = before + std::time::Duration::from_millis(100).into();
 
         if packet.len() != socket.as_ref().write(&packet)? {
@@ -542,7 +543,7 @@ async fn run_latency_test(
             }
         }
 
-        let after = fasync::Time::now();
+        let after = fasync::MonotonicInstant::now();
         latencies.push(
             get_time_delta_nanos(before, after)
                 .try_into()
@@ -626,7 +627,7 @@ async fn run_micro_benchmark(guest_manager: GuestManagerProxy) -> Result<Measure
     let mut active_connections = HashMap::new();
 
     // Give the utility 15s to open all the expected connections.
-    let timeout = fasync::Time::now() + std::time::Duration::from_secs(15).into();
+    let timeout = fasync::MonotonicInstant::now() + std::time::Duration::from_secs(15).into();
     loop {
         select! {
             () = fasync::Timer::new(timeout).fuse() => {

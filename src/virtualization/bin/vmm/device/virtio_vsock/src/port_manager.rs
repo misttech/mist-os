@@ -32,12 +32,12 @@ impl HostPortInfo {
 #[derive(Clone, Copy, Debug)]
 struct QuarantinedConnection {
     connection: VsockConnectionKey,
-    available_time: fasync::Time,
+    available_time: fasync::MonotonicInstant,
 }
 
 impl QuarantinedConnection {
     fn new(connection: VsockConnectionKey) -> Self {
-        let available_time = fasync::Time::after(QUARANTINE_TIME);
+        let available_time = fasync::MonotonicInstant::after(QUARANTINE_TIME);
         QuarantinedConnection { connection, available_time }
     }
 }
@@ -196,7 +196,7 @@ impl PortManager {
     // Frees connections that have been quarantined for enough time. This should happen before
     // attempting to allocate ports.
     fn check_quarantined_connections(&mut self) {
-        let now = fasync::Time::now();
+        let now = fasync::MonotonicInstant::now();
         while !self.quarantined_connections.is_empty() {
             let front = self.quarantined_connections.front().unwrap().clone();
             if front.available_time < now {
@@ -247,7 +247,7 @@ mod tests {
     #[fuchsia::test]
     fn listen_unlisten_listen_on_port() {
         let executor = TestExecutor::new_with_fake_time();
-        executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
+        executor.set_fake_time(fuchsia_async::MonotonicInstant::from_nanos(0));
         let mut port_manager = PortManager::new();
 
         // No need to progress time -- listeners are not quarantined when removed
@@ -317,7 +317,7 @@ mod tests {
     #[fuchsia::test]
     fn port_stays_active_when_connection_quarantined() {
         let executor = TestExecutor::new_with_fake_time();
-        executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
+        executor.set_fake_time(fuchsia_async::MonotonicInstant::from_nanos(0));
         let mut port_manager = PortManager::new();
 
         assert!(port_manager
@@ -342,7 +342,7 @@ mod tests {
     #[fuchsia::test]
     fn port_stays_active_when_no_connections_but_listener() {
         let executor = TestExecutor::new_with_fake_time();
-        executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
+        executor.set_fake_time(fuchsia_async::MonotonicInstant::from_nanos(0));
         let mut port_manager = PortManager::new();
 
         assert!(port_manager
@@ -362,7 +362,7 @@ mod tests {
         ));
 
         // One nano after quarantine ends.
-        executor.set_fake_time(fuchsia_async::Time::after(
+        executor.set_fake_time(fuchsia_async::MonotonicInstant::after(
             QUARANTINE_TIME + zx::Duration::from_nanos(1),
         ));
 
@@ -376,7 +376,7 @@ mod tests {
     #[fuchsia::test]
     fn connection_pair_recycled_after_quarantine() {
         let executor = TestExecutor::new_with_fake_time();
-        executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
+        executor.set_fake_time(fuchsia_async::MonotonicInstant::from_nanos(0));
         let mut port_manager = PortManager::new();
 
         assert!(port_manager
@@ -390,7 +390,7 @@ mod tests {
         ));
 
         // One nano after quarantine ends.
-        executor.set_fake_time(fuchsia_async::Time::after(
+        executor.set_fake_time(fuchsia_async::MonotonicInstant::after(
             QUARANTINE_TIME + zx::Duration::from_nanos(1),
         ));
 

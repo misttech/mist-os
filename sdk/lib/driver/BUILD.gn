@@ -9,6 +9,7 @@ group("tests") {
     "async-helpers/cpp:tests",
     "compat:tests",
     "component/cpp:tests",
+    "component/rust:tests",
     "devfs:tests",
     "devicetree:tests",
     "fake-bti/cpp:tests",
@@ -17,5 +18,6 @@ group("tests") {
     "metadata/cpp:tests",
     "platform-device/cpp:tests",
     "power/cpp:tests",
+    "runtime/rust:tests",
   ]
 }

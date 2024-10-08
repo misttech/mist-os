@@ -453,7 +453,7 @@ fn log_common(inspect_node: &InspectNode, driver_timestamp: zx::MonotonicInstant
     inspect_node.record_int(
         "entry_latency_micros",
         // Use lower precision for latency, to minimize space.
-        (fuchsia_async::Time::now().into_zx() - driver_timestamp).into_micros(),
+        (fuchsia_async::MonotonicInstant::now().into_zx() - driver_timestamp).into_micros(),
     );
 }
 
@@ -3710,7 +3710,7 @@ mod tests {
                 trace_id: None,
                 handled: input_device::Handled::No,
             });
-            executor.set_fake_time(fasync::Time::from_nanos(10_000_000));
+            executor.set_fake_time(fasync::MonotonicInstant::from_nanos(10_000_000));
             gesture_matching_contender
                 .set_next_result(ExamineEventResult::Contender(gesture_matching_contender.clone()));
             assert_matches!(
@@ -3731,7 +3731,7 @@ mod tests {
                 trace_id: None,
                 handled: input_device::Handled::Yes,
             });
-            executor.set_fake_time(fasync::Time::from_nanos(12_000_000));
+            executor.set_fake_time(fasync::MonotonicInstant::from_nanos(12_000_000));
             assert_matches!(
                 executor.run_until_stalled(&mut handle_event_fut),
                 std::task::Poll::Ready(_)
@@ -3750,7 +3750,7 @@ mod tests {
                 trace_id: None,
                 handled: input_device::Handled::No,
             });
-            executor.set_fake_time(fasync::Time::from_nanos(14_000_000));
+            executor.set_fake_time(fasync::MonotonicInstant::from_nanos(14_000_000));
             assert_matches!(
                 executor.run_until_stalled(&mut handle_event_fut),
                 std::task::Poll::Ready(_)
@@ -3784,7 +3784,7 @@ mod tests {
             );
             gesture_matching_contender
                 .set_next_result(ExamineEventResult::MatchedContender(matched_contender));
-            executor.set_fake_time(fasync::Time::from_nanos(19_000_000));
+            executor.set_fake_time(fasync::MonotonicInstant::from_nanos(19_000_000));
             assert_matches!(
                 executor.run_until_stalled(&mut handle_event_fut),
                 std::task::Poll::Ready(_)
@@ -4142,7 +4142,7 @@ mod tests {
                 trace_id: None,
                 handled: input_device::Handled::No,
             });
-            executor.set_fake_time(fasync::Time::from_nanos(1_000_000));
+            executor.set_fake_time(fasync::MonotonicInstant::from_nanos(1_000_000));
             assert_matches!(
                 executor.run_until_stalled(&mut handle_event_fut),
                 std::task::Poll::Ready(_)

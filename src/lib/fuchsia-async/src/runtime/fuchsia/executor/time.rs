@@ -10,11 +10,11 @@ use std::ops;
 /// A time relative to the executor's clock.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(transparent)]
-pub struct Time(zx::MonotonicInstant);
+pub struct MonotonicInstant(zx::MonotonicInstant);
 
 pub use zx::Duration;
 
-impl Time {
+impl MonotonicInstant {
     /// Return the current time according to the global executor.
     ///
     /// This function requires that an executor has been set up.
@@ -33,7 +33,7 @@ impl Time {
 
     /// Convert from `zx::MonotonicInstant`.
     pub const fn from_zx(t: zx::MonotonicInstant) -> Self {
-        Time(t)
+        MonotonicInstant(t)
     }
 
     /// Convert into `zx::MonotonicInstant`.
@@ -52,67 +52,68 @@ impl Time {
     }
 
     /// The maximum time.
-    pub const INFINITE: Time = Time(zx::MonotonicInstant::INFINITE);
+    pub const INFINITE: MonotonicInstant = MonotonicInstant(zx::MonotonicInstant::INFINITE);
 
     /// The minimum time.
-    pub const INFINITE_PAST: Time = Time(zx::MonotonicInstant::INFINITE_PAST);
+    pub const INFINITE_PAST: MonotonicInstant =
+        MonotonicInstant(zx::MonotonicInstant::INFINITE_PAST);
 }
 
-impl From<zx::MonotonicInstant> for Time {
-    fn from(t: zx::MonotonicInstant) -> Time {
-        Time(t)
+impl From<zx::MonotonicInstant> for MonotonicInstant {
+    fn from(t: zx::MonotonicInstant) -> MonotonicInstant {
+        MonotonicInstant(t)
     }
 }
 
-impl From<Time> for zx::MonotonicInstant {
-    fn from(t: Time) -> zx::MonotonicInstant {
+impl From<MonotonicInstant> for zx::MonotonicInstant {
+    fn from(t: MonotonicInstant) -> zx::MonotonicInstant {
         t.0
     }
 }
 
-impl ops::Add<zx::Duration> for Time {
-    type Output = Time;
-    fn add(self, d: zx::Duration) -> Time {
-        Time(self.0 + d)
+impl ops::Add<zx::Duration> for MonotonicInstant {
+    type Output = MonotonicInstant;
+    fn add(self, d: zx::Duration) -> MonotonicInstant {
+        MonotonicInstant(self.0 + d)
     }
 }
 
-impl ops::Add<Time> for zx::Duration {
-    type Output = Time;
-    fn add(self, t: Time) -> Time {
-        Time(self + t.0)
+impl ops::Add<MonotonicInstant> for zx::Duration {
+    type Output = MonotonicInstant;
+    fn add(self, t: MonotonicInstant) -> MonotonicInstant {
+        MonotonicInstant(self + t.0)
     }
 }
 
-impl ops::Sub<zx::Duration> for Time {
-    type Output = Time;
-    fn sub(self, d: zx::Duration) -> Time {
-        Time(self.0 - d)
+impl ops::Sub<zx::Duration> for MonotonicInstant {
+    type Output = MonotonicInstant;
+    fn sub(self, d: zx::Duration) -> MonotonicInstant {
+        MonotonicInstant(self.0 - d)
     }
 }
 
-impl ops::Sub<Time> for Time {
+impl ops::Sub<MonotonicInstant> for MonotonicInstant {
     type Output = zx::Duration;
-    fn sub(self, t: Time) -> zx::Duration {
+    fn sub(self, t: MonotonicInstant) -> zx::Duration {
         self.0 - t.0
     }
 }
 
-impl ops::AddAssign<zx::Duration> for Time {
+impl ops::AddAssign<zx::Duration> for MonotonicInstant {
     fn add_assign(&mut self, d: zx::Duration) {
         self.0.add_assign(d)
     }
 }
 
-impl ops::SubAssign<zx::Duration> for Time {
+impl ops::SubAssign<zx::Duration> for MonotonicInstant {
     fn sub_assign(&mut self, d: zx::Duration) {
         self.0.sub_assign(d)
     }
 }
 
 impl DurationExt for zx::Duration {
-    fn after_now(self) -> Time {
-        Time::after(self)
+    fn after_now(self) -> MonotonicInstant {
+        MonotonicInstant::after(self)
     }
 }
 
@@ -125,12 +126,18 @@ mod tests {
         zxt2: zx::MonotonicInstant,
         d: zx::Duration,
     ) {
-        let t1 = Time::from_zx(zxt1);
-        let t2 = Time::from_zx(zxt2);
+        let t1 = MonotonicInstant::from_zx(zxt1);
+        let t2 = MonotonicInstant::from_zx(zxt2);
         assert_eq!(t1.into_zx(), zxt1);
 
-        assert_eq!(Time::from_zx(zx::MonotonicInstant::INFINITE), Time::INFINITE);
-        assert_eq!(Time::from_zx(zx::MonotonicInstant::INFINITE_PAST), Time::INFINITE_PAST);
+        assert_eq!(
+            MonotonicInstant::from_zx(zx::MonotonicInstant::INFINITE),
+            MonotonicInstant::INFINITE
+        );
+        assert_eq!(
+            MonotonicInstant::from_zx(zx::MonotonicInstant::INFINITE_PAST),
+            MonotonicInstant::INFINITE_PAST
+        );
         assert_eq!(zxt1 - zxt2, t1 - t2);
         assert_eq!(zxt1 + d, (t1 + d).into_zx());
         assert_eq!(d + zxt1, (d + t1).into_zx());
@@ -162,14 +169,19 @@ mod tests {
 
     #[test]
     fn time_saturating_add() {
-        assert_eq!(Time::from_nanos(10) + zx::Duration::from_nanos(30), Time::from_nanos(40));
         assert_eq!(
-            Time::from_nanos(10) + zx::Duration::from_nanos(Time::INFINITE.into_nanos()),
-            Time::INFINITE
+            MonotonicInstant::from_nanos(10) + zx::Duration::from_nanos(30),
+            MonotonicInstant::from_nanos(40)
         );
         assert_eq!(
-            Time::from_nanos(-10) + zx::Duration::from_nanos(Time::INFINITE_PAST.into_nanos()),
-            Time::INFINITE_PAST
+            MonotonicInstant::from_nanos(10)
+                + zx::Duration::from_nanos(MonotonicInstant::INFINITE.into_nanos()),
+            MonotonicInstant::INFINITE
+        );
+        assert_eq!(
+            MonotonicInstant::from_nanos(-10)
+                + zx::Duration::from_nanos(MonotonicInstant::INFINITE_PAST.into_nanos()),
+            MonotonicInstant::INFINITE_PAST
         );
     }
 }

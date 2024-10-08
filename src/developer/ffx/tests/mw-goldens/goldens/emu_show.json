@@ -200,6 +200,7 @@
       "required": [
         "audio",
         "cpu",
+        "cpu_count",
         "memory_bytes",
         "name",
         "pointing_device",
@@ -222,6 +223,12 @@
         "cpu": {
           "description": "Details of the Central Processing Unit (CPU).",
           "type": "string"
+        },
+        "cpu_count": {
+          "description": "Count of Central Processing Units present.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
         },
         "audio": {
           "description": "Details about any audio devices included in the virtual device.",

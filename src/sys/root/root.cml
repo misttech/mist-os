@@ -77,6 +77,7 @@
                 "fuchsia.fshost.StorageHost",
                 "fuchsia.fshost.UseDiskMigration",
                 "fuchsia.pkgcache.AllPackagesExecutable",
+                "fuchsia.pkgcache.EnableUpgradablePackages",
                 "fuchsia.pkgcache.UseFxblob",
                 "fuchsia.pkgcache.UseSystemImage",
                 "fuchsia.platform.bus.SoftwareDeviceIds",
@@ -343,6 +344,24 @@
             from: "framework",
             as: "fuchsia.sys2.RouteValidator.root",
             to: "#bootstrap",
+        },
+        {
+            protocol: "fuchsia.sys2.RealmQuery",
+            from: "framework",
+            as: "fuchsia.sys2.RealmQuery.root",
+            to: "#toolbox",
+        },
+        {
+            protocol: "fuchsia.sys2.LifecycleController",
+            from: "framework",
+            as: "fuchsia.sys2.LifecycleController.root",
+            to: "#toolbox",
+        },
+        {
+            protocol: "fuchsia.sys2.RouteValidator",
+            from: "framework",
+            as: "fuchsia.sys2.RouteValidator.root",
+            to: "#toolbox",
         },
 
         // Offer boot resolver to `bootstrap` for driver usage.

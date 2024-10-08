@@ -25,7 +25,11 @@ if (is_host) {
         }
       }
     }
-    environments = [ vim3_env ]
+    environments = [
+      vim3_env,
+      sherlock_env,
+      nelson_env,
+    ]
   }
 }
 

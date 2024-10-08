@@ -146,7 +146,6 @@ zx_status_t fdio_namespace::WalkLocked(fbl::RefPtr<LocalVnode>* in_out_vn,
 // appropriate object to interact with the remote object.
 //
 // Otherwise, this function creates a generic "remote" object.
-// TODO(https://fxbug.dev/324111518): Add a replacement for this which uses Open3.
 zx::result<fdio_ptr> fdio_namespace::OpenAtDeprecated(fbl::RefPtr<LocalVnode> vn,
                                                       std::string_view path,
                                                       fio::wire::OpenFlags flags) const {
@@ -171,6 +170,30 @@ zx::result<fdio_ptr> fdio_namespace::OpenAtDeprecated(fbl::RefPtr<LocalVnode> vn
 
             // Active remote connections are immutable, so referencing remote here
             // is safe. We don't want to do a blocking open under the ns lock.
+            return fdio_internal::open_async_deprecated(s.Connection(), path, flags);
+          },
+      },
+      vn->NodeType());
+}
+
+zx::result<fdio_ptr> fdio_namespace::OpenAt(fbl::RefPtr<LocalVnode> vn, std::string_view path,
+                                            fio::Flags flags) const {
+  {
+    fbl::AutoLock lock(&lock_);
+    zx_status_t status = WalkLocked(&vn, &path);
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+  }
+
+  return std::visit(
+      fdio::overloaded{
+          [&](LocalVnode::Local& l) -> zx::result<fdio_ptr> { return l.Open(); },
+          [&](LocalVnode::Intermediate& c) -> zx::result<fdio_ptr> { return CreateConnection(vn); },
+          [&](LocalVnode::Remote& s) -> zx::result<fdio_ptr> {
+            if ((flags & fio::Flags::kFlagMustCreate) && path == ".") {
+              return zx::error(ZX_ERR_ALREADY_EXISTS);
+            }
             return fdio_internal::open_async(s.Connection(), path, flags);
           },
       },
@@ -247,8 +270,8 @@ zx_status_t fdio_namespace::OpenRemoteDeprecated(std::string_view path, fio::wir
                             return status;
                           }
                           fidl::UnownedClientEnd<fio::Directory> directory(borrowed_handle);
-                          return fdio_internal::fdio_open_at(directory, path, flags,
-                                                             std::move(server_end));
+                          return fdio_internal::open_at_deprecated(directory, path, flags,
+                                                                   std::move(server_end));
                         },
                     },
                     vn->NodeType());
@@ -289,8 +312,7 @@ zx_status_t fdio_namespace::OpenRemote(std::string_view path, fio::Flags flags,
                             return status;
                           }
                           fidl::UnownedClientEnd<fio::Directory> directory(borrowed_handle);
-                          return fdio_internal::fdio_open3_at(directory, path, flags,
-                                                              std::move(object));
+                          return fdio_internal::open_at(directory, path, flags, std::move(object));
                         },
                     },
                     vn->NodeType());
@@ -653,8 +675,10 @@ zx::result<fdio_ptr> fdio_namespace::OpenRoot() const {
               return zx::error(status);
             }
             // We know this is a Directory.
+            fio::wire::DirectoryInfo info;
             return fdio::create(fidl::ClientEnd<fio::Node>(std::move(clone)),
-                                fio::wire::NodeInfoDeprecated::WithDirectory({}));
+                                fio::wire::Representation::WithDirectory(
+                                    fidl::ObjectView<decltype(info)>::FromExternal(&info)));
           },
       },
       vn->NodeType());

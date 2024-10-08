@@ -1076,8 +1076,10 @@ async fn add_wrapping_key() {
         .root
         .connect_to_protocol_at_exposed_dir::<CryptManagementMarker>()
         .expect("connect_to_protcol_at_exposed_dir failed");
+    let mut wrapping_key_id = [0; 16];
+    wrapping_key_id[0] = 2;
     crypt_management
-        .add_wrapping_key(2, &[1; 32])
+        .add_wrapping_key(&wrapping_key_id, &[1; 32])
         .await
         .expect("FIDL failure")
         .expect("add wrapping key failed");

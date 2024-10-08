@@ -65,11 +65,12 @@ async fn setup_connected_to_open_bss(
 
             fullmac_driver
                 .ifc_proxy
-                .connect_conf(&fidl_fullmac::WlanFullmacConnectConfirm {
-                    peer_sta_address: COMPATIBLE_OPEN_BSS.bssid.to_array(),
-                    result_code: fidl_ieee80211::StatusCode::Success,
-                    association_id: 0,
-                    association_ies: vec![],
+                .connect_conf(&fidl_fullmac::WlanFullmacImplIfcConnectConfRequest {
+                    peer_sta_address: Some(COMPATIBLE_OPEN_BSS.bssid.to_array()),
+                    result_code: Some(fidl_ieee80211::StatusCode::Success),
+                    association_id: Some(0),
+                    association_ies: Some(vec![]),
+                    ..Default::default()
                 })
                 .await
                 .expect("Failed to send ConnectConf");
@@ -143,9 +144,10 @@ async fn test_scan_request_success() {
 
         fullmac_driver
             .ifc_proxy
-            .on_scan_end(&fidl_fullmac::WlanFullmacScanEnd {
-                txn_id,
-                code: fidl_fullmac::WlanScanResult::Success,
+            .on_scan_end(&fidl_fullmac::WlanFullmacImplIfcOnScanEndRequest {
+                txn_id: Some(txn_id),
+                code: Some(fidl_fullmac::WlanScanResult::Success),
+                ..Default::default()
             })
             .await
             .expect("Failed to send on_scan_end");
@@ -196,9 +198,10 @@ async fn test_scan_request_error() {
 
         fullmac_driver
             .ifc_proxy
-            .on_scan_end(&fidl_fullmac::WlanFullmacScanEnd {
-                txn_id,
-                code: fidl_fullmac::WlanScanResult::NotSupported,
+            .on_scan_end(&fidl_fullmac::WlanFullmacImplIfcOnScanEndRequest {
+                txn_id: Some(txn_id),
+                code: Some(fidl_fullmac::WlanScanResult::NotSupported),
+                ..Default::default()
             })
             .await
             .expect("Failed to send on_scan_end");
@@ -260,11 +263,12 @@ async fn test_open_connect_request_success() {
 
         fullmac_driver
             .ifc_proxy
-            .connect_conf(&fidl_fullmac::WlanFullmacConnectConfirm {
-                peer_sta_address: COMPATIBLE_OPEN_BSS.bssid.to_array(),
-                result_code: fidl_ieee80211::StatusCode::Success,
-                association_id: 0,
-                association_ies: vec![],
+            .connect_conf(&fidl_fullmac::WlanFullmacImplIfcConnectConfRequest {
+                peer_sta_address: Some(COMPATIBLE_OPEN_BSS.bssid.to_array()),
+                result_code: Some(fidl_ieee80211::StatusCode::Success),
+                association_id: Some(0),
+                association_ies: Some(vec![]),
+                ..Default::default()
             })
             .await
             .expect("Failed to send ConnectConf");
@@ -349,11 +353,12 @@ async fn test_open_connect_request_error() {
 
         fullmac_driver
             .ifc_proxy
-            .connect_conf(&fidl_fullmac::WlanFullmacConnectConfirm {
-                peer_sta_address: COMPATIBLE_OPEN_BSS.bssid.to_array(),
-                result_code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
-                association_id: 0,
-                association_ies: vec![],
+            .connect_conf(&fidl_fullmac::WlanFullmacImplIfcConnectConfRequest {
+                peer_sta_address: Some(COMPATIBLE_OPEN_BSS.bssid.to_array()),
+                result_code: Some(fidl_ieee80211::StatusCode::RefusedReasonUnspecified),
+                association_id: Some(0),
+                association_ies: Some(vec![]),
+                ..Default::default()
             })
             .await
             .expect("Failed to send ConnectConf");
@@ -451,11 +456,12 @@ async fn test_wpa2_connect_request_success() {
 
         fullmac_driver
             .ifc_proxy
-            .connect_conf(&fidl_fullmac::WlanFullmacConnectConfirm {
-                peer_sta_address: COMPATIBLE_WPA2_BSS.bssid.to_array(),
-                result_code: fidl_ieee80211::StatusCode::Success,
-                association_id: 0,
-                association_ies: vec![],
+            .connect_conf(&fidl_fullmac::WlanFullmacImplIfcConnectConfRequest {
+                peer_sta_address: Some(COMPATIBLE_WPA2_BSS.bssid.to_array()),
+                result_code: Some(fidl_ieee80211::StatusCode::Success),
+                association_id: Some(0),
+                association_ies: Some(vec![]),
+                ..Default::default()
             })
             .await
             .expect("Failed to send ConnectConf");
@@ -686,11 +692,12 @@ async fn test_wpa3_connect_success() {
 
         fullmac_driver
             .ifc_proxy
-            .connect_conf(&fidl_fullmac::WlanFullmacConnectConfirm {
-                peer_sta_address: COMPATIBLE_WPA3_BSS.bssid.to_array(),
-                result_code: fidl_ieee80211::StatusCode::Success,
-                association_id: 0,
-                association_ies: vec![],
+            .connect_conf(&fidl_fullmac::WlanFullmacImplIfcConnectConfRequest {
+                peer_sta_address: Some(COMPATIBLE_WPA3_BSS.bssid.to_array()),
+                result_code: Some(fidl_ieee80211::StatusCode::Success),
+                association_id: Some(0),
+                association_ies: Some(vec![]),
+                ..Default::default()
             })
             .await
             .expect("Failed to send ConnectConf");
@@ -983,11 +990,12 @@ async fn test_remote_disassoc_then_reconnect() {
 
     fullmac_driver
         .ifc_proxy
-        .connect_conf(&fidl_fullmac::WlanFullmacConnectConfirm {
-            peer_sta_address: COMPATIBLE_OPEN_BSS.bssid.to_array(),
-            result_code: fidl_ieee80211::StatusCode::Success,
-            association_id: 0,
-            association_ies: vec![],
+        .connect_conf(&fidl_fullmac::WlanFullmacImplIfcConnectConfRequest {
+            peer_sta_address: Some(COMPATIBLE_OPEN_BSS.bssid.to_array()),
+            result_code: Some(fidl_ieee80211::StatusCode::Success),
+            association_id: Some(0),
+            association_ies: Some(vec![]),
+            ..Default::default()
         })
         .await
         .expect("Failed to send ConnectConf");

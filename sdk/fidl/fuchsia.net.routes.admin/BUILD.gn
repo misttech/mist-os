@@ -7,7 +7,6 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.net.routes.admin") {
   sdk_category = "internal"
 
-  api = "fuchsia.net.routes.admin.api"
   sources = [
     "common.fidl",
     "ipv4.fidl",

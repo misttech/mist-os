@@ -110,16 +110,19 @@ import("//build/toolchain/toolchain_environment.gni")
 #   See source_set() for other parameters.
 #
 template("zx_library") {
-  template_params = [
+  # Parameters that are not forwarded to the underlying target
+  # TODO(https://fxbug.dev/333125197): Remove when removing the parameters.
+  unforwarded_params = [
     "sdk",
     "sdk_headers",
     "sdk_publishable",
     "stable",
   ]
 
-  assert(defined(sdk_publishable) ||
-         (!defined(sdk_area) && !defined(stable) && !defined(sdk_name) &&
-          !defined(sdk_headers_for_internal_use)))
+  assert(defined(invoker.sdk_publishable) ||
+         (!defined(invoker.sdk_area) && !defined(invoker.stable) &&
+          !defined(invoker.sdk_name) &&
+          !defined(invoker.sdk_headers_for_internal_use)))
 
   if (zircon_toolchain != false) {
     _library_name = target_name
@@ -148,7 +151,7 @@ template("zx_library") {
       if (kernel_library_target_type == "static_library") {
         complete_static_lib = true
       }
-      forward_variables_from(invoker, "*", template_params)
+      forward_variables_from(invoker, "*", unforwarded_params)
       if (!defined(public_deps)) {
         public_deps = []
       }
@@ -202,7 +205,6 @@ template("zx_library") {
         }
         target_type = "sdk_source_set"
         extra_target_args = {
-          api = "//sdk/lib/$target_name/$target_name.api"
           build_as_static = true
           category = sdk_category
           sdk_name = name
@@ -219,60 +221,33 @@ template("zx_library") {
     } else if (shape == "static") {
       if (sdkable) {
         target_type = "sdk_static_library"
-        if (sdk_category == "public" || sdk_category == "partner") {
-          extra_target_args = {
-            api = "//sdk/lib/$target_name/$target_name.api"
-            category = sdk_category
-            libcxx_linkage = "static"
-            sdk_name = target_name
-            forward_variables_from(invoker,
-                                   [
-                                     "sdk_headers_for_internal_use",
-                                     "sdk_area",
-                                   ])
-          }
-        } else {
-          extra_target_args = {
-            category = sdk_category
-            sdk_name = target_name
-            libcxx_linkage = "static"
-            forward_variables_from(invoker,
-                                   [
-                                     "sdk_headers_for_internal_use",
-                                     "sdk_area",
-                                   ])
-          }
+        extra_target_args = {
+          category = sdk_category
+          sdk_name = target_name
+          libcxx_linkage = "static"
+          forward_variables_from(invoker,
+                                 [
+                                   "sdk_headers_for_internal_use",
+                                   "sdk_area",
+                                 ])
         }
       } else {
         target_type = "static_library"
       }
     } else if (shape == "shared") {
       if (sdkable) {
+        assert(sdk_category == "partner")
         target_type = "sdk_shared_library"
-        if (sdk_category == "public" || sdk_category == "partner") {
-          extra_target_args = {
-            api = "//sdk/lib/$target_name/$target_name.api"
-            category = sdk_category
-            libcxx_linkage = "static"
-            sdk_name = target_name
-            symbols_api = "//sdk/lib/$target_name/$target_name.ifs"
-            forward_variables_from(invoker,
-                                   [
-                                     "sdk_headers_for_internal_use",
-                                     "sdk_area",
-                                   ])
-          }
-        } else {
-          extra_target_args = {
-            category = sdk_category
-            sdk_name = target_name
-            libcxx_linkage = "static"
-            forward_variables_from(invoker,
-                                   [
-                                     "sdk_headers_for_internal_use",
-                                     "sdk_area",
-                                   ])
-          }
+        extra_target_args = {
+          category = sdk_category
+          sdk_name = target_name
+          libcxx_linkage = "static"
+          symbols_api = "//sdk/lib/$target_name/$target_name.ifs"
+          forward_variables_from(invoker,
+                                 [
+                                   "sdk_headers_for_internal_use",
+                                   "sdk_area",
+                                 ])
         }
       } else {
         target_type = "shared_library"
@@ -354,17 +329,22 @@ template("zx_library") {
     target(target_type, main_target_name) {
       forward_variables_from(invoker,
                              "*",
-                             template_params + [
+                             unforwarded_params + [
                                    "deps",
                                    "libs",
                                    "public_deps",
                                  ])
+      forward_variables_from(extra_target_args, "*")
 
       deps = lib_deps
       libs = lib_libs
       public_deps = lib_public_deps
 
-      forward_variables_from(extra_target_args, "*")
+      if (sdkable && sdk_category == "partner") {
+        # For targets that require modification acknowledgement, ensure the
+        # `.api` file location is under `//sdk/lib`.
+        api = "//sdk/lib/$target_name/$target_name.api"
+      }
 
       if (_has_public_headers) {
         public = []

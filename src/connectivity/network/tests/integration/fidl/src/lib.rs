@@ -340,14 +340,14 @@ async fn test_forwarding<I: IpExt + IcmpIpExt, N: Netstack>(
         let config_with_ip_forwarding_set = |ip_version, forwarding| match ip_version {
             fnet::IpVersion::V4 => finterfaces_admin::Configuration {
                 ipv4: Some(finterfaces_admin::Ipv4Configuration {
-                    forwarding: Some(forwarding),
+                    unicast_forwarding: Some(forwarding),
                     ..Default::default()
                 }),
                 ..Default::default()
             },
             fnet::IpVersion::V6 => finterfaces_admin::Configuration {
                 ipv6: Some(finterfaces_admin::Ipv6Configuration {
-                    forwarding: Some(forwarding),
+                    unicast_forwarding: Some(forwarding),
                     ..Default::default()
                 }),
                 ..Default::default()

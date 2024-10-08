@@ -47,6 +47,10 @@ pub use fidl_fuchsia_developer_ffx::TargetProxy;
 
 const FASTBOOT_INLINE_TARGET: &str = "ffx.fastboot.inline_target";
 
+/// The default target name if no target spec is given (for debugging, reporting to the user, etc).
+/// TODO(b/371222096): Use this everywhere (will require a bit of digging).
+pub const UNSPECIFIED_TARGET_NAME: &str = "[unspecified]";
+
 /// Attempt to connect to RemoteControl on a target device using a connection to a daemon.
 ///
 /// The optional |target| is a string matcher as defined in fuchsia.developer.ffx.TargetQuery
@@ -566,11 +570,55 @@ mod test {
         assert!(res.is_err());
     }
 
-    #[fuchsia::test]
+    #[fuchsia::test(threads = 1)]
     async fn test_get_empty_default_target() {
         let env = test_init().await.unwrap();
-        let target_spec = get_target_specifier(&env.context).await.unwrap();
+        // Just in case, we need to remove the env variables mentioned
+        // in the default config for "default.target". Because of the way
+        // EnvironmentContext::env_var() works, we need to remove it from both
+        // the context and the actual environment.
+        const NODENAME_KEY: &str = "FUCHSIA_NODENAME";
+        const ADDR_KEY: &str = "FUCHSIA_DEVICE_ADDR";
+        let mut context = env.context.clone();
+
+        context.remove_var(NODENAME_KEY);
+        let fuchsia_nodename = std::env::var_os(NODENAME_KEY);
+        if fuchsia_nodename.is_some() {
+            // UNSAFE: remove_var() should not be called in multithreaded
+            // environments; this test is explicitly marked as single-threaded,
+            // so it is safe.
+            unsafe {
+                std::env::remove_var(NODENAME_KEY);
+            }
+        }
+        context.remove_var(ADDR_KEY);
+        let fuchsia_device_addr = std::env::var_os(ADDR_KEY);
+        if fuchsia_device_addr.is_some() {
+            // UNSAFE: remove_var() should not be called in multithreaded
+            // environments; this test is explicitly marked as single-threaded,
+            // so it is safe.
+            unsafe {
+                std::env::remove_var(ADDR_KEY);
+            }
+        }
+        let target_spec = get_target_specifier(&context).await.unwrap();
         assert_eq!(target_spec, None);
+        if let Some(nodename) = fuchsia_nodename {
+            // UNSAFE: set_var() should not be called in multithreaded
+            // environments; this test is explicitly marked as single-threaded,
+            // so it is safe.
+            unsafe {
+                std::env::set_var(NODENAME_KEY, &nodename);
+            }
+        }
+        if let Some(device_addr) = fuchsia_device_addr {
+            // UNSAFE: set_var() should not be called in multithreaded
+            // environments; this test is explicitly marked as single-threaded,
+            // so it is safe.
+            unsafe {
+                std::env::set_var(ADDR_KEY, &device_addr);
+            }
+        }
     }
 
     #[fuchsia::test]

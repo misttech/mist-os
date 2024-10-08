@@ -1,0 +1,45 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
+load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_devicetree_fragment")
+
+package(default_visibility = ["//visibility:public"])
+
+test_suite(
+    name = "tests",
+    tests = [
+        ":test-soc-common_golden_test",
+        ":test-soc_golden_test",
+    ],
+)
+
+fuchsia_devicetree_fragment(
+    name = "test-soc-common",
+    source = "dts/test-soc-common.dtsi.S",
+    deps = [
+        "//fuchsia/devicetree/test_soc",
+    ],
+)
+
+fuchsia_devicetree_fragment(
+    name = "test-soc",
+    source = "dts/test-soc.dtsi.S",
+    deps = [
+        ":test-soc-common",
+        "//fuchsia/devicetree/test_soc",
+    ],
+)
+
+diff_test(
+    name = "test-soc-common_golden_test",
+    file1 = "dts/test-soc-common_golden.dtsi",
+    file2 = ":test-soc-common",
+)
+
+diff_test(
+    name = "test-soc_golden_test",
+    file1 = "dts/test-soc_golden.dtsi",
+    file2 = ":test-soc",
+)

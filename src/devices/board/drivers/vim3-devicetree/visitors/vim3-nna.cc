@@ -11,7 +11,7 @@ zx::result<> Vim3NnaVisitor::DriverVisit(fdf_devicetree::Node& node,
   const uint64_t s_external_sram_phys_base = 0xFF000000;  // A311D_NNA_SRAM_BASE
 
   fuchsia_hardware_platform_bus::Metadata nna_metadata = {
-      {.type = 0,
+      {.id = "0",
        .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&s_external_sram_phys_base),
                                     reinterpret_cast<const uint8_t*>(&s_external_sram_phys_base) +
                                         sizeof(s_external_sram_phys_base))}};

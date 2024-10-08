@@ -55,13 +55,13 @@ TiLp8556Metadata kDeviceMetadata = {
 
 static const std::vector<fpbus::Metadata> backlight_metadata{
     {{
-        .type = DEVICE_METADATA_BACKLIGHT_MAX_BRIGHTNESS_NITS,
+        .id = std::to_string(DEVICE_METADATA_BACKLIGHT_MAX_BRIGHTNESS_NITS),
         .data = std::vector<uint8_t>(
             reinterpret_cast<const uint8_t*>(&kMaxBrightnessInNits),
             reinterpret_cast<const uint8_t*>(&kMaxBrightnessInNits) + sizeof(kMaxBrightnessInNits)),
     }},
     {{
-        .type = DEVICE_METADATA_PRIVATE,
+        .id = std::to_string(DEVICE_METADATA_PRIVATE),
         .data = std::vector<uint8_t>(
             reinterpret_cast<const uint8_t*>(&kDeviceMetadata),
             reinterpret_cast<const uint8_t*>(&kDeviceMetadata) + sizeof(kDeviceMetadata)),

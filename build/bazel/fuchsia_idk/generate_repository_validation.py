@@ -20,44 +20,42 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import typing as T
 from pathlib import Path
 
 _SCRIPT_DIR = Path(__file__).parent
 
 
-def _get_files_and_subdirs_from(top_dir: Path):
-    """Walk the top_dir directory, and return lists of files and sub-directories in it."""
-    all_files = set()
-    all_dirs = set()
+def _get_files_from(top_dir: Path) -> T.Tuple[T.Set[str], T.Set[str]]:
+    """Walk the top_dir directory, and return a set of all its files."""
+    all_files: T.Set[str] = set()
     for dirpath, dirnames, filenames in os.walk(top_dir):
         for filename in filenames:
             filepath = os.path.relpath(os.path.join(dirpath, filename), top_dir)
             all_files.add(filepath)
-        for dirname in dirnames:
-            subdir = (Path(dirpath) / dirname).relative_to(top_dir)
-            all_dirs.add(subdir)
 
-    return all_files, all_dirs
+    return all_files
 
 
-def compare_directories(left_dir: Path, right_dir: Path):
+def compare_directories(
+    left_dir: Path, right_dir: Path
+) -> T.Tuple[T.Sequence[str], T.Sequence[str], T.Sequence[str]]:
     """Compare the content of two directories.
 
     Args:
         left: Path to first directory.
         right: Path to second directory.
     Returns:
-        A 4-tuple whose item correspond to the following lists or
+        A 3-tuple whose item correspond to the following lists or
         relative path strings:
 
         - different_files: files that are present in both directories,
           but whose content differs.
-
         - left_only_file: files that only appear in the `left` directory.
         - right_only_files: files that only appear in the `right` directory.
     """
-    left_files, left_subdirs = _get_files_and_subdirs_from(left_dir)
-    right_files, right_subdirs = _get_files_and_subdirs_from(right_dir)
+    left_files = _get_files_from(left_dir)
+    right_files = _get_files_from(right_dir)
 
     left_only_files = left_files - right_files
     right_only_files = right_files - left_files
@@ -95,7 +93,7 @@ def compare_directories(left_dir: Path, right_dir: Path):
 class BuildDir(object):
     """Convenience class to model either a build directory."""
 
-    def __init__(self, build_dir: None | Path = None):
+    def __init__(self, build_dir: None | Path = None) -> None:
         """Create new instance.
 
         Args:

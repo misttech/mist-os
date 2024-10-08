@@ -45,24 +45,50 @@ std::unique_ptr<Logger> Logger::NoOp() {
   return std::make_unique<Logger>("", FUCHSIA_LOG_INFO, zx::socket(), std::move(log_sink));
 }
 
-std::unique_ptr<Logger> Logger::Create(const Namespace& ns, async_dispatcher_t* dispatcher,
-                                       std::string_view name, FuchsiaLogSeverity min_severity,
-                                       bool wait_for_initial_interest) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+std::unique_ptr<Logger> Logger::Create2(const Namespace& ns, async_dispatcher_t* dispatcher,
+                                        std::string_view name, FuchsiaLogSeverity min_severity,
+                                        bool wait_for_initial_interest) {
+  auto result = Logger::MaybeCreate(ns, dispatcher, name, min_severity, wait_for_initial_interest);
+  if (!result.is_ok()) {
+    return Logger::NoOp();
+  }
+  return std::move(result.value());
+}
+#endif
+
+zx::result<std::unique_ptr<Logger>> Logger::Create(const Namespace& ns,
+                                                   async_dispatcher_t* dispatcher,
+                                                   std::string_view name,
+                                                   FuchsiaLogSeverity min_severity,
+                                                   bool wait_for_initial_interest) {
+  auto result = Logger::MaybeCreate(ns, dispatcher, name, min_severity, wait_for_initial_interest);
+  if (!result.is_ok()) {
+    return zx::ok(Logger::NoOp());
+  }
+  return result;
+}
+
+zx::result<std::unique_ptr<Logger>> Logger::MaybeCreate(const Namespace& ns,
+                                                        async_dispatcher_t* dispatcher,
+                                                        std::string_view name,
+                                                        FuchsiaLogSeverity min_severity,
+                                                        bool wait_for_initial_interest) {
   zx::socket client_end, server_end;
   zx_status_t status = zx::socket::create(ZX_SOCKET_DATAGRAM, &client_end, &server_end);
   if (status != ZX_OK) {
-    return Logger::NoOp();
+    return zx::error(status);
   }
 
   auto ns_result = ns.Connect<fuchsia_logger::LogSink>();
   if (ns_result.is_error()) {
-    return Logger::NoOp();
+    return ns_result.take_error();
   }
 
   fidl::WireClient<fuchsia_logger::LogSink> log_sink(std::move(*ns_result), dispatcher);
   auto sink_result = log_sink->ConnectStructured(std::move(server_end));
   if (!sink_result.ok()) {
-    return Logger::NoOp();
+    return zx::error(sink_result.status());
   }
 
   auto logger =
@@ -71,7 +97,7 @@ std::unique_ptr<Logger> Logger::Create(const Namespace& ns, async_dispatcher_t* 
   if (wait_for_initial_interest) {
     auto interest_result = logger->log_sink_.sync()->WaitForInterestChange();
     if (!interest_result.ok()) {
-      return Logger::NoOp();
+      return zx::error(interest_result.status());
     }
     // We are guanteed to not call this twice to we can ignore the application error.
     logger->HandleInterest(interest_result->value()->data);
@@ -80,7 +106,7 @@ std::unique_ptr<Logger> Logger::Create(const Namespace& ns, async_dispatcher_t* 
   logger->log_sink_->WaitForInterestChange().Then(
       fit::bind_member(logger.get(), &Logger::OnInterestChange));
 
-  return logger;
+  return zx::ok(std::move(logger));
 }
 
 Logger* Logger::GlobalInstance() {

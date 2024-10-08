@@ -326,7 +326,7 @@ fn remote_file_attrs_and_ops(
     if handle_type == zx::ObjectType::CHANNEL {
         let channel = zx::Channel::from(handle);
         let queryable = funknown::QueryableSynchronousProxy::new(channel);
-        if let Ok(name) = queryable.query(zx::MonotonicTime::INFINITE) {
+        if let Ok(name) = queryable.query(zx::MonotonicInstant::INFINITE) {
             if name == fbinder::UNIX_DOMAIN_SOCKET_PROTOCOL_NAME.as_bytes() {
                 let socket_ops = RemoteUnixDomainSocket::new(queryable.into_channel())?;
                 let socket = Socket::new_with_ops(Box::new(socket_ops))?;
@@ -1500,7 +1500,7 @@ mod test {
 
         let mut context = LookupContext::default();
         let _test_file = root
-            .lookup_child(&current_task, &mut context, "bin/hello_starnix".into())?
+            .lookup_child(&current_task, &mut context, "data/tests/hello_starnix".into())?
             .open(&mut locked, &current_task, OpenFlags::RDONLY, AccessCheck::default())?;
         Ok(())
     }

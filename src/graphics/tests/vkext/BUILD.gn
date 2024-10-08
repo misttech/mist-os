@@ -187,7 +187,6 @@ fuchsia_test_package("vkext-unprotected-lavapipe-package") {
     },
   ]
   test_specs = {
-    environments = []
     log_settings = {
       max_severity = "ERROR"
     }

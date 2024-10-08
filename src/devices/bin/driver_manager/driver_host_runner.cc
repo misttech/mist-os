@@ -111,10 +111,9 @@ void DriverHostRunner::PublishComponentRunner(component::OutgoingDirectory& outg
   ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
 }
 
-zx::result<DriverHostRunner::DriverHost*> DriverHostRunner::CreateDriverHost(
+zx::result<DriverHostRunner::DriverHost*> DriverHostRunner::CreateDriverHostProcess(
     std::string_view name) {
   zx::process process;
-  zx::thread thread;
   zx::vmar root_vmar;
   zx_status_t status =
       zx::process::create(*zx::job::default_job(), name.data(), static_cast<uint32_t>(name.size()),
@@ -122,31 +121,19 @@ zx::result<DriverHostRunner::DriverHost*> DriverHostRunner::CreateDriverHost(
   if (status != ZX_OK) {
     return zx::error(status);
   }
-  status = zx::thread::create(process, name.data(), static_cast<uint32_t>(name.size()), 0, &thread);
-  if (status != ZX_OK) {
-    return zx::error(status);
-  }
-  auto driver_host =
-      std::make_unique<DriverHost>(std::move(process), std::move(thread), std::move(root_vmar));
+  auto driver_host = std::make_unique<DriverHost>(std::move(process), std::move(root_vmar));
   DriverHost* driver_host_ptr = driver_host.get();
   driver_hosts_.push_back(std::move(driver_host));
   return zx::ok(driver_host_ptr);
 }
 
 zx_status_t DriverHostRunner::DriverHost::GetDuplicateHandles(zx::process* out_process,
-                                                              zx::thread* out_thread,
                                                               zx::vmar* out_root_vmar) {
   zx::process process;
-  zx::thread thread;
   zx::vmar root_vmar;
   zx_status_t status = process_.duplicate(ZX_RIGHT_SAME_RIGHTS, &process);
   if (status != ZX_OK) {
     LOGF(ERROR, "Failed to duplicate process handle: %s", zx_status_get_string(status));
-    return status;
-  }
-  status = thread_.duplicate(ZX_RIGHT_SAME_RIGHTS, &thread);
-  if (status != ZX_OK) {
-    LOGF(ERROR, "Failed to duplicate thread handle: %s", zx_status_get_string(status));
     return status;
   }
   status = root_vmar_.duplicate(ZX_RIGHT_SAME_RIGHTS, &root_vmar);
@@ -155,13 +142,11 @@ zx_status_t DriverHostRunner::DriverHost::GetDuplicateHandles(zx::process* out_p
     return status;
   }
   *out_process = std::move(process);
-  *out_thread = std::move(thread);
   *out_root_vmar = std::move(root_vmar);
   return ZX_OK;
 }
 
 void DriverHostRunner::StartDriverHost(driver_loader::Loader* loader,
-                                       zx::channel bootstrap_receiver,
                                        fidl::ServerEnd<fuchsia_io::Directory> exposed_dir,
                                        StartDriverHostCallback callback) {
   constexpr std::string_view kUrl = "fuchsia-boot:///driver_host2#meta/driver_host2.cm";
@@ -169,16 +154,14 @@ void DriverHostRunner::StartDriverHost(driver_loader::Loader* loader,
 
   StartDriverHostComponent(
       name, kUrl, std::move(exposed_dir),
-      [this, name, loader, bootstrap_receiver = std::move(bootstrap_receiver),
-       callback = std::move(callback)](
+      [this, name, loader, callback = std::move(callback)](
           zx::result<driver_manager::DriverHostRunner::StartedComponent> component) mutable {
         if (component.is_error()) {
           LOGF(ERROR, "Failed to start driver host: %s", component.status_string());
           callback(component.take_error());
           return;
         }
-        LoadDriverHost(loader, component->info, name, std::move(bootstrap_receiver),
-                       std::move(callback));
+        LoadDriverHost(loader, component->info, name, std::move(callback));
       });
 }
 
@@ -192,7 +175,7 @@ std::unordered_set<const DriverHostRunner::DriverHost*> DriverHostRunner::Driver
 
 void DriverHostRunner::LoadDriverHost(
     driver_loader::Loader* loader, const fuchsia_component_runner::ComponentStartInfo& start_info,
-    std::string_view name, zx::channel bootstrap_receiver, StartDriverHostCallback callback) {
+    std::string_view name, StartDriverHostCallback callback) {
   auto url = *start_info.resolved_url();
   fidl::Arena arena;
   fuchsia_data::wire::Dictionary wire_program = fidl::ToWire(arena, *start_info.program());
@@ -230,7 +213,7 @@ void DriverHostRunner::LoadDriverHost(
   }
   zx::vmo vdso_vmo = std::move(*vdso_result);
 
-  zx::result<DriverHost*> driver_host = CreateDriverHost(name);
+  zx::result<DriverHost*> driver_host = CreateDriverHostProcess(name);
   if (driver_host.is_error()) {
     LOGF(ERROR, "Failed to create driver host env: %s", driver_host.status_string());
     callback(driver_host.take_error());
@@ -238,10 +221,9 @@ void DriverHostRunner::LoadDriverHost(
   }
 
   zx::process process;
-  zx::thread thread;
   zx::vmar root_vmar;
 
-  zx_status_t status = (*driver_host)->GetDuplicateHandles(&process, &thread, &root_vmar);
+  zx_status_t status = (*driver_host)->GetDuplicateHandles(&process, &root_vmar);
   if (status != ZX_OK) {
     LOGF(ERROR, "GetDuplicateHandles failed: %s", zx_status_get_string(status));
     callback(zx::error(status));
@@ -255,9 +237,8 @@ void DriverHostRunner::LoadDriverHost(
     return;
   }
 
-  auto loader_result = loader->Start(std::move(process), std::move(thread), std::move(root_vmar),
-                                     std::move(exec_vmo), std::move(vdso_vmo), std::move(*lib_dir),
-                                     std::move(bootstrap_receiver));
+  auto loader_result = loader->Start(std::move(process), std::move(root_vmar), std::move(exec_vmo),
+                                     std::move(vdso_vmo), std::move(*lib_dir));
   if (loader_result.is_error()) {
     LOGF(ERROR, "Loader failed to start driver host: %s", loader_result.status_string());
     callback(loader_result.take_error());

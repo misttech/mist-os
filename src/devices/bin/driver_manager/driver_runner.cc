@@ -532,28 +532,18 @@ void DriverRunner::CreateDriverHostDynamicLinker(
     return;
   }
 
-  zx::channel bootstrap_sender, bootstrap_receiver;
-  zx_status_t status = zx::channel::create(0, &bootstrap_sender, &bootstrap_receiver);
-  if (status != ZX_OK) {
-    LOGF(ERROR, "Failed to create bootstrap channels: %s", zx_status_get_string(status));
-    completion_cb(zx::error(status));
-    return;
-  }
-
   dynamic_linker_args_->driver_host_runner->StartDriverHost(
-      dynamic_linker_service_client.get(), std::move(bootstrap_receiver),
-      std::move(endpoints.server),
+      dynamic_linker_service_client.get(), std::move(endpoints.server),
       [this, linker = std::move(dynamic_linker_service_client),
-       bootstrap_sender = std::move(bootstrap_sender), completion_cb = std::move(completion_cb),
-       client_end = std::move(client_end)](
+       completion_cb = std::move(completion_cb), client_end = std::move(client_end)](
           zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> result) mutable {
         if (result.is_error()) {
           completion_cb(result.take_error());
           return;
         }
         auto driver_host = std::make_unique<DynamicLinkerDriverHostComponent>(
-            std::move(*client_end), std::move(*result), dispatcher_, std::move(bootstrap_sender),
-            std::move(linker), &dynamic_linker_driver_hosts_);
+            std::move(*client_end), std::move(*result), dispatcher_, std::move(linker),
+            &dynamic_linker_driver_hosts_);
 
         auto driver_host_ptr = driver_host.get();
         dynamic_linker_driver_hosts_.push_back(std::move(driver_host));

@@ -2700,7 +2700,7 @@ mod tests {
     fn expect_next_event_at_deadline<E: std::fmt::Debug>(
         executor: &mut fuchsia_async::TestExecutor,
         mut timed_event_stream: impl Stream<Item = timer::Event<E>> + std::marker::Unpin,
-        deadline: fuchsia_async::Time,
+        deadline: fuchsia_async::MonotonicInstant,
     ) -> timer::Event<E> {
         assert_variant!(executor.run_until_stalled(&mut timed_event_stream.next()), Poll::Pending);
         assert_eq!(deadline, executor.wake_next_timer().expect("expected pending timer"));
@@ -2714,7 +2714,7 @@ mod tests {
     #[test]
     fn simple_rsna_response_timeout_with_unresponsive_ap() {
         let mut h = TestHelper::new_with_fake_time();
-        h.executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
+        h.executor.set_fake_time(fuchsia_async::MonotonicInstant::from_nanos(0));
         let (supplicant, suppl_mock) = mock_psk_supplicant();
         let (command, mut connect_txn_stream) = connect_command_wpa2(supplicant);
         let bss = command.bss.clone();
@@ -2791,7 +2791,7 @@ mod tests {
     #[test]
     fn simple_retransmission_timeout_with_responsive_ap() {
         let mut h = TestHelper::new_with_fake_time();
-        h.executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
+        h.executor.set_fake_time(fuchsia_async::MonotonicInstant::from_nanos(0));
 
         let (supplicant, suppl_mock) = mock_psk_supplicant();
         let (command, _connect_txn_stream) = connect_command_wpa2(supplicant);
@@ -2906,7 +2906,7 @@ mod tests {
     #[test]
     fn retransmission_timeouts_do_not_extend_response_timeout() {
         let mut h = TestHelper::new_with_fake_time();
-        h.executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
+        h.executor.set_fake_time(fuchsia_async::MonotonicInstant::from_nanos(0));
 
         let (supplicant, suppl_mock) = mock_psk_supplicant();
         let (command, mut connect_txn_stream) = connect_command_wpa2(supplicant);
@@ -2942,11 +2942,16 @@ mod tests {
                 data: test_utils::eapol_key_frame().into(),
             },
         };
+        // Progress time to avoid scheduling two concurrent rsna response timeouts.
+        // TODO(https://fxbug.dev/371613444): Remove when our timer implementation supports better cancel behavior.
+        let first_rsna_response_deadline =
+            zx::Duration::from_millis(event::RSNA_RESPONSE_TIMEOUT_MILLIS).after_now();
+        h.executor.set_fake_time(zx::Duration::from_millis(1).after_now());
         let mut state = state.on_mlme_event(eapol_ind, &mut h.context);
 
         // Cycle through the RSNA retransmission timeouts
         let mock_number_of_retransmissions = 5;
-        let rsna_response_deadline =
+        let second_rsna_response_deadline =
             zx::Duration::from_millis(event::RSNA_RESPONSE_TIMEOUT_MILLIS).after_now();
         for i in 0..=mock_number_of_retransmissions {
             expect_eapol_req(&mut h.mlme_stream, bss.bssid);
@@ -2968,18 +2973,27 @@ mod tests {
             state = state.handle_timeout(timed_event.id, timed_event.event, &mut h.context);
         }
 
-        // Expire the RSNA response timeout
-        let timed_event = expect_next_event_at_deadline(
+        // Expire the first RSNA response timeout. This should do nothing.
+        let first_timeout = expect_next_event_at_deadline(
             &mut h.executor,
             &mut timed_event_stream,
-            rsna_response_deadline,
+            first_rsna_response_deadline,
         );
-        assert_variant!(timed_event.event, Event::RsnaResponseTimeout(..));
+        assert_variant!(first_timeout.event, Event::RsnaResponseTimeout(..));
+        let state = state.handle_timeout(first_timeout.id, first_timeout.event, &mut h.context);
+        expect_stream_empty(&mut h.mlme_stream, "unexpected event in mlme stream");
 
+        // Expire the second RSNA response timeout
+        let second_timeout = expect_next_event_at_deadline(
+            &mut h.executor,
+            &mut timed_event_stream,
+            second_rsna_response_deadline,
+        );
+        assert_variant!(second_timeout.event, Event::RsnaResponseTimeout(..));
         suppl_mock.set_on_rsna_response_timeout(EstablishRsnaFailureReason::RsnaResponseTimeout(
             wlan_rsn::Error::EapolHandshakeIncomplete("PTKSA never initialized".to_string()),
         ));
-        let state = state.handle_timeout(timed_event.id, timed_event.event, &mut h.context);
+        let state = state.handle_timeout(second_timeout.id, second_timeout.event, &mut h.context);
 
         expect_deauth_req(&mut h.mlme_stream, bss.bssid, fidl_ieee80211::ReasonCode::StaLeaving);
         assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnConnectResult { result, is_reconnect: false })) => {
@@ -3059,7 +3073,7 @@ mod tests {
     #[test]
     fn simple_completion_timeout_with_responsive_ap() {
         let mut h = TestHelper::new_with_fake_time();
-        h.executor.set_fake_time(fuchsia_async::Time::from_nanos(0));
+        h.executor.set_fake_time(fuchsia_async::MonotonicInstant::from_nanos(0));
 
         let (supplicant, suppl_mock) = mock_psk_supplicant();
         let (command, mut connect_txn_stream) = connect_command_wpa2(supplicant);
@@ -3093,7 +3107,7 @@ mod tests {
 
         // Send an initial EAPOL frame to SME. Advance the time to prevent scheduling
         // simultaneous response timeouts for simplicity.
-        h.executor.set_fake_time(fuchsia_async::Time::from_nanos(100));
+        h.executor.set_fake_time(fuchsia_async::MonotonicInstant::from_nanos(100));
         let eapol_ind = fidl_mlme::EapolIndication {
             src_addr: bss.bssid.to_array(),
             dst_addr: fake_device_info().sta_addr,

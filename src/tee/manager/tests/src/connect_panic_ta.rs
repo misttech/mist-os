@@ -9,8 +9,7 @@ use fidl::endpoints::Proxy;
 use fidl::AsHandleRef;
 use fidl_fuchsia_tee::ReturnOrigin;
 use fuchsia_component::client::{connect_to_protocol_at, connect_to_protocol_at_path};
-
-use tee_internal::binding::TEE_ERROR_TARGET_DEAD;
+use tee_internal::Error as TeeError;
 use {fidl_fuchsia_io, fidl_fuchsia_tee, fuchsia_fs};
 
 #[fuchsia::test]
@@ -30,7 +29,7 @@ async fn connect_panic_ta() -> Result<(), Error> {
 
     // We expect the panic TA to panic when send it the first request.
     if let Ok((_, op_result)) = result {
-        assert_eq!(op_result.return_code, Some(TEE_ERROR_TARGET_DEAD as u64));
+        assert_eq!(op_result.return_code, Some(TeeError::TargetDead as u64));
         assert_eq!(op_result.return_origin, Some(ReturnOrigin::TrustedOs));
         assert_eq!(op_result.parameter_set, None);
     }
@@ -39,7 +38,7 @@ async fn connect_panic_ta() -> Result<(), Error> {
     let result = panic_ta.invoke_command(0, 0, vec![]).await;
     assert!(result.is_ok());
     if let Ok(op_result) = result {
-        assert_eq!(op_result.return_code, Some(TEE_ERROR_TARGET_DEAD as u64));
+        assert_eq!(op_result.return_code, Some(TeeError::TargetDead as u64));
         assert_eq!(op_result.return_origin, Some(ReturnOrigin::TrustedOs));
         assert_eq!(op_result.parameter_set, None);
     }

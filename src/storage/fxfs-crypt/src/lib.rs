@@ -6,7 +6,7 @@ use aes_gcm_siv::aead::Aead;
 use aes_gcm_siv::{Aes256GcmSiv, Key, KeyInit as _, Nonce};
 use anyhow::{Context, Error};
 use fidl_fuchsia_fxfs::{
-    CryptCreateKeyResult, CryptManagementAddWrappingKeyResult,
+    CryptCreateKeyResult, CryptCreateKeyWithIdResult, CryptManagementAddWrappingKeyResult,
     CryptManagementForgetWrappingKeyResult, CryptManagementRequest, CryptManagementRequestStream,
     CryptManagementSetActiveKeyResult, CryptRequest, CryptRequestStream, CryptUnwrapKeyResult,
     KeyPurpose,
@@ -26,9 +26,9 @@ pub enum Services {
 
 #[derive(Default)]
 struct CryptServiceInner {
-    ciphers: HashMap<u64, Aes256GcmSiv>,
-    active_data_key: Option<u64>,
-    active_metadata_key: Option<u64>,
+    ciphers: HashMap<u128, Aes256GcmSiv>,
+    active_data_key: Option<u128>,
+    active_metadata_key: Option<u128>,
 }
 
 pub struct CryptService {
@@ -65,10 +65,26 @@ impl CryptService {
             zx::Status::INTERNAL.into_raw()
         })?;
 
-        Ok((*wrapping_key_id, wrapped.into(), key.into()))
+        Ok((wrapping_key_id.to_le_bytes(), wrapped.into(), key.into()))
     }
 
-    fn unwrap_key(&self, wrapping_key_id: u64, owner: u64, key: Vec<u8>) -> CryptUnwrapKeyResult {
+    fn create_key_with_id(&self, owner: u64, wrapping_key_id: u128) -> CryptCreateKeyWithIdResult {
+        let inner = self.inner.lock().unwrap();
+        let cipher = inner.ciphers.get(&wrapping_key_id).ok_or(zx::Status::NOT_FOUND.into_raw())?;
+        let nonce = zero_extended_nonce(owner);
+
+        let mut key = [0u8; 32];
+        zx::cprng_draw(&mut key);
+
+        let wrapped = cipher.encrypt(&nonce, &key[..]).map_err(|error| {
+            error!(?error, "Failed to wrap key");
+            zx::Status::INTERNAL.into_raw()
+        })?;
+
+        Ok((wrapped.into(), key.into()))
+    }
+
+    fn unwrap_key(&self, wrapping_key_id: u128, owner: u64, key: Vec<u8>) -> CryptUnwrapKeyResult {
         let inner = self.inner.lock().unwrap();
         let cipher = inner.ciphers.get(&wrapping_key_id).ok_or(zx::Status::NOT_FOUND.into_raw())?;
         let nonce = zero_extended_nonce(owner);
@@ -78,7 +94,7 @@ impl CryptService {
 
     pub fn add_wrapping_key(
         &self,
-        wrapping_key_id: u64,
+        wrapping_key_id: u128,
         key: Vec<u8>,
     ) -> CryptManagementAddWrappingKeyResult {
         let mut inner = self.inner.lock().unwrap();
@@ -95,7 +111,7 @@ impl CryptService {
     pub fn set_active_key(
         &self,
         purpose: KeyPurpose,
-        wrapping_key_id: u64,
+        wrapping_key_id: u128,
     ) -> CryptManagementSetActiveKeyResult {
         let mut inner = self.inner.lock().unwrap();
         if !inner.ciphers.contains_key(&wrapping_key_id) {
@@ -109,7 +125,7 @@ impl CryptService {
         Ok(())
     }
 
-    fn forget_wrapping_key(&self, wrapping_key_id: u64) -> CryptManagementForgetWrappingKeyResult {
+    fn forget_wrapping_key(&self, wrapping_key_id: u128) -> CryptManagementForgetWrappingKeyResult {
         info!(wrapping_key_id, "Removing wrapping key");
         let mut inner = self.inner.lock().unwrap();
         if let Some(id) = &inner.active_data_key {
@@ -133,9 +149,9 @@ impl CryptService {
                     match request {
                         CryptRequest::CreateKey { owner, purpose, responder } => {
                             responder
-                                .send(match self.create_key(owner, purpose) {
+                                .send(match &self.create_key(owner, purpose) {
                                     Ok((id, ref wrapped, ref key)) => Ok((id, wrapped, key)),
-                                    Err(e) => Err(e),
+                                    Err(e) => Err(*e),
                                 })
                                 .unwrap_or_else(|e| {
                                     error!(
@@ -144,12 +160,36 @@ impl CryptService {
                                     )
                                 });
                         }
+                        CryptRequest::CreateKeyWithId { owner, wrapping_key_id, responder } => {
+                            responder
+                                .send(
+                                    match self.create_key_with_id(
+                                        owner,
+                                        u128::from_le_bytes(wrapping_key_id),
+                                    ) {
+                                        Ok((ref wrapped, ref key)) => Ok((wrapped, key)),
+                                        Err(e) => Err(e),
+                                    },
+                                )
+                                .unwrap_or_else(|e| {
+                                    error!(
+                                        error = e.as_value(),
+                                        "Failed to send CreateKeyWithId response"
+                                    )
+                                });
+                        }
                         CryptRequest::UnwrapKey { wrapping_key_id, owner, key, responder } => {
                             responder
-                                .send(match self.unwrap_key(wrapping_key_id, owner, key) {
-                                    Ok(ref unwrapped) => Ok(unwrapped),
-                                    Err(e) => Err(e),
-                                })
+                                .send(
+                                    match self.unwrap_key(
+                                        u128::from_le_bytes(wrapping_key_id),
+                                        owner,
+                                        key,
+                                    ) {
+                                        Ok(ref unwrapped) => Ok(unwrapped),
+                                        Err(e) => Err(e),
+                                    },
+                                )
                                 .unwrap_or_else(|e| {
                                     error!(
                                         error = e.as_value(),
@@ -168,7 +208,8 @@ impl CryptService {
                             key,
                             responder,
                         } => {
-                            let response = self.add_wrapping_key(wrapping_key_id, key);
+                            let response =
+                                self.add_wrapping_key(u128::from_le_bytes(wrapping_key_id), key);
                             responder.send(response).unwrap_or_else(|e| {
                                 error!(
                                     error = e.as_value(),
@@ -181,7 +222,8 @@ impl CryptService {
                             wrapping_key_id,
                             responder,
                         } => {
-                            let response = self.set_active_key(purpose, wrapping_key_id);
+                            let response =
+                                self.set_active_key(purpose, u128::from_le_bytes(wrapping_key_id));
                             responder.send(response).unwrap_or_else(|e| {
                                 error!(error = e.as_value(), "Failed to send SetActiveKey response")
                             });
@@ -190,7 +232,8 @@ impl CryptService {
                             wrapping_key_id,
                             responder,
                         } => {
-                            let response = self.forget_wrapping_key(wrapping_key_id);
+                            let response =
+                                self.forget_wrapping_key(u128::from_le_bytes(wrapping_key_id));
                             responder.send(response).unwrap_or_else(|e| {
                                 error!(
                                     error = e.as_value(),
@@ -220,17 +263,53 @@ mod tests {
 
         let (wrapping_key_id, wrapped, unwrapped) =
             service.create_key(0, KeyPurpose::Data).expect("create_key failed");
-        assert_eq!(wrapping_key_id, 1);
+        let wrapping_key_id_int = u128::from_le_bytes(wrapping_key_id);
+        assert_eq!(wrapping_key_id_int, 1);
         let unwrap_result =
-            service.unwrap_key(wrapping_key_id, 0, wrapped).expect("unwrap_key failed");
+            service.unwrap_key(wrapping_key_id_int, 0, wrapped).expect("unwrap_key failed");
         assert_eq!(unwrap_result, unwrapped);
 
         // Do it twice to make sure the service can use the same key repeatedly.
         let (wrapping_key_id, wrapped, unwrapped) =
             service.create_key(1, KeyPurpose::Data).expect("create_key failed");
-        assert_eq!(wrapping_key_id, 1);
+        let wrapping_key_id_int = u128::from_le_bytes(wrapping_key_id);
+        assert_eq!(wrapping_key_id_int, 1);
         let unwrap_result =
-            service.unwrap_key(wrapping_key_id, 1, wrapped).expect("unwrap_key failed");
+            service.unwrap_key(wrapping_key_id_int, 1, wrapped).expect("unwrap_key failed");
+        assert_eq!(unwrap_result, unwrapped);
+    }
+
+    #[test]
+    fn wrap_unwrap_key_with_arbitrary_wrapping_key() {
+        let service = CryptService::new();
+        let key = vec![0xABu8; 32];
+        service.add_wrapping_key(2, key.clone()).expect("add_key failed");
+
+        let (wrapped, unwrapped) =
+            service.create_key_with_id(0, 2).expect("create_key_with_id failed");
+        let unwrap_result = service.unwrap_key(2, 0, wrapped).expect("unwrap_key failed");
+        assert_eq!(unwrap_result, unwrapped);
+
+        // Do it twice to make sure the service can use the same key repeatedly.
+        let (wrapped, unwrapped) =
+            service.create_key_with_id(1, 2).expect("create_key_with_id failed");
+        let unwrap_result = service.unwrap_key(2, 1, wrapped).expect("unwrap_key failed");
+        assert_eq!(unwrap_result, unwrapped);
+    }
+
+    #[test]
+    fn create_key_with_wrapping_key_that_does_not_exist() {
+        let service = CryptService::new();
+        service
+            .create_key_with_id(0, 2)
+            .expect_err("create_key_with_id should fail if the wrapping key does not exist");
+
+        let wrapping_key = vec![0xABu8; 32];
+        service.add_wrapping_key(2, wrapping_key.clone()).expect("add_key failed");
+
+        let (wrapped, unwrapped) =
+            service.create_key_with_id(0, 2).expect("create_key_with_id failed");
+        let unwrap_result = service.unwrap_key(2, 0, wrapped).expect("unwrap_key failed");
         assert_eq!(unwrap_result, unwrapped);
     }
 
@@ -246,7 +325,9 @@ mod tests {
         for byte in &mut wrapped {
             *byte ^= 0xff;
         }
-        service.unwrap_key(wrapping_key_id, 0, wrapped).expect_err("unwrap_key should fail");
+        service
+            .unwrap_key(u128::from_le_bytes(wrapping_key_id), 0, wrapped)
+            .expect_err("unwrap_key should fail");
     }
 
     #[test]
@@ -258,7 +339,9 @@ mod tests {
 
         let (wrapping_key_id, wrapped, _) =
             service.create_key(0, KeyPurpose::Data).expect("create_key failed");
-        service.unwrap_key(wrapping_key_id, 1, wrapped).expect_err("unwrap_key should fail");
+        service
+            .unwrap_key(u128::from_le_bytes(wrapping_key_id), 1, wrapped)
+            .expect_err("unwrap_key should fail");
     }
 
     #[test]

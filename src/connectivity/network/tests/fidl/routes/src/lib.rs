@@ -377,7 +377,7 @@ fn new_installed_route<I: fnet_routes_ext::FidlRouteIpExt>(
             },
         },
         effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric: metric },
-        table_id,
+        table_id: fnet_routes_ext::TableId::new(table_id),
     }
 }
 
@@ -567,7 +567,9 @@ async fn watcher_existing<
     while let Some(event) = event_stream
         .next()
         .on_timeout(
-            fuchsia_async::Time::after(netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT),
+            fuchsia_async::MonotonicInstant::after(
+                netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
+            ),
             || None,
         )
         .await
@@ -764,7 +766,9 @@ async fn watcher_outlives_state<N: Netstack, I: fnet_routes_ext::FidlRouteIpExt>
         .next()
         .map(Err)
         .on_timeout(
-            fuchsia_async::Time::after(netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT),
+            fuchsia_async::MonotonicInstant::after(
+                netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
+            ),
             || Ok(()),
         )
         .await
@@ -925,7 +929,7 @@ async fn route_watcher_in_specific_table<
     assert_eq!(
         existing_main_routes
             .iter()
-            .find(|installed_route| installed_route.table_id == u32::from(user_table_id)),
+            .find(|installed_route| installed_route.table_id == user_table_id),
         None
     );
 
@@ -951,7 +955,7 @@ async fn route_watcher_in_specific_table<
         pin!(fnet_routes_ext::event_stream_from_state_with_options::<I>(
             &state,
             fnet_routes_ext::WatcherOptions {
-                table_interest: Some(fnet_routes::TableInterest::Only(user_table_id.into()))
+                table_interest: Some(fnet_routes::TableInterest::Only(user_table_id.get()))
             }
         )
         .expect("failed to create event stream"));
@@ -983,7 +987,7 @@ async fn route_watcher_in_specific_table<
         main_table_routes_stream
             .next()
             .on_timeout(
-                fuchsia_async::Time::after(
+                fuchsia_async::MonotonicInstant::after(
                     netstack_testing_common::ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT
                 ),
                 || None,

@@ -38,9 +38,6 @@
                 "fuchsia.boot.Arguments",
                 "fuchsia.boot.WriteOnlyLog",
 
-                // Services from fshost
-                "fuchsia.fshost.BlockWatcher",
-
                 // Builtin service
                 "fuchsia.process.Launcher",
 

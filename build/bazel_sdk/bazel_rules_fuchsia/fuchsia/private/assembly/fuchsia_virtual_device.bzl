@@ -23,6 +23,7 @@ def _fuchsia_virtual_device_impl(ctx):
             "hardware": {
                 "cpu": {
                     "arch": ctx.attr.arch,
+                    "count": ctx.attr.cpu_count,
                 },
                 "audio": {
                     "model": "hda",
@@ -31,6 +32,10 @@ def _fuchsia_virtual_device_impl(ctx):
                     # Touch is the default to avoid issues with mouse capture
                     # especially with cloudtops.
                     "pointing_device": "touch",
+                },
+                "vsock": {
+                    "enabled": ctx.attr.vsock_enabled,
+                    "cid": ctx.attr.vsock_cid,
                 },
                 "window_size": {
                     "height": ctx.attr.window_height_px,
@@ -80,6 +85,10 @@ fuchsia_virtual_device = rule(
             values = [ARCH.X64, ARCH.ARM64, ARCH.RISCV64],
             mandatory = True,
         ),
+        "cpu_count": attr.int(
+            doc = "The number of CPUs",
+            default = 4,
+        ),
         "window_width_px": attr.int(
             doc = "Width of the virtual device's screen, in pixels.",
             default = 1200,
@@ -103,6 +112,14 @@ fuchsia_virtual_device = rule(
         "storage_unit": attr.string(
             doc = "Unit for storage of the virtual device (e.g. megabytes, gigabytes, etc.).",
             default = "gigabytes",
+        ),
+        "vsock_enabled": attr.bool(
+            doc = "Whether the virtual device should expose a vsock",
+            default = False,
+        ),
+        "vsock_cid": attr.int(
+            doc = "The context id the guest vsock should. Only used if vsock_enable = true.",
+            default = 3,
         ),
     },
 )

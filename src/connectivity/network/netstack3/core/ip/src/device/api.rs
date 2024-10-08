@@ -308,11 +308,11 @@ where
                 let IpDeviceConfiguration {
                     gmp_enabled,
                     unicast_forwarding_enabled,
-                    multicast_forwarding_enabled: _,
+                    multicast_forwarding_enabled,
                 } = config.as_ref();
                 inspector.record_bool("GmpEnabled", *gmp_enabled);
                 inspector.record_bool("ForwardingEnabled", *unicast_forwarding_enabled);
-                // TODO(https://fxbug.dev/352570820): Add multicast_forwarding.
+                inspector.record_bool("MulticastForwardingEnabled", *multicast_forwarding_enabled);
             })
         });
     }

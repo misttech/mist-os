@@ -604,8 +604,11 @@ class ZirconPlatformSysmem2Connection : public PlatformSysmemConnection {
  public:
   explicit ZirconPlatformSysmem2Connection(fidl::SyncClient<fuchsia_sysmem2::Allocator> allocator)
       : sysmem_allocator_(std::move(allocator)) {
-    std::string debug_name =
-        std::string("(2) magma[") + magma::PlatformProcessHelper::GetCurrentProcessName() + "]";
+    const std::string process_name = magma::PlatformProcessHelper::GetCurrentProcessName();
+    const size_t max_length =
+        std::min(process_name.length(),
+                 static_cast<size_t>(fuchsia_sysmem2::kMaxClientNameLength - 16 /* padding */));
+    std::string debug_name = std::string("(2) magma[") + process_name.substr(0, max_length) + "]";
     fuchsia_sysmem2::AllocatorSetDebugClientInfoRequest set_debug_request;
     set_debug_request.name().emplace(debug_name);
     set_debug_request.id().emplace(magma::PlatformProcessHelper::GetCurrentProcessId());

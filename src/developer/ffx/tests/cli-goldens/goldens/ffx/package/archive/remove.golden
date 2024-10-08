@@ -44,7 +44,7 @@
       "optionality": "required",
       "long": "--output",
       "short": "o",
-      "description": "file to add to the package archive",
+      "description": "the name of the resulting archive. Can be the same as <archive> to overwrite <archive>",
       "hidden": false
     }
   ],

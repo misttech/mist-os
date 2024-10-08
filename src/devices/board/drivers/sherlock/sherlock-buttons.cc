@@ -68,11 +68,11 @@ zx_status_t Sherlock::ButtonsInit() {
        .pid = PDEV_PID_GENERIC,
        .did = PDEV_DID_BUTTONS,
        .metadata = std::vector<fpbus::Metadata>{
-           {{.type = DEVICE_METADATA_BUTTONS_BUTTONS,
+           {{.id = std::to_string(DEVICE_METADATA_BUTTONS_BUTTONS),
              .data = std::vector<uint8_t>(
                  reinterpret_cast<const uint8_t*>(&buttons),
                  reinterpret_cast<const uint8_t*>(&buttons) + sizeof(buttons))}},
-           {{.type = DEVICE_METADATA_BUTTONS_GPIOS,
+           {{.id = std::to_string(DEVICE_METADATA_BUTTONS_GPIOS),
              .data = std::vector(reinterpret_cast<const uint8_t*>(&gpios),
                                  reinterpret_cast<const uint8_t*>(&gpios) + sizeof(gpios))}}}}};
 

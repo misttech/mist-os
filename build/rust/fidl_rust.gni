@@ -168,7 +168,7 @@ template("fidl_rust") {
           deps += [ "//src/lib/fidl/rust/fidl_driver" ]
 
           # TODO: incorporate this into fidl_driver
-          deps += [ "//src/devices/bin/driver_runtime/rust:fdf_rust_lib" ]
+          deps += [ "//sdk/lib/driver/runtime/rust" ]
           features = [ "driver" ]
         }
       } else {

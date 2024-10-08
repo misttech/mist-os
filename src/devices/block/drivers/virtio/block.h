@@ -6,7 +6,7 @@
 
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
-#include <lib/ddk/io-buffer.h>
+#include <lib/dma-buffer/buffer.h>
 #include <lib/sync/completion.h>
 #include <lib/virtio/backends/backend.h>
 #include <lib/virtio/device.h>
@@ -93,7 +93,7 @@ class BlockDevice : public Device,
   // A queue of block request/responses.
   static const size_t blk_req_count = 32;
 
-  io_buffer_t blk_req_buf_;
+  std::unique_ptr<dma_buffer::ContiguousBuffer> blk_req_buf_;
   virtio_blk_req_t* blk_req_ = nullptr;
 
   zx_paddr_t blk_res_pa_ = 0;

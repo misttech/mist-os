@@ -27,6 +27,7 @@ rustc_library("gpt") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/storage/gpt:golden_images",
+    "//src/storage/lib/block_server",
     "//src/storage/lib/block_server:fake_block_server",
     "//third_party/rust_crates:futures",
   ]
@@ -46,8 +47,6 @@ rustc_library("gpt_testing") {
   deps = [
     ":gpt",
     "//sdk/rust/zx",
-    "//third_party/rust_crates:crc",
-    "//third_party/rust_crates:uuid",
     "//third_party/rust_crates:zerocopy",
   ]
   sources = [ "src/testing.rs" ]

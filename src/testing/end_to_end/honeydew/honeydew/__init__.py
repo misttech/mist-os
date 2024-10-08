@@ -22,16 +22,11 @@ def create_device(
     ffx_config: custom_types.FFXConfig,
     # intentionally made this a Dict instead of dataclass to minimize the changes in remaining Lacewing stack every time we need to add a new configuration item
     config: dict[str, Any] | None = None,
-    # TODO(b/369445945): will be deleted after antlion migrates to use "config"
-    # pylint: disable-next=unused-argument
-    transport: custom_types.TRANSPORT | None = None,
 ) -> fuchsia_device_interface.FuchsiaDevice:
     """Factory method that creates and returns the device class.
 
     Args:
         device_info: Fuchsia device information.
-
-        transport: Transport to use to perform host-target interactions.
 
         ffx_config: Ffx configuration that need to be used while running ffx
             commands.

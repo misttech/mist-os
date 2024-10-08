@@ -31,7 +31,8 @@ use netemul::InterfaceConfig;
 use netstack_testing_common::constants::{eth as eth_consts, ipv6 as ipv6_consts};
 use netstack_testing_common::ndp::{
     self, assert_dad_failed, assert_dad_success, expect_dad_neighbor_solicitation,
-    fail_dad_with_na, fail_dad_with_ns, send_ra, send_ra_with_router_lifetime, DadState,
+    fail_dad_with_na, fail_dad_with_ns, send_ra, send_ra_with_router_lifetime,
+    wait_for_router_solicitation, DadState,
 };
 use netstack_testing_common::realms::{
     constants, KnownServiceProvider, Netstack, NetstackVersion, TestSandboxExt as _,
@@ -59,10 +60,6 @@ use test_case::test_case;
 /// interface is brought up as a host.
 const EXPECTED_ROUTER_SOLICIATIONS: u8 = 3;
 
-/// The expected interval between sending Router Solicitation messages when
-/// soliciting IPv6 routers.
-const EXPECTED_ROUTER_SOLICITATION_INTERVAL: zx::Duration = zx::Duration::from_seconds(4);
-
 /// The expected number of Neighbor Solicitations sent by the netstack when
 /// performing Duplicate Address Detection.
 const EXPECTED_DUP_ADDR_DETECT_TRANSMITS: u8 = 1;
@@ -70,6 +67,10 @@ const EXPECTED_DUP_ADDR_DETECT_TRANSMITS: u8 = 1;
 /// The expected interval between sending Neighbor Solicitation messages when
 /// performing Duplicate Address Detection.
 const EXPECTED_DAD_RETRANSMIT_TIMER: zx::Duration = zx::Duration::from_seconds(1);
+
+/// The expected interval between sending Router Solicitation messages when
+/// soliciting IPv6 routers.
+const EXPECTED_ROUTER_SOLICITATION_INTERVAL: zx::Duration = zx::Duration::from_seconds(4);
 
 /// As per [RFC 7217 section 6] Hosts SHOULD introduce a random delay between 0 and
 /// `IDGEN_DELAY` before trying a new tentative address.
@@ -188,7 +189,7 @@ async fn consistent_initial_ipv6_addrs<N: Netstack>(name: &str) {
 async fn enable_ipv6_forwarding(iface: &netemul::TestInterface<'_>) {
     let config_with_ipv6_forwarding_set = |forwarding| fnet_interfaces_admin::Configuration {
         ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
-            forwarding: Some(forwarding),
+            unicast_forwarding: Some(forwarding),
             ..Default::default()
         }),
         ..Default::default()
@@ -338,7 +339,7 @@ async fn slaac_with_privacy_extensions<N: Netstack>(
     let name = format!("{}_{}", test_name, sub_test_name);
     let name = name.as_str();
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let (_network, realm, iface, fake_ep) =
+    let (_network, _realm, iface, fake_ep) =
         setup_network::<N>(&sandbox, name, None).await.expect("error setting up network");
 
     if forwarding {
@@ -348,28 +349,7 @@ async fn slaac_with_privacy_extensions<N: Netstack>(
     // Wait for a Router Solicitation.
     //
     // The first RS should be sent immediately.
-    let () = fake_ep
-        .frame_stream()
-        .try_filter_map(|(data, dropped)| {
-            assert_eq!(dropped, 0);
-            future::ok(
-                parse_icmp_packet_in_ip_packet_in_ethernet_frame::<
-                    net_types_ip::Ipv6,
-                    _,
-                    RouterSolicitation,
-                    _,
-                >(&data, EthernetFrameLengthCheck::NoCheck, |_| {})
-                .map_or(None, |_| Some(())),
-            )
-        })
-        .try_next()
-        .map(|r| r.context("error getting OnData event"))
-        .on_timeout(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.after_now(), || {
-            Err(anyhow::anyhow!("timed out waiting for RS packet"))
-        })
-        .await
-        .unwrap()
-        .expect("failed to get next OnData event");
+    wait_for_router_solicitation(&fake_ep).await;
 
     // Send a Router Advertisement with information for a SLAAC prefix.
     let options = [NdpOptionBuilder::PrefixInformation(PrefixInformation::new(
@@ -388,19 +368,12 @@ async fn slaac_with_privacy_extensions<N: Netstack>(
     //
     // We expect two addresses for the SLAAC prefixes to be assigned to the NIC as the
     // netstack should generate both a stable and temporary SLAAC address.
-    let interface_state = realm
-        .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
-        .expect("failed to connect to fuchsia.net.interfaces/State");
     let expected_addrs = 2;
     fidl_fuchsia_net_interfaces_ext::wait_interface_with_id(
-        fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
-            &interface_state,
-            fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned,
-        )
-        .expect("error getting interface state event stream"),
+        iface.get_interface_event_stream().expect("error getting interface state event stream"),
         &mut fidl_fuchsia_net_interfaces_ext::InterfaceState::<()>::Unknown(iface.id()),
         |iface| {
-            if iface
+            (iface
                 .properties
                 .addresses
                 .iter()
@@ -425,12 +398,8 @@ async fn slaac_with_privacy_extensions<N: Netstack>(
                     },
                 )
                 .count()
-                == expected_addrs as usize
-            {
-                Some(())
-            } else {
-                None
-            }
+                == expected_addrs as usize)
+                .then_some(())
         },
     )
     .map_err(anyhow::Error::from)
@@ -793,12 +762,15 @@ async fn on_and_off_link_route_discovery<N: Netstack>(
         fnet_routes_ext::wait_for_routes(ipv6_route_stream, &mut routes, |accumulated_routes| {
             want_routes.iter().all(|route| accumulated_routes.contains(route))
         })
-        .on_timeout(fuchsia_async::Time::after(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT), || {
-            panic!(
-                "timed out on waiting for a route table entry after {} seconds",
-                ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.into_seconds()
-            )
-        })
+        .on_timeout(
+            fuchsia_async::MonotonicInstant::after(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT),
+            || {
+                panic!(
+                    "timed out on waiting for a route table entry after {} seconds",
+                    ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.into_seconds()
+                )
+            },
+        )
         .await
         .expect("error while waiting for routes to satisfy predicate");
     }
@@ -814,7 +786,9 @@ async fn on_and_off_link_route_discovery<N: Netstack>(
     let main_route_table = realm
         .connect_to_protocol::<fidl_fuchsia_net_routes_admin::RouteTableV6Marker>()
         .expect("failed to connect to protocol");
-    let main_table_id = main_route_table.get_table_id().await.expect("failed to get table id");
+    let main_table_id = fnet_routes_ext::TableId::new(
+        main_route_table.get_table_id().await.expect("failed to get table id"),
+    );
 
     if forwarding {
         enable_ipv6_forwarding(&iface).await;

@@ -91,7 +91,7 @@ impl RemotePeerInspect {
         }
     }
 
-    pub fn record_connected(&mut self, at: fasync::Time) {
+    pub fn record_connected(&mut self, at: fasync::MonotonicInstant) {
         if let Some(prop) = &self.last_connected {
             prop.set_at(at.into());
         } else {
@@ -167,7 +167,7 @@ mod tests {
             }
         });
 
-        let time = fasync::Time::from_nanos(123_456_789);
+        let time = fasync::MonotonicInstant::from_nanos(123_456_789);
         peer_inspect.record_connected(time);
         assert_data_tree!(inspect, root: {
             peer: {

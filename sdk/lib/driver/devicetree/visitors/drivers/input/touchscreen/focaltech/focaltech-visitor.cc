@@ -48,7 +48,7 @@ zx::result<> FocaltechVisitor::DriverVisit(fdf_devicetree::Node& node,
   device_info.needs_firmware = parser_output->find(kNeedsFirmware) != parser_output->end();
 
   fuchsia_hardware_platform_bus::Metadata focaltech_metadata = {
-      {.type = DEVICE_METADATA_PRIVATE,
+      {.id = std::to_string(DEVICE_METADATA_PRIVATE),
        .data = std::vector<uint8_t>(
            reinterpret_cast<const uint8_t*>(&device_info),
            reinterpret_cast<const uint8_t*>(&device_info) + sizeof(device_info))}};

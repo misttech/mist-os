@@ -759,12 +759,7 @@ impl RoutingTestModel for RoutingTest {
                     }
                 }
             }
-            CheckUse::StorageAdmin {
-                storage_relation,
-                from_cm_namespace,
-                storage_subdir,
-                expected_res,
-            } => {
+            CheckUse::StorageAdmin { storage_relation, storage_subdir, expected_res } => {
                 let storage_admin_proxy =
                     capability_util::connect_to_svc_in_namespace::<fsys::StorageAdminMarker>(
                         &namespace,
@@ -772,21 +767,25 @@ impl RoutingTestModel for RoutingTest {
                     )
                     .await;
                 let (storage_proxy, server_end) = create_proxy().unwrap();
-                let flags = fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::CREATE
-                    | fio::OpenFlags::DIRECTORY;
                 let moniker_string = format!("{}", storage_relation);
                 let component_moniker = moniker.concat(&storage_relation);
                 let instance_id =
                     self.model.root().component_id_index().id_for_moniker(&component_moniker);
-                storage_admin_proxy
-                    .open_component_storage(
-                        moniker_string.as_str(),
-                        flags,
-                        fio::ModeType::empty(),
-                        server_end,
-                    )
-                    .expect("failed to open component storage");
+                match storage_admin_proxy.open_storage(moniker_string.as_str(), server_end).await {
+                    Ok(response) => {
+                        assert_eq!(expected_res, ExpectedResult::Ok);
+                        response
+                    }
+                    Err(fidl::Error::ClientChannelClosed { status, protocol_name: _ }) => {
+                        let ExpectedResult::Err(expected_status) = expected_res else {
+                            panic!("StorageAdmin client channel closed: {:?}", status);
+                        };
+                        assert_eq!(status, expected_status);
+                        return;
+                    }
+                    Err(e) => panic!("Unexpected transport error: {:?}", e),
+                }
+                .expect("failed to open component storage");
 
                 let storage_proxy =
                     fio::DirectoryProxy::from_channel(storage_proxy.into_channel().unwrap());
@@ -796,38 +795,30 @@ impl RoutingTestModel for RoutingTest {
                     expected_res.clone(),
                 )
                 .await;
-                if expected_res == ExpectedResult::Ok {
-                    let storage_dir = if from_cm_namespace {
-                        fuchsia_fs::directory::open_in_namespace_deprecated(
-                            "/tmp",
-                            fuchsia_fs::OpenFlags::RIGHT_READABLE,
-                        )
-                        .expect("failed to open /tmp")
-                    } else {
-                        fuchsia_fs::directory::clone_no_describe(&self.test_dir_proxy, None)
-                            .expect("failed to clone test_dir_proxy")
-                    };
-                    capability_util::check_file_in_storage(
-                        storage_subdir.clone(),
-                        storage_relation.clone(),
-                        instance_id.clone(),
-                        &storage_dir,
-                    )
+
+                let storage_dir =
+                    fuchsia_fs::directory::clone_no_describe(&self.test_dir_proxy, None)
+                        .expect("failed to clone test_dir_proxy");
+                capability_util::check_file_in_storage(
+                    storage_subdir.clone(),
+                    storage_relation.clone(),
+                    instance_id.clone(),
+                    &storage_dir,
+                )
+                .await
+                .expect("failed to read file");
+                storage_admin_proxy
+                    .delete_component_storage(moniker_string.as_str())
                     .await
-                    .expect("failed to read file");
-                    storage_admin_proxy
-                        .delete_component_storage(moniker_string.as_str())
-                        .await
-                        .expect("failed to send fidl message")
-                        .expect("error encountered while deleting component storage");
-                    capability_util::confirm_storage_is_deleted_for_component(
-                        storage_subdir,
-                        storage_relation,
-                        instance_id,
-                        &storage_dir,
-                    )
-                    .await;
-                }
+                    .expect("failed to send fidl message")
+                    .expect("error encountered while deleting component storage");
+                capability_util::confirm_storage_is_deleted_for_component(
+                    storage_subdir,
+                    storage_relation,
+                    instance_id,
+                    &storage_dir,
+                )
+                .await;
             }
             CheckUse::EventStream { path, .. } => {
                 // Fails if the component did not use the protocol EventStream or if the event is

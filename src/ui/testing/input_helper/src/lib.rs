@@ -475,7 +475,7 @@ fn input_report_for_touch_contacts(contacts: Vec<(u32, math::Vec_)>) -> InputRep
     };
 
     InputReport {
-        event_time: Some(fasync::Time::now().into_nanos()),
+        event_time: Some(fasync::MonotonicInstant::now().into_nanos()),
         touch: Some(touch_input_report),
         ..Default::default()
     }
@@ -612,7 +612,7 @@ async fn handle_touchscreen_request_stream(
             }
             Ok(TouchScreenRequest::SimulateTouchEvent { report, responder }) => {
                 let input_report = InputReport {
-                    event_time: Some(fasync::Time::now().into_nanos()),
+                    event_time: Some(fasync::MonotonicInstant::now().into_nanos()),
                     touch: Some(report),
                     ..Default::default()
                 };
@@ -644,7 +644,7 @@ async fn handle_media_buttons_device_request_stream(
                     };
 
                     let input_report = InputReport {
-                        event_time: Some(fasync::Time::now().into_nanos()),
+                        event_time: Some(fasync::MonotonicInstant::now().into_nanos()),
                         consumer_control: Some(media_buttons_input_report),
                         ..Default::default()
                     };
@@ -657,7 +657,7 @@ async fn handle_media_buttons_device_request_stream(
                     // so that input pipeline generates a media buttons
                     // event with the target button being released.
                     let empty_report = InputReport {
-                        event_time: Some(fasync::Time::now().into_nanos()),
+                        event_time: Some(fasync::MonotonicInstant::now().into_nanos()),
                         consumer_control: Some(ConsumerControlInputReport {
                             pressed_buttons: Some(vec![]),
                             ..Default::default()
@@ -680,7 +680,7 @@ async fn handle_media_buttons_device_request_stream(
                     None => vec![],
                 };
                 let input_report = InputReport {
-                    event_time: Some(fasync::Time::now().into_nanos()),
+                    event_time: Some(fasync::MonotonicInstant::now().into_nanos()),
                     consumer_control: Some(ConsumerControlInputReport {
                         pressed_buttons: Some(buttons),
                         ..Default::default()
@@ -717,7 +717,7 @@ async fn handle_keyboard_request_stream(
                     let mut key_iter = key_sequence.into_iter().peekable();
                     while let Some(keyboard_report) = key_iter.next() {
                         let input_report = InputReport {
-                            event_time: Some(fasync::Time::now().into_nanos()),
+                            event_time: Some(fasync::MonotonicInstant::now().into_nanos()),
                             keyboard: Some(KeyboardInputReport {
                                 pressed_keys3: Some(convert_keyboard_report_to_keys(
                                     &keyboard_report,
@@ -744,7 +744,7 @@ async fn handle_keyboard_request_stream(
             Ok(KeyboardRequest::SimulateKeyEvent { payload, responder }) => {
                 let keyboard_report = payload.report.expect("no report");
                 let input_report = InputReport {
-                    event_time: Some(fasync::Time::now().into_nanos()),
+                    event_time: Some(fasync::MonotonicInstant::now().into_nanos()),
                     keyboard: Some(keyboard_report),
                     ..Default::default()
                 };
@@ -792,7 +792,7 @@ async fn handle_mouse_request_stream(
                 }
 
                 let input_report = InputReport {
-                    event_time: Some(fasync::Time::now().into_nanos()),
+                    event_time: Some(fasync::MonotonicInstant::now().into_nanos()),
                     mouse: Some(mouse_input_report),
                     ..Default::default()
                 };

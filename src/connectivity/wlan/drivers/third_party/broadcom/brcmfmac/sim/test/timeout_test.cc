@@ -102,7 +102,7 @@ TEST_F(TimeoutTest, AssocTimeout) {
   // Receiving assoc_resp in SME with error status.
   EXPECT_EQ(client_ifc_.stats_.connect_attempts, 1U);
   EXPECT_EQ(connect_results->size(), 1U);
-  EXPECT_EQ(connect_results->front().result_code,
+  EXPECT_EQ(connect_results->front().result_code(),
             wlan_ieee80211::StatusCode::kRefusedReasonUnspecified);
 }
 

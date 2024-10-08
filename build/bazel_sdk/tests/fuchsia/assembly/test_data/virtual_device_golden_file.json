@@ -6,7 +6,8 @@
                 "model": "hda"
             },
             "cpu": {
-                "arch": "x64"
+                "arch": "x64",
+                "count": 4
             },
             "inputs": {
                 "pointing_device": "touch"
@@ -23,6 +24,10 @@
                 "height": 2160,
                 "units": "pixels",
                 "width": 3840
+            },
+            "vsock": {
+                "enabled": false,
+                "cid": 3
             }
         },
         "name": "test",

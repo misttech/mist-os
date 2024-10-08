@@ -325,11 +325,11 @@ mod tests {
         // it ran longer than the backoff duration.
         let mut executor = fasync::LocalExecutor::new();
 
-        let start_time = fasync::Time::now();
+        let start_time = fasync::MonotonicInstant::now();
 
         let result = executor.run_singlethreaded(future);
 
-        let actual_duration = fasync::Time::now() - start_time;
+        let actual_duration = fasync::MonotonicInstant::now() - start_time;
         let expected_duration = Duration::from_millis(BACKOFF_DURATION) * pending_count as u32;
 
         assert!(expected_duration <= actual_duration);

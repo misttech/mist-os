@@ -4,6 +4,7 @@
 
 """Rules for defining assembly board input bundle."""
 
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 load("//fuchsia/private:fuchsia_package.bzl", "get_driver_component_manifests")
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
@@ -192,7 +193,7 @@ fuchsia_board_input_bundle = rule(
             allow_single_file = True,
             default = "@fuchsia_sdk//:meta/manifest.json",
         ),
-    },
+    } | COMPATIBILITY.HOST_ATTRS,
 )
 
 def _fuchsia_prebuilt_board_input_bundle_impl(ctx):

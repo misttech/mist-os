@@ -4,8 +4,9 @@
 
 use crate::policy::PolicyError;
 use crate::rights::Rights;
+use async_trait::async_trait;
 use clonable_error::ClonableError;
-use cm_rust::CapabilityTypeName;
+use cm_rust::{CapabilityTypeName, ExposeDeclCommon, OfferDeclCommon, SourceName, UseDeclCommon};
 use cm_types::Name;
 use moniker::{ChildName, ExtendedMoniker, Moniker};
 use router_error::{DowncastErrorForTest, Explain, RouterError};
@@ -749,5 +750,71 @@ impl From<AvailabilityRoutingError> for ExtendedMoniker {
             | AvailabilityRoutingError::OfferFromVoidToRequiredTarget { moniker }
             | AvailabilityRoutingError::TargetHasStrongerAvailability { moniker } => moniker,
         }
+    }
+}
+
+// Implements error reporting upon routing failure. For example, component
+// manager logs the error.
+#[async_trait]
+pub trait ErrorReporter: Clone + Send + Sync + 'static {
+    async fn report(&self, request: &RouteRequestErrorInfo, err: &RouterError);
+}
+
+/// What to print in an error if a route request fails.
+pub struct RouteRequestErrorInfo {
+    capability_type: cm_rust::CapabilityTypeName,
+    name: cm_types::Name,
+    availability: cm_rust::Availability,
+}
+
+impl RouteRequestErrorInfo {
+    pub fn availability(&self) -> cm_rust::Availability {
+        self.availability.clone()
+    }
+}
+
+impl From<&cm_rust::UseDecl> for RouteRequestErrorInfo {
+    fn from(value: &cm_rust::UseDecl) -> Self {
+        RouteRequestErrorInfo {
+            capability_type: value.into(),
+            name: value.source_name().clone(),
+            availability: value.availability().clone(),
+        }
+    }
+}
+
+impl From<&cm_rust::UseConfigurationDecl> for RouteRequestErrorInfo {
+    fn from(value: &cm_rust::UseConfigurationDecl) -> Self {
+        RouteRequestErrorInfo {
+            capability_type: CapabilityTypeName::Config,
+            name: value.source_name().clone(),
+            availability: value.availability().clone(),
+        }
+    }
+}
+
+impl From<&cm_rust::ExposeDecl> for RouteRequestErrorInfo {
+    fn from(value: &cm_rust::ExposeDecl) -> Self {
+        RouteRequestErrorInfo {
+            capability_type: value.into(),
+            name: value.target_name().clone(),
+            availability: value.availability().clone(),
+        }
+    }
+}
+
+impl From<&cm_rust::OfferDecl> for RouteRequestErrorInfo {
+    fn from(value: &cm_rust::OfferDecl) -> Self {
+        RouteRequestErrorInfo {
+            capability_type: value.into(),
+            name: value.target_name().clone(),
+            availability: value.availability().clone(),
+        }
+    }
+}
+
+impl std::fmt::Display for RouteRequestErrorInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} `{}`", self.capability_type, self.name)
     }
 }

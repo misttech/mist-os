@@ -23,6 +23,8 @@
                 "fuchsia.memory.NormalCaptureDelay",
                 "fuchsia.memory.WarningCaptureDelay",
                 "fuchsia.power.SuspendEnabled",
+                "fuchsia.recovery.DisplayRotation",
+                "fuchsia.recovery.UseFxBlob",
                 "fuchsia.scenic.DisplayComposition",
                 "fuchsia.scenic.DisplayRotation",
                 "fuchsia.scenic.FrameSchedulerMinPredictedFrameDurationInUs",
@@ -177,6 +179,7 @@
         },
         {
             protocol: [
+                "fuchsia.fxfs.CryptManagement",
                 "fuchsia.tpm.cr50.Cr50",
                 "fuchsia.virtualconsole.SessionManager",
             ],

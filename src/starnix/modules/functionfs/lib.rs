@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use starnix_core::task::CurrentTask;
+use fidl::endpoints::SynchronousProxy;
+use fidl_fuchsia_hardware_adb as fadb;
+use starnix_core::power::{clear_wake_proxy_signal, create_proxy_for_wake_events};
+use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, fs_args, fs_node_impl_dir_readonly,
     fs_node_impl_not_dir, CacheMode, DirectoryEntryType, FileObject, FileOps, FileSystem,
@@ -20,9 +23,9 @@ use starnix_uapi::{
     usb_functionfs_event_type_FUNCTIONFS_BIND, usb_functionfs_event_type_FUNCTIONFS_ENABLE,
 };
 use std::collections::VecDeque;
+use std::ops::Deref;
 use std::sync::Arc;
 use zerocopy::IntoBytes;
-use {fidl_fuchsia_hardware_adb as fadb, zx};
 
 // The node identifiers of different nodes in FunctionFS.
 const ROOT_NODE_ID: ino_t = 1;
@@ -116,6 +119,10 @@ struct FunctionFsState {
     // FIDL bindings to the Adb driver, for reading and writing to a device.
     adb_proxy: Option<AdbHandle>,
 
+    // If this exists then receiving messages from the ADB device will wake starnix,
+    // and this event should be cleared after receiving a message.
+    adb_proxy_resume_event: Option<Arc<zx::EventPair>>,
+
     // FIDL binding to the adb driver, for start and stop calls.
     device_proxy: Option<fadb::DeviceSynchronousProxy>,
 
@@ -124,35 +131,56 @@ struct FunctionFsState {
     event_queue: VecDeque<usb_functionfs_event>,
 }
 
-fn connect_to_device() -> Result<(fadb::DeviceSynchronousProxy, AdbHandle), Errno> {
+pub enum AdbProxyMode {
+    /// Don't proxy events at all.
+    None,
+
+    /// Have the Starnix runner proxy events such that the container
+    /// will wake up if events are received while the container is
+    /// suspended.
+    WakeContainer,
+}
+
+fn connect_to_device(
+    proxy: AdbProxyMode,
+) -> Result<(fadb::DeviceSynchronousProxy, AdbHandle, Option<Arc<zx::EventPair>>), Errno> {
     let mut dir = std::fs::read_dir(ADB_DIRECTORY).map_err(|_| errno!(EINVAL))?;
 
-    if let Some(Ok(entry)) = dir.next() {
-        let path = entry.path().into_os_string().into_string().map_err(|_| errno!(EINVAL))?;
+    let Some(Ok(entry)) = dir.next() else {
+        return error!(EBUSY);
+    };
+    let path = entry.path().into_os_string().into_string().map_err(|_| errno!(EINVAL))?;
 
-        let (client_channel, server_channel) = zx::Channel::create();
-        fdio::service_connect(&path, server_channel).map_err(|_| errno!(EINVAL))?;
-        let device_proxy = fadb::DeviceSynchronousProxy::new(client_channel);
+    let (client_channel, server_channel) = zx::Channel::create();
+    fdio::service_connect(&path, server_channel).map_err(|_| errno!(EINVAL))?;
+    let device_proxy = fadb::DeviceSynchronousProxy::new(client_channel);
 
-        let (adb_proxy, server_end) =
-            fidl::endpoints::create_sync_proxy::<fadb::UsbAdbImpl_Marker>();
-        device_proxy
-            .start(server_end, zx::MonotonicInstant::INFINITE)
-            .map_err(|_| errno!(EINVAL))?
-            .map_err(|_| errno!(EINVAL))?;
-
-        loop {
-            let fadb::UsbAdbImpl_Event::OnStatusChanged { status } = adb_proxy
-                .wait_for_event(zx::MonotonicInstant::INFINITE)
-                .expect("failed to wait for event");
-            if status == fadb::StatusFlags::ONLINE {
-                break;
-            }
+    let (adb_proxy, server_end) = fidl::endpoints::create_sync_proxy::<fadb::UsbAdbImpl_Marker>();
+    let (adb_proxy, adb_proxy_resume_event) = match proxy {
+        AdbProxyMode::None => (adb_proxy, None),
+        AdbProxyMode::WakeContainer => {
+            let (adb_proxy, adb_proxy_resume_event) =
+                create_proxy_for_wake_events(adb_proxy.into_channel());
+            let adb_proxy = fadb::UsbAdbImpl_SynchronousProxy::from_channel(adb_proxy);
+            (adb_proxy, Some(Arc::new(adb_proxy_resume_event)))
         }
+    };
 
-        return Ok((device_proxy, Arc::new(adb_proxy)));
+    device_proxy
+        .start(server_end, zx::MonotonicInstant::INFINITE)
+        .map_err(|_| errno!(EINVAL))?
+        .map_err(|_| errno!(EINVAL))?;
+
+    loop {
+        let fadb::UsbAdbImpl_Event::OnStatusChanged { status } = adb_proxy
+            .wait_for_event(zx::MonotonicInstant::INFINITE)
+            .expect("failed to wait for event");
+        adb_proxy_resume_event.as_ref().map(Arc::as_ref).map(clear_wake_proxy_signal);
+        if status == fadb::StatusFlags::ONLINE {
+            break;
+        }
     }
-    error!(EBUSY)
+    return Ok((device_proxy, Arc::new(adb_proxy), adb_proxy_resume_event));
 }
 
 #[derive(Default)]
@@ -161,7 +189,7 @@ struct FunctionFsRootDir {
 }
 
 impl FunctionFsRootDir {
-    fn create_endpoints(&self) -> Result<(), Errno> {
+    fn create_endpoints(&self, kernel: &Kernel) -> Result<(), Errno> {
         let mut state = self.state.lock();
 
         // create_endpoints can be called multiple times as descriptors are written
@@ -169,9 +197,22 @@ impl FunctionFsRootDir {
         if state.has_input_output_endpoints {
             return Ok(());
         }
-        let result = connect_to_device()?;
-        state.device_proxy = Some(result.0);
-        state.adb_proxy = Some(result.1);
+        let (device_proxy, adb_proxy, adb_proxy_resume_event) =
+            connect_to_device(AdbProxyMode::None)?;
+
+        // Note: we do not use any of the events after this point and so we spawn a
+        // thread to discard them so they don't clog the channel.
+        let adb_proxy_clone = adb_proxy.clone();
+        let adb_proxy_resume_event_clone = adb_proxy_resume_event.clone();
+        kernel.kthreads.spawn(move |_, _| {
+            while adb_proxy_clone.wait_for_event(zx::MonotonicInstant::INFINITE).is_ok() {
+                adb_proxy_resume_event_clone.as_ref().map(Arc::as_ref).map(clear_wake_proxy_signal);
+            }
+        });
+
+        state.device_proxy = Some(device_proxy);
+        state.adb_proxy = Some(adb_proxy);
+        state.adb_proxy_resume_event = adb_proxy_resume_event;
         state.has_input_output_endpoints = true;
 
         // Currently FunctionFS assumes the device is always online.
@@ -214,6 +255,54 @@ impl FunctionFsRootDir {
     fn available(&self) -> usize {
         let state = self.state.lock();
         state.event_queue.len()
+    }
+
+    fn write(&self, bytes: &[u8]) -> Result<usize, Errno> {
+        let adb = self.get_adb()?;
+        let result = match adb.queue_tx(&bytes, zx::MonotonicInstant::INFINITE) {
+            Err(err) => {
+                log_warn!("Failed to call UsbAdbImpl.QueueTx: {err}");
+                error!(EINVAL)
+            }
+            Ok(Err(err)) => {
+                log_warn!("Failed to queue data to adb driver: {err}");
+                error!(EINVAL)
+            }
+            Ok(Ok(_)) => Ok(bytes.len()),
+        };
+        // We can clear the runner signals immediately after receiving our
+        // message because we are less concerned about keeping starnix awake for
+        // the entirety of the code path (unlike the hanging get patterns which
+        // require not clearing the signals until we re-arm the loop).
+        self.clear_wake_proxy_signal();
+        result
+    }
+
+    fn read(&self) -> Result<Vec<u8>, Errno> {
+        let adb = self.get_adb()?;
+
+        let result = match adb.receive(zx::MonotonicInstant::INFINITE) {
+            Err(err) => {
+                log_warn!("Failed to call UsbAdbImpl.Receive: {err}");
+                error!(EINVAL)
+            }
+            Ok(Err(err)) => {
+                log_warn!("Failed to receive data from adb driver: {err}");
+                error!(EINVAL)
+            }
+            Ok(Ok(payload)) => Ok(payload),
+        };
+        // We can clear the runner signals immediately after receiving our
+        // message because we are less concerned about keeping starnix awake for
+        // the entirety of the code path (unlike the hanging get patterns which
+        // require not clearing the signals until we re-arm the loop).
+        self.clear_wake_proxy_signal();
+        result
+    }
+
+    fn clear_wake_proxy_signal(&self) {
+        let state = self.state.lock();
+        state.adb_proxy_resume_event.as_ref().map(Arc::as_ref).map(clear_wake_proxy_signal);
     }
 
     fn get_adb(&self) -> Result<AdbHandle, Errno> {
@@ -367,7 +456,7 @@ impl FileOps for FunctionFsControlEndpoint {
         &self,
         _locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         _offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
@@ -382,7 +471,7 @@ impl FileOps for FunctionFsControlEndpoint {
             .node
             .downcast_ops::<FunctionFsRootDir>()
             .expect("failed to downcast functionfs root dir");
-        rootdir.create_endpoints()?;
+        rootdir.create_endpoints(current_task.kernel().deref())?;
 
         Ok(data.drain())
     }
@@ -454,19 +543,7 @@ impl FileOps for FunctionFsInputEndpoint {
             .node
             .downcast_ops::<FunctionFsRootDir>()
             .expect("failed to downcast functionfs root dir");
-        let adb = rootdir.get_adb()?;
-
-        match adb.queue_tx(&bytes, zx::MonotonicInstant::INFINITE) {
-            Err(err) => {
-                log_warn!("Failed to call UsbAdbImpl.QueueTx: {err}");
-                return error!(EINVAL);
-            }
-            Ok(Err(err)) => {
-                log_warn!("Failed to queue data to adb driver: {err}");
-                return error!(EINVAL);
-            }
-            Ok(Ok(_)) => Ok(bytes.len()),
-        }
+        rootdir.write(&bytes)
     }
 }
 
@@ -507,27 +584,14 @@ impl FileOps for FunctionFsOutputFileObject {
             .node
             .downcast_ops::<FunctionFsRootDir>()
             .expect("failed to downcast functionfs root dir");
-        let adb = rootdir.get_adb()?;
-
-        match adb.receive(zx::MonotonicInstant::INFINITE) {
-            Err(err) => {
-                log_warn!("Failed to call UsbAdbImpl.Receive: {err}");
-                return error!(EINVAL);
-            }
-            Ok(Err(err)) => {
-                log_warn!("Failed to receive data from adb driver: {err}");
-                return error!(EINVAL);
-            }
-            Ok(Ok(payload)) => {
-                if payload.len() > data.available() {
-                    // This means the data will only be partially written, with the rest discarded.
-                    // Instead of attempting this, we'll instead return error to the client.
-                    return error!(EINVAL);
-                }
-
-                data.write(&payload)
-            }
+        let payload = rootdir.read()?;
+        if payload.len() > data.available() {
+            // This means the data will only be partially written, with the rest discarded.
+            // Instead of attempting this, we'll instead return error to the client.
+            return error!(EINVAL);
         }
+
+        data.write(&payload)
     }
 
     fn write(

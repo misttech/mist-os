@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 library fuchsia.bluetooth.le;
+using fuchsia.bluetooth as bt;
 
 type PeripheralError = strict enum {
     /// The operation or parameters requested are not supported on the current hardware.
@@ -101,6 +102,20 @@ type AdvertisingParameters = table {
     /// information.
     @available(added=NEXT)
     6: advertising_procedure AdvertisingProcedure;
+
+    /// If privacy is not enabled, the address type will always be public.
+    ///
+    /// If privacy is enabled and the client is not privileged, the address will be a random
+    /// private address (either resolvable or non-resolvable). A non-privileged client requesting a
+    /// public address will return an error.
+    ///
+    /// If privacy is enabled and the client is privileged, they may request any address type,
+    /// or will default to a random private address.
+    ///
+    /// If this field is unset, the address type will be public or random depending on if privacy
+    /// is enabled in the system.
+    @available(added=NEXT)
+    7: address_type bt.AddressType;
 };
 
 /// Capability that is valid for the duration of advertising. The caller can close the handle to
@@ -217,4 +232,17 @@ closed protocol Peripheral {
         peer Peer;
         connection client_end:Connection;
     });
+};
+
+/// Privileged version of the Peripheral protocol.
+/// This protocol should only be routed to trusted and system components. Using this protocol will
+/// enable the client to break normal privacy restrictions which could leak information about the
+/// location or owner of the device.
+///
+/// Use cases which reveal information are noted in documentation and marked as only available
+/// through PrivilegedPeripheral, and are an error if used through Peripheral.
+@available(added=NEXT)
+@discoverable(server="platform")
+closed protocol PrivilegedPeripheral {
+    compose Peripheral;
 };

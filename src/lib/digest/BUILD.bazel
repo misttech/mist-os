@@ -1,0 +1,27 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "digest",
+    srcs = [
+        "digest.cc",
+        "hash-list.cc",
+        "merkle-tree.cc",
+        "node-digest.cc",
+    ],
+    hdrs = [
+        "digest.h",
+        "hash-list.h",
+        "merkle-tree.h",
+        "node-digest.h",
+    ],
+    target_compatible_with = ["@platforms//os:fuchsia"],
+    deps = [
+        "//zircon/system/ulib/fbl",
+        "@boringssl",
+        "@fuchsia_sdk//pkg/stdcompat",
+    ],
+)

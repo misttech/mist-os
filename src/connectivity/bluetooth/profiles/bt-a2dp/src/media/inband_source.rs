@@ -282,7 +282,8 @@ impl RunningTask {
                     trace::duration_end!(c"bt-a2dp", c"Media:PacketSent");
                     return Ok(());
                 }
-                data_stream_inspect.record_transferred(packet.len(), fasync::Time::now());
+                data_stream_inspect
+                    .record_transferred(packet.len(), fasync::MonotonicInstant::now());
                 trace::duration_end!(c"bt-a2dp", c"Media:PacketSent");
             }
         }

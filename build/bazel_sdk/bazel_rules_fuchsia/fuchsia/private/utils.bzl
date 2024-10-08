@@ -495,8 +495,37 @@ Returns the current `CcToolchainInfo`.
     # We didn't find anything.
     fail("In order to use find_cc_toolchain, your rule has to depend on C++ toolchain. See find_cc_toolchain.bzl docs for details.")
 
-def with_fuchsia_constraint(target_compatible_with = []):
-    """Adds "@platforms//os:fuchsia" to the specified list if it's not already present."""
-    return target_compatible_with if (
-        "@platforms//os:fuchsia" in target_compatible_with
-    ) else target_compatible_with + ["@platforms//os:fuchsia"]
+def preprocesss_file(ctx, source, includes, headers = []):
+    """Helper function for .S file preprocessing.
+
+    Args:
+      ctx: The rule context for which to find a toolchain.
+      source: The source file to be preprocessed. It should be a .S file
+      includes: A depset of includes paths (as strings) needed for preprocessing.
+      headers: A list of headers in the format of File.
+
+    Returns:
+      A File of preprocessed file.
+    """
+
+    dest_filename = source.basename.rstrip(".S")
+    output_file = ctx.actions.declare_file(dest_filename)
+
+    cc_toolchain = find_cc_toolchain(ctx)
+
+    pp_args = ctx.actions.args()
+    pp_args.add("-undef")
+    pp_args.add("-E")
+    pp_args.add("-P")
+    pp_args.add_all(includes, before_each = "-I")
+    pp_args.add("-x", "assembler-with-cpp")
+    pp_args.add(source)
+    pp_args.add("-o", output_file)
+
+    ctx.actions.run(
+        executable = cc_toolchain.preprocessor_executable,
+        arguments = [pp_args],
+        inputs = [source] + cc_toolchain.all_files.to_list() + headers,
+        outputs = [output_file],
+    )
+    return output_file

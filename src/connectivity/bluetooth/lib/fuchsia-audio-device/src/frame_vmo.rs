@@ -27,7 +27,7 @@ pub(crate) struct FrameVmo {
     /// The time that streaming was started.
     /// Used to calculate the currently available frames.
     /// None if the stream is not started.
-    start_time: Option<fasync::Time>,
+    start_time: Option<fasync::MonotonicInstant>,
 
     /// A waker to wake if we have been polled before enough frames are available, or
     /// before we have been started.
@@ -113,7 +113,7 @@ impl FrameVmo {
 
     /// Start the audio clock for the buffer at `time`
     /// Can't start if the format has not been set.
-    pub(crate) fn start(&mut self, time: fasync::Time) -> Result<()> {
+    pub(crate) fn start(&mut self, time: fasync::MonotonicInstant) -> Result<()> {
         if self.start_time.is_some() || self.format.is_none() {
             return Err(Error::InvalidState);
         }
@@ -142,7 +142,11 @@ impl FrameVmo {
     /// Replaces the currently active timer.
     /// Returns Poll::Pending if it was set to a time in the future, or Poll::Ready(()) if it would
     /// be ready now.
-    fn reset_frame_timer(&mut self, deadline: fasync::Time, cx: &mut Context<'_>) -> Poll<()> {
+    fn reset_frame_timer(
+        &mut self,
+        deadline: fasync::MonotonicInstant,
+        cx: &mut Context<'_>,
+    ) -> Poll<()> {
         let mut timer = fasync::Timer::new(deadline);
         let Poll::Pending = timer.poll_unpin(cx) else {
             return Poll::Ready(());
@@ -157,7 +161,7 @@ impl FrameVmo {
         (self.bytes_per_frame != 0).then_some(self.bytes_per_frame * num)
     }
 
-    fn poll_start(&mut self, cx: &mut Context<'_>) -> Poll<fasync::Time> {
+    fn poll_start(&mut self, cx: &mut Context<'_>) -> Poll<fasync::MonotonicInstant> {
         match self.start_time.as_ref() {
             None => {
                 self.waker = Some(cx.waker().clone());
@@ -184,7 +188,7 @@ impl FrameVmo {
     /// The safe frame window advances forward through time.
     /// TODO(https://fxbug.dev/42073419): currently this just returns the whole buffer
     /// it should only return the moving window we've reserved for ourselves.
-    fn safe_frames_at(&self, time: fasync::Time) -> (usize, usize) {
+    fn safe_frames_at(&self, time: fasync::MonotonicInstant) -> (usize, usize) {
         let youngest_frame_count = self.frames_before(time);
         let oldest_frame_count =
             youngest_frame_count.saturating_sub(self.size / self.bytes_per_frame);
@@ -252,7 +256,7 @@ impl FrameVmo {
 
         let frame_until = next_frame + count;
 
-        let now = fasync::Time::now();
+        let now = fasync::MonotonicInstant::now();
         let (_oldest_frame_count, current_frame_count) = self.safe_frames_at(now);
         // We write _ahead_ of the read pointer.
         if (current_frame_count + total_vmo_frames) < frame_until {
@@ -328,7 +332,7 @@ impl FrameVmo {
             return Poll::Ready(Err(Error::InvalidArgs));
         }
 
-        let now = fasync::Time::now();
+        let now = fasync::MonotonicInstant::now();
         let (oldest_frame_count, current_frame_count) = self.safe_frames_at(now);
 
         let missing_frames = oldest_frame_count.saturating_sub(next_frame);
@@ -374,7 +378,7 @@ impl FrameVmo {
     }
 
     /// Count of the number of frames that have ended before `time`.
-    fn frames_before(&self, time: fasync::Time) -> usize {
+    fn frames_before(&self, time: fasync::MonotonicInstant) -> usize {
         match self.start_time.as_ref() {
             Some(start) if time > *start => self.frames_from_duration(time - *start) as usize,
             _ => 0,
@@ -472,13 +476,13 @@ mod tests {
         let mut vmo = FrameVmo::new().expect("can't make a framevmo");
 
         // Starting before set_format is an error.
-        assert!(vmo.start(fasync::Time::now()).is_err());
+        assert!(vmo.start(fasync::MonotonicInstant::now()).is_err());
         // Stopping before set_format is an error.
         assert!(vmo.stop().is_err());
 
         let _handle = vmo.set_format(TEST_FPS, TEST_FORMAT, TEST_CHANNELS, TEST_FRAMES, 0).unwrap();
 
-        let start_time = fasync::Time::now();
+        let start_time = fasync::MonotonicInstant::now();
         vmo.start(start_time).unwrap();
         match vmo.start(start_time) {
             Err(Error::InvalidState) => {}
@@ -499,7 +503,7 @@ mod tests {
         frames: usize,
     ) {
         let _ = vmo.stop();
-        let start_time = fasync::Time::from_nanos(time_nanos);
+        let start_time = fasync::MonotonicInstant::from_nanos(time_nanos);
         vmo.start(start_time).unwrap();
         assert_eq!(frames, vmo.frames_before(start_time + duration));
     }
@@ -509,7 +513,7 @@ mod tests {
     fn frames_before(mut vmo: FrameVmo) {
         let _exec = fasync::TestExecutor::new();
 
-        let start_time = fasync::Time::now();
+        let start_time = fasync::MonotonicInstant::now();
         vmo.start(start_time).unwrap();
 
         assert_eq!(0, vmo.frames_before(start_time));
@@ -539,15 +543,15 @@ mod tests {
     #[fuchsia::test]
     fn poll_read(mut vmo: FrameVmo) {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(1_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(1_000_000_000));
 
-        let start_time = fasync::Time::now();
+        let start_time = fasync::MonotonicInstant::now();
         vmo.start(start_time).unwrap();
 
         let half_dur = TEST_VMO_DURATION / 2;
         const QUART_FRAMES: usize = TEST_FRAMES / 4;
         let mut quart_frames_buf = [0; QUART_FRAMES];
-        exec.set_fake_time(fasync::Time::after(half_dur));
+        exec.set_fake_time(fasync::MonotonicInstant::after(half_dur));
 
         let mut no_wake_cx = Context::from_waker(futures_test::task::panic_waker_ref());
 
@@ -560,7 +564,7 @@ mod tests {
         assert_eq!(frame_idx, QUART_FRAMES);
 
         // After another half_dur, we should be able to read the whole buffer from start to finish.
-        exec.set_fake_time(fasync::Time::after(half_dur));
+        exec.set_fake_time(fasync::MonotonicInstant::after(half_dur));
 
         let mut full_buf = [0; TEST_FRAMES];
         let res = vmo.poll_read(0, &mut full_buf, &mut no_wake_cx);
@@ -573,7 +577,7 @@ mod tests {
         // Each `half_dur` period should pseudo-fill half the vmo.
         // After three halves, we should have the oldest frame half-way through the buffer (at
         // index 12000)
-        exec.set_fake_time(fasync::Time::after(half_dur));
+        exec.set_fake_time(fasync::MonotonicInstant::after(half_dur));
 
         // Should be able to get frames that span from the middle of the buffer to the middle of the
         // buffer (from index 12000 to index 11999).  This should be 24000 frames.
@@ -599,12 +603,12 @@ mod tests {
     #[fuchsia::test]
     fn poll_read_waking(mut vmo: FrameVmo) {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(1_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(1_000_000_000));
 
         let half_dur = TEST_VMO_DURATION / 2;
         const QUART_FRAMES: usize = TEST_FRAMES / 4;
         let mut quart_frames_buf = [0; QUART_FRAMES];
-        exec.set_fake_time(fasync::Time::after(half_dur));
+        exec.set_fake_time(fasync::MonotonicInstant::after(half_dur));
 
         let (waker, count) = futures_test::task::new_count_waker();
         let mut counting_wake_cx = Context::from_waker(&waker);
@@ -613,7 +617,7 @@ mod tests {
         let res = vmo.poll_read(0, &mut quart_frames_buf[..], &mut counting_wake_cx);
         res.expect_pending("should be pending before start");
 
-        let start_time = fasync::Time::now();
+        let start_time = fasync::MonotonicInstant::now();
         vmo.start(start_time).unwrap();
 
         // Woken when we start.
@@ -625,7 +629,7 @@ mod tests {
 
         // Each `half_dur` period should pseudo-fill half the vmo.
         // After a half_dur, we should have been woken.
-        let new_time = fasync::Time::after(half_dur);
+        let new_time = fasync::MonotonicInstant::after(half_dur);
         exec.set_fake_time(new_time);
         assert!(exec.wake_expired_timers());
 
@@ -649,7 +653,7 @@ mod tests {
     #[fuchsia::test]
     fn multibyte_poll_read() {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(1_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(1_000_000_000));
         let mut vmo = FrameVmo::new().expect("can't make a framevmo");
         let format = AudioSampleFormat::Sixteen { unsigned: false, invert_endian: false };
         let frames = TEST_FPS as usize / 2;
@@ -662,7 +666,7 @@ mod tests {
         let half_dur = zx::Duration::from_millis(250);
 
         // Start in the past so we can be sure the frames are in the past.
-        let start_time = fasync::Time::now() - half_dur;
+        let start_time = fasync::MonotonicInstant::now() - half_dur;
         vmo.start(start_time).unwrap();
 
         let bytecount =
@@ -682,10 +686,10 @@ mod tests {
     #[fuchsia::test]
     fn poll_read_boundaries(mut vmo: FrameVmo) {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(1_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(1_000_000_000));
         let mut no_wake_cx = Context::from_waker(futures_test::task::panic_waker_ref());
 
-        let start_time = fasync::Time::now();
+        let start_time = fasync::MonotonicInstant::now();
 
         vmo.start(start_time).unwrap();
 
@@ -756,9 +760,9 @@ mod tests {
     #[fuchsia::test]
     fn poll_write(mut vmo: FrameVmo) {
         let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(1_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(1_000_000_000));
 
-        let start_time = fasync::Time::now();
+        let start_time = fasync::MonotonicInstant::now();
         vmo.start(start_time).unwrap();
 
         let half_dur = TEST_VMO_DURATION / 2;
@@ -779,7 +783,7 @@ mod tests {
         // After a quarter_duration, we should be able to write to the whole buffer
         // TODO(https://fxbug.dev/42073419): this should only be the safe space and not the whole
         // buffer, there is a no-go-space just past the read pointer.
-        exec.set_fake_time(fasync::Time::after(half_dur / 2));
+        exec.set_fake_time(fasync::MonotonicInstant::after(half_dur / 2));
 
         let full_buf = [0; TEST_FRAMES];
         let res = vmo.poll_write(frame_idx, &full_buf, &mut no_wake_cx);
@@ -792,7 +796,7 @@ mod tests {
         // Each `half_dur` period should "read past" half the vmo.
         // After five quarters duration, the read pointer should be at FRAMES + QUART_FRAMES.
         // (vmo index 12000)
-        exec.set_fake_time(fasync::Time::after(TEST_VMO_DURATION));
+        exec.set_fake_time(fasync::MonotonicInstant::after(TEST_VMO_DURATION));
 
         // Should be able to write frames frames that span from the quarter of the buffer to the
         // read pointer again (from index 6000 to index 5999).  This should be 24000 frames.
@@ -817,12 +821,12 @@ mod tests {
     #[fuchsia::test]
     fn poll_write_waking(mut vmo: FrameVmo) {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(1_000_000_000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(1_000_000_000));
 
         let half_dur = TEST_VMO_DURATION / 2;
         const QUART_FRAMES: usize = TEST_FRAMES / 4;
         let quart_frames_buf = [0; QUART_FRAMES];
-        exec.set_fake_time(fasync::Time::after(half_dur));
+        exec.set_fake_time(fasync::MonotonicInstant::after(half_dur));
 
         let (waker, count) = futures_test::task::new_count_waker();
         let mut counting_wake_cx = Context::from_waker(&waker);
@@ -831,7 +835,7 @@ mod tests {
         let res = vmo.poll_write(0, &quart_frames_buf, &mut counting_wake_cx);
         res.expect_pending("should be pending before start");
 
-        let start_time = fasync::Time::now();
+        let start_time = fasync::MonotonicInstant::now();
         vmo.start(start_time).unwrap();
 
         // Woken when we start.
@@ -855,7 +859,7 @@ mod tests {
 
         // Each `half_dur` period should pseudo-read half the vmo.
         // After a half_dur, we should have been woken.
-        let new_time = fasync::Time::after(half_dur);
+        let new_time = fasync::MonotonicInstant::after(half_dur);
         exec.set_fake_time(new_time);
         assert!(exec.wake_expired_timers());
 

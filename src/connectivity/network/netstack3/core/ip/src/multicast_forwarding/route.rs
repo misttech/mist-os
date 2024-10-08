@@ -7,13 +7,17 @@
 use alloc::fmt::Debug;
 use alloc::sync::Arc;
 use core::hash::Hash;
+use core::sync::atomic::Ordering;
 use derivative::Derivative;
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6Scope};
 use net_types::{
     MulticastAddr, MulticastAddress as _, NonMappedAddr, ScopeableAddress as _, SpecifiedAddr,
     SpecifiedAddress as _, UnicastAddr,
 };
-use netstack3_base::{InstantBindingsTypes, IpExt, StrongDeviceIdentifier};
+use netstack3_base::{
+    AtomicInstant, Inspectable, InspectableValue, Inspector, InspectorDeviceExt,
+    InstantBindingsTypes, IpExt, StrongDeviceIdentifier,
+};
 
 /// A witness type wrapping [`Ipv4Addr`], proving the following properties:
 /// * the inner address is specified, and
@@ -218,6 +222,13 @@ impl<I: MulticastRouteIpExt> MulticastRouteKey<I> {
     }
 }
 
+impl<I: MulticastRouteIpExt> Inspectable for MulticastRouteKey<I> {
+    fn record<II: Inspector>(&self, inspector: &mut II) {
+        inspector.record_ip_addr("SourceAddress", self.src_addr());
+        inspector.record_ip_addr("DestinationAddress", self.dst_addr());
+    }
+}
+
 /// An entry in the multicast route table.
 #[derive(Derivative)]
 #[derivative(Debug(bound = ""))]
@@ -226,6 +237,31 @@ pub struct MulticastRouteEntry<D: StrongDeviceIdentifier, BT: InstantBindingsTyp
     // NB: Hold the statistics as an AtomicInstant so that they can be updated
     // without write-locking the multicast route table.
     pub(crate) stats: MulticastRouteStats<BT::AtomicInstant>,
+}
+
+impl<D: StrongDeviceIdentifier, BT: InstantBindingsTypes> MulticastRouteEntry<D, BT> {
+    /// Writes this [`MulticastRouteEntry`] to the inspector.
+    // NB: This exists as a method rather than an implementation of
+    // `Inspectable` because we need to restrict the type of `I::DeviceId`.
+    pub(crate) fn inspect<I: Inspector, II: InspectorDeviceExt<D>>(&self, inspector: &mut I) {
+        let MulticastRouteEntry {
+            route: MulticastRoute { input_interface, action },
+            stats: MulticastRouteStats { last_used },
+        } = self;
+        II::record_device(inspector, "InputInterface", input_interface);
+        let Action::Forward(targets) = action;
+        inspector.record_child("ForwardingTargets", |inspector| {
+            for MulticastRouteTarget { output_interface, min_ttl } in targets.iter() {
+                inspector.record_unnamed_child(|inspector| {
+                    II::record_device(inspector, "OutputInterface", output_interface);
+                    inspector.record_uint("MinTTL", *min_ttl);
+                });
+            }
+        });
+        inspector.record_child("Statistics", |inspector| {
+            last_used.load(Ordering::Relaxed).record("LastUsed", inspector);
+        });
+    }
 }
 
 /// All attributes of a multicast route, excluding the [`MulticastRouteKey`].

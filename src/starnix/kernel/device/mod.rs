@@ -14,7 +14,6 @@ pub use registry::*;
 pub mod android;
 #[cfg(not(feature = "starnix_lite"))]
 pub mod binder;
-pub mod device_mapper;
 #[cfg(not(feature = "starnix_lite"))]
 pub mod framebuffer;
 pub mod kobject;

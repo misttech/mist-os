@@ -28,14 +28,12 @@
 #include "src/storage/lib/paver/luis.h"
 #include "src/storage/lib/paver/sherlock.h"
 #include "src/storage/lib/paver/test/test-utils.h"
-#include "src/storage/lib/paver/utils.h"
 #include "src/storage/lib/paver/x64.h"
 
 namespace {
 
 using device_watcher::RecursiveWaitForFile;
 using driver_integration_test::IsolatedDevmgr;
-using paver::BlockWatcherPauser;
 
 TEST(AstroAbrTests, CreateFails) {
   IsolatedDevmgr devmgr;

@@ -11,7 +11,7 @@ use fho::{
     VerifiedMachineWriter,
 };
 use fidl_fuchsia_developer_ffx as ffx;
-use fuchsia_async::{Time, Timer};
+use fuchsia_async::{MonotonicInstant, Timer};
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::time::Duration;
@@ -45,7 +45,7 @@ async fn wait_for_daemon_to_exit(
     timeout: Option<u32>,
 ) -> Result<Option<String>> {
     let socket_path = context.get_ascendd_path().await?;
-    let start_time = Time::now();
+    let start_time = MonotonicInstant::now();
     let mut last_pid = None;
     loop {
         let details = SocketDetails::new(socket_path.clone());
@@ -66,7 +66,7 @@ async fn wait_for_daemon_to_exit(
 
         Timer::new(STOP_WAIT_POLL_TIME).await;
         if let Some(timeout_ms) = timeout {
-            if Time::now() - start_time > Duration::from_millis(timeout_ms.into()) {
+            if MonotonicInstant::now() - start_time > Duration::from_millis(timeout_ms.into()) {
                 let message = format!(
                     "Daemon {details} did not exit after {timeout_ms} ms. Killing daemon {pid}"
                 );

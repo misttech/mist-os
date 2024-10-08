@@ -7,6 +7,7 @@ import("//build/cpp/sdk_source_set.gni")
 
 sdk_source_set("cpp") {
   category = "partner"
+  stable = false
   sdk_name = "driver_fake_platform_device_cpp"
   include_base = "//sdk"
   testonly = true

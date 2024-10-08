@@ -4,6 +4,7 @@
 
 pub mod binding_stubs;
 pub mod mem;
+pub mod storage;
 
 pub fn panic(code: u32) {
     std::process::exit(code as i32)

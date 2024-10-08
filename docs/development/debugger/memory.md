@@ -191,7 +191,7 @@ For example:
 0x1605a5d1440 0x7fffffffffffffff
 0x1605a5d1448 0x0000044ab6c81800 ▷ inside map "scudo:primary"
 0x1605a5d1450 0x000001605a5d14d0 ◁ rbp, frame 1 base. ▷ inside map "initial-thread"
-0x1605a5d1458 0x00000125dd3566f5 ▷ fuchsia_zircon_status::Status::ok
+0x1605a5d1458 0x00000125dd3566f5 ▷ zx_status::Status::ok
 0x1605a5d1460 0x0000000000000000 ◁ frame 2 rsp
 0x1605a5d1468 0x0000000000000000
 0x1605a5d1470 0x0000000000000000

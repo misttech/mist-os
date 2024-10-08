@@ -249,6 +249,8 @@ pub enum BootfsCompiledPackageDestination {
     Bootstrap,
     /// The compiled root realm package.
     Root,
+    /// The compiled toolbox realm package.
+    Toolbox,
 }
 
 /// Test variants.

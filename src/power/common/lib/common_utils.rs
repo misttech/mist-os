@@ -90,7 +90,7 @@ pub mod ok_or_default_err {
 
 /// The number of nanoseconds since the system was powered on.
 pub fn get_current_timestamp() -> crate::types::Nanoseconds {
-    crate::types::Nanoseconds(fuchsia_async::Time::now().into_nanos())
+    crate::types::Nanoseconds(fuchsia_async::MonotonicInstant::now().into_nanos())
 }
 
 // Finds all of the node config files under the test package's "/config/data" directory. The node
@@ -139,10 +139,10 @@ mod tests {
 
         let exec = fuchsia_async::TestExecutor::new_with_fake_time();
 
-        exec.set_fake_time(fuchsia_async::Time::from_nanos(0));
+        exec.set_fake_time(fuchsia_async::MonotonicInstant::from_nanos(0));
         assert_eq!(get_current_timestamp(), Nanoseconds(0));
 
-        exec.set_fake_time(fuchsia_async::Time::from_nanos(1000));
+        exec.set_fake_time(fuchsia_async::MonotonicInstant::from_nanos(1000));
         assert_eq!(get_current_timestamp(), Nanoseconds(1000));
     }
 }

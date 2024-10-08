@@ -5,9 +5,10 @@ library zx;
 
 const MAX_POWER_LEVELS usize64 = 256;
 const MAX_POWER_LEVEL_TRANSITIONS usize64 = 65536; // MAX_POWER_LEVELS^2
-
-type CpuSet = struct {
-    // Sadly we can't do math in FIDL with constants to compute the array size.
+type ProcessorPowerDomain = struct {
+    // Defines an `id` used for transition requests.
+    domain_id uint32;
+    // mask of Cpus that belong to this power domain.
     mask array<uint64, 8>;
 };
 
@@ -39,6 +40,13 @@ type ProcessorPowerLevelTransition = struct {
     from uint8;
     to uint8;
     reserved array<uint8, 6>;
+};
+
+type ProcessorPowerState = struct {
+    domain_id uint32;
+    option uint32;
+    control_interface ProcessorPowerControl;
+    control_argument uint64;
 };
 
 type SystemPowerctlArg = struct {
@@ -498,12 +506,6 @@ closed protocol System {
     /// See [RFC 0123](/docs/contribute/governance/rfcs/0123_cpu_performance_info.md)
     /// for further details on values and update protocols.
     ///
-    /// ### ZX_POWER_DOMAIN_POWER_LEVEL
-    ///
-    /// *count*: Must be one.
-    ///
-    /// *info* type: `zx_power_level_info_t`
-    ///
     /// ## Rights
     ///
     /// *resource* must have resource kind `ZX_RSRC_KIND_SYSTEM`.
@@ -541,6 +543,48 @@ closed protocol System {
         @voidptr
         info experimental_pointer<byte>;
         count usize64;
+    }) -> () error Status;
+
+
+    /// ## Summary
+    ///
+    /// Updates the current processor power level state as observed by the kernel.
+    /// Note: Process must use next-vdso.
+    ///
+    ///
+    /// ## Declaration
+    ///
+    /// ```c
+    /// #include <zircon/syscalls-next.h>
+    ///
+    /// zx_status_t zx_system_set_processor_power_state(zx_handle_t port,
+    ///                                                 const zx_processor_power_state_t* power_state);
+    ///
+    /// ```
+    ///
+    /// ## Description
+    ///
+    /// `port`  must be of type `ZX_OBJ_TYPE_PORT` and must be the same port where the power domain
+    ///  transition requests are queued. The `port` is the capability for updating a specific
+    ///   power domain.
+    ///
+    /// `power_state` is the power state of the domain provided in `power_state.target_id`.
+    ///
+    /// ## Rights
+    /// `port` must have `ZX_RIGHT_IO`.
+    ///
+    /// ## Errors
+    ///
+    /// `ZX_ERR_ACCESS_DENIED` if `port` is not the one registered with the power domain.
+    ///
+    /// `ZX_ERR_WRONG_TYPE` if `port` is not of type `ZX_OBJ_TYPE_PORT`.
+    ///
+    /// `ZX_ERR_INVALID_ARGS` if `power_state` transition is not present in the registered energy model.
+    ///
+    @next
+    strict SetProcessorPowerState(resource struct {
+        port Handle:PORT;
+        power_state ProcessorPowerState;
     }) -> () error Status;
 
     /// ## Summary
@@ -935,12 +979,8 @@ closed protocol System {
     /// zx_status_t zx_system_set_processor_power_level_domain(
     ///     zx_handle_t resource,
     ///     uint64_t options,
-    ///     const zx_cpu_set_t* cpus,
-    ///     uint64_t power_domain_id,
-    ///     const zx_processor_power_level_t* power_levels,
-    ///     size_t num_power_levels,
-    ///     const zx_processor_power_level_transition_t* transitions,
-    ///     size_t num_transitions);
+    ///     const zx_power_domain_t* power_domain,
+    ///     zx_handle_t port);
     /// ```
     ///
     /// ## Description
@@ -960,6 +1000,8 @@ closed protocol System {
     ///
     /// This syscall shall have "set or update" semantics, such that any new data
     /// replaces exisitng one. This applies for `power_domain_id` and `cpus`.
+    ///
+    /// Provided `port` will be used for queueing power level transition requests.
     ///
     /// ## Rights
     ///
@@ -983,105 +1025,12 @@ closed protocol System {
     /// `ZX_MAX_POWER_LEVEL_TRANSITIONS`.
     ///
     @next
-    strict SetProcessorPowerLevelDomain(resource struct {
+    strict SetProcessorPowerDomain(resource struct {
         resource Handle:RESOURCE;
         options uint64;
-        cpus CpuSet;
-        power_domain_id uint64;
+        domain ProcessorPowerDomain;
+        port Handle:PORT;
         power_levels vector<ProcessorPowerLevel>:MAX_POWER_LEVELS;
         transitions vector<ProcessorPowerLevelTransition>:MAX_POWER_LEVEL_TRANSITIONS;
     }) -> () error Status;
-
-    /// ## Summary
-    ///
-    /// Provides the kernel with a handle to a port where the scheduler can request
-    /// power level transitions for individual power domains given a control interface.
-    ///
-    /// This means for a specified interface, the provided control arguments will be provided
-    /// such that the handler can execute the transition according to the power level information
-    /// provided to the kernel.
-    ///
-    /// ## Declaration
-    ///
-    /// ```c
-    /// #include <zircon/syscalls-next.h>
-    ///
-    /// zx_status_t zx_system_create_processor_power_level_transition_handler(
-    ///     zx_handle_t resource,
-    ///     uint32_t options,
-    ///     zx_processor_power_control_t control,
-    ///     zx_handle_t* out_port);
-    /// ```
-    ///
-    /// ## Description
-    ///
-    /// Enables energy-aware scheduling by providing the kernel with a mechanism
-    /// for requesting OPP transitions. When the port is attached and the communication
-    /// initiated the kernel will queue `ZX_PKT_TYPE_OPP_TRANSITION`for individual power
-    /// domain transitions. At any point, there will be no more than a single queued transition
-    /// for a power domain.
-    ///
-    /// The other half of this operation, is acknowleding that such operation took place
-    /// through `zx_system_set_performance_info` with `ZX_POWER_DOMAIN_OPP_TRANSITION` as a topic,
-    /// more details in `zx_system_set_performance_info` documentation.
-    ///
-    /// If the created port handle `out_port` is closed, then the kernel will operate without
-    /// the ability to transitoin OPPs, that is, closing the handle is equivalent to "dettaching"
-    /// the port.
-    ///
-    /// `resource` must be of `ZX_RSRC_KIND_SYSTEM` kind and
-    ///            `ZX_RSRC_SYSTEM_CPU_BASE` base.
-    ///
-    /// `options` must be 0.
-    ///
-    /// `control` specifies which power level control interface this handler services.
-    ///           Must be `PROCESSOR_POWER_CONTROL_CPU_DRIVER`.
-    ///
-    /// `out_port` must ve a valid pointer. On success provides
-    ///
-    /// ## Rights
-    ///
-    /// `resource` must be handle with at least the following rights:
-    ///
-    /// * `ZX_RIGHT_WRITE`
-    ///
-    /// ## Return value
-    ///
-    /// On success `ZX_OK` will be returned and `out_port` will point to a new handle with the
-    /// following rights:
-    ///
-    /// * `ZX_RIGHT_TRANSFER`
-    /// * `ZX_RIGHT_READ`
-    /// * `ZX_RIGHT_WAIT`
-    ///
-    /// ## Errors
-    ///
-    /// `ZX_ERR_BAD_HANDLE` if `resource` is not a valid handle.
-    ///
-    /// `ZX_ERR_WRONG_TYPE` if `resource` is not handle to a resource object.
-    ///
-    /// `ZX_ERR_ACCESS_DENIED` if `resource` does not have the minimal rights.
-    ///
-    /// `ZX_ERR_INVALID_ARGS` if `options` is not zero, `out_port` is not a valid pointer or
-    ///                       `resource` is not the appropiate kind or base.
-    ///
-    /// `ZX_ERR_NO_MEMORY` if the operation failed due to lack of system memory.
-    ///
-    /// ## See also
-    ///
-    ///  - [`zx_handle_close()`]
-    ///  - [`zx_system_set_performance_info()`]
-    ///  - [`zx_port_create()`]
-    ///
-    /// [`zx_handle_close()`]: handle_close.md
-    /// [`zx_system_set_performance_info()`]: system_set_performance_info.md
-    /// [`zx_port_create()`]: port_create.md
-    @next
-    strict CreateProcessorPowerLevelTransitionHandler(resource struct {
-        resource Handle:RESOURCE;
-        options uint32;
-        control ProcessorPowerControl;
-    }) -> (resource struct {
-        out_port Handle;
-    }) error Status;
 };

@@ -161,13 +161,15 @@ where
 
         self.diagnostics.record(Event::Phase(Phase::Converge));
         for _ in 0..CONVERGE_SAMPLES {
-            fasync::Timer::new(fasync::Time::after(converge_time_between_samples)).await;
+            fasync::Timer::new(fasync::MonotonicInstant::after(converge_time_between_samples))
+                .await;
             self.try_generate_sample_until_successful(SAMPLE_POLLS, &mut sink).await?;
         }
 
         self.diagnostics.record(Event::Phase(Phase::Maintain));
         loop {
-            fasync::Timer::new(fasync::Time::after(maintain_time_between_samples)).await;
+            fasync::Timer::new(fasync::MonotonicInstant::after(maintain_time_between_samples))
+                .await;
             self.try_generate_sample_until_successful(SAMPLE_POLLS, &mut sink).await?;
         }
     }
@@ -226,8 +228,10 @@ where
                     let _ = self.handle_sample_error(http_error, &mut last_error_type);
                 }
             }
-            fasync::Timer::new(fasync::Time::after(self.retry_strategy.backoff_duration(attempt)))
-                .await;
+            fasync::Timer::new(fasync::MonotonicInstant::after(
+                self.retry_strategy.backoff_duration(attempt),
+            ))
+            .await;
         }
     }
 
@@ -285,8 +289,10 @@ where
                     }
                 }
             }
-            fasync::Timer::new(fasync::Time::after(self.retry_strategy.backoff_duration(attempt)))
-                .await;
+            fasync::Timer::new(fasync::MonotonicInstant::after(
+                self.retry_strategy.backoff_duration(attempt),
+            ))
+            .await;
         }
     }
 }

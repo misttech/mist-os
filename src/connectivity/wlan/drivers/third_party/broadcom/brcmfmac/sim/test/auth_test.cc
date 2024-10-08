@@ -85,7 +85,7 @@ class AuthInterface : public SimInterface {
     completer.Reply();
   }
   void ConnectConf(ConnectConfRequestView request, ConnectConfCompleter::Sync& completer) override {
-    on_connect_confirm_(&request->resp);
+    on_connect_confirm_(request);
     completer.Reply();
   }
   void SaeHandshakeInd(SaeHandshakeIndRequestView request,
@@ -100,7 +100,8 @@ class AuthInterface : public SimInterface {
 
   std::function<void(const wlan_fullmac_wire::WlanFullmacImplIfcOnScanResultRequest*)>
       on_scan_result_;
-  std::function<void(const wlan_fullmac_wire::WlanFullmacConnectConfirm*)> on_connect_confirm_;
+  std::function<void(const wlan_fullmac_wire::WlanFullmacImplIfcConnectConfRequest*)>
+      on_connect_confirm_;
   std::function<void(const wlan_fullmac_wire::WlanFullmacSaeHandshakeInd*)> on_sae_handshake_ind_;
   std::function<void(const wlan_fullmac_wire::WlanFullmacSaeFrame*)> on_sae_frame_;
 };
@@ -150,7 +151,7 @@ class AuthTest : public SimTest {
 
   // Event handlers
   void OnScanResult(const wlan_fullmac_wire::WlanFullmacImplIfcOnScanResultRequest* result);
-  void OnConnectConf(const wlan_fullmac_wire::WlanFullmacConnectConfirm* resp);
+  void OnConnectConf(const wlan_fullmac_wire::WlanFullmacImplIfcConnectConfRequest* resp);
   void OnSaeHandshakeInd(const wlan_fullmac_wire::WlanFullmacSaeHandshakeInd* ind);
   void OnSaeFrameRx(const wlan_fullmac_wire::WlanFullmacSaeFrame* frame);
 
@@ -424,8 +425,8 @@ void AuthTest::OnScanResult(
   EXPECT_EQ(result->bss().capability_info, (uint16_t)32);
 }
 
-void AuthTest::OnConnectConf(const wlan_fullmac_wire::WlanFullmacConnectConfirm* resp) {
-  connect_status_ = resp->result_code;
+void AuthTest::OnConnectConf(const wlan_fullmac_wire::WlanFullmacImplIfcConnectConfRequest* resp) {
+  connect_status_ = resp->result_code();
   if (connect_status_ != wlan_ieee80211::StatusCode::kSuccess) {
     return;
   }

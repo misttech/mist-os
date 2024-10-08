@@ -4,6 +4,7 @@
 
 """Runs components, tests components, or register drivers within a package."""
 
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":fuchsia_task.bzl", "fuchsia_task_rule")
 load(":providers.bzl", "FuchsiaPackageInfo")
 
@@ -134,5 +135,5 @@ def _fuchsia_task_run_component_impl(ctx, make_fuchsia_task):
             doc = "The tool used to run components",
             default = "//fuchsia/tools:run_component",
         ),
-    },
+    } | COMPATIBILITY.HOST_ATTRS,
 )

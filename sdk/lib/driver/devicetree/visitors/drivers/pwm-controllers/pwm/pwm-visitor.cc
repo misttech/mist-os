@@ -193,7 +193,7 @@ zx::result<> PwmVisitor::FinalizeNode(fdf_devicetree::Node& node) {
       }
 
       fuchsia_hardware_platform_bus::Metadata channels_metadata = {{
-          .type = DEVICE_METADATA_PWM_CHANNELS,
+          .id = std::to_string(DEVICE_METADATA_PWM_CHANNELS),
           .data = encoded_metadata.value(),
       }};
 

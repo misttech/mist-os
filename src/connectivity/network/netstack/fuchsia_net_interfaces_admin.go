@@ -667,7 +667,7 @@ func (ci *adminControlImpl) SetConfiguration(_ fidl.Context, config admin.Config
 	if config.HasIpv4() {
 		// Loopback does not support forwarding.
 		if ci.isLoopback() {
-			if config.Ipv4.HasForwarding() && config.Ipv4.Forwarding {
+			if config.Ipv4.HasUnicastForwarding() && config.Ipv4.UnicastForwarding {
 				return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIpv4ForwardingUnsupported), nil
 			}
 
@@ -712,7 +712,7 @@ func (ci *adminControlImpl) SetConfiguration(_ fidl.Context, config admin.Config
 	if config.HasIpv6() {
 		// Loopback does not support forwarding.
 		if ci.isLoopback() {
-			if config.Ipv6.HasForwarding() && config.Ipv6.Forwarding {
+			if config.Ipv6.HasUnicastForwarding() && config.Ipv6.UnicastForwarding {
 				return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIpv6ForwardingUnsupported), nil
 			}
 
@@ -764,8 +764,8 @@ func (ci *adminControlImpl) SetConfiguration(_ fidl.Context, config admin.Config
 		var previousIpv4Config admin.Ipv4Configuration
 		ipv4Config := config.Ipv4
 
-		if ipv4Config.HasForwarding() {
-			previousIpv4Config.SetForwarding(ci.setIPForwardingLocked(ipv4.ProtocolNumber, ipv4Config.Forwarding))
+		if ipv4Config.HasUnicastForwarding() {
+			previousIpv4Config.SetUnicastForwarding(ci.setIPForwardingLocked(ipv4.ProtocolNumber, ipv4Config.UnicastForwarding))
 		}
 
 		if ipv4Config.HasMulticastForwarding() {
@@ -812,8 +812,8 @@ func (ci *adminControlImpl) SetConfiguration(_ fidl.Context, config admin.Config
 		var previousIpv6Config admin.Ipv6Configuration
 		ipv6Config := config.Ipv6
 
-		if ipv6Config.HasForwarding() {
-			previousIpv6Config.SetForwarding(ci.setIPForwardingLocked(ipv6.ProtocolNumber, ipv6Config.Forwarding))
+		if ipv6Config.HasUnicastForwarding() {
+			previousIpv6Config.SetUnicastForwarding(ci.setIPForwardingLocked(ipv6.ProtocolNumber, ipv6Config.UnicastForwarding))
 		}
 
 		if ipv6Config.HasMulticastForwarding() {
@@ -850,6 +850,18 @@ func (ci *adminControlImpl) SetConfiguration(_ fidl.Context, config admin.Config
 
 			if ipv6Config.Ndp.HasDad() {
 				_ = syslog.WarnTf(controlName, "ignoring unsupported DAD configuration")
+			}
+
+			if ipv6Config.Ndp.HasSlaac() {
+				var previousSLAACConfig admin.SlaacConfiguration
+				if ipv6Config.Ndp.Slaac.HasTemporaryAddress() {
+					ndpEP := ci.getNetworkEndpoint(ipv6.ProtocolNumber).(ipv6.NDPEndpoint)
+					config := ndpEP.NDPConfigurations()
+					previousSLAACConfig.SetTemporaryAddress(config.AutoGenTempGlobalAddresses)
+					config.AutoGenTempGlobalAddresses = ipv6Config.Ndp.Slaac.TemporaryAddress
+					ndpEP.SetNDPConfigurations(config)
+				}
+				previousNdpConfig.SetSlaac(previousSLAACConfig)
 			}
 
 			previousIpv6Config.SetNdp(previousNdpConfig)
@@ -893,7 +905,7 @@ func (ci *adminControlImpl) GetConfiguration(fidl.Context) (admin.ControlGetConf
 
 	{
 		var ipv4Config admin.Ipv4Configuration
-		ipv4Config.SetForwarding(ci.ipForwardingRLocked(ipv4.ProtocolNumber))
+		ipv4Config.SetUnicastForwarding(ci.ipForwardingRLocked(ipv4.ProtocolNumber))
 		ipv4Config.SetMulticastForwarding(ci.multicastIPForwardingRLocked(ipv4.ProtocolNumber))
 
 		var igmpConfig admin.IgmpConfiguration
@@ -910,7 +922,7 @@ func (ci *adminControlImpl) GetConfiguration(fidl.Context) (admin.ControlGetConf
 
 	{
 		var ipv6Config admin.Ipv6Configuration
-		ipv6Config.SetForwarding(ci.ipForwardingRLocked(ipv6.ProtocolNumber))
+		ipv6Config.SetUnicastForwarding(ci.ipForwardingRLocked(ipv6.ProtocolNumber))
 		ipv6Config.SetMulticastForwarding(ci.multicastIPForwardingRLocked(ipv6.ProtocolNumber))
 
 		var mldConfig admin.MldConfiguration
@@ -919,6 +931,12 @@ func (ci *adminControlImpl) GetConfiguration(fidl.Context) (admin.ControlGetConf
 		if !ci.isLoopback() {
 			var ndpConfig admin.NdpConfiguration
 			ndpConfig.SetNud(toAdminNudConfiguration(ci.getNUDConfig(ipv6.ProtocolNumber)))
+
+			var slaacConfig admin.SlaacConfiguration
+			config := ci.getNetworkEndpoint(ipv6.ProtocolNumber).(ipv6.NDPEndpoint).NDPConfigurations()
+			slaacConfig.SetTemporaryAddress(config.AutoGenTempGlobalAddresses)
+			ndpConfig.SetSlaac(slaacConfig)
+
 			ipv6Config.SetNdp(ndpConfig)
 		}
 

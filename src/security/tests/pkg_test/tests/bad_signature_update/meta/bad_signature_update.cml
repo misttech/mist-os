@@ -136,17 +136,16 @@
     ],
     offer: [
         {
-            from: "#pkg-cache-config",
-            to: "#pkg-cache",
             config: [
                 "fuchsia.pkgcache.AllPackagesExecutable",
+                "fuchsia.pkgcache.EnableUpgradablePackages",
                 "fuchsia.pkgcache.UseFxblob",
                 "fuchsia.pkgcache.UseSystemImage",
             ],
+            from: "#pkg-cache-config",
+            to: "#pkg-cache",
         },
         {
-            from: "#fshost_config",
-            to: "#fshost",
             config: [
                 "fuchsia.fshost.Blobfs",
                 "fuchsia.fshost.BlobfsInitialInodes",
@@ -174,15 +173,17 @@
                 "fuchsia.fshost.StorageHost",
                 "fuchsia.fshost.UseDiskMigration",
             ],
+            from: "#fshost_config",
+            to: "#fshost",
         },
         {
-            from: "void",
-            to: "#fshost",
             config: [
                 "fuchsia.blobfs.CacheEvictionPolicy",
                 "fuchsia.blobfs.WriteCompressionAlgorithm",
                 "fuchsia.fshost.DisableAutomount",
             ],
+            from: "void",
+            to: "#fshost",
             availability: "optional",
         },
         {

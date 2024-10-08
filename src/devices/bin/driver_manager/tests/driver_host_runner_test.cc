@@ -80,10 +80,6 @@ void DriverHostRunnerTest::StartDriverHost(std::string_view driver_host_path,
         created_component = true;
       });
 
-  zx::channel bootstrap_sender, bootstrap_receiver;
-  zx_status_t status = zx::channel::create(0, &bootstrap_sender, &bootstrap_receiver);
-  ASSERT_EQ(ZX_OK, status);
-
   auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
   realm().SetOpenExposedDirHandler(
@@ -97,7 +93,7 @@ void DriverHostRunnerTest::StartDriverHost(std::string_view driver_host_path,
   // entire thing.
   bool got_cb = false;
   driver_host_runner_->StartDriverHost(
-      loader_.get(), std::move(bootstrap_receiver), std::move(endpoints.server),
+      loader_.get(), std::move(endpoints.server),
       [&](zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> result) {
         ASSERT_EQ(ZX_OK, result.status_value());
         ASSERT_TRUE(result->is_valid());

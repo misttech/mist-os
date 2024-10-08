@@ -116,7 +116,7 @@ class DynamicLinkerDriverHostComponent final
   DynamicLinkerDriverHostComponent(
       fidl::ClientEnd<fuchsia_driver_host::DriverHost> driver_host,
       fidl::ClientEnd<fuchsia_driver_loader::DriverHost> client, async_dispatcher_t* dispatcher,
-      zx::channel bootstrap_sender, std::unique_ptr<driver_loader::Loader> loader,
+      std::unique_ptr<driver_loader::Loader> loader,
       fbl::DoublyLinkedList<std::unique_ptr<DynamicLinkerDriverHostComponent>>* driver_hosts);
 
   void Start(fidl::ClientEnd<fuchsia_driver_framework::Node> node, std::string node_name,
@@ -140,7 +140,6 @@ class DynamicLinkerDriverHostComponent final
  private:
   fidl::WireSharedClient<fuchsia_driver_host::DriverHost> driver_host_;
   fidl::WireClient<fuchsia_driver_loader::DriverHost> driver_host_loader_;
-  zx::channel bootstrap_sender_;
   std::unique_ptr<driver_loader::Loader> loader_;
 };
 

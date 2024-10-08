@@ -500,7 +500,7 @@ mod tests {
             thermal_load_driver: Rc<ThermalLoadDriver>,
             mock_temperature_nodes: Vec<Rc<MockNode>>,
         ) -> Self {
-            executor.set_fake_time(fasync::Time::from_nanos(0));
+            executor.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
             let mut this = Self {
                 executor,
                 polling_tasks: thermal_load_driver.polling_tasks.take(),

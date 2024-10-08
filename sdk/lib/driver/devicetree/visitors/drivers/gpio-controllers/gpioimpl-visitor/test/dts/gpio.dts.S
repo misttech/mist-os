@@ -33,17 +33,20 @@
         pins = <GROUP1_PIN1 GROUP1_PIN2>;
         function = <0x0 GROUP1_FUNCTION>;
         drive-strength-microamp = <0x0 GROUP1_DRIVE_STRENGTH>;
+        drive-open-drain;
       };
 
       group2: group2 {
         pins = <GROUP2_PIN1 GROUP2_PIN2>;
         output-low;
+        power-source = <GROUP2_POWER_SOURCE>;
       };
 
       group3: group3 {
         pins = <GROUP3_PIN1>;
-        input-enable;
+        output-disable;
         bias-disable;
+        drive-open-source;
       };
 
     };
@@ -56,8 +59,8 @@
 
       group4: group4 {
         pins = <GROUP4_PIN1>;
-        input-enable;
         bias-pull-up;
+        drive-push-pull;
       };
 
     };

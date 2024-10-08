@@ -69,7 +69,12 @@ zx::result<fidl::ClientEnd<fuchsia_ldsvc::Loader>> LoaderFactory() {
 }
 
 std::unique_ptr<driver_loader::Loader> DynamicLinkerFactory(async_dispatcher_t* dispatcher) {
-  return driver_loader::Loader::Create(dispatcher);
+  auto load_driver_handler = [](zx::unowned_channel bootstrap_sender,
+                                driver_loader::Loader::DriverStartAddr addr) {
+    zx_status_t status = bootstrap_sender->write(0, &addr, sizeof(addr), nullptr, 0);
+    ASSERT_EQ(ZX_OK, status);
+  };
+  return driver_loader::Loader::Create(dispatcher, std::move(load_driver_handler));
 }
 
 fdecl::ChildRef CreateChildRef(std::string name, std::string collection) {

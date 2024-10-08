@@ -50,7 +50,7 @@ contains the number of nanoseconds since the system was powered on. See
 
 * {Rust}
 
-  Monotonic time is accessible through the [fuchsia_zircon][rust-zircon] crate.
+  Monotonic time is accessible through the [zx][rust-zircon] crate.
   This crate is only available in-tree.
 
   ```rust
@@ -100,7 +100,7 @@ synchronized, before reading it.
 
   You can obtain a handle to the UTC clock using the
   [fuchsia_runtime][rust-runtime] crate and use the syscall wrappers in the
-  [fuchsia_zircon][rust-zircon] crate. The [fuchsia_async][rust-async] crate
+  [zx][rust-zircon] crate. The [fuchsia_async][rust-async] crate
   contains utilities to aid waiting for the clock to start. Note that these
   crates are only available in-tree.
 
@@ -120,5 +120,5 @@ synchronized, before reading it.
 [c-libzircon]: /docs/concepts/process/core_libraries.md#libzircon
 [cpp-libzx]: /docs/concepts/process/core_libraries.md#libzx
 [rust-runtime]: /src/lib/fuchsia-runtime
-[rust-zircon]: /src/lib/zircon/rust
+[rust-zircon]: /sdk/rust/zx
 [rust-async]: /src/lib/fuchsia-async

@@ -28,22 +28,28 @@ zx::result<> SetUpCryptWithRandomKeys(
   }
   unsigned char key[32];
   zx_cprng_draw(key, sizeof(key));
-  if (auto result = client->AddWrappingKey(0, fidl::VectorView<unsigned char>::FromExternal(key));
+  fidl::Array<uint8_t, 16> wrapping_key_id_0 = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  if (auto result = client->AddWrappingKey(wrapping_key_id_0,
+                                           fidl::VectorView<unsigned char>::FromExternal(key));
       !result.ok()) {
     FX_LOGS(ERROR) << "Failed to add wrapping key: " << result.status_string();
     return zx::error(result.status());
   }
   zx_cprng_draw(key, sizeof(key));
-  if (auto result = client->AddWrappingKey(1, fidl::VectorView<unsigned char>::FromExternal(key));
+  fidl::Array<uint8_t, 16> wrapping_key_id_1 = {1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  if (auto result = client->AddWrappingKey(wrapping_key_id_1,
+                                           fidl::VectorView<unsigned char>::FromExternal(key));
       !result.ok()) {
     FX_LOGS(ERROR) << "Failed to add wrapping key: " << result.status_string();
     return zx::error(result.status());
   }
-  if (auto result = client->SetActiveKey(fuchsia_fxfs::wire::KeyPurpose::kData, 0); !result.ok()) {
+  if (auto result = client->SetActiveKey(fuchsia_fxfs::wire::KeyPurpose::kData, wrapping_key_id_0);
+      !result.ok()) {
     FX_LOGS(ERROR) << "Failed to set active data key: " << result.status_string();
     return zx::error(result.status());
   }
-  if (auto result = client->SetActiveKey(fuchsia_fxfs::wire::KeyPurpose::kMetadata, 1);
+  if (auto result =
+          client->SetActiveKey(fuchsia_fxfs::wire::KeyPurpose::kMetadata, wrapping_key_id_1);
       !result.ok()) {
     FX_LOGS(ERROR) << "Failed to set active data key: " << result.status_string();
     return zx::error(result.status());

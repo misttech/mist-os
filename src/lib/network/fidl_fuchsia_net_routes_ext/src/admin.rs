@@ -15,7 +15,7 @@ use {
     fidl_fuchsia_net_routes_admin as fnet_routes_admin,
 };
 
-use crate::{impl_responder, FidlRouteIpExt, Responder};
+use crate::{impl_responder, FidlRouteIpExt, Responder, TableId};
 
 /// Route set creation errors.
 #[derive(Clone, Debug, Error)]
@@ -391,14 +391,14 @@ pub async fn remove_route_table<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
 /// proxy.
 pub async fn get_table_id<I: Ip + FidlRouteAdminIpExt + FidlRouteIpExt>(
     route_table: &<I::RouteTableMarker as ProtocolMarker>::Proxy,
-) -> Result<u32, fidl::Error> {
+) -> Result<TableId, fidl::Error> {
     let IpInvariant(result_fut) = net_types::map_ip_twice!(
         I,
         RouteTableProxy { route_table },
         |RouteTableProxy { route_table }| IpInvariant(route_table.get_table_id()),
     );
 
-    result_fut.await
+    result_fut.await.map(TableId::new)
 }
 
 /// Dispatches `get_authorization_for_route_table` on either the `RouteTableV4`

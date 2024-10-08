@@ -29,7 +29,7 @@ use linux_uapi::{
     rt_class_t_RT_TABLE_COMPAT, rt_class_t_RT_TABLE_MAIN, rtnetlink_groups_RTNLGRP_IPV4_ROUTE,
     rtnetlink_groups_RTNLGRP_IPV6_ROUTE,
 };
-use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersion, Subnet};
+use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersion, IpVersionMarker, Subnet};
 use net_types::{SpecifiedAddr, SpecifiedAddress as _, Witness as _};
 use netlink_packet_core::{NetlinkMessage, NLM_F_MULTIPART};
 use netlink_packet_route::route::{
@@ -48,7 +48,9 @@ use crate::netlink_packet::errno::Errno;
 use crate::netlink_packet::UNSPECIFIED_SEQUENCE_NUMBER;
 use crate::protocol_family::route::NetlinkRoute;
 use crate::protocol_family::ProtocolFamily;
-use crate::route_tables::{NetlinkRouteTableIndex, NonZeroNetlinkRouteTableIndex};
+use crate::route_tables::{
+    NetlinkRouteTableIndex, NonZeroNetlinkRouteTableIndex, RouteTable, RouteTableKey, RouteTableMap,
+};
 use crate::util::respond_to_completer;
 
 // TODO(https://fxbug.dev/336382905): Remove special constant and rely on table
@@ -226,19 +228,13 @@ pub(crate) struct Request<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessa
 /// Handles asynchronous work related to RTM_ROUTE messages.
 ///
 /// Can respond to RTM_ROUTE message requests.
-pub(crate) struct RoutesWorkerState<
+pub(crate) struct RoutesWorker<
     I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
 > {
-    route_tables: HashMap<RouteTableKey, RouteTable<I>>,
-}
-
-// A `RouteTable` identifier.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-enum RouteTableKey {
-    // Routing tables that are created and managed by Netlink.
-    NetlinkManaged { table_id: crate::route_tables::NetlinkRouteTableIndex },
-    // Routing tables that are not managed by Netlink, but exist on the system.
-    Unmanaged,
+    // There's currently no actual state inside of `RoutesWorker`, but it's useful as a kind of
+    // witness that we have actually initialized the routes worker when handling routes events and
+    // requests.
+    _version: IpVersionMarker<I>,
 }
 
 // TODO(https://fxbug.dev/336382905): Remove converter below once table
@@ -269,13 +265,6 @@ fn get_table_u8_and_nla_from_key(table: RouteTableKey) -> (u8, Option<RouteAttri
         // RT_TABLE_COMPAT (252) can be downcasted without loss into u8.
         Err(_) => (rt_class_t_RT_TABLE_COMPAT as u8, Some(RouteAttribute::Table(table_id))),
     }
-}
-
-pub(crate) struct RouteTable<
-    I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt,
-> {
-    route_set_proxy: <I::RouteSetMarker as ProtocolMarker>::Proxy,
-    route_messages: HashSet<NetlinkRouteMessage>,
 }
 
 /// FIDL errors from the routes worker.
@@ -330,7 +319,7 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>, I: Ip> PendingRo
 }
 
 impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdminIpExt>
-    RoutesWorkerState<I>
+    RoutesWorker<I>
 {
     pub(crate) async fn create(
         set_provider_proxy: &<I::RouteTableMarker as ProtocolMarker>::Proxy,
@@ -338,6 +327,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
     ) -> Result<
         (
             Self,
+            RouteTableMap<I>,
             impl futures::Stream<
                     Item = Result<fnet_routes_ext::Event<I>, fnet_routes_ext::WatchError>,
                 > + Unpin,
@@ -365,14 +355,11 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
         })?;
         let route_messages = new_set_with_existing_routes(installed_routes);
         let route_set_proxy = create_route_set_proxy(set_provider_proxy)?;
-        Ok((
-            Self {
-                route_tables: HashMap::from([(RouteTableKey::Unmanaged, {
-                    RouteTable { route_set_proxy, route_messages }
-                })]),
-            },
-            route_event_stream,
-        ))
+        let route_table_map = RouteTableMap::from(HashMap::from([(
+            RouteTableKey::Unmanaged,
+            RouteTable { route_set_proxy, route_messages },
+        )]));
+        Ok((Self { _version: I::VERSION_MARKER }, route_table_map, route_event_stream))
     }
 
     /// Handles events observed by the route watchers by adding/removing routes
@@ -383,12 +370,13 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
         S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
     >(
         &mut self,
+        route_table_map: &mut RouteTableMap<I>,
         route_clients: &ClientTable<NetlinkRoute, S>,
         event: fnet_routes_ext::Event<I>,
         pending_request_args: Option<PendingRouteRequestArgs<I>>,
     ) -> Result<(), RouteEventHandlerError<I>> {
         handle_route_watcher_event::<I, S>(
-            &mut self.route_tables,
+            route_table_map,
             route_clients,
             event,
             pending_request_args,
@@ -596,11 +584,11 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
         S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
     >(
         &mut self,
+        route_tables: &mut RouteTableMap<I>,
         interfaces_proxy: &fnet_root::InterfacesProxy,
         set_provider_proxy: &<I::RouteTableMarker as ProtocolMarker>::Proxy,
         Request { args, sequence_number, mut client, completer }: Request<S, I>,
     ) -> Option<PendingRouteRequest<S, I>> {
-        let Self { route_tables } = self;
         log_debug!("handling request {args:?} from {client}");
 
         let result = match args {
@@ -735,6 +723,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
         S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
     >(
         &self,
+        route_tables: &mut RouteTableMap<I>,
         pending_route_request: PendingRouteRequest<S, I>,
     ) -> Option<PendingRouteRequest<S, I>> {
         let PendingRouteRequest { request_args, client: _, completer: _ } = &pending_route_request;
@@ -746,7 +735,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
                 // for conflicts against routes in the current table
                 // instead of checking for conflicts against
                 // all observed routes.
-                let all_route_messages = get_all_route_messages(self.route_tables.values());
+                let all_route_messages = get_all_route_messages(route_tables.values());
                 let conflict = new_route_matches_existing(&route, all_route_messages);
                 match conflict {
                     NewRouteConflict::ConflictInSameTable
@@ -768,7 +757,7 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
                     }
                 };
                 let table = RouteTableKey::NetlinkManaged { table_id };
-                match &self.route_tables.get(&table) {
+                match &route_tables.get(&table) {
                     Some(RouteTable { route_set_proxy: _, route_messages }) => {
                         !route_messages.contains(route_msg)
                     }
@@ -822,7 +811,7 @@ fn handle_route_watcher_event<
     I: Ip + fnet_routes_ext::admin::FidlRouteAdminIpExt + fnet_routes_ext::FidlRouteIpExt,
     S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>,
 >(
-    route_tables: &mut HashMap<RouteTableKey, RouteTable<I>>,
+    route_table_map: &mut RouteTableMap<I>,
     route_clients: &ClientTable<NetlinkRoute, S>,
     event: fnet_routes_ext::Event<I>,
     pending_request: Option<PendingRouteRequestArgs<I>>,
@@ -856,7 +845,7 @@ fn handle_route_watcher_event<
             if let Some(route_message) = NetlinkRouteMessage::optionally_from(route, table) {
                 // The Unmanaged table is initialized eagerly, so even
                 // without a `PendingRouteRequest` it will be present.
-                let RouteTable { route_set_proxy: _, route_messages } = route_tables
+                let RouteTable { route_set_proxy: _, route_messages } = route_table_map
                     .get_mut(&table)
                     .expect("route table should have been initialized when handling request");
                 if !route_messages.insert(route_message.clone()) {
@@ -877,20 +866,22 @@ fn handle_route_watcher_event<
             // remove the route. Only a single route is expected to match
             // `installed_route_matches_netlink_message` due to the matching
             // fn checking against all identifiable fields.
-            let table_with_route = route_tables
-                .iter()
-                .filter_map(|(table, RouteTable { route_set_proxy: _, route_messages })| {
-                    route_messages
-                        .iter()
-                        .any(|msg| installed_route_matches_netlink_message(&route, msg))
-                        .then_some(table)
-                })
-                .at_most_one();
+            let table_with_route = {
+                let table_with_route = route_table_map
+                    .iter()
+                    .filter_map(|(table, RouteTable { route_set_proxy: _, route_messages })| {
+                        route_messages
+                            .iter()
+                            .any(|msg| installed_route_matches_netlink_message(&route, msg))
+                            .then_some(table)
+                    })
+                    .at_most_one();
 
-            let table_with_route = match table_with_route {
-                Ok(table) => table.copied(),
-                Err(_) => {
-                    unreachable!("two routes cannot exist in the Netstack with the same fields")
+                match table_with_route {
+                    Ok(table) => table.copied(),
+                    Err(_) => {
+                        unreachable!("two routes cannot exist in the Netstack with the same fields")
+                    }
                 }
             };
 
@@ -898,7 +889,7 @@ fn handle_route_watcher_event<
                 if let Some(route_message) = NetlinkRouteMessage::optionally_from(route, table) {
                     // The Unmanaged table is initialized eagerly, so even
                     // without a `PendingRouteRequest` it will be present.
-                    let RouteTable { route_set_proxy: _, route_messages } = route_tables
+                    let RouteTable { route_set_proxy: _, route_messages } = route_table_map
                         .get_mut(&table)
                         .expect("route table should have been initialized when handling request");
                     if !route_messages.remove(&route_message) {
@@ -1510,6 +1501,7 @@ fn get_all_route_messages<
 mod tests {
     use super::*;
 
+    use std::collections::HashMap;
     use std::convert::Infallible as Never;
     use std::pin::pin;
 
@@ -1582,7 +1574,7 @@ mod tests {
             },
             effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric },
             // TODO(https://fxbug.dev/336382905): The tests should use the ID.
-            table_id: 0,
+            table_id: fnet_routes_ext::TableId::new(0),
         }
     }
 
@@ -1734,10 +1726,10 @@ mod tests {
         let (route_set_proxy, _route_set_server_end) =
             fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
 
-        let mut route_table = HashMap::from([(
+        let mut route_table = RouteTableMap::from(HashMap::from([(
             table,
             RouteTable { route_set_proxy, route_messages: HashSet::new() },
-        )]);
+        )]));
 
         // An event that is not an add or remove should result in an error.
         assert_matches!(
@@ -1916,7 +1908,7 @@ mod tests {
         let (managed_route_set_proxy, _managed_route_set_server_end) =
             fidl::endpoints::create_proxy::<I::RouteSetMarker>().unwrap();
 
-        let mut route_table = HashMap::from([
+        let mut route_table = RouteTableMap::from(HashMap::from([
             (
                 RouteTableKey::Unmanaged,
                 RouteTable {
@@ -1931,7 +1923,7 @@ mod tests {
                     route_messages: HashSet::new(),
                 },
             ),
-        ]);
+        ]));
 
         // Ensure that the route gets added to the table managed by Netlink.
         assert_eq!(
@@ -2041,7 +2033,7 @@ mod tests {
             },
             effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric: METRIC1 },
             // TODO(https://fxbug.dev/336382905): The tests should use the ID.
-            table_id: 0,
+            table_id: fnet_routes_ext::TableId::new(0),
         };
 
         let actual: Result<NetlinkRouteMessage, NetlinkRouteMessageConversionError> =
@@ -2824,7 +2816,7 @@ mod tests {
             route,
             effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric },
             // TODO(https://fxbug.dev/336382905): The tests should use the ID.
-            table_id: 0,
+            table_id: fnet_routes_ext::TableId::new(0),
         })
         .try_into()
         .unwrap()

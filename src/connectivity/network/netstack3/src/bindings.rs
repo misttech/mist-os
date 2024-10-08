@@ -91,7 +91,7 @@ use netstack3_core::inspect::{InspectableValue, Inspector};
 use netstack3_core::ip::{
     AddIpAddrSubnetError, AddressRemovedReason, IpDeviceConfigurationUpdate, IpDeviceEvent,
     IpLayerEvent, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfiguration,
-    Ipv6DeviceConfigurationUpdate, Lifetime, SlaacConfiguration,
+    Ipv6DeviceConfigurationUpdate, Lifetime, SlaacConfigurationUpdate,
 };
 use netstack3_core::routes::RawMetric;
 use netstack3_core::sync::{DynDebugReferences, RwLock as CoreRwLock};
@@ -1069,10 +1069,10 @@ impl Netstack {
                 Ipv6DeviceConfigurationUpdate {
                     dad_transmits: Some(None),
                     max_router_solicitations: Some(None),
-                    slaac_config: Some(SlaacConfiguration {
-                        enable_stable_addresses: true,
+                    slaac_config: SlaacConfigurationUpdate {
+                        enable_stable_addresses: Some(true),
                         temporary_address_configuration: None,
-                    }),
+                    },
                     ip_config,
                 },
             )
@@ -1307,6 +1307,14 @@ impl NetstackSeed {
             let routes = inspector.root().create_lazy_child("Routes", move || {
                 futures::future::ok(inspect::routes(&mut routes_ctx.clone())).boxed()
             });
+            let multicast_forwarding_ctx = netstack.ctx.clone();
+            let multicast_forwarding =
+                inspector.root().create_lazy_child("MulticastForwarding", move || {
+                    futures::future::ok(inspect::multicast_forwarding(
+                        &mut multicast_forwarding_ctx.clone(),
+                    ))
+                    .boxed()
+                });
             let devices_ctx = netstack.ctx.clone();
             let devices = inspector.root().create_lazy_child("Devices", move || {
                 futures::future::ok(inspect::devices(&mut devices_ctx.clone())).boxed()
@@ -1324,7 +1332,16 @@ impl NetstackSeed {
                 inspector.root().create_lazy_child("Filtering State", move || {
                     futures::future::ok(inspect::filtering_state(&mut filter_ctx.clone())).boxed()
                 });
-            (health, sockets, routes, devices, neighbors, counters, filtering_state)
+            (
+                health,
+                sockets,
+                routes,
+                multicast_forwarding,
+                devices,
+                neighbors,
+                counters,
+                filtering_state,
+            )
         };
 
         let diagnostics_handler = debug_fidl_worker::DiagnosticsHandler::default();

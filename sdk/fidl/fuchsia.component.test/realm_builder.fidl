@@ -5,7 +5,6 @@
 library fuchsia.component.test;
 
 using fuchsia.component;
-using fuchsia.component.config;
 using fuchsia.component.decl;
 using fuchsia.component.runner;
 using fuchsia.component.types;
@@ -167,8 +166,6 @@ type Capability = flexible union {
     2: directory Directory;
     3: storage Storage;
     4: service Service;
-    @available(removed=11)
-    5: event Event;
     @available(added=9)
     6: event_stream EventStream;
     @available(added=20)
@@ -519,18 +516,6 @@ closed protocol Realm {
         options ChildOptions;
     }) -> () error RealmBuilderError;
 
-    @available(removed=12)
-    strict AddLegacyChild(struct {
-        /// The name of the child that is being added.
-        name fuchsia.component.child_name;
-
-        /// The component's legacy URL (commonly ends with `.cmx`).
-        legacy_url fuchsia.url.Url;
-
-        /// Additional properties for the child.
-        options ChildOptions;
-    }) -> () error RealmBuilderError;
-
     /// Adds a component to this realm whose declaration is set to `decl`. When
     /// launched, the component will share the test package as its package
     /// directory, and may access any resources from it.
@@ -732,13 +717,6 @@ closed protocol Realm {
         name fuchsia.component.name;
     }) -> () error RealmBuilderError;
 
-    @available(removed=12)
-    strict ReplaceConfigValue(struct {
-        name fuchsia.component.name;
-        key fuchsia.component.decl.ConfigKey;
-        value fuchsia.component.config.ValueSpec;
-    }) -> () error RealmBuilderError;
-
     /// Add a capability to the realm.
     @available(added=20)
     strict AddCapability(struct {
@@ -765,9 +743,6 @@ closed protocol Realm {
         key fuchsia.component.decl.ConfigKey;
 
         /// The config value being replaced.
-        @available(replaced=13)
-        value fuchsia.component.config.ValueSpec;
-        @available(added=13)
         value fuchsia.component.decl.ConfigValueSpec;
     }) -> () error RealmBuilderError;
 };

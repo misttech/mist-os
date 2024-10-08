@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, ensure, Error};
+use crc::Hasher32 as _;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
 const MAX_PARTITION_ENTRIES: u32 = 128;
@@ -187,6 +188,44 @@ impl PartitionTableEntry {
         ensure!(self.last_lba != 0 && self.last_lba >= self.first_lba, "Invalid last LBA");
         Ok(())
     }
+}
+
+/// Serializes the partition table, and updates `header` to reflect the changes (including computing
+/// the CRC).  Returns the raw bytes of the partition table.
+/// Fails if any of the entries in `entries` are invalid.
+pub fn serialize_partition_table(
+    header: &mut Header,
+    block_size: usize,
+    num_blocks: u64,
+    entries: &[PartitionTableEntry],
+) -> Result<Vec<u8>, Error> {
+    let mut digest = crc::crc32::Digest::new(crc::crc32::IEEE);
+    let partition_table_len = header.part_size as usize * entries.len();
+    let partition_table_len =
+        partition_table_len.checked_next_multiple_of(block_size).ok_or(anyhow!("Overflow"))?;
+    let mut partition_table = vec![0u8; partition_table_len];
+    let mut partition_table_view = &mut partition_table[..];
+    let mut used_ranges = vec![(0, header.first_usable), (header.last_usable, num_blocks)];
+    let part_size = header.part_size as usize;
+    for entry in entries {
+        if !entry.is_empty() {
+            entry.ensure_integrity()?;
+            used_ranges.push((entry.first_lba, entry.last_lba));
+            let part_raw = entry.as_bytes();
+            assert!(part_raw.len() == header.part_size as usize);
+            digest.write(part_raw);
+            partition_table_view[..part_raw.len()].copy_from_slice(part_raw);
+        }
+        partition_table_view = &mut partition_table_view[part_size..];
+    }
+    used_ranges.sort();
+    for ranges in used_ranges.windows(2) {
+        ensure!(ranges[0].1 <= ranges[1].0, "Partition range overlaps other region");
+    }
+    header.num_parts = entries.len() as u32;
+    header.crc32_parts = digest.sum32();
+    header.crc32 = header.compute_checksum();
+    Ok(partition_table)
 }
 
 #[cfg(test)]

@@ -44,6 +44,9 @@ pub trait DirectConnector: Debug {
     /// Returns the device address (if there currently is one).
     fn device_address(&self) -> LocalBoxFuture<'_, Option<SocketAddr>>;
 
+    /// Returns the host address of the ssh connection from the device perspective.
+    fn host_ssh_address(&self) -> LocalBoxFuture<'_, Option<String>>;
+
     /// Returns the spec of the target to which we are connecting/connected.
     fn target_spec(&self) -> Option<String>;
 }
@@ -63,10 +66,15 @@ impl TryFromEnvContext for Option<String> {
 impl TryFromEnvContext for ffx_target::Resolution {
     fn try_from_env_context<'a>(env: &'a EnvironmentContext) -> LocalBoxFuture<'a, Result<Self>> {
         Box::pin(async {
+            let unspecified_target = ffx_target::UNSPECIFIED_TARGET_NAME.to_owned();
             let target_spec = Option::<String>::try_from_env_context(env).await?;
-            let target_spec_unwrapped = target_spec.as_ref().ok_or(ffx_command::user_error!(
-                "You must specify a target via `-t <target_name>` before any command arguments"
-            ))?;
+            let target_spec_unwrapped = if env.is_strict() {
+                target_spec.as_ref().ok_or(ffx_command::user_error!(
+                    "You must specify a target via `-t <target_name>` before any command arguments"
+                ))?
+            } else {
+                target_spec.as_ref().unwrap_or(&unspecified_target)
+            };
             tracing::trace!("resolving target spec address from {}", target_spec_unwrapped);
             let resolution = ffx_target::resolve_target_address(&target_spec, env)
                 .await
@@ -176,6 +184,17 @@ impl<T: TryFromEnvContext + OvernetConnector + 'static> DirectConnector for Over
 
     fn device_address(&self) -> LocalBoxFuture<'_, Option<SocketAddr>> {
         Box::pin(async { self.connection.lock().await.as_ref().and_then(|c| c.device_address()) })
+    }
+
+    fn host_ssh_address(&self) -> LocalBoxFuture<'_, Option<String>> {
+        Box::pin(async {
+            self.connection
+                .lock()
+                .await
+                .as_ref()
+                .and_then(|c| c.host_ssh_address())
+                .map(|a| a.to_string())
+        })
     }
 
     fn target_spec(&self) -> Option<String> {

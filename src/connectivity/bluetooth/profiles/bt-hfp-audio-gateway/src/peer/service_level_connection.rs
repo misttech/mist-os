@@ -266,7 +266,7 @@ impl Inspect for &mut ServiceLevelConnection {
         self.inspect.iattach(parent, name.as_ref())?;
         self.inspect.update_slc_state(&self.state);
         if self.connection.is_some() {
-            self.inspect.connected(fasync::Time::now());
+            self.inspect.connected(fasync::MonotonicInstant::now());
         }
         Ok(())
     }
@@ -336,7 +336,7 @@ impl ServiceLevelConnection {
         // stale procedure requests.
         self.reset();
         self.connection = Some(DataController::new(channel));
-        self.inspect.connected(fasync::Time::now());
+        self.inspect.connected(fasync::MonotonicInstant::now());
         debug!("Initializing Service Level Connection");
     }
 
@@ -364,7 +364,7 @@ impl ServiceLevelConnection {
         info!("Service Level Connection initialized: {:?}", SlcInitializationDebug(&self.state));
         self.queue_slc_request(SlcRequest::Initialized);
         self.state.initialized = true;
-        self.inspect.initialized(fasync::Time::now());
+        self.inspect.initialized(fasync::MonotonicInstant::now());
     }
 
     pub fn network_operator_name_format(&self) -> &Option<at::NetworkOperatorNameFormat> {

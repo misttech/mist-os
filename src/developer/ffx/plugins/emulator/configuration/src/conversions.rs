@@ -107,13 +107,13 @@ fn convert_v2_bundle_to_configs(
         audio: virtual_device.hardware.audio.clone(),
         cpu: VirtualCpu {
             architecture: virtual_device.hardware.cpu.arch.clone(),
-            // TODO(https://fxbug.dev/42170191): Add a count parameter to the virtual_device cpu field.
-            count: usize::default(),
+            count: virtual_device.hardware.cpu.count,
         },
         memory: virtual_device.hardware.memory.clone(),
         pointing_device: virtual_device.hardware.inputs.pointing_device.clone(),
         screen: virtual_device.hardware.window_size.clone(),
         storage: virtual_device.hardware.storage.clone(),
+        vsock: Some(virtual_device.hardware.vsock.clone()),
     };
 
     emulator_configuration.runtime.template = None;
@@ -173,7 +173,7 @@ mod tests {
     use sdk_metadata::virtual_device::{Cpu, Hardware};
     use sdk_metadata::{
         AudioDevice, AudioModel, CpuArchitecture, DataAmount, DataUnits, ElementType, InputDevice,
-        PointingDevice, Screen, ScreenUnits,
+        PointingDevice, Screen, ScreenUnits, VsockDevice,
     };
     use std::collections::HashMap;
     use std::fs::File;
@@ -219,12 +219,13 @@ mod tests {
             description: Some("A fake virtual device".to_string()),
             kind: ElementType::VirtualDevice,
             hardware: Hardware {
-                cpu: Cpu { arch: CpuArchitecture::X64 },
+                cpu: Cpu { arch: CpuArchitecture::X64, count: 4 },
                 audio: AudioDevice { model: AudioModel::Hda },
                 storage: DataAmount { quantity: 512, units: DataUnits::Megabytes },
                 inputs: InputDevice { pointing_device: PointingDevice::Mouse },
                 memory: DataAmount { quantity: 4, units: DataUnits::Gigabytes },
                 window_size: Screen { height: 480, width: 640, units: ScreenUnits::Pixels },
+                vsock: VsockDevice { enabled: false, cid: 3 },
             },
             ports: None,
         };
@@ -238,6 +239,7 @@ mod tests {
         assert_eq!(config.device.pointing_device, device.hardware.inputs.pointing_device);
         assert_eq!(config.device.screen, device.hardware.window_size);
         assert_eq!(config.device.storage, device.hardware.storage);
+        assert_eq!(config.device.vsock, Some(device.hardware.vsock));
 
         assert!(config.guest.disk_image.is_some());
 
@@ -267,12 +269,13 @@ mod tests {
             },
         ]);
         device.hardware = Hardware {
-            cpu: Cpu { arch: CpuArchitecture::Arm64 },
+            cpu: Cpu { arch: CpuArchitecture::Arm64, count: 4 },
             audio: AudioDevice { model: AudioModel::None },
             storage: DataAmount { quantity: 8, units: DataUnits::Gigabytes },
             inputs: InputDevice { pointing_device: PointingDevice::Touch },
             memory: DataAmount { quantity: 2048, units: DataUnits::Megabytes },
             window_size: Screen { height: 1024, width: 1280, units: ScreenUnits::Pixels },
+            vsock: VsockDevice { enabled: false, cid: 3 },
         };
 
         let mut ports = HashMap::new();
@@ -290,6 +293,7 @@ mod tests {
         assert_eq!(config.device.pointing_device, device.hardware.inputs.pointing_device);
         assert_eq!(config.device.screen, device.hardware.window_size);
         assert_eq!(config.device.storage, device.hardware.storage);
+        assert_eq!(config.device.vsock, Some(device.hardware.vsock));
 
         assert!(config.guest.disk_image.is_some());
 
@@ -374,12 +378,13 @@ mod tests {
             description: Some("A fake virtual device".to_string()),
             kind: ElementType::VirtualDevice,
             hardware: Hardware {
-                cpu: Cpu { arch: CpuArchitecture::X64 },
+                cpu: Cpu { arch: CpuArchitecture::X64, count: 4 },
                 audio: AudioDevice { model: AudioModel::Hda },
                 storage: DataAmount { quantity: 512, units: DataUnits::Megabytes },
                 inputs: InputDevice { pointing_device: PointingDevice::Mouse },
                 memory: DataAmount { quantity: 4, units: DataUnits::Gigabytes },
                 window_size: Screen { height: 480, width: 640, units: ScreenUnits::Pixels },
+                vsock: VsockDevice { enabled: false, cid: 3 },
             },
             ports: None,
         };
@@ -393,6 +398,7 @@ mod tests {
         assert_eq!(config.device.pointing_device, device.hardware.inputs.pointing_device);
         assert_eq!(config.device.screen, device.hardware.window_size);
         assert_eq!(config.device.storage, device.hardware.storage);
+        assert_eq!(config.device.vsock, Some(device.hardware.vsock));
 
         assert!(config.guest.disk_image.is_none());
         assert!(config.guest.zbi_image.is_none());
@@ -430,12 +436,13 @@ mod tests {
             description: Some("A fake virtual device".to_string()),
             kind: ElementType::VirtualDevice,
             hardware: Hardware {
-                cpu: Cpu { arch: CpuArchitecture::X64 },
+                cpu: Cpu { arch: CpuArchitecture::X64, count: 4 },
                 audio: AudioDevice { model: AudioModel::Hda },
                 storage: DataAmount { quantity: 512, units: DataUnits::Megabytes },
                 inputs: InputDevice { pointing_device: PointingDevice::Mouse },
                 memory: DataAmount { quantity: 4, units: DataUnits::Gigabytes },
                 window_size: Screen { height: 480, width: 640, units: ScreenUnits::Pixels },
+                vsock: VsockDevice { enabled: false, cid: 3 },
             },
             ports: None,
         };
@@ -449,6 +456,7 @@ mod tests {
         assert_eq!(config.device.pointing_device, device.hardware.inputs.pointing_device);
         assert_eq!(config.device.screen, device.hardware.window_size);
         assert_eq!(config.device.storage, device.hardware.storage);
+        assert_eq!(config.device.vsock, Some(device.hardware.vsock));
 
         assert_eq!(
             config.guest.disk_image,

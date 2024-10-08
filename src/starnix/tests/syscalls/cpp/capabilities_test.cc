@@ -149,7 +149,7 @@ class CapsExecTest : public ::testing::Test {
       // We shouldn't run the cleanup step if we skipped the SetUp step.
       return;
     }
-    SAFE_SYSCALL(umount2(path_.c_str(), MNT_FORCE));
+    SAFE_SYSCALL(umount2(path_.c_str(), MNT_DETACH));
 
     std::error_code ec;
     std::filesystem::remove_all(path_, ec);

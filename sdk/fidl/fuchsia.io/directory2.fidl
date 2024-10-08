@@ -133,6 +133,21 @@ const MASK_KNOWN_PROTOCOLS Flags
 const INHERITED_WRITE_PERMISSIONS Operations
         = Operations.WRITE_BYTES | Operations.ENUMERATE | Operations.MODIFY_DIRECTORY | Operations.UPDATE_ATTRIBUTES;
 
+/// Set of permissions that are expected when opening a node as readable.
+@available(added=HEAD)
+const PERM_READABLE Flags
+        = Flags.PERM_CONNECT | Flags.PERM_ENUMERATE | Flags.PERM_TRAVERSE | Flags.PERM_READ | Flags.PERM_GET_ATTRIBUTES;
+
+/// Set of permissions that are expected when opening a node as writable.
+@available(added=HEAD)
+const PERM_WRITABLE Flags
+        = Flags.PERM_CONNECT | Flags.PERM_ENUMERATE | Flags.PERM_TRAVERSE | Flags.PERM_WRITE | Flags.PERM_MODIFY | Flags.PERM_SET_ATTRIBUTES;
+
+/// Set of permissions that are expected when opening a node as executable.
+@available(added=HEAD)
+const PERM_EXECUTABLE Flags
+        = Flags.PERM_CONNECT | Flags.PERM_ENUMERATE | Flags.PERM_TRAVERSE | Flags.PERM_EXECUTE;
+
 /// Options which can be used with Open3. Unlike [`Flags`], these options are designed for specific
 /// use cases (e.g. to reduce round-trip latency when requesting attributes).
 type Options = table {

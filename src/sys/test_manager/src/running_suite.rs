@@ -397,12 +397,9 @@ impl RunningSuite {
         while let Some(storage_moniker) = stream.try_next().await? {
             let (node, server) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
             let directory: ClientEnd<fio::DirectoryMarker> = node.into_channel().into();
-            artifact_storage_admin.open_component_storage(
-                &storage_moniker,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-                fio::ModeType::empty(),
-                server,
-            )?;
+            artifact_storage_admin.open_storage(&storage_moniker, server).await?.map_err(|e| {
+                format_err!("Error opening component storage in test realm: {:?}", e)
+            })?;
             let (event_client, event_server) = zx::EventPair::create();
             self.custom_artifact_tokens.push(event_server);
 

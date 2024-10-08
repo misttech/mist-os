@@ -188,11 +188,11 @@ zx_status_t Sherlock::EmmcInit() {
 
   static const std::vector<fpbus::Metadata> sherlock_emmc_metadata{
       {{
-          .type = DEVICE_METADATA_GPT_INFO,
+          .id = std::to_string(DEVICE_METADATA_GPT_INFO),
           .data = std::move(encoded.value()),
       }},
       {{
-          .type = DEVICE_METADATA_SDMMC,
+          .id = std::to_string(DEVICE_METADATA_SDMMC),
           .data = std::move(sdmmc_metadata.value()),
       }},
   };

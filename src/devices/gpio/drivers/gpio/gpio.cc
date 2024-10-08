@@ -721,6 +721,31 @@ zx_status_t GpioInitDevice::ConfigureGpios(
           return ZX_ERR_BAD_STATE;
         }
       }
+
+      if (config.has_drive_type()) {
+        if (!result->value()->new_config.has_drive_type()) {
+          FDF_LOG(WARNING, "Drive type not returned for %u", pin);
+          return ZX_ERR_BAD_STATE;
+        }
+        if (result->value()->new_config.drive_type() != config.drive_type()) {
+          FDF_LOG(WARNING, "Actual drive type (%u) doesn't match expected (%u) for %u",
+                  static_cast<uint32_t>(result->value()->new_config.drive_type()),
+                  static_cast<uint32_t>(config.drive_type()), pin);
+          return ZX_ERR_BAD_STATE;
+        }
+      }
+
+      if (config.has_power_source()) {
+        if (!result->value()->new_config.has_power_source()) {
+          FDF_LOG(WARNING, "Power source not returned for %u", pin);
+          return ZX_ERR_BAD_STATE;
+        }
+        if (result->value()->new_config.power_source() != config.power_source()) {
+          FDF_LOG(WARNING, "Actual power source (%lu) doesn't match expected (%lu) for %u",
+                  result->value()->new_config.power_source(), config.power_source(), pin);
+          return ZX_ERR_BAD_STATE;
+        }
+      }
     } else if (step.call().call.is_buffer_mode()) {
       auto result =
           pinimpl.sync().buffer(arena)->SetBufferMode(pin, step.call().call.buffer_mode());

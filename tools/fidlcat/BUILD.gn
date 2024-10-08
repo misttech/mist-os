@@ -83,3 +83,12 @@ install_host_tools("fidlcat_host") {
   deps = [ ":fidlcat" ]
   outputs = [ "fidlcat" ]
 }
+
+group("tests") {
+  testonly = true
+
+  deps = [
+    ":fidlcat_host_tests($host_toolchain)",
+    "tests",
+  ]
+}

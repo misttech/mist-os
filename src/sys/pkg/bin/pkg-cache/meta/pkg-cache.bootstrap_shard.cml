@@ -14,13 +14,14 @@
     ],
     offer: [
         {
-            from: "parent",
-            to: "#pkg-cache",
             config: [
                 "fuchsia.pkgcache.AllPackagesExecutable",
+                "fuchsia.pkgcache.EnableUpgradablePackages",
                 "fuchsia.pkgcache.UseFxblob",
                 "fuchsia.pkgcache.UseSystemImage",
             ],
+            from: "parent",
+            to: "#pkg-cache",
         },
         {
             protocol: "fuchsia.tracing.provider.Registry",

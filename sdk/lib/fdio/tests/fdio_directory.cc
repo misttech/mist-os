@@ -12,210 +12,308 @@
 
 namespace {
 
-const fuchsia_io::wire::OpenFlags kReadFlags = fuchsia_io::wire::OpenFlags::kRightReadable;
+class DirectoryTest : public zxtest::Test {
+  void TearDown() override {
+    ZX_ASSERT_MSG(chdir("/") == 0, "Failed to reset working directory to /: %s", strerror(errno));
+  }
+};
 
-TEST(DirectoryTest, ServiceConnect) {
-  ASSERT_STATUS(ZX_ERR_INVALID_ARGS, fdio_service_connect(nullptr, ZX_HANDLE_INVALID));
+constexpr uint32_t kFlagsDeprecated = static_cast<uint32_t>(fuchsia_io::OpenFlags::kRightReadable);
+constexpr uint64_t kFlags = static_cast<uint64_t>(fuchsia_io::wire::kRStarDir);
+
+// kPathTooLong is `/a{4095}\0` (leading forward slash then 4,095 'a's then null), which including
+// the null at the end, is 4,097 bytes total. This is longer than the maximum allowed length (4096):
+// https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.io/io.fidl;l=47;drc=e7cbd843e8ced20ea21f9213989d803ae64fcfaf
+constexpr std::string_view kPathTooLong =
+    "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+static_assert(kPathTooLong.length() == 4096);
+
+TEST_F(DirectoryTest, ServiceConnect) {
+  ASSERT_STATUS(fdio_service_connect(nullptr, ZX_HANDLE_INVALID), ZX_ERR_INVALID_ARGS);
 
   zx::channel h1, h2;
   ASSERT_OK(zx::channel::create(0, &h1, &h2));
-  ASSERT_STATUS(ZX_ERR_NOT_FOUND, fdio_service_connect("/x/y/z", h1.release()));
-  ASSERT_STATUS(ZX_ERR_NOT_SUPPORTED, fdio_service_connect("/", h2.release()));
+  ASSERT_STATUS(fdio_service_connect("/x/y/z", h1.release()), ZX_ERR_NOT_FOUND);
+  ASSERT_STATUS(fdio_service_connect("/", h2.release()), ZX_ERR_NOT_SUPPORTED);
 
   ASSERT_OK(zx::channel::create(0, &h1, &h2));
   ASSERT_OK(fdio_service_connect(fidl::DiscoverableProtocolDefaultPath<fuchsia_process::Launcher>,
                                  h1.release()));
 }
 
-TEST(DirectoryTest, Open) {
-  ASSERT_STATUS(ZX_ERR_INVALID_ARGS, fdio_open(nullptr, 0, ZX_HANDLE_INVALID));
-
+TEST_F(DirectoryTest, ServiceConnectAt) {
   zx::channel h1, h2;
   ASSERT_OK(zx::channel::create(0, &h1, &h2));
-  ASSERT_STATUS(ZX_ERR_NOT_FOUND,
-                fdio_open("/x/y/z", static_cast<uint32_t>(kReadFlags), h1.release()));
-  ASSERT_STATUS(ZX_ERR_NOT_SUPPORTED,
-                fdio_open("/", static_cast<uint32_t>(kReadFlags), h2.release()));
+  ASSERT_OK(fdio_open("/svc", kFlagsDeprecated, h1.release()));
 
-  ASSERT_OK(zx::channel::create(0, &h1, &h2));
-  ASSERT_OK(fdio_open("/svc", static_cast<uint32_t>(kReadFlags), h1.release()));
+  ASSERT_STATUS(fdio_service_connect_at(h2.get(), nullptr, ZX_HANDLE_INVALID), ZX_ERR_INVALID_ARGS);
 
   zx::channel h3, h4;
   ASSERT_OK(zx::channel::create(0, &h3, &h4));
   ASSERT_OK(fdio_service_connect_at(
       h2.get(), fidl::DiscoverableProtocolName<fuchsia_process::Launcher>, h3.release()));
-
-  zx::channel h5, h6;
-  ASSERT_OK(zx::channel::create(0, &h5, &h6));
-  ASSERT_OK(fdio_open_at(h2.get(), fidl::DiscoverableProtocolName<fuchsia_process::Launcher>,
-                         static_cast<uint32_t>(kReadFlags), h5.release()));
 }
 
-TEST(DirectoryTest, OpenFD) {
-  // kInvalidLengthPath is `/a{4095}\0` (leading forward slash then 4,095 'a's then null),
-  // which is 4,097 bytes (including the null) which is one longer than the maximum allowed path
-  // https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.io/io.fidl;l=47;drc=e7cbd843e8ced20ea21f9213989d803ae64fcfaf
-  constexpr std::string_view kInvalidLengthPath =
-      "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-  EXPECT_EQ(kInvalidLengthPath.length(), 4096);
-  {
-    fbl::unique_fd fd;
-    ASSERT_STATUS(ZX_ERR_INVALID_ARGS, fdio_open_fd(nullptr, static_cast<uint32_t>(kReadFlags),
-                                                    fd.reset_and_get_address()));
-    ASSERT_STATUS(ZX_ERR_NOT_FOUND, fdio_open_fd("/x/y/z", static_cast<uint32_t>(kReadFlags),
-                                                 fd.reset_and_get_address()));
+TEST_F(DirectoryTest, Open) {
+  ASSERT_STATUS(fdio_open(nullptr, 0, ZX_HANDLE_INVALID), ZX_ERR_INVALID_ARGS);
 
-    // Opening local directories, like the root of the namespace, should be supported.
-    ASSERT_OK(fdio_open_fd("/", static_cast<uint32_t>(kReadFlags), fd.reset_and_get_address()));
-
-    // fdio_open_fd canonicalizes the path, per
-    // https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.io/io.fidl;l=41-43;drc=e7cbd843e8ced20ea21f9213989d803ae64fcfaf
-    ASSERT_OK(
-        fdio_open_fd("/pkg/..", static_cast<uint32_t>(kReadFlags), fd.reset_and_get_address()));
-
-    // fdio_open_fd rejects paths of 4,097 bytes (including the null) or more.
-    ASSERT_STATUS(ZX_ERR_BAD_PATH,
-                  fdio_open_fd(kInvalidLengthPath.data(), static_cast<uint32_t>(kReadFlags),
-                               fd.reset_and_get_address()));
-
-    // fdio_open_fd's path canonicalization of consecutive '/'s works with fdio_open_fd's
-    // requirement for a leading slash.
-    ASSERT_OK(fdio_open_fd("//", static_cast<uint32_t>(kReadFlags), fd.reset_and_get_address()));
-
-    // Relative paths are interpreted to CWD which is '/' at this point of the test.
-    ASSERT_OK(fdio_open_fd("pkg", static_cast<uint32_t>(kReadFlags), fd.reset_and_get_address()));
-
-    // fdio_open_fd sets OPEN_FLAG_DIRECTORY if the path ends in '/'.
-    ASSERT_STATUS(ZX_ERR_NOT_DIR,
-                  fdio_open_fd("/pkg/test/fdio-test/", static_cast<uint32_t>(kReadFlags),
-                               fd.reset_and_get_address()));
-  }
-
-  {
-    ASSERT_EQ(chdir("/pkg"), 0, "errno %d: %s", errno, strerror(errno));
-
-    fbl::unique_fd fd;
-    ASSERT_OK(fdio_open_fd("test", static_cast<uint32_t>(kReadFlags), fd.reset_and_get_address()));
-    ASSERT_TRUE(fd.is_valid());
-
-    ASSERT_EQ(chdir("/"), 0, "errno %d: %s", errno, strerror(errno));
-  }
-
-  {
-    fbl::unique_fd fd;
-    ASSERT_OK(
-        fdio_open_fd("/pkg/test", static_cast<uint32_t>(kReadFlags), fd.reset_and_get_address()));
-    ASSERT_TRUE(fd.is_valid());
-
-    fbl::unique_fd fd2;
-    ASSERT_STATUS(ZX_ERR_INVALID_ARGS,
-                  fdio_open_fd_at(fd.get(), nullptr, static_cast<uint32_t>(kReadFlags),
-                                  fd2.reset_and_get_address()));
-    ASSERT_FALSE(fd2.is_valid());
-    ASSERT_STATUS(ZX_ERR_NOT_FOUND,
-                  fdio_open_fd_at(fd.get(), "some-nonexistent-file",
-                                  static_cast<uint32_t>(kReadFlags), fd2.reset_and_get_address()));
-    ASSERT_FALSE(fd2.is_valid());
-
-    // fdio_open_fd_at() should not resolve absolute paths to the root directory, unlike openat().
-    ASSERT_STATUS(ZX_ERR_INVALID_ARGS,
-                  fdio_open_fd_at(fd.get(), "/pkg", static_cast<uint32_t>(kReadFlags),
-                                  fd2.reset_and_get_address()));
-    ASSERT_FALSE(fd2.is_valid());
-
-    // fdio_open_fd_at() also should not interpret absolute paths as relative paths to the provided
-    // fd.
-    ASSERT_STATUS(ZX_ERR_INVALID_ARGS,
-                  fdio_open_fd_at(fd.get(), "/fdio-test", static_cast<uint32_t>(kReadFlags),
-                                  fd2.reset_and_get_address()));
-    ASSERT_FALSE(fd2.is_valid());
-
-    // fdio_open_fd_at rejects paths of 4,097 bytes (including the null) or more.
-    ASSERT_STATUS(ZX_ERR_BAD_PATH,
-                  fdio_open_fd_at(fd.get(), kInvalidLengthPath.data(),
-                                  static_cast<uint32_t>(kReadFlags), fd2.reset_and_get_address()));
-
-    // We expect the binary that this file is compiled into to exist
-    ASSERT_OK(fdio_open_fd_at(fd.get(), "fdio-test", static_cast<uint32_t>(kReadFlags),
-                              fd2.reset_and_get_address()));
-    ASSERT_TRUE(fd2.is_valid());
-
-    // Verify that we can actually read from that file.
-    char buf[256];
-    ssize_t bytes_read = read(fd2.get(), buf, 256);
-    ASSERT_EQ(bytes_read, 256);
-
-    // fdio_open_fd_at canonicalizes the path, per
-    // https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.io/io.fidl;l=41-43;drc=e7cbd843e8ced20ea21f9213989d803ae64fcfaf
-    ASSERT_OK(fdio_open_fd_at(fd.get(), "fdio-test/..", static_cast<uint32_t>(kReadFlags),
-                              fd2.reset_and_get_address()));
-    ASSERT_TRUE(fd2.is_valid());
-
-    // fdio_open_fd_at sets OPEN_FLAG_DIRECTORY if the path ends in '/'.
-    ASSERT_STATUS(ZX_ERR_NOT_DIR,
-                  fdio_open_fd_at(fd.get(), "fdio-test/", static_cast<uint32_t>(kReadFlags),
-                                  fd2.reset_and_get_address()));
-    ASSERT_FALSE(fd2.is_valid());
-  }
-}
-
-TEST(DirectoryTest, FdioOpenAtConsumesHandleOnFailure) {
   zx::channel h1, h2;
   ASSERT_OK(zx::channel::create(0, &h1, &h2));
-  ASSERT_OK(fdio_open("/svc", static_cast<uint32_t>(kReadFlags), h1.release()));
+  ASSERT_STATUS(fdio_open("/x/y/z", kFlagsDeprecated, h1.release()), ZX_ERR_NOT_FOUND);
+  ASSERT_STATUS(fdio_open("/", kFlagsDeprecated, h2.release()), ZX_ERR_NOT_SUPPORTED);
+}
+
+TEST_F(DirectoryTest, Open3) {
+  ASSERT_STATUS(fdio_open3(nullptr, 0, ZX_HANDLE_INVALID), ZX_ERR_INVALID_ARGS);
+
+  zx::channel h1, h2;
+  ASSERT_OK(zx::channel::create(0, &h1, &h2));
+  ASSERT_STATUS(fdio_open3("/x/y/z", kFlags, h1.release()), ZX_ERR_NOT_FOUND);
+  ASSERT_STATUS(fdio_open3("/", kFlags, h2.release()), ZX_ERR_NOT_SUPPORTED);
+}
+
+TEST_F(DirectoryTest, OpenFd) {
+  fbl::unique_fd fd;
+  ASSERT_STATUS(fdio_open_fd(nullptr, kFlagsDeprecated, fd.reset_and_get_address()),
+                ZX_ERR_INVALID_ARGS);
+  ASSERT_STATUS(fdio_open_fd("/x/y/z", kFlagsDeprecated, fd.reset_and_get_address()),
+                ZX_ERR_NOT_FOUND);
+
+  // Opening local directories, like the root of the namespace, should be supported.
+  ASSERT_OK(fdio_open_fd("/", kFlagsDeprecated, fd.reset_and_get_address()));
+
+  // Paths should be canonicalized per
+  // https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.io/io.fidl;l=41-43;drc=e7cbd843e8ced20ea21f9213989d803ae64fcfaf
+  ASSERT_OK(fdio_open_fd("/pkg/..", kFlagsDeprecated, fd.reset_and_get_address()));
+
+  // Paths of 4,097 bytes (including the null) or more should be rejected.
+  ASSERT_STATUS(fdio_open_fd(kPathTooLong.data(), kFlagsDeprecated, fd.reset_and_get_address()),
+                ZX_ERR_BAD_PATH);
+
+  // Path canonicalization of consecutive '/'s should be handled gracefully.
+  ASSERT_OK(fdio_open_fd("//", kFlagsDeprecated, fd.reset_and_get_address()));
+
+  // Relative paths are interpreted to CWD which is '/' at this point of the test.
+  ASSERT_OK(fdio_open_fd("pkg", kFlagsDeprecated, fd.reset_and_get_address()));
+
+  // Should fail to open path ending with a slash if last component is not a directory.
+  ASSERT_STATUS(fdio_open_fd("/pkg/test/fdio-test/", kFlagsDeprecated, fd.reset_and_get_address()),
+                ZX_ERR_NOT_DIR);
+}
+
+TEST_F(DirectoryTest, OpenFdChangeWorkingDir) {
+  ASSERT_EQ(chdir("/pkg"), 0, "errno %d: %s", errno, strerror(errno));
+
+  fbl::unique_fd fd;
+  ASSERT_OK(fdio_open_fd("test", kFlagsDeprecated, fd.reset_and_get_address()));
+  ASSERT_TRUE(fd.is_valid());
+}
+
+TEST_F(DirectoryTest, OpenFdAt) {
+  fbl::unique_fd fd;
+  ASSERT_OK(fdio_open_fd("/pkg/test", kFlagsDeprecated, fd.reset_and_get_address()));
+  ASSERT_TRUE(fd.is_valid());
+
+  fbl::unique_fd fd2;
+  ASSERT_STATUS(fdio_open_fd_at(fd.get(), nullptr, kFlagsDeprecated, fd2.reset_and_get_address()),
+                ZX_ERR_INVALID_ARGS);
+  ASSERT_FALSE(fd2.is_valid());
+  ASSERT_STATUS(fdio_open_fd_at(fd.get(), "some-nonexistent-file", kFlagsDeprecated,
+                                fd2.reset_and_get_address()),
+                ZX_ERR_NOT_FOUND);
+  ASSERT_FALSE(fd2.is_valid());
+
+  // fdio_open_fd_at() should not resolve absolute paths to the root directory, unlike openat().
+  ASSERT_STATUS(fdio_open_fd_at(fd.get(), "/pkg", kFlagsDeprecated, fd2.reset_and_get_address()),
+                ZX_ERR_INVALID_ARGS);
+  ASSERT_FALSE(fd2.is_valid());
+
+  // Should not interpret absolute paths as relative paths to the provided fd.
+  ASSERT_STATUS(
+      fdio_open_fd_at(fd.get(), "/fdio-test", kFlagsDeprecated, fd2.reset_and_get_address()),
+      ZX_ERR_INVALID_ARGS);
+  ASSERT_FALSE(fd2.is_valid());
+
+  // Paths of 4,097 bytes (including the null) or more should be rejected.
+  ASSERT_STATUS(
+      fdio_open_fd_at(fd.get(), kPathTooLong.data(), kFlagsDeprecated, fd2.reset_and_get_address()),
+      ZX_ERR_BAD_PATH);
+
+  // Verify that we can open and read from the binary this test is compiled into.
+  ASSERT_OK(fdio_open_fd_at(fd.get(), "fdio-test", kFlagsDeprecated, fd2.reset_and_get_address()));
+  ASSERT_TRUE(fd2.is_valid());
+  char buf[256];
+  ssize_t bytes_read = read(fd2.get(), buf, 256);
+  ASSERT_EQ(bytes_read, 256);
+
+  // Paths should be canonicalized per
+  // https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.io/io.fidl;l=41-43;drc=e7cbd843e8ced20ea21f9213989d803ae64fcfaf
+  ASSERT_OK(
+      fdio_open_fd_at(fd.get(), "fdio-test/..", kFlagsDeprecated, fd2.reset_and_get_address()));
+  ASSERT_TRUE(fd2.is_valid());
+
+  // Should fail to open path ending with a slash if last component is not a directory.
+  ASSERT_STATUS(
+      fdio_open_fd_at(fd.get(), "fdio-test/", kFlagsDeprecated, fd2.reset_and_get_address()),
+      ZX_ERR_NOT_DIR);
+  ASSERT_FALSE(fd2.is_valid());
+}
+
+TEST_F(DirectoryTest, Open3Fd) {
+  fbl::unique_fd fd;
+  ASSERT_STATUS(fdio_open3_fd(nullptr, kFlags, fd.reset_and_get_address()), ZX_ERR_INVALID_ARGS);
+  ASSERT_STATUS(fdio_open3_fd("/x/y/z", kFlags, fd.reset_and_get_address()), ZX_ERR_NOT_FOUND);
+
+  // Opening local directories, like the root of the namespace, should be supported.
+  ASSERT_OK(fdio_open3_fd("/", kFlags, fd.reset_and_get_address()));
+
+  // Paths should be canonicalized per
+  // https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.io/io.fidl;l=41-43;drc=e7cbd843e8ced20ea21f9213989d803ae64fcfaf
+  ASSERT_OK(fdio_open3_fd("/pkg/..", kFlags, fd.reset_and_get_address()));
+
+  // Paths of 4,097 bytes (including the null) or more should be rejected.
+  ASSERT_STATUS(fdio_open3_fd(kPathTooLong.data(), kFlags, fd.reset_and_get_address()),
+                ZX_ERR_BAD_PATH);
+
+  // Path canonicalization of consecutive '/'s should be handled gracefully.
+  ASSERT_OK(fdio_open3_fd("//", kFlags, fd.reset_and_get_address()));
+
+  // Relative paths are interpreted to CWD which is '/' at this point of the test.
+  ASSERT_OK(fdio_open3_fd("pkg", kFlags, fd.reset_and_get_address()));
+
+  // Should fail to open path ending with a slash if last component is not a directory.
+  ASSERT_STATUS(fdio_open3_fd("/pkg/test/fdio-test/", kFlags, fd.reset_and_get_address()),
+                ZX_ERR_NOT_DIR);
+}
+
+TEST_F(DirectoryTest, Open3FdChangeWorkingDir) {
+  // Ensure changes to the working directory are handled.
+  ASSERT_EQ(chdir("/pkg"), 0, "errno %d: %s", errno, strerror(errno));
+
+  fbl::unique_fd fd;
+  ASSERT_OK(fdio_open3_fd("test", kFlags, fd.reset_and_get_address()));
+  ASSERT_TRUE(fd.is_valid());
+}
+
+TEST_F(DirectoryTest, Open3FdAt) {
+  fbl::unique_fd fd;
+  ASSERT_OK(fdio_open3_fd("/pkg/test", kFlags, fd.reset_and_get_address()));
+  ASSERT_TRUE(fd.is_valid());
+
+  fbl::unique_fd fd2;
+  ASSERT_STATUS(fdio_open3_fd_at(fd.get(), nullptr, kFlags, fd2.reset_and_get_address()),
+                ZX_ERR_INVALID_ARGS);
+  ASSERT_FALSE(fd2.is_valid());
+  ASSERT_STATUS(
+      fdio_open3_fd_at(fd.get(), "some-nonexistent-file", kFlags, fd2.reset_and_get_address()),
+      ZX_ERR_NOT_FOUND);
+  ASSERT_FALSE(fd2.is_valid());
+
+  // fdio_open3_fd_at() should not resolve absolute paths to the root directory, unlike openat().
+  ASSERT_STATUS(fdio_open3_fd_at(fd.get(), "/pkg", kFlags, fd2.reset_and_get_address()),
+                ZX_ERR_INVALID_ARGS);
+  ASSERT_FALSE(fd2.is_valid());
+
+  ASSERT_STATUS(fdio_open3_fd_at(fd.get(), "/fdio-test", kFlags, fd2.reset_and_get_address()),
+                ZX_ERR_INVALID_ARGS);
+  ASSERT_FALSE(fd2.is_valid());
+
+  // fdio_open3_fd_at rejects paths of 4,097 bytes (including the null) or more.
+  ASSERT_STATUS(
+      fdio_open3_fd_at(fd.get(), kPathTooLong.data(), kFlags, fd2.reset_and_get_address()),
+      ZX_ERR_BAD_PATH);
+
+  // Verify that we can open and read from the binary this test is compiled into.
+  ASSERT_OK(fdio_open3_fd_at(fd.get(), "fdio-test", kFlags, fd2.reset_and_get_address()));
+  ASSERT_TRUE(fd2.is_valid());
+  char buf[256];
+  ssize_t bytes_read = read(fd2.get(), buf, 256);
+  ASSERT_EQ(bytes_read, 256);
+
+  // Paths should be canonicalized per
+  // https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.io/io.fidl;l=41-43;drc=e7cbd843e8ced20ea21f9213989d803ae64fcfaf
+  ASSERT_OK(fdio_open3_fd_at(fd.get(), "fdio-test/..", kFlags, fd2.reset_and_get_address()));
+  ASSERT_TRUE(fd2.is_valid());
+
+  // Should fail to open path ending with a slash if last component is not a directory.
+  ASSERT_STATUS(fdio_open3_fd_at(fd.get(), "fdio-test/", kFlags, fd2.reset_and_get_address()),
+                ZX_ERR_NOT_DIR);
+  ASSERT_FALSE(fd2.is_valid());
+}
+
+TEST_F(DirectoryTest, OpenAtConsumesHandleOnFailure) {
+  zx::channel h1, h2;
+  ASSERT_OK(zx::channel::create(0, &h1, &h2));
+  ASSERT_OK(fdio_open("/svc", kFlagsDeprecated, h1.release()));
 
   zx::channel h3, h4;
   ASSERT_OK(zx::channel::create(0, &h3, &h4));
-  ASSERT_STATUS(ZX_ERR_INVALID_ARGS, fdio_open_at(h2.get(), /*path=*/nullptr,
-                                                  static_cast<uint32_t>(kReadFlags), h3.release()));
+  ASSERT_STATUS(fdio_open_at(h2.get(), /*path=*/nullptr, kFlagsDeprecated, h3.release()),
+                ZX_ERR_INVALID_ARGS);
 
   zx_signals_t pending;
   ASSERT_OK(h4.wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite_past(), &pending));
   // fdio_open_at takes ownership of the request handle even when path == nullptr
+  ASSERT_TRUE((pending & ZX_CHANNEL_PEER_CLOSED) != 0);
+}
+
+TEST_F(DirectoryTest, Open3AtConsumesHandleOnFailure) {
+  zx::channel h1, h2;
+  ASSERT_OK(zx::channel::create(0, &h1, &h2));
+  ASSERT_OK(fdio_open3("/svc", kFlags, h1.release()));
+
+  zx::channel h3, h4;
+  ASSERT_OK(zx::channel::create(0, &h3, &h4));
+  // Passing nullptr for path should fail with ERR_INVALID_ARGS.
+  ASSERT_STATUS(fdio_open3_at(h2.get(), nullptr, kFlags, h3.release()), ZX_ERR_INVALID_ARGS);
+
+  // fdio_open3_at should take ownership of the request handle even on failure.
+  zx_signals_t pending;
+  ASSERT_OK(h4.wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite_past(), &pending));
   ASSERT_TRUE((pending & ZX_CHANNEL_PEER_CLOSED) != 0);
 }
 

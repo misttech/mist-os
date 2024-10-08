@@ -84,7 +84,7 @@ async fn package_resolution() {
     let mut expected_bin = DirentsSameInodeBuilder::new(fio::INO_UNKNOWN);
     expected_bin.add(fio::DirentType::Directory, b".").add(fio::DirentType::File, b"trigger");
     assert_read_dirents!(
-        fuchsia_fs::directory::open_directory_no_describe(
+        fuchsia_fs::directory::open_directory_no_describe_deprecated(
             &dir_proxy,
             "bin",
             fio::OpenFlags::empty(),
@@ -103,7 +103,7 @@ async fn package_resolution() {
         .add(fio::DirentType::File, b"trigger.cm");
 
     assert_read_dirents!(
-        fuchsia_fs::directory::open_directory_no_describe(
+        fuchsia_fs::directory::open_directory_no_describe_deprecated(
             &dir_proxy,
             "meta",
             fio::OpenFlags::empty(),

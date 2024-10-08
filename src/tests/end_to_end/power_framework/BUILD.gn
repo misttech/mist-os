@@ -21,8 +21,6 @@ python_perf_test("power_framework_benchmarks") {
     "//src/performance/lib/trace_processing",
   ]
 
-  transport = "fuchsia-controller"
-
   target_deps = [ "//src/power/bench:integration" ]
 }
 

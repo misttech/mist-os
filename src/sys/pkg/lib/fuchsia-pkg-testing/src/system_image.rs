@@ -57,7 +57,7 @@ impl SystemImageBuilder {
     /// calling [`Self::cache_package`].
     pub fn cache_packages(mut self, cache_packages: &[&Package]) -> Self {
         assert_eq!(self.cache_packages, None);
-        self.cache_packages = Some(Self::packages_to_urls(cache_packages));
+        self.cache_packages = Some(cache_packages.iter().map(|pkg| pkg.fuchsia_url()).collect());
         self
     }
 
@@ -73,19 +73,6 @@ impl SystemImageBuilder {
             .map(|pkg| {
                 (
                     PackagePath::from_name_and_variant(pkg.name().to_owned(), "0".parse().unwrap()),
-                    *pkg.hash(),
-                )
-            })
-            .collect()
-    }
-
-    fn packages_to_urls(pkgs: &[&Package]) -> Vec<PinnedAbsolutePackageUrl> {
-        pkgs.iter()
-            .map(|pkg| {
-                PinnedAbsolutePackageUrl::new(
-                    DEFAULT_PACKAGE_REPO_URL.parse().unwrap(),
-                    pkg.name().clone(),
-                    Some(fuchsia_url::PackageVariant::zero()),
                     *pkg.hash(),
                 )
             })

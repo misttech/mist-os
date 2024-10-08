@@ -332,7 +332,7 @@ async fn handle_open_capability(
             .await;
         }
         "fuchsia.sys2.RealmQuery.root" | fsys::RealmQueryMarker::PROTOCOL_NAME => {
-            assert_eq!(moniker, "core/remote-control");
+            assert_eq!(moniker, "toolbox");
             let server_end = fidl::endpoints::ServerEnd::from(channel);
             handle_realm_query(
                 state

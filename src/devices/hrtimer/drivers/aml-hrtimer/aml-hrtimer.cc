@@ -11,8 +11,6 @@
 #include <lib/driver/power/cpp/power-support.h>
 #include <zircon/syscalls-next.h>
 
-#include "src/devices/power/lib/from-fidl/cpp/from-fidl.h"
-
 namespace hrtimer {
 
 zx::result<PowerConfiguration> AmlHrtimer::GetPowerConfiguration(
@@ -49,7 +47,7 @@ zx::result<PowerConfiguration> AmlHrtimer::GetPowerConfiguration(
   }
 
   fuchsia_hardware_power::PowerElementConfiguration natural_config = fidl::ToNatural(wire_config);
-  zx::result config = power::from_fidl::CreatePowerElementConfiguration(natural_config);
+  zx::result config = fdf_power::PowerElementConfiguration::FromFidl(natural_config);
   if (config.is_error()) {
     FDF_SLOG(ERROR, "Failed to convert power element configuration from fidl.",
              KV("status", config.status_string()));

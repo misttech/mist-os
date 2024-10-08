@@ -47,19 +47,21 @@ zx::result<zx::vmo> GetStubLdVmo() {
 namespace driver_loader {
 
 // static
-std::unique_ptr<Loader> Loader::Create(async_dispatcher_t* dispatcher) {
+std::unique_ptr<Loader> Loader::Create(async_dispatcher_t* dispatcher,
+                                       LoadDriverHandler load_driver_handler_for_testing) {
   zx::result<zx::vmo> stub_ld_vmo = GetStubLdVmo();
   if (stub_ld_vmo.is_error()) {
     LOGF(ERROR, "Failed to get stub ld vmo for loader: %s", stub_ld_vmo.status_string());
     return nullptr;
   }
   auto diag = MakeDiagnostics();
-  return std::unique_ptr<Loader>(new Loader(dispatcher, diag, std::move(*stub_ld_vmo)));
+  return std::unique_ptr<Loader>(new Loader(dispatcher, std::move(load_driver_handler_for_testing),
+                                            diag, std::move(*stub_ld_vmo)));
 }
 
 zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> Loader::Start(
-    zx::process process, zx::thread thread, zx::vmar root_vmar, zx::vmo exec_vmo, zx::vmo vdso_vmo,
-    fidl::ClientEnd<fuchsia_io::Directory> lib_dir, zx::channel bootstrap_receiver) {
+    zx::process process, zx::vmar root_vmar, zx::vmo exec_vmo, zx::vmo vdso_vmo,
+    fidl::ClientEnd<fuchsia_io::Directory> lib_dir) {
   auto diag = MakeDiagnostics();
 
   Linker linker;
@@ -146,18 +148,32 @@ zx::result<fidl::ClientEnd<fuchsia_driver_loader::DriverHost>> Loader::Start(
   // Commit the VMARs and mappings.
   linker.Commit();
 
+  constexpr std::string_view kThreadName = "driver-host-initial-thread";
+  zx::thread thread;
+  zx_status_t status =
+      zx::thread::create(process, kThreadName.data(), kThreadName.size(), 0, &thread);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  zx::channel bootstrap_sender, bootstrap_receiver;
+  status = zx::channel::create(0, &bootstrap_sender, &bootstrap_receiver);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+
   auto preloaded_modules = linker.PreloadedImplicit(*init_result);
   // Start the process.
-  auto process_state = ProcessState::Create(remote_abi_stub_, std::move(process), std::move(thread),
-                                            std::move(root_vmar), std::move(process_start_args),
-                                            std::move(preloaded_modules));
+  auto process_state = ProcessState::Create(
+      remote_abi_stub_, std::move(process), std::move(thread), std::move(root_vmar),
+      std::move(bootstrap_sender), load_driver_handler_for_testing_.share(),
+      std::move(process_start_args), std::move(preloaded_modules));
   if (process_state.is_error()) {
     LOGF(ERROR, "Failed to create process state: %s", process_state.status_string());
     return process_state.take_error();
   }
 
   auto [client_end, server_end] = fidl::Endpoints<fuchsia_driver_loader::DriverHost>::Create();
-  zx_status_t status = process_state->BindServer(dispatcher_, std::move(server_end));
+  status = process_state->BindServer(dispatcher_, std::move(server_end));
   if (status != ZX_OK) {
     LOGF(ERROR, "Failed to bind server endpoint to process state: %s",
          zx_status_get_string(status));
@@ -196,7 +212,9 @@ zx::result<zx::vmo> Loader::GetDepVmo(fidl::UnownedClientEnd<fuchsia_io::Directo
 // static
 zx::result<std::unique_ptr<Loader::ProcessState>> Loader::ProcessState::Create(
     ld::RemoteAbiStub<>::Ptr remote_abi_stub, zx::process process, zx::thread thread,
-    zx::vmar root_vmar, const ProcessStartArgs& args, Linker::InitModuleList preloaded_modules) {
+    zx::vmar root_vmar, zx::channel bootstrap_sender,
+    LoadDriverHandler load_driver_handler_for_testing, const ProcessStartArgs& args,
+    Linker::InitModuleList preloaded_modules) {
   auto process_state = std::unique_ptr<ProcessState>(new ProcessState());
 
   process_state->remote_abi_stub_ = std::move(remote_abi_stub);
@@ -205,6 +223,8 @@ zx::result<std::unique_ptr<Loader::ProcessState>> Loader::ProcessState::Create(
   process_state->root_vmar_ = std::move(root_vmar);
   process_state->process_start_args_ = std::move(args);
   process_state->preloaded_modules_ = std::move(preloaded_modules);
+  process_state->bootstrap_sender_ = std::move(bootstrap_sender);
+  process_state->load_driver_handler_for_testing_ = std::move(load_driver_handler_for_testing);
 
   zx_status_t status = process_state->AllocateStack();
   if (status != ZX_OK) {
@@ -281,7 +301,7 @@ void Loader::ProcessState::LoadDriver(LoadDriverRequestView request,
                              .Build());
 }
 
-zx::result<Loader::ProcessState::DriverStartAddr> Loader::ProcessState::LoadDriverModule(
+zx::result<Loader::DriverStartAddr> Loader::ProcessState::LoadDriverModule(
     std::string driver_name, zx::vmo driver_module,
     fidl::ClientEnd<fuchsia_io::Directory> lib_dir) {
   auto diag = MakeDiagnostics();
@@ -365,6 +385,11 @@ zx::result<Loader::ProcessState::DriverStartAddr> Loader::ProcessState::LoadDriv
   }
   DriverStartAddr addr = symbol->value + linker.main_module().load_bias();
   ZX_ASSERT_MSG(addr != 0u, "Got null for driver start address");
+
+  if (load_driver_handler_for_testing_) {
+    load_driver_handler_for_testing_(bootstrap_sender_.borrow(), addr);
+  }
+
   return zx::ok(addr);
 }
 

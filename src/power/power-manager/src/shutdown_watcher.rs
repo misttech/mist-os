@@ -529,7 +529,7 @@ mod tests {
     fn test_watcher_response_timeout() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         let node = ShutdownWatcherBuilder::new().build().unwrap();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         // Register the reboot watcher
         let (watcher_proxy, _watcher_stream) =
@@ -548,7 +548,7 @@ mod tests {
         assert!(exec.run_until_stalled(&mut notify_future).is_pending());
 
         // Wake the timer that causes the watcher timeout to fire
-        assert_eq!(exec.wake_next_timer(), Some(fasync::Time::from_nanos(1e9 as i64)));
+        assert_eq!(exec.wake_next_timer(), Some(fasync::MonotonicInstant::from_nanos(1e9 as i64)));
 
         // Verify the notify future can now complete
         assert!(exec.run_until_stalled(&mut notify_future).is_ready());

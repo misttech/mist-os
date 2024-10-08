@@ -44,13 +44,13 @@ struct ClientIfc : public SimInterface {
     completer.Reply();
   }
   void OnScanEnd(OnScanEndRequestView request, OnScanEndCompleter::Sync& completer) override {
-    on_scan_end_(&request->end);
+    on_scan_end_(request);
     completer.Reply();
   }
 
   std::function<void(const wlan_fullmac_wire::WlanFullmacImplIfcOnScanResultRequest*)>
       on_scan_result_;
-  std::function<void(const wlan_fullmac_wire::WlanFullmacScanEnd*)> on_scan_end_;
+  std::function<void(const wlan_fullmac_wire::WlanFullmacImplIfcOnScanEndRequest*)> on_scan_end_;
 };
 
 class ActiveScanTest : public SimTest {
@@ -84,7 +84,7 @@ class ActiveScanTest : public SimTest {
   uint32_t GetNumProbeReqsSeen() { return num_probe_reqs_seen; }
 
   void OnScanResult(const wlan_fullmac_wire::WlanFullmacImplIfcOnScanResultRequest* result);
-  void OnScanEnd(const wlan_fullmac_wire::WlanFullmacScanEnd* end);
+  void OnScanEnd(const wlan_fullmac_wire::WlanFullmacImplIfcOnScanEndRequest* end);
 
  protected:
   // This is the interface we will use for our single client interface
@@ -132,8 +132,8 @@ void ActiveScanTest::OnScanResult(
   scan_results_.emplace_back(copy);
 }
 
-void ActiveScanTest::OnScanEnd(const wlan_fullmac_wire::WlanFullmacScanEnd* end) {
-  scan_result_code_ = end->code;
+void ActiveScanTest::OnScanEnd(const wlan_fullmac_wire::WlanFullmacImplIfcOnScanEndRequest* end) {
+  scan_result_code_ = end->code();
 }
 
 void ActiveScanTest::SetUp() {

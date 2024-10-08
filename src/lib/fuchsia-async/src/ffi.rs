@@ -101,7 +101,7 @@ mod fuchsia_details {
 pub struct Executor {
     executor: Mutex<fasync::LocalExecutor>,
     quit_tx: Mutex<Option<oneshot::Sender<()>>>,
-    start: fasync::Time,
+    start: fasync::MonotonicInstant,
     cb_executor: *mut std::ffi::c_void,
 }
 
@@ -110,7 +110,7 @@ impl Executor {
         Box::new(Executor {
             executor: Mutex::new(fasync::LocalExecutor::new()),
             quit_tx: Mutex::new(None),
-            start: fasync::Time::now(),
+            start: fasync::MonotonicInstant::now(),
             cb_executor,
         })
     }
@@ -210,7 +210,7 @@ impl Executor {
     }
 
     fn now(&self) -> zx_time_t {
-        let dur = fasync::Time::now() - self.start;
+        let dur = fasync::MonotonicInstant::now() - self.start;
         #[cfg(target_os = "fuchsia")]
         let r = dur.into_nanos();
         #[cfg(not(target_os = "fuchsia"))]

@@ -84,6 +84,7 @@ function getClInfo(changeId) {
     author: cl.owner.email,
     created: cl.created,
     updated: cl.updated,
+    submitted: cl.submitted,
     status: cl.status,
     work_in_progress: Boolean(cl.work_in_progress),
   };

@@ -5,7 +5,6 @@
 #ifndef LIB_SYS_COMPONENT_CPP_TESTING_REALM_BUILDER_H_
 #define LIB_SYS_COMPONENT_CPP_TESTING_REALM_BUILDER_H_
 
-#include <fuchsia/component/config/cpp/fidl.h>
 #include <fuchsia/component/cpp/fidl.h>
 #include <fuchsia/component/decl/cpp/fidl.h>
 #include <fuchsia/component/runner/cpp/fidl.h>

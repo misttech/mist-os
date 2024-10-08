@@ -66,6 +66,16 @@ async fn create_test_env() -> TestEnv {
         .await
         .unwrap();
 
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::configuration("fuchsia.power.WaitForSuspendingToken"))
+                .from(Ref::void())
+                .to(&component_ref),
+        )
+        .await
+        .unwrap();
+
     // Expose capabilities from power-broker to fake-system-activity-governor.
     builder
         .add_route(

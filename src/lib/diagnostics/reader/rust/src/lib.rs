@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use async_stream::stream;
-use bitflags::bitflags;
 use diagnostics_data::DiagnosticsData;
 use fidl_fuchsia_diagnostics::{
     ArchiveAccessorMarker, ArchiveAccessorProxy, BatchIteratorMarker, BatchIteratorProxy,
@@ -182,26 +181,25 @@ impl CheckResponse for serde_cbor::Value {
     }
 }
 
-bitflags! {
-    /// Retry configuration for ArchiveReader.
-    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-    pub struct RetryConfig: u8 {
-        /// ArchiveReader will retry on empty responses.
-        const EMPTY = 0b00000001;
-    }
+/// Retry configuration for ArchiveReader.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum RetryConfig {
+    MinSchemaCount(usize),
 }
 
 impl RetryConfig {
     pub fn always() -> Self {
-        Self::all()
+        Self::MinSchemaCount(1)
     }
 
     pub fn never() -> Self {
-        Self::empty()
+        Self::MinSchemaCount(0)
     }
 
-    fn on_empty(&self) -> bool {
-        self.intersects(Self::EMPTY)
+    fn should_retry(&self, result_count: usize) -> bool {
+        match self {
+            Self::MinSchemaCount(min) => *min > result_count,
+        }
     }
 }
 
@@ -212,7 +210,6 @@ pub struct ArchiveReader {
     archive: Arc<Mutex<Option<ArchiveAccessorProxy>>>,
     selectors: Vec<SelectorArgument>,
     retry_config: RetryConfig,
-    minimum_schema_count: usize,
     timeout: Option<Duration>,
     batch_retrieval_timeout_seconds: Option<i64>,
     max_aggregated_content_size_bytes: Option<u64>,
@@ -228,7 +225,6 @@ impl ArchiveReader {
             selectors: vec![],
             retry_config: RetryConfig::always(),
             archive: Arc::new(Mutex::new(None)),
-            minimum_schema_count: 1,
             batch_retrieval_timeout_seconds: None,
             max_aggregated_content_size_bytes: None,
         }
@@ -257,17 +253,6 @@ impl ArchiveReader {
     /// Sets a custom retry configuration. By default we always retry.
     pub fn retry(&mut self, config: RetryConfig) -> &mut Self {
         self.retry_config = config;
-        self
-    }
-
-    // TODO(b/308979621): soft-migrate and remove.
-    #[doc(hidden)]
-    pub fn retry_if_empty(&mut self, enable: bool) -> &mut Self {
-        if enable {
-            self.retry_config = self.retry_config | RetryConfig::EMPTY;
-        } else {
-            self.retry_config = self.retry_config - RetryConfig::EMPTY;
-        }
         self
     }
 
@@ -304,7 +289,7 @@ impl ArchiveReader {
     /// Sets the minumum number of schemas expected in a result in order for the
     /// result to be considered a success.
     pub fn with_minimum_schema_count(&mut self, minimum_schema_count: usize) -> &mut Self {
-        self.minimum_schema_count = minimum_schema_count;
+        self.retry_config = RetryConfig::MinSchemaCount(minimum_schema_count);
         self
     }
 
@@ -372,9 +357,11 @@ impl ArchiveReader {
                 .collect::<Vec<_>>()
                 .await;
 
-            if self.retry_config.on_empty() && result.len() < self.minimum_schema_count {
-                fasync::Timer::new(fasync::Time::after(zx::Duration::from_millis(RETRY_DELAY_MS)))
-                    .await;
+            if self.retry_config.should_retry(result.len()) {
+                fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_millis(
+                    RETRY_DELAY_MS,
+                )))
+                .await;
             } else {
                 return Ok(result);
             }
@@ -974,5 +961,38 @@ mod tests {
             .use_log_sink(log_sink_proxy);
         let publisher = Publisher::new(options).unwrap();
         (instance, publisher, reader)
+    }
+
+    #[fuchsia::test]
+    fn retry_config_behavior() {
+        let config = RetryConfig::MinSchemaCount(1);
+        let got = 0;
+
+        assert!(config.should_retry(got));
+
+        let config = RetryConfig::MinSchemaCount(1);
+        let got = 1;
+
+        assert!(!config.should_retry(got));
+
+        let config = RetryConfig::MinSchemaCount(1);
+        let got = 2;
+
+        assert!(!config.should_retry(got));
+
+        let config = RetryConfig::MinSchemaCount(0);
+        let got = 1;
+
+        assert!(!config.should_retry(got));
+
+        let config = RetryConfig::always();
+        let got = 0;
+
+        assert!(config.should_retry(got));
+
+        let config = RetryConfig::never();
+        let got = 0;
+
+        assert!(!config.should_retry(got));
     }
 }

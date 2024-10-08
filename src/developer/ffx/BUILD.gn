@@ -11,6 +11,12 @@ import("//build/tools/json_merge/json_merge.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
 import("config.gni")
 
+declare_args() {
+  # Label pointing to the main product bundle to work with if the default product in a multi-product
+  # build is not desired.
+  main_product_label = ""
+}
+
 group("ffx") {
   testonly = true
 
@@ -60,6 +66,16 @@ if (current_toolchain == default_toolchain) {
     output_conversion = "json"
   }
 
+  if (main_product_label == "") {
+    if (defined(files) && defined(files.product_bundle_dir)) {
+      _product_path = files.product_bundle_dir
+    }
+  } else {
+    _product_path =
+        get_label_info(main_product_label, "target_out_dir") + "/" +
+        get_label_info(main_product_label, "name") + "/product_bundle"
+  }
+
   group("default_ffx_config") {
     #
     # NOTE: There is a long standing issue with using $ in the value of string variables in scopes.
@@ -88,10 +104,9 @@ if (current_toolchain == default_toolchain) {
           # Only define it if the variable exists since there are builds, such as SDK only,
           # that do not build any product bundles. In those builds, there is no product, so
           # it is OK to not set this value.
-          if (defined(files) && defined(files.product_bundle_dir)) {
+          if (defined(_product_path)) {
             product = {
-              path = "!!BUILD_DIR/" +
-                     rebase_path(files.product_bundle_dir, root_out_dir)
+              path = "!!BUILD_DIR/" + rebase_path(_product_path, root_out_dir)
             }
           }
 

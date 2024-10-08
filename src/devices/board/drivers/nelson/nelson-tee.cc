@@ -106,7 +106,7 @@ zx_status_t Nelson::TeeInit() {
 
   metadata.emplace_back([&]() {
     fpbus::Metadata ret;
-    ret.type() = DEVICE_METADATA_TEE_THREAD_CONFIG;
+    ret.id() = std::to_string(DEVICE_METADATA_TEE_THREAD_CONFIG);
     ret.data() = std::move(data);
     return ret;
   }());

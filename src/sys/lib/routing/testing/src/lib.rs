@@ -138,10 +138,6 @@ pub enum CheckUse {
     StorageAdmin {
         // The moniker from the storage declaration to the use declaration.
         storage_relation: Moniker,
-        // The backing directory for this storage is in component manager's namespace, not the
-        // test's isolated test directory.
-        from_cm_namespace: bool,
-
         storage_subdir: Option<String>,
         expected_res: ExpectedResult,
     },

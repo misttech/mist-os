@@ -193,34 +193,7 @@ class Context:
         )
         self._directory = isolate_dir
 
-    def connect_daemon_protocol(self, marker: str) -> "Channel":
-        """Connects to a Fuchsia daemon protocol.
-
-        Args:
-            marker: The marker of the protocol to connect to.
-
-        Returns:
-            A FIDL client for the protocol.
-        """
-        return Channel(
-            fuchsia_controller_internal.context_connect_daemon_protocol(
-                self._handle, marker
-            )
-        )
-
-    def target_add(self, target: str, wait: bool):
-        """Adds a target to the ffx daemon manually.
-
-        Args:
-            target: A string denoting the IP address of the target.
-            wait: Determines whether or not to wait for the target to connect
-                  to RCS
-        """
-        fuchsia_controller_internal.context_target_add(
-            self._handle, target, wait
-        )
-
-    def target_wait(self, timeout: int) -> bool:
+    def target_wait(self, timeout: int, offline=False) -> bool:
         """Waits for the target to be ready.
 
         Args:
@@ -231,19 +204,7 @@ class Context:
             True if the target is ready, False otherwise.
         """
         return fuchsia_controller_internal.context_target_wait(
-            self._handle, timeout
-        )
-
-    def connect_target_proxy(self) -> "Channel":
-        """Connects to the target proxy.
-
-        Returns:
-            A FIDL client for the target proxy.
-        """
-        return Channel(
-            fuchsia_controller_internal.context_connect_target_proxy(
-                self._handle
-            )
+            self._handle, timeout, offline
         )
 
     def config_get_string(self, key) -> str:

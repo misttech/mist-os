@@ -80,8 +80,7 @@ class NetworkDevice : public Device,
   void NetworkDeviceImplPrepareVmo(uint8_t vmo_id, zx::vmo vmo,
                                    network_device_impl_prepare_vmo_callback callback, void* cookie);
   void NetworkDeviceImplReleaseVmo(uint8_t vmo_id);
-  void NetworkDeviceImplSetSnoop(bool snoop) { /* do nothing , only auto-snooping is allowed */
-  }
+
   // NetworkPort protocol:
   void NetworkPortGetInfo(port_base_info_t* out_info);
   void NetworkPortGetStatus(port_status_t* out_status);

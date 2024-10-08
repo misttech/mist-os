@@ -56,7 +56,7 @@ class SimInterface : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFullmacIm
     size_t connect_successes = 0;
     size_t roam_attempts = 0;
     size_t roam_successes = 0;
-    std::list<wlan_fullmac_wire::WlanFullmacConnectConfirm> connect_results;
+    std::list<fuchsia_wlan_fullmac::WlanFullmacImplIfcConnectConfRequest> connect_results;
     std::list<wlan_fullmac_wire::WlanFullmacAssocInd> assoc_indications;
     std::list<wlan_fullmac_wire::WlanFullmacAuthInd> auth_indications;
     std::list<wlan_fullmac_wire::WlanFullmacImplIfcDeauthConfRequest> deauth_results;

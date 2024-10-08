@@ -325,6 +325,16 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
     }
 
     fn validate_child(&mut self, child: &'a Child) -> Result<(), Error> {
+        if let Some(resource) = child.url.resource() {
+            if resource.ends_with(".cml") {
+                return Err(Error::validate(format!(
+                    "child URL ends in .cml instead of .cm, \
+which is almost certainly a mistake: {}",
+                    child.url
+                )));
+            }
+        }
+
         if let Some(environment_ref) = &child.environment {
             match environment_ref {
                 EnvironmentRef::Named(environment_name) => {
@@ -4777,21 +4787,32 @@ mod tests {
             Err(Error::Parse { err, .. }) if &err == "missing field `name`"
         ),
         test_cml_children_duplicate_names(
-           json!({
-               "children": [
-                    {
-                        "name": "logger",
-                        "url": "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm"
-                    },
-                    {
-                        "name": "logger",
-                        "url": "fuchsia-pkg://fuchsia.com/logger/beta#meta/logger.cm"
-                    }
-                ]
-            }),
-            Err(Error::Validate { err, .. }) if &err == "identifier \"logger\" is defined twice, once in \"children\" and once in \"children\""
-        ),
-        test_cml_children_bad_startup(
+            json!({
+                "children": [
+                     {
+                         "name": "logger",
+                         "url": "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cm"
+                     },
+                     {
+                         "name": "logger",
+                         "url": "fuchsia-pkg://fuchsia.com/logger/beta#meta/logger.cm"
+                     }
+                 ]
+             }),
+             Err(Error::Validate { err, .. }) if &err == "identifier \"logger\" is defined twice, once in \"children\" and once in \"children\""
+         ),
+         test_cml_children_url_ends_in_cml(
+            json!({
+                "children": [
+                     {
+                         "name": "logger",
+                         "url": "fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cml"
+                     },
+                 ]
+             }),
+             Err(Error::Validate { err, ..}) if &err == "child URL ends in .cml instead of .cm, which is almost certainly a mistake: fuchsia-pkg://fuchsia.com/logger/stable#meta/logger.cml"
+         ),
+          test_cml_children_bad_startup(
             json!({
                 "children": [
                     {

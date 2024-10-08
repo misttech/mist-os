@@ -219,14 +219,14 @@ fn round_to_nearest_second(duration: zx::Duration) -> i64 {
 struct Telemetry {
     cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
     state_summary: Option<SystemStateSummary>,
-    state_last_refreshed_for_cobalt: fasync::Time,
-    state_last_refreshed_for_inspect: fasync::Time,
+    state_last_refreshed_for_cobalt: fasync::MonotonicInstant,
+    state_last_refreshed_for_inspect: fasync::MonotonicInstant,
     reachability_lost_at: Option<(
-        fasync::Time,
+        fasync::MonotonicInstant,
         metrics::ReachabilityGlobalSnapshotDurationMetricDimensionRouteConfig,
     )>,
     network_config: Option<NetworkConfig>,
-    network_config_last_refreshed: fasync::Time,
+    network_config_last_refreshed: fasync::MonotonicInstant,
 
     _inspect_node: InspectNode,
     stats: Arc<Mutex<Stats>>,
@@ -243,18 +243,18 @@ impl Telemetry {
         Self {
             cobalt_proxy,
             state_summary: None,
-            state_last_refreshed_for_cobalt: fasync::Time::now(),
-            state_last_refreshed_for_inspect: fasync::Time::now(),
+            state_last_refreshed_for_cobalt: fasync::MonotonicInstant::now(),
+            state_last_refreshed_for_inspect: fasync::MonotonicInstant::now(),
             reachability_lost_at: None,
             network_config: None,
-            network_config_last_refreshed: fasync::Time::now(),
+            network_config_last_refreshed: fasync::MonotonicInstant::now(),
             _inspect_node: inspect_node,
             stats,
         }
     }
 
     pub async fn handle_telemetry_event(&mut self, event: TelemetryEvent) {
-        let now = fasync::Time::now();
+        let now = fasync::MonotonicInstant::now();
         match event {
             TelemetryEvent::SystemStateUpdate { update: SystemStateUpdate { system_state } } => {
                 let new_state = Some(match &self.state_summary {
@@ -312,7 +312,7 @@ impl Telemetry {
     async fn log_system_state_metrics(
         &mut self,
         new_state: Option<SystemStateSummary>,
-        now: fasync::Time,
+        now: fasync::MonotonicInstant,
         ctx: &'static str,
     ) {
         let duration_cobalt = now - self.state_last_refreshed_for_cobalt;
@@ -426,7 +426,7 @@ impl Telemetry {
     async fn log_network_config_metrics(
         &mut self,
         new_config: Option<NetworkConfig>,
-        now: fasync::Time,
+        now: fasync::MonotonicInstant,
         ctx: &'static str,
     ) {
         let duration = now - self.network_config_last_refreshed;
@@ -467,7 +467,7 @@ impl Telemetry {
     }
 
     pub fn handle_ten_secondly_telemetry(&mut self) {
-        let now = fasync::Time::now();
+        let now = fasync::MonotonicInstant::now();
         let duration_sec_inspect =
             round_to_nearest_second(now - self.state_last_refreshed_for_inspect) as i32;
 
@@ -497,7 +497,7 @@ impl Telemetry {
     }
 
     pub async fn handle_hourly_telemetry(&mut self) {
-        let now = fasync::Time::now();
+        let now = fasync::MonotonicInstant::now();
         self.log_system_state_metrics(None, now, "handle_hourly_telemetry").await;
         self.log_network_config_metrics(None, now, "handle_hourly_telemetry").await;
     }
@@ -1007,7 +1007,7 @@ mod tests {
             self.advance_test_fut(test_fut);
 
             for _i in 0..(duration.into_nanos() / STEP_INCREMENT.into_nanos()) {
-                self.exec.set_fake_time(fasync::Time::after(STEP_INCREMENT));
+                self.exec.set_fake_time(fasync::MonotonicInstant::after(STEP_INCREMENT));
                 let _ = self.exec.wake_expired_timers();
                 self.advance_test_fut(test_fut);
             }
@@ -1087,7 +1087,7 @@ mod tests {
 
     fn setup_test() -> (TestHelper, Pin<Box<impl Future<Output = ()>>>) {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         let (cobalt_proxy, cobalt_stream) =
             create_proxy_and_stream::<fidl_fuchsia_metrics::MetricEventLoggerMarker>()

@@ -5,20 +5,20 @@
 //! Implementations for multicast forwarding that integrate with traits/types
 //! from foreign modules.
 
-use lock_order::lock::LockLevelFor;
+use lock_order::lock::{LockLevelFor, UnlockedAccess};
 use lock_order::relation::LockBefore;
-use lock_order::wrap::LockedWrapperApi;
-use netstack3_base::CoreTimerContext;
+use lock_order::wrap::{LockedWrapperApi, LockedWrapperUnlockedApi};
+use netstack3_base::{CoreTimerContext, CounterContext};
 use netstack3_device::{DeviceId, WeakDeviceId};
 use netstack3_ip::multicast_forwarding::{
-    MulticastForwardingEnabledState, MulticastForwardingPendingPackets,
-    MulticastForwardingPendingPacketsContext, MulticastForwardingState,
-    MulticastForwardingStateContext, MulticastForwardingTimerId, MulticastRouteTable,
-    MulticastRouteTableContext,
+    MulticastForwardingCounters, MulticastForwardingEnabledState,
+    MulticastForwardingPendingPackets, MulticastForwardingPendingPacketsContext,
+    MulticastForwardingState, MulticastForwardingStateContext, MulticastForwardingTimerId,
+    MulticastRouteTable, MulticastRouteTableContext,
 };
 use netstack3_ip::IpLayerTimerId;
 
-use crate::{lock_ordering, BindingsContext, BindingsTypes, CoreCtx, IpExt};
+use crate::{lock_ordering, BindingsContext, BindingsTypes, CoreCtx, IpExt, StackState};
 
 #[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<
@@ -132,5 +132,28 @@ where
 {
     fn convert_timer(dispatch_id: MulticastForwardingTimerId<I>) -> BC::DispatchId {
         IpLayerTimerId::from(dispatch_id).into()
+    }
+}
+
+impl<I, BC, L> CounterContext<MulticastForwardingCounters<I>> for CoreCtx<'_, BC, L>
+where
+    I: IpExt,
+    BC: BindingsContext,
+{
+    fn with_counters<O, F: FnOnce(&MulticastForwardingCounters<I>) -> O>(&self, cb: F) -> O {
+        cb(self.unlocked_access::<crate::lock_ordering::MulticastForwardingCounters<I>>())
+    }
+}
+
+impl<I, BC> UnlockedAccess<crate::lock_ordering::MulticastForwardingCounters<I>> for StackState<BC>
+where
+    I: IpExt,
+    BC: BindingsContext,
+{
+    type Data = MulticastForwardingCounters<I>;
+    type Guard<'l> = &'l MulticastForwardingCounters<I> where Self: 'l;
+
+    fn access(&self) -> Self::Guard<'_> {
+        self.inner_ip_state().multicast_forwarding_counters()
     }
 }

@@ -416,6 +416,15 @@ class NetworkConfig:
             credential_value=credential.value(),
         )
 
+    def to_fidl(self) -> f_wlan_policy.NetworkConfig:
+        """Convert to equivalent FIDL."""
+        return f_wlan_policy.NetworkConfig(
+            id=NetworkIdentifier(self.ssid, self.security_type).to_fidl(),
+            credential=Credential.from_password(
+                self.credential_value
+            ).to_fidl(),
+        )
+
     def __lt__(self, other: NetworkConfig) -> bool:
         return self.ssid < other.ssid
 
@@ -993,3 +1002,141 @@ class CountryCode(enum.StrEnum):
     TAIWAN = "TW"
     UNITED_STATES_OF_AMERICA = "US"
     WORLDWIDE = "WW"
+
+
+class ConnectivityMode(enum.IntEnum):
+    """Connectivity operating mode for the access point."""
+
+    LOCAL_ONLY = 1
+    """Allows for connectivity between co-located devices.
+
+    Local only access points do not forward traffic to other network connections.
+    """
+
+    UNRESTRICTED = 2
+    """Allows for full connectivity.
+
+    Traffic can potentially being forwarded to other network connections (e.g.
+    tethering mode).
+    """
+
+    @staticmethod
+    def from_fidl(
+        fidl: f_wlan_policy.ConnectivityMode,
+    ) -> "ConnectivityMode":
+        """Parse from a fuchsia.wlan.policy/ConnectivityMode."""
+        return ConnectivityMode(fidl)
+
+    def to_fidl(self) -> f_wlan_policy.ConnectivityMode:
+        """Convert to equivalent FIDL."""
+        return f_wlan_policy.ConnectivityMode(self.value)
+
+
+class OperatingBand(enum.IntEnum):
+    """Operating band for wlan control request and status updates."""
+
+    ANY = 1
+    """Allows for band switching depending on device operating mode and
+    environment."""
+
+    ONLY_2_4GHZ = 2
+    """Restricted to 2.4 GHz bands only."""
+
+    ONLY_5GHZ = 3
+    """Restricted to 5 GHz bands only."""
+
+    @staticmethod
+    def from_fidl(
+        fidl: f_wlan_policy.OperatingBand,
+    ) -> "OperatingBand":
+        """Parse from a fuchsia.wlan.policy/OperatingBand."""
+        return OperatingBand(fidl)
+
+    def to_fidl(self) -> f_wlan_policy.OperatingBand:
+        """Convert to equivalent FIDL."""
+        return f_wlan_policy.OperatingBand(self.value)
+
+
+class OperatingState(enum.IntEnum):
+    """Current detailed operating state for an access point."""
+
+    FAILED = 1
+    """Access point operation failed.
+
+    Access points that enter the failed state will have one update informing
+    registered listeners of the failure and then an additional update with the
+    access point removed from the list.
+    """
+
+    STARTING = 2
+    """Access point operation is starting up."""
+
+    ACTIVE = 3
+    """Access point operation is active."""
+
+    @staticmethod
+    def from_fidl(
+        fidl: f_wlan_policy.OperatingState,
+    ) -> "OperatingState":
+        """Parse from a fuchsia.wlan.policy/OperatingState."""
+        return OperatingState(fidl)
+
+
+@dataclass(frozen=True)
+class AccessPointState:
+    """Information about the individual operating access points.
+
+    This includes limited information about any connected clients.
+    """
+
+    state: OperatingState
+    """Current access point operating state."""
+
+    mode: ConnectivityMode
+    """Requested operating connectivity mode."""
+
+    band: OperatingBand
+    """Access point operating band."""
+
+    frequency: int | None
+    """Access point operating frequency (in MHz)."""
+
+    clients: ConnectedClientInformation | None
+    """Information about connected clients."""
+
+    id: NetworkIdentifier
+    """Identifying information of the access point whose state has changed."""
+
+    @staticmethod
+    def from_fidl(
+        fidl: f_wlan_policy.AccessPointState,
+    ) -> "AccessPointState":
+        """Parse from a fuchsia.wlan.policy/AccessPointState."""
+        return AccessPointState(
+            state=OperatingState.from_fidl(fidl.state),
+            mode=ConnectivityMode.from_fidl(fidl.mode),
+            band=OperatingBand.from_fidl(fidl.band),
+            frequency=fidl.frequency,
+            clients=ConnectedClientInformation.from_fidl(fidl.clients)
+            if fidl.clients
+            else None,
+            id=NetworkIdentifier.from_fidl(fidl.id),
+        )
+
+
+@dataclass(frozen=True)
+class ConnectedClientInformation:
+    """Connected client information.
+
+    This is initially limited to the number of connected clients.
+    """
+
+    count: int
+    """Number of connected clients."""
+
+    @staticmethod
+    def from_fidl(
+        fidl: f_wlan_policy.ConnectedClientInformation,
+    ) -> "ConnectedClientInformation":
+        """Parse from a fuchsia.wlan.policy/ConnectedClientInformation."""
+        return ConnectedClientInformation(count=fidl.count)

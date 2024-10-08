@@ -815,8 +815,8 @@ The calculation of traits derivation rules is visible in
 ```
 
 <!-- link labels -->
-[`HandleDisposition`]: https://fuchsia-docs.firebaseapp.com/rust/fuchsia_zircon/struct.HandleDisposition.html
-[`HandleInfo`]: https://fuchsia-docs.firebaseapp.com/rust/fuchsia_zircon/struct.HandleInfo.html
+[`HandleDisposition`]: https://fuchsia-docs.firebaseapp.com/rust/zx/struct.HandleDisposition.html
+[`HandleInfo`]: https://fuchsia-docs.firebaseapp.com/rust/zx/struct.HandleInfo.html
 [`persist`]: https://fuchsia-docs.firebaseapp.com/rust/fidl/fn.persist.html
 [`standalone_encode_value`]: https://fuchsia-docs.firebaseapp.com/rust/fidl/fn.standalone_encode_value.html
 [`standalone_encode_resource`]: https://fuchsia-docs.firebaseapp.com/rust/fidl/fn.standalone_encode_resource.html

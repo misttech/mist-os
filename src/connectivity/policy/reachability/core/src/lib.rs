@@ -222,7 +222,7 @@ struct StateEvent {
     /// `state` is the current reachability state.
     state: State,
     /// The time of this event.
-    time: fasync::Time,
+    time: fasync::MonotonicInstant,
 }
 
 impl StateEvent {
@@ -411,7 +411,7 @@ impl StateInfo {
 
     /// Report the duration of the current state for each interface and each protocol.
     fn report(&self) {
-        let time = fasync::Time::now();
+        let time = fasync::MonotonicInstant::now();
         debug!("system reachability state IPv4 {:?}", self.get_system_ipv4());
         debug!("system reachability state IPv6 {:?}", self.get_system_ipv6());
         for (id, IpVersions { ipv4, ipv6 }) in self.per_interface.iter() {
@@ -872,8 +872,14 @@ impl<Time: TimeProvider> Monitor<Time> {
 
         ctx.checker_state = NetworkCheckState::Idle;
         let info = IpVersions {
-            ipv4: StateEvent { state: ctx.discovered_state_v4, time: fasync::Time::now() },
-            ipv6: StateEvent { state: ctx.discovered_state_v6, time: fasync::Time::now() },
+            ipv4: StateEvent {
+                state: ctx.discovered_state_v4,
+                time: fasync::MonotonicInstant::now(),
+            },
+            ipv6: StateEvent {
+                state: ctx.discovered_state_v6,
+                time: fasync::MonotonicInstant::now(),
+            },
         };
 
         let gateway_event_v4 = TelemetryEvent::GatewayProbe {
@@ -942,7 +948,7 @@ impl<Time: TimeProvider> Monitor<Time> {
         &mut self,
         fnet_interfaces_ext::Properties { id, name, .. }: fnet_interfaces_ext::Properties,
     ) {
-        let time = fasync::Time::now();
+        let time = fasync::MonotonicInstant::now();
         if let Some(mut reachability) = self.state.get(id.into()).cloned() {
             reachability.ipv4 = StateEvent {
                 state: State { link: LinkState::Removed, ..Default::default() },
@@ -1427,7 +1433,7 @@ mod tests {
 
     impl<S: Into<State>> Construct<S> for StateEvent {
         fn construct(link: S) -> Self {
-            Self { state: link.into(), time: fasync::Time::INFINITE }
+            Self { state: link.into(), time: fasync::MonotonicInstant::INFINITE }
         }
     }
 
@@ -1438,7 +1444,7 @@ mod tests {
                     link,
                     application: ApplicationState { dns_resolved, http_fetch_succeeded },
                 },
-                time: fasync::Time::INFINITE,
+                time: fasync::MonotonicInstant::INFINITE,
             }
         }
     }
@@ -2614,7 +2620,7 @@ mod tests {
         const NON_ETHERNET_INTERFACE_NAME: &str = "test01";
 
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        let time = fasync::Time::from_nanos(1_000_000_000);
+        let time = fasync::MonotonicInstant::from_nanos(1_000_000_000);
         let () = exec.set_fake_time(time.into());
 
         let got = run_network_check(

@@ -20,6 +20,15 @@ impl Counter {
         let _: u64 = v.fetch_add(1, Ordering::Relaxed);
     }
 
+    /// Adds the provided value to the counter.
+    pub fn add(&self, n: u64) {
+        // Use relaxed ordering since we do not use packet counter values to
+        // synchronize other accesses.  See:
+        // https://doc.rust-lang.org/nomicon/atomics.html#relaxed
+        let Self(v) = self;
+        let _: u64 = v.fetch_add(n, Ordering::Relaxed);
+    }
+
     /// Atomically retrieves the counter value as a `u64`.
     pub fn get(&self) -> u64 {
         // Use relaxed ordering since we do not use packet counter values to
@@ -40,6 +49,11 @@ pub trait CounterContext<T> {
     /// Increments the counter returned by the callback.
     fn increment<F: FnOnce(&T) -> &Counter>(&self, cb: F) {
         self.with_counters(|counters| cb(counters).increment());
+    }
+
+    /// Adds the provided value to the counter returned by the callback.
+    fn add<F: FnOnce(&T) -> &Counter>(&self, n: u64, cb: F) {
+        self.with_counters(|counters| cb(counters).add(n))
     }
 }
 

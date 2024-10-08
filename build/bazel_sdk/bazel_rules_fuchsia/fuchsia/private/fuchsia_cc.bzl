@@ -13,6 +13,7 @@ cc_binary & cc_test wrappers:
  - fuchsia_wrap_cc_test
 """
 
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":fuchsia_component.bzl", "fuchsia_test_component")
 load(":fuchsia_component_manifest.bzl", "fuchsia_component_manifest")
 load(
@@ -166,7 +167,7 @@ _fuchsia_cc_binary, _fuchsia_cc_test = rule_variants(
         "_cc_toolchain": attr.label(
             default = Label("@bazel_tools//tools/cpp:current_cc_toolchain"),
         ),
-    },
+    } | COMPATIBILITY.FUCHSIA_ATTRS,
 )
 
 # fuchsia_cc_binary build rules.
@@ -348,7 +349,7 @@ _fuchsia_cc_test_manifest = rule(
             default = "//fuchsia/private:templates/cc_test_manifest.cml.tmpl",
             allow_single_file = True,
         ),
-    },
+    } | COMPATIBILITY.HOST_ATTRS,
 )
 
 def fuchsia_wrap_cc_test(

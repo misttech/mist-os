@@ -246,7 +246,7 @@ struct StatisticsTracker {
 
     /// Start time for a new statistics period.
     /// This is an exclusive start.
-    statistics_start_time: fasync::Time,
+    statistics_start_time: fasync::MonotonicInstant,
 }
 
 pub struct SensorLoggerArgs<'a, T> {
@@ -290,11 +290,11 @@ pub struct SensorLogger<T> {
 
     /// Start time for the logger; used to calculate elapsed time.
     /// This is an exclusive start.
-    start_time: fasync::Time,
+    start_time: fasync::MonotonicInstant,
 
     /// Time at which the logger will stop.
     /// This is an exclusive end.
-    end_time: fasync::Time,
+    end_time: fasync::MonotonicInstant,
 
     /// Client associated with this logger.
     client_id: String,
@@ -346,14 +346,15 @@ impl<T: Sensor<T>> SensorLogger<T> {
 
         let driver_names: Vec<String> = drivers.iter().map(|c| c.name().to_string()).collect();
 
-        let start_time = fasync::Time::now();
-        let end_time = duration_ms
-            .map_or(fasync::Time::INFINITE, |d| start_time + zx::Duration::from_millis(d as i64));
+        let start_time = fasync::MonotonicInstant::now();
+        let end_time = duration_ms.map_or(fasync::MonotonicInstant::INFINITE, |d| {
+            start_time + zx::Duration::from_millis(d as i64)
+        });
         let sampling_interval = zx::Duration::from_millis(sampling_interval_ms as i64);
 
         let statistics_tracker = statistics_interval_ms.map(|i| StatisticsTracker {
             statistics_interval: zx::Duration::from_millis(i as i64),
-            statistics_start_time: fasync::Time::now(),
+            statistics_start_time: fasync::MonotonicInstant::now(),
             samples: vec![Vec::new(); drivers.len()],
         });
 
@@ -395,7 +396,7 @@ impl<T: Sensor<T>> SensorLogger<T> {
             // If we're interested in very high-rate polling in the future, it might be worth
             // comparing the elapsed time to the intended polling interval and logging any
             // anomalies.
-            let now = fasync::Time::now();
+            let now = fasync::MonotonicInstant::now();
             if now >= self.end_time {
                 break;
             }
@@ -403,7 +404,7 @@ impl<T: Sensor<T>> SensorLogger<T> {
         }
     }
 
-    async fn log_single_data(&mut self, time_stamp: fasync::Time) {
+    async fn log_single_data(&mut self, time_stamp: fasync::MonotonicInstant) {
         // Execute a query to each sensor driver.
         let queries = FuturesUnordered::new();
         for (index, driver) in self.drivers.iter().enumerate() {
@@ -904,7 +905,7 @@ pub mod tests {
     impl Runner {
         fn new() -> Self {
             let executor = fasync::TestExecutor::new_with_fake_time();
-            executor.set_fake_time(fasync::Time::from_nanos(0));
+            executor.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
             let inspector = inspect::Inspector::default();
             let inspect_root = inspector.root().create_child("MetricsLogger");

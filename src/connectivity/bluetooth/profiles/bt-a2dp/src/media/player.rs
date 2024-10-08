@@ -40,7 +40,7 @@ struct AudioConsumerSink {
     buffers: Vec<zx::Vmo>,
     buffers_free: HashSet<usize>,
     tx_count: u64,
-    first_packet_sent: Option<fasync::Time>,
+    first_packet_sent: Option<fasync::MonotonicInstant>,
     flags_receiver: mpsc::Receiver<u32>,
     stream_sink: StreamSinkProxy,
     audio_consumer: AudioConsumerProxy,
@@ -161,7 +161,7 @@ impl AudioConsumerSink {
         };
 
         if self.first_packet_sent.is_none() {
-            let now = fasync::Time::now();
+            let now = fasync::MonotonicInstant::now();
             self.first_packet_sent = Some(now);
             self.audio_consumer.start(AudioConsumerStartFlags::SUPPLY_DRIVEN, 0, NO_TIMESTAMP)?;
         }

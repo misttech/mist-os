@@ -4,6 +4,7 @@ load(
     "fuchsia_package_resource_collection",
     "fuchsia_package_resource_group",
 )
+load("@fuchsia_sdk//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//:generated_constants.bzl", "constants")
 
 fuchsia_package_resource_group(
@@ -13,7 +14,7 @@ fuchsia_package_resource_group(
     ],
     dest = "{{dest}}",
     basename_only = True,
-    target_compatible_with = [ "@platforms//os:fuchsia" ]
+    target_compatible_with = COMPATIBILITY.FUCHSIA_CONDITION,
 )
 
 fuchsia_package_resource_collection(

@@ -1217,9 +1217,9 @@ async fn test_forwarding<M: Manager, N: Netstack>(name: &str) {
                 // configuration to be installed on v4 because the device
                 // installed by this test doesn't match the Ethernet device
                 // class.
-                assert_eq!(ipv4.forwarding, Some(true));
+                assert_eq!(ipv4.unicast_forwarding, Some(true));
                 assert_eq!(ipv4.multicast_forwarding, Some(true));
-                assert_eq!(ipv6.forwarding, Some(false));
+                assert_eq!(ipv6.unicast_forwarding, Some(false));
                 assert_eq!(ipv6.multicast_forwarding, Some(false));
             }
             .boxed_local()
@@ -1947,7 +1947,7 @@ struct MasqueradeTestSetup {
         router_server_ip: fidl_subnet!("192.168.0.1/24"),
         router_if_config: fnet_interfaces_admin::Configuration {
             ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
-                forwarding: Some(true),
+                unicast_forwarding: Some(true),
                 ..Default::default()
             }),
             ..Default::default()
@@ -1968,7 +1968,7 @@ struct MasqueradeTestSetup {
         router_server_ip: fidl_subnet!("fd00:0:0:2::1/64"),
         router_if_config: fnet_interfaces_admin::Configuration {
             ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
-                forwarding: Some(true),
+                unicast_forwarding: Some(true),
                 ..Default::default()
             }),
             ..Default::default()

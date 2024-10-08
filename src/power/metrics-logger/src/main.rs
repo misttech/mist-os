@@ -656,7 +656,7 @@ mod tests {
         fn new() -> Self {
             // Fuchsia Executor must be created first.
             let executor = fasync::TestExecutor::new_with_fake_time();
-            executor.set_fake_time(fasync::Time::from_nanos(0));
+            executor.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
             Self {
                 executor,

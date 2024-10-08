@@ -66,6 +66,7 @@ cc_source_library://pkg/driver_logging_cpp
 cc_source_library://pkg/driver_metadata_cpp (unstable)
 cc_source_library://pkg/driver_node_cpp
 cc_source_library://pkg/driver_outgoing_cpp
+cc_source_library://pkg/driver_platform_device_cpp (unstable)
 cc_source_library://pkg/driver_power_cpp (unstable)
 cc_source_library://pkg/driver_runtime
 cc_source_library://pkg/driver_runtime_cpp
@@ -218,7 +219,6 @@ fidl_library://fidl/fuchsia.castsetup
 fidl_library://fidl/fuchsia.castsysteminfo
 fidl_library://fidl/fuchsia.castwindow
 fidl_library://fidl/fuchsia.component
-fidl_library://fidl/fuchsia.component.config
 fidl_library://fidl/fuchsia.component.decl
 fidl_library://fidl/fuchsia.component.resolution
 fidl_library://fidl/fuchsia.component.runner

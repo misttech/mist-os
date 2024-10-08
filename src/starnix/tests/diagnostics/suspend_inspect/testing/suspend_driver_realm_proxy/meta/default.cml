@@ -47,7 +47,6 @@
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.kernel.PowerResource",
-                "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
             ],
             from: "parent",

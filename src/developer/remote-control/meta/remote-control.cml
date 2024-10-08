@@ -13,6 +13,15 @@
     ],
     use: [
         {
+            // Whether we should use hardcoded identity or query the system for identifying
+            // information.
+            config: "fuchsia.rcs.UseDefaultIdentity",
+            key: "use_default_identity",
+            type: "bool",
+            availability: "optional",
+            default: false,
+        },
+        {
             directory: "dev-overnet-usb",
             rights: [ "r*" ],
             path: "/dev/class/overnet-usb",
@@ -22,7 +31,6 @@
             protocol: [
                 "fuchsia.boot.Arguments",
                 "fuchsia.sys2.LifecycleController.root",
-                "fuchsia.sys2.RealmExplorer.root",
                 "fuchsia.sys2.RealmQuery.root",
                 "fuchsia.sys2.RouteValidator.root",
             ],

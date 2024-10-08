@@ -95,8 +95,6 @@ class IgcDriver final : public fdf::DriverBase,
   void ReleaseVmo(
       fuchsia_hardware_network_driver::wire::NetworkDeviceImplReleaseVmoRequest* request,
       fdf::Arena& arena, ReleaseVmoCompleter::Sync& completer) override;
-  void SetSnoop(fuchsia_hardware_network_driver::wire::NetworkDeviceImplSetSnoopRequest* request,
-                fdf::Arena& arena, SetSnoopCompleter::Sync& completer) override;
 
   // NetworkPort protocol implementation.
   void GetInfo(

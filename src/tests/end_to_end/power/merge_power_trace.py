@@ -32,7 +32,7 @@ def merge_trace(trace: str = "", power: str = "", output: str = "") -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        "fx merge_power_data",
+        "fx merge_power_trace",
         description="Align and merge together a power.csv and a trace file",
         exit_on_error=False,
     )

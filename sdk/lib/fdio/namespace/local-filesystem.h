@@ -70,6 +70,11 @@ struct fdio_namespace : public fbl::RefCounted<fdio_namespace> {
   zx_status_t OpenRemoteDeprecated(std::string_view path, fuchsia_io::wire::OpenFlags flags,
                                    fidl::ServerEnd<fuchsia_io::Node> server_end) const;
 
+  // Open |path| relative to |vn| with specified |flags|. |path| may represent either a local node,
+  // or a remote object.
+  zx::result<fbl::RefPtr<fdio>> OpenAt(fbl::RefPtr<LocalVnode> vn, std::string_view path,
+                                       fuchsia_io::Flags flags) const;
+
   // Open a remote node at |path| within the namespace using |flags|. |path| must be an absolute
   // path starting from /.
   //

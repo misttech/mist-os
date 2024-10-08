@@ -321,7 +321,7 @@ pub fn create_inspect_persistence_channel() -> (mpsc::Sender<String>, mpsc::Rece
 /// Create past connection data with all random values. Tests can set the values they care about.
 pub fn random_connection_data() -> PastConnectionData {
     let mut rng = rand::thread_rng();
-    let connect_time = fasync::Time::from_nanos(rng.gen::<u16>().into());
+    let connect_time = fasync::MonotonicInstant::from_nanos(rng.gen::<u16>().into());
     let time_to_connect = zx::Duration::from_seconds(rng.gen_range::<i64, _>(5..10));
     let uptime = zx::Duration::from_seconds(rng.gen_range::<i64, _>(5..1000));
     let disconnect_time = connect_time + time_to_connect + uptime;

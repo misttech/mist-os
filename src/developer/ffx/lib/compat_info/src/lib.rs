@@ -66,8 +66,12 @@ impl Into<fidl_fuchsia_developer_remotecontrol::CompatibilityState> for Compatib
 impl From<version_history::AbiRevisionError> for CompatibilityState {
     fn from(value: version_history::AbiRevisionError) -> Self {
         match value {
-            version_history::AbiRevisionError::Unknown { .. } => Self::Unknown,
-            version_history::AbiRevisionError::Unsupported { .. } => Self::Unsupported,
+            version_history::AbiRevisionError::Malformed { .. }
+            | version_history::AbiRevisionError::PlatformMismatch { .. }
+            | version_history::AbiRevisionError::UnstableMismatch { .. }
+            | version_history::AbiRevisionError::TooNew { .. } => Self::Unknown,
+            version_history::AbiRevisionError::Retired { .. }
+            | version_history::AbiRevisionError::Invalid => Self::Unsupported,
         }
     }
 }

@@ -1,6 +1,6 @@
 {
   "name": "add",
-  "description": "add a file (<file_to_add>) to an existing package archive (<archive>), overwriting the archive",
+  "description": "add a file (<file_to_add>) to an existing package archive (<archive>), placing the resulting archive in <output>",
   "examples": [],
   "flags": [
     {

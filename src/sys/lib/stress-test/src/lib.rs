@@ -10,7 +10,7 @@ mod counter;
 
 use crate::counter::start_counter;
 use crate::environment::Environment;
-use fuchsia_async::{Time, Timer};
+use fuchsia_async::{MonotonicInstant, Timer};
 use futures::future::{select, Aborted, Either};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
@@ -64,7 +64,7 @@ pub async fn run_test<E: 'static + Environment>(mut env: E) {
     let (counter_task, counter_tx) = start_counter(target_operations);
 
     // Create a timeout task
-    let timeout = Timer::new(Time::after(timeout_secs.into()));
+    let timeout = Timer::new(MonotonicInstant::after(timeout_secs.into()));
     let mut test_end = select(counter_task, timeout);
 
     // A monotonically increasing counter representing the current generation.

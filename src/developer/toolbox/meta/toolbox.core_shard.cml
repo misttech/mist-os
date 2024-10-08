@@ -42,6 +42,20 @@
             availability: "optional",
             source_availability: "unknown",
         },
+        {
+            protocol: "fuchsia.developer.remotecontrol.RemoteControl",
+            from: "#remote-control",
+            to: "self/toolbox",
+            availability: "optional",
+            source_availability: "unknown",
+        },
+        {
+            protocol: "fuchsia.posix.socket.Provider",
+            from: "#network",
+            to: "self/toolbox",
+            availability: "optional",
+            source_availability: "unknown",
+        },
     ],
     expose: [
         {

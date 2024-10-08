@@ -296,11 +296,11 @@ impl RunningSinkTask {
         fasync::Task::spawn({
             let task_finished = result_fut.clone();
             async move {
-                let start_time = fasync::Time::now();
+                let start_time = fasync::MonotonicInstant::now();
                 trace::instant!(c"bt-a2dp", c"Media:Start", trace::Scope::Thread);
                 let _ = task_finished.await;
                 trace::instant!(c"bt-a2dp", c"Media:Stop", trace::Scope::Thread);
-                let end_time = fasync::Time::now();
+                let end_time = fasync::MonotonicInstant::now();
 
                 report_stream_metrics(metrics, &codec_type, (end_time - start_time).into_seconds())
             }
@@ -368,7 +368,7 @@ async fn media_stream_task(
                     player = Some(new_player);
                 }
 
-                inspect.record_transferred(pkt.len(), fasync::Time::now());
+                inspect.record_transferred(pkt.len(), fasync::MonotonicInstant::now());
                 if let Err(e) = player.as_mut().unwrap().push_payload(&pkt.as_slice()).await {
                     warn!(%peer_id, ?e, "can't play audio packet");
                 }
@@ -685,7 +685,7 @@ mod tests {
         let inspect =
             DataStreamInspect::default().with_inspect(root, "stream").expect("attach to tree");
 
-        exec.set_fake_time(fasync::Time::from_nanos(5_678900000));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(5_678900000));
 
         let (mut media_sender, mut media_receiver) = mpsc::channel(1);
 
@@ -716,7 +716,7 @@ mod tests {
         let sbc_packet_size = 85u64;
 
         media_sender.try_send(Ok(raw.clone())).expect("should be able to send into stream");
-        exec.set_fake_time(fasync::Time::after(zx::Duration::from_seconds(1)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(zx::Duration::from_seconds(1)));
         assert!(exec.run_until_stalled(&mut decode_fut).is_pending());
 
         // Expect a request for status and respond as they setup the player after data is first

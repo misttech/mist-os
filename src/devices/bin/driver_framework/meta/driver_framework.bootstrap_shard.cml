@@ -349,7 +349,10 @@
             ],
         },
         {
-            protocol: [ "fuchsia.power.system.ActivityGovernor" ],
+            protocol: [
+                "fuchsia.power.system.ActivityGovernor",
+                "fuchsia.power.system.CpuElementManager",
+            ],
             from: "#system-activity-governor",
             to: "#boot-drivers",
             source_availability: "unknown",

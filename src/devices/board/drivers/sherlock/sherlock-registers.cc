@@ -150,7 +150,7 @@ zx_status_t Sherlock::RegistersInit() {
 
   std::vector<fpbus::Metadata> registers_metadata{
       {{
-          .type = DEVICE_METADATA_REGISTERS,
+          .id = std::to_string(DEVICE_METADATA_REGISTERS),
           .data = metadata_bytes.value(),
       }},
   };

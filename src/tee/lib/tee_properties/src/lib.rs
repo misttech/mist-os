@@ -5,19 +5,11 @@
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine as _;
 use indexmap::IndexMap;
-use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use serde::{Deserialize, Serialize};
 use std::fs::read_to_string;
 use std::path::Path;
-use tee_internal::binding::{
-    TEE_Identity, TEE_LOGIN_APPLICATION, TEE_LOGIN_APPLICATION_GROUP, TEE_LOGIN_APPLICATION_USER,
-    TEE_LOGIN_GROUP, TEE_LOGIN_PUBLIC, TEE_LOGIN_TRUSTED_APP, TEE_LOGIN_USER, TEE_UUID,
-};
-use thiserror::Error;
-
-const EMPTY_UUID: TEE_UUID =
-    TEE_UUID { timeLow: 0, timeMid: 0, timeHiAndVersion: 0, clockSeqAndNode: [0; 8] };
+use tee_internal::{Identity, Login, Uuid};
 
 // Maps to GlobalPlatform TEE Internal Core API Section 4.4: Property Access Functions
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -32,7 +24,7 @@ pub enum PropType {
     String,
 }
 
-#[derive(Clone, Debug, Error)]
+#[derive(Clone, Debug, thiserror::Error)]
 pub enum PropertyError {
     #[error("Bad format: Unable to parse type: {prop_type:?} from value: {value}")]
     BadFormat { prop_type: PropType, value: String },
@@ -41,18 +33,6 @@ pub enum PropertyError {
     // Callers following Internal Core API spec should panic on this error.
     #[error("Generic TeeProperty error: {msg}")]
     Generic { msg: String },
-}
-
-#[repr(u32)]
-#[derive(FromPrimitive)]
-enum Login {
-    Public = TEE_LOGIN_PUBLIC,
-    User = TEE_LOGIN_USER,
-    Group = TEE_LOGIN_GROUP,
-    Application = TEE_LOGIN_APPLICATION,
-    ApplicationUser = TEE_LOGIN_APPLICATION_USER,
-    ApplicationGroup = TEE_LOGIN_APPLICATION_GROUP,
-    TrustedApp = TEE_LOGIN_TRUSTED_APP,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -144,11 +124,11 @@ impl PropSet {
         parse_binary_block(self.get_value(prop_name)?)
     }
 
-    pub fn get_uuid_property(&self, prop_name: String) -> Result<TEE_UUID, PropertyError> {
+    pub fn get_uuid_property(&self, prop_name: String) -> Result<Uuid, PropertyError> {
         parse_uuid(self.get_value(prop_name)?)
     }
 
-    pub fn get_identity_property(&self, prop_name: String) -> Result<TEE_Identity, PropertyError> {
+    pub fn get_identity_property(&self, prop_name: String) -> Result<Identity, PropertyError> {
         parse_identity(self.get_value(prop_name)?)
     }
 
@@ -233,12 +213,12 @@ impl PropEnumerator {
         self.get_props()?.get_binary_block_property(prop_name)
     }
 
-    pub fn get_property_as_uuid(&self) -> Result<TEE_UUID, PropertyError> {
+    pub fn get_property_as_uuid(&self) -> Result<Uuid, PropertyError> {
         let prop_name = self.get_property_name()?;
         self.get_props()?.get_uuid_property(prop_name)
     }
 
-    pub fn get_property_as_identity(&self) -> Result<TEE_Identity, PropertyError> {
+    pub fn get_property_as_identity(&self) -> Result<Identity, PropertyError> {
         let prop_name = self.get_property_name()?;
         self.get_props()?.get_identity_property(prop_name)
     }
@@ -287,41 +267,40 @@ fn parse_binary_block(value: String) -> Result<Vec<u8>, PropertyError> {
     }
 }
 
-fn parse_uuid(value: String) -> Result<TEE_UUID, PropertyError> {
+fn parse_uuid(value: String) -> Result<Uuid, PropertyError> {
     match uuid::Uuid::parse_str(&value) {
         Ok(uuid) => {
             let (time_low, time_mid, time_hi_and_version, clock_seq_and_node) = uuid.as_fields();
-            Ok(TEE_UUID {
-                timeLow: time_low,
-                timeMid: time_mid,
-                timeHiAndVersion: time_hi_and_version,
-                clockSeqAndNode: *clock_seq_and_node,
+            Ok(Uuid {
+                time_low: time_low,
+                time_mid: time_mid,
+                time_hi_and_version: time_hi_and_version,
+                clock_seq_and_node: *clock_seq_and_node,
             })
         }
         Err(_) => Err(PropertyError::BadFormat { prop_type: PropType::Uuid, value }),
     }
 }
 
-fn parse_identity(value: String) -> Result<TEE_Identity, PropertyError> {
+fn parse_identity(value: String) -> Result<Identity, PropertyError> {
     // Encoded as `integer (':' uuid)?`.
     let (login_str, uuid) = match value.split_once(':') {
         Some((login_str, uuid_str)) => (login_str, parse_uuid(uuid_str.to_string())?),
-        None => (value.as_str(), EMPTY_UUID),
+        None => (value.as_str(), Uuid::default()),
     };
     let login_val = match login_str.parse::<u32>() {
         Ok(val) => val,
         Err(_) => return Err(PropertyError::BadFormat { prop_type: PropType::Identity, value }),
     };
-    let _ = Login::from_u32(login_val)
+    let login = Login::from_u32(login_val)
         .ok_or(PropertyError::BadFormat { prop_type: PropType::Identity, value })?;
-    Ok(TEE_Identity { login: login_val, uuid })
+    Ok(Identity { login, uuid })
 }
 
 // TODO(b/366015756): Parsing logic should be fuzzed for production-hardening.
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use tee_internal::binding::TEE_LOGIN_TRUSTED_APP;
 
     const TEST_PROP_NAME_STRING: &str = "gpd.tee.test.string";
     const TEST_PROP_NAME_BOOL: &str = "gpd.tee.test.bool";
@@ -338,17 +317,17 @@ pub mod tests {
     const TEST_PROP_VAL_BINARY_BLOCK: &str = "ZnVjaHNpYQ=="; // base64 encoding of "fuchsia"
 
     const TEST_PROP_VAL_UUID: &str = "5b9e0e40-2636-11e1-ad9e-0002a5d5c51b"; // OS Test TA UUID
-    const TEST_PROP_UUID: TEE_UUID = TEE_UUID {
-        timeLow: 0x5b9e0e40,
-        timeMid: 0x2636,
-        timeHiAndVersion: 0x11e1,
-        clockSeqAndNode: [0xad, 0x9e, 0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b],
+    const TEST_PROP_UUID: Uuid = Uuid {
+        time_low: 0x5b9e0e40,
+        time_mid: 0x2636,
+        time_hi_and_version: 0x11e1,
+        clock_seq_and_node: [0xad, 0x9e, 0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b],
     };
 
     // TODO(https://fxbug.dev/369916290): Spell as 0xf0000000 when hex encodings are supported.
     const TEST_PROP_VAL_IDENTITY: &str = "4026531840:5b9e0e40-2636-11e1-ad9e-0002a5d5c51b";
-    const TEST_PROP_IDENTITY: TEE_Identity =
-        TEE_Identity { login: TEE_LOGIN_TRUSTED_APP, uuid: TEST_PROP_UUID };
+    const TEST_PROP_IDENTITY: Identity =
+        Identity { login: Login::TrustedApp, uuid: TEST_PROP_UUID };
 
     fn create_test_prop_map() -> PropertiesMap {
         let mut props: IndexMap<String, (PropType, String)> = IndexMap::new();
@@ -512,11 +491,11 @@ pub mod tests {
         let prop_type = enumerator.get_property_type().expect("getting prop type");
         assert_eq!(PropType::Uuid, prop_type);
 
-        let prop_val: TEE_UUID = enumerator.get_property_as_uuid().expect("getting prop as uuid");
-        assert_eq!(TEST_PROP_UUID.timeLow, prop_val.timeLow);
-        assert_eq!(TEST_PROP_UUID.timeMid, prop_val.timeMid);
-        assert_eq!(TEST_PROP_UUID.timeHiAndVersion, prop_val.timeHiAndVersion);
-        assert_eq!(TEST_PROP_UUID.clockSeqAndNode, prop_val.clockSeqAndNode);
+        let prop_val: Uuid = enumerator.get_property_as_uuid().expect("getting prop as uuid");
+        assert_eq!(TEST_PROP_UUID.time_low, prop_val.time_low);
+        assert_eq!(TEST_PROP_UUID.time_mid, prop_val.time_mid);
+        assert_eq!(TEST_PROP_UUID.time_hi_and_version, prop_val.time_hi_and_version);
+        assert_eq!(TEST_PROP_UUID.clock_seq_and_node, prop_val.clock_seq_and_node);
 
         // Identity.
         enumerator.next().expect("moving enumerator to next prop");
@@ -527,14 +506,14 @@ pub mod tests {
         let prop_type = enumerator.get_property_type().expect("getting prop type");
         assert_eq!(PropType::Identity, prop_type);
 
-        let prop_val: TEE_Identity =
+        let prop_val: Identity =
             enumerator.get_property_as_identity().expect("getting prop as identity");
         assert_eq!(TEST_PROP_IDENTITY.login, prop_val.login);
         // This should have the same test UUID; can reuse parsed expected uuid fields.
-        assert_eq!(TEST_PROP_IDENTITY.uuid.timeLow, prop_val.uuid.timeLow);
-        assert_eq!(TEST_PROP_IDENTITY.uuid.timeMid, prop_val.uuid.timeMid);
-        assert_eq!(TEST_PROP_IDENTITY.uuid.timeHiAndVersion, prop_val.uuid.timeHiAndVersion);
-        assert_eq!(TEST_PROP_IDENTITY.uuid.clockSeqAndNode, prop_val.uuid.clockSeqAndNode);
+        assert_eq!(TEST_PROP_IDENTITY.uuid.time_low, prop_val.uuid.time_low);
+        assert_eq!(TEST_PROP_IDENTITY.uuid.time_mid, prop_val.uuid.time_mid);
+        assert_eq!(TEST_PROP_IDENTITY.uuid.time_hi_and_version, prop_val.uuid.time_hi_and_version);
+        assert_eq!(TEST_PROP_IDENTITY.uuid.clock_seq_and_node, prop_val.uuid.clock_seq_and_node);
 
         // Test error upon going out of bounds and attempting to query next property.
         enumerator.next().expect("moving enumerator to next prop");
@@ -733,10 +712,10 @@ pub mod tests {
             .get_uuid_property(TEST_PROP_NAME_UUID.to_string())
             .expect("getting uuid prop val");
 
-        assert_eq!(TEST_PROP_UUID.timeLow, val.timeLow);
-        assert_eq!(TEST_PROP_UUID.timeMid, val.timeMid);
-        assert_eq!(TEST_PROP_UUID.timeHiAndVersion, val.timeHiAndVersion);
-        assert_eq!(TEST_PROP_UUID.clockSeqAndNode, val.clockSeqAndNode);
+        assert_eq!(TEST_PROP_UUID.time_low, val.time_low);
+        assert_eq!(TEST_PROP_UUID.time_mid, val.time_mid);
+        assert_eq!(TEST_PROP_UUID.time_hi_and_version, val.time_hi_and_version);
+        assert_eq!(TEST_PROP_UUID.clock_seq_and_node, val.clock_seq_and_node);
     }
 
     #[test]
@@ -754,15 +733,15 @@ pub mod tests {
     pub fn test_propset_get_identity_success() {
         let prop_set = create_test_prop_set();
 
-        let val: TEE_Identity = prop_set
+        let val: Identity = prop_set
             .get_identity_property(TEST_PROP_NAME_IDENTITY.to_string())
             .expect("getting identity prop val");
 
         assert_eq!(TEST_PROP_IDENTITY.login, val.login);
-        assert_eq!(TEST_PROP_IDENTITY.uuid.timeLow, val.uuid.timeLow);
-        assert_eq!(TEST_PROP_IDENTITY.uuid.timeMid, val.uuid.timeMid);
-        assert_eq!(TEST_PROP_IDENTITY.uuid.timeHiAndVersion, val.uuid.timeHiAndVersion);
-        assert_eq!(TEST_PROP_IDENTITY.uuid.clockSeqAndNode, val.uuid.clockSeqAndNode);
+        assert_eq!(TEST_PROP_IDENTITY.uuid.time_low, val.uuid.time_low);
+        assert_eq!(TEST_PROP_IDENTITY.uuid.time_mid, val.uuid.time_mid);
+        assert_eq!(TEST_PROP_IDENTITY.uuid.time_hi_and_version, val.uuid.time_hi_and_version);
+        assert_eq!(TEST_PROP_IDENTITY.uuid.clock_seq_and_node, val.uuid.clock_seq_and_node);
     }
 
     #[test]
@@ -1014,7 +993,7 @@ pub mod tests {
         let res = parse_identity("4026531840".to_string());
         assert!(res.is_ok());
         let id = res.unwrap();
-        assert_eq!(EMPTY_UUID, id.uuid);
+        assert_eq!(Uuid::default(), id.uuid);
     }
 
     #[test]

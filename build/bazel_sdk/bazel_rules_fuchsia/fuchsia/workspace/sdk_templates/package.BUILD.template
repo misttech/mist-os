@@ -2,10 +2,12 @@ load(
     "@fuchsia_sdk//fuchsia:defs.bzl",
     "fuchsia_prebuilt_package",
 )
+load("@fuchsia_sdk//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 
 fuchsia_prebuilt_package(
     name = "{{name}}",
     files = [{{files}}],
     manifest = "{{manifest}}",
     deprecation = {{deprecation}},
+    target_compatible_with = COMPATIBILITY.HOST_CONDITION,
 )

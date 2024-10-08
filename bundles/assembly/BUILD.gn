@@ -143,7 +143,10 @@ assembly_input_bundle("embeddable") {
       components = [
         {
           component_name = "bootstrap"
-          shards = [ "//src/sys/bootstrap/meta/bootstrap.cml" ]
+          shards = [
+            "//src/diagnostics/archivist/meta/archivist.bootstrap_shard.cml",
+            "//src/sys/bootstrap/meta/bootstrap.cml",
+          ]
         },
       ]
     },
@@ -365,7 +368,18 @@ assembly_input_bundle("embeddable_userdebug") {
     # shell
     "//zircon/third_party/uapp/dash:bootfs",
   ]
-  bootfs_packages = [ "//src/developer/toolbox" ]
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "toolbox"
+      components = [
+        {
+          component_name = "toolbox"
+          shards = [ "//src/developer/toolbox/meta/toolbox.cml" ]
+        },
+      ]
+    },
+  ]
 }
 
 # The most minimal AIB that is included in userdebug and eng assembled systems
@@ -406,6 +420,7 @@ assembly_input_bundle("embeddable_eng") {
   testonly = true
   bootfs_files_labels = [
     # tools
+    "//src/bringup/bin/bootpkg:bootfs",
     "//src/devices/bin/driver_tools:bootfs",
     "//src/devices/bin/lsdev:bootfs",
     "//src/diagnostics/iquery:bootfs",
@@ -1477,6 +1492,16 @@ assembly_input_bundle("core_realm_development_access") {
         },
       ]
     },
+    {
+      bootfs_package = true
+      name = "toolbox"
+      components = [
+        {
+          component_name = "toolbox"
+          shards = [ "//src/developer/remote-control/meta/remote-control.toolbox_shard.cml" ]
+        },
+      ]
+    },
   ]
   shell_commands = [
     {
@@ -1532,6 +1557,16 @@ assembly_input_bundle("bootstrap_realm_vsock_development_access") {
             "//src/developer/remote-control/meta/remote-control.bootstrap_shard.cml",
             "//src/developer/vsock-sshd-host/meta/vsock-sshd-host.bootstrap_shard.cml",
           ]
+        },
+      ]
+    },
+    {
+      bootfs_package = true
+      name = "toolbox"
+      components = [
+        {
+          component_name = "toolbox"
+          shards = [ "//src/developer/remote-control/meta/remote-control.vsock_toolbox_shard.cml" ]
         },
       ]
     },
@@ -1631,11 +1666,6 @@ assembly_input_bundle("radar_proxy_without_injector") {
       ]
     },
   ]
-}
-
-assembly_input_bundle("feedback_low_memory_product_config") {
-  config_data_labels =
-      [ "//src/developer/forensics:feedback_low_memory_product_config" ]
 }
 
 assembly_input_bundle("feedback_remote_device_id_provider") {
@@ -1838,11 +1868,6 @@ assembly_input_bundle("common_standard") {
 # This is exclusive to user builds on the minimal support level.
 #
 assembly_input_bundle("standard_user") {
-  base_packages = [
-    # memory_monitor with profiling disabled.
-    "//src/developer/memory/monitor:monitor_without_memory_sampler",
-  ]
-
   config_data = [
     {
       package_name = "cobalt"
@@ -1850,20 +1875,6 @@ assembly_input_bundle("standard_user") {
         {
           source = "//src/cobalt/bin/app/configs/user_config.json"
           destination = "config.json"
-        },
-      ]
-    },
-  ]
-
-  compiled_packages = [
-    {
-      name = "core"
-      components = [
-        {
-          component_name = "core"
-          shards = [
-            "//src/developer/memory/monitor/meta/memory_monitor.core_shard.cml",
-          ]
         },
       ]
     },
@@ -1897,15 +1908,6 @@ assembly_input_bundle("standard_userdebug") {
         {
           source = "//src/diagnostics/detect/configs/cobalt-detect.triage"
           destination = "cobalt-detect.triage"
-        },
-      ]
-    },
-    {
-      package_name = "memory_monitor"
-      files = [
-        {
-          source = "//src/developer/memory/monitor/config/send_critical_pressure_crash_reports"
-          destination = "send_critical_pressure_crash_reports"
         },
       ]
     },
@@ -1964,10 +1966,6 @@ assembly_input_bundle("standard_userdebug_and_eng") {
     "//src/diagnostics/detect:triage-detect",
     "//src/sys/pkg/bin/pkgctl",
     "//src/sys/pkg/bin/update",
-
-    # memory_monitor with profiling enabled.
-    "//src/developer/memory/monitor:monitor_with_memory_sampler",
-    "//src/performance/memory/sampler:memory_sampler",
   ]
   shell_commands = [
     {
@@ -1994,12 +1992,7 @@ assembly_input_bundle("standard_userdebug_and_eng") {
       components = [
         {
           component_name = "core"
-          shards = [
-            "//src/diagnostics/detect/meta/detect.core_shard.cml",
-            "//src/developer/memory/monitor/meta/memory_monitor.core_shard.cml",
-            "//src/developer/memory/monitor/meta/memory_monitor_with_memory_sampler.core_shard.cml",
-            "//src/performance/memory/sampler/meta/memory_sampler.core_shard.cml",
-          ]
+          shards = [ "//src/diagnostics/detect/meta/detect.core_shard.cml" ]
         },
       ]
     },
@@ -2012,6 +2005,83 @@ assembly_input_bundle("standard_userdebug_and_eng") {
           shards = [
             "//src/diagnostics/detect/meta/detect_userdebug.root_shard.cml",
           ]
+        },
+      ]
+    },
+  ]
+}
+
+# Assembly support for memory_monitor (v1).
+assembly_input_bundle("memory_monitor") {
+  base_packages = [
+    # memory_monitor with profiling disabled.
+    "//src/developer/memory/monitor:monitor_without_memory_sampler",
+  ]
+
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [
+            "//src/developer/memory/monitor/meta/memory_monitor.core_shard.cml",
+          ]
+        },
+      ]
+    },
+  ]
+}
+
+# Assembly support for memory_monitor (v1) with memory profiling enabled.
+assembly_input_bundle("memory_monitor_with_memory_sampler") {
+  base_packages = [
+    # memory_monitor with profiling enabled.
+    "//src/developer/memory/monitor:monitor_with_memory_sampler",
+    "//src/performance/memory/sampler:memory_sampler",
+  ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [
+            "//src/developer/memory/monitor/meta/memory_monitor.core_shard.cml",
+            "//src/developer/memory/monitor/meta/memory_monitor_with_memory_sampler.core_shard.cml",
+            "//src/performance/memory/sampler/meta/memory_sampler.core_shard.cml",
+          ]
+        },
+      ]
+    },
+  ]
+}
+
+assembly_input_bundle("memory_monitor_critical_reports") {
+  config_data = [
+    {
+      package_name = "memory_monitor"
+      files = [
+        {
+          source = "//src/developer/memory/monitor/config/send_critical_pressure_crash_reports"
+          destination = "send_critical_pressure_crash_reports"
+        },
+      ]
+    },
+  ]
+}
+
+# Assembly support for memory_monitor2.
+assembly_input_bundle("memory_monitor2") {
+  base_packages = [ "//src/performance/memory/attribution/monitor:monitor" ]
+
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/performance/memory/attribution/monitor/meta/memory_monitor2.core_shard.cml" ]
         },
       ]
     },
@@ -3600,22 +3670,6 @@ assembly_input_bundle("media_sessions") {
   ]
 }
 
-assembly_input_bundle("live_usb") {
-  bootfs_packages = [ "//src/sys/live_usb:package" ]
-  compiled_packages = [
-    {
-      bootfs_package = true
-      name = "bootstrap"
-      components = [
-        {
-          component_name = "bootstrap"
-          shards = [ "//src/sys/live_usb/meta/live-usb.shard.cml" ]
-        },
-      ]
-    },
-  ]
-}
-
 # Session manager support
 #
 # feature_set_levels: minimal
@@ -4329,10 +4383,7 @@ assembly_input_bundle("zoneinfo") {
 # feature set levels: standard (always), utility (optionally)
 # build types: all
 assembly_input_bundle("factory_reset") {
-  base_packages = [
-    # This still needs to be configured correctly for fxblob support
-    "//src/recovery/factory_reset:factory_reset_pkg",
-  ]
+  base_packages = [ "//src/recovery/factory_reset:factory_reset_pkg" ]
   compiled_packages = [
     {
       name = "core"
@@ -4350,10 +4401,7 @@ assembly_input_bundle("factory_reset") {
 
 # Assembly support for recovery-fdr
 assembly_input_bundle("recovery_fdr") {
-  base_packages = [
-    # This still needs to be configured correctly for board display rotations
-    "//src/recovery/system:system_recovery_fdr",
-  ]
+  base_packages = [ "//src/recovery/system:system_recovery_fdr" ]
   compiled_packages = [
     {
       name = "core"

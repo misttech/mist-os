@@ -544,7 +544,8 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
         }
 
         self.timer_futs.push(Abortable::new(
-            fasync::Timer::new(fasync::Time::from_zx(instant)).replace_value(timer_type),
+            fasync::Timer::new(fasync::MonotonicInstant::from_zx(instant))
+                .replace_value(timer_type),
             reg,
         ))
     }

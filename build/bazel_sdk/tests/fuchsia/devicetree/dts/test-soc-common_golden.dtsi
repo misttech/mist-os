@@ -1,0 +1,21 @@
+/dts-v1/;
+
+/ {
+ interrupt-parent = <&gic>;
+ soc {
+  #address-cells = <2>;
+  #size-cells = <2>;
+  ranges;
+  gpio: gpio-controller@ff634400 {
+   compatible = "test-soc,gpio";
+   reg = <0x0 0xff634400 0x0 0x400>;
+   interrupts = <0 64 (1 << 0)>;
+   gpio-controller;
+   #gpio-cells = <2>;
+   usb_power: usb-power {
+    pins = <(16 + 6)>;
+    output-high;
+   };
+  };
+ };
+};

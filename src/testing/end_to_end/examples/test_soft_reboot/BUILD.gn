@@ -6,7 +6,7 @@ import("//build/python/python_mobly_test.gni")
 import("//build/testing/environments.gni")
 
 if (is_host) {
-  python_mobly_test("soft_reboot_test_fc") {
+  python_mobly_test("soft_reboot_test") {
     main_source = "test_soft_reboot.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -15,7 +15,6 @@ if (is_host) {
     params = {
       num_reboots = 1
     }
-    transport = "fuchsia-controller"
     enable_hermetic_exe = true
     environments = [
       # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
@@ -71,8 +70,8 @@ group("test_soft_reboot_sl4f") {
 group("tests") {
   testonly = true
   public_deps = [
-    ":soft_reboot_test_fc($host_toolchain)",
-    ":soft_reboot_test_fc.hermetic($host_toolchain)",
+    ":soft_reboot_test($host_toolchain)",
+    ":soft_reboot_test.hermetic($host_toolchain)",
     ":test_soft_reboot_sl4f",
   ]
 }

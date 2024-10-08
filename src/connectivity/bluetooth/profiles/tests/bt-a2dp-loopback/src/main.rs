@@ -94,6 +94,9 @@ async fn main() {
     // TODO(https://fxbug.dev/42055121): Verify that audio packets are transferred from Source to Sink.
     const STREAMING_DURATION: i64 = 10;
     info!("Streaming for duration {}", STREAMING_DURATION);
-    fasync::Timer::new(fasync::Time::after(zx::Duration::from_seconds(STREAMING_DURATION))).await;
+    fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_seconds(
+        STREAMING_DURATION,
+    )))
+    .await;
     info!("Finished streaming.")
 }

@@ -4,7 +4,8 @@
 
 #![recursion_limit = "512"]
 
-use starnix_core::mm::PAGE_SIZE;
+use linux_uapi::FUSE_DEV_IOC_PASSTHROUGH_OPEN_V2;
+use starnix_core::mm::{MemoryAccessorExt, PAGE_SIZE};
 use starnix_core::mutable_state::Guard;
 use starnix_core::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter};
 use starnix_core::vfs::buffers::{
@@ -17,7 +18,8 @@ use starnix_core::vfs::{
     DynamicFile, DynamicFileBuf, DynamicFileSource, FallocMode, FdNumber, FileObject, FileOps,
     FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
     FsNodeInfo, FsNodeOps, FsStr, FsString, PeekBufferSegmentsCallback, SeekTarget, SimpleFileNode,
-    StaticDirectoryBuilder, SymlinkTarget, ValueOrSize, VecDirectory, VecDirectoryEntry, XattrOp,
+    StaticDirectoryBuilder, SymlinkTarget, ValueOrSize, VecDirectory, VecDirectoryEntry,
+    WeakFileHandle, XattrOp,
 };
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{log_error, log_trace, log_warn, track_stub};
@@ -121,6 +123,37 @@ impl FileOps for DevFuse {
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
         Ok(self.connection.lock().query_events())
+    }
+
+    fn ioctl(
+        &self,
+        locked: &mut Locked<'_, Unlocked>,
+        file: &FileObject,
+        current_task: &CurrentTask,
+        request: u32,
+        arg: SyscallArg,
+    ) -> Result<SyscallResult, Errno> {
+        match request {
+            FUSE_DEV_IOC_PASSTHROUGH_OPEN_V2 => {
+                let fd = current_task.read_object::<FdNumber>(arg.into())?;
+                let fd = current_task.files.get(fd)?;
+                let id = {
+                    let mut connection = self.connection.lock();
+                    let (mut id, _) = connection.last_passthrough_id.overflowing_add(1);
+                    let mut entry = connection.registered_passthrough.entry(id);
+                    while id == 0 || matches!(entry, Entry::Occupied(_)) {
+                        let (new_id, _) = id.overflowing_add(1);
+                        id = new_id;
+                        entry = connection.registered_passthrough.entry(id);
+                    }
+                    entry.or_insert(Arc::downgrade(&fd));
+                    connection.last_passthrough_id = id;
+                    id
+                };
+                Ok(id.into())
+            }
+            _ => default_ioctl(file, locked, current_task, request, arg),
+        }
     }
 }
 
@@ -633,6 +666,8 @@ impl FuseNode {
 
 struct FuseFileObject {
     connection: Arc<FuseConnection>,
+    /// An optional file handle to redirect all read/write to.
+    passthrough_file: WeakFileHandle,
     /// The response to the open calls from the userspace process.
     open_out: uapi::fuse_open_out,
 }
@@ -648,16 +683,20 @@ impl FileOps for FuseFileObject {
     fn close(&self, file: &FileObject, current_task: &CurrentTask) {
         let node = Self::get_fuse_node(file);
         let is_dir = file.node().is_dir();
-        if let Err(e) = self.connection.lock().execute_operation(
-            current_task,
-            node.nodeid,
-            if is_dir {
-                FuseOperation::ReleaseDir(self.open_out)
-            } else {
-                FuseOperation::Release(self.open_out)
-            },
-        ) {
-            log_error!("Error when releasing fh: {e:?}");
+        {
+            let mut connection = self.connection.lock();
+            if let Err(e) = connection.execute_operation(
+                current_task,
+                node.nodeid,
+                if is_dir {
+                    FuseOperation::ReleaseDir(self.open_out)
+                } else {
+                    FuseOperation::Release(self.open_out)
+                },
+            ) {
+                log_error!("Error when releasing fh: {e:?}");
+            }
+            connection.clear_released_passthrough_fds();
         }
     }
 
@@ -678,12 +717,18 @@ impl FileOps for FuseFileObject {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
+        if file.node().info().mode.is_dir() {
+            return error!(EISDIR);
+        }
+        if let Some(file_object) = self.passthrough_file.upgrade() {
+            return file_object.ops().read(locked, &file_object, current_task, offset, data);
+        }
         let node = Self::get_fuse_node(file);
         let response = self.connection.lock().execute_operation(
             current_task,
@@ -708,12 +753,18 @@ impl FileOps for FuseFileObject {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<'_, FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
+        if file.node().info().mode.is_dir() {
+            return error!(EISDIR);
+        }
+        if let Some(file_object) = self.passthrough_file.upgrade() {
+            return file_object.ops().write(locked, &file_object, current_task, offset, data);
+        }
         let node = Self::get_fuse_node(file);
         let content = data.peek_all()?;
         let response = self.connection.lock().execute_operation(
@@ -1091,7 +1142,21 @@ impl FsNodeOps for FuseNode {
         } else {
             return error!(EINVAL);
         };
-        Ok(Box::new(FuseFileObject { connection: self.connection.clone(), open_out }))
+        let passthrough_file = if open_out.passthrough_fh != 0 {
+            let mut connection = self.connection.lock();
+            let entry = connection.registered_passthrough.entry(open_out.passthrough_fh);
+            match entry {
+                Entry::Occupied(v) => v.remove(),
+                Entry::Vacant(_) => Default::default(),
+            }
+        } else {
+            Weak::new()
+        };
+        Ok(Box::new(FuseFileObject {
+            connection: self.connection.clone(),
+            passthrough_file,
+            open_out,
+        }))
     }
 
     fn lookup(
@@ -1528,16 +1593,7 @@ struct FuseConfiguration {
 impl TryFrom<uapi::fuse_init_out> for FuseConfiguration {
     type Error = Errno;
     fn try_from(init_out: uapi::fuse_init_out) -> Result<Self, Errno> {
-        let unknown_flags = init_out.flags & !FuseInitFlags::all().bits();
-        if unknown_flags != 0 {
-            track_stub!(
-                TODO("https://fxbug.dev/322875725"),
-                "FUSE unknown init flags",
-                unknown_flags
-            );
-            log_warn!("FUSE daemon requested unknown flags in init: {unknown_flags}");
-        }
-        let flags = FuseInitFlags::from_bits_truncate(init_out.flags);
+        let flags = FuseInitFlags::try_from(init_out)?;
         Ok(Self { flags })
     }
 }
@@ -1578,6 +1634,13 @@ struct FuseMutableState {
 
     /// If true, then the create operation is not supported in which case mknod will be used.
     no_create: bool,
+
+    /// Last used id for registered fd for passthrough.
+    last_passthrough_id: u32,
+
+    /// All currently registered fd for passthrough, associated with their id. The elements are
+    /// cleared when used and regularly to check for closed files.
+    registered_passthrough: HashMap<u32, WeakFileHandle>,
 }
 
 impl<'a> FuseMutableStateGuard<'a> {
@@ -1889,6 +1952,10 @@ impl FuseMutableState {
             }
         }
     }
+
+    fn clear_released_passthrough_fds(&mut self) {
+        self.registered_passthrough.retain(|_, s| s.strong_count() > 0);
+    }
 }
 
 /// An operation that is either queued to be send to userspace, or already sent to userspace and
@@ -1943,16 +2010,43 @@ impl FuseKernelMessage {
 
 bitflags::bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-    pub struct FuseInitFlags : u32 {
-        const BIG_WRITES = uapi::FUSE_BIG_WRITES;
-        const DONT_MASK = uapi::FUSE_DONT_MASK;
-        const SPLICE_WRITE = uapi::FUSE_SPLICE_WRITE;
-        const SPLICE_MOVE = uapi::FUSE_SPLICE_MOVE;
-        const SPLICE_READ = uapi::FUSE_SPLICE_READ;
-        const DO_READDIRPLUS = uapi::FUSE_DO_READDIRPLUS;
-        const READDIRPLUS_AUTO = uapi::FUSE_READDIRPLUS_AUTO;
-        const SETXATTR_EXT = uapi::FUSE_SETXATTR_EXT;
-        const POSIX_ACL = uapi::FUSE_POSIX_ACL;
+    pub struct FuseInitFlags : u64 {
+        const BIG_WRITES = uapi::FUSE_BIG_WRITES as u64;
+        const DONT_MASK = uapi::FUSE_DONT_MASK as u64;
+        const SPLICE_WRITE = uapi::FUSE_SPLICE_WRITE as u64;
+        const SPLICE_MOVE = uapi::FUSE_SPLICE_MOVE as u64;
+        const SPLICE_READ = uapi::FUSE_SPLICE_READ as u64;
+        const DO_READDIRPLUS = uapi::FUSE_DO_READDIRPLUS as u64;
+        const READDIRPLUS_AUTO = uapi::FUSE_READDIRPLUS_AUTO as u64;
+        const SETXATTR_EXT = uapi::FUSE_SETXATTR_EXT as u64;
+        const POSIX_ACL = uapi::FUSE_POSIX_ACL as u64;
+        const PASSTHROUGH = uapi::FUSE_PASSTHROUGH as u64;
+    }
+}
+
+impl TryFrom<uapi::fuse_init_out> for FuseInitFlags {
+    type Error = Errno;
+    fn try_from(init_out: uapi::fuse_init_out) -> Result<Self, Errno> {
+        let flags = (init_out.flags as u64) | ((init_out.flags2 as u64) << 32);
+        let unknown_flags = flags & !Self::all().bits();
+        if unknown_flags != 0 {
+            track_stub!(
+                TODO("https://fxbug.dev/322875725"),
+                "FUSE unknown init flags",
+                unknown_flags
+            );
+            log_warn!("FUSE daemon requested unknown flags in init: {unknown_flags}");
+        }
+        Ok(Self::from_bits_truncate(flags))
+    }
+}
+
+impl FuseInitFlags {
+    /// Returns the 2 u32 components for these flags. The lowest part is returned first.
+    fn get_u32_components(&self) -> (u32, u32) {
+        let flags = (self.bits() & (u32::max_value() as u64)) as u32;
+        let flags2 = (self.bits() >> 32) as u32;
+        (flags, flags2)
     }
 }
 
@@ -2361,10 +2455,12 @@ impl FuseOperation {
                 Ok(len)
             }
             Self::Init { .. } => {
+                let (flags, flags2) = FuseInitFlags::all().get_u32_components();
                 let message = uapi::fuse_init_in {
                     major: uapi::FUSE_KERNEL_VERSION,
                     minor: uapi::FUSE_KERNEL_MINOR_VERSION,
-                    flags: FuseInitFlags::all().bits(),
+                    flags,
+                    flags2,
                     ..Default::default()
                 };
                 data.write_all(message.as_bytes())

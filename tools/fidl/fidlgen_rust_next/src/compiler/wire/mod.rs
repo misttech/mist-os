@@ -52,7 +52,7 @@ fn emit_type<W: Write>(compiler: &mut Compiler<'_>, out: &mut W, ty: &Type) -> R
                 write!(out, "{}", compiler.config.resource_bindings.handle.optional_wire_path)?;
             }
         }
-        Type::Request { nullable, .. } => {
+        Type::Endpoint { nullable, .. } => {
             if !*nullable {
                 write!(out, "{}", compiler.config.resource_bindings.server_end.wire_path)?;
             } else {
@@ -172,7 +172,7 @@ fn emit_type_check<W: Write>(
             }
         }
         Type::Handle { .. }
-        | Type::Request { .. }
+        | Type::Endpoint { .. }
         | Type::Primitive { .. }
         | Type::Identifier { .. } => (),
         Type::Internal { subtype } => match subtype {

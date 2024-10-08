@@ -38,11 +38,19 @@ pub struct uaddr {
     pub addr: u64,
 }
 
-#[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, IntoBytes, FromBytes, KnownLayout, Immutable)]
+#[derive(Debug, Default, Eq, PartialEq, Hash, Ord, PartialOrd, IntoBytes, FromBytes, KnownLayout, Immutable)]
 #[repr(transparent)]
 pub struct uref<T> {
     pub addr: uaddr,
     _phantom: std::marker::PhantomData<T>,
+}
+
+impl<T> Copy for uref<T> {}
+
+impl<T> Clone for uref<T> {
+    fn clone(&self) -> Self {
+        Self { addr: self.addr, _phantom: Default::default() }
+    }
 }
 
 impl<T> From<uaddr> for uref<T> {
@@ -211,7 +219,7 @@ REPLACEMENTS = [
         r'::std::option::Option<unsafe extern "C" fn\([a-zA-Z_0-9: ]*\)>',
         "uaddr",
     ),
-    (r"([:=]) \*(const|mut) ([a-zA-Z_0-9:]*)", "\\1 uref<\\3>"),
+    (r"([:=]) \*(const|mut) ([a-z_][a-zA-Z_0-9:]*)", "\\1 uref<\\3>"),
     # Convert atomic wrapper.
     (r": StdAtomic([UI])(8|16|32|64)", ": std::sync::atomic::Atomic\\1\\2"),
     # Remove __bindgen_missing from the start of constants defined in missing_includes.h

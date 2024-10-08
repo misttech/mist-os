@@ -29,7 +29,7 @@ Use below commands to run HelloWorld Lacewing test locally:
 ```shell
 $ fx set core.x64 --with //src/testing/end_to_end/examples
 
-$ fx test //src/testing/end_to_end/examples/test_hello_world:hello_world_test_fc --e2e --output
+$ fx test //src/testing/end_to_end/examples/test_hello_world:hello_world_test --e2e --output
 ```
 
 ### Data resource access Test
@@ -42,7 +42,7 @@ Use below commands to run this test locally:
 ```shell
 $ fx set core.x64 --with //src/testing/end_to_end/examples
 
-$ fx test //src/testing/end_to_end/examples/test_data_resource_access:data_resource_access_test_fc --e2e --output
+$ fx test //src/testing/end_to_end/examples/test_data_resource_access:data_resource_access_test --e2e --output
 ```
 
 ### Example Revive Test Case
@@ -50,13 +50,13 @@ $ fx test //src/testing/end_to_end/examples/test_data_resource_access:data_resou
 $ fx set workbench_eng.x64 --with //src/testing/end_to_end/examples
 
 # To run the test class without reviving any test cases
-$ fx test //src/testing/end_to_end/examples/test_case_revive_example:run_wo_test_case_revive_fc --e2e --output
+$ fx test //src/testing/end_to_end/examples/test_case_revive_example:run_wo_test_case_revive --e2e --output
 
 # To run the test class by reviving test cases with Idle-Suspend-Timer-Resume operation
-$ fx test //src/testing/end_to_end/examples/test_case_revive_example:test_case_revive_with_idle_suspend_timer_resume_fc --e2e --output
+$ fx test //src/testing/end_to_end/examples/test_case_revive_example:test_case_revive_with_idle_suspend_timer_resume --e2e --output
 
 # To run the test class by reviving test cases with Soft-Reboot operation
-$ fx test //src/testing/end_to_end/examples/test_case_revive_example:test_case_revive_with_soft_reboot_fc --e2e --output
+$ fx test //src/testing/end_to_end/examples/test_case_revive_example:test_case_revive_with_soft_reboot --e2e --output
 ```
 
 ### Soft Reboot Test
@@ -69,7 +69,7 @@ $ ffx emu stop ; ffx emu start -H --net tap
 
 # Run SoftRebootTest using Fuchsia-Controller
 $ fx set core.x64 --with //src/testing/end_to_end/examples
-$ fx test //src/testing/end_to_end/examples/test_soft_reboot:soft_reboot_test_fc --e2e --output
+$ fx test //src/testing/end_to_end/examples/test_soft_reboot:soft_reboot_test --e2e --output
 ```
 
 ### Multi Device Test

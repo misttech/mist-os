@@ -28,19 +28,19 @@ fn handle_one_request(
         fidl_fullmac::WlanFullmacImplIfcRequest::OnScanResult { payload, responder } => {
             responder.send().context("Failed to respond to OnScanResult")?;
             driver_event_sink.0.send(FullmacDriverEvent::OnScanResult {
-                result: fullmac_to_mlme::convert_scan_result(payload),
+                result: fullmac_to_mlme::convert_scan_result(payload)?,
             });
         }
-        fidl_fullmac::WlanFullmacImplIfcRequest::OnScanEnd { end, responder } => {
+        fidl_fullmac::WlanFullmacImplIfcRequest::OnScanEnd { payload, responder } => {
             responder.send().context("Failed to respond to OnScanEnd")?;
             driver_event_sink.0.send(FullmacDriverEvent::OnScanEnd {
-                end: fullmac_to_mlme::convert_scan_end(end),
+                end: fullmac_to_mlme::convert_scan_end(payload)?,
             });
         }
-        fidl_fullmac::WlanFullmacImplIfcRequest::ConnectConf { resp, responder } => {
+        fidl_fullmac::WlanFullmacImplIfcRequest::ConnectConf { payload, responder } => {
             responder.send().context("Failed to respond to ConnectConf")?;
             driver_event_sink.0.send(FullmacDriverEvent::ConnectConf {
-                resp: fullmac_to_mlme::convert_connect_confirm(resp),
+                resp: fullmac_to_mlme::convert_connect_confirm(payload)?,
             });
         }
         fidl_fullmac::WlanFullmacImplIfcRequest::RoamConf { payload, responder } => {
@@ -201,9 +201,10 @@ mod tests {
 
         std::mem::drop(driver_event_receiver);
 
-        let scan_end = fidl_fullmac::WlanFullmacScanEnd {
-            txn_id: 42u64,
-            code: fidl_fullmac::WlanScanResult::Success,
+        let scan_end = fidl_fullmac::WlanFullmacImplIfcOnScanEndRequest {
+            txn_id: Some(42u64),
+            code: Some(fidl_fullmac::WlanScanResult::Success),
+            ..Default::default()
         };
 
         let mut req_fut = pin!(ifc_proxy.on_scan_end(&scan_end));

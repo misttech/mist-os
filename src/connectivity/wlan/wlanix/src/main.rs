@@ -401,7 +401,7 @@ struct SupplicantStaIfaceState {
 struct ConnectionContext {
     stream: fidl_sme::ConnectTransactionEventStream,
     original_bss_desc: Box<BssDescription>,
-    most_recent_connect_time: fasync::Time,
+    most_recent_connect_time: fasync::MonotonicInstant,
     current_rssi_dbm: i8,
     current_snr_db: i8,
     current_channel: Channel,
@@ -492,7 +492,7 @@ async fn handle_client_connect_transactions<C: ClientIface>(
                 match (disconnect_with_ongoing_reconnect.as_ref(), result.is_reconnect) {
                     (Some(info), true) => {
                         if result.code == fidl_fuchsia_wlan_ieee80211::StatusCode::Success {
-                            ctx.most_recent_connect_time = fasync::Time::now();
+                            ctx.most_recent_connect_time = fasync::MonotonicInstant::now();
                             info!("Successfully reconnected after disconnect");
                         } else {
                             send_disconnect_event(
@@ -548,7 +548,8 @@ async fn handle_client_connect_transactions<C: ClientIface>(
                 }
             }
             Ok(fidl_sme::ConnectTransactionEvent::OnDisconnect { info }) => {
-                let connected_duration = fasync::Time::now() - ctx.most_recent_connect_time;
+                let connected_duration =
+                    fasync::MonotonicInstant::now() - ctx.most_recent_connect_time;
                 telemetry_sender.send(TelemetryEvent::Disconnect {
                     info: wlan_telemetry::DisconnectInfo {
                         connected_duration: connected_duration,
@@ -659,7 +660,7 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                             Some(ConnectionContext {
                                 stream: connected.transaction_stream,
                                 original_bss_desc: connected.bss.clone(),
-                                most_recent_connect_time: fasync::Time::now(),
+                                most_recent_connect_time: fasync::MonotonicInstant::now(),
                                 current_rssi_dbm: connected.bss.rssi_dbm,
                                 current_snr_db: connected.bss.snr_db,
                                 current_channel: connected.bss.channel.clone(),
@@ -1272,7 +1273,7 @@ fn convert_scan_result(result: fidl_sme::ScanResult) -> Nl80211Attr {
         Nl80211BssAttr::Bssid(result.bss_description.bssid),
         Nl80211BssAttr::Frequency(center_freq),
         Nl80211BssAttr::InformationElement(result.bss_description.ies),
-        Nl80211BssAttr::LastSeenBoottime(fasync::Time::now().into_nanos() as u64),
+        Nl80211BssAttr::LastSeenBoottime(fasync::MonotonicInstant::now().into_nanos() as u64),
         Nl80211BssAttr::SignalMbm(result.bss_description.rssi_dbm as i32 * 100),
         Nl80211BssAttr::Capability(result.bss_description.capability_info),
         Nl80211BssAttr::Status(0),
@@ -1870,7 +1871,7 @@ mod tests {
 
     fn setup_wifi_test() -> (WifiTestHelper, Pin<Box<impl Future<Output = ()>>>) {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         let (wlanix_proxy, wlanix_stream) = create_proxy_and_stream::<fidl_wlanix::WlanixMarker>()
             .expect("create Wlanix proxy should succeed");
@@ -2244,7 +2245,9 @@ mod tests {
         );
 
         let connection_length_nanos: u16 = rand::thread_rng().gen();
-        test_helper.exec.set_fake_time(fasync::Time::from_nanos(connection_length_nanos.into()));
+        test_helper
+            .exec
+            .set_fake_time(fasync::MonotonicInstant::from_nanos(connection_length_nanos.into()));
 
         let mocked_disconnect_source = fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
             mlme_event_name: fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
@@ -2337,7 +2340,9 @@ mod tests {
         );
 
         let connection_length_nanos: u16 = rand::thread_rng().gen();
-        test_helper.exec.set_fake_time(fasync::Time::from_nanos(connection_length_nanos.into()));
+        test_helper
+            .exec
+            .set_fake_time(fasync::MonotonicInstant::from_nanos(connection_length_nanos.into()));
 
         let mocked_disconnect_source = fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
             mlme_event_name: fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
@@ -2468,7 +2473,7 @@ mod tests {
 
     fn setup_supplicant_test() -> (SupplicantTestHelper, Pin<Box<impl Future<Output = ()>>>) {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         let (wlanix_proxy, wlanix_stream) = create_proxy_and_stream::<fidl_wlanix::WlanixMarker>()
             .expect("create Wlanix proxy should succeed");

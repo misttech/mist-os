@@ -10,8 +10,6 @@
 #include <lib/driver/power/cpp/element-description-builder.h>
 #include <lib/driver/power/cpp/power-support.h>
 
-#include "src/devices/power/lib/from-fidl/cpp/from-fidl.h"
-
 namespace fake_child_device {
 zx::result<> FakeChild::Start() {
   // Connect to the Device from our platform device parent and get our power
@@ -34,7 +32,7 @@ zx::result<> FakeChild::Start() {
       return zx::error(ZX_ERR_INTERNAL);
     }
     zx::result result =
-        power::from_fidl::CreatePowerElementConfiguration(fidl_config.value().config()[0]);
+        fdf_power::PowerElementConfiguration::FromFidl(fidl_config.value().config()[0]);
     if (result.is_error()) {
       return result.take_error();
     }

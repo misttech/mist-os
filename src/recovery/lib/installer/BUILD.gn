@@ -9,7 +9,6 @@ rustc_library("installer") {
   edition = "2021"
   with_unit_tests = true
   deps = [
-    "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_rust",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
     "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_rust",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",

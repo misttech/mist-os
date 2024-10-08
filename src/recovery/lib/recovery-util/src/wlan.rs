@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use fidl::endpoints::{create_proxy, create_request_stream};
 use fidl_fuchsia_wlan_common as wlan_common;
 use fidl_fuchsia_wlan_policy::{self as wlan_policy, NetworkConfig, SecurityType};
-use fuchsia_async::{Time, TimeoutExt as _};
+use fuchsia_async::{MonotonicInstant, TimeoutExt as _};
 use fuchsia_component::client::connect_to_protocol;
 use futures::TryStreamExt as _;
 use zx::Duration;
@@ -148,7 +148,7 @@ impl WifiConnect for WifiConnectImpl {
             Err(e) => Err(format_err!("failed to save network with {:?}", e)),
         }?;
         self.wait_for_connection(client_state_updates_request)
-            .on_timeout(Time::after(CONNECT_TIMEOUT), || {
+            .on_timeout(MonotonicInstant::after(CONNECT_TIMEOUT), || {
                 bail!("Timed out waiting for wlan connection")
             })
             .await
@@ -286,7 +286,7 @@ mod tests {
     fn connect_timeout() {
         // Fake time to test the timeout.
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
         fn network_id() -> wlan_policy::NetworkIdentifier {
             wlan_policy::NetworkIdentifier {

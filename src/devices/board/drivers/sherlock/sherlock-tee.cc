@@ -104,7 +104,7 @@ zx_status_t Sherlock::TeeInit() {
 
   metadata.emplace_back([&]() {
     fpbus::Metadata metadata;
-    metadata.type() = DEVICE_METADATA_TEE_THREAD_CONFIG;
+    metadata.id() = std::to_string(DEVICE_METADATA_TEE_THREAD_CONFIG);
     metadata.data() = std::move(data);
     return metadata;
   }());

@@ -28,10 +28,5 @@
             from: "parent",
             to: "#coll",
         },
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: "#coll",
-        },
     ],
 }

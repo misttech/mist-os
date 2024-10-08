@@ -1177,7 +1177,7 @@ group("xml-rs") {
 }
 
 group("zerocopy") {
-  public_deps = [ ":zerocopy-v0_8_0-alpha_26" ]
+  public_deps = [ ":zerocopy-v0_8_1" ]
 }
 
 if (!(current_os == "fuchsia" || current_os == "mistos")) {
@@ -18385,35 +18385,34 @@ rust_library("zerocopy-v0_7_15") {
   applicable_licenses = [ ":zerocopy-v0_7_15.license" ]
 }
 
-license("zerocopy-v0_8_0-alpha_26.license") {
+license("zerocopy-v0_8_1.license") {
   public_package_name = "zerocopy"
   license_files = [
-    "//third_party/rust_crates/vendor/zerocopy-0.8.0-alpha.26/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/zerocopy-0.8.0-alpha.26/LICENSE-BSD",
-    "//third_party/rust_crates/vendor/zerocopy-0.8.0-alpha.26/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/zerocopy-0.8.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/zerocopy-0.8.1/LICENSE-BSD",
+    "//third_party/rust_crates/vendor/zerocopy-0.8.1/LICENSE-MIT",
   ]
 }
 
-rust_library("zerocopy-v0_8_0-alpha_26") {
+rust_library("zerocopy-v0_8_1") {
   crate_name = "zerocopy"
-  crate_root =
-      "//third_party/rust_crates/vendor/zerocopy-0.8.0-alpha.26/src/lib.rs"
-  output_name = "zerocopy-47f1617dbe8f9d50"
+  crate_root = "//third_party/rust_crates/vendor/zerocopy-0.8.1/src/lib.rs"
+  output_name = "zerocopy-df48f33500cb30bc"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":zerocopy-derive-v0_8_0-alpha_26($host_toolchain)" ]
+  deps += [ ":zerocopy-derive-v0_8_1($host_toolchain)" ]
   if (true) {
-    deps += [ ":zerocopy-derive-v0_8_0-alpha_26($host_toolchain)" ]
+    deps += [ ":zerocopy-derive-v0_8_1($host_toolchain)" ]
   }
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=47f1617dbe8f9d50",
-    "-Cextra-filename=-47f1617dbe8f9d50",
+    "--edition=2021",
+    "-Cmetadata=df48f33500cb30bc",
+    "-Cextra-filename=-df48f33500cb30bc",
     "--cfg=feature=\"derive\"",
     "--cfg=feature=\"simd\"",
     "--cfg=feature=\"zerocopy-derive\"",
@@ -18427,7 +18426,7 @@ rust_library("zerocopy-v0_8_0-alpha_26") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":zerocopy-v0_8_0-alpha_26.license" ]
+  applicable_licenses = [ ":zerocopy-v0_8_1.license" ]
 }
 
 license("zerocopy-derive-v0_7_15.license") {
@@ -18465,19 +18464,20 @@ rust_proc_macro("zerocopy-derive-v0_7_15") {
   applicable_licenses = [ ":zerocopy-derive-v0_7_15.license" ]
 }
 
-license("zerocopy-derive-v0_8_0-alpha_26.license") {
+license("zerocopy-derive-v0_8_1.license") {
   public_package_name = "zerocopy_derive"
   license_files = [
-    "//third_party/rust_crates/vendor/zerocopy-derive-0.8.0-alpha.26/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/zerocopy-derive-0.8.0-alpha.26/LICENSE-BSD",
-    "//third_party/rust_crates/vendor/zerocopy-derive-0.8.0-alpha.26/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/zerocopy-derive-0.8.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/zerocopy-derive-0.8.1/LICENSE-BSD",
+    "//third_party/rust_crates/vendor/zerocopy-derive-0.8.1/LICENSE-MIT",
   ]
 }
 
-rust_proc_macro("zerocopy-derive-v0_8_0-alpha_26") {
+rust_proc_macro("zerocopy-derive-v0_8_1") {
   crate_name = "zerocopy_derive"
-  crate_root = "//third_party/rust_crates/vendor/zerocopy-derive-0.8.0-alpha.26/src/lib.rs"
-  output_name = "zerocopy_derive-6a70e0862a85ff72"
+  crate_root =
+      "//third_party/rust_crates/vendor/zerocopy-derive-0.8.1/src/lib.rs"
+  output_name = "zerocopy_derive-62a16c5a276d365c"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -18489,14 +18489,15 @@ rust_proc_macro("zerocopy-derive-v0_8_0-alpha_26") {
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=6a70e0862a85ff72",
-    "-Cextra-filename=-6a70e0862a85ff72",
+    "--edition=2021",
+    "-Cmetadata=62a16c5a276d365c",
+    "-Cextra-filename=-62a16c5a276d365c",
+    "--cfg=zerocopy_derive_union_into_bytes",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":zerocopy-derive-v0_8_0-alpha_26.license" ]
+  applicable_licenses = [ ":zerocopy-derive-v0_8_1.license" ]
 }
 
 license("zeroize-v1_6_0.license") {

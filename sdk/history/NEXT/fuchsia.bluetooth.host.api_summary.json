@@ -502,6 +502,12 @@
     },
     {
         "kind": "union/member",
+        "name": "fuchsia.bluetooth.host/ProtocolRequest.privileged_peripheral",
+        "ordinal": "6",
+        "type": "server_end:fuchsia.bluetooth.le/PrivilegedPeripheral"
+    },
+    {
+        "kind": "union/member",
         "name": "fuchsia.bluetooth.host/ProtocolRequest.profile",
         "ordinal": "5",
         "type": "server_end:fuchsia.bluetooth.bredr/Profile"

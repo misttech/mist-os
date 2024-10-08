@@ -1114,7 +1114,7 @@ fn test_timeout() {
     });
 
     loop {
-        let new_time = fuchsia_async::Time::from_nanos(
+        let new_time = fuchsia_async::MonotonicInstant::from_nanos(
             executor.now().into_nanos()
                 + zx::Duration::from_millis(SETTING_PROXY_TIMEOUT_MS).into_nanos(),
         );
@@ -1182,7 +1182,7 @@ fn test_timeout_no_retry() {
     });
 
     loop {
-        let new_time = fuchsia_async::Time::from_nanos(
+        let new_time = fuchsia_async::MonotonicInstant::from_nanos(
             executor.now().into_nanos()
                 + zx::Duration::from_millis(SETTING_PROXY_TIMEOUT_MS).into_nanos(),
         );

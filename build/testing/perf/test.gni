@@ -40,13 +40,6 @@ performance_testing_environments = [
 #     Type: list(string)
 #     Default: empty list
 #
-#   transport (optional)
-#     Force a specific host->device transport.
-#     Any transport supported by honeydew can be used here, but recommended
-#     values are "sl4f", "fc", or "fuchsia-controller".
-#     Type: string
-#     Default: "fuchsia-controller"
-#
 #   data_sources (optional)
 #     See build/python/python_binary.gni
 #
@@ -132,13 +125,15 @@ template("python_perf_test") {
 
       forward_variables_from(invoker,
                              [
+                               "honeydew_config",
+                               "isolated",
                                "local_config_source",
                                "main_source",
-                               "params",
                                "params_source",
+                               "params",
+                               "product_bundle",
                                "test_data_deps",
                                "timeout_secs",
-                               "honeydew_config",
                              ])
       data_sources = _data_sources
       data_package_name = _data_package_name
@@ -161,11 +156,6 @@ template("python_perf_test") {
         environments = invoker.environments
       } else {
         environments = performance_testing_environments
-      }
-
-      transport = "fuchsia-controller"
-      if (defined(invoker.transport)) {
-        transport = invoker.transport
       }
     }
   } else {

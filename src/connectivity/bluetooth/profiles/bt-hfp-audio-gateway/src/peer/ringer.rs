@@ -100,7 +100,7 @@ mod tests {
     #[fuchsia::test]
     fn ring_stream_output_frequency() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::Time::from_nanos(0));
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
         let _ = exec.wake_expired_timers();
 
         // A new ringer returns None
@@ -118,14 +118,14 @@ mod tests {
         assert_matches!(result, Poll::Pending);
 
         // Advance the time by less than DEFAULT_FREQUENCY.
-        exec.set_fake_time(fasync::Time::after(DEFAULT_FREQUENCY / 2));
+        exec.set_fake_time(fasync::MonotonicInstant::after(DEFAULT_FREQUENCY / 2));
         let _ = exec.wake_expired_timers();
 
         // The stream is Pending
         let result = exec.run_until_stalled(&mut ringer.next());
         assert_matches!(result, Poll::Pending);
 
-        exec.set_fake_time(fasync::Time::after(DEFAULT_FREQUENCY));
+        exec.set_fake_time(fasync::MonotonicInstant::after(DEFAULT_FREQUENCY));
         let _ = exec.wake_expired_timers();
 
         // After DEFAULT_FREQUENCY, a new Item is Ready.

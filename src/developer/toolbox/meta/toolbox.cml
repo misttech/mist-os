@@ -9,6 +9,7 @@
                 "fuchsia.bluetooth.pandora.RootcanalClientController",
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.feedback.DataProvider",
+                "fuchsia.posix.socket.Provider",
                 "fuchsia.process.explorer.ProcessExplorer",
                 "fuchsia.process.explorer.Query",
             ],
@@ -19,8 +20,16 @@
             protocol: [
                 "fuchsia.diagnostics.host.ArchiveAccessor",
                 "fuchsia.diagnostics.LogSettings",
+                "fuchsia.sysinfo.SysInfo",
             ],
             from: "parent/toolbox-bootstrap",
+        },
+        {
+            protocol: [
+                "fuchsia.sys2.LifecycleController.root",
+                "fuchsia.sys2.RealmQuery.root",
+                "fuchsia.sys2.RouteValidator.root",
+            ],
         },
         {
             service: [ "fuchsia.hardware.rtc.Service" ],

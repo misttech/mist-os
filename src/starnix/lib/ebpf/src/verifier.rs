@@ -1373,6 +1373,21 @@ impl ComputationContext {
                                     id: array_id.prepended(id.clone()),
                                 });
                             }
+                            Type::PtrToMemory {
+                                id: memory_id,
+                                offset,
+                                buffer_size,
+                                fields,
+                                mappings,
+                            } => {
+                                return Ok(Type::PtrToMemory {
+                                    id: memory_id.prepended(id.clone()),
+                                    offset: *offset,
+                                    buffer_size: *buffer_size,
+                                    fields: fields.clone(),
+                                    mappings: mappings.clone(),
+                                });
+                            }
                             _ => panic!("Unexpected field_type: {field:?}"),
                         }
                     }

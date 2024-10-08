@@ -624,15 +624,15 @@ impl ComponentInstance {
             if let Some(started) = started {
                 let started_timestamp = started.timestamp;
                 let stop_timer = Box::pin(async move {
-                    let timer = fasync::Timer::new(fasync::Time::after(zx::Duration::from(
-                        self.environment.stop_timeout(),
-                    )));
+                    let timer = fasync::Timer::new(fasync::MonotonicInstant::after(
+                        zx::Duration::from(self.environment.stop_timeout()),
+                    ));
                     timer.await;
                 });
                 let kill_timer = Box::pin(async move {
-                    let timer = fasync::Timer::new(fasync::Time::after(zx::Duration::from(
-                        DEFAULT_KILL_TIMEOUT,
-                    )));
+                    let timer = fasync::Timer::new(fasync::MonotonicInstant::after(
+                        zx::Duration::from(DEFAULT_KILL_TIMEOUT),
+                    ));
                     timer.await;
                 });
                 let ret = started
@@ -1319,6 +1319,17 @@ impl ComponentInstance {
                 }
             },
         };
+
+        if let Some(resource) = component_address.resource() {
+            if resource.ends_with(".cml") {
+                warn!(
+                    "Component resource ends with .cml instead of .cm, which was \
+probably not intended: {}",
+                    component_address.url()
+                );
+            }
+        }
+
         let resolvers_dict = component_input.environment().resolvers();
         let resolver_capability_res =
             resolvers_dict.get(&Name::new(component_address.scheme()).unwrap());
@@ -2701,7 +2712,7 @@ pub mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn open_outgoing_while_component_is_stopping() {
         // Use mock time in this test.
-        let initial = fasync::Time::from_nanos(0);
+        let initial = fasync::MonotonicInstant::from_nanos(0);
         TestExecutor::advance_to(initial).await;
 
         let components = vec![("root", ComponentDeclBuilder::new().build())];

@@ -40,8 +40,16 @@ class Metadata:
     rustdoc_out_dir: Path
     touch: Path
     searchdir: str
-    extern: str
+    extern: str  # looks like --extern=CRATE_NAME=PATH
     disable_rustdoc: bool
+
+    @property
+    def extern_arg_as_rmeta(self) -> str:
+        """Returns modified extern argument that points to the .rmeta"""
+        flag, crate_name, path = self.extern.split("=")
+        return "=".join(
+            (flag, crate_name, str(Path(path).with_suffix(".rmeta")))
+        )
 
     @staticmethod
     def parse(m: dict[str, Any], args: Namespace) -> Optional["Metadata"]:
@@ -193,7 +201,7 @@ def rustdoc_link(meta: list[Metadata], args: Namespace):
             if "fuchsia" in target
             else args.destination / "host"
         )
-        extern = set(m.extern for m in meta)
+        extern = set(m.extern_arg_as_rmeta for m in meta)
 
         if not args.quiet:
             print("running rustdoc to document index for", target, file=stderr)

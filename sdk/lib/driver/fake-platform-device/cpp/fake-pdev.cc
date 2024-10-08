@@ -7,6 +7,8 @@
 #include <lib/driver/fake-resource/cpp/fake-resource.h>
 #include <lib/driver/platform-device/cpp/pdev.h>
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+
 namespace fdf_fake_platform_device {
 
 void FakePDev::GetMmioById(GetMmioByIdRequestView request, GetMmioByIdCompleter::Sync& completer) {
@@ -154,12 +156,23 @@ void FakePDev::GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& compl
 }
 
 void FakePDev::GetMetadata(GetMetadataRequestView request, GetMetadataCompleter::Sync& completer) {
-  auto metadata = metadata_.find(request->type);
+  auto id = std::to_string(request->type);
+  auto metadata = metadata_.find(id);
   if (metadata == metadata_.end()) {
     completer.ReplyError(ZX_ERR_NOT_FOUND);
     return;
   }
   completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(metadata->second));
+}
+
+void FakePDev::GetMetadata2(GetMetadata2RequestView request,
+                            GetMetadata2Completer::Sync& completer) {
+  if (auto metadata = metadata_.find(request->id.get()); metadata != metadata_.end()) {
+    completer.ReplySuccess(fidl::VectorView<uint8_t>::FromExternal(metadata->second));
+    return;
+  }
+
+  completer.ReplyError(ZX_ERR_NOT_FOUND);
 }
 
 void FakePDev::handle_unknown_method(
@@ -178,3 +191,5 @@ zx::result<fdf::MmioBuffer> fdf::internal::PDevMakeMmioBufferWeak(fdf::PDev::Mmi
   auto* mmio_buffer = reinterpret_cast<MmioBuffer*>(pdev_mmio.offset);
   return zx::ok(std::move(*mmio_buffer));
 }
+
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(HEAD)

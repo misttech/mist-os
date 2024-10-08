@@ -4,6 +4,7 @@
 
 """Tool for setting up the work_on runner."""
 
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(
     ":utils.bzl",
     "collect_runfiles",
@@ -41,5 +42,5 @@ fuchsia_work_on_runner = rule(
             cfg = "exec",
             default = "//fuchsia/tools:work_on_runner",
         ),
-    },
+    } | COMPATIBILITY.HOST_ATTRS,
 )

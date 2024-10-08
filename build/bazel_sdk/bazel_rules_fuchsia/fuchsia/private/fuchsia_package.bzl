@@ -5,6 +5,7 @@
 """fuchsia_package() rule."""
 
 load("//fuchsia/private/workflows:fuchsia_package_tasks.bzl", "fuchsia_package_tasks")
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_ATTRS", "get_fuchsia_api_level")
 load(
     ":fuchsia_debug_symbols.bzl",
@@ -35,8 +36,6 @@ load(
     "rule_variants",
     "stub_executable",
 )
-
-_FUCHSIA_OS_PLATFORM = "@platforms//os:fuchsia"
 
 def get_driver_component_manifests(package):
     """Returns a list of the manifest paths for drivers in the package
@@ -121,11 +120,6 @@ def fuchsia_package(
 
     package_repository_name = kwargs.pop("package_repository_name", None)
 
-    # Fuchsia packages are only compatible with the fuchsia OS.
-    target_compat = kwargs.pop("target_compatible_with", [])
-    if _FUCHSIA_OS_PLATFORM not in target_compat:
-        target_compat.append(_FUCHSIA_OS_PLATFORM)
-
     _deps_to_search = components + resources + tools
 
     processed_binaries = "%s_fuchsia_package.elf_binaries" % name
@@ -158,7 +152,6 @@ def fuchsia_package(
         fuchsia_api_level = fuchsia_api_level,
         platform = platform,
         package_repository_name = package_repository_name,
-        target_compatible_with = target_compat,
         tags = tags + ["manual"],
         **kwargs
     )
@@ -191,15 +184,11 @@ def _fuchsia_test_package(
         subpackages_to_flatten = [],
         test_realm = None,
         tags = [],
+        target_compatible_with = [],
         **kwargs):
     """Defines test variants of fuchsia_package.
 
     See fuchsia_package for argument descriptions."""
-
-    # Fuchsia packages are only compatible with the fuchsia OS.
-    target_compat = kwargs.pop("target_compatible_with", [])
-    if _FUCHSIA_OS_PLATFORM not in target_compat:
-        target_compat.append(_FUCHSIA_OS_PLATFORM)
 
     _deps_to_search = _components + resources + _test_component_mapping.values()
 
@@ -209,6 +198,7 @@ def _fuchsia_test_package(
         deps = _deps_to_search,
         testonly = True,
         tags = tags + ["manual"],
+        target_compatible_with = target_compatible_with,
     )
 
     collected_resources = "%s_fuchsia_package.resources" % name
@@ -217,6 +207,7 @@ def _fuchsia_test_package(
         deps = _deps_to_search,
         testonly = True,
         tags = tags + ["manual"],
+        target_compatible_with = target_compatible_with,
     )
 
     _build_fuchsia_package_test(
@@ -232,7 +223,7 @@ def _fuchsia_test_package(
         archive_name = archive_name,
         fuchsia_api_level = fuchsia_api_level,
         platform = platform,
-        target_compatible_with = target_compat,
+        target_compatible_with = target_compatible_with,
         tags = tags + ["manual"],
         **kwargs
     )
@@ -244,6 +235,7 @@ def _fuchsia_test_package(
         is_test = True,
         test_realm = test_realm,
         tags = tags,
+        target_compatible_with = target_compatible_with,
         **kwargs
     )
 
@@ -669,5 +661,5 @@ _build_fuchsia_package, _build_fuchsia_package_test = rule_variants(
         "_allowlist_function_transition": attr.label(
             default = "@bazel_tools//tools/allowlists/function_transition_allowlist",
         ),
-    } | FUCHSIA_API_LEVEL_ATTRS | FUCHSIA_DEBUG_SYMBOLS_ATTRS,
+    } | COMPATIBILITY.FUCHSIA_ATTRS | FUCHSIA_API_LEVEL_ATTRS | FUCHSIA_DEBUG_SYMBOLS_ATTRS,
 )

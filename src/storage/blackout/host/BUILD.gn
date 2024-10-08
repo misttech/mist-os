@@ -104,7 +104,6 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:test_case_revive",
     ]
-    transport = "fuchsia-controller"
     params = {
       # Blackout args
       component_name = "/core/ffx-laboratory:blackout-target"
@@ -127,7 +126,6 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:test_case_revive",
     ]
-    transport = "fuchsia-controller"
     params = {
       # Blackout args
       component_name = "/core/ffx-laboratory:blackout-target"
@@ -150,7 +148,6 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:test_case_revive",
     ]
-    transport = "fuchsia-controller"
     params = {
       # Blackout args
       component_name = "/core/ffx-laboratory:blackout-target"
@@ -172,7 +169,6 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:test_case_revive",
     ]
-    transport = "fuchsia-controller"
     params = {
       # Blackout args
       component_name = "/core/ffx-laboratory:blackout-target"
@@ -200,7 +196,6 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:test_case_revive",
     ]
-    transport = "fuchsia-controller"
     params = {
       # Blackout args
       component_name = "/core/ffx-laboratory:blackout-target"
@@ -228,7 +223,6 @@ if (is_host) {
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:test_case_revive",
     ]
-    transport = "fuchsia-controller"
     params = {
       # Blackout args
       component_name = "/core/ffx-laboratory:blackout-target"

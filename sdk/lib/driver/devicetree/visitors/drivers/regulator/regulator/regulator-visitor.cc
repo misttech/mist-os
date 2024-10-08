@@ -132,7 +132,7 @@ zx::result<> RegulatorVisitor::AddRegulatorMetadata(fdf_devicetree::Node& node,
     return zx::error(encoded_metadata.error_value().status());
   }
   fuchsia_hardware_platform_bus::Metadata vreg_metadata = {{
-      .type = DEVICE_METADATA_VREG,
+      .id = std::to_string(DEVICE_METADATA_VREG),
       .data = encoded_metadata.value(),
   }};
 

@@ -14,8 +14,6 @@
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/test/platform/cpp/bind.h>
 
-#include "src/devices/power/lib/from-fidl/cpp/from-fidl.h"
-
 namespace fake_parent_device {
 
 zx::result<> FakeParent::Start() {
@@ -42,7 +40,7 @@ zx::result<> FakeParent::Start() {
       return zx::error(ZX_ERR_INTERNAL);
     }
     zx::result result =
-        power::from_fidl::CreatePowerElementConfiguration(fidl_config.value().config()[0]);
+        fdf_power::PowerElementConfiguration::FromFidl(fidl_config.value().config()[0]);
     if (result.is_error()) {
       FDF_SLOG(ERROR, "Failed to convert power element configuration from FIDL.",
                KV("status", result.status_string()));

@@ -164,18 +164,17 @@ typedef struct zx_packet_page_request {
 } zx_packet_page_request_t;
 
 typedef struct {
-  // The target power domain, matching the provided ID. The ID matches the one
-  // provided for the provided mask when setting the processor's power level
-  // information.
-  uint64_t target;
+  /// Request targeting the provided power domain.
+  uint32_t domain_id;
 
-  // The control argument for the power control interface bound to the
-  // port.
+  // Options applying to this transition.
+  uint32_t options;
+
+  // Control Interface ID provided in the energy model.
+  uint64_t control_interface;
+
+  // Control Interface Argument provided in the energy model.
   uint64_t control_argument;
-
-  // Opaque context ID indication the conditions the transition was requested
-  // int. This value must be provided when acknowledging the transition request.
-  uint64_t context;
 
   // Padding bits.
   uint64_t reserved;

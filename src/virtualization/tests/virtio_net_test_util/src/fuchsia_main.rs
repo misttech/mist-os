@@ -117,7 +117,10 @@ async fn network_device_send(
         let recv_result = session
             .recv()
             .map(|result| Some(result.expect("recv failed")))
-            .on_timeout(fuchsia_async::Time::after(zx::Duration::from_seconds(1)), || None)
+            .on_timeout(
+                fuchsia_async::MonotonicInstant::after(zx::Duration::from_seconds(1)),
+                || None,
+            )
             .await;
         match recv_result {
             Some(received_buffer) => {

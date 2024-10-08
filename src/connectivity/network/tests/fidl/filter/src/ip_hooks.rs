@@ -9,7 +9,6 @@ use std::num::NonZeroU64;
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use assert_matches::assert_matches;
-use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_net_filter_ext::{
     Action, Change, Controller, ControllerId, Domain, InstalledIpRoutine, InstalledNatRoutine,
     InterfaceMatcher, IpHook, Matchers, Namespace, NamespaceId, NatHook, Resource, ResourceId,
@@ -20,9 +19,8 @@ use futures::future::LocalBoxFuture;
 use futures::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _};
 use heck::SnakeCase as _;
-use net_declare::{fidl_subnet, net_ip_v4, net_ip_v6};
-use net_types::ip::{GenericOverIp, Ip, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
-use net_types::SpecifiedAddr;
+use net_declare::fidl_subnet;
+use net_types::ip::{GenericOverIp, Ip, IpVersion, IpVersionMarker, Ipv4, Ipv6};
 use netemul::{RealmTcpListener as _, RealmUdpSocket as _};
 use netstack_testing_common::interfaces::TestInterfaceExt as _;
 use netstack_testing_common::realms::{Netstack3, TestSandboxExt as _};
@@ -32,10 +30,8 @@ use test_case::test_case;
 use tracing::info;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_ext as fnet_ext,
-    fidl_fuchsia_net_filter as fnet_filter,
-    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
-    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
-    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fidl_fuchsia_posix_socket as fposix_socket,
+    fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_routes_ext as fnet_routes_ext,
+    fidl_fuchsia_posix_socket as fposix_socket,
 };
 
 use crate::matchers::{
@@ -1297,16 +1293,12 @@ pub(crate) trait RouterTestIpExt:
     /// The router's IP address and subnet prefix assigned on the interface that
     /// neighbors the client.
     const ROUTER_CLIENT_ADDR_WITH_PREFIX: fnet::Subnet;
-    /// The router's IP address assigned on the interface that neighbors the client.
-    const ROUTER_CLIENT_ADDR: Self::Addr;
     /// The server netstack's IP address and subnet prefix. The server is on the
     /// same subnet as the router's server-facing interface.
     const SERVER_ADDR_WITH_PREFIX: fnet::Subnet;
     /// The router's IP address and subnet prefix assigned on the interface that
     /// neighbors the server.
     const ROUTER_SERVER_ADDR_WITH_PREFIX: fnet::Subnet;
-    /// The router's IP address assigned on the interface that neighbors the server.
-    const ROUTER_SERVER_ADDR: Self::Addr;
     /// An unrelated subnet on which neither netstack nor the router has an assigned
     /// IP address; defined for the purpose of exercising inverse subnet and address
     /// range match.
@@ -1316,20 +1308,16 @@ pub(crate) trait RouterTestIpExt:
 impl RouterTestIpExt for Ipv4 {
     const CLIENT_ADDR_WITH_PREFIX: fnet::Subnet = fidl_subnet!("192.0.2.1/24");
     const ROUTER_CLIENT_ADDR_WITH_PREFIX: fnet::Subnet = fidl_subnet!("192.0.2.2/24");
-    const ROUTER_CLIENT_ADDR: Ipv4Addr = net_ip_v4!("192.0.2.2");
     const SERVER_ADDR_WITH_PREFIX: fnet::Subnet = fidl_subnet!("10.0.0.1/24");
     const ROUTER_SERVER_ADDR_WITH_PREFIX: fnet::Subnet = fidl_subnet!("10.0.0.2/24");
-    const ROUTER_SERVER_ADDR: Ipv4Addr = net_ip_v4!("10.0.0.2");
     const OTHER_SUBNET: fnet::Subnet = fidl_subnet!("8.8.8.0/24");
 }
 
 impl RouterTestIpExt for Ipv6 {
     const CLIENT_ADDR_WITH_PREFIX: fnet::Subnet = fidl_subnet!("a::1/64");
     const ROUTER_CLIENT_ADDR_WITH_PREFIX: fnet::Subnet = fidl_subnet!("a::2/64");
-    const ROUTER_CLIENT_ADDR: Ipv6Addr = net_ip_v6!("a::2");
     const SERVER_ADDR_WITH_PREFIX: fnet::Subnet = fidl_subnet!("b::1/64");
     const ROUTER_SERVER_ADDR_WITH_PREFIX: fnet::Subnet = fidl_subnet!("b::2/64");
-    const ROUTER_SERVER_ADDR: Ipv6Addr = net_ip_v6!("b::2");
     const OTHER_SUBNET: fnet::Subnet = fidl_subnet!("c::/64");
 }
 
@@ -1342,22 +1330,22 @@ struct TestRouterNet<'a, I: RouterTestIpExt> {
     _router_server_net: netemul::TestNetwork<'a>,
     router_server_interface: netemul::TestInterface<'a>,
 
-    // Client resources. We keep handles around to the interface and route set
-    // so that they are not torn down for the lifetime of the test.
+    // Client resources. We keep the handle to the interface around so that it is
+    // not torn down for the lifetime of the test.
     client: netemul::TestRealm<'a>,
     _client_interface: netemul::TestInterface<'a>,
-    _client_route_set: <I::RouteSetMarker as ProtocolMarker>::Proxy,
 
-    // Server resources. We keep handles around to the interface and route set
-    // so that they are not torn down for the lifetime of the test.
+    // Server resources. We keep the handle to the interface around so that it is
+    // not torn down for the lifetime of the test.
     server: netemul::TestRealm<'a>,
     _server_interface: netemul::TestInterface<'a>,
-    _server_route_set: <I::RouteSetMarker as ProtocolMarker>::Proxy,
 
     // Filtering resources (for the router).
     controller: Controller,
     namespace: NamespaceId,
     routine: RoutineId,
+
+    _ip_version: IpVersionMarker<I>,
 }
 
 impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
@@ -1378,6 +1366,8 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
             .add_address_and_subnet_route(I::ROUTER_CLIENT_ADDR_WITH_PREFIX)
             .await
             .expect("configure address");
+        router_client_interface.set_ipv4_forwarding_enabled(true).await.expect("enable forwarding");
+        router_client_interface.set_ipv6_forwarding_enabled(true).await.expect("enable forwarding");
 
         let server_net = sandbox.create_network("router_server").await.expect("create network");
         let router_server_interface =
@@ -1387,96 +1377,33 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
             .add_address_and_subnet_route(I::ROUTER_SERVER_ADDR_WITH_PREFIX)
             .await
             .expect("configure address");
-
-        async fn enable_forwarding(interface: &netemul::TestInterface<'_>) {
-            let _prev = interface
-                .control()
-                .set_configuration(&fnet_interfaces_admin::Configuration {
-                    ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
-                        forwarding: Some(true),
-                        ..Default::default()
-                    }),
-                    ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
-                        forwarding: Some(true),
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                })
-                .await
-                .expect("set_configuration FIDL error")
-                .expect("error setting configuration");
-        }
-
-        enable_forwarding(&router_client_interface).await;
-        enable_forwarding(&router_server_interface).await;
+        router_server_interface.set_ipv4_forwarding_enabled(true).await.expect("enable forwarding");
+        router_server_interface.set_ipv6_forwarding_enabled(true).await.expect("enable forwarding");
 
         let add_host = |name: String, net, subnet, router_addr| async move {
             let realm =
                 sandbox.create_netstack_realm::<Netstack3, _>(name.clone()).expect("create realm");
+
             let interface = realm.join_network(net, name).await.expect("join network");
             interface.add_address_and_subnet_route(subnet).await.expect("configure address");
             interface.apply_nud_flake_workaround().await.expect("nud flake workaround");
+            interface.add_default_route(router_addr).await.expect("add router as default gateway");
 
-            // Add the router as a default gateway.
-            let set_provider = realm
-                .connect_to_protocol::<I::RouteTableMarker>()
-                .expect("connect to route set provider");
-            let route_set =
-                fnet_routes_ext::admin::new_route_set::<I>(&set_provider).expect("new route set");
-
-            // Authenticate for this interface so we can add a route.
-            let grant = interface.get_authorization().await.expect("getting grant should succeed");
-            let proof = fnet_interfaces_ext::admin::proof_from_grant(&grant);
-            fnet_routes_ext::admin::authenticate_for_interface::<I>(&route_set, proof)
-                .await
-                .expect("call authenticate")
-                .expect("authentication should succeed");
-
-            let added = fnet_routes_ext::admin::add_route::<I>(
-                &route_set,
-                &fnet_routes_ext::Route {
-                    destination: net_types::ip::Subnet::new(I::UNSPECIFIED_ADDRESS, 0)
-                        .expect("unspecified subnet should be valid"),
-                    action: fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget::<
-                        I,
-                    > {
-                        outbound_interface: interface.id(),
-                        next_hop: Some(
-                            SpecifiedAddr::new(router_addr)
-                                .expect("router address should be specified"),
-                        ),
-                    }),
-                    properties: fnet_routes_ext::RouteProperties {
-                        specified_properties: fnet_routes_ext::SpecifiedRouteProperties {
-                            metric: fnet_routes::SpecifiedMetric::InheritedFromInterface(
-                                fnet_routes::Empty {},
-                            ),
-                        },
-                    },
-                }
-                .try_into()
-                .expect("convert to FIDL"),
-            )
-            .await
-            .expect("call add route")
-            .expect("add default route");
-            assert!(added);
-
-            (realm, interface, route_set)
+            (realm, interface)
         };
 
-        let (client, client_interface, _client_route_set) = add_host(
+        let (client, client_interface) = add_host(
             format!("{name}_client"),
             &client_net,
             I::CLIENT_ADDR_WITH_PREFIX,
-            I::ROUTER_CLIENT_ADDR,
+            I::ROUTER_CLIENT_ADDR_WITH_PREFIX.addr,
         )
         .await;
-        let (server, server_interface, _server_route_set) = add_host(
+        let (server, server_interface) = add_host(
             format!("{name}_server"),
             &server_net,
             I::SERVER_ADDR_WITH_PREFIX,
-            I::ROUTER_SERVER_ADDR,
+            I::ROUTER_SERVER_ADDR_WITH_PREFIX.addr,
         )
         .await;
 
@@ -1511,13 +1438,12 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
             _router_server_net: server_net,
             client,
             _client_interface: client_interface,
-            _client_route_set,
             server,
             _server_interface: server_interface,
-            _server_route_set,
             controller,
             namespace,
             routine,
+            _ip_version: IpVersionMarker::new(),
         }
     }
 

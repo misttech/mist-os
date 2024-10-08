@@ -6,13 +6,12 @@ import("//build/python/python_mobly_test.gni")
 import("//build/testing/environments.gni")
 
 if (is_host) {
-  python_mobly_test("session_test_fc") {
+  python_mobly_test("session_test_ffx") {
     main_source = "test_session.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
     ]
-    transport = "fuchsia-controller"
     environments = [
       # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
       aemu_env,
@@ -28,16 +27,16 @@ group("packages") {
   public_deps = [ "//src/ui/examples:flatland-examples" ]
 }
 
-group("test_session") {
+group("test_session_ffx") {
   testonly = true
   deps = [
     ":packages",
-    ":session_test_fc($host_toolchain)",
+    ":session_test_ffx($host_toolchain)",
   ]
 }
 
 # Group containing all of the Session affordance functional test cases and their dependencies.
 group("tests") {
   testonly = true
-  public_deps = [ ":test_session" ]
+  public_deps = [ ":test_session_ffx" ]
 }

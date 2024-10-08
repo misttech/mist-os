@@ -54,6 +54,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/AdvertisingData.broadcast_name",
+        "ordinal": "10",
+        "type": "string:128"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.bluetooth.le/AdvertisingData.include_tx_power_level",
         "ordinal": "8",
         "type": "bool"
@@ -69,6 +75,12 @@
         "name": "fuchsia.bluetooth.le/AdvertisingData.name",
         "ordinal": "1",
         "type": "string:248"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/AdvertisingData.resolvable_set_identifier",
+        "ordinal": "9",
+        "type": "array<uint8,6>"
     },
     {
         "kind": "table/member",
@@ -176,6 +188,12 @@
         "name": "fuchsia.bluetooth.le/AdvertisingModeHint",
         "strictness": "strict",
         "type": "uint8"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/AdvertisingParameters.address_type",
+        "ordinal": "7",
+        "type": "fuchsia.bluetooth/AddressType"
     },
     {
         "kind": "table/member",
@@ -1018,6 +1036,12 @@
     },
     {
         "kind": "const",
+        "name": "fuchsia.bluetooth.le/MAX_BROADCAST_NAME_OCTETS",
+        "type": "uint8",
+        "value": "128"
+    },
+    {
+        "kind": "const",
         "name": "fuchsia.bluetooth.le/MAX_MANUFACTURER_DATA_LENGTH",
         "type": "uint8",
         "value": "252"
@@ -1248,6 +1272,50 @@
         "kind": "struct",
         "name": "fuchsia.bluetooth.le/PeripheralStartAdvertisingRequest",
         "resourceness": "resource"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/PrivilegedPeripheral.Advertise",
+        "strictness": "strict",
+        "ordinal": "3287285943277633919",
+        "direction": "two_way",
+        "request": "fuchsia.bluetooth.le/PeripheralAdvertiseRequest",
+        "response": "fuchsia.bluetooth.le/Peripheral_Advertise_Response",
+        "error": "fuchsia.bluetooth.le/PeripheralError"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/PrivilegedPeripheral.ListenL2cap",
+        "strictness": "strict",
+        "ordinal": "4163271092247470904",
+        "direction": "two_way",
+        "request": "fuchsia.bluetooth.le/ChannelListenerRegistryListenL2capRequest",
+        "response": "fuchsia.bluetooth.le/ChannelListenerRegistry_ListenL2cap_Response",
+        "error": "int32"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/PrivilegedPeripheral.OnPeerConnected",
+        "strictness": "strict",
+        "ordinal": "1590717649738392406",
+        "direction": "event",
+        "request": "fuchsia.bluetooth.le/PeripheralOnPeerConnectedRequest"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth.le/PrivilegedPeripheral.StartAdvertising",
+        "strictness": "strict",
+        "ordinal": "6374213901444190077",
+        "direction": "two_way",
+        "request": "fuchsia.bluetooth.le/PeripheralStartAdvertisingRequest",
+        "response": "fuchsia.bluetooth.le/Peripheral_StartAdvertising_Response",
+        "error": "fuchsia.bluetooth.le/PeripheralError"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.bluetooth.le/PrivilegedPeripheral",
+        "openness": "closed",
+        "transport": "channel"
     },
     {
         "kind": "struct/member",

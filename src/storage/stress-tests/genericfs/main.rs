@@ -81,24 +81,27 @@ async fn test() {
                 .expect("Failed to connect to the crypt management service");
             let mut key = [0; 32];
             zx::cprng_draw(&mut key);
+            let wrapping_key_id_0 = [0; 16];
+            let mut wrapping_key_id_1 = [0; 16];
+            wrapping_key_id_1[0] = 1;
             crypt_management_service
-                .add_wrapping_key(0, &key)
+                .add_wrapping_key(&wrapping_key_id_0, &key)
                 .await
                 .expect("FIDL failed")
                 .expect("add_wrapping_key failed");
             zx::cprng_draw(&mut key);
             crypt_management_service
-                .add_wrapping_key(1, &key)
+                .add_wrapping_key(&wrapping_key_id_1, &key)
                 .await
                 .expect("FIDL failed")
                 .expect("add_wrapping_key failed");
             crypt_management_service
-                .set_active_key(KeyPurpose::Data, 0)
+                .set_active_key(KeyPurpose::Data, &wrapping_key_id_0)
                 .await
                 .expect("FIDL failed")
                 .expect("set_active_key failed");
             crypt_management_service
-                .set_active_key(KeyPurpose::Metadata, 1)
+                .set_active_key(KeyPurpose::Metadata, &wrapping_key_id_1)
                 .await
                 .expect("FIDL failed")
                 .expect("set_active_key failed");

@@ -113,7 +113,7 @@ zx_status_t Nelson::PwmInit() {
 
   const std::vector<fpbus::Metadata> pwm_metadata{
       {{
-          .type = DEVICE_METADATA_PWM_CHANNELS,
+          .id = std::to_string(DEVICE_METADATA_PWM_CHANNELS),
           .data = encoded_metadata.value(),
       }},
   };

@@ -22,15 +22,6 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#hwinfo_negative_tests_test_driver",
-                "#misc",
-                "#protocol",
-            ],
-        },
-        {
             protocol: "fuchsia.factory.MiscFactoryStoreProvider",
             from: "#misc",
             to: "#protocol",

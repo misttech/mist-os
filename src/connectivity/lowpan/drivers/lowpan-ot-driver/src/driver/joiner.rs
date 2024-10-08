@@ -159,7 +159,11 @@ where
             },
         );
 
-        self.start_ongoing_stream_process(init_task, stream, fasync::Time::after(JOIN_TIMEOUT))
-            .boxed()
+        self.start_ongoing_stream_process(
+            init_task,
+            stream,
+            fasync::MonotonicInstant::after(JOIN_TIMEOUT),
+        )
+        .boxed()
     }
 }

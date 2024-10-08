@@ -589,7 +589,6 @@ zx_status_t Remote<Protocol, kObjectType>::Sync() {
   return ZX_OK;
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 constexpr fio::NodeAttributesQuery BuildAttributeQuery(
     const zxio_node_attributes_t::zxio_node_attr_has_t& attr_has) {
   fio::NodeAttributesQuery query;
@@ -610,6 +609,7 @@ constexpr fio::NodeAttributesQuery BuildAttributeQuery(
     query |= fio::NodeAttributesQuery::kCreationTime;
   if (attr_has.modification_time)
     query |= fio::NodeAttributesQuery::kModificationTime;
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
   if (attr_has.change_time)
     query |= fio::NodeAttributesQuery::kChangeTime;
   if (attr_has.access_time)
@@ -622,6 +622,8 @@ constexpr fio::NodeAttributesQuery BuildAttributeQuery(
     query |= fio::NodeAttributesQuery::kGid;
   if (attr_has.rdev)
     query |= fio::NodeAttributesQuery::kRdev;
+#endif
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   if (attr_has.fsverity_options)
     query |= fio::NodeAttributesQuery::kOptions;
   if (attr_has.fsverity_root_hash)
@@ -630,6 +632,7 @@ constexpr fio::NodeAttributesQuery BuildAttributeQuery(
     query |= fio::NodeAttributesQuery::kVerityEnabled;
   if (attr_has.casefold)
     query |= fio::NodeAttributesQuery::kCasefold;
+#endif
 
   return query;
 }
@@ -644,9 +647,15 @@ zx::result<fio::wire::MutableNodeAttributes> BuildMutableAttributes(
   // Ensure no immutable attributes were specified.
   if (mutable_attrs->has.protocols || mutable_attrs->has.abilities || mutable_attrs->has.id ||
       mutable_attrs->has.content_size || mutable_attrs->has.storage_size ||
-      mutable_attrs->has.link_count || mutable_attrs->has.change_time) {
+      mutable_attrs->has.link_count) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  if (mutable_attrs->has.change_time || mutable_attrs->has.fsverity_enabled ||
+      mutable_attrs->has.fsverity_options || mutable_attrs->has.fsverity_root_hash) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+#endif
   if (mutable_attrs->has.creation_time) {
     builder.creation_time(fidl::ObjectView<uint64_t>::FromExternal(
         const_cast<uint64_t*>(&mutable_attrs->creation_time)));
@@ -655,6 +664,7 @@ zx::result<fio::wire::MutableNodeAttributes> BuildMutableAttributes(
     builder.modification_time(fidl::ObjectView<uint64_t>::FromExternal(
         const_cast<uint64_t*>(&mutable_attrs->modification_time)));
   }
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
   if (mutable_attrs->has.access_time) {
     builder.access_time(fidl::ObjectView<uint64_t>::FromExternal(
         const_cast<uint64_t*>(&mutable_attrs->access_time)));
@@ -672,12 +682,14 @@ zx::result<fio::wire::MutableNodeAttributes> BuildMutableAttributes(
     builder.rdev(
         fidl::ObjectView<uint64_t>::FromExternal(const_cast<uint64_t*>(&mutable_attrs->rdev)));
   }
+#endif
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   if (mutable_attrs->has.casefold) {
     builder.casefold(mutable_attrs->casefold);
   }
+#endif
   return zx::ok(builder.Build());
 }
-#endif
 
 template <typename Protocol, typename ToZxioAbilities>
 zx_status_t AttrGetCommon(const fidl::WireSyncClient<Protocol>& client, ToZxioAbilities to_zxio,
@@ -697,7 +709,6 @@ zx_status_t AttrGetCommon(const fidl::WireSyncClient<Protocol>& client, ToZxioAb
 template <typename Protocol>
 zx_status_t AttributesGetCommon(const fidl::WireSyncClient<Protocol>& client,
                                 zxio_node_attributes_t* inout_attr) {
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   // Construct query from has in inout_attr
   const fio::NodeAttributesQuery query = BuildAttributeQuery(inout_attr->has);
   const fidl::WireResult result = client->GetAttributes(query);
@@ -712,9 +723,6 @@ zx_status_t AttributesGetCommon(const fidl::WireSyncClient<Protocol>& client,
   if (zx_status_t status = zxio_attr_from_wire(*attributes, inout_attr); status != ZX_OK)
     return status;
   return ZX_OK;
-#else
-  return ZX_ERR_NOT_SUPPORTED;
-#endif  //  FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 }
 
 template <typename Protocol, typename ToIo1ModePermissions>
@@ -745,7 +753,6 @@ zx_status_t AttrSetCommon(const fidl::WireSyncClient<Protocol>& client, ToIo1Mod
 template <typename Protocol>
 zx_status_t AttributesSetCommon(const fidl::WireSyncClient<Protocol>& client,
                                 const zxio_node_attributes_t* attr) {
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   fidl::WireTableFrame<fio::wire::MutableNodeAttributes> mutable_attrs_frame;
   const zx::result mutable_attributes = BuildMutableAttributes(attr, mutable_attrs_frame);
   if (mutable_attributes.is_error()) {
@@ -760,9 +767,6 @@ zx_status_t AttributesSetCommon(const fidl::WireSyncClient<Protocol>& client,
     return response.error_value();
   }
   return ZX_OK;
-#else
-  return ZX_ERR_NOT_SUPPORTED;
-#endif  // FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 }
 
 template <typename Protocol, zxio_object_type_t kObjectType>
@@ -782,13 +786,11 @@ zx_status_t Remote<Protocol, kObjectType>::AttrGet(zxio_node_attributes_t* inout
 
 template <typename Protocol, zxio_object_type_t kObjectType>
 zx_status_t Remote<Protocol, kObjectType>::AttrSet(const zxio_node_attributes_t* attr) {
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   // If these attributes are set, call `update_attributes` (io2) otherwise, we can fall back to
   // `SetAttr` to only update creation and modification time.
   if (attr->has.mode || attr->has.uid || attr->has.gid || attr->has.rdev || attr->has.access_time) {
     return AttributesSetCommon(client(), attr);
   }
-#endif
   return AttrSetCommon(client(), ToIo1ModePermissionsForFile(), attr);
 }
 
@@ -1083,7 +1085,6 @@ zx_status_t Remote<Protocol, kObjectType>::Open3(const char* path, size_t path_l
                                                  zxio_open_flags_t flags,
                                                  const zxio_open_options_t* options,
                                                  zxio_storage_t* storage) {
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   zx::channel client_end, server_end;
   if (zx_status_t status = zx::channel::create(0, &client_end, &server_end); status != ZX_OK) {
     return status;
@@ -1131,9 +1132,6 @@ zx_status_t Remote<Protocol, kObjectType>::Open3(const char* path, size_t path_l
   }
   return zxio_create_with_on_representation(client_end.release(),
                                             options ? options->inout_attr : nullptr, storage);
-#else
-  return ZX_ERR_NOT_SUPPORTED;
-#endif  // FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 }
 
 template <typename Protocol, zxio_object_type_t kObjectType>
@@ -1570,14 +1568,12 @@ class Directory : public Remote<fio::Directory, ZXIO_OBJECT_TYPE_DIR> {
   }
 
   zx_status_t AttrSet(const zxio_node_attributes_t* attr) {
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
     // If these attributes are set, call `update_attributes` (io2) otherwise, we can fall back to
     // `SetAttr` to only update creation and modification time.
     if (attr->has.mode || attr->has.uid || attr->has.gid || attr->has.rdev ||
         attr->has.access_time || attr->has.casefold) {
       return AttributesSetCommon(client(), attr);
     }
-#endif
     return AttrSetCommon(client(), ToIo1ModePermissionsForDirectory(), attr);
   }
 
@@ -2001,45 +1997,86 @@ uint32_t zxio_get_posix_mode(zxio_node_protocols_t protocols, zxio_abilities_t a
   return mode;
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 zx_status_t zxio_attr_from_wire(const fio::wire::NodeAttributes2& in, zxio_node_attributes_t* out) {
-  if (out->has.protocols && in.immutable_attributes.has_protocols()) {
+  out->has = {};
+
+  if (in.immutable_attributes.has_protocols()) {
     out->protocols = static_cast<uint64_t>(in.immutable_attributes.protocols());
-  } else {
-    out->has.protocols = false;
+    out->has.protocols = true;
   }
 
-  if (out->has.abilities && in.immutable_attributes.has_abilities()) {
+  if (in.immutable_attributes.has_abilities()) {
     out->abilities = static_cast<uint64_t>(in.immutable_attributes.abilities());
-  } else {
-    out->has.abilities = false;
+    out->has.abilities = true;
   }
 
-  if (out->has.id && in.immutable_attributes.has_id()) {
+  if (in.immutable_attributes.has_id()) {
     out->id = in.immutable_attributes.id();
-  } else {
-    out->has.id = false;
+    out->has.id = true;
   }
 
-  if (out->has.content_size && in.immutable_attributes.has_content_size()) {
+  if (in.immutable_attributes.has_content_size()) {
     out->content_size = in.immutable_attributes.content_size();
-  } else {
-    out->has.content_size = false;
+    out->has.content_size = true;
   }
 
-  if (out->has.storage_size && in.immutable_attributes.has_storage_size()) {
+  if (in.immutable_attributes.has_storage_size()) {
     out->storage_size = in.immutable_attributes.storage_size();
-  } else {
-    out->has.storage_size = false;
+    out->has.storage_size = true;
   }
 
-  if (out->has.link_count && in.immutable_attributes.has_link_count()) {
+  if (in.immutable_attributes.has_link_count()) {
     out->link_count = in.immutable_attributes.link_count();
-  } else {
-    out->has.link_count = false;
+    out->has.link_count = true;
   }
 
-  if (out->has.fsverity_options && in.immutable_attributes.has_options()) {
+  if (in.mutable_attributes.has_creation_time()) {
+    out->creation_time = in.mutable_attributes.creation_time();
+    out->has.creation_time = true;
+  }
+
+  if (in.mutable_attributes.has_modification_time()) {
+    out->modification_time = in.mutable_attributes.modification_time();
+    out->has.modification_time = true;
+  }
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
+  if (in.mutable_attributes.has_access_time()) {
+    out->access_time = in.mutable_attributes.access_time();
+    out->has.access_time = true;
+  }
+
+  if (in.mutable_attributes.has_mode()) {
+    out->mode = in.mutable_attributes.mode();
+    out->has.mode = true;
+  }
+
+  if (in.mutable_attributes.has_uid()) {
+    out->uid = in.mutable_attributes.uid();
+    out->has.uid = true;
+  }
+
+  if (in.mutable_attributes.has_gid()) {
+    out->gid = in.mutable_attributes.gid();
+    out->has.gid = true;
+  }
+
+  if (in.mutable_attributes.has_rdev()) {
+    out->rdev = in.mutable_attributes.rdev();
+    out->has.rdev = true;
+  }
+#endif
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  if (in.immutable_attributes.has_change_time()) {
+    out->change_time = in.immutable_attributes.change_time();
+    out->has.change_time = true;
+  }
+
+  if (in.mutable_attributes.has_casefold()) {
+    out->casefold = in.mutable_attributes.casefold();
+    out->has.casefold = true;
+  }
+
+  if (in.immutable_attributes.has_options()) {
     zxio_verification_options_t out_options{};
     fio::wire::VerificationOptions in_options = in.immutable_attributes.options();
     size_t salt_size = in_options.salt().count();
@@ -2049,80 +2086,23 @@ zx_status_t zxio_attr_from_wire(const fio::wire::NodeAttributes2& in, zxio_node_
     memcpy(out_options.salt, in_options.salt().data(), salt_size);
     out_options.hash_alg = static_cast<zxio_hash_algorithm_t>(in_options.hash_algorithm());
     out->fsverity_options = out_options;
-  } else {
-    out->has.fsverity_options = false;
+    out->has.fsverity_options = true;
   }
 
-  if (out->has.fsverity_root_hash && in.immutable_attributes.has_root_hash()) {
+  if (in.immutable_attributes.has_root_hash()) {
     if (!out->fsverity_root_hash) {
       return ZX_ERR_INVALID_ARGS;  // Caller must provide a pointer to write root hash to.
     }
     memcpy(out->fsverity_root_hash, in.immutable_attributes.root_hash().data(),
            ZXIO_ROOT_HASH_LENGTH);
-  } else {
-    out->has.fsverity_root_hash = false;
+    out->has.fsverity_root_hash = true;
   }
 
-  if (out->has.fsverity_enabled && in.immutable_attributes.has_verity_enabled()) {
+  if (in.immutable_attributes.has_verity_enabled()) {
     out->fsverity_enabled = in.immutable_attributes.verity_enabled();
-  } else {
-    out->has.fsverity_enabled = false;
+    out->has.fsverity_enabled = true;
   }
-
-  if (out->has.creation_time && in.mutable_attributes.has_creation_time()) {
-    out->creation_time = in.mutable_attributes.creation_time();
-  } else {
-    out->has.creation_time = false;
-  }
-
-  if (out->has.modification_time && in.mutable_attributes.has_modification_time()) {
-    out->modification_time = in.mutable_attributes.modification_time();
-  } else {
-    out->has.modification_time = false;
-  }
-
-  if (out->has.change_time && in.immutable_attributes.has_change_time()) {
-    out->change_time = in.immutable_attributes.change_time();
-  } else {
-    out->has.change_time = false;
-  }
-
-  if (out->has.access_time && in.mutable_attributes.has_access_time()) {
-    out->access_time = in.mutable_attributes.access_time();
-  } else {
-    out->has.access_time = false;
-  }
-
-  if (out->has.mode && in.mutable_attributes.has_mode()) {
-    out->mode = in.mutable_attributes.mode();
-  } else {
-    out->has.mode = false;
-  }
-
-  if (out->has.uid && in.mutable_attributes.has_uid()) {
-    out->uid = in.mutable_attributes.uid();
-  } else {
-    out->has.uid = false;
-  }
-
-  if (out->has.gid && in.mutable_attributes.has_gid()) {
-    out->gid = in.mutable_attributes.gid();
-  } else {
-    out->has.gid = false;
-  }
-
-  if (out->has.rdev && in.mutable_attributes.has_rdev()) {
-    out->rdev = in.mutable_attributes.rdev();
-  } else {
-    out->has.rdev = false;
-  }
-
-  if (out->has.casefold && in.mutable_attributes.has_casefold()) {
-    out->casefold = in.mutable_attributes.casefold();
-  } else {
-    out->has.casefold = false;
-  }
+#endif
 
   return ZX_OK;
 }
-#endif  // FUCHSIA_API_LEVEL_AT_LEAST(HEAD)

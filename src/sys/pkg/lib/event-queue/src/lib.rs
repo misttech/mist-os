@@ -645,7 +645,7 @@ mod tests {
         assert!(!executor.wake_expired_timers());
         assert_eq!(executor.run_until_stalled(&mut wait_flush), Poll::Pending);
 
-        executor.set_fake_time(fasync::Time::after(Duration::from_secs(1).into()));
+        executor.set_fake_time(fasync::MonotonicInstant::after(Duration::from_secs(1).into()));
         assert!(executor.wake_expired_timers());
         assert_eq!(executor.run_until_stalled(&mut wait_flush), Poll::Ready(Err(TimedOut)));
 

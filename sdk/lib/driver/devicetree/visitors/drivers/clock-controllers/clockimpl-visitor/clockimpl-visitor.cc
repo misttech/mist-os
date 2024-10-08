@@ -296,7 +296,7 @@ zx::result<> ClockImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
 
     if (!controller->second.clock_ids_metadata.empty()) {
       fuchsia_hardware_platform_bus::Metadata id_metadata = {{
-          .type = DEVICE_METADATA_CLOCK_IDS,
+          .id = std::to_string(DEVICE_METADATA_CLOCK_IDS),
           .data = controller->second.clock_ids_metadata,
       }};
       node.AddMetadata(std::move(id_metadata));
@@ -312,7 +312,7 @@ zx::result<> ClockImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
       }
 
       fuchsia_hardware_platform_bus::Metadata metadata = {{
-          .type = DEVICE_METADATA_CLOCK_INIT,
+          .id = std::to_string(DEVICE_METADATA_CLOCK_INIT),
           .data = encoded_metadata.value(),
       }};
       node.AddMetadata(std::move(metadata));
