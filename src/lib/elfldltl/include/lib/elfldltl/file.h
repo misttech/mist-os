@@ -1,4 +1,3 @@
-// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -17,10 +16,6 @@
 #include "diagnostics.h"
 
 namespace elfldltl {
-
-#if _KERNEL_MISTOS
-using off_t = int64_t;
-#endif
 
 template <typename Handle>
 inline auto DefaultMakeInvalidHandle() {
