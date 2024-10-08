@@ -4,6 +4,7 @@
 
 """Download a product bundle as a task workflow."""
 
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":fuchsia_shell_task.bzl", "shell_task_rule")
 load(":providers.bzl", "FuchsiaProductBundleInfo")
 
@@ -47,5 +48,5 @@ _fuchsia_task_download, _fuchsia_task_download_for_test, fuchsia_task_download =
             providers = [FuchsiaProductBundleInfo],
             mandatory = True,
         ),
-    },
+    } | COMPATIBILITY.HOST_ATTRS,
 )

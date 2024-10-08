@@ -4,6 +4,7 @@
 
 """Rule for assembling a Fuchsia product."""
 
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 load(
     ":providers.bzl",
@@ -225,7 +226,7 @@ _fuchsia_product_assembly = rule(
         "_developer_overrides_list": attr.label(
             default = "//fuchsia:assembly_developer_overrides_list",
         ),
-    },
+    } | COMPATIBILITY.HOST_ATTRS,
 )
 
 def _fuchsia_product_create_system_impl(ctx):
@@ -294,7 +295,7 @@ _fuchsia_product_create_system = rule(
             allow_single_file = True,
             default = "@fuchsia_sdk//:meta/manifest.json",
         ),
-    },
+    } | COMPATIBILITY.HOST_ATTRS,
 )
 
 def fuchsia_product(

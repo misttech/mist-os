@@ -4,6 +4,7 @@
 
 """Rule for running size checker on given image."""
 
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("@bazel_skylib//lib:paths.bzl", "paths")
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 load(":providers.bzl", "FuchsiaProductImageInfo", "FuchsiaSizeCheckerInfo")
@@ -98,5 +99,5 @@ fuchsia_product_size_check = rule(
             specific number of unique copies, and to have a distinct creep
             budget.""",
         ),
-    },
+    } | COMPATIBILITY.HOST_ATTRS,
 )

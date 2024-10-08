@@ -4,6 +4,7 @@
 
 """Rule for creating an update package."""
 
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 load(
     ":providers.bzl",
@@ -110,5 +111,5 @@ fuchsia_update_package = rule(
             doc = "Epoch needed to create update package.",
             mandatory = True,
         ),
-    },
+    } | COMPATIBILITY.HOST_ATTRS,
 )

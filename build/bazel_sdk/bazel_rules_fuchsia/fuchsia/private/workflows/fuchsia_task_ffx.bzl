@@ -4,6 +4,7 @@
 
 """ffx invokation as a workflow task."""
 
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":fuchsia_shell_task.bzl", "shell_task_rule")
 
 def ffx_task_rule(*, implementation, toolchains = [], attrs = {}, **kwargs):
@@ -31,7 +32,7 @@ def ffx_task_rule(*, implementation, toolchains = [], attrs = {}, **kwargs):
                 executable = True,
                 cfg = "exec",
             ),
-        } | attrs,
+        } | COMPATIBILITY.HOST_ATTRS | attrs,
         **kwargs
     )
 

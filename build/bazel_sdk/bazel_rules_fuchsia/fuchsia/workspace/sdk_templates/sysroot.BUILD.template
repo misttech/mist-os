@@ -2,6 +2,7 @@ load(
     "@fuchsia_sdk//fuchsia:defs.bzl",
     "fuchsia_cpu_select",
 )
+load("@fuchsia_sdk//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//:generated_constants.bzl", "constants")
 
 alias(
@@ -20,4 +21,5 @@ alias(
         },
         constants.target_cpus,
     ),
+    target_compatible_with = COMPATIBILITY.FUCHSIA_CONDITION,
 )

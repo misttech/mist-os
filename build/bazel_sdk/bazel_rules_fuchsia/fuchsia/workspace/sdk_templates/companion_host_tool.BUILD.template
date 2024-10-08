@@ -1,4 +1,7 @@
+load("@fuchsia_sdk//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
+
 filegroup(
     name = "{{name}}",
     srcs = [{{files}}],
+    target_compatible_with = COMPATIBILITY.HOST_CONDITION,
 )

@@ -4,6 +4,7 @@
 
 """Publishes packages as a workflow task."""
 
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageGroupInfo", "FuchsiaPackageInfo")
 load(":fuchsia_task.bzl", "fuchsia_task_rule")
 
@@ -54,5 +55,5 @@ def _fuchsia_task_publish_impl(ctx, make_fuchsia_task):
             executable = True,
             cfg = "target",
         ),
-    },
+    } | COMPATIBILITY.HOST_ATTRS,
 )

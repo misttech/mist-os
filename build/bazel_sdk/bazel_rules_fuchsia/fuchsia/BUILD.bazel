@@ -31,6 +31,7 @@ filegroup(
         # files.
         "//:bzl_srcs",
         "//common:bzl_srcs",
+        "//fuchsia/constraints:bzl_srcs",
         "//fuchsia/constraints/platforms:bzl_srcs",
         "//fuchsia/private:bzl_srcs",
         "//fuchsia/private/assembly:bzl_srcs",
@@ -47,6 +48,7 @@ filegroup(
         "@rules_license//rules_gathering:standard_package",
         "@rules_license//rules:standard_package",
         "@platforms//:srcs",
+        "@host_platform//:constraints.bzl",
 
         # We cannot depend on @bazel_tools//tools:bzl_srcs since it will pull in
         # rules_java which we do not want to depend on. Depend on the specific

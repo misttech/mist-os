@@ -4,6 +4,7 @@
 
 """Enumerates all components within a test package and runs each of them as test components."""
 
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":fuchsia_task.bzl", "fuchsia_task_rule")
 load(":providers.bzl", "FuchsiaPackageInfo")
 
@@ -84,5 +85,5 @@ def _fuchsia_task_test_enumerated_components_impl(ctx, make_fuchsia_task):
             doc = "The tool used to enumerate and test all components",
             default = "//fuchsia/tools:test_enumerated_components",
         ),
-    },
+    } | COMPATIBILITY.HOST_ATTRS,
 )

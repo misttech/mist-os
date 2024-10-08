@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 # buildifier: disable=module-docstring
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(
     ":providers.bzl",
     "FuchsiaComponentManifestInfo",
@@ -189,7 +190,7 @@ src file and included in the includes attribute.
             doc = "A list of dependencies which are included in the src cml",
             providers = [FuchsiaComponentManifestShardInfo],
         ),
-    } | _COMMON_CMC_ATTRIBUTES,
+    } | COMPATIBILITY.HOST_ATTRS | _COMMON_CMC_ATTRIBUTES,
 )
 
 def fuchsia_component_manifest(*, name, tags = ["manual"], **kwargs):
@@ -228,6 +229,6 @@ ensure_compiled_component_manifest = rule(
             doc = "The dependency to check. This should either be a plain cml file or a fuchsia_component_manifest target.",
             allow_single_file = [".cml", ".cm"],
         ),
-    } | _COMMON_CMC_ATTRIBUTES,
+    } | COMPATIBILITY.HOST_ATTRS | _COMMON_CMC_ATTRIBUTES,
     provides = [FuchsiaComponentManifestInfo],
 )

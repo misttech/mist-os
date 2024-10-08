@@ -495,12 +495,6 @@ Returns the current `CcToolchainInfo`.
     # We didn't find anything.
     fail("In order to use find_cc_toolchain, your rule has to depend on C++ toolchain. See find_cc_toolchain.bzl docs for details.")
 
-def with_fuchsia_constraint(target_compatible_with = []):
-    """Adds "@platforms//os:fuchsia" to the specified list if it's not already present."""
-    return target_compatible_with if (
-        "@platforms//os:fuchsia" in target_compatible_with
-    ) else target_compatible_with + ["@platforms//os:fuchsia"]
-
 def preprocesss_file(ctx, source, includes, headers = []):
     """Helper function for .S file preprocessing.
 

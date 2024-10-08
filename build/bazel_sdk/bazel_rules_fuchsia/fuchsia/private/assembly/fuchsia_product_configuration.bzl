@@ -4,6 +4,7 @@
 
 """Rule for declaring a Fuchsia product configuration."""
 
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private:fuchsia_package.bzl", "get_driver_component_manifests")
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 
@@ -176,7 +177,7 @@ _fuchsia_prebuilt_product_configuration = rule(
             doc = "Build type of the product config. Must match the prebuilts.",
             mandatory = True,
         ),
-    },
+    } | COMPATIBILITY.HOST_ATTRS,
 )
 
 _fuchsia_product_configuration = rule(
@@ -226,7 +227,7 @@ _fuchsia_product_configuration = rule(
             doc = "Additional dependencies that must be built before this target is built.",
             default = [],
         ),
-    },
+    } | COMPATIBILITY.HOST_ATTRS,
 )
 
 def fuchsia_prebuilt_product_configuration(

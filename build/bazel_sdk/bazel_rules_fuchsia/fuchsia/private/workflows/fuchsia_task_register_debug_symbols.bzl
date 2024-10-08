@@ -4,6 +4,7 @@
 
 """Registers debug symbols with ffx as a task workflow."""
 
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private:fuchsia_debug_symbols.bzl", "collect_debug_symbols")
 load(":fuchsia_shell_task.bzl", "shell_task_rule")
 
@@ -45,5 +46,5 @@ def _fuchsia_task_register_debug_symbols_impl(ctx, make_shell_task):
             """,
             mandatory = True,
         ),
-    },
+    } | COMPATIBILITY.HOST_ATTRS,
 )

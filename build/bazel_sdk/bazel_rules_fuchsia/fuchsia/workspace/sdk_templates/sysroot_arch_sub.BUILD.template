@@ -2,11 +2,12 @@ load(
     "@fuchsia_sdk//fuchsia:defs.bzl",
     "fuchsia_package_resource_group",
 )
+load("@fuchsia_sdk//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 
 fuchsia_package_resource_group(
     name = "dist",
     srcs = select({{srcs}}),
     dest = "lib",
     strip_prefix = "{{strip_prefix}}",
-    target_compatible_with = [ "@platforms//os:fuchsia" ],
+    target_compatible_with = COMPATIBILITY.FUCHSIA_CONDITION,
 )

@@ -1,7 +1,9 @@
 load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_component_manifest_shard_collection")
+load("@fuchsia_sdk//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 
 fuchsia_component_manifest_shard_collection(
     name = "{{name}}",
     deps = {{deps}},
-     visibility = ["//visibility:public"],
+    visibility = ["//visibility:public"],
+    target_compatible_with = COMPATIBILITY.FUCHSIA_CONDITION,
 )
