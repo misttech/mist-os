@@ -10,7 +10,7 @@
 namespace starnix {
 
 // The `SymlinkMode` enum encodes how symlinks are followed during path traversal.
-enum SymlinkMode {
+enum SymlinkMode : uint8_t {
   /// Follow a symlink at the end of a path resolution.
   Follow,
 

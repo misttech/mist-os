@@ -161,7 +161,9 @@ class CurrentTask : public TaskMemoryAccessor {
   /// this task. Relative paths are resolve relative to dir_fd. To resolve
   /// relative to the current working directory, pass FdNumber::AT_FDCWD for
   /// dir_fd.
-  fit::result<Errno, ktl::pair<NamespaceNode, FsString>> lookup_parent_at() const;
+  fit::result<Errno, ktl::pair<NamespaceNode, FsString>> lookup_parent_at(LookupContext& context,
+                                                                          FdNumber dir_fd,
+                                                                          const FsStr& path) const;
 
   /// Lookup the parent of a namespace node.
   ///

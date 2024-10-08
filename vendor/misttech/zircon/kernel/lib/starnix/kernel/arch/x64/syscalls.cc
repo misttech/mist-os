@@ -78,4 +78,12 @@ fit::result<Errno, FdNumber> sys_open(const CurrentTask& current_task,
   return sys_openat(current_task, FdNumber::AT_FDCWD_, user_path, flags, mode);
 }
 
+fit::result<Errno> sys_stat(const CurrentTask& current_task,
+                                      starnix_uapi::UserCString user_path,
+                                      starnix_uapi::UserRef<struct ::stat> buffer) {
+  // TODO(https://fxbug.dev/42172993): Add the `AT_NO_AUTOMOUNT` flag once it is supported in
+  // `sys_newfstatat`.
+  return sys_newfstatat(current_task, FdNumber::AT_FDCWD_, user_path, buffer, 0);
+}
+
 }  // namespace starnix

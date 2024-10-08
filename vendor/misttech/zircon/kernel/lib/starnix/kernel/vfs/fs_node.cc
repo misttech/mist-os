@@ -173,10 +173,7 @@ fit::result<Errno, SymlinkTarget> FsNode::readlink(const CurrentTask& current_ta
 }
 
 fit::result<Errno, struct stat> FsNode::stat(const CurrentTask& current_task) const {
-  auto result = refresh_info(current_task);
-  if (result.is_error())
-    return result.take_error();
-
+  auto result = refresh_info(current_task) _EP(result);
   auto info = result.value();
 
   /*
@@ -193,7 +190,16 @@ fit::result<Errno, struct stat> FsNode::stat(const CurrentTask& current_task) co
   */
 
   return fit::ok<struct stat>({
+      //.st_dev =
+      .st_ino = info.ino,
+      .st_nlink = static_cast<__kernel_ulong_t>(info.link_count),
+      .st_mode = info.mode.bits(),
+      .st_uid = info.uid,
+      .st_gid = info.gid,
+      .st_rdev = info.rdev.bits(),
       .st_size = static_cast<__kernel_long_t>(info.size),
+      .st_blksize = static_cast<__kernel_long_t>(info.blksize),
+      .st_blocks = static_cast<__kernel_long_t>(info.blocks),
   });
 }
 

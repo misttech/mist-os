@@ -15,6 +15,7 @@
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/starnix_uapi/user_value.h>
 
+#include <asm/stat.h>
 #include <linux/openat2.h>
 
 namespace starnix {
@@ -82,6 +83,13 @@ fit::result<Errno, FdNumber> sys_openat2(const CurrentTask& current_task, FdNumb
 
 fit::result<Errno, FdNumber> sys_openat2(const CurrentTask& current_task, FdNumber dd,
                                          starnix_uapi::UserRef<struct stat>);
+
+fit::result<Errno> sys_fstat(const CurrentTask& current_task, FdNumber fd,
+                             starnix_uapi::UserRef<struct ::stat> buffer);
+
+fit::result<Errno> sys_newfstatat(const CurrentTask& current_task, FdNumber fd,
+                                  starnix_uapi::UserCString user_path,
+                                  starnix_uapi::UserRef<struct ::stat> buffer, uint32_t flags);
 
 }  // namespace starnix
 
