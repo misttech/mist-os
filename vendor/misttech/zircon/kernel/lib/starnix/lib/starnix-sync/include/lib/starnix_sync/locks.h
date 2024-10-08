@@ -26,9 +26,7 @@ class StarnixMutex : public fbl::RefCounted<StarnixMutex<Data>> {
   // No moving or copying allowed.
   DISALLOW_COPY_ASSIGN_AND_MOVE(StarnixMutex);
 
-  // Copy elision - Return value optimization (RVO)
   MutexGuard<Data> Lock() { return MutexGuard(this); }
-  const MutexGuard<Data> Lock() const { return MutexGuard(this); }
 
  private:
   friend class MutexGuard<Data>;
@@ -75,18 +73,13 @@ class RwLock {
   using RwLockReadGuard = RwLockGuard<Data, BrwLockPi::Reader>;
 
   RwLock() = default;
-  RwLock(Data&& data) : data_(data) {}
+  explicit RwLock(Data&& data) : data_(data) {}
 
   // No moving or copying allowed.
   DISALLOW_COPY_ASSIGN_AND_MOVE(RwLock);
 
-  // Copy elision - Return value optimization (RVO)
-  RwLockReadGuard Read() { return RwLockReadGuard(this); }
-  const RwLockReadGuard Read() const { return RwLockReadGuard(this); }
-
-  // Copy elision - Return value optimization (RVO)
-  RwLockWriteGuard Write() { return RwLockWriteGuard(this); }
-  const RwLockWriteGuard Write() const { return RwLockWriteGuard(this); }
+  RwLockReadGuard Read() { return ktl::move(RwLockReadGuard(this)); }
+  RwLockWriteGuard Write() { return ktl::move(RwLockWriteGuard(this)); }
 
  private:
   friend class RwLockGuard<Data, BrwLockPi::Reader>;
@@ -111,6 +104,8 @@ class RwLockGuard : public Guard<BrwLockPi, Option> {
 
   Data* operator->() const { return &mtx_->data_; }
   Data& operator*() const { return mtx_->data_; }
+
+  ~RwLockGuard() = default;
 
  private:
   RwLock<Data>* mtx_;
