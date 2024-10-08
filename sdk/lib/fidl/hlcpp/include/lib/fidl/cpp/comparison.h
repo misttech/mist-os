@@ -14,6 +14,7 @@
 #include <utility>
 #include <vector>
 
+#include "lib/fidl/cpp/time.h"
 #include "lib/fidl/cpp/types.h"
 
 #ifdef __Fuchsia__
@@ -49,6 +50,14 @@ struct Equality<T, typename std::enable_if_t<std::is_base_of<zx::object_base, T>
   bool operator()(const T& lhs, const T& rhs) const { return lhs.get() == rhs.get(); }
 };
 #endif  // __Fuchsia__
+
+template <zx_clock_t kClockId>
+struct Equality<fidl::basic_time<kClockId>> {
+  bool operator()(const fidl::basic_time<kClockId>& lhs,
+                  const fidl::basic_time<kClockId>& rhs) const {
+    return lhs == rhs;
+  }
+};
 
 template <typename T, size_t N>
 struct Equality<std::array<T, N>> {

@@ -8,6 +8,7 @@
 #include <lib/fidl/cpp/box.h>
 #include <lib/fidl/cpp/natural_decoder.h>
 #include <lib/fidl/cpp/natural_encoder.h>
+#include <lib/fidl/cpp/time.h>
 #include <lib/fidl/cpp/wire/traits.h>
 #include <lib/stdcompat/optional.h>
 
@@ -365,7 +366,23 @@ struct NaturalCodingTraits<
     value->reset(handle);
   }
 };
+
 #endif  // __Fuchsia__
+
+template <zx_clock_t ClockId>
+struct NaturalCodingTraits<fidl::basic_time<ClockId>, NaturalCodingConstraintEmpty> {
+  static constexpr size_t kInlineSize = sizeof(zx_time_t);
+  static constexpr bool kIsMemcpyCompatible = true;
+
+  static void Encode(NaturalEncoder* encoder, const fidl::basic_time<ClockId>* value, size_t offset,
+                     size_t recursion_depth) {
+    *encoder->template GetPtr<zx_time_t>(offset) = value->get();
+  }
+  static void Decode(NaturalDecoder* decoder, fidl::basic_time<ClockId>* value, size_t offset,
+                     size_t recursion_depth) {
+    *value = fidl::basic_time<ClockId>(*decoder->template GetPtr<zx_time_t>(offset));
+  }
+};
 
 template <typename T, typename Constraint>
 struct NaturalCodingTraits<cpp17::optional<std::vector<T>>, Constraint> {

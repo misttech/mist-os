@@ -7,6 +7,8 @@
 
 #include <lib/fidl/cpp/box.h>
 #include <lib/fidl/cpp/framework_err.h>
+#include <lib/fidl/cpp/time.h>
+#include <zircon/time.h>
 
 #include <iostream>
 #include <optional>
@@ -167,7 +169,24 @@ struct Formatter<T, std::enable_if_t<std::is_base_of_v<zx::object_base, T>>> {
     }
   }
 };
+
 #endif
+
+template <>
+struct Formatter<fidl::basic_time<ZX_CLOCK_MONOTONIC>> {
+  static std::ostream& Format(std::ostream& os, const fidl::basic_time<ZX_CLOCK_MONOTONIC>& value) {
+    auto time_value = static_cast<zx_time_t>(value.get());
+    return os << "monotonic_instant(" << time_value << ")";
+  }
+};
+
+template <>
+struct Formatter<fidl::basic_time<ZX_CLOCK_BOOT>> {
+  static std::ostream& Format(std::ostream& os, const fidl::basic_time<ZX_CLOCK_BOOT>& value) {
+    auto time_value = static_cast<zx_time_t>(value.get());
+    return os << "boot_instant(" << time_value << ")";
+  }
+};
 
 template <typename T>
 struct Formatter<std::vector<T>> {

@@ -12,6 +12,7 @@
 
 #include "lib/fidl/cpp/decoder.h"
 #include "lib/fidl/cpp/encoder.h"
+#include "lib/fidl/cpp/time.h"
 #include "lib/fidl/cpp/traits.h"
 #include "lib/fidl/cpp/types.h"
 #include "lib/fidl/cpp/vector.h"
@@ -89,6 +90,19 @@ struct CodingTraits<T, typename std::enable_if<std::is_base_of<zx::object_base, 
   }
 };
 #endif
+
+template <zx_clock_t kClockId>
+struct CodingTraits<fidl::basic_time<kClockId>> {
+  static constexpr size_t kInlineSize = sizeof(zx_time_t);
+  static void Encode(Encoder* encoder, fidl::basic_time<kClockId>* value, size_t offset,
+                     cpp17::optional<HandleInformation> maybe_handle_info = cpp17::nullopt) {
+    ZX_DEBUG_ASSERT(maybe_handle_info == cpp17::nullopt);
+    *encoder->template GetPtr<zx_time_t>(offset) = value->get();
+  }
+  static void Decode(Decoder* decoder, fidl::basic_time<kClockId>* value, size_t offset) {
+    *value = fidl::basic_time<kClockId>(*decoder->template GetPtr<zx_time_t>(offset));
+  }
+};
 
 template <typename T>
 struct CodingTraits<std::unique_ptr<T>, typename std::enable_if<!IsFidlXUnion<T>::value>::type> {

@@ -5,6 +5,7 @@
 #ifndef LIB_FIDL_CPP_WIRE_WIRE_CODING_TRAITS_H_
 #define LIB_FIDL_CPP_WIRE_WIRE_CODING_TRAITS_H_
 
+#include <lib/fidl/cpp/time.h>
 #include <lib/fidl/cpp/wire/coding_errors.h>
 #include <lib/fidl/cpp/wire/object_view.h>
 #include <lib/fidl/cpp/wire/optional.h>
@@ -365,6 +366,19 @@ struct WireCodingTraits<T, Constraint, IsRecursive,
   }
 };
 #endif  // __Fuchsia__
+
+template <zx_clock_t ClockId, bool IsRecursive>
+struct WireCodingTraits<fidl::basic_time<ClockId>, WireCodingConstraintEmpty, IsRecursive> {
+  static constexpr size_t kInlineSize = sizeof(zx_time_t);
+  static constexpr bool kIsMemcpyCompatible = true;
+
+  static void Encode(WireEncoder* encoder, fidl::basic_time<ClockId>* value, WirePosition position,
+                     RecursionDepth<IsRecursive> recursion_depth) {
+    *position.As<zx_time_t>() = value->get();
+  }
+  static void Decode(WireDecoder* decoder, WirePosition position,
+                     RecursionDepth<IsRecursive> recursion_depth) {}
+};
 
 template <typename T, typename Constraint, bool IsRecursive>
 struct WireCodingTraits<fidl::ObjectView<T>, Constraint, IsRecursive> {
