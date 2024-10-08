@@ -343,7 +343,7 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
         """
         if self._client_controller is None:
             self.create_client_controller()
-        assert self._client_controller is not None
+            assert self._client_controller is not None
 
         return await asyncio.wait_for(
             self._client_controller.updates.get(), timeout
