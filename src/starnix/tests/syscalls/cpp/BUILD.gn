@@ -335,13 +335,6 @@ if (is_linux) {
       "-static",
     ]
 
-    # On RISC-V the linker uses base address that's below the base allowed by
-    # Zircon (0x200000). See b/311221240. Specify the base address to
-    # workaround this issue.
-    if (current_cpu == "riscv64") {
-      ldflags += [ "-Wl,--image-base=0x200000" ]
-    }
-
     configs -= [
       "//build/config/linux:default-pie",
       "//build/config/linux:implicit-host-libs",

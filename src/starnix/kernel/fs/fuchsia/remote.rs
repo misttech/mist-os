@@ -1500,7 +1500,7 @@ mod test {
 
         let mut context = LookupContext::default();
         let _test_file = root
-            .lookup_child(&current_task, &mut context, "bin/hello_starnix".into())?
+            .lookup_child(&current_task, &mut context, "data/tests/hello_starnix".into())?
             .open(&mut locked, &current_task, OpenFlags::RDONLY, AccessCheck::default())?;
         Ok(())
     }

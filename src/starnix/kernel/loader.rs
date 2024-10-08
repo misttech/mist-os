@@ -762,7 +762,7 @@ mod tests {
         L: LockBefore<BeforeFsNodeAppend>,
         L: LockBefore<MmDumpable>,
     {
-        let argv = vec![CString::new("bin/hello_starnix").unwrap()];
+        let argv = vec![CString::new("data/tests/hello_starnix").unwrap()];
         let executable =
             current_task.open_file(locked, argv[0].as_bytes().into(), OpenFlags::RDONLY)?;
         current_task.exec(locked, executable, argv[0].clone(), argv, vec![])?;
