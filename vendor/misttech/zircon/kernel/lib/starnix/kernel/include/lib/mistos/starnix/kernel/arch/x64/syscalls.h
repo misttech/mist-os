@@ -12,6 +12,8 @@
 #include <lib/mistos/starnix_uapi/file_mode.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 
+#include <asm/stat.h>
+
 namespace starnix {
 
 class CurrentTask;
@@ -28,13 +30,20 @@ fit::result<Errno, pid_t> sys_clone(const CurrentTask& current_task, uint64_t fl
 
 fit::result<Errno, pid_t> sys_fork(const CurrentTask& current_task);
 
+// https://pubs.opengroup.org/onlinepubs/9699919799/functions/creat.html
 fit::result<Errno, FdNumber> sys_creat(const CurrentTask& current_task,
                                        starnix_uapi::UserCString user_path,
                                        starnix_uapi::FileMode mode);
+
 fit::result<Errno, pid_t> sys_getpgrp(const CurrentTask& current_task);
+
 fit::result<Errno, FdNumber> sys_open(const CurrentTask& current_task,
                                       starnix_uapi::UserCString user_path, uint32_t flags,
                                       starnix_uapi::FileMode mode);
+
+fit::result<Errno> sys_stat(const CurrentTask& current_task,
+                                      starnix_uapi::UserCString user_path,
+                                      starnix_uapi::UserRef<struct ::stat> buffer);
 
 }  // namespace starnix
 
