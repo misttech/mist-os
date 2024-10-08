@@ -99,15 +99,22 @@ fit::result<zx_status_t, Vmar> create_user_vmar(const Vmar& root_vmar,
   return fit::ok(Vmar{Handle::Make(ktl::move(vmar_handle), vmar_rights)});
 }
 
+namespace {
+uint64_t from_le_bytes(const ktl::array<uint8_t, 8>& bytes) {
+  return (static_cast<uint64_t>(bytes[0])) | (static_cast<uint64_t>(bytes[1]) << 8) |
+         (static_cast<uint64_t>(bytes[2]) << 16) | (static_cast<uint64_t>(bytes[3]) << 24) |
+         (static_cast<uint64_t>(bytes[4]) << 32) | (static_cast<uint64_t>(bytes[5]) << 40) |
+         (static_cast<uint64_t>(bytes[6]) << 48) | (static_cast<uint64_t>(bytes[7]) << 56);
+}
+}  // namespace
+
 size_t generate_random_offset_for_aslr() {
   // Generate a number with ASLR_RANDOM_BITS.
   auto randomness = []() -> size_t {
     const size_t MASK = (1 << starnix::ASLR_RANDOM_BITS) - 1;
-    ktl::array<uint8_t, sizeof(size_t)> bytes;
+    ktl::array<uint8_t, sizeof(size_t)> bytes{0};
     cprng_draw(bytes.data(), bytes.size());
-    size_t value;
-    memcpy(&value, bytes.data(), sizeof(value));
-
+    size_t value = from_le_bytes(bytes);
     return value & MASK;
   }();
 
