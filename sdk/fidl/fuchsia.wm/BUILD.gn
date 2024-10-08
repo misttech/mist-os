@@ -8,7 +8,10 @@ fidl("fuchsia.wm") {
   sdk_category = "internal"
   sdk_area = "View System"
 
-  sources = [ "controls.fidl" ]
+  sources = [
+    "controls.fidl",
+    "screensaver.fidl",
+  ]
 
   public_deps = [ "//sdk/fidl/fuchsia.element" ]
 }
