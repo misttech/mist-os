@@ -945,6 +945,10 @@ if (!is_efi_toolchain) {
       "boot-test-success",
       "graceful-shutdown",
     ]
+    if (is_mistos) {
+      # needed to run some starnix loader tests from bootfs
+      deps += [ "//vendor/misttech/zircon/kernel/lib/starnix/examples/hello_starnix:bin" ]
+    }
   }
 }
 

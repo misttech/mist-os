@@ -164,6 +164,6 @@ bool test_snapshot_hello_starnix() {
 
 UNITTEST_START_TESTCASE(starnix_loader)
 UNITTEST("test trivial initial stack", unit_testing::test_trivial_initial_stack)
-// UNITTEST("test load hello starnix", unit_testing::test_load_hello_starnix)
-// UNITTEST("test snapshot hello starnix", unit_testing::test_snapshot_hello_starnix)
+UNITTEST("test load hello starnix", unit_testing::test_load_hello_starnix)
+UNITTEST("test snapshot hello starnix", unit_testing::test_snapshot_hello_starnix)
 UNITTEST_END_TESTCASE(starnix_loader, "starnix_loader", "Tests for Loader")
