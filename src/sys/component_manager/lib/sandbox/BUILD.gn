@@ -42,6 +42,7 @@ rustc_library("sandbox") {
     "src/connector.rs",
     "src/data.rs",
     "src/dict.rs",
+    "src/dir_entry.rs",
     "src/directory.rs",
     "src/fidl/capability.rs",
     "src/fidl/connector.rs",
@@ -73,10 +74,7 @@ rustc_library("sandbox") {
       "//third_party/rust_crates:scopeguard",
       "//third_party/rust_crates:tracing",
     ]
-    sources += [
-      "src/dir_entry.rs",
-      "src/fidl/registry.rs",
-    ]
+    sources += [ "src/fidl/registry.rs" ]
   }
 
   visibility = [

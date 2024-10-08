@@ -86,8 +86,6 @@ pub enum Capability {
     Handle(crate::Handle),
     Router(crate::Router),
     Instance(crate::WeakInstanceToken),
-
-    #[cfg(target_os = "fuchsia")]
     DirEntry(crate::DirEntry),
 }
 
@@ -109,7 +107,6 @@ impl Capability {
             Self::Directory(s) => Self::Directory(s.clone()),
             Self::Handle(s) => Self::Handle(s.try_clone()?),
             Self::Instance(s) => Self::Instance(s.clone()),
-            #[cfg(target_os = "fuchsia")]
             Self::DirEntry(s) => Self::DirEntry(s.clone()),
         };
         Ok(out)
@@ -125,8 +122,6 @@ impl Capability {
             Self::Directory(_) => "Directory",
             Self::Handle(_) => "Handle",
             Self::Instance(_) => "Instance",
-
-            #[cfg(target_os = "fuchsia")]
             Self::DirEntry(_) => "DirEntry",
         }
     }
