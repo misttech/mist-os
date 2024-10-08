@@ -183,14 +183,6 @@ fit::result<std::string, perfetto::third_party::perftools::profiles::Profile> sa
   //    #1    <addr> in <function> <file>:<line> <library>+<offset>
   //    ...
   //    #<n>    <addr> in <function> <file>:<line> <library>+<offset>
-  // [[[ELF module declaration]]
-  // [[[ELF module declaration]]
-  // ...
-  // [[[ELF module declaration]]
-  // <pid>
-  // <tid>
-  //   ... Repeats above for each set of modules ...
-  //
   //
   // The following loop parses it using a state machine that looks like:
   //
@@ -198,11 +190,11 @@ fit::result<std::string, perfetto::third_party::perftools::profiles::Profile> sa
   //     |
   //     v
   //  [ MODULES ] -> [ PID_TID ] --------\
-  //    ^   |  ^          ^              |
-  //    \---/  |          |              v
-  //           |          \-------- [ ENTRIES ]-\
-  //           |                       |  ^     |
-  //           |------------------------  \-----/
+  //    ^   |             ^              |
+  //    \---/             |              v
+  //                      \-------- [ ENTRIES ]-\
+  //                                      ^     |
+  //                                      \-----/
   //
   std::vector<BackTraceEntry> frame;
   for (std::string line; std::getline(in, line);) {
@@ -222,11 +214,6 @@ fit::result<std::string, perfetto::third_party::perftools::profiles::Profile> sa
         break;
       }
       case ENTRIES: {
-        if (line[0] == '[') {
-          // We're seeing modules again
-          state = MODULES;
-          break;
-        }
         if (line[0] != ' ') {  // This is a pid, meaning we've hit a new sample
           // Include two artificial frames containing the pid and tid of the sample. This way
           // profiles which include samples from multiple threads and processes will have their

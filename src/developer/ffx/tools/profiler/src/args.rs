@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use argh::{ArgsInfo, FromArgs};
-use std::io::IsTerminal;
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 /// Interact with the profiling subsystem.
@@ -45,11 +44,6 @@ pub struct Attach {
     #[argh(option)]
     pub job_ids: Vec<u64>,
 
-    /// profile everything running on the system. Equivalent to profiling the root job and
-    /// everything running under it.
-    #[argh(switch)]
-    pub system_wide: bool,
-
     /// how long to profiler for. If unspecified, will interactively wait until <ENTER> is pressed.
     #[argh(option)]
     pub duration: Option<u64>,
@@ -74,11 +68,6 @@ pub struct Attach {
     /// how frequently to take a sample
     #[argh(option, default = "10000")]
     pub sample_period_us: u64,
-
-    /// if true, include color codes in output. Defaults to true if terminal output is
-    /// detected, else false
-    #[argh(option, default = "std::io::stdout().is_terminal()")]
-    pub color_output: bool,
 }
 
 #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
@@ -128,9 +117,4 @@ pub struct Launch {
     /// test case filters to apply to profiled tests
     #[argh(option)]
     pub test_filters: Vec<String>,
-
-    /// if true, include color codes in output. Defaults to true if terminal output is
-    /// detected, else false
-    #[argh(option, default = "std::io::stdout().is_terminal()")]
-    pub color_output: bool,
 }

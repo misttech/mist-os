@@ -260,17 +260,16 @@ zx::result<profiler::SymbolizationContext> profiler::Sampler::GetContexts() {
   zx::result<> res =
       targets_.ForEachProcess([&contexts](cpp20::span<const zx_koid_t>,
                                           const ProcessTarget& target) mutable -> zx::result<> {
+        FX_LOGS(INFO) << "Getting modules for: " << target.pid;
         zx::result<std::vector<profiler::Module>> modules =
             profiler::GetProcessModules(target.handle.borrow());
-        if (modules.is_ok()) {
-          contexts[target.pid] = *modules;
+        if (modules.is_error()) {
+          return modules.take_error();
         }
-        // It's possible that the process we were profiling no longer exists -- it exited before the
-        // profile ended. If this happens, we don't want ForEachProcess to short circuit and stop,
-        // so we return success even if we "failed".
+        contexts[target.pid] = *modules;
         return zx::ok();
       });
-  if (res.is_error()) {
+  if (res.is_error() && contexts.empty()) {
     return res.take_error();
   }
   return zx::ok(profiler::SymbolizationContext{contexts});
