@@ -24,6 +24,7 @@
 
 #define GROUP2_PIN1 20
 #define GROUP2_PIN2 17
+#define GROUP2_POWER_SOURCE 3
 
 #define GROUP3_PIN1 7
 

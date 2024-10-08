@@ -34,6 +34,10 @@ class GpioImplVisitor : public fdf_devicetree::Visitor {
   static constexpr char kPinBiasPullDown[] = "bias-pull-down";
   static constexpr char kPinBiasPullUp[] = "bias-pull-up";
   static constexpr char kPinBiasDisable[] = "bias-disable";
+  static constexpr char kPinDrivePushPull[] = "drive-push-pull";
+  static constexpr char kPinDriveOpenDrain[] = "drive-open-drain";
+  static constexpr char kPinDriveOpenSource[] = "drive-open-source";
+  static constexpr char kPinPowerSource[] = "power-source";
 
   GpioImplVisitor();
 

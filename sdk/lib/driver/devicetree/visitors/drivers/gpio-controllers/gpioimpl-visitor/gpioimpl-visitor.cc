@@ -28,6 +28,7 @@ namespace gpio_impl_dt {
 
 namespace {
 using fuchsia_hardware_gpio::BufferMode;
+using fuchsia_hardware_pin::DriveType;
 using fuchsia_hardware_pin::Pull;
 using fuchsia_hardware_pinimpl::InitCall;
 using fuchsia_hardware_pinimpl::Metadata;
@@ -220,18 +221,46 @@ zx::result<> GpioImplVisitor::ParsePinCtrlCfg(fdf_devicetree::Node& child,
 
   std::vector<InitCall> init_calls;
 
+  fuchsia_hardware_pin::Configuration config;
+
   if (cfg_node.properties().find(kPinInputEnable) != cfg_node.properties().end()) {
+    std::optional<Pull> pull;
+    auto save_pull = [&](Pull val) -> zx::result<> {
+      if (pull.has_value()) {
+        FDF_LOG(
+            ERROR,
+            "Pin controller config '%s' can only support one pull direction. Previously already set with %d, now trying to set as %d",
+            cfg_node.name().c_str(), static_cast<uint32_t>(*pull), static_cast<uint32_t>(val));
+        return zx::error(ZX_ERR_NOT_SUPPORTED);
+      }
+      pull = val;
+      return zx::ok();
+    };
     if (cfg_node.properties().find(kPinBiasPullDown) != cfg_node.properties().end()) {
-      init_calls.emplace_back(InitCall::WithPinConfig({{.pull = Pull::kDown}}));
-    } else if (cfg_node.properties().find(kPinBiasPullUp) != cfg_node.properties().end()) {
-      init_calls.emplace_back(InitCall::WithPinConfig({{.pull = Pull::kUp}}));
-    } else if (cfg_node.properties().find(kPinBiasDisable) != cfg_node.properties().end()) {
-      init_calls.emplace_back(InitCall::WithPinConfig({{.pull = Pull::kNone}}));
-    } else {
+      auto result = save_pull(Pull::kDown);
+      if (result.is_error()) {
+        return result.take_error();
+      }
+    }
+    if (cfg_node.properties().find(kPinBiasPullUp) != cfg_node.properties().end()) {
+      auto result = save_pull(Pull::kUp);
+      if (result.is_error()) {
+        return result.take_error();
+      }
+    }
+    if (cfg_node.properties().find(kPinBiasDisable) != cfg_node.properties().end()) {
+      auto result = save_pull(Pull::kNone);
+      if (result.is_error()) {
+        return result.take_error();
+      }
+    }
+
+    if (!pull.has_value()) {
       FDF_LOG(ERROR, "Pin controller config '%s' has unsupported input config.",
               cfg_node.name().c_str());
       return zx::error(ZX_ERR_NOT_SUPPORTED);
     }
+    config.pull(*pull);
   }
 
   if (cfg_node.properties().find(kPinOutputLow) != cfg_node.properties().end()) {
@@ -248,7 +277,7 @@ zx::result<> GpioImplVisitor::ParsePinCtrlCfg(fdf_devicetree::Node& child,
       FDF_LOG(ERROR, "Pin controller config '%s' has invalid function.", cfg_node.name().c_str());
       return zx::error(ZX_ERR_INVALID_ARGS);
     }
-    init_calls.emplace_back(InitCall::WithPinConfig({{.function = *function}}));
+    config.function(*function);
   }
 
   if (cfg_node.properties().find(kPinDriveStrengthUa) != cfg_node.properties().end()) {
@@ -258,7 +287,55 @@ zx::result<> GpioImplVisitor::ParsePinCtrlCfg(fdf_devicetree::Node& child,
               cfg_node.name().c_str());
       return zx::error(ZX_ERR_INVALID_ARGS);
     }
-    init_calls.emplace_back(InitCall::WithPinConfig({{.drive_strength_ua = *drive_strength_ua}}));
+    config.drive_strength_ua(*drive_strength_ua);
+  }
+
+  std::optional<DriveType> drive_type;
+  auto save_drive_type = [&](DriveType val) -> zx::result<> {
+    if (drive_type.has_value()) {
+      FDF_LOG(
+          ERROR,
+          "Pin controller config '%s' can only support one drive typ. Previously already set with %d, now trying to set as %d",
+          cfg_node.name().c_str(), static_cast<uint32_t>(*drive_type), static_cast<uint32_t>(val));
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
+    }
+    drive_type = val;
+    return zx::ok();
+  };
+  if (cfg_node.properties().find(kPinDrivePushPull) != cfg_node.properties().end()) {
+    auto result = save_drive_type(DriveType::kPushPull);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+  }
+  if (cfg_node.properties().find(kPinDriveOpenDrain) != cfg_node.properties().end()) {
+    auto result = save_drive_type(DriveType::kOpenDrain);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+  }
+  if (cfg_node.properties().find(kPinDriveOpenSource) != cfg_node.properties().end()) {
+    auto result = save_drive_type(DriveType::kOpenSource);
+    if (result.is_error()) {
+      return result.take_error();
+    }
+  }
+  if (drive_type.has_value()) {
+    config.drive_type(*drive_type);
+  }
+
+  if (cfg_node.properties().find(kPinPowerSource) != cfg_node.properties().end()) {
+    auto power_source = cfg_node.properties().at(kPinPowerSource).AsUint32();
+    if (!power_source) {
+      FDF_LOG(ERROR, "Pin controller config '%s' has invalid power source.",
+              cfg_node.name().c_str());
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+    config.power_source(*power_source);
+  }
+
+  if (!config.IsEmpty()) {
+    init_calls.emplace_back(InitCall::WithPinConfig(std::move(config)));
   }
 
   if (init_calls.empty()) {
