@@ -283,16 +283,15 @@ fit::result<Errno, UserAddress> MemoryManagerState::map_memory(
     // track_stub !(TODO("https://fxbug.dev/297373369"), "GROWSDOWN guard region");
   }
 
+  LTRACEF("mapped at 0x%lx\n", mapped_addr->ptr());
+
   return fit::ok(*mapped_addr);
 }
 
 fit::result<Errno, UserAddress> MemoryManagerState::map_anonymous(
     fbl::RefPtr<MemoryManager> mm, DesiredAddress addr, size_t length, ProtectionFlags prot_flags,
     MappingOptionsFlags options, MappingName name, fbl::Vector<Mapping>& released_mappings) {
-  auto result = create_anonymous_mapping_memory(length);
-  if (result.is_error()) {
-    return result.take_error();
-  }
+  auto result = create_anonymous_mapping_memory(length) _EP(result);
   auto flags = MappingFlagsImpl::from_prot_flags_and_options(prot_flags, options);
   return map_memory(ktl::move(mm), addr, ktl::move(result.value()), 0, length, flags,
                     options.contains(MappingOptions::POPULATE), ktl::move(name), released_mappings);
@@ -1713,21 +1712,16 @@ fit::result<Errno, UserAddress> MemoryManager::map_anonymous(DesiredAddress addr
                                                              MappingName name) {
   LTRACE;
   fbl::Vector<Mapping> released_mappings;
-  fit::result<Errno, UserAddress> result = fit::error(errno(EINVAL));
 
-  {
-    // Hold the lock throughout the operation to uphold memory manager's invariants.
-    // See mm/README.md.
-    auto _state = state.Write();
-    result = _state->map_anonymous(fbl::RefPtr<MemoryManager>(this), addr, length, prot_flags,
-                                   options, ktl::move(name), released_mappings);
-    if (result.is_error()) {
-      return result.take_error();
-    }
-  }
+  // Hold the lock throughout the operation to uphold memory manager's invariants.
+  // See mm/README.md.
+  auto _state = state.Write();
+  auto result = _state->map_anonymous(fbl::RefPtr<MemoryManager>(this), addr, length, prot_flags,
+                                      options, ktl::move(name), released_mappings) _EP(result);
 
   // Drop the state before the unmapped mappings, since dropping a mapping may acquire a lock
   // in `DirEntry`'s `drop`.
+  _state.~RwLockGuard();
   released_mappings.reset();
 
   return result;
