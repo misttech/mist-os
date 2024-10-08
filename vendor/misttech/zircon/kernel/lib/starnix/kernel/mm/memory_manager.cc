@@ -24,6 +24,7 @@
 #include <lib/mistos/util/error_propagation.h>
 #include <lib/mistos/util/num.h>
 #include <lib/mistos/util/range-map.h>
+#include <lib/mistos/util/range_ext.h>
 #include <lib/user_copy/user_ptr.h>
 #include <trace.h>
 #include <zircon/assert.h>
@@ -668,7 +669,68 @@ fit::result<Errno> MemoryManagerState::update_after_unmap(fbl::RefPtr<MemoryMana
 
 fit::result<Errno> MemoryManagerState::protect(UserAddress addr, size_t length,
                                                ProtectionFlags prot_flags) {
-  return fit::error(errno(ENOSYS));
+  // profile_duration !("Protect");
+  //  TODO(https://fxbug.dev/42179751): If the mprotect flags include PROT_GROWSDOWN then the
+  //  specified protection may extend below the provided address if the lowest mapping is a
+  //  MAP_GROWSDOWN mapping. This function has to compute the potentially extended range before
+  //  modifying the Zircon protections or metadata.
+  auto vmar_flags = ProtectionFlagsImpl(prot_flags).to_vmar_flags();
+
+  if (check_has_unauthorized_splits(addr, length)) {
+    return fit::error(errno(EINVAL));
+  }
+
+  // Make one call to mprotect to update all the zircon protections.
+  // SAFETY: This is safe because the vmar belongs to a different process.
+  if (!VmAddressRegionDispatcher::is_valid_mapping_protection(vmar_flags)) {
+    return fit::error(errno(EINVAL));
+  }
+  auto result = user_vmar_.dispatcher()->Protect(
+      addr.ptr(), length, vmar_flags,
+      VmAddressRegionDispatcher::op_children_from_rights(user_vmar_.vmar->rights()));
+  if (result != ZX_OK) {
+    switch (result) {
+      case ZX_ERR_INVALID_ARGS:
+        return fit::error(errno(EINVAL));
+      case ZX_ERR_NOT_FOUND: {
+        // track_stub!(
+        //             TODO("https://fxbug.dev/322875024"),
+        //             "mprotect: succeed and update prot after NOT_FOUND"
+        //         );
+        return fit::error(errno(EINVAL));
+      }
+      case ZX_ERR_ACCESS_DENIED:
+        return fit::error(errno(EACCES));
+      default:
+        impossible_error(result);
+    }
+  }
+
+  // Update the flags on each mapping in the range.
+  auto end = (addr + length).round_up(PAGE_SIZE) _EP(end);
+  util::Range<UserAddress> prot_range{.start = addr, .end = end.value()};
+  fbl::Vector<ktl::pair<util::RangeMap<UserAddress, Mapping>::RangeType,
+                        util::RangeMap<UserAddress, Mapping>::ValueType>>
+      updates;
+  fbl::AllocChecker ac;
+  for (auto& [range, mapping] :
+       mappings.intersection(util::Range<UserAddress>{.start = addr, .end = end.value()})) {
+    auto r = util::intersect(range, prot_range);
+    auto m = mapping;
+    auto new_flags = mapping.flags() & (MappingFlags(MappingFlagsEnum::READ) |
+                                        MappingFlags(MappingFlagsEnum::WRITE) |
+                                        MappingFlags(MappingFlagsEnum::EXEC))
+                                           .complement() |
+                     MappingFlags::from_bits_truncate(prot_flags.bits());
+    m.flags_ = new_flags;
+    updates.push_back(ktl::pair(r, m), &ac);
+    ZX_ASSERT(ac.check());
+  }
+  // Use a separate loop to avoid mutating the mappings structure while iterating over it.
+  for (auto& [range, mapping] : updates) {
+    mappings.insert(range, mapping);
+  }
+  return fit::ok();
 }
 
 fit::result<Errno, ktl::span<uint8_t>> MemoryManagerState::read_memory(
