@@ -28,7 +28,10 @@ struct Range {
   bool operator==(Range const& other) const { return (start == other.start) && (end == other.end); }
   bool operator!=(Range const& other) const { return (start != other.start) || (end != other.end); }
   bool operator<(const Range& other) const { return start < other.start; }
+
   bool contains(const T& key) const { return start <= key && key < end; }
+
+  bool is_empty() { return !(start < end); }
 };
 
 template <typename _Type = uint64_t>
