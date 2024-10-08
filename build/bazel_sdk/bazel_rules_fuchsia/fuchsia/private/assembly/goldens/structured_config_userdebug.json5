@@ -1,5 +1,10 @@
 {
     components: {
+        "fuchsia-boot:///pkg-cache#meta/pkg-cache.cm": {
+            fields: {
+                all_packages_executable: false,
+            },
+        },
         "fuchsia-boot:///power-manager#meta/power-manager.cm": {
             fields: {
                 enable_debug_service: false,
