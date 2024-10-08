@@ -17,7 +17,7 @@
 
 #include <linux/utsname.h>
 
-#define LOCAL_TRACE MISTOS_SYSCALLS_GLOBAL_TRACE(2)
+#define LOCAL_TRACE MISTOS_SYSCALLS_GLOBAL_TRACE(0)
 
 long sys_a0039_getpid() {
   LTRACE;
@@ -26,7 +26,7 @@ long sys_a0039_getpid() {
 }
 
 long sys_a0063_uname(user_out_ptr<void> name) {
-#if 1
+#if 0
   struct new_utsname result;
   strncpy(result.sysname, "Linux", sizeof(result.sysname) / sizeof(result.sysname[0]));
 
