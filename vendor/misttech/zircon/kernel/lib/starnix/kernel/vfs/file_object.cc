@@ -109,12 +109,8 @@ fit::result<Errno, size_t> FileObject::read(const CurrentTask& current_task,
     }
     auto offset_guard = offset.Lock();
     auto _offset = static_cast<size_t>(*offset_guard);
-    if (auto result = checked_add_offset_and_length(_offset, data->available()); result.is_error())
-      return result.take_error();
-
-    auto result = ops->read(*this, current_task, _offset, data);
-    if (result.is_error())
-      return result.take_error();
+    auto result = checked_add_offset_and_length(_offset, data->available()) _EP(result);
+    auto read_result = ops->read(*this, current_task, _offset, data) _EP(read_result);
 
     auto read = result.value();
     *offset_guard += static_cast<off_t>(read);
@@ -127,8 +123,7 @@ fit::result<Errno, size_t> FileObject::read_at(const CurrentTask& current_task, 
   if (!ops_().is_seekable()) {
     return fit::error(errno(ESPIPE));
   }
-  if (auto result = checked_add_offset_and_length(_offset, data->available()); result.is_error())
-    return result.take_error();
+  auto result = checked_add_offset_and_length(_offset, data->available()) _EP(result);
 
   return read_internal([&]() -> fit::result<Errno, size_t> {
     return ops->read(*this, current_task, _offset, data);
@@ -143,9 +138,7 @@ fit::result<Errno, size_t> FileObject::write_common(const CurrentTask& current_t
   //   The number of bytes written may be less than count if, for example, there is
   //   insufficient space on the underlying physical medium, or the RLIMIT_FSIZE resource
   //   limit is encountered (see setrlimit(2)),
-  if (auto result = checked_add_offset_and_length(_offset, data->available()); result.is_error())
-    return result.take_error();
-
+  auto result = checked_add_offset_and_length(_offset, data->available()) _EP(result);
   return ops_().write(*this, current_task, _offset, data);
 }
 
@@ -160,21 +153,15 @@ fit::result<Errno, size_t> FileObject::write(const CurrentTask& current_task,
     size_t bytes_written;
     if (flags().contains(OpenFlagsEnum::APPEND)) {
       // let _guard = self.node().append_lock.write(current_task)?;
-      auto seek_result =
-          ops_().seek(*this, current_task, *_offset, SeekTarget{SeekTargetType::End, 0});
-      if (seek_result.is_error())
-        return seek_result.take_error();
+      auto seek = ops_().seek(*this, current_task, *_offset,
+                              SeekTarget{.type = SeekTargetType::End, .offset = 0}) _EP(seek);
 
-      *_offset = seek_result.value();
-      auto result = write_common(current_task, static_cast<size_t>(*_offset), data);
-      if (result.is_error())
-        return result.take_error();
-      bytes_written = result.value();
+      *_offset = *seek;
+      auto result = write_common(current_task, static_cast<size_t>(*_offset), data) _EP(result);
+      bytes_written = *result;
     } else {
       // let _guard = self.node().append_lock.write(current_task)?;
-      auto result = write_common(current_task, static_cast<size_t>(*_offset), data);
-      if (result.is_error())
-        return result.take_error();
+      auto result = write_common(current_task, static_cast<size_t>(*_offset), data) _EP(result);
       bytes_written = result.value();
     }
     *_offset += static_cast<off_t>(bytes_written);
