@@ -147,7 +147,6 @@ zx_status_t DriverHostRunner::DriverHost::GetDuplicateHandles(zx::process* out_p
 }
 
 void DriverHostRunner::StartDriverHost(driver_loader::Loader* loader,
-                                       zx::channel bootstrap_receiver,
                                        fidl::ServerEnd<fuchsia_io::Directory> exposed_dir,
                                        StartDriverHostCallback callback) {
   constexpr std::string_view kUrl = "fuchsia-boot:///driver_host2#meta/driver_host2.cm";
@@ -155,16 +154,14 @@ void DriverHostRunner::StartDriverHost(driver_loader::Loader* loader,
 
   StartDriverHostComponent(
       name, kUrl, std::move(exposed_dir),
-      [this, name, loader, bootstrap_receiver = std::move(bootstrap_receiver),
-       callback = std::move(callback)](
+      [this, name, loader, callback = std::move(callback)](
           zx::result<driver_manager::DriverHostRunner::StartedComponent> component) mutable {
         if (component.is_error()) {
           LOGF(ERROR, "Failed to start driver host: %s", component.status_string());
           callback(component.take_error());
           return;
         }
-        LoadDriverHost(loader, component->info, name, std::move(bootstrap_receiver),
-                       std::move(callback));
+        LoadDriverHost(loader, component->info, name, std::move(callback));
       });
 }
 
@@ -178,7 +175,7 @@ std::unordered_set<const DriverHostRunner::DriverHost*> DriverHostRunner::Driver
 
 void DriverHostRunner::LoadDriverHost(
     driver_loader::Loader* loader, const fuchsia_component_runner::ComponentStartInfo& start_info,
-    std::string_view name, zx::channel bootstrap_receiver, StartDriverHostCallback callback) {
+    std::string_view name, StartDriverHostCallback callback) {
   auto url = *start_info.resolved_url();
   fidl::Arena arena;
   fuchsia_data::wire::Dictionary wire_program = fidl::ToWire(arena, *start_info.program());
@@ -240,9 +237,8 @@ void DriverHostRunner::LoadDriverHost(
     return;
   }
 
-  auto loader_result =
-      loader->Start(std::move(process), std::move(root_vmar), std::move(exec_vmo),
-                    std::move(vdso_vmo), std::move(*lib_dir), std::move(bootstrap_receiver));
+  auto loader_result = loader->Start(std::move(process), std::move(root_vmar), std::move(exec_vmo),
+                                     std::move(vdso_vmo), std::move(*lib_dir));
   if (loader_result.is_error()) {
     LOGF(ERROR, "Loader failed to start driver host: %s", loader_result.status_string());
     callback(loader_result.take_error());

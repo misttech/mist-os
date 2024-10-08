@@ -244,12 +244,11 @@ zx::result<> DriverHostComponent::InstallLoader(
 DynamicLinkerDriverHostComponent::DynamicLinkerDriverHostComponent(
     fidl::ClientEnd<fuchsia_driver_host::DriverHost> driver_host,
     fidl::ClientEnd<fuchsia_driver_loader::DriverHost> client, async_dispatcher_t* dispatcher,
-    zx::channel bootstrap_sender, std::unique_ptr<driver_loader::Loader> loader,
+    std::unique_ptr<driver_loader::Loader> loader,
     fbl::DoublyLinkedList<std::unique_ptr<DynamicLinkerDriverHostComponent>>* driver_hosts)
     : driver_host_(std::move(driver_host), dispatcher,
                    fidl::ObserveTeardown([this, driver_hosts] { driver_hosts->erase(*this); })),
       driver_host_loader_(std::move(client), dispatcher),
-      bootstrap_sender_(std::move(bootstrap_sender)),
       loader_(std::move(loader)) {}
 
 void DynamicLinkerDriverHostComponent::StartWithDynamicLinker(
@@ -265,7 +264,7 @@ void DynamicLinkerDriverHostComponent::StartWithDynamicLinker(
 
   std::string driver_name = std::string(load_args.driver_soname);
   driver_host_loader_->LoadDriver(args).ThenExactlyOnce(
-      [this, driver = std::move(driver), node = std::move(node), node_name,
+      [driver = std::move(driver), node = std::move(node), node_name,
        start_args = std::move(start_args), driver_name, cb = std::move(cb)](auto& result) mutable {
         if (!result.ok()) {
           LOGF(ERROR, "Failed to start driver %s in driver host: %s", driver_name.c_str(),
@@ -277,17 +276,6 @@ void DynamicLinkerDriverHostComponent::StartWithDynamicLinker(
           LOGF(ERROR, "Failed to start driver %s in driver host: %s", driver_name.c_str(),
                zx_status_get_string(result->error_value()));
           cb(result->take_error());
-          return;
-        }
-
-        auto driver_start_addr = result.value()->runtime_load_address();
-        // TODO(https://fxbug.dev/355291912): we should replace this with an actual protocol.
-        // Currently we are temporarily using it to send the driver's start function pointer to the
-        // driver host.
-        zx_status_t status =
-            bootstrap_sender_.write(0, &driver_start_addr, sizeof(driver_start_addr), nullptr, 0);
-        if (status != ZX_OK) {
-          cb(zx::error(status));
           return;
         }
 
