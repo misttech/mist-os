@@ -121,6 +121,7 @@
 		interrupts = <GIC_SPI 3 GIC_IRQ_MODE_EDGE_RISING>,
 			<GIC_SPI 89 GIC_IRQ_MODE_EDGE_RISING>,
 			<GIC_SPI 86 GIC_IRQ_MODE_EDGE_RISING>;
+		interrupt-names = "viu1-vsync", "rdma-done", "vdin1-write-done";
 		iommus = <&dummy_iommu 9>;
 		smcs = <2 1 0>;
 		gpios = <&gpio_expander 0 0>,

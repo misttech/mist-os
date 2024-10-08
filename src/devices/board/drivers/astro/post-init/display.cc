@@ -72,14 +72,17 @@ static const std::vector<fpbus::Irq> display_irqs{
     {{
         .irq = S905D2_VIU1_VSYNC_IRQ,
         .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
+        .name = "viu1-vsync",
     }},
     {{
         .irq = S905D2_RDMA_DONE,
         .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
+        .name = "rdma-done",
     }},
     {{
         .irq = S905D2_VID1_WR,
         .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
+        .name = "vdin1-write-done",
     }},
 };
 
