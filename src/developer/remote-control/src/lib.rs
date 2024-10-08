@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::host_identifier::HostIdentifier;
+use crate::host_identifier::{DefaultIdentifier, HostIdentifier, Identifier};
 use anyhow::{Context as _, Result};
 use component_debug::dirs::*;
 use component_debug::lifecycle::*;
@@ -25,7 +25,7 @@ mod host_identifier;
 
 pub struct RemoteControlService {
     ids: RefCell<Vec<Weak<RefCell<Vec<u64>>>>>,
-    id_allocator: Box<dyn Fn() -> Result<HostIdentifier>>,
+    id_allocator: Box<dyn Fn() -> Result<Box<dyn Identifier + 'static>>>,
     connector: Box<dyn Fn(fidl::Socket)>,
 }
 
@@ -42,12 +42,16 @@ struct Client {
 impl RemoteControlService {
     pub async fn new(connector: impl Fn(fidl::Socket) + 'static) -> Self {
         let boot_id = zx::MonotonicInstant::get().into_nanos() as u64;
-        Self::new_with_allocator(connector, Box::new(move || HostIdentifier::new(boot_id)))
+        Self::new_with_allocator(connector, move || Ok(Box::new(HostIdentifier::new(boot_id)?)))
+    }
+
+    pub async fn new_with_default_allocator(connector: impl Fn(fidl::Socket) + 'static) -> Self {
+        Self::new_with_allocator(connector, || Ok(Box::new(DefaultIdentifier::new())))
     }
 
     pub(crate) fn new_with_allocator(
         connector: impl Fn(fidl::Socket) + 'static,
-        id_allocator: impl Fn() -> Result<HostIdentifier> + 'static,
+        id_allocator: impl Fn() -> Result<Box<dyn Identifier + 'static>> + 'static,
     ) -> Self {
         Self {
             id_allocator: Box::new(id_allocator),
@@ -522,26 +526,34 @@ mod tests {
     #[non_exhaustive]
     struct RcsEnv {
         system_info_proxy: Option<sysinfo::SysInfoProxy>,
+        use_default_identifier: bool,
     }
 
     fn make_rcs_from_env(env: RcsEnv) -> Rc<RemoteControlService> {
-        let RcsEnv { system_info_proxy } = env;
-        Rc::new(RemoteControlService::new_with_allocator(
-            |_| (),
-            move || {
-                Ok(HostIdentifier {
-                    interface_state_proxy: setup_fake_interface_state_service(),
-                    name_provider_proxy: setup_fake_name_provider_service(),
-                    device_info_proxy: setup_fake_device_service(),
-                    system_info_proxy: system_info_proxy
-                        .clone()
-                        .unwrap_or_else(|| setup_fake_sysinfo_service(zx::Status::INTERNAL)),
-                    build_info_proxy: setup_fake_build_info_service(),
-                    boot_timestamp_nanos: BOOT_TIME,
-                    boot_id: 0,
-                })
-            },
-        ))
+        let RcsEnv { system_info_proxy, use_default_identifier } = env;
+        if use_default_identifier {
+            Rc::new(RemoteControlService::new_with_allocator(
+                |_| (),
+                move || Ok(Box::new(DefaultIdentifier { boot_timestamp_nanos: BOOT_TIME })),
+            ))
+        } else {
+            Rc::new(RemoteControlService::new_with_allocator(
+                |_| (),
+                move || {
+                    Ok(Box::new(HostIdentifier {
+                        interface_state_proxy: setup_fake_interface_state_service(),
+                        name_provider_proxy: setup_fake_name_provider_service(),
+                        device_info_proxy: setup_fake_device_service(),
+                        system_info_proxy: system_info_proxy
+                            .clone()
+                            .unwrap_or_else(|| setup_fake_sysinfo_service(zx::Status::INTERNAL)),
+                        build_info_proxy: setup_fake_build_info_service(),
+                        boot_timestamp_nanos: BOOT_TIME,
+                        boot_id: 0,
+                    }))
+                },
+            ))
+        }
     }
 
     fn setup_rcs_proxy_from_env(
@@ -815,6 +827,23 @@ mod tests {
         assert_eq!(ids.len(), 2);
         assert_eq!(1234u64, ids[0]);
         assert_eq!(4567u64, ids[1]);
+
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_identify_default() -> Result<()> {
+        let (rcs_proxy, _) =
+            setup_rcs_proxy_from_env(RcsEnv { use_default_identifier: true, ..Default::default() });
+
+        let resp = rcs_proxy.identify_host().await.unwrap().unwrap();
+
+        assert_eq!(resp.nodename.unwrap(), "fuchsia-default-nodename");
+        assert_eq!(resp.serial_number.unwrap(), "fuchsia-default-serial-number");
+        assert_eq!(resp.board_config, None);
+        assert_eq!(resp.product_config, None);
+        assert_eq!(resp.addresses, None);
+        assert_eq!(resp.boot_timestamp_nanos.unwrap(), BOOT_TIME);
 
         Ok(())
     }

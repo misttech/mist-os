@@ -8,7 +8,19 @@
             url: "fuchsia-boot:///remote-control#meta/remote-control.cm",
         },
     ],
+    capabilities: [
+        {
+            config: "fuchsia.rcs.UseDefaultIdentity",
+            type: "bool",
+            value: true,
+        },
+    ],
     offer: [
+        {
+            config: "fuchsia.rcs.UseDefaultIdentity",
+            from: "self",
+            to: "#remote-control",
+        },
         {
             protocol: "fuchsia.boot.Arguments",
             from: "parent",

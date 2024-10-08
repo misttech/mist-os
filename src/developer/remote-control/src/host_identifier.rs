@@ -11,6 +11,35 @@ use {
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_sysinfo as sysinfo, zx,
 };
 
+#[async_trait::async_trait]
+pub trait Identifier {
+    async fn identify(&self) -> Result<rcs::IdentifyHostResponse, rcs::IdentifyHostError>;
+}
+
+pub struct DefaultIdentifier {
+    pub(crate) boot_timestamp_nanos: u64,
+}
+
+impl DefaultIdentifier {
+    pub fn new() -> Self {
+        let boot_timestamp_nanos = (fuchsia_runtime::utc_time().into_nanos()
+            - zx::MonotonicInstant::get().into_nanos()) as u64;
+        Self { boot_timestamp_nanos }
+    }
+}
+
+#[async_trait::async_trait]
+impl Identifier for DefaultIdentifier {
+    async fn identify(&self) -> Result<rcs::IdentifyHostResponse, rcs::IdentifyHostError> {
+        Ok(rcs::IdentifyHostResponse {
+            nodename: Some("fuchsia-default-nodename".into()),
+            serial_number: Some("fuchsia-default-serial-number".into()),
+            boot_timestamp_nanos: Some(self.boot_timestamp_nanos),
+            ..Default::default()
+        })
+    }
+}
+
 pub struct HostIdentifier {
     pub(crate) interface_state_proxy: fnet_interfaces::StateProxy,
     pub(crate) name_provider_proxy: fdevice::NameProviderProxy,
@@ -44,8 +73,11 @@ impl HostIdentifier {
             boot_id,
         });
     }
+}
 
-    pub async fn identify(&self) -> Result<rcs::IdentifyHostResponse, rcs::IdentifyHostError> {
+#[async_trait::async_trait]
+impl Identifier for HostIdentifier {
+    async fn identify(&self) -> Result<rcs::IdentifyHostResponse, rcs::IdentifyHostError> {
         let stream = fnet_interfaces_ext::event_stream_from_state(
             &self.interface_state_proxy,
             fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,

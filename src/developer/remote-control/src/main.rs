@@ -10,6 +10,7 @@ use futures::channel::mpsc::unbounded;
 use futures::join;
 use futures::prelude::*;
 use remote_control::RemoteControlService;
+use remote_control_config::Config;
 use std::rc::Rc;
 use std::sync::Arc;
 use tracing::{debug, error, info};
@@ -17,7 +18,7 @@ use {fidl_fuchsia_developer_remotecontrol as rcs, fuchsia_async as fasync};
 
 mod usb;
 
-async fn exec_server() -> Result<(), Error> {
+async fn exec_server(config: &Config) -> Result<(), Error> {
     diagnostics_log::initialize(PublishOptions::default().tags(&["remote-control"]))?;
 
     let router = overnet_core::Router::new(None)?;
@@ -60,7 +61,11 @@ async fn exec_server() -> Result<(), Error> {
         }
     };
 
-    let service = Rc::new(RemoteControlService::new(connector).await);
+    let service = if config.use_default_identity {
+        Rc::new(RemoteControlService::new_with_default_allocator(connector).await)
+    } else {
+        Rc::new(RemoteControlService::new(connector).await)
+    };
     let (sender, receiver) = unbounded();
 
     router
@@ -107,7 +112,8 @@ async fn exec_server() -> Result<(), Error> {
 
 #[fasync::run_singlethreaded]
 async fn main() -> Result<(), Error> {
-    if let Err(err) = exec_server().await {
+    let config = Config::take_from_startup_handle();
+    if let Err(err) = exec_server(&config).await {
         error!(%err, "Error executing server");
     }
     Ok(())
