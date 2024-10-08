@@ -372,6 +372,7 @@ struct TestEnvBuilder<BlobfsAndSystemImageFut> {
     blobfs_and_system_image:
         Box<dyn FnOnce(blobfs_ramdisk::Implementation) -> BlobfsAndSystemImageFut>,
     ignore_system_image: bool,
+    enable_upgradable_packages: bool,
     blob_implementation: Option<blobfs_ramdisk::Implementation>,
     bootfs_blobs: HashMap<Hash, Vec<u8>>,
 }
@@ -392,6 +393,7 @@ impl TestEnvBuilder<BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>> {
             }),
             paver_service_builder: None,
             ignore_system_image: false,
+            enable_upgradable_packages: false,
             blob_implementation: None,
             bootfs_blobs: HashMap::new(),
         }
@@ -419,6 +421,7 @@ where
             blobfs_and_system_image: Box::new(move |_| future::ready((blobfs, system_image))),
             paver_service_builder: self.paver_service_builder,
             ignore_system_image: self.ignore_system_image,
+            enable_upgradable_packages: self.enable_upgradable_packages,
             blob_implementation: self.blob_implementation,
             bootfs_blobs: self.bootfs_blobs,
         }
@@ -454,6 +457,7 @@ where
             }),
             paver_service_builder: self.paver_service_builder,
             ignore_system_image: self.ignore_system_image,
+            enable_upgradable_packages: self.enable_upgradable_packages,
             blob_implementation: Some(blobfs_ramdisk::Implementation::from_env()),
             bootfs_blobs: self.bootfs_blobs,
         }
@@ -462,6 +466,11 @@ where
     fn ignore_system_image(self) -> Self {
         assert_eq!(self.ignore_system_image, false);
         Self { ignore_system_image: true, ..self }
+    }
+
+    fn enable_upgradable_packages(self) -> Self {
+        assert_eq!(self.enable_upgradable_packages, false);
+        Self { enable_upgradable_packages: true, ..self }
     }
 
     fn fxblob(self) -> Self {
@@ -634,9 +643,6 @@ where
             .add_route(
                 Route::new()
                     .capability(Capability::configuration("fuchsia.pkgcache.AllPackagesExecutable"))
-                    .capability(Capability::configuration(
-                        "fuchsia.pkgcache.EnableUpgradablePackages",
-                    ))
                     .from(&pkg_cache_config)
                     .to(&pkg_cache),
             )
@@ -656,6 +662,30 @@ where
                 Route::new()
                     .capability(Capability::configuration("fuchsia.pkgcache.UseSystemImage"))
                     .from(if self.ignore_system_image {
+                        Ref::self_()
+                    } else {
+                        (&pkg_cache_config).into()
+                    })
+                    .to(&pkg_cache),
+            )
+            .await
+            .unwrap();
+        if self.enable_upgradable_packages {
+            builder
+                .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+                    name: "fuchsia.pkgcache.EnableUpgradablePackages".parse().unwrap(),
+                    value: true.into(),
+                }))
+                .await
+                .unwrap();
+        }
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::configuration(
+                        "fuchsia.pkgcache.EnableUpgradablePackages",
+                    ))
+                    .from(if self.enable_upgradable_packages {
                         Ref::self_()
                     } else {
                         (&pkg_cache_config).into()

@@ -279,6 +279,7 @@ async fn main_inner() -> Result<(), Error> {
     {
         let blobfs = blobfs.clone();
         let base_packages = Arc::clone(&base_packages);
+        let upgradable_packages = upgradable_packages.clone();
         let open_packages = open_packages.clone();
         let commit_status_provider =
             fuchsia_component::client::connect_to_protocol::<CommitStatusProviderMarker>()
@@ -292,6 +293,7 @@ async fn main_inner() -> Result<(), Error> {
                         blobfs.clone(),
                         Arc::clone(&base_packages),
                         Arc::clone(&cache_packages),
+                        upgradable_packages.clone(),
                         Arc::clone(&package_index),
                         open_packages.clone(),
                         commit_status_provider.clone(),

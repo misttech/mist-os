@@ -6,7 +6,7 @@ use crate::base_packages::{BasePackages, CachePackages};
 use fidl_fuchsia_pkg as fpkg;
 use fuchsia_sync::Mutex;
 use fuchsia_url::{PinnedAbsolutePackageUrl, UnpinnedAbsolutePackageUrl};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tracing::error;
 
@@ -66,5 +66,35 @@ impl UpgradablePackages {
             return Err(fpkg::SetUpgradableUrlsError::PartialSet);
         }
         Ok(())
+    }
+
+    pub async fn list_blobs(&self, blobfs: &blobfs::Client) -> HashSet<fuchsia_hash::Hash> {
+        let () = self.init_event.wait().await;
+
+        let mut all_blobs = HashSet::new();
+        let package_hashes: Vec<_> = self.packages.lock().values().copied().collect();
+        let memoized_packages = async_lock::RwLock::new(HashMap::new());
+        for package_hash in package_hashes {
+            match crate::required_blobs::find_required_blobs_recursive(
+                blobfs,
+                &package_hash,
+                &memoized_packages,
+                crate::required_blobs::ErrorStrategy::PropagateFailure,
+            )
+            .await
+            {
+                Ok(blobs) => {
+                    all_blobs.insert(package_hash);
+                    all_blobs.extend(blobs);
+                }
+                Err(e) => {
+                    error!(
+                        "find required blobs for package {package_hash}: {:#}",
+                        anyhow::anyhow!(e)
+                    );
+                }
+            }
+        }
+        all_blobs
     }
 }
