@@ -31,7 +31,9 @@ def _convert_reverse_hex(address: List[str]) -> List[int]:
     return [int(x, 16) for x in reversed(address)]
 
 
-def retrieve_device_id(data: dict[str, Any], reverse_hex_address: str) -> str:
+def retrieve_device_id(
+    data: dict[str, Any], reverse_hex_address: list[int]
+) -> str:
     """Retrieve ID based on reversed address."""
     for value in data.values():
         if value["address"] == reverse_hex_address:
