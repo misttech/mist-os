@@ -254,8 +254,43 @@ class WlanPolicyAp(AsyncAdapter, wlan_policy_ap.WlanPolicyAp):
         Raises:
             HoneydewWlanError: Error from WLAN stack.
         """
-        # TODO(http://b/324948461): Finish implementation
-        raise NotImplementedError()
+        # Replace the existing AccessPointStateUpdates server without giving up our
+        # handle to AccessPointController. This is necessary since the AccessPointProvider
+        # API is designed to only allow a single caller to make AccessPointController
+        # calls which would impact WLAN state. If we lose our handle to the
+        # AccessPointController, some other component on the system could take it.
+        self.cancel_task(
+            self._access_point_controller.access_point_state_updates_server_task
+        )
+
+        access_point_listener_proxy = f_wlan_policy.AccessPointListener.Client(
+            self._fc_transport.connect_device_proxy(
+                _ACCESS_POINT_LISTENER_PROXY
+            )
+        )
+
+        updates: asyncio.Queue[list[AccessPointState]] = asyncio.Queue()
+        updates_client, updates_server = Channel.create()
+        access_point_state_updates_server = AccessPointStateUpdatesImpl(
+            updates_server, updates
+        )
+        task = self._async_adapter_loop.create_task(
+            access_point_state_updates_server.serve()
+        )
+
+        try:
+            access_point_listener_proxy.get_listener(
+                updates=updates_client.take(),
+            )
+        except ZxStatus as status:
+            raise errors.HoneydewWlanError(
+                f"AccessPointListener.GetListener() error {status}"
+            ) from status
+
+        self._access_point_controller.updates = updates
+        self._access_point_controller.access_point_state_updates_server_task = (
+            task
+        )
 
     @asyncmethod
     # pylint: disable-next=invalid-overridden-method

@@ -4,7 +4,12 @@
 """Unit tests for honeydew.affordances.fuchsia_controller.wlan.wlan_policy_ap."""
 
 import unittest
+from collections.abc import Iterator
+from contextlib import contextmanager
 from unittest import mock
+
+import fidl.fuchsia_wlan_policy as f_wlan_policy
+from fuchsia_controller_py import Channel
 
 from honeydew.affordances.fuchsia_controller.wlan import wlan_policy_ap
 from honeydew.errors import NotSupportedError
@@ -44,22 +49,76 @@ class WlanPolicyApFCTests(unittest.TestCase):
             wlan_policy_ap._REQUIRED_CAPABILITIES
         )
 
-        self.wlan_policy_ap_obj = wlan_policy_ap.WlanPolicyAp(
-            device_name="fuchsia-emulator",
-            ffx=self.ffx_transport_obj,
-            fuchsia_controller=self.fc_transport_obj,
-            reboot_affordance=self.reboot_affordance_obj,
-            fuchsia_device_close=self.fuchsia_device_close_obj,
-        )
+        self.access_point_state_updates_proxy: (
+            f_wlan_policy.AccessPointStateUpdatesClient | None
+        ) = None
+
+        with (
+            self.mock_ap_provider(),
+            self.mock_ap_listener(),
+        ):
+            self.wlan_policy_ap_obj = wlan_policy_ap.WlanPolicyAp(
+                device_name="fuchsia-emulator",
+                ffx=self.ffx_transport_obj,
+                fuchsia_controller=self.fc_transport_obj,
+                reboot_affordance=self.reboot_affordance_obj,
+                fuchsia_device_close=self.fuchsia_device_close_obj,
+            )
 
         self.assertFalse(
             self.wlan_policy_ap_obj._access_point_controller.access_point_state_updates_server_task.cancelled(),
             "Expected access point state update server to be running",
         )
 
+        self.assertIsNotNone(self.access_point_state_updates_proxy)
+        assert self.access_point_state_updates_proxy is not None
+
     def tearDown(self) -> None:
         self.wlan_policy_ap_obj._close()
         return super().tearDown()
+
+    @contextmanager
+    def mock_ap_provider(self) -> Iterator[mock.MagicMock]:
+        """Mock requests to fuchsia.wlan.policy/AccessPointProvider."""
+        ap_provider_client = mock.MagicMock(
+            spec=f_wlan_policy.AccessPointProvider.Client,
+            autospec=True,
+        )
+
+        # pylint: disable-next=unused-argument
+        def get_controller(requests: Channel, updates: Channel) -> None:
+            self.access_point_state_updates_proxy = (
+                f_wlan_policy.AccessPointStateUpdates.Client(updates)
+            )
+
+        ap_provider_client.get_controller = mock.Mock(wraps=get_controller)
+
+        with mock.patch(
+            "fidl.fuchsia_wlan_policy.AccessPointProvider", autospec=True
+        ) as fidl_mock:
+            fidl_mock.Client.return_value = ap_provider_client
+            yield ap_provider_client
+
+    @contextmanager
+    def mock_ap_listener(self) -> Iterator[mock.MagicMock]:
+        """Mock requests to fuchsia.wlan.policy/AccessPointListener."""
+        ap_listener_client = mock.MagicMock(
+            spec=f_wlan_policy.AccessPointListener.Client,
+            autospec=True,
+        )
+
+        def get_listener(updates: Channel) -> None:
+            self.access_point_state_updates_proxy = (
+                f_wlan_policy.AccessPointStateUpdates.Client(updates)
+            )
+
+        ap_listener_client.get_listener = mock.Mock(wraps=get_listener)
+
+        with mock.patch(
+            "fidl.fuchsia_wlan_policy.AccessPointListener", autospec=True
+        ) as fidl_mock:
+            fidl_mock.Client.return_value = ap_listener_client
+            yield ap_listener_client
 
     def test_verify_supported(self) -> None:
         """Verify _verify_supported fails."""
@@ -110,10 +169,27 @@ class WlanPolicyApFCTests(unittest.TestCase):
         """Verify WlanPolicyAp.stop_all()."""
         self.wlan_policy_ap_obj.stop_all()
 
-    def test_set_new_update_listener(self) -> None:
-        """Verify WlanPolicyAp.set_new_update_listener()."""
-        with self.assertRaises(NotImplementedError):
+    def test_set_new_update_listener_overrides(self) -> None:
+        """Verify WlanPolicyAp.set_new_update_listener() overrides the existing
+        access point state updates server."""
+        old_server = (
+            self.wlan_policy_ap_obj._access_point_controller.access_point_state_updates_server_task
+        )
+
+        with self.mock_ap_listener():
             self.wlan_policy_ap_obj.set_new_update_listener()
+
+        new_server = (
+            self.wlan_policy_ap_obj._access_point_controller.access_point_state_updates_server_task
+        )
+
+        self.assertNotEqual(new_server, old_server)
+        self.assertTrue(old_server.cancelled())
+        self.assertFalse(new_server.cancelled())
+        self.assertEqual(
+            self.wlan_policy_ap_obj._access_point_controller.updates.qsize(),
+            0,
+        )
 
     def test_get_update(self) -> None:
         """Verify WlanPolicyAp.get_update()."""
