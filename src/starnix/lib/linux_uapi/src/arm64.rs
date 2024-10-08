@@ -20201,6 +20201,12 @@ impl Default for fuse_bpf_args {
     }
 }
 #[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_entry_out_extended {
+    pub arg: fuse_entry_out,
+    pub bpf_arg: fuse_entry_bpf_out,
+}
+#[repr(C)]
 #[repr(align(8))]
 #[derive(Debug, Default)]
 pub struct StdAtomicI64 {
