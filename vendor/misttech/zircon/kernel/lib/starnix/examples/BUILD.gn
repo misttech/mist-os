@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 group("examples") {
+  testonly = true
   deps = [ "hello_starnix" ]
 }
 
