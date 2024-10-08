@@ -207,6 +207,19 @@ fit::result<Errno> sys_close(const CurrentTask& current_task, FdNumber fd) {
   return fit::ok();
 }
 
+fit::result<Errno, size_t> sys_pread64(const CurrentTask& current_task, FdNumber fd,
+                                       starnix_uapi::UserAddress address, size_t length,
+                                       off_t offset) {
+  auto file = current_task->files.get(fd) _EP(file);
+  auto unsiged_offset = mtl::TryFrom<off_t, size_t>(offset);
+  if (!unsiged_offset.has_value()) {
+    return fit::error(errno(EINVAL));
+  }
+  auto buffer = UserBuffersOutputBuffer<TaskMemoryAccessor>::unified_new_at(current_task, address,
+                                                                            length) _EP(buffer);
+  return file->read_at(current_task, *unsiged_offset, &*buffer);
+}
+
 fit::result<Errno, size_t> sys_writev(const CurrentTask& current_task, FdNumber fd,
                                       starnix_uapi::UserAddress iovec_addr,
                                       starnix_uapi::UserValue<uint32_t> iovec_count) {
