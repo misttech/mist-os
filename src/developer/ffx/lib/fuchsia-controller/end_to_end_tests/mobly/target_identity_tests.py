@@ -6,6 +6,7 @@ import asyncio
 from collections import deque
 from typing import Any, List
 
+import fidl.fuchsia_developer_ffx as ffx
 import fidl.fuchsia_device as device
 import fidl.fuchsia_feedback as feedback
 import fidl.fuchsia_hwinfo as hwinfo
@@ -23,6 +24,21 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
         ] = self.register_controller(fuchsia_device)
         self.device = self.fuchsia_devices[0]
         self.device.set_ctx(self)
+
+    @asyncmethod
+    async def test_get_nodename(self) -> None:
+        """Test that gets the nodename using the Target daemon protocol.
+
+        Targeted criteria:
+        -- call that results in simple output.
+        -- calls a non-SDK protocol
+           (daemon protocols are not explicitly in the SDK).
+        """
+        assert self.device.ctx is not None
+        target_proxy = ffx.Target.Client(self.device.ctx.connect_target_proxy())
+        res = await target_proxy.identity()
+        target_info = res.target_info
+        asserts.assert_equal(target_info.nodename, self.device.config["name"])
 
     @asyncmethod
     async def test_get_device_info(self) -> None:

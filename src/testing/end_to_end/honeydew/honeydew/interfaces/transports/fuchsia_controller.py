@@ -48,3 +48,14 @@ class FuchsiaController(abc.ABC):
         Returns:
             FIDL channel to proxy.
         """
+
+    @abc.abstractmethod
+    def add_target(
+        self,
+    ) -> None:
+        """Adds a target to the ffx daemon manually and wait for the target to
+           connect to RCS.
+
+        Raises:
+            errors.FuchsiaControllerError: Failed to add target
+        """

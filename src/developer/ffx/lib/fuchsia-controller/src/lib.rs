@@ -14,6 +14,7 @@ use crate::env_context::{EnvContext, FfxConfigEntry};
 use crate::ext_buffer::ExtBuffer;
 use crate::lib_context::LibContext;
 use fidl::HandleBased;
+use netext::parse_address_parts;
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
 use std::path::PathBuf;
@@ -92,6 +93,26 @@ pub unsafe extern "C" fn create_ffx_env_context(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn ffx_connect_daemon_protocol(
+    ctx: *mut EnvContext,
+    protocol: *const i8,
+    handle: *mut zx_types::zx_handle_t,
+) -> zx_status::Status {
+    let ctx = unsafe { get_arc(ctx) };
+    let protocol =
+        unsafe { CStr::from_ptr(protocol) }.to_str().expect("valid protocol string").to_owned();
+    let (responder, rx) = mpsc::sync_channel(1);
+    ctx.lib_ctx().run(LibraryCommand::OpenDaemonProtocol { env: ctx.clone(), protocol, responder });
+    match rx.recv().unwrap() {
+        Ok(r) => {
+            unsafe { *handle = r };
+            zx_status::Status::OK
+        }
+        Err(e) => e,
+    }
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn ffx_connect_device_proxy(
     ctx: *mut EnvContext,
     moniker: *const i8,
@@ -121,15 +142,63 @@ pub unsafe extern "C" fn ffx_connect_device_proxy(
 }
 
 #[no_mangle]
-pub unsafe extern "C" fn ffx_target_wait(
+pub unsafe extern "C" fn ffx_target_wait(ctx: *mut EnvContext, timeout: u64) -> zx_status::Status {
+    let ctx = unsafe { get_arc(ctx) };
+    let (responder, rx) = mpsc::sync_channel(1);
+    ctx.lib_ctx().run(LibraryCommand::TargetWait { env: ctx.clone(), timeout, responder });
+    rx.recv().unwrap()
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn ffx_target_add(
     ctx: *mut EnvContext,
-    timeout: u64,
-    offline: bool,
+    target: *const i8,
+    wait: bool,
+) -> zx_status::Status {
+    let target =
+        unsafe { CStr::from_ptr(target) }.to_str().expect("valid target string").to_owned();
+    let (addr, scope, port) = match parse_address_parts(target.as_str()) {
+        Ok(res) => res,
+        Err(_) => return zx_status::Status::INVALID_ARGS,
+    };
+    let scope_id = if let Some(scope) = scope {
+        match netext::get_verified_scope_id(scope) {
+            Ok(scope) => scope,
+            Err(_) => return zx_status::Status::INVALID_ARGS,
+        }
+    } else {
+        0
+    };
+    let ctx = unsafe { get_arc(ctx) };
+    let (responder, rx) = mpsc::sync_channel(1);
+    ctx.lib_ctx().run(LibraryCommand::TargetAdd {
+        env: ctx.clone(),
+        addr,
+        scope_id,
+        port: port.unwrap_or(0),
+        wait,
+        responder,
+    });
+    rx.recv().unwrap()
+}
+
+/// This function isn't really necessary. It can be opened via connect_daemon_protocol from the
+/// target.
+#[no_mangle]
+pub unsafe extern "C" fn ffx_connect_target_proxy(
+    ctx: *mut EnvContext,
+    handle: *mut zx_types::zx_handle_t,
 ) -> zx_status::Status {
     let ctx = unsafe { get_arc(ctx) };
     let (responder, rx) = mpsc::sync_channel(1);
-    ctx.lib_ctx().run(LibraryCommand::TargetWait { env: ctx.clone(), timeout, responder, offline });
-    rx.recv().unwrap()
+    ctx.lib_ctx().run(LibraryCommand::OpenTargetProxy { env: ctx.clone(), responder });
+    match rx.recv().unwrap() {
+        Ok(h) => {
+            unsafe { *handle = h };
+            zx_status::Status::OK
+        }
+        Err(e) => e,
+    }
 }
 
 #[no_mangle]
