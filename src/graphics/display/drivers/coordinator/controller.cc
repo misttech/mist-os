@@ -932,6 +932,10 @@ void Controller::PrepareStop() {
       image->OnRetire();
     }
   }
+
+  // Deregister the Controller itself from the display engine driver while both
+  // drivers are still alive.
+  engine_driver_client_->DeregisterDisplayEngineListener();
 }
 
 void Controller::Stop() { FDF_LOG(INFO, "Controller::Stop"); }
@@ -960,10 +964,7 @@ Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
       root_.CreateUint("last_valid_apply_config_stamp", kInvalidConfigStamp.value());
 }
 
-Controller::~Controller() {
-  FDF_LOG(INFO, "Controller::~Controller");
-  engine_driver_client_->DeregisterDisplayEngineListener();
-}
+Controller::~Controller() { FDF_LOG(INFO, "Controller::~Controller"); }
 
 size_t Controller::TEST_imported_images_count() const {
   fbl::AutoLock lock(mtx());
