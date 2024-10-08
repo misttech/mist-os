@@ -19,22 +19,39 @@ kernel_cmdline("cmdline") {
 
 linux_executable("bin") {
   output_name = "cowsay"
-
   sources = [ "//examples/cowsay/cowsay.c" ]
+
   disable_syslog_backend = true
 }
 
-resource("lib") {
-  sources =
-      [ "//prebuilt/third_party/sysroot/linux/lib64/ld-linux-x86-64.so.2" ]
+resource("ld") {
+  sources = [
+    "//prebuilt/third_party/sysroot/ubuntu20.04/lib64/ld-linux-x86-64.so.2",
+  ]
   outputs = [ "lib64/ld-linux-x86-64.so.2" ]
+}
+
+resource("libm") {
+  sources = [
+    "//prebuilt/third_party/sysroot/ubuntu20.04/lib/x86_64-linux-gnu/libm.so.6",
+  ]
+  outputs = [ "usr/lib/libm.so.6" ]
+}
+
+resource("libc") {
+  sources = [
+    "//prebuilt/third_party/sysroot/ubuntu20.04/lib/x86_64-linux-gnu/libc.so.6",
+  ]
+  outputs = [ "usr/lib/libc.so.6" ]
 }
 
 zbi("cowsay") {
   deps = [
     ":bin",
     ":cmdline",
-    ":lib",
+    ":ld",
+    ":libc",
+    ":libm",
     "//zircon/kernel",
   ]
 
