@@ -139,18 +139,6 @@ fit::result<zx_status_t, util::Range<uint64_t>> aligned_range(uint32_t offset, u
       util::Range<uint64_t>{.start = aligned_offset, .end = (aligned_offset + aligned_size)});
 }
 
-/*
-[[noreturn]] void Fail(const BootfsView::Error& error) {
-  zbitl::PrintBootfsError(error, [&](const char* fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    vprintf(fmt, args);
-    va_end(args);
-  });
-  ZX_PANIC("");
-}
-*/
-
 fbl::Vector<ktl::string_view> split_and_filter(const ktl::string_view& str, char delimiter) {
   fbl::Vector<ktl::string_view> result;
   ktl::string_view::size_type start = 0, end;
@@ -178,20 +166,20 @@ fbl::Vector<ktl::string_view> split_and_filter(const ktl::string_view& str, char
 
 }  // namespace
 
-FileSystemHandle BootFs::new_fs(const fbl::RefPtr<Kernel>& kernel, HandleOwner zbi_vmo) {
-  if (auto result = BootFs::new_fs_with_options(kernel, ktl::move(zbi_vmo), {});
-      result.is_error()) {
+FileSystemHandle BootFs::new_fs(const fbl::RefPtr<Kernel>& kernel,
+                                fbl::RefPtr<VmObjectDispatcher> vmo) {
+  if (auto result = BootFs::new_fs_with_options(kernel, ktl::move(vmo), {}); result.is_error()) {
     ZX_PANIC("empty options cannot fail");
   } else {
     return result.value();
   }
 }
 
-fit::result<Errno, FileSystemHandle> BootFs::new_fs_with_options(const fbl::RefPtr<Kernel>& kernel,
-                                                                 HandleOwner zbi_vmo,
-                                                                 FileSystemOptions options) {
+fit::result<Errno, FileSystemHandle> BootFs::new_fs_with_options(
+    const fbl::RefPtr<Kernel>& kernel, fbl::RefPtr<VmObjectDispatcher> vmo,
+    FileSystemOptions options) {
   fbl::AllocChecker ac;
-  auto bootfs = new (&ac) BootFs(ktl::move(zbi_vmo));
+  auto bootfs = new (&ac) BootFs(vmo);
   if (!ac.check()) {
     return fit::error(errno(ENOMEM));
   }
@@ -245,9 +233,8 @@ fit::result<Errno, struct statfs> BootFs::statfs(const FileSystem& fs,
   return fit::ok(stat);
 }
 
-BootFs::BootFs(HandleOwner zbi_vmo) {
-  fbl::RefPtr<Dispatcher> disp = zbi_vmo->dispatcher();
-  ZbiView zbi(DownCastDispatcher<VmObjectDispatcher>(&disp)->vmo());
+BootFs::BootFs(const fbl::RefPtr<VmObjectDispatcher>& vmo) {
+  ZbiView zbi(vmo->vmo());
   fbl::RefPtr<VmObject> bootfs_vmo;
   for (auto it = zbi.begin(); it != zbi.end(); ++it) {
     if (it->header->type == ZBI_TYPE_STORAGE_BOOTFS) {
@@ -261,6 +248,7 @@ BootFs::BootFs(HandleOwner zbi_vmo) {
       zx_status_t status = bootfs_vmo->set_name(kBootfsVmoName, strlen(kBootfsVmoName) - 1);
       ZX_ASSERT(status == ZX_OK);
 
+#if 0
       // Signal that we've already processed this one.
       // GCC's -Wmissing-field-initializers is buggy: it should allow
       // designated initializers without all fields, but doesn't (in C++?).
@@ -269,6 +257,7 @@ BootFs::BootFs(HandleOwner zbi_vmo) {
       if (auto ok = zbi.EditHeader(it, discard); ok.is_error()) {
         ZX_PANIC("vmo write failed on ZBI VMO\n");
       }
+#endif
 
       // Cancel error-checking since we're ending the iteration on purpose.
       zbi.ignore_error();
@@ -277,8 +266,14 @@ BootFs::BootFs(HandleOwner zbi_vmo) {
   }
 
   if (bootfs_vmo) {
-    if (auto result = BootfsReader::Create(std::move(bootfs_vmo)); result.is_error()) {
-      // Fail(result.error_value());
+    if (auto result = BootfsReader::Create(ktl::move(bootfs_vmo)); result.is_error()) {
+      zbitl::PrintBootfsError(result.error_value(), [&](const char* fmt, ...) {
+        va_list args;
+        va_start(args, fmt);
+        vprintf(fmt, args);
+        va_end(args);
+      });
+      ZX_PANIC("Failed to create bootfs");
     } else {
       bootfs_reader_ = ktl::move(result.value());
     }

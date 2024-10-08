@@ -8,6 +8,8 @@
 #include <object/vm_object_dispatcher.h>
 #include <vm/vm_object_paged.h>
 
+#include "fbl/ref_ptr.h"
+
 namespace bootfs::testing {
 
 // This object facilitates doing fprintf directly into the VMO representing
@@ -29,7 +31,7 @@ class ZbiFile {
   }
 
   // Move the VMO into a handle and return it.
-  Handle* Finish() && {
+  fbl::RefPtr<VmObjectDispatcher> Finish() {
     KernelHandle<VmObjectDispatcher> handle;
     zx_rights_t rights;
     zx_status_t status = VmObjectDispatcher::Create(
@@ -39,7 +41,7 @@ class ZbiFile {
     // DEBUG_ASSERT(status == ZX_OK);
     status = handle.dispatcher()->SetContentSize(pos_);
     DEBUG_ASSERT(status == ZX_OK);
-    return Handle::Make(ktl::move(handle), rights).release();
+    return handle.release();
   }
 
  private:

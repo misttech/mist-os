@@ -69,10 +69,10 @@ zx_library("starnix_core") {
   ]
 
   deps = [
+    "//vendor/misttech/zircon/kernel/lib/handoff",
     "//vendor/misttech/zircon/kernel/lib/mistos/util",
     "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-zircon:headers",
     "//zircon/kernel/object:headers",
-    "//zircon/kernel/phys:handoff",
   ]
 }
 
@@ -84,8 +84,8 @@ zx_library("starnix_runner") {
 
   deps = [
     ":starnix_core",
+    "//vendor/misttech/zircon/kernel/lib/handoff",
     "//zircon/kernel/lib/console",
-    "//zircon/kernel/phys:handoff",
   ]
 }
 

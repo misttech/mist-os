@@ -33,11 +33,12 @@ using BootfsView = zbitl::BootfsView<fbl::RefPtr<VmObject>>;
 
 class BootFs final : public FileSystemOps {
  public:
-  static FileSystemHandle new_fs(const fbl::RefPtr<Kernel>& kernel, HandleOwner zbi_vmo);
+  static FileSystemHandle new_fs(const fbl::RefPtr<Kernel>& kernel,
+                                 fbl::RefPtr<VmObjectDispatcher> vmo);
 
-  static fit::result<Errno, FileSystemHandle> new_fs_with_options(const fbl::RefPtr<Kernel>& kernel,
-                                                                  HandleOwner zbi_vmo,
-                                                                  FileSystemOptions options);
+  static fit::result<Errno, FileSystemHandle> new_fs_with_options(
+      const fbl::RefPtr<Kernel>& kernel, fbl::RefPtr<VmObjectDispatcher> vmo,
+      FileSystemOptions options);
 
   fit::result<Errno, struct statfs> statfs(const FileSystem& fs,
                                            const CurrentTask& current_task) final;
@@ -52,7 +53,7 @@ class BootFs final : public FileSystemOps {
 
  public:
   // C++
-  explicit BootFs(HandleOwner zbi_vmo);
+  explicit BootFs(const fbl::RefPtr<VmObjectDispatcher>& vmo);
 
   ~BootFs() final;
 

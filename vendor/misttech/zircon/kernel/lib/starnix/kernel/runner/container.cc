@@ -6,6 +6,7 @@
 #include "lib/mistos/starnix/kernel/runner/container.h"
 
 #include <lib/fit/result.h>
+#include <lib/handoff/handoff.h>
 #include <lib/mistos/starnix/kernel/execution/executor.h>
 #include <lib/mistos/starnix/kernel/fs/mistos/bootfs.h>
 #include <lib/mistos/starnix/kernel/fs/mistos/syslog.h>
@@ -27,7 +28,7 @@
 #include <fbl/ref_ptr.h>
 #include <ktl/algorithm.h>
 #include <object/process_dispatcher.h>
-#include <phys/handoff.h>
+#include <object/vm_object_dispatcher.h>
 
 #include "../kernel_priv.h"
 
@@ -148,9 +149,7 @@ fit::result<Errno, Container> create_container(const Config& config) {
 
 fit::result<zx_status_t, fbl::RefPtr<FsContext>> create_fs_context(
     const fbl::RefPtr<Kernel>& kernel, const Config& config) {
-  HandoffEnd end = EndHandoff();
-
-  auto rootfs = BootFs::new_fs(kernel, ktl::move(end.zbi));
+  auto rootfs = BootFs::new_fs(kernel, GetZbi());
   return fit::ok(ktl::move(FsContext::New(Namespace::new_with_flags(rootfs, MountFlags::empty()))));
 }
 

@@ -5,6 +5,7 @@
 
 #include "lib/mistos/starnix/testing/testing.h"
 
+#include <lib/handoff/handoff.h>
 #include <lib/mistos/starnix/kernel/fs/mistos/bootfs.h>
 #include <lib/mistos/starnix/kernel/fs/tmpfs.h>
 #include <lib/mistos/starnix/kernel/mm/flags.h>
@@ -23,7 +24,6 @@
 #include <zircon/assert.h>
 
 #include <fbl/ref_ptr.h>
-#include <phys/handoff.h>
 
 namespace starnix::testing {
 
@@ -71,12 +71,11 @@ create_kernel_task_and_unlocked_with_fs_and_selinux(
 FileSystemHandle create_bootfs(const fbl::RefPtr<Kernel>& kernel) {
   bootfs::testing::ZbiFile zbi;
   zbi.Write({kBootFsZbi, sizeof(kBootFsZbi) - 1});
-  return BootFs::new_fs(kernel, HandleOwner(ktl::move(zbi).Finish()));
+  return BootFs::new_fs(kernel, zbi.Finish());
 }
 
 FileSystemHandle create_bootfs_current_zbi(const fbl::RefPtr<Kernel>& kernel) {
-  HandoffEnd end = EndHandoff();
-  return BootFs::new_fs(kernel, ktl::move(end.zbi));
+  return BootFs::new_fs(kernel, GetZbi());
 }
 
 ktl::pair<fbl::RefPtr<Kernel>, starnix::testing::AutoReleasableTask>
