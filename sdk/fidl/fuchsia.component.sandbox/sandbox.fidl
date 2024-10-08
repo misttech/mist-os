@@ -43,15 +43,23 @@ type DictionaryRef = resource struct {
 };
 
 @available(added=HEAD)
+type Unit = struct {};
+
+@available(added=HEAD)
 type Capability = flexible resource union {
-    1: unit @generated_name("Unit") struct {};
+    1: unit Unit;
     2: handle zx.Handle;
     3: data Data;
     4: dictionary DictionaryRef;
     5: connector Connector;
-    6: directory client_end:fuchsia.io.Directory;
-    7: router client_end:Router;
+    6: directory_connector Connector;
+    7: directory client_end:fuchsia.io.Directory;
     8: dir_entry DirEntry;
+    9: router client_end:Router;
+    10: connector_router client_end:ConnectorRouter;
+    11: dictionary_router client_end:DictionaryRouter;
+    12: dir_entry_router client_end:DirEntryRouter;
+    13: data_router client_end:DataRouter;
 };
 
 /// The maximum length of a dictionary key. This should coincide with
@@ -494,6 +502,12 @@ type RouterError = flexible enum : uint32 {
 
     /// The arguments provided to the function are invalid.
     INVALID_ARGS = 2;
+
+    /// The operation is not supported.
+    NOT_SUPPORTED = 3;
+
+    /// An internal error occurred.
+    INTERNAL = 4;
 };
 
 /// A router allows a client to request a capability.
@@ -509,6 +523,56 @@ open protocol Router {
     /// this, an attempt to pass an empty request should return `RouterError.INVALID_ARGS`.
     flexible Route(RouteRequest) -> (resource struct {
         capability Capability;
+    }) error RouterError;
+};
+
+
+@available(added=HEAD)
+type Unavailable = struct {};
+
+@discoverable
+@available(added=HEAD)
+open protocol ConnectorRouter {
+    flexible Route(RouteRequest) -> (strict resource union {
+        1: connector Connector;
+        2: unavailable Unit;
+    }) error RouterError;
+};
+
+@discoverable
+@available(added=HEAD)
+open protocol DictionaryRouter {
+    flexible Route(RouteRequest) -> (strict resource union {
+        1: dictionary DictionaryRef;
+        2: unavailable Unit;
+    }) error RouterError;
+};
+
+
+@discoverable
+@available(added=HEAD)
+open protocol DirectoryRouter {
+    flexible Route(RouteRequest) -> (strict resource union {
+        1: directory client_end:fuchsia.io.Directory;
+        2: unavailable Unit;
+    }) error RouterError;
+};
+
+@discoverable
+@available(added=HEAD)
+open protocol DirEntryRouter {
+    flexible Route(RouteRequest) -> (strict resource union {
+        1: dir_entry DirEntry;
+        2: unavailable Unit;
+    }) error RouterError;
+};
+
+@discoverable
+@available(added=HEAD)
+open protocol DataRouter {
+    flexible Route(RouteRequest) -> (strict resource union {
+        1: data Data;
+        2: unavailable Unit;
     }) error RouterError;
 };
 

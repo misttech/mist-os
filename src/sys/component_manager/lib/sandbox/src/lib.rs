@@ -14,12 +14,13 @@ mod handle;
 mod instance_token;
 mod receiver;
 mod router;
+mod specific_router;
 mod unit;
 
 #[cfg(target_os = "fuchsia")]
 pub mod fidl;
 
-pub use self::capability::{Capability, ConversionError, RemoteError};
+pub use self::capability::{Capability, CapabilityBound, ConversionError, RemoteError};
 pub use self::connector::{Connectable, Connector, Message};
 pub use self::data::Data;
 pub use self::dict::{Dict, Key as DictKey};
@@ -29,6 +30,7 @@ pub use self::handle::Handle;
 pub use self::instance_token::{WeakInstanceToken, WeakInstanceTokenAny};
 pub use self::receiver::Receiver;
 pub use self::router::{Request, Routable, Router};
+pub use self::specific_router::{SpecificRoutable, SpecificRouter, SpecificRouterResponse};
 pub use self::unit::Unit;
 
 #[cfg(target_os = "fuchsia")]

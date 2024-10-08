@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::CapabilityBound;
 use std::fmt;
 
 /// [DirEntry] is a [Capability] that's a thin wrapper over [vfs::directory::entry::DirectoryEntry]
@@ -21,6 +22,8 @@ pub struct DirEntry {
     #[cfg(target_os = "fuchsia")]
     pub(crate) entry: std::sync::Arc<dyn vfs::directory::entry::DirectoryEntry>,
 }
+
+impl CapabilityBound for DirEntry {}
 
 #[cfg(target_os = "fuchsia")]
 impl fmt::Debug for DirEntry {

@@ -14,6 +14,10 @@ impl From<Capability> for fsandbox::Capability {
         match capability {
             Capability::Connector(s) => s.into(),
             Capability::DirEntry(s) => s.into(),
+            Capability::DictionaryRouter(s) => s.into(),
+            Capability::ConnectorRouter(s) => s.into(),
+            Capability::DirEntryRouter(s) => s.into(),
+            Capability::DataRouter(s) => s.into(),
             Capability::Router(s) => s.into(),
             Capability::Dictionary(s) => s.into(),
             Capability::Data(s) => s.into(),
@@ -59,6 +63,38 @@ impl TryFrom<fsandbox::Capability> for Capability {
                 };
                 Ok(any)
             }
+            fsandbox::Capability::ConnectorRouter(client_end) => {
+                let any = try_from_handle_in_registry(client_end.as_handle_ref())?;
+                match &any {
+                    Capability::ConnectorRouter(_) => (),
+                    _ => return Err(RemoteError::BadCapability),
+                };
+                Ok(any)
+            }
+            fsandbox::Capability::DictionaryRouter(client_end) => {
+                let any = try_from_handle_in_registry(client_end.as_handle_ref())?;
+                match &any {
+                    Capability::DictionaryRouter(_) => (),
+                    _ => return Err(RemoteError::BadCapability),
+                };
+                Ok(any)
+            }
+            fsandbox::Capability::DirEntryRouter(client_end) => {
+                let any = try_from_handle_in_registry(client_end.as_handle_ref())?;
+                match &any {
+                    Capability::DirEntryRouter(_) => (),
+                    _ => return Err(RemoteError::BadCapability),
+                };
+                Ok(any)
+            }
+            fsandbox::Capability::DataRouter(client_end) => {
+                let any = try_from_handle_in_registry(client_end.as_handle_ref())?;
+                match &any {
+                    Capability::DataRouter(_) => (),
+                    _ => return Err(RemoteError::BadCapability),
+                };
+                Ok(any)
+            }
             fsandbox::Capability::DirEntry(dir_entry) => {
                 let any = try_from_handle_in_registry(dir_entry.token.as_handle_ref())?;
                 match &any {
@@ -78,6 +114,10 @@ impl RemotableCapability for Capability {
             Self::Connector(s) => s.try_into_directory_entry(),
             Self::DirEntry(s) => s.try_into_directory_entry(),
             Self::Router(s) => s.try_into_directory_entry(),
+            Self::ConnectorRouter(s) => s.try_into_directory_entry(),
+            Self::DictionaryRouter(s) => s.try_into_directory_entry(),
+            Self::DirEntryRouter(s) => s.try_into_directory_entry(),
+            Self::DataRouter(s) => s.try_into_directory_entry(),
             Self::Dictionary(s) => s.try_into_directory_entry(),
             Self::Data(s) => s.try_into_directory_entry(),
             Self::Unit(s) => s.try_into_directory_entry(),

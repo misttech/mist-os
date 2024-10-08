@@ -16,6 +16,12 @@ pub enum RouterError {
     #[error("invalid arguments")]
     InvalidArgs,
 
+    #[error("not supported")]
+    NotSupported,
+
+    #[error("internal")]
+    Internal,
+
     #[error("unknown")]
     Unknown,
 }
@@ -25,6 +31,8 @@ impl From<fsandbox::RouterError> for RouterError {
         match err {
             fsandbox::RouterError::NotFound => Self::NotFound(Arc::new(ExternalNotFoundError {})),
             fsandbox::RouterError::InvalidArgs => Self::InvalidArgs,
+            fsandbox::RouterError::NotSupported => Self::NotSupported,
+            fsandbox::RouterError::Internal => Self::Internal,
             fsandbox::RouterErrorUnknown!() => Self::Unknown,
         }
     }
@@ -35,6 +43,8 @@ impl From<RouterError> for fsandbox::RouterError {
         match err {
             RouterError::NotFound(_) => Self::NotFound,
             RouterError::InvalidArgs => Self::InvalidArgs,
+            RouterError::NotSupported => Self::NotSupported,
+            RouterError::Internal => Self::Internal,
             RouterError::Unknown => Self::unknown(),
         }
     }
@@ -70,6 +80,8 @@ impl Explain for RouterError {
         match self {
             Self::NotFound(err) => err.as_zx_status(),
             Self::InvalidArgs => zx::Status::INVALID_ARGS,
+            Self::NotSupported => zx::Status::NOT_SUPPORTED,
+            Self::Internal => zx::Status::INTERNAL,
             Self::Unknown => zx::Status::INTERNAL,
         }
     }
