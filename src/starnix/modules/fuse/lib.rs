@@ -1016,14 +1016,18 @@ impl DirEntryOps for FuseDirEntry {
         let parent = dir_entry.parent().expect("non-root nodes always has a parent");
         let parent = FuseNode::from_node(&parent.node);
         let name = dir_entry.local_name();
-        let uapi::fuse_entry_out {
-            nodeid,
-            generation,
-            entry_valid,
-            entry_valid_nsec,
-            attr,
-            attr_valid,
-            attr_valid_nsec,
+        let FuseEntryOutExtended {
+            arg:
+                uapi::fuse_entry_out {
+                    nodeid,
+                    generation,
+                    entry_valid,
+                    entry_valid_nsec,
+                    attr,
+                    attr_valid,
+                    attr_valid_nsec,
+                },
+            ..
         } = match parent.connection.lock().execute_operation(
             current_task,
             parent.nodeid,
@@ -2187,7 +2191,7 @@ impl RunningOperationKind {
                 Ok(FuseResponse::Init(Self::to_response::<uapi::fuse_init_out>(&buffer)))
             }
             Self::Lookup | Self::Mkdir | Self::Mknod | Self::Link | Self::Symlink => {
-                Ok(FuseResponse::Entry(Self::to_response::<uapi::fuse_entry_out>(&buffer)))
+                Ok(FuseResponse::Entry(Self::to_response::<FuseEntryOutExtended>(&buffer)))
             }
             Self::Open { .. } => {
                 Ok(FuseResponse::Open(Self::to_response::<uapi::fuse_open_out>(&buffer)))
@@ -2399,7 +2403,7 @@ enum FuseResponse {
     Access(Result<(), Errno>),
     Attr(uapi::fuse_attr_out),
     Create(CreateResponse),
-    Entry(uapi::fuse_entry_out),
+    Entry(FuseEntryOutExtended),
     GetXAttr(ValueOrSize<FsString>),
     Init(uapi::fuse_init_out),
     Open(uapi::fuse_open_out),
@@ -2418,7 +2422,7 @@ enum FuseResponse {
 impl FuseResponse {
     fn entry(&self) -> Option<&uapi::fuse_entry_out> {
         if let Self::Entry(entry) = self {
-            Some(entry)
+            Some(&entry.arg)
         } else {
             None
         }
@@ -2434,6 +2438,18 @@ struct CreateResponse {
 
 static_assertions::const_assert_eq!(
     std::mem::offset_of!(CreateResponse, open),
+    std::mem::size_of::<uapi::fuse_entry_out>()
+);
+
+#[repr(C)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, IntoBytes, Immutable)]
+struct FuseEntryOutExtended {
+    arg: uapi::fuse_entry_out,
+    bpf_arg: uapi::fuse_entry_bpf_out,
+}
+
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(FuseEntryOutExtended, bpf_arg),
     std::mem::size_of::<uapi::fuse_entry_out>()
 );
 
