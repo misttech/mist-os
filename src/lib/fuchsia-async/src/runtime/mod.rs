@@ -45,10 +45,6 @@ pub mod scope {
     pub use super::implementation::scope::Join;
 }
 
-// TODO(https://fxbug.dex/328306129): Remove after whole repo rename
-#[allow(missing_docs)]
-pub type Time = MonotonicInstant;
-
 pub use scope::Scope;
 
 use futures::prelude::*;
