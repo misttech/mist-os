@@ -52,9 +52,12 @@ fit::result<Errno, FdNumber> sys_open(const CurrentTask& current_task,
                                       starnix_uapi::UserCString user_path, uint32_t flags,
                                       starnix_uapi::FileMode mode);
 
-fit::result<Errno> sys_stat(const CurrentTask& current_task,
-                                      starnix_uapi::UserCString user_path,
-                                      starnix_uapi::UserRef<struct ::stat> buffer);
+fit::result<Errno, size_t> sys_readlink(const CurrentTask& current_task,
+                                        starnix_uapi::UserCString user_path,
+                                        starnix_uapi::UserAddress buffer, size_t buffer_size);
+
+fit::result<Errno> sys_stat(const CurrentTask& current_task, starnix_uapi::UserCString user_path,
+                            starnix_uapi::UserRef<struct ::stat> buffer);
 
 }  // namespace starnix
 

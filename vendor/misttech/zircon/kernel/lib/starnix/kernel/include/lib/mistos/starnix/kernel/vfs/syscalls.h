@@ -104,6 +104,17 @@ fit::result<Errno> sys_newfstatat(const CurrentTask& current_task, FdNumber fd,
                                   starnix_uapi::UserCString user_path,
                                   starnix_uapi::UserRef<struct ::stat> buffer, uint32_t flags);
 
+fit::result<Errno> sys_statx(const CurrentTask& current_task, FdNumber dir_fd,
+                             starnix_uapi::UserCString user_path, uint32_t flags, uint32_t mask,
+                             starnix_uapi::UserRef<struct ::statx> statxbuf);
+
+fit::result<Errno, size_t> sys_readlinkat(const CurrentTask& current_task, FdNumber dir_fd,
+                                          starnix_uapi::UserCString user_path,
+                                          starnix_uapi::UserAddress buffer, size_t buffer_size);
+
+fit::result<Errno> sys_mkdirat(const CurrentTask& current_task, FdNumber dir_fd,
+                               starnix_uapi::UserCString user_path, starnix_uapi::FileMode mode);
+
 }  // namespace starnix
 
 #endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_VFS_SYSCALLS_H_
