@@ -65,7 +65,7 @@ class PidTable {
 
  private:
   /// impl PidTable
-  ktl::optional<const PidEntry*> get_entry(pid_t pid);
+  ktl::optional<const PidEntry*> get_entry(pid_t pid) const;
 
   PidEntry& get_entry_mut(pid_t pid);
 
@@ -76,7 +76,7 @@ class PidTable {
 
   size_t len() const;
 
-  util::WeakPtr<Task> get_task(pid_t pid);
+  util::WeakPtr<Task> get_task(pid_t pid) const;
 
   void add_task(const fbl::RefPtr<Task>& task);
 
