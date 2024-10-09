@@ -126,7 +126,7 @@ struct DebuglogTests {
     ktl::unique_ptr<DLog> log = ktl::make_unique<DLog>(&ac);
     ASSERT_TRUE(ac.check());
 
-    const zx_time_t now = current_time();
+    const zx_instant_boot_t now = current_boot_time();
 
     char msg[] = "Message!";
     ASSERT_EQ(ZX_OK, log->Write(DEBUGLOG_WARNING, 0, {msg, sizeof(msg)}));
@@ -459,11 +459,11 @@ struct DebuglogTests {
       // DLOG_MASK.
       zx_status_t status = ZX_ERR_INTERNAL;
 
-      const zx_time_t before_ts = current_time();
+      const zx_instant_boot_t before_ts = current_boot_time();
       guard.CallUnlocked([&log, &status, kPayload]() {
         status = log->Write(kTestSeverity, kTestFlags, kPayload);
       });
-      const zx_time_t after_ts = current_time();
+      const zx_instant_boot_t after_ts = current_boot_time();
 
       ASSERT_OK(status);
       EXPECT_EQ(offset, log->tail_);

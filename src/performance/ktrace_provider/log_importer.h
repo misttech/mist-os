@@ -24,7 +24,7 @@ class LogImporter {
               const zx_packet_signal_t* signal);
 
   zx::debuglog log_;
-  zx_time_t start_time_;
+  zx_instant_boot_t start_time_;
   double time_scale_;
   async::WaitMethod<LogImporter, &LogImporter::Handle> wait_{this};
 

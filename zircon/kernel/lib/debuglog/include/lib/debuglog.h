@@ -82,7 +82,7 @@ struct dlog_header {
   uint16_t datalen;
   uint8_t severity;
   uint8_t flags;
-  zx_time_t timestamp;
+  zx_instant_boot_t timestamp;
   uint64_t pid;
   uint64_t tid;
   // Each log record is assigned a sequence number at the time it enters the

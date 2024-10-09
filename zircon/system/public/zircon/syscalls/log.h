@@ -19,7 +19,7 @@ typedef struct zx_log_record {
   uint16_t datalen;
   uint8_t severity;
   uint8_t flags;
-  zx_time_t timestamp;
+  zx_instant_boot_t timestamp;
   uint64_t pid;
   uint64_t tid;
   char data[];
