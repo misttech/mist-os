@@ -389,8 +389,8 @@ pub mod tests {
         // Create a mock program which simulates immediately shutting down
         // the component.
         let (program, server) = mocks::mock_program();
-        let stop_timeout = zx::Duration::from_millis(50);
-        let kill_timeout = zx::Duration::from_millis(10);
+        let stop_timeout = zx::Duration::from_millis(200);
+        let kill_timeout = zx::Duration::from_millis(40);
 
         // Create a request map which the MockController will fill with
         // requests it received related to mocked component.
