@@ -9,7 +9,7 @@ use crate::security::selinux_hooks::XATTR_NAME_SELINUX;
 use crate::security::SecurityServer;
 use crate::task::CurrentTask;
 use crate::testing::AutoReleasableTask;
-use crate::vfs::{NamespaceNode, XattrOp};
+use crate::vfs::{FsStr, NamespaceNode, XattrOp};
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::file_mode::FileMode;
@@ -47,6 +47,23 @@ pub fn create_test_file(
         .root()
         .create_node(locked, &current_task, "file".into(), FileMode::IFREG, DeviceType::NONE)
         .expect("create_node(file)")
+}
+
+/// Creates a new path of directories with the given names under the root of the
+/// filesystem. Note that this will exercise the file-labeling scheme specified for the
+/// root filesystem by the current policy.
+pub fn create_directory_with_parents(
+    dir_names: Vec<&FsStr>,
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+) -> NamespaceNode {
+    let mut current_dir = current_task.fs().root();
+    for dir_name in dir_names {
+        current_dir = current_dir
+            .create_node(locked, &current_task, dir_name, FileMode::IFDIR, DeviceType::NONE)
+            .expect("create_node(file)");
+    }
+    current_dir
 }
 
 /// `hooks_tests_policy.pp` is a compiled policy module.

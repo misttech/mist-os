@@ -10,8 +10,9 @@ use crate::task::{CurrentTask, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
     DirEntry, DirEntryHandle, FileSystem, FileSystemHandle, FsNode, FsStr, FsString, NamespaceNode,
-    ValueOrSize, XattrOp,
+    PathBuilder, ValueOrSize, XattrOp,
 };
+use bstr::BStr;
 use linux_uapi::XATTR_NAME_SELINUX;
 use selinux::permission_check::{PermissionCheck, PermissionCheckResult};
 use selinux::policy::FsUseType;
@@ -62,6 +63,18 @@ pub(super) fn sb_umount(
     Ok(())
 }
 
+/// Returns the relative path from the root of the file system containing this `DirEntry`.
+fn get_fs_relative_path(dir_entry: &DirEntryHandle) -> FsString {
+    let mut path_builder = PathBuilder::new();
+    let mut current_dir = dir_entry.clone();
+
+    while let Some(parent) = current_dir.parent() {
+        path_builder.prepend_element(&BStr::new(&current_dir.local_name()));
+        current_dir = parent;
+    }
+    path_builder.build_absolute()
+}
+
 /// Called by the VFS to initialize the security state for an `FsNode` that is being linked at
 /// `dir_entry`.
 pub(super) fn fs_node_init_with_dentry(
@@ -88,9 +101,6 @@ pub(super) fn fs_node_init_with_dentry(
         FileSystemLabelState::Labeled { label } => label.clone(),
     };
 
-    // TODO: https://fxbug.dev/349117435 - Determine the appropriate label for the node, whether
-    // by applying a static `genfscon` label, by reading a dynamic label from the node's extended
-    // attributes, etc. as appropriate for the file-system labeling scheme.
     let sid = match label.scheme {
         // mountpoint-labelling labels every node from the "context=" mount option.
         FileSystemLabelingScheme::Mountpoint => label.sid,
@@ -134,6 +144,18 @@ pub(super) fn fs_node_init_with_dentry(
                     }
                 }
             }
+        }
+        FileSystemLabelingScheme::GenFsCon => {
+            let fs_type = fs_node.fs().name();
+            // This will give us the path of the node from the root node of the filesystem,
+            // excluding the path of the filesystem's mount point. For example, assuming that
+            // filesystem "proc" is mounted in "/proc" and if the actual full path to the
+            // fs_node is "/proc/bootconfig" then, get_fs_relative_path will return
+            // "/bootconfig". This matches the path definitions in the genfscon statements.
+            let sub_path = get_fs_relative_path(dir_entry);
+            security_server
+                .genfscon_label_for_fs_and_path(fs_type.into(), sub_path.as_slice().into())
+                .unwrap_or(SecurityId::initial(InitialSid::Unlabeled))
         }
     };
 
@@ -188,11 +210,6 @@ pub(super) fn fs_node_init_on_create(
         track_stub!(TODO("https://fxbug.dev/369067922"), "new FsNode already labeled");
     }
 
-    // TODO: https://fxbug.dev/349117435 - Remove this workaround once "bpf" is correctly "genfscon"-labelled.
-    if new_node.fs().name() == "bpf" {
-        return Ok(None);
-    }
-
     // If the creating task's "fscreate" attribute is set then it overrides the normal process
     // for labeling new files.
     if let Some(fscreate_sid) = current_task.read().security_state.attrs.fscreate_sid.clone() {
@@ -236,6 +253,10 @@ pub(super) fn fs_node_init_on_create(
                     .transpose()?;
                 (sid, xattr)
             }
+        }
+        FileSystemLabelingScheme::GenFsCon => {
+            // The label in this case is decided in the `fs_node_init_with_dentry` hook.
+            return Ok(None);
         }
     };
 
@@ -639,7 +660,7 @@ pub(super) fn get_cached_sid(fs_node: &FsNode) -> Option<SecurityId> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testing::create_kernel_task_and_unlocked_with_selinux;
+    use crate::testing::{create_kernel_task_and_unlocked_with_selinux, spawn_kernel_and_run};
     use crate::vfs::XattrOp;
     use starnix_uapi::errno;
 
@@ -802,5 +823,40 @@ mod tests {
 
         // Verify that the SID now cached on the node corresponds to VALID_SECURITY_CONTEXT.
         assert_eq!(Some(expected_sid), get_cached_sid(node));
+    }
+
+    #[fuchsia::test]
+    async fn get_fs_relative_path_root() {
+        // Verify the full path for the root entry.
+        spawn_kernel_and_run(|_, current_task| {
+            let dir_entry = current_task.fs().root().entry;
+
+            assert_eq!(BStr::new(b"/"), get_fs_relative_path(&dir_entry));
+        });
+    }
+
+    #[fuchsia::test]
+    async fn get_fs_relative_path_simple_file() {
+        // Verify the full path for a file directly under the root: "/file".
+        spawn_kernel_and_run(|locked, current_task| {
+            let dir_entry = &testing::create_test_file(locked, &current_task).entry;
+
+            assert_eq!(BStr::new(b"/file"), get_fs_relative_path(&dir_entry));
+        });
+    }
+
+    #[fuchsia::test]
+    async fn get_fs_relative_path_nested_dir() {
+        // Verify the full path for a nested directory: "/foo/bar".
+        spawn_kernel_and_run(|locked, current_task| {
+            let dir_entry = &testing::create_directory_with_parents(
+                vec![BStr::new(b"foo"), BStr::new(b"bar")],
+                locked,
+                &current_task,
+            )
+            .entry;
+
+            assert_eq!(BStr::new(b"/foo/bar"), get_fs_relative_path(&dir_entry));
+        });
     }
 }

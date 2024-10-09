@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::arrays::{Context, FsUseType};
+use super::arrays::{Context, FsContext, FsUseType};
 use super::extensible_bitmap::ExtensibleBitmapSpan;
 use super::metadata::HandleUnknown;
 use super::parser::ParseStrategy;
@@ -16,6 +16,31 @@ use super::{CategoryId, ParsedPolicy, RoleId, TypeId};
 use crate::{ClassPermission as _, NullessByteStr};
 use std::collections::HashMap;
 use std::num::NonZeroU32;
+
+/// Helper used to check whether a given `path` is nested within another (`maybe_ancestor`).
+fn is_ancestor_path(maybe_ancestor: &[u8], path: &[u8]) -> bool {
+    // genfscon statements never have an empty path.
+    assert!(maybe_ancestor.len() >= 1);
+
+    // Note that a partial path "/a/b/foo/" does not match "/a/b/foo" but will match
+    // other descendents like "/a/b/foo/1".
+    if !path.starts_with(maybe_ancestor) {
+        return false;
+    }
+
+    // Checking for substring is not enough to confirm this is an ancestor path:
+    // E.g. in the case where "/abc/cd" will be considered, erroneously, an ancestor path of
+    // "abc/cdef". There are actually 3 cases:
+    // 1. The two paths are the same (i.e. the lengths are equal)
+    // 2. The path from maybe_ancestor ends in a '/' character: e.g. if "/abc/" is a prefix of
+    //    another path, we know it's also an ancestor.
+    // 3. The path being checked has a / as the first character that doesn't match. E.g. "/abc"
+    //    is an ancestor of any path starting with "/abc/..." no matter what the rest of the
+    //    path's bytes contain.
+    maybe_ancestor.len() == path.len()
+        || *maybe_ancestor.last().unwrap() == b'/'
+        || path[maybe_ancestor.len()] == b'/'
+}
 
 /// The [`SecurityContext`] and [`FsUseType`] derived from some `fs_use_*` line of the policy.
 pub struct FsUseLabelAndType {
@@ -286,6 +311,47 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
                 context: self.security_context_from_policy_context(fs_use.context()).unwrap(),
                 use_type: fs_use.behavior(),
             })
+    }
+
+    /// If there is a genfscon statement for the given filesystem type, returns the associated
+    /// [`SecurityContext`], taking the `node_path` into account.
+    pub(super) fn genfscon_label_for_fs_and_path(
+        &self,
+        fs_type: NullessByteStr<'_>,
+        node_path: NullessByteStr<'_>,
+    ) -> Option<SecurityContext> {
+        // All contexts listed in the policy for the file system type.
+        let fs_contexts = self
+            .parsed_policy
+            .generic_fs_contexts()
+            .iter()
+            .find(|genfscon| genfscon.fs_type() == fs_type.as_bytes())?
+            .contexts();
+
+        // The correct match is the closest parent among the ones given in the policy file.
+        // E.g. if in the policy we have
+        //     genfscon foofs "/" label1
+        //     genfscon foofs "/abc/" label2
+        //     genfscon foofs "/abc/def" label3
+        // The correct label for a file "/abc/def/g/h/i" is label3, as "/abc/def" is the closest parent
+        // among those defined.
+        // TODO(372212126): Optimize the algorithm.
+        let mut result: Option<&FsContext<PS>> = None;
+        for fs_context in fs_contexts {
+            if is_ancestor_path(fs_context.partial_path(), node_path.as_bytes()) {
+                if result.is_none()
+                    || result.unwrap().partial_path().len() < fs_context.partial_path().len()
+                {
+                    result = Some(fs_context);
+                }
+            }
+        }
+
+        // The returned SecurityContext must be valid with respect to the policy, since otherwise
+        // we'd have rejected the policy load.
+        result.and_then(|fs_context| {
+            Some(self.security_context_from_policy_context(fs_context.context()).unwrap())
+        })
     }
 
     /// Helper used to construct and validate well-known [`SecurityContext`] values.

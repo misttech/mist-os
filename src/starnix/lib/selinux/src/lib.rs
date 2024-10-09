@@ -442,6 +442,8 @@ pub enum FileSystemLabelingScheme {
     /// identifies the context to use for unlabeled files in the filesystem (the "default
     /// context").
     FsUse { fs_use_type: FsUseType, def_sid: SecurityId, root_sid: SecurityId },
+    /// This filesystem has one or more "genfscon" statements associated with it in the policy.
+    GenFsCon,
 }
 
 /// SELinux security context-related filesystem mount options. These options are documented in the
