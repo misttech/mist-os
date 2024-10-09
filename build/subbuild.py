@@ -211,6 +211,11 @@ def main() -> int:
         "--host-tag", help="Fuchsia host os/cpu tag used to find prebuilts."
     )
     parser.add_argument(
+        "--use-jobserver",
+        action="store_true",
+        help="Use a jobserver pool setup by the parent Ninja process.",
+    )
+    parser.add_argument(
         "--verbose", action="store_true", help="Print more information."
     )
     parser.add_argument(
@@ -343,17 +348,49 @@ def main() -> int:
         ninja_status = status_prefix + ninja_status
         ninja_env = {"NINJA_STATUS": ninja_status}
 
-        if not run_checked_command(
-            [
-                *ninja_cmd_prefix,
-                "-C",
-                str(build_dir),
+        ninja_cmd = [
+            *ninja_cmd_prefix,
+            "-C",
+            str(build_dir),
+        ]
+        use_jobserver = bool(args.use_jobserver)
+        if use_jobserver:
+            # Check that the jobserver pool is setup by scanning the MAKEFLAGS
+            # environment variable. If it does not contain --jobserver-auth
+            # something is wrong, and the argument will be ignored.
+            makeflags = os.environ.get("MAKEFLAGS", "")
+            if "--jobserver-auth" not in makeflags:
+                print(
+                    f"WARNING: --use-jobserver used, but no jobserver pool in MAKEFLAGS [{makeflags}]",
+                    file=sys.stderr,
+                )
+                use_jobserver = False
+
+            # IMPORTANT NOTE: benchmarking shows that enforcing load-average limitation
+            # with --jobserver drastically reduces overall performance when using
+            # remote builders. Why exactly is still undetermined but for reference,
+            # a minimal.x64 build configuration, on a 128 core workstation with RBE
+            # enabled can clean-build //sdk:final_fuchsia_idk.exported in:
+            #
+            # - regular build:                            12m52.786s
+            # - jobserver build (current implementation): 9m58.563s
+            # - jobserver build (with -l<load_average>):  24m25.327s  (!?)
+            #
+
+        if not use_jobserver:
+            ninja_cmd += [
                 "-j",
                 args.parallelism,
                 "-l",
                 args.max_load_average,
-                label_to_ninja_target(args.target_label),
-            ],
+            ]
+
+        ninja_cmd += [
+            label_to_ninja_target(args.target_label),
+        ]
+
+        if not run_checked_command(
+            ninja_cmd,
             capture_output=not args.verbose,
             env=os.environ | ninja_env,
         ):

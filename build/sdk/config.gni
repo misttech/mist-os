@@ -13,8 +13,9 @@ declare_args() {
   # Can be true for any API level, including "PLATFORM", and CPU architecture.
   sdk_inside_sub_build = false
 
-  # An upper bound on the maximum number of subbuilds that may be running at the
-  # same time. A larger number means these good things:
+  # When enable_jobserver is not set, this provides an upper bound on the
+  # maximum number of subbuilds that may be running at the same time.
+  # A larger number means these good things:
   # - Better parallelization of the inherently single-threaded parts of GN and
   #   ninja.
   # - Better parallelization in the face of "stragglers" in the build -
@@ -30,16 +31,16 @@ declare_args() {
   # 5 was chosen mostly because it's the number of fingers on each of my hands.
   sdk_max_simultaneous_sub_builds = 5
 
-  # Value of `-j` to pass to ninja during a subbuild. Note that up to
-  # `sdk_max_simultaneous_sub_builds` subbuilds may be happening in parallel, so
-  # the number of concurrent actions may go as high as this number times the
-  # number of concurrent subbuilds. If left blank, the subbuild script will make
-  # a guess.
+  # When enable_jobserver is not set, value of `-j` to pass to ninja during a subbuild.
+  # Note that up to `sdk_max_simultaneous_sub_builds` subbuilds may be happening in
+  # parallel, so the number of concurrent actions may go as high as this number
+  # times the number of concurrent subbuilds. If left blank, the subbuild script
+  # will make a guess.
   sdk_sub_build_parallelism = ""
 
-  # Value of `-l` to pass to ninja during a subbuild. If the system load average
-  # on the system goes beyond this value, ninja will throttle itself. If left
-  # blank, the subbuild script will make a guess.
+  # When enable_jobserver is not set, value of `-l` to pass to ninja during a subbuild.
+  # If the system load average on the system goes beyond this value, ninja will throttle
+  # itself. If left blank, the subbuild script will make a guess.
   sdk_sub_build_max_load_average = ""
 
   # Set to `true` to enable verbose logging during IDK subbuilds.

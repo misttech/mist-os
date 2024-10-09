@@ -4,6 +4,7 @@
 
 import("//build/config/compiler.gni")
 import("//build/config/fuchsia/platform_version.gni")
+import("//build/config/jobserver.gni")
 import("//build/sdk/config.gni")
 import("//sdk/config.gni")
 
@@ -123,6 +124,12 @@ template("subbuild") {
       args += [ "--verbose" ]
     }
 
+    if (enable_jobserver) {
+      # Ensure the sub-builds use the jobserver pool setup by
+      # the top-level Ninja process.
+      args += [ "--use-jobserver" ]
+    }
+
     if (cxx_rbe_enable) {
       args += [ "--cxx-rbe-enable" ]
     }
@@ -139,7 +146,12 @@ template("subbuild") {
       ]
     }
 
-    pool = "//sdk:subbuild_pool"
+    # If jobserver mode is not enabled, limit the number of concurrent
+    # sub-builds that can run at the same time to avoid overloading the
+    # system with two many overall parallel tasks.
+    if (!enable_jobserver) {
+      pool = "//sdk:subbuild_pool"
+    }
 
     # This script cannot be hermetic.
     hermetic_deps = false
