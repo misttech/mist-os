@@ -19,7 +19,6 @@ use bitflags::bitflags;
 use fuchsia_inspect_contrib::{profile_duration, ProfileDuration};
 
 use once_cell::sync::Lazy;
-use rand::{thread_rng, Rng};
 use range_map::RangeMap;
 use smallvec::SmallVec;
 use starnix_logging::{
@@ -627,6 +626,11 @@ fn map_in_vmar(
 
     let base_addr = UserAddress::from_ptr(vmar_info.base);
     let (vmar_offset, vmar_extra_flags) = match addr {
+        DesiredAddress::Any if flags.contains(MappingFlags::LOWER_32BIT) => {
+            // MAP_32BIT specifies that the memory allocated will
+            // be within the first 2 GB of the process address space.
+            (0x80000000 - base_addr.ptr(), zx::VmarFlags::OFFSET_IS_UPPER_LIMIT)
+        }
         DesiredAddress::Hint(_) | DesiredAddress::Any => unreachable!(),
         DesiredAddress::Fixed(addr) => (addr - base_addr, zx::VmarFlags::SPECIFIC),
         DesiredAddress::FixedOverwrite(addr) => (addr - base_addr, ZX_VM_SPECIFIC_OVERWRITE),
@@ -665,81 +669,8 @@ fn map_in_vmar(
 }
 
 impl MemoryManagerState {
-    fn count_possible_placements(
-        &self,
-        length: usize,
-        subrange: &Range<UserAddress>,
-    ) -> Option<usize> {
-        let mut mappings_in_range = self.mappings.intersection(subrange);
-        let mut possible_placements = 0;
-        // If the allocation is placed at the first available address, every page that is left
-        // before the next mapping or the end of subrange is +1 potential placement.
-        let mut first_fill_end = subrange.start.checked_add(length)?;
-        while first_fill_end <= subrange.end {
-            let Some((mapping, _)) = mappings_in_range.next() else {
-                possible_placements += (subrange.end - first_fill_end) / (*PAGE_SIZE as usize) + 1;
-                break;
-            };
-            if mapping.start >= first_fill_end {
-                possible_placements += (mapping.start - first_fill_end) / (*PAGE_SIZE as usize) + 1;
-            }
-            first_fill_end = mapping.end.checked_add(length)?;
-        }
-        Some(possible_placements)
-    }
-
-    fn pick_placement(
-        &self,
-        length: usize,
-        mut chosen_placement_idx: usize,
-        subrange: &Range<UserAddress>,
-    ) -> Option<UserAddress> {
-        let mut candidate =
-            Range { start: subrange.start, end: subrange.start.checked_add(length)? };
-        let mut mappings_in_range = self.mappings.intersection(subrange);
-        loop {
-            let Some((mapping, _)) = mappings_in_range.next() else {
-                // No more mappings: treat the rest of the index as an offset.
-                let res =
-                    candidate.start.checked_add(chosen_placement_idx * *PAGE_SIZE as usize)?;
-                debug_assert!(res.checked_add(length)? <= subrange.end);
-                return Some(res);
-            };
-            if mapping.start < candidate.end {
-                // doesn't fit, skip
-                candidate = Range { start: mapping.end, end: mapping.end.checked_add(length)? };
-                continue;
-            }
-            let unused_space =
-                (mapping.start.ptr() - candidate.end.ptr()) / (*PAGE_SIZE as usize) + 1;
-            if unused_space > chosen_placement_idx {
-                // Chosen placement is within the range; treat the rest of the index as an offset.
-                let res =
-                    candidate.start.checked_add(chosen_placement_idx * *PAGE_SIZE as usize)?;
-                return Some(res);
-            }
-
-            // chosen address is further up, skip
-            chosen_placement_idx -= unused_space;
-            candidate = Range { start: mapping.end, end: mapping.end.checked_add(length)? };
-        }
-    }
-
-    fn find_random_unused_range(
-        &self,
-        length: usize,
-        subrange: &Range<UserAddress>,
-    ) -> Option<UserAddress> {
-        let possible_placements = self.count_possible_placements(length, subrange)?;
-        if possible_placements == 0 {
-            return None;
-        }
-        let chosen_placement_idx = thread_rng().gen_range(0..possible_placements);
-        self.pick_placement(length, chosen_placement_idx, subrange)
-    }
-
     // Find the first unused range of addresses that fits a mapping of `length` bytes, searching
-    // from `mmap_top` downwards.
+    // from `RESTRICTED_ASPACE_HIGHEST_ADDRESS` downwards.
     pub fn find_next_unused_range(&self, length: usize) -> Option<UserAddress> {
         // Iterate over existing mappings within range, in descending order
         let mut map_iter = self.mappings.iter_ending_at(&self.mmap_top);
@@ -793,23 +724,13 @@ impl MemoryManagerState {
             };
         }
 
-        // If the address is not known at this point, choose one. If LOWER_32BIT is set, choose at
-        // random, otherwise choose the highest available gap.
-        if addr == DesiredAddress::Any {
+        // If the address is not known at this point, choose an available one. If LOWER_32BIT is
+        // set, defer the decision to Zircon.
+        if addr == DesiredAddress::Any && !flags.contains(MappingFlags::LOWER_32BIT) {
             profile_duration!("FindAddressForMmap");
-            let new_addr = if flags.contains(MappingFlags::LOWER_32BIT) {
-                // MAP_32BIT specifies that the memory allocated will
-                // be within the first 2 GB of the process address space.
-                self.find_random_unused_range(
-                    adjusted_length,
-                    &(UserAddress::from_ptr(RESTRICTED_ASPACE_BASE)
-                        ..UserAddress::from_ptr(RESTRICTED_ASPACE_BASE + 0x80000000)),
-                )
-                .ok_or_else(|| errno!(ENOMEM))?
-            } else {
-                self.find_next_unused_range(adjusted_length).ok_or_else(|| errno!(ENOMEM))?
-            };
-
+            let new_addr = self
+                .find_next_unused_range(round_up_to_system_page_size(length)?)
+                .ok_or_else(|| errno!(ENOMEM))?;
             addr = DesiredAddress::Fixed(new_addr)
         }
         map_in_vmar(
@@ -4684,100 +4605,6 @@ mod tests {
 
         // Searching for more memory than available should fail.
         assert_eq!(mm.state.read().find_next_unused_range(mmap_top), None);
-    }
-
-    #[::fuchsia::test]
-    async fn test_count_placements() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
-
-        // ten-page range
-        let page_size = *PAGE_SIZE as usize;
-        let subrange_ten = UserAddress::from_ptr(RESTRICTED_ASPACE_BASE)
-            ..UserAddress::from_ptr(RESTRICTED_ASPACE_BASE + 10 * page_size);
-
-        assert_eq!(
-            mm.state.read().count_possible_placements(11 * page_size, &subrange_ten),
-            Some(0)
-        );
-        assert_eq!(
-            mm.state.read().count_possible_placements(10 * page_size, &subrange_ten),
-            Some(1)
-        );
-        assert_eq!(
-            mm.state.read().count_possible_placements(9 * page_size, &subrange_ten),
-            Some(2)
-        );
-        assert_eq!(mm.state.read().count_possible_placements(page_size, &subrange_ten), Some(10));
-
-        // map 6th page
-        let addr = UserAddress::from_ptr(RESTRICTED_ASPACE_BASE + 5 * page_size);
-        assert_eq!(map_memory(&mut locked, &current_task, addr, *PAGE_SIZE), addr);
-
-        assert_eq!(
-            mm.state.read().count_possible_placements(10 * page_size, &subrange_ten),
-            Some(0)
-        );
-        assert_eq!(
-            mm.state.read().count_possible_placements(5 * page_size, &subrange_ten),
-            Some(1)
-        );
-        assert_eq!(
-            mm.state.read().count_possible_placements(4 * page_size, &subrange_ten),
-            Some(3)
-        );
-        assert_eq!(mm.state.read().count_possible_placements(page_size, &subrange_ten), Some(9));
-    }
-
-    #[::fuchsia::test]
-    async fn test_pick_placement() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
-
-        let page_size = *PAGE_SIZE as usize;
-        let subrange_ten = UserAddress::from_ptr(RESTRICTED_ASPACE_BASE)
-            ..UserAddress::from_ptr(RESTRICTED_ASPACE_BASE + 10 * page_size);
-
-        let addr = UserAddress::from_ptr(RESTRICTED_ASPACE_BASE + 5 * page_size);
-        assert_eq!(map_memory(&mut locked, &current_task, addr, *PAGE_SIZE), addr);
-        assert_eq!(
-            mm.state.read().count_possible_placements(4 * page_size, &subrange_ten),
-            Some(3)
-        );
-
-        assert_eq!(
-            mm.state.read().pick_placement(4 * page_size, 0, &subrange_ten),
-            Some(UserAddress::from_ptr(RESTRICTED_ASPACE_BASE))
-        );
-        assert_eq!(
-            mm.state.read().pick_placement(4 * page_size, 1, &subrange_ten),
-            Some(UserAddress::from_ptr(RESTRICTED_ASPACE_BASE + page_size))
-        );
-        assert_eq!(
-            mm.state.read().pick_placement(4 * page_size, 2, &subrange_ten),
-            Some(UserAddress::from_ptr(RESTRICTED_ASPACE_BASE + 6 * page_size))
-        );
-    }
-
-    #[::fuchsia::test]
-    async fn test_find_random_unused_range() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = current_task.mm();
-
-        // ten-page range
-        let page_size = *PAGE_SIZE as usize;
-        let subrange_ten = UserAddress::from_ptr(RESTRICTED_ASPACE_BASE)
-            ..UserAddress::from_ptr(RESTRICTED_ASPACE_BASE + 10 * page_size);
-
-        for _ in 0..10 {
-            let addr = mm.state.read().find_random_unused_range(page_size, &subrange_ten);
-            assert!(addr.is_some());
-            assert_eq!(
-                map_memory(&mut locked, &current_task, addr.unwrap(), *PAGE_SIZE),
-                addr.unwrap()
-            );
-        }
-        assert_eq!(mm.state.read().find_random_unused_range(page_size, &subrange_ten), None);
     }
 
     #[::fuchsia::test]
