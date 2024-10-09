@@ -243,7 +243,7 @@ class SdmmcBlockDevice {
   fidl::WireSyncClient<fuchsia_power_broker::Lessor> hardware_power_lessor_client_;
   fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel> hardware_power_current_level_client_;
   fidl::WireClient<fuchsia_power_broker::RequiredLevel> hardware_power_required_level_client_;
-
+  zx::event hardware_power_element_assertive_token_;
   fidl::ClientEnd<fuchsia_power_broker::LeaseControl> hardware_power_lease_control_client_end_;
 
   block_info_t block_info_{};

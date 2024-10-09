@@ -328,10 +328,33 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
               std::move(description.current_level_client.value()));
       hardware_power_required_level_client_ = fidl::WireClient<fuchsia_power_broker::RequiredLevel>(
           std::move(description.required_level_client.value()), parent_->driver_async_dispatcher());
+      hardware_power_element_assertive_token_ = std::move(description.assertive_token);
     } else {
       FDF_SLOG(ERROR, "Unexpected power element.", KV("index", i),
                KV("element-name", config.element.name));
       return zx::error(ZX_ERR_BAD_STATE);
+    }
+  }
+
+  zx::result connect_to_cpu_element_manager =
+      parent_->driver_incoming()->Connect<fuchsia_power_system::CpuElementManager>();
+  if (connect_to_cpu_element_manager.is_error()) {
+    // TODO (https://fxbug.dev/372507953) Return an error instead of just logging
+    FDF_LOGL(INFO, logger(), "Registration skipped, CpuElementManager unavailable: %s",
+             zx_status_get_string(connect_to_cpu_element_manager.error_value()));
+  } else {
+    fidl::SyncClient<fuchsia_power_system::CpuElementManager> cpu_element_manager(
+        std::move(connect_to_cpu_element_manager.value()));
+    zx::event clone;
+    ZX_ASSERT(hardware_power_element_assertive_token_.duplicate(ZX_RIGHT_SAME_RIGHTS, &clone) ==
+              ZX_OK);
+    fidl::Result<fuchsia_power_system::CpuElementManager::AddExecutionStateDependency> result =
+        cpu_element_manager->AddExecutionStateDependency(
+            {{.dependency_token = std::move(clone), .power_level = 1}});
+    if (result.is_error()) {
+      // TODO (https://fxbug.dev/372507953) Return an error instead of just logging
+      FDF_LOGL(ERROR, logger(), "CpuElementManager token registration failed: %s",
+               result.error_value().FormatDescription().c_str());
     }
   }
 
