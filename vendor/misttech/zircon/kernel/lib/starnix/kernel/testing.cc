@@ -40,13 +40,25 @@ fbl::RefPtr<FsContext> create_test_fs_context(const fbl::RefPtr<Kernel>& kernel,
 TaskBuilder create_test_init_task(fbl::RefPtr<Kernel> kernel, fbl::RefPtr<FsContext> fs) {
   auto init_pid = kernel->pids.Write()->allocate_pid();
   ASSERT(init_pid == 1);
-  auto init_task = CurrentTask::create_init_process(kernel, init_pid, "test-task", fs);
+  fbl::Array<ktl::pair<starnix_uapi::Resource, uint64_t>> rlimits;
+  auto init_task =
+      CurrentTask::create_init_process(kernel, init_pid, "test-task", fs, ktl::move(rlimits));
 
   init_task->mm()->initialize_mmap_layout_for_test();
 
-  /*let system_task =
-        CurrentTask::create_system_task(locked, kernel, fs).expect("create system task");
-    kernel.kthreads.init(system_task).expect("failed to initialize kthreads");*/
+  auto system_task = CurrentTask::create_system_task(kernel, fs);
+  ZX_ASSERT_MSG(system_task.is_ok(), "create system task");
+  // kernel.kthreads.init(system_task).expect("failed to initialize kthreads");*/
+
+  // let system_task = kernel.kthreads.system_task();
+  // kernel.hrtimer_manager.init(&system_task).expect("init hrtimer manager worker thread");
+
+  // Take the lock on thread group and task in the correct order to ensure any wrong ordering
+  // will trigger the tracing-mutex at the right call site.
+  {
+    auto _l1 = init_task->thread_group->read();
+    auto _l2 = init_task->mutable_state_.Read();
+  }
 
   return ktl::move(init_task.value());
 }
