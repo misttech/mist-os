@@ -4,12 +4,18 @@
 
 #include "test_util.h"
 
+#include <fidl/fuchsia.hardware.suspend/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
 
 #include <gtest/gtest.h>
 
+#include "fidl/fuchsia.hardware.suspend/cpp/natural_types.h"
+#include "fidl/test.suspendcontrol/cpp/natural_types.h"
+
 namespace system_integration_utils {
 namespace {
+
+namespace fh_suspend = fuchsia_hardware_suspend;
 
 template <typename T>
 std::string ToString(const T& value) {
@@ -25,9 +31,29 @@ std::string FidlString(const T& value) {
 }  // namespace
 
 void TestLoopBase::Initialize() {
-  auto result = component::Connect<test_sagcontrol::State>();
-  ASSERT_EQ(ZX_OK, result.status_value());
-  sag_control_state_client_end_ = std::move(result.value());
+  {
+    auto result = component::Connect<test_sagcontrol::State>();
+    ASSERT_EQ(ZX_OK, result.status_value());
+    sag_control_state_client_end_ = std::move(result.value());
+  }
+
+  {
+    auto result = component::Connect<test_suspendcontrol::Device>();
+    ASSERT_EQ(ZX_OK, result.status_value());
+    suspend_device_client_end_ = std::move(result.value());
+  }
+
+  {
+    fh_suspend::SuspendState state;
+    state.resume_latency(zx::usec(100).to_nsecs());
+
+    test_suspendcontrol::DeviceSetSuspendStatesRequest request;
+    std::vector<fh_suspend::SuspendState> states = {state};
+    request.suspend_states(states);
+
+    auto result = fidl::Call(suspend_device_client_end_)->SetSuspendStates(request);
+    ASSERT_TRUE(result.is_ok());
+  }
 }
 
 test_sagcontrol::SystemActivityGovernorState TestLoopBase::GetBootCompleteState() {
@@ -37,6 +63,32 @@ test_sagcontrol::SystemActivityGovernorState TestLoopBase::GetBootCompleteState(
   state.full_wake_handling_level(fuchsia_power_system::FullWakeHandlingLevel::kInactive);
   state.wake_handling_level(fuchsia_power_system::WakeHandlingLevel::kInactive);
   return state;
+}
+
+zx_status_t TestLoopBase::AwaitSystemSuspend() {
+  std::cout << "Awaiting suspend" << std::endl;
+  auto wait_result = fidl::Call(suspend_device_client_end_)->AwaitSuspend();
+  if (!wait_result.is_ok()) {
+    std::cout << "Failed to await suspend: " << wait_result.error_value() << std::endl;
+    return ZX_ERR_INTERNAL;
+  }
+  std::cout << "Suspend confirmed" << std::endl;
+
+  return ZX_OK;
+}
+
+zx_status_t TestLoopBase::StartSystemResume() {
+  std::cout << "Starting system resume" << std::endl;
+  test_suspendcontrol::SuspendResult suspend_result;
+  auto request = test_suspendcontrol::DeviceResumeRequest::WithResult(suspend_result);
+  auto resume_result = fidl::Call(suspend_device_client_end_)->Resume(request);
+  if (!resume_result.is_ok()) {
+    std::cout << "Failed to await suspend: " << resume_result.error_value() << std::endl;
+    return ZX_ERR_INTERNAL;
+  }
+  std::cout << "Resume started" << std::endl;
+
+  return ZX_OK;
 }
 
 zx_status_t TestLoopBase::ChangeSagState(test_sagcontrol::SystemActivityGovernorState state,

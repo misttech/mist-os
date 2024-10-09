@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.diagnostics/cpp/fidl.h>
 #include <fidl/test.sagcontrol/cpp/fidl.h>
 #include <fidl/test.sagcontrol/cpp/natural_ostream.h>
+#include <fidl/test.suspendcontrol/cpp/fidl.h>
 #include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/diagnostics/reader/cpp/archive_reader.h>
 
@@ -17,6 +18,9 @@ class TestLoopBase : public loop_fixture::RealLoop {
   void Initialize();
 
   test_sagcontrol::SystemActivityGovernorState GetBootCompleteState();
+
+  zx_status_t AwaitSystemSuspend();
+  zx_status_t StartSystemResume();
 
   // Change the SAG state and wait for the transition to complete.
   zx_status_t ChangeSagState(test_sagcontrol::SystemActivityGovernorState state,
@@ -34,6 +38,7 @@ class TestLoopBase : public loop_fixture::RealLoop {
 
  private:
   fidl::ClientEnd<test_sagcontrol::State> sag_control_state_client_end_;
+  fidl::ClientEnd<test_suspendcontrol::Device> suspend_device_client_end_;
 };
 
 }  // namespace system_integration_utils

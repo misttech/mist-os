@@ -320,5 +320,12 @@
             to: "#console-launcher",
             source_availability: "unknown",
         },
+        {
+            protocol: "test.suspendcontrol.Device",
+            from: "#fake-suspend",
+            to: "#console-launcher",
+            availability: "optional",
+            source_availability: "unknown",
+        },
     ],
 }

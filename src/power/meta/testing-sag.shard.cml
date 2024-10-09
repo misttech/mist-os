@@ -23,7 +23,7 @@
             availability: "optional",
         },
         {
-            protocol: "test.suspendcontrol.Device",
+            service: "fuchsia.hardware.suspend.SuspendService",
             from: "#fake-suspend",
             to: "#system-activity-governor",
         },

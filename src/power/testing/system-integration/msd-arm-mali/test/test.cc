@@ -158,6 +158,7 @@ TEST_F(PowerSystemIntegration, SuspendResume) {
   state.execution_state_level(fuchsia_power_system::ExecutionStateLevel::kInactive);
   state.application_activity_level(fuchsia_power_system::ApplicationActivityLevel::kInactive);
   ASSERT_EQ(ChangeSagState(state, kPollDuration), ZX_OK);
+  ASSERT_EQ(AwaitSystemSuspend(), ZX_OK);
 
   // - Power Broker: mali gpu powered off.
   // - msd_arm_mali - lease enabled, powered off.
@@ -171,6 +172,7 @@ TEST_F(PowerSystemIntegration, SuspendResume) {
                    s.msd_arm_mali_current_power_level, uint64_t{0});
 
   // Emulate system resume.
+  ASSERT_EQ(StartSystemResume(), ZX_OK);
   state.execution_state_level(fuchsia_power_system::ExecutionStateLevel::kActive);
   state.application_activity_level(fuchsia_power_system::ApplicationActivityLevel::kActive);
   ASSERT_EQ(ChangeSagState(state, kPollDuration), ZX_OK);
