@@ -14,14 +14,18 @@ class WakeupMetricsProcessor(trace_metrics.MetricsProcessor):
     the provided series of trace events.
     """
 
-    def __init__(self, label: str, event_names: list[str]) -> None:
+    def __init__(
+        self, label: str, event_names: list[str], require_wakeup: bool = False
+    ) -> None:
         """
         Args:
             label: Report wakeup durations under this TestCaseResult label.
             event_names: Events that define a "wakeup".
+            require_wakeup: When true, raise exception when no wakeup observed.
         """
         self._label = label
         self._event_names = event_names
+        self._require_wakeup = require_wakeup
 
     def process_metrics(
         self, model: trace_model.Model
@@ -30,6 +34,9 @@ class WakeupMetricsProcessor(trace_metrics.MetricsProcessor):
 
         Args:
             model: In-memory representation of a system trace.
+
+        Raises:
+            RuntimeError: When a wakeup is required and none were observed.
 
         Returns:
             Sequence with a TestCaseResult of Wakeup durations (or an empty
@@ -53,6 +60,14 @@ class WakeupMetricsProcessor(trace_metrics.MetricsProcessor):
                     next_event_index = 0
                 else:
                     next_event_index += 1
+
+        if self._require_wakeup and not wakeup_durations:
+            obs = ",".join(self._event_names[:next_event_index])
+            mis = self._event_names[next_event_index]
+            extras = f"observed events: '{obs}', missing event: '{mis}'"
+            raise RuntimeError(
+                f"Required wakeup not present in trace, {extras}"
+            )
 
         return (
             [

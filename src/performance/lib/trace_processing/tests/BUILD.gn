@@ -8,6 +8,7 @@ import("//build/testing/host_test_data.gni")
 if (is_host) {
   host_test_data("wakeup_metrics_processor_test_data") {
     sources = [
+      "data/wakeup_metrics_processor/incomplete_wakeup.json",
       "data/wakeup_metrics_processor/many_wakeups.json",
       "data/wakeup_metrics_processor/one_wakeup.json",
       "data/wakeup_metrics_processor/zero_wakeups.json",
