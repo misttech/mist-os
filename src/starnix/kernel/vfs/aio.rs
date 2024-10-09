@@ -2,28 +2,35 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::collections::VecDeque;
-use std::sync::mpsc::{channel, Receiver};
-use std::sync::{Arc, Weak};
-
+use crate::mm::{
+    DesiredAddress, MappingName, MappingOptions, MemoryAccessorExt, ProtectionFlags,
+    TaskMemoryAccessor,
+};
+use crate::task::{CurrentTask, Task};
+use crate::vfs::eventfd::EventFdFileObject;
+use crate::vfs::{
+    checked_add_offset_and_length, FdNumber, FileHandle, InputBuffer, OutputBuffer,
+    UserBuffersInputBuffer, UserBuffersOutputBuffer, VecInputBuffer, VecOutputBuffer,
+    WeakFileHandle,
+};
+use smallvec::smallvec;
+use starnix_logging::track_stub;
 use starnix_sync::{Locked, Mutex, Unlocked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::ownership::{OwnedRef, WeakRef};
 use starnix_uapi::user_address::UserAddress;
-use starnix_uapi::user_buffer::UserBuffers;
-use starnix_uapi::{errno, error, io_event};
-use std::sync::mpsc::Sender;
-use std::sync::OnceLock;
+use starnix_uapi::user_buffer::{UserBuffer, UserBuffers};
+use starnix_uapi::{
+    aio_context_t, errno, error, io_event, iocb, IOCB_CMD_PREAD, IOCB_CMD_PREADV, IOCB_CMD_PWRITE,
+    IOCB_CMD_PWRITEV, IOCB_FLAG_RESFD,
+};
+use std::collections::VecDeque;
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::{Arc, OnceLock, Weak};
 use zerocopy::IntoBytes;
 
-use crate::task::{CurrentTask, Task};
-use crate::vfs::{
-    FileHandle, InputBuffer, OutputBuffer, UserBuffersInputBuffer, UserBuffersOutputBuffer,
-    VecInputBuffer, VecOutputBuffer, WeakFileHandle,
-};
-
 /// From aio.go in gVisor.
-pub const AIO_RING_SIZE: usize = 32;
+const AIO_RING_SIZE: usize = 32;
 
 pub struct AioContext {
     // Channels to send operations to background threads.
@@ -32,13 +39,26 @@ pub struct AioContext {
     // operation is queued.
     read_sender: OnceLock<Sender<IoOperation>>,
     write_sender: OnceLock<Sender<IoOperation>>,
-
-    // TODO: Refactor code from syscalls.rs into this file to make this field private.
-    pub state: Arc<Mutex<AioContextState>>,
+    state: Arc<Mutex<AioContextState>>,
 }
 
 impl AioContext {
-    pub fn new(max_operations: usize) -> Arc<Self> {
+    pub fn create(
+        current_task: &CurrentTask,
+        max_operations: usize,
+    ) -> Result<aio_context_t, Errno> {
+        let context = Self::new(max_operations);
+        let context_addr = current_task.mm().map_anonymous(
+            DesiredAddress::Any,
+            AIO_RING_SIZE,
+            ProtectionFlags::READ | ProtectionFlags::WRITE,
+            MappingOptions::ANONYMOUS,
+            MappingName::AioContext(context),
+        )?;
+        Ok(context_addr.ptr() as aio_context_t)
+    }
+
+    fn new(max_operations: usize) -> Arc<Self> {
         Arc::new(Self {
             read_sender: Default::default(),
             write_sender: Default::default(),
@@ -48,6 +68,88 @@ impl AioContext {
                 results: VecDeque::new(),
             })),
         })
+    }
+
+    pub fn get_events(&self, max_nr: usize) -> Vec<io_event> {
+        let mut state = self.state.lock();
+        state.read_available_results(max_nr)
+    }
+
+    pub fn submit(
+        &self,
+        current_task: &CurrentTask,
+        control_block: iocb,
+        iocb_addr: UserAddress,
+    ) -> Result<(), Errno> {
+        let file = current_task.files.get(FdNumber::from_raw(control_block.aio_fildes as i32))?;
+        let id = control_block.aio_data;
+        let opcode = control_block.aio_lio_opcode as u32;
+        let offset = control_block.aio_offset as usize;
+        let flags = control_block.aio_flags;
+
+        let op_type = match opcode {
+            IOCB_CMD_PREAD => IoOperationType::Read,
+            IOCB_CMD_PREADV => IoOperationType::ReadV,
+            IOCB_CMD_PWRITE => IoOperationType::Write,
+            IOCB_CMD_PWRITEV => IoOperationType::WriteV,
+            _ => {
+                track_stub!(TODO("https://fxbug.dev/297433877"), "io_submit opcode", opcode);
+                return error!(ENOSYS);
+            }
+        };
+        match op_type {
+            IoOperationType::Read | IoOperationType::ReadV => {
+                if !file.can_read() {
+                    return error!(EBADF);
+                }
+            }
+            IoOperationType::Write | IoOperationType::WriteV => {
+                if !file.can_write() {
+                    return error!(EBADF);
+                }
+            }
+        }
+        let mut buffers = match op_type {
+            IoOperationType::Read | IoOperationType::Write => smallvec![UserBuffer {
+                address: control_block.aio_buf.into(),
+                length: control_block.aio_nbytes as usize,
+            }],
+            IoOperationType::ReadV | IoOperationType::WriteV => {
+                let count: i32 = control_block.aio_nbytes.try_into().map_err(|_| errno!(EINVAL))?;
+                current_task.read_iovec(control_block.aio_buf.into(), count.into())?
+            }
+        };
+
+        // Validate the user buffers and offset synchronously.
+        let buffer_length = UserBuffer::cap_buffers_to_max_rw_count(
+            current_task.maximum_valid_address(),
+            &mut buffers,
+        )?;
+        checked_add_offset_and_length(offset, buffer_length)?;
+
+        let eventfd = if flags & IOCB_FLAG_RESFD == IOCB_FLAG_RESFD {
+            let eventfd =
+                current_task.files.get(FdNumber::from_raw(control_block.aio_resfd as i32))?;
+            if eventfd.downcast_file::<EventFdFileObject>().is_none() {
+                return error!(EINVAL);
+            }
+            Some(Arc::downgrade(&eventfd))
+        } else {
+            None
+        };
+
+        self.queue_op(
+            current_task,
+            IoOperation {
+                op_type,
+                file: Arc::downgrade(&file),
+                buffers,
+                offset,
+                id,
+                iocb_addr,
+                eventfd,
+            },
+        )
     }
 
     fn reader(&self, current_task: &CurrentTask) -> &Sender<IoOperation> {
@@ -76,7 +178,7 @@ impl AioContext {
         })
     }
 
-    pub fn queue_op(&self, current_task: &CurrentTask, op: IoOperation) -> Result<(), Errno> {
+    fn queue_op(&self, current_task: &CurrentTask, op: IoOperation) -> Result<(), Errno> {
         // TODO: We should increase the pending_operations count here as part of ensure that
         // there's room in the queue for this operation.
         if !self.state.lock().can_queue() {
@@ -109,7 +211,7 @@ impl std::cmp::Eq for AioContext {}
 
 /// Kernel state-machine-based implementation of asynchronous I/O.
 /// See https://man7.org/linux/man-pages/man7/aio.7.html#NOTES
-pub struct AioContextState {
+struct AioContextState {
     max_operations: usize,
 
     // TODO: Nothing ever modifies the number of pending operations.
@@ -120,21 +222,21 @@ pub struct AioContextState {
     results: VecDeque<io_event>,
 }
 
-pub enum IoOperationType {
+enum IoOperationType {
     Read,
     ReadV,
     Write,
     WriteV,
 }
 
-pub struct IoOperation {
-    pub op_type: IoOperationType,
-    pub file: WeakFileHandle,
-    pub buffers: UserBuffers,
-    pub offset: usize,
-    pub id: u64,
-    pub iocb_addr: UserAddress,
-    pub eventfd: Option<WeakFileHandle>,
+struct IoOperation {
+    op_type: IoOperationType,
+    file: WeakFileHandle,
+    buffers: UserBuffers,
+    offset: usize,
+    id: u64,
+    iocb_addr: UserAddress,
+    eventfd: Option<WeakFileHandle>,
 }
 
 impl AioContextState {
@@ -142,7 +244,7 @@ impl AioContextState {
         self.pending_operations < self.max_operations
     }
 
-    pub fn read_available_results(&mut self, max_nr: usize) -> Vec<io_event> {
+    fn read_available_results(&mut self, max_nr: usize) -> Vec<io_event> {
         let len = std::cmp::min(self.results.len(), max_nr);
         self.results.drain(..len).collect()
     }

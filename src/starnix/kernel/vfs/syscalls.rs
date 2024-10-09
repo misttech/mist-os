@@ -2,18 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::{
-    DesiredAddress, MappingName, MappingOptions, MemoryAccessor, MemoryAccessorExt,
-    ProtectionFlags, TaskMemoryAccessor, PAGE_SIZE,
-};
+use crate::mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
 use crate::security;
 use crate::task::{
     CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Timeline,
     TimerWakeup, Waiter,
 };
-use crate::vfs::aio::{AioContext, IoOperation, IoOperationType, AIO_RING_SIZE};
+use crate::vfs::aio::AioContext;
 use crate::vfs::buffers::{UserBuffersInputBuffer, UserBuffersOutputBuffer};
-use crate::vfs::eventfd::{new_eventfd, EventFdFileObject, EventFdType};
+use crate::vfs::eventfd::{new_eventfd, EventFdType};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::inotify::InotifyFileObject;
 use crate::vfs::io_uring::{IoUringFileObject, IORING_MAX_ENTRIES};
@@ -28,7 +25,6 @@ use crate::vfs::{
     TargetFdNumber, TimeUpdateType, UnlinkKind, ValueOrSize, WdNumber, WhatToMount, XattrOp,
 };
 
-use smallvec::smallvec;
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -65,7 +61,7 @@ use starnix_uapi::{
     F_ADD_SEALS, F_DUPFD, F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_GETLEASE, F_GETLK, F_GETOWN,
     F_GETOWN_EX, F_GET_SEALS, F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW, F_OWNER_PGRP, F_OWNER_PID,
     F_OWNER_TID, F_SETFD, F_SETFL, F_SETLEASE, F_SETLK, F_SETLKW, F_SETOWN, F_SETOWN_EX,
-    IN_CLOEXEC, IN_NONBLOCK, IOCB_FLAG_RESFD, IORING_REGISTER_BUFFERS, IORING_SETUP_CQSIZE,
+    IN_CLOEXEC, IN_NONBLOCK, IORING_REGISTER_BUFFERS, IORING_SETUP_CQSIZE,
     IORING_UNREGISTER_BUFFERS, MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_HUGETLB, MFD_HUGE_MASK,
     MFD_HUGE_SHIFT, NAME_MAX, O_CLOEXEC, O_CREAT, O_NOFOLLOW, O_PATH, O_TMPFILE, PATH_MAX,
     PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI, POLLRDBAND, POLLRDNORM, POLLWRBAND,
@@ -2876,21 +2872,13 @@ pub fn sys_io_setup(
     if current_task.read_object(user_ctx_idp)? != 0 {
         return error!(EINVAL);
     }
-    let context = AioContext::new(max_operations);
-    let context_addr = current_task.mm().map_anonymous(
-        DesiredAddress::Any,
-        AIO_RING_SIZE,
-        ProtectionFlags::READ | ProtectionFlags::WRITE,
-        MappingOptions::ANONYMOUS,
-        MappingName::AioContext(context),
-    )?;
-    let ctx_idp = context_addr.ptr() as aio_context_t;
+    let ctx_idp = AioContext::create(current_task, max_operations)?;
     current_task.write_object(user_ctx_idp, &ctx_idp)?;
     Ok(())
 }
 
 pub fn sys_io_submit(
-    locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     ctx_id: aio_context_t,
     user_nr: UserValue<i32>,
@@ -2906,13 +2894,10 @@ pub fn sys_io_submit(
     let mut num_submitted: i32 = 0;
     loop {
         let iocb_addr = current_task.read_object(iocb_addrs)?;
-        let iocb_ref: UserRef<iocb> = UserRef::new(iocb_addr.clone());
+        let iocb_ref = UserRef::<iocb>::new(iocb_addr.clone());
         let control_block = current_task.read_object(iocb_ref)?;
 
-        match (
-            num_submitted,
-            submit_iocb(locked, current_task, control_block, iocb_addr, ctx.clone()),
-        ) {
+        match (num_submitted, ctx.submit(current_task, control_block, iocb_addr)) {
             (0, Err(e)) => return Err(e),
             (_, Err(_)) => break,
             (_, Ok(())) => {
@@ -2926,84 +2911,7 @@ pub fn sys_io_submit(
         iocb_addrs = iocb_addrs.next();
     }
 
-    Ok(num_submitted.into())
-}
-
-fn submit_iocb(
-    _locked: &mut Locked<'_, Unlocked>,
-    current_task: &CurrentTask,
-    control_block: iocb,
-    iocb_addr: UserAddress,
-    ctx: Arc<AioContext>,
-) -> Result<(), Errno> {
-    let file = current_task.files.get(FdNumber::from_raw(control_block.aio_fildes as i32))?;
-    let id = control_block.aio_data;
-    let opcode = control_block.aio_lio_opcode as u32;
-    let offset = control_block.aio_offset as usize;
-    let flags = control_block.aio_flags;
-
-    let op_type = match opcode {
-        starnix_uapi::IOCB_CMD_PREAD => IoOperationType::Read,
-        starnix_uapi::IOCB_CMD_PREADV => IoOperationType::ReadV,
-        starnix_uapi::IOCB_CMD_PWRITE => IoOperationType::Write,
-        starnix_uapi::IOCB_CMD_PWRITEV => IoOperationType::WriteV,
-        _ => {
-            track_stub!(TODO("https://fxbug.dev/297433877"), "io_submit opcode", opcode);
-            return error!(ENOSYS);
-        }
-    };
-    match op_type {
-        IoOperationType::Read | IoOperationType::ReadV => {
-            if !file.can_read() {
-                return error!(EBADF);
-            }
-        }
-        IoOperationType::Write | IoOperationType::WriteV => {
-            if !file.can_write() {
-                return error!(EBADF);
-            }
-        }
-    }
-    let mut buffers = match op_type {
-        IoOperationType::Read | IoOperationType::Write => smallvec![UserBuffer {
-            address: control_block.aio_buf.into(),
-            length: control_block.aio_nbytes as usize,
-        }],
-        IoOperationType::ReadV | IoOperationType::WriteV => {
-            let count: i32 = control_block.aio_nbytes.try_into().map_err(|_| errno!(EINVAL))?;
-            current_task.read_iovec(control_block.aio_buf.into(), count.into())?
-        }
-    };
-
-    // Validate the user buffers and offset synchronously.
-    let buffer_length = UserBuffer::cap_buffers_to_max_rw_count(
-        current_task.maximum_valid_address(),
-        &mut buffers,
-    )?;
-    checked_add_offset_and_length(offset, buffer_length)?;
-
-    let eventfd = if flags & IOCB_FLAG_RESFD == IOCB_FLAG_RESFD {
-        let eventfd = current_task.files.get(FdNumber::from_raw(control_block.aio_resfd as i32))?;
-        if eventfd.downcast_file::<EventFdFileObject>().is_none() {
-            return error!(EINVAL);
-        }
-        Some(Arc::downgrade(&eventfd))
-    } else {
-        None
-    };
-
-    ctx.queue_op(
-        current_task,
-        IoOperation {
-            op_type,
-            file: Arc::downgrade(&file),
-            buffers,
-            offset,
-            id,
-            iocb_addr,
-            eventfd,
-        },
-    )
+    Ok(num_submitted)
 }
 
 pub fn sys_io_getevents(
@@ -3028,12 +2936,7 @@ pub fn sys_io_getevents(
     }
 
     let ctx = current_task.mm().get_aio_context(ctx_id.into()).ok_or_else(|| errno!(EINVAL))?;
-
-    let events = {
-        let mut ctx = ctx.state.lock();
-        ctx.read_available_results(nr as usize)
-    };
-
+    let events = ctx.get_events(nr as usize);
     current_task.write_objects(events_ref, &events)?;
 
     Ok(events.len() as i32)
