@@ -388,7 +388,8 @@ extern "C" fn TEE_GetCancellationFlag() -> bool {
 
 #[no_mangle]
 extern "C" fn TEE_UnmaskCancellation() -> bool {
-    unimplemented!()
+    // TODO(https://fxbug.dev/370103570): Implement Cancellation APIs.
+    return true;
 }
 
 #[no_mangle]
