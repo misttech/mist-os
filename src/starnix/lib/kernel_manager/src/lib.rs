@@ -441,14 +441,17 @@ fn forward_message(
             zx::ChannelReadResult::Ok(r) => r,
             _ => return Err(anyhow!("Failed to read from channel")),
         };
-        write_channel.write(actual_bytes, actual_handles)?;
 
         if let Some(event) = event {
             // Signal event with `RUNNER_SIGNAL`, indicating that an event is being sent to
             // the kernel.
             let (clear_mask, set_mask) = (KERNEL_SIGNAL, RUNNER_SIGNAL);
             event.signal_handle(clear_mask, set_mask)?;
+        }
 
+        write_channel.write(actual_bytes, actual_handles)?;
+
+        if let Some(event) = event {
             // Wait for the kernel endpoint to signal that the event has been handled, and
             // that it is now safe to suspend the container again.
             match event.wait_handle(KERNEL_SIGNAL, zx::MonotonicInstant::INFINITE) {
