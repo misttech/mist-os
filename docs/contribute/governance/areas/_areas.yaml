@@ -165,7 +165,7 @@
         Protocols for controlling a container of unmodified Linux binaries.
 
 - name: 'Graphics'
-  api_primary: 'jbauman@google.com'
+  api_primary: 'costan@google.com'
   api_secondary: 'emircan@google.com'
   description: |
     The set of APIs that are used to transport and compose images on the system.
