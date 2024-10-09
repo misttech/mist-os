@@ -61,14 +61,6 @@
             to: "#exception_handler",
         },
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#crash_reporter",
-                "#exception_handler",
-            ],
-        },
-        {
             protocol: "fuchsia.process.Launcher",
             from: "parent",
             to: [ "#exception_handler" ],
@@ -85,9 +77,9 @@
             rights: [ "rw*" ],
         },
         {
+            config: "fuchsia.power.SuspendEnabled",
             from: "#config_suspend_disabled",
             to: "#exception_handler",
-            config: "fuchsia.power.SuspendEnabled",
         },
     ],
 }

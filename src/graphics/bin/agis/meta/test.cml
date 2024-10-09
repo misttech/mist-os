@@ -44,13 +44,5 @@
             from: "#netstack-debug",
             to: "#agis",
         },
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [
-                "#agis",
-                "#netstack-debug",
-            ],
-        },
     ],
 }

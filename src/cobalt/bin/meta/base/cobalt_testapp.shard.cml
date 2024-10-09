@@ -54,7 +54,6 @@
         },
         {
             protocol: [
-                "fuchsia.logger.LogSink",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.tracing.provider.Registry",
             ],

@@ -5,6 +5,7 @@
     include: [
         "//src/connectivity/network/testing/netemul/runner/default.shard.cml",
         "//src/connectivity/network/testing/netemul/runner/expectations-client.shard.cml",
+        "syslog/client.shard.cml",
     ],
     program: {
         networks: [
@@ -86,10 +87,7 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
+            protocol: [ "fuchsia.inspect.InspectSink" ],
             from: "parent",
             to: [
                 "#client",
