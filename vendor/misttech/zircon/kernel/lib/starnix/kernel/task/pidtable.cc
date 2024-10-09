@@ -43,7 +43,7 @@ PidEntry::PidEntry(pid_t pid) : pid_(pid) {}
 
 PidEntry::~PidEntry() = default;
 
-ktl::optional<const PidEntry*> PidTable::get_entry(pid_t pid) {
+ktl::optional<const PidEntry*> PidTable::get_entry(pid_t pid) const {
   const auto& entry = table.find(pid);
   if (entry == table.end()) {
     return ktl::nullopt;
@@ -77,7 +77,7 @@ pid_t PidTable::last_pid() const { return last_pid_; }
 
 size_t PidTable::len() const { return table.size(); }
 
-util::WeakPtr<Task> PidTable::get_task(pid_t pid) {
+util::WeakPtr<Task> PidTable::get_task(pid_t pid) const {
   auto entry = get_entry(pid);
   if (entry.has_value()) {
     return entry.value()->task_.value_or(util::WeakPtr<Task>());

@@ -172,7 +172,7 @@ struct NamespaceNode {
   ktl::optional<NamespaceNode> mountpoint() const;
 
   /// The path from the task's root to this node.
-  FsString path(Task& task) const;
+  FsString path(const Task& task) const;
 
   /// The path from the root of the namespace to this node.
   FsString path_escaping_chroot() const;

@@ -61,6 +61,11 @@ TaskBuilder::TaskBuilder(fbl::RefPtr<Task> task) : task(ktl::move(task)) {}
 
 TaskBuilder::~TaskBuilder() = default;
 
+const Task* TaskBuilder::operator->() const {
+  ASSERT_MSG(task, "called `operator->` empty Task");
+  return task.get();
+}
+
 Task* TaskBuilder::operator->() {
   ASSERT_MSG(task, "called `operator->` empty Task");
   return task.get();
@@ -70,7 +75,12 @@ CurrentTask::~CurrentTask() = default;
 
 CurrentTask::CurrentTask(fbl::RefPtr<Task> task) : task(ktl::move(task)) {}
 
-Task* CurrentTask::operator->() const {
+const Task* CurrentTask::operator->() const {
+  ASSERT_MSG(task, "called `operator->()` empty Task");
+  return task.get();
+}
+
+Task* CurrentTask::operator->() {
   ASSERT_MSG(task, "called `operator->()` empty Task");
   return task.get();
 }

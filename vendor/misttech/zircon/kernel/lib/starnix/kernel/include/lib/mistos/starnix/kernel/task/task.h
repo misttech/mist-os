@@ -123,7 +123,7 @@ class TaskMutableState {
 
  public:
   /// impl TaskMutableState
-  bool no_new_privs() { return no_new_privs_; }
+  bool no_new_privs() const { return no_new_privs_; }
 
  public:
   // TaskMutableState(const TaskMutableState&) = delete;
@@ -333,11 +333,11 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
     }
   */
 
-  fbl::RefPtr<FsContext> fs();
+  fbl::RefPtr<FsContext> fs() const;
 
-  fbl::RefPtr<MemoryManager>& mm();
+  const fbl::RefPtr<MemoryManager>& mm() const;
 
-  util::WeakPtr<Task> get_task(pid_t pid);
+  util::WeakPtr<Task> get_task(pid_t pid) const;
 
   pid_t get_pid() const;
 
