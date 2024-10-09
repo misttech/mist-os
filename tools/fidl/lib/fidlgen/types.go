@@ -565,6 +565,7 @@ type Type struct {
 	ResourceIdentifier string
 	TypeShapeV2        TypeShape
 	PointeeType        *Type
+	MaybeAlias         *PartialTypeConstructor
 
 	// TODO(https://fxbug.dev/42149402): These are fields that will start being
 	// used in fidlgen soon. For now, we just pass them through without
@@ -605,6 +606,13 @@ func (t *Type) UnmarshalJSON(b []byte) error {
 	}
 	if f := obj["protocol"]; f != nil {
 		err = json.Unmarshal(*f, &t.Protocol)
+		if err != nil {
+			return err
+		}
+	}
+
+	if f := obj["experimental_maybe_from_alias"]; f != nil {
+		err = json.Unmarshal(*f, &t.MaybeAlias)
 		if err != nil {
 			return err
 		}
@@ -742,6 +750,10 @@ func (t *Type) MarshalJSON() ([]byte, error) {
 	}
 	if f := t.Protocol; f != nil {
 		obj["protocol"] = f
+	}
+
+	if f := t.MaybeAlias; f != nil {
+		obj["experimental_maybe_from_alias"] = f
 	}
 
 	switch t.Kind {
