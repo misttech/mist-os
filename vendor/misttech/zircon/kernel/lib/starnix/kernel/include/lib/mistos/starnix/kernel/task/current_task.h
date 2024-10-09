@@ -74,6 +74,7 @@ class TaskBuilder {
   explicit TaskBuilder(fbl::RefPtr<Task> task);
 
   Task* operator->();
+  const Task* operator->() const;
 
   // C++
   ~TaskBuilder();
@@ -319,7 +320,8 @@ class CurrentTask : public TaskMemoryAccessor {
   // C++
   ~CurrentTask() override;
 
-  Task* operator->() const;
+  Task* operator->();
+  const Task* operator->() const;
 
  private:
   explicit CurrentTask(fbl::RefPtr<Task> task);

@@ -67,19 +67,19 @@ Task::Task(pid_t _id, fbl::RefPtr<ThreadGroup> _thread_group,
 
 Task::~Task() = default;
 
-fbl::RefPtr<FsContext> Task::fs() {
+fbl::RefPtr<FsContext> Task::fs() const {
   ASSERT_MSG(fs_.has_value(), "fs must be set");
   return *fs_->Read();
 }
 
-fbl::RefPtr<MemoryManager>& Task::mm() {
+const fbl::RefPtr<MemoryManager>& Task::mm() const {
   ASSERT_MSG(mm_.has_value(), "mm must be set");
   return mm_.value();
 }
 
 fbl::RefPtr<Kernel>& Task::kernel() const { return thread_group->kernel; }
 
-util::WeakPtr<Task> Task::get_task(pid_t pid) { return kernel()->pids.Read()->get_task(pid); }
+util::WeakPtr<Task> Task::get_task(pid_t pid) const { return kernel()->pids.Read()->get_task(pid); }
 
 pid_t Task::get_pid() const { return thread_group->leader; }
 
