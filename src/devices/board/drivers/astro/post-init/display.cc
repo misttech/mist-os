@@ -29,42 +29,50 @@ static const std::vector<fpbus::Mmio> display_mmios{
         // VPU
         .base = S905D2_VPU_BASE,
         .length = S905D2_VPU_LENGTH,
+        .name = "vpu",
     }},
     {{
         // MIPI DSI "TOP"
         .base = S905D2_MIPI_TOP_DSI_BASE,
         .length = S905D2_MIPI_TOP_DSI_LENGTH,
+        .name = "dsi-top",
     }},
     {{
         // MIPI DSI PHY
         .base = S905D2_DSI_PHY_BASE,
         .length = S905D2_DSI_PHY_LENGTH,
+        .name = "dsi-phy",
     }},
     {{
         // DSI Host Controller
         .base = S905D2_MIPI_DSI_BASE,
         .length = S905D2_MIPI_DSI_LENGTH,
+        .name = "dsi-controller",
     }},
     {{
         // HIU / HHI
         .base = S905D2_HIU_BASE,
         .length = S905D2_HIU_LENGTH,
+        .name = "hhi",
     }},
     {{
         // AOBUS
         // TODO(https://fxbug.dev/42081392): Restrict range to RTI
         .base = S905D2_AOBUS_BASE,
         .length = S905D2_AOBUS_LENGTH,
+        .name = "always-on-rti",
     }},
     {{
         // RESET
         .base = S905D2_RESET_BASE,
         .length = S905D2_RESET_LENGTH,
+        .name = "ee-reset",
     }},
     {{
         // PERIPHS_REGS (GPIO Multiplexer)
         .base = S905D2_GPIO_BASE,
         .length = S905D2_GPIO_LENGTH,
+        .name = "gpio-mux",
     }},
 };
 

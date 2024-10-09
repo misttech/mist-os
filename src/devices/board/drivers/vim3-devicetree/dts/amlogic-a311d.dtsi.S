@@ -118,6 +118,8 @@
 			<0x0 A311D_GPIO_BASE 0x0 A311D_GPIO_LENGTH>,
 			<0x0 A311D_HDMITX_CONTROLLER_IP_BASE 0x0 A311D_HDMITX_CONTROLLER_IP_LENGTH>,
 			<0x0 A311D_HDMITX_TOP_LEVEL_BASE 0x0 A311D_HDMITX_TOP_LEVEL_LENGTH>;
+		reg-names = "vpu", "dsi-top", "dsi-phy", "dsi-controller", "hhi", "always-on-rti", "ee-reset",
+		    "gpio-mux", "hdmitx-controller", "hdmitx-top";
 		interrupts = <GIC_SPI 3 GIC_IRQ_MODE_EDGE_RISING>,
 			<GIC_SPI 89 GIC_IRQ_MODE_EDGE_RISING>,
 			<GIC_SPI 86 GIC_IRQ_MODE_EDGE_RISING>;
