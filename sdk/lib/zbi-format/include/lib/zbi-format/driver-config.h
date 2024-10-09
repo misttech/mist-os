@@ -84,6 +84,9 @@ typedef uint32_t zbi_kernel_driver_t;
 // 'PXAU'
 #define ZBI_KERNEL_DRIVER_PXA_UART ((zbi_kernel_driver_t)(0x50584155u))
 
+// 'EXYU'
+#define ZBI_KERNEL_DRIVER_EXYNOS_USI_UART ((zbi_kernel_driver_t)(0x45585955u))
+
 // Kernel driver struct that can be used for simple drivers.
 // Used by ZBI_KERNEL_DRIVER_PL011_UART, ZBI_KERNEL_DRIVER_AMLOGIC_UART, and
 // ZBI_KERNEL_DRIVER_GENI_UART, ZBI_KERNEL_DRIVER_I8250_MMIO_UART.

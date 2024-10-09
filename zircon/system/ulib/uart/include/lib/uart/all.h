@@ -17,6 +17,7 @@
 #include <hwreg/internal.h>
 
 #include "amlogic.h"
+#include "exynos-usi.h"
 #include "geni.h"
 #include "motmot.h"
 #include "ns8250.h"
@@ -68,7 +69,7 @@ using WithAllDrivers = Template<
     amlogic::Driver, geni::Driver, pl011::Driver,
 #endif
 #if defined(__aarch64__) || defined(__riscv) || UART_ALL_DRIVERS
-    motmot::Driver,
+    exynos_usi::Driver,
 #endif
 #if defined(__x86_64__) || defined(__i386__) || UART_ALL_DRIVERS
     ns8250::PioDriver,

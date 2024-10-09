@@ -2,16 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/uart/exynos-usi.h>
 #include <lib/uart/mock.h>
-#include <lib/uart/motmot.h>
 #include <lib/uart/uart.h>
 
 #include <zxtest/zxtest.h>
 
 namespace {
 
-using SimpleTestDriver =
-    uart::KernelDriver<uart::motmot::Driver, uart::mock::IoProvider, uart::UnsynchronizedPolicy>;
+using SimpleTestDriver = uart::KernelDriver<uart::exynos_usi::Driver, uart::mock::IoProvider,
+                                            uart::UnsynchronizedPolicy>;
 constexpr zbi_dcfg_simple_t kTestConfig = {};
 
 template <typename Mock>
@@ -40,7 +40,7 @@ void AppendInitSequence(Mock& mock) {
       ;
 }
 
-TEST(MotmotTests, HelloWorld) {
+TEST(ExynosUsiTests, HelloWorld) {
   SimpleTestDriver driver(kTestConfig);
 
   AppendInitSequence(driver.io().mock());
@@ -63,7 +63,7 @@ TEST(MotmotTests, HelloWorld) {
   EXPECT_EQ(3, driver.Write("hi\n"));
 }
 
-TEST(MotmotTests, ReadWrite) {
+TEST(ExynosUsiTests, ReadWrite) {
   SimpleTestDriver driver(kTestConfig);
 
   AppendInitSequence(driver.io().mock());
