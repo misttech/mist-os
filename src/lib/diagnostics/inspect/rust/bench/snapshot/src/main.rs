@@ -15,8 +15,6 @@ enum InspectorState {
     Done,
 }
 
-mod utils;
-
 /// Start a worker thread that will continually update the given inspector at the given rate.
 ///
 /// Returns a closure that when called cancels the thread, returning only when the thread has
@@ -87,7 +85,8 @@ fn snapshot_tree_bench(b: &mut criterion::Bencher, size: usize, frequency: usize
     let mut executor = fuchsia_async::LocalExecutor::new();
 
     let inspector = Inspector::new(InspectorConfig::default().size(size));
-    let (proxy, tree_server_fut) = utils::spawn_server(inspector.clone()).unwrap();
+    let (proxy, tree_server_fut) =
+        fuchsia_inspect_bench_utils::spawn_server(inspector.clone()).unwrap();
     let task = fasync::Task::spawn(tree_server_fut);
 
     let done_fn = start_inspector_update_thread(inspector.clone(), frequency);
@@ -111,7 +110,8 @@ fn uncontended_snapshot_tree_bench(b: &mut criterion::Bencher, size: usize) {
     let mut executor = fuchsia_async::LocalExecutor::new();
 
     let inspector = Inspector::new(InspectorConfig::default().size(size));
-    let (proxy, tree_server_fut) = utils::spawn_server(inspector.clone()).unwrap();
+    let (proxy, tree_server_fut) =
+        fuchsia_inspect_bench_utils::spawn_server(inspector.clone()).unwrap();
     let task = fasync::Task::local(tree_server_fut);
 
     b.iter_with_large_drop(|| loop {
@@ -130,7 +130,8 @@ fn reader_snapshot_tree_vmo_bench(b: &mut criterion::Bencher, size: usize, fille
     let mut executor = fuchsia_async::LocalExecutor::new();
 
     let inspector = Inspector::new(InspectorConfig::default().size(size));
-    let (proxy, tree_server_fut) = utils::spawn_server(inspector.clone()).unwrap();
+    let (proxy, tree_server_fut) =
+        fuchsia_inspect_bench_utils::spawn_server(inspector.clone()).unwrap();
     let task = fasync::Task::local(tree_server_fut);
 
     let mut nodes = vec![];

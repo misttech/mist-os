@@ -18,8 +18,6 @@ use std::time::Duration;
 
 const NAME: &str = "name";
 
-mod utils;
-
 /// Benchmarks for operations that can be done on an Inspect Node.
 fn node_benchmarks(mut bench: criterion::Benchmark) -> criterion::Benchmark {
     bench = bench.with_function("Node/create_child", move |b| {
@@ -511,7 +509,8 @@ fn bench_write_after_tree_cow_read(mut bench: criterion::Benchmark) -> criterion
         properties.push(inspector.root().create_int("i", i));
     }
 
-    let (proxy, tree_server_fut) = utils::spawn_server(inspector.clone()).unwrap();
+    let (proxy, tree_server_fut) =
+        fuchsia_inspect_bench_utils::spawn_server(inspector.clone()).unwrap();
     let task = fasync::Task::spawn(tree_server_fut);
     // Force TLB shootdown for following writes on the local inspector
     let _ = proxy.vmo();
