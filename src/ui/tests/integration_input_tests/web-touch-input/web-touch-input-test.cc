@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.component/cpp/fidl.h>
 #include <fidl/fuchsia.element/cpp/fidl.h>
 #include <fidl/fuchsia.fonts/cpp/fidl.h>
-#include <fidl/fuchsia.input.injection/cpp/fidl.h>
 #include <fidl/fuchsia.intl/cpp/fidl.h>
 #include <fidl/fuchsia.kernel/cpp/fidl.h>
 #include <fidl/fuchsia.memorypressure/cpp/fidl.h>

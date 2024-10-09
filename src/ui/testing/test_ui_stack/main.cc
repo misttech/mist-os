@@ -6,6 +6,7 @@
 #include <fidl/fuchsia.element/cpp/fidl.h>
 #include <fidl/fuchsia.input.interaction.observation/cpp/fidl.h>
 #include <fidl/fuchsia.input.interaction/cpp/fidl.h>
+#include <fidl/fuchsia.input.virtualkeyboard/cpp/fidl.h>
 #include <fidl/fuchsia.ui.composition/cpp/fidl.h>
 #include <fidl/fuchsia.ui.display.singleton/cpp/fidl.h>
 #include <fidl/fuchsia.ui.focus/cpp/fidl.h>
@@ -25,6 +26,7 @@
 
 #include <src/ui/testing/test_ui_stack/test_ui_stack_config_lib.h>
 
+#include "fidl/fuchsia.input.virtualkeyboard/cpp/markers.h"
 #include "src/ui/testing/ui_test_realm/ui_test_realm.h"
 
 namespace {
@@ -92,7 +94,10 @@ int run_test_ui_stack(int argc, const char** argv) {
   // Helper services.
   AddPublicService<fuchsia_ui_test_input::Registry>(context.get(), realm_exposed_services.get());
   AddPublicService<fuchsia_ui_test_scene::Controller>(context.get(), realm_exposed_services.get());
-
+  AddPublicService<fuchsia_input_virtualkeyboard::Manager>(context.get(),
+                                                           realm_exposed_services.get());
+  AddPublicService<fuchsia_input_virtualkeyboard::ControllerCreator>(context.get(),
+                                                                     realm_exposed_services.get());
   if (config.accessibility_owner == ui_testing::UITestRealm::AccessibilityOwnerType::FAKE) {
     AddPublicService<test_accessibility::Magnifier>(context.get(), realm_exposed_services.get());
   }

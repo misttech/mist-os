@@ -64,19 +64,20 @@ class WebAppBase {
     }
   }
 
+  void SendMessageToWebPage(fidl::ServerEnd<fuchsia_web::MessagePort> message_port,
+                            const std::string& message);
+
   NavListener nav_listener_;
   // message_port used for JS send message to this class.
   fidl::Client<fuchsia_web::MessagePort> out_message_port_;
+  async::Loop loop_;
 
  private:
   void SetupWebEngine(const std::string& web_app_name,
                       fuchsia_web::ContextFeatureFlags context_feature_flags);
   void PresentView();
   void SetupWebPage(const std::string& js_code);
-  void SendMessageToWebPage(fidl::ServerEnd<fuchsia_web::MessagePort> message_port,
-                            const std::string& message);
 
-  async::Loop loop_;
   component::OutgoingDirectory outgoing_directory_;
   fidl::ServerBindingGroup<fuchsia_web::NavigationEventListener> nav_listener_bindings_;
   fidl::SyncClient<fuchsia_web::ContextProvider> web_context_provider_;

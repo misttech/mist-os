@@ -43,6 +43,7 @@ source_set("portable_ui_test") {
   public_deps = [
     ":fidl_cpp_helpers",
     ":screenshot_helper",
+    "//sdk/fidl/fuchsia.input.virtualkeyboard:fuchsia.input.virtualkeyboard_cpp",
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
