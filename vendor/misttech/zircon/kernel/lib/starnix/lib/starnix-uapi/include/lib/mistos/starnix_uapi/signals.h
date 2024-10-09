@@ -28,7 +28,7 @@ struct Signal {
   uint32_t number() const { return number_; }
 
   /// Returns the bitmask for this signal number.
-  uint64_t mask() const { return 1u << (number_ - 1); }
+  uint64_t mask() const { return 1ul << (number_ - 1); }
 
   /// Returns true if the signal is a real-time signal.
   bool is_real_time() const { return number_ >= SIGRTMIN; }
