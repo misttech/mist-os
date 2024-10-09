@@ -4,6 +4,7 @@
 
 #include "scsi.h"
 
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/virtio/backends/fake.h>
 
 #include <memory>
@@ -35,6 +36,10 @@ class FakeBackendForScsi : public virtio::FakeBackend {
 };
 
 TEST(ScsiTest, Init) {
+  // TODO: Need unit tests that actually instantiate the driver, at which point this logger can be
+  // removed.
+  fdf_testing::ScopedGlobalLogger logger;
+
   std::unique_ptr<virtio::Backend> backend = std::make_unique<FakeBackendForScsi>();
   zx::bti bti(ZX_HANDLE_INVALID);
 
