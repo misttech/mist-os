@@ -105,6 +105,10 @@ type NodeAttributesQuery = flexible bits : uint64 {
     /// Requests [`MutableNodeAttributes.selinux_context`]. See that field for more detail.
     @available(added=HEAD)
     SELINUX_CONTEXT = 0x40000;
+
+    /// fscrypt attribute.
+    @available(added=HEAD)
+    WRAPPING_KEY_ID = 0x80000;
 };
 
 type MutableNodeAttributes = table {
@@ -155,6 +159,15 @@ type MutableNodeAttributes = table {
         1: data vector<uint8>:MAX_SELINUX_CONTEXT_ATTRIBUTE_LEN;
         2: use_extended_attributes EmptyStruct;
     };
+
+    /// Fscrypt support
+    /// This attribute can only be changed on empty directories and will be inherited by any
+    /// child directories that are subsequently created. This attribute can only be set once per
+    /// directory. The wrapping_key_id set will be used to encrypt file contents and filenames for
+    /// this directory and its children.
+    /// The only filesystem to support this at the time of writing is Fxfs.
+    @available(added=HEAD)
+    10: wrapping_key_id array<uint8, 16>;
 };
 
 // TODO(https://fxbug.dev/42057114): Inline this into its only reference when fidlgen_go is fixed.
