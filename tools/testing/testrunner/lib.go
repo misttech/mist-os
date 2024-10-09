@@ -80,6 +80,8 @@ type Options struct {
 	UploadToResultDB bool
 
 	// The path to the llvm-profdata binary to use to merge profiles on the host.
+	// If given as `<path>=<version>`, the version should correspond to the version
+	// of the profiles produced by the tests that are run.")
 	LLVMProfdataPath string
 }
 

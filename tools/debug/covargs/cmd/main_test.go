@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"go.fuchsia.dev/fuchsia/tools/debug/covargs"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 )
 
@@ -35,7 +36,7 @@ func TestSplitVersion(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			version, path := splitVersion(tc.arg)
+			version, path := covargs.SplitVersion(tc.arg)
 			if version != tc.expectedVersion {
 				t.Errorf("got version %s, want %s", version, tc.expectedVersion)
 			}

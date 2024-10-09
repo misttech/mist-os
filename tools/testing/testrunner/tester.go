@@ -28,6 +28,7 @@ import (
 
 	botanistconstants "go.fuchsia.dev/fuchsia/tools/botanist/constants"
 	"go.fuchsia.dev/fuchsia/tools/build"
+	"go.fuchsia.dev/fuchsia/tools/debug/covargs"
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder"
 	"go.fuchsia.dev/fuchsia/tools/lib/clock"
 	"go.fuchsia.dev/fuchsia/tools/lib/environment"
@@ -38,7 +39,6 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/osmisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/retry"
 	"go.fuchsia.dev/fuchsia/tools/lib/serial"
-	"go.fuchsia.dev/fuchsia/tools/lib/streams"
 	"go.fuchsia.dev/fuchsia/tools/lib/subprocess"
 	"go.fuchsia.dev/fuchsia/tools/net/sshutil"
 	sshutilconstants "go.fuchsia.dev/fuchsia/tools/net/sshutil/constants"
@@ -570,8 +570,11 @@ type FFXTester struct {
 	// A map of the test PackageURL to data needed for processing the test results.
 	testRuns map[string]ffxTestRun
 
-	llvmProfdata string
-	sinksPerTest map[string]runtests.DataSinkReference
+	llvmProfdata      string
+	llvmVersion       string
+	sinksPerTest      map[string]runtests.DataSinkReference
+	debuginfodServers []string
+	debuginfodCache   string
 
 	// The following waitgroup and errs track the goroutines for merging profiles.
 	wg     sync.WaitGroup
@@ -593,23 +596,32 @@ func NewFFXTester(ctx context.Context, ffx FFXInstance, sshTester Tester, localO
 	if err != nil {
 		return nil, err
 	}
+	debuginfodServers := []string{}
+	debuginfodCache := ""
+	llvmVersion := ""
 	if llvmProfdata != "" {
+		llvmVersion, llvmProfdata = covargs.SplitVersion(llvmProfdata)
 		llvmProfdata, err = filepath.Abs(llvmProfdata)
 		if err != nil {
 			return nil, err
 		}
+		debuginfodServers = strings.Split(os.Getenv("DEBUGINFOD_URLS"), " ")
+		debuginfodCache = filepath.Join(localOutputDir, "debuginfod-cache")
 	}
 	return &FFXTester{
-		ffx:             ffx,
-		sshTester:       sshTester,
-		localOutputDir:  localOutputDir,
-		experimentLevel: experimentLevel,
-		testRuns:        make(map[string]ffxTestRun),
-		llvmProfdata:    llvmProfdata,
-		sinksPerTest:    make(map[string]runtests.DataSinkReference),
-		wg:              sync.WaitGroup{},
-		errs:            []error{},
-		errsMu:          sync.Mutex{},
+		ffx:               ffx,
+		sshTester:         sshTester,
+		localOutputDir:    localOutputDir,
+		experimentLevel:   experimentLevel,
+		testRuns:          make(map[string]ffxTestRun),
+		llvmProfdata:      llvmProfdata,
+		llvmVersion:       llvmVersion,
+		sinksPerTest:      make(map[string]runtests.DataSinkReference),
+		debuginfodServers: debuginfodServers,
+		debuginfodCache:   debuginfodCache,
+		wg:                sync.WaitGroup{},
+		errs:              []error{},
+		errsMu:            sync.Mutex{},
 	}, nil
 }
 
@@ -899,6 +911,11 @@ func (t *FFXTester) EnsureSinks(ctx context.Context, sinks []runtests.DataSinkRe
 			return err
 		}
 	}
+	defer func() {
+		if err := os.RemoveAll(t.debuginfodCache); err != nil {
+			logger.Debugf(ctx, "failed to remove debuginfod cache: %s", err)
+		}
+	}()
 	// Wait for all goroutines that are merging profiles.
 	t.wg.Wait()
 	t.errsMu.Lock()
@@ -1056,61 +1073,27 @@ func (t *FFXTester) getEarlyBootSinks(ctx context.Context, sinkDir string, sinks
 // moveProfileToOutputDir moves the profile from the sinkDir to the local output directory.
 // If a profile of the same name already exists, then the two are merged.
 func (t *FFXTester) moveProfileToOutputDir(ctx context.Context, sinkDir, sinkFile string) error {
-	oldPath := filepath.Join(sinkDir, sinkFile)
-	newPath := filepath.Join(t.localOutputDir, "v2", sinkFile)
-	if _, err := os.Stat(newPath); err == nil && t.llvmProfdata != "" {
+	profile := filepath.Join(sinkDir, sinkFile)
+	destProfile := filepath.Join(t.localOutputDir, "v2", sinkFile)
+	if _, err := os.Stat(destProfile); err == nil && t.llvmProfdata != "" {
 		// Merge profiles.
-		logger.Debugf(ctx, "merging profile %s to %s", oldPath, newPath)
-		if err := t.mergeProfiles(ctx, sinkDir, oldPath, newPath, t.llvmProfdata); err != nil {
+		logger.Debugf(ctx, "merging profile %s to %s", profile, destProfile)
+		if err := covargs.MergeSameVersionProfiles(ctx, sinkDir, []string{destProfile, profile}, destProfile, t.llvmProfdata, t.llvmVersion, 0, t.debuginfodServers, t.debuginfodCache); err != nil {
+			logger.Debugf(ctx, "failed to merge profiles: %s", err)
 			return err
 		}
 		// Remove old profile.
-		if err := os.Remove(oldPath); err != nil {
+		if err := os.Remove(profile); err != nil {
 			return err
 		}
 	} else {
-		if err := os.MkdirAll(filepath.Dir(newPath), os.ModePerm); err != nil {
+		if err := os.MkdirAll(filepath.Dir(destProfile), os.ModePerm); err != nil {
 			return err
 		}
-		if err := os.Rename(oldPath, newPath); err != nil {
+		if err := os.Rename(profile, destProfile); err != nil {
 			return err
 		}
 	}
-	return nil
-}
-
-// mergeProfiles merges raw profiles (.profraw) and returns a single indexed profile.
-// TODO(ihuh): Dedupe with code in covargs.
-func (t *FFXTester) mergeProfiles(ctx context.Context, sinkDir string, newProfile string, origProfile string, llvmProfData string) error {
-	r := newRunner(sinkDir, []string{})
-	// Make the llvm-profdata response file.
-	profdataFile, err := os.Create(filepath.Join(sinkDir, "llvm-profdata.rsp"))
-	if err != nil {
-		return fmt.Errorf("creating llvm-profdata.rsp file: %w", err)
-	}
-	defer os.Remove(profdataFile.Name())
-	for _, profile := range []string{origProfile, newProfile} {
-		fmt.Fprintf(profdataFile, "%s\n", profile)
-	}
-	if err := profdataFile.Close(); err != nil {
-		return err
-	}
-
-	// Merge new profile into old profile.
-	mergedProfileFile := origProfile
-	mergeCmd := []string{
-		llvmProfData,
-		"merge",
-		"--failure-mode=any",
-		"--sparse",
-		"--output", mergedProfileFile,
-	}
-	mergeCmd = append(mergeCmd, "@"+profdataFile.Name())
-
-	if err := r.Run(ctx, mergeCmd, subprocess.RunOptions{Stdout: streams.Stdout(ctx), Stderr: streams.Stderr(ctx)}); err != nil {
-		return fmt.Errorf("%s failed with %v", strings.Join(mergeCmd, " "), err)
-	}
-
 	return nil
 }
 

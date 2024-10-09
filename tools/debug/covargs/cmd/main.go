@@ -34,12 +34,11 @@ import (
 )
 
 const (
-	shardSize                              = 1000
-	symbolCacheSize                        = 100
-	cloudFetchMaxAttempts                  = 2
-	cloudFetchRetryBackoff                 = 500 * time.Millisecond
-	cloudFetchTimeout                      = 60 * time.Second
-	llvmProfdataDebuginfodSupportedVersion = "clang"
+	shardSize              = 1000
+	symbolCacheSize        = 100
+	cloudFetchMaxAttempts  = 2
+	cloudFetchRetryBackoff = 500 * time.Millisecond
+	cloudFetchTimeout      = 60 * time.Second
 )
 
 var (
@@ -108,21 +107,12 @@ func init() {
 
 const llvmProfileSinkType = "llvm-profile"
 
-func splitVersion(arg string) (version, value string) {
-	version = ""
-	s := strings.SplitN(arg, "=", 2)
-	if len(s) > 1 {
-		version = s[1]
-	}
-	return version, s[0]
-}
-
 // readSummary reads a summary file, and returns a mapping of unique profile to version.
 func readSummary(summaryFiles []string) (map[string]string, error) {
 	versionedSinks := make(map[string]runtests.DataSinkMap)
 
 	for _, summaryFile := range summaryFiles {
-		version, summaryFile := splitVersion(summaryFile)
+		version, summaryFile := covargs.SplitVersion(summaryFile)
 		sinks, ok := versionedSinks[version]
 		if !ok {
 			sinks = make(runtests.DataSinkMap)
@@ -199,57 +189,17 @@ func mergeProfiles(ctx context.Context, tempDir string, profiles map[string]stri
 			continue
 		}
 
-		// Make the llvm-profdata response file.
-		profdataFile, err := os.Create(filepath.Join(tempDir, fmt.Sprintf("llvm-profdata%s.rsp", version)))
-		if err != nil {
-			return "", fmt.Errorf("creating llvm-profdata.rsp file: %w", err)
-		}
-
-		for _, profile := range profileList {
-			fmt.Fprintf(profdataFile, "%s\n", profile)
-		}
-		profdataFile.Close()
-
-		// Merge all raw profiles.
-		mergedProfileFile := filepath.Join(tempDir, fmt.Sprintf("merged%s.profdata", version))
-		args := []string{
-			"merge",
-			"--sparse",
-			"--output", mergedProfileFile,
-		}
-
-		useDebugInfod := false
-		// Use debuginfod during profile merging if it is enabled.
-		if len(debuginfodServers) > 0 && version == llvmProfdataDebuginfodSupportedVersion {
-			useDebugInfod = true
-			// TODO(https://fxbug.dev/359885449): Switch to --failure-mode=any by default when missing build id issue is resolved.
-			args = append(args, "--debuginfod", "--correlate=binary", "--failure-mode=all")
-		} else {
-			args = append(args, "--failure-mode=any")
-		}
-
-		if numThreads != 0 {
-			args = append(args, "--num-threads", strconv.Itoa(numThreads))
-		}
-		args = append(args, "@"+profdataFile.Name())
-
 		// Find the associated llvm-profdata tool.
 		llvmProfData, ok := llvmProfDataVersions[version]
 		if !ok {
 			return "", fmt.Errorf("no llvm-profdata has been specified for version %q", version)
 		}
 
-		mergeCmd := exec.Command(llvmProfData, args...)
-		logger.Debugf(ctx, "%s\n", mergeCmd)
-		if useDebugInfod {
-			if err := setDebuginfodEnv(mergeCmd); err != nil {
-				return "", fmt.Errorf("failed to set debuginfod environment: %w", err)
-			}
+		mergedProfileFile := filepath.Join(tempDir, fmt.Sprintf("merged%s.profdata", version))
+		if err := covargs.MergeSameVersionProfiles(ctx, tempDir, profileList, mergedProfileFile, llvmProfData, version, numThreads, debuginfodServers, debuginfodCache); err != nil {
+			return "", err
 		}
-		data, err := mergeCmd.CombinedOutput()
-		if err != nil {
-			return "", fmt.Errorf("%s failed with %v:\n%s", mergeCmd.String(), err, string(data))
-		}
+
 		profdataFiles = append(profdataFiles, mergedProfileFile)
 	}
 
@@ -648,7 +598,7 @@ func exportCoverageData(ctx context.Context, mergedProfileFile string, covFile s
 func process(ctx context.Context) error {
 	llvmProfDataVersions := make(map[string]string)
 	for _, profdata := range llvmProfdata {
-		version, tool := splitVersion(profdata)
+		version, tool := covargs.SplitVersion(profdata)
 		llvmProfDataVersions[version] = tool
 	}
 	if _, ok := llvmProfDataVersions[""]; !ok {
