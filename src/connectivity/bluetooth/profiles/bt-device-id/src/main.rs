@@ -10,7 +10,7 @@ use futures::future;
 use std::pin::pin;
 use tracing::{error, info, warn};
 
-use crate::device_id::DeviceIdServer;
+use crate::device_id::{DIRecord, DeviceIdServer};
 use crate::fidl_service::run_services;
 
 mod device_id;
@@ -23,9 +23,15 @@ pub const DEFAULT_MAX_DEVICE_ID_ADVERTISEMENTS: usize = 10;
 #[fuchsia::main(logging_tags = ["bt-device-id"])]
 async fn main() -> Result<(), Error> {
     let profile = fuchsia_component::client::connect_to_protocol::<ProfileMarker>()?;
+    let default_config =
+        DIRecord::try_from(bt_device_id_profile_config::Config::take_from_startup_handle());
+    if default_config.is_err() {
+        info!("Default DI configuration is invalid. Ignoring.");
+    }
     let (device_id_request_sender, device_id_request_receiver) = mpsc::channel(1);
     let device_id_server = DeviceIdServer::new(
         DEFAULT_MAX_DEVICE_ID_ADVERTISEMENTS,
+        default_config.ok(),
         profile,
         device_id_request_receiver,
     )
@@ -35,7 +41,7 @@ async fn main() -> Result<(), Error> {
     let fs = ServiceFs::new();
     let services = pin!(run_services(fs, device_id_request_sender));
 
-    info!("Device ID Component running.");
+    info!("Device ID component running");
 
     match future::select(services, device_id_server).await {
         future::Either::Left((Ok(()), _)) => {

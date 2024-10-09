@@ -31,13 +31,13 @@ async fn setup_test_topology() -> (RealmInstance, BtProfileComponent, PiconetMem
         .await
         .expect("failed to add mock piconet member");
 
-    // Add bt-device-id which is under test.
+    // Add `bt-device-id` which is under test.
     let expose = vec![Capability::protocol::<DeviceIdentificationMarker>().into()];
     let di_profile = test_harness
         .add_profile_with_capabilities(
             DEVICE_ID_MONIKER.to_string(),
             DEVICE_ID_URL.to_string(),
-            None,
+            /* rfcomm_url=*/ None,
             vec![],
             expose,
         )
@@ -74,7 +74,7 @@ fn record(primary: bool) -> DeviceIdentificationRecord {
 /// Connects to the `DeviceIdentification` capability exposed by the DI Profile component and makes
 /// a request to set the device identification.
 /// Returns a future representing the set request - this should be polled to correctly detect when
-/// the advertisement request has terminated.
+/// the advertisement has terminated.
 /// Returns the Proxy associated with the request which should be kept alive until the client no
 /// longer wants to advertise.
 fn connect_di_client(
@@ -118,8 +118,34 @@ async fn expect_di_service_found(
     attributes
 }
 
+#[track_caller]
+fn expect_attributes(attributes: Vec<bredr::Attribute>) {
+    // All the mandatory DI attributes should exist (6).
+    assert_eq!(attributes.iter().filter(|a| a.id == Some(0x200)).count(), 1);
+    assert_eq!(attributes.iter().filter(|a| a.id == Some(0x201)).count(), 1);
+    assert_eq!(attributes.iter().filter(|a| a.id == Some(0x202)).count(), 1);
+    assert_eq!(attributes.iter().filter(|a| a.id == Some(0x203)).count(), 1);
+    assert_eq!(attributes.iter().filter(|a| a.id == Some(0x204)).count(), 1);
+    assert_eq!(attributes.iter().filter(|a| a.id == Some(0x205)).count(), 1);
+    // We also expect the (optional) documentation attribute.
+    assert_eq!(attributes.iter().filter(|a| a.id == Some(0x000A)).count(), 1);
+}
+
 #[fuchsia::test]
-async fn piconet_member_discovers_di_component_advertisement() {
+async fn default_di_advertisement_is_discoverable() {
+    let (_test_topology, di_component, test_driven_peer) = setup_test_topology().await;
+
+    // A member of the piconet should be able to immediately discover the default Device ID
+    // advertisement.
+    let mut results_requests = test_driven_peer
+        .register_service_search(bredr::ServiceClassProfileIdentifier::PnpInformation, vec![])
+        .expect("can register service search");
+    let attributes = expect_di_service_found(&mut results_requests, di_component.peer_id()).await;
+    expect_attributes(attributes);
+}
+
+#[fuchsia::test]
+async fn fidl_di_advertisement_is_discoverable() {
     let (test_topology, di_component, test_driven_peer) = setup_test_topology().await;
 
     // Set up a DI client that wants to set the device information.
@@ -132,16 +158,7 @@ async fn piconet_member_discovers_di_component_advertisement() {
 
     // We expect it to discover the DI service advertisement.
     let attributes = expect_di_service_found(&mut results_requests, di_component.peer_id()).await;
-
-    // All the mandatory DI attributes should exist (6).
-    assert_eq!(attributes.iter().filter(|a| a.id == Some(0x200)).count(), 1);
-    assert_eq!(attributes.iter().filter(|a| a.id == Some(0x201)).count(), 1);
-    assert_eq!(attributes.iter().filter(|a| a.id == Some(0x202)).count(), 1);
-    assert_eq!(attributes.iter().filter(|a| a.id == Some(0x203)).count(), 1);
-    assert_eq!(attributes.iter().filter(|a| a.id == Some(0x204)).count(), 1);
-    assert_eq!(attributes.iter().filter(|a| a.id == Some(0x205)).count(), 1);
-    // We do expect the (optional) documentation attribute.
-    assert_eq!(attributes.iter().filter(|a| a.id == Some(0x000A)).count(), 1);
+    expect_attributes(attributes);
 
     // TODO(https://fxbug.dev/42169240): Add a service description and verify the attribute once the MPS
     // supports parsing the `information` field of a bredr.ServiceDefinition.

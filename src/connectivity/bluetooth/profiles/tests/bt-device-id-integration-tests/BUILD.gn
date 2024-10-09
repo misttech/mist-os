@@ -33,6 +33,19 @@ fuchsia_test_component("bt_device_id_integration_tests") {
   deps = [ ":tests_bin" ]
 }
 
+fuchsia_structured_config_values("test_config_values") {
+  testonly = true
+  component_name = "bt-device-id"
+  cm_label = "//src/connectivity/bluetooth/profiles/bt-device-id:manifest"
+  values = {
+    vendor_id = 1000  # Vendor ID = 1000 (random)
+    product_id = 0  # Product ID not specified
+    version = 0  # Product version not specified
+    primary = true
+    service_description = ""
+  }
+}
+
 fuchsia_test_package("bt-device-id-integration-tests") {
   test_components = [ ":bt_device_id_integration_tests" ]
 
@@ -42,7 +55,8 @@ fuchsia_test_package("bt-device-id-integration-tests") {
   }
 
   deps = [
-    # The Device ID component.
+    # The Device ID component and test config.
+    ":test_config_values",
     "//src/connectivity/bluetooth/profiles/bt-device-id:component",
 
     # Mock Piconet Server component.

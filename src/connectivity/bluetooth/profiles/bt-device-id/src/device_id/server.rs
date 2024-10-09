@@ -7,14 +7,14 @@ use core::task::{Context, Poll};
 use futures::channel::mpsc;
 use futures::stream::{FlattenUnordered, FuturesUnordered};
 use futures::{ready, select, Future, StreamExt};
-use tracing::{info, warn};
+use tracing::{info, trace, warn};
 use {fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_deviceid as di, zx};
 
-use crate::device_id::service_record::DeviceIdentificationService;
+use crate::device_id::service_record::{DIRecord, DeviceIdentificationService};
 use crate::device_id::token::DeviceIdRequestToken;
 use crate::error::Error;
 
-/// Represents a classic advertisement with the upstream BR/EDR server.
+/// Represents a service advertisement with the upstream BR/EDR Profile server.
 pub struct BrEdrProfileAdvertisement {
     // Although we don't expect any stream items (connection requests), this channel must be kept
     // alive for the duration of the advertisement.
@@ -44,24 +44,32 @@ impl Future for BrEdrProfileAdvertisement {
 pub struct DeviceIdServer {
     /// The maximum number of concurrent DI advertisements this server supports.
     max_advertisements: usize,
+    /// The default `DIRecord` that will be advertised on startup, if set.
+    default: Option<DIRecord>,
     /// The connection to the upstream BR/EDR Profile server.
     profile: bredr::ProfileProxy,
-    /// `DeviceIdentification` protocol requests from connected clients.
+    /// FIDL client connection requests to the `DeviceIdentification` protocol.
     device_id_requests: FlattenUnordered<mpsc::Receiver<di::DeviceIdentificationRequestStream>>,
-    /// The current set of DI advertisements.
+    /// The default DI advertisement - this is Some<T> on component startup. None if a FIDL client
+    /// has requested to set the DI advertisement.
+    default_di_advertisement: Option<BrEdrProfileAdvertisement>,
+    /// The current set of managed DI advertisements.
     device_id_advertisements: FuturesUnordered<DeviceIdRequestToken>,
 }
 
 impl DeviceIdServer {
     pub fn new(
         max_advertisements: usize,
+        default: Option<DIRecord>,
         profile: bredr::ProfileProxy,
         device_id_clients: mpsc::Receiver<di::DeviceIdentificationRequestStream>,
     ) -> Self {
         Self {
             max_advertisements,
+            default,
             profile,
             device_id_requests: device_id_clients.flatten_unordered(None),
+            default_di_advertisement: None,
             device_id_advertisements: FuturesUnordered::new(),
         }
     }
@@ -80,14 +88,31 @@ impl DeviceIdServer {
         self.advertisement_size() + requested_space <= self.max_advertisements
     }
 
+    /// Advertises the default Device Identification provided to the server on startup.
+    fn make_default_advertisement(&mut self) -> Result<(), Error> {
+        let Some(record) = self.default.as_ref() else { return Ok(()) };
+        trace!(?record, "Publishing default DI record");
+        let bredr_record: bredr::ServiceDefinition = record.into();
+        let advertisement = Self::advertise(&self.profile, vec![bredr_record.clone()])?;
+        self.default_di_advertisement = Some(advertisement);
+        info!(?bredr_record, "Successfully published DI record");
+        Ok(())
+    }
+
     pub async fn run(mut self) -> Result<(), Error> {
+        self.make_default_advertisement()?;
         loop {
             select! {
                 device_id_request = self.device_id_requests.select_next_some() => {
                     match device_id_request {
                         Ok(req) => {
                             match self.handle_device_id_request(req) {
-                                Ok(token) => self.device_id_advertisements.push(token),
+                                Ok(token) => {
+                                    // Remove the default advertisement if we've successfully built
+                                    // the FIDL client DI request.
+                                    self.default_di_advertisement = None;
+                                    self.device_id_advertisements.push(token);
+                                }
                                 Err(e) => info!("Couldn't handle DI request: {:?}", e),
                             }
                         }
@@ -216,7 +241,7 @@ pub(crate) mod tests {
             fidl::endpoints::create_proxy_and_stream::<bredr::ProfileMarker>()
                 .expect("valid endpoints");
         let max = max.unwrap_or(DEFAULT_MAX_DEVICE_ID_ADVERTISEMENTS);
-        let server = DeviceIdServer::new(max, profile, receiver);
+        let server = DeviceIdServer::new(max, None, profile, receiver);
 
         (exec, server, profile_server, sender)
     }
@@ -387,5 +412,39 @@ pub(crate) mod tests {
         let (fidl_client_result, _server_fut) = run_while(&mut exec, server_fut, fidl_client_fut2);
         let expected_err = zx::Status::ALREADY_EXISTS.into_raw();
         assert_eq!(fidl_client_result.expect("fidl result is ok"), Err(expected_err));
+    }
+
+    /// Verifies that a default advertisement is published on server startup and is overwritten by
+    /// a `DeviceIdentification` FIDL client's advertise request.
+    #[fuchsia::test]
+    fn default_advertisement_is_replaced_by_fidl_advertisement() {
+        let mut exec = fasync::TestExecutor::new();
+
+        let (sender, receiver) = mpsc::channel(0);
+        let (profile, mut profile_server) =
+            fidl::endpoints::create_proxy_and_stream::<bredr::ProfileMarker>()
+                .expect("valid endpoints");
+        let default = (&minimal_record(true)).try_into().ok();
+        let server =
+            DeviceIdServer::new(DEFAULT_MAX_DEVICE_ID_ADVERTISEMENTS, default, profile, receiver);
+        let mut server_fut = pin!(server.run());
+
+        // Since a default configuration is provided, the server should attempt to publish it via
+        // the BR/EDR Profile service.
+        exec.run_until_stalled(&mut server_fut).expect_pending("server still active");
+        let default_upstream_receiver = expect_advertise_request(&mut exec, &mut profile_server);
+
+        // FIDL client connects and requests to advertise.
+        let (mut server_fut, client1) = connect_fidl_client(&mut exec, server_fut, sender.clone());
+        let (_token1, fidl_client_fut1) = make_request(&client1, true);
+        let mut fidl_client_fut1 = pin!(fidl_client_fut1);
+        exec.run_until_stalled(&mut server_fut).expect_pending("server still active");
+        exec.run_until_stalled(&mut fidl_client_fut1).expect_pending("advertisement still active");
+        // Expect the BR/EDR Profile service to receive the advertisement. The previous default
+        // advertisement should be terminated by the DeviceID Server.
+        let _upstream_receiver = expect_advertise_request(&mut exec, &mut profile_server);
+        let mut closed_fut = pin!(default_upstream_receiver.on_closed());
+        let result = exec.run_until_stalled(&mut closed_fut).expect("receiver should be closed");
+        assert_matches!(result, Ok(_));
     }
 }
