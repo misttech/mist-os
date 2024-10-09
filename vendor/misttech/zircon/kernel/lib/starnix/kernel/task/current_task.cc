@@ -25,6 +25,7 @@
 #include <lib/mistos/starnix_uapi/auth.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
+#include <lib/mistos/starnix_uapi/signals.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/util/default_construct.h>
 #include <lib/mistos/util/strings/split_string.h>
@@ -49,6 +50,7 @@
 
 #include <ktl/enforce.h>
 
+#include <linux/resource.h>
 #include <linux/sched.h>
 
 #define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
@@ -87,7 +89,7 @@ Task* CurrentTask::operator->() {
 
 fit::result<Errno, TaskBuilder> CurrentTask::create_init_process(
     const fbl::RefPtr<Kernel>& kernel, pid_t pid, const ktl::string_view& initial_name,
-    fbl::RefPtr<FsContext> fs) {
+    fbl::RefPtr<FsContext> fs, fbl::Array<ktl::pair<starnix_uapi::Resource, uint64_t>> rlimits) {
   LTRACE;
   auto pids = kernel->pids.Write();
 
@@ -96,7 +98,8 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_init_process(
     return create_zircon_process(kernel, {}, pid, process_group, initial_name);
   };
 
-  return create_task_with_pid(kernel, pids, pid, initial_name, fs, task_info_factory);
+  return create_task_with_pid(kernel, pids, pid, initial_name, fs, task_info_factory,
+                              Credentials::root(), ktl::move(rlimits));
 }
 
 fit::result<Errno, CurrentTask> CurrentTask::create_system_task(const fbl::RefPtr<Kernel>& kernel,
@@ -144,14 +147,17 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_task(const fbl::RefPtr<Kerne
   LTRACE;
   auto pids = kernel->pids.Write();
   auto pid = pids->allocate_pid();
-  return create_task_with_pid(kernel, pids, pid, initial_name, root_fs, task_info_factory);
+  return create_task_with_pid(kernel, pids, pid, initial_name, root_fs, task_info_factory,
+                              Credentials::root(),
+                              fbl::Array<ktl::pair<starnix_uapi::Resource, uint64_t>>());
 }
 
 template <typename TaskInfoFactory>
 fit::result<Errno, TaskBuilder> CurrentTask::create_task_with_pid(
     const fbl::RefPtr<Kernel>& kernel, RwLock<PidTable>::RwLockWriteGuard& pids, pid_t pid,
     const ktl::string_view& initial_name, fbl::RefPtr<FsContext> root_fs,
-    TaskInfoFactory&& task_info_factory) {
+    TaskInfoFactory&& task_info_factory, Credentials creds,
+    fbl::Array<ktl::pair<starnix_uapi::Resource, uint64_t>> rlimits) {
   LTRACE;
   DEBUG_ASSERT(pids->get_task(pid).Lock() == nullptr);
 
@@ -169,9 +175,9 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_task_with_pid(
 
   process_group->insert(task_info.thread_group);
 
-  auto builder = TaskBuilder{Task::New(pid, initial_name, task_info.thread_group,
-                                       ktl::move(task_info.thread), FdTable::Create(),
-                                       task_info.memory_manager, root_fs, Credentials::root())};
+  auto builder =
+      TaskBuilder{Task::New(pid, initial_name, task_info.thread_group, ktl::move(task_info.thread),
+                            FdTable::Create(), task_info.memory_manager, root_fs, creds, kSIGCHLD)};
 
   // TODO (Herrera) Add fit::defer
   {
@@ -180,15 +186,11 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_task_with_pid(
     if (result.is_error()) {
       return result.take_error();
     }
-    /*
-    for (resource, limit) in rlimits {
-                builder
-                    .thread_group
-                    .limits
-                    .lock()
-                    .set(*resource, rlimit { rlim_cur: *limit, rlim_max: *limit });
-            }
-    */
+
+    for (auto& [resouce, limit] : rlimits) {
+      builder->thread_group->limits.Lock()->set(resouce,
+                                                rlimit{.rlim_cur = limit, .rlim_max = limit});
+    }
 
     pids->add_task(temp_task);
     pids->add_thread_group(builder->thread_group);
@@ -353,8 +355,8 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
 
   auto& [thread, thread_group, memory_manager] = task_info_or_error.value();
 
-  auto child = TaskBuilder(
-      Task::New(pid, command, thread_group, ktl::move(thread), files, memory_manager, fs, creds));
+  auto child = TaskBuilder(Task::New(pid, command, thread_group, ktl::move(thread), files,
+                                     memory_manager, fs, creds, child_exit_signal));
 
   {
     auto child_task = child.task;
@@ -430,6 +432,11 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
   */
 
   return fit::ok(child);
+}
+
+void CurrentTask::thread_group_exit(ExitStatus exit_status) {
+  // self.ptrace_event(PtraceOptions::TRACEEXIT, exit_status.signal_info_status() as u64);
+  (*this)->thread_group->exit(exit_status, {});
 }
 
 starnix::testing::AutoReleasableTask CurrentTask::clone_task_for_test(

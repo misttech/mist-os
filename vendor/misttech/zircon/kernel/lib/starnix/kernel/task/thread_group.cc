@@ -9,9 +9,14 @@
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
+#include <lib/mistos/util/weak_wrapper.h>
+#include <lib/starnix_sync/locks.h>
+#include <zircon/assert.h>
 #include <zircon/errors.h>
 
+#include <fbl/alloc_checker.h>
 #include <fbl/ref_ptr.h>
+#include <fbl/vector.h>
 #include <kernel/mutex.h>
 #include <ktl/optional.h>
 #include <object/process_dispatcher.h>
@@ -28,6 +33,31 @@ ThreadGroupMutableState::ThreadGroupMutableState(ThreadGroup* base,
     : parent(ktl::move(_parent)), process_group(ktl::move(_process_group)), base_(base) {}
 
 pid_t ThreadGroupMutableState::leader() const { return base_->leader; }
+
+fbl::Vector<fbl::RefPtr<ThreadGroup>> ThreadGroupMutableState::children() const {
+  fbl::Vector<fbl::RefPtr<ThreadGroup>> children_vec;
+  fbl::AllocChecker ac;
+  for (auto iter = children_.begin(); iter != children_.end(); ++iter) {
+    auto strong = util::WeakPtr<ThreadGroup>(iter.CopyPointer()).Lock();
+    ZX_ASSERT_MSG(strong, "Weak references to processes in ThreadGroup must always be valid");
+    children_vec.push_back(strong, &ac);
+    ZX_ASSERT(ac.check());
+  }
+  return ktl::move(children_vec);
+}
+
+fbl::Vector<fbl::RefPtr<Task>> ThreadGroupMutableState::tasks() const {
+  fbl::Vector<fbl::RefPtr<Task>> tasks_vec;
+  fbl::AllocChecker ac;
+  for (auto& tc : tasks_) {
+    auto strong = tc.upgrade();
+    if (strong.has_value()) {
+      tasks_vec.push_back(strong.value(), &ac);
+      ZX_ASSERT(ac.check());
+    }
+  }
+  return ktl::move(tasks_vec);
+}
 
 pid_t ThreadGroupMutableState::get_ppid() const {
   if (parent.has_value()) {
@@ -50,6 +80,44 @@ fbl::RefPtr<ThreadGroup> ThreadGroup::New(
     //  parent.value()->mutable_state_->children().insert()
   }
   return ktl::move(thread_group);
+}
+
+void ThreadGroup::exit(ExitStatus exit_status, ktl::optional<CurrentTask> current_task) {
+  if (current_task.has_value()) {
+    // current_task
+    //             .ptrace_event(PtraceOptions::TRACEEXIT, exit_status.signal_info_status() as u64);
+  }
+
+  auto pids = kernel->pids.Write();
+  auto state = mutable_state_.Write();
+  if (state->terminating) {
+    // The thread group is already terminating and all threads in the thread group have
+    // already been interrupted.
+    return;
+  }
+  state->terminating = true;
+
+  // Drop ptrace zombies
+  // state.zombie_ptracees.release(&mut pids);
+
+  // Interrupt each task. Unlock the group because send_signal will lock the group in order
+  // to call set_stopped.
+  // SAFETY: tasks is kept on the stack. The static is required to ensure the lock on
+  // ThreadGroup can be dropped.
+  auto tasks = state->tasks();
+  state.~RwLockGuard();
+
+  // Detach from any ptraced tasks.
+  // let tracees = self.ptracees.lock().keys().cloned().collect::<Vec<_>>();
+  // for tracee in tracees {
+  //    if let Some(task_ref) = pids.get_task(tracee).clone().upgrade() {
+  //        let _ = ptrace_detach(self, task_ref.as_ref(), &UserAddress::NULL);
+  //    }
+  //}
+  for (auto task : tasks) {
+    // task->mutable_state_.Write()
+    // task->thread.Write()->
+  }
 }
 
 uint64_t ThreadGroup::get_rlimit(starnix_uapi::Resource resource) const {

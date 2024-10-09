@@ -19,9 +19,11 @@
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/util/weak_wrapper.h>
 #include <trace.h>
+#include <zircon/compiler.h>
 
 #include <ktl/algorithm.h>
 #include <ktl/optional.h>
+#include <object/process_dispatcher.h>
 
 #include <linux/errno.h>
 #include <linux/prctl.h>
@@ -40,6 +42,8 @@ util::WeakPtr<starnix::Task> get_task_or_current(const starnix::CurrentTask& cur
     return current_task->get_task(pid);
   }
 }
+
+void __NO_RETURN do_exit(long code) { ProcessDispatcher::ExitCurrent(code); }
 
 }  // namespace
 
@@ -146,6 +150,21 @@ fit::result<Errno, uid_t> sys_geteuid(const CurrentTask& current_task) {
 
 fit::result<Errno, uid_t> sys_getegid(const CurrentTask& current_task) {
   return fit::ok(current_task->creds().egid);
+}
+
+fit::result<Errno> sys_exit(const CurrentTask& current_task, uint32_t code) {
+  // Only change the current exit status if this has not been already set by exit_group, as
+  // otherwise it has priority.
+  // current_task.write().set_exit_status_if_not_already(ExitStatus::Exit(code as u8));
+  // Ok(())
+  do_exit((code & 0xff) << 8);
+  __UNREACHABLE;
+}
+
+fit::result<Errno> sys_exit_group(CurrentTask& current_task, uint32_t code) {
+  current_task.thread_group_exit(ExitStatusExit(static_cast<uint8_t>(code)));
+  do_exit((code & 0xff) << 8);
+  __UNREACHABLE;
 }
 
 fit::result<Errno, SyscallResult> sys_prctl(const CurrentTask& current_task, int option,

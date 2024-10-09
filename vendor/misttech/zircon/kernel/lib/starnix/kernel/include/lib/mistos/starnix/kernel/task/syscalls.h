@@ -29,6 +29,9 @@ fit::result<Errno, uid_t> sys_getgid(const CurrentTask& current_task);
 fit::result<Errno, uid_t> sys_geteuid(const CurrentTask& current_task);
 fit::result<Errno, uid_t> sys_getegid(const CurrentTask& current_task);
 
+fit::result<Errno> sys_exit(const CurrentTask& current_task, uint32_t code);
+fit::result<Errno> sys_exit_group(CurrentTask& current_task, uint32_t code);
+
 fit::result<Errno, starnix_syscalls::SyscallResult> sys_prctl(const CurrentTask& current_task,
                                                               int option, uint64_t arg2,
                                                               uint64_t arg3, uint64_t arg4,

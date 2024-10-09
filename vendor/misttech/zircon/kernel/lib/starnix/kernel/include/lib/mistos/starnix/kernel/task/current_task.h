@@ -10,6 +10,7 @@
 #include <lib/mistos/starnix/kernel/arch/x64/registers.h>
 #include <lib/mistos/starnix/kernel/loader.h>
 #include <lib/mistos/starnix/kernel/mm/memory_accessor.h>
+#include <lib/mistos/starnix/kernel/task/exit_status.h>
 #include <lib/mistos/starnix/kernel/task/pidtable.h>
 #include <lib/mistos/starnix/kernel/vfs/fd_number.h>
 #include <lib/mistos/starnix/kernel/vfs/mount.h>
@@ -17,6 +18,7 @@
 #include <lib/mistos/starnix_uapi/auth.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
+#include <lib/mistos/starnix_uapi/resource_limits.h>
 #include <lib/mistos/starnix_uapi/signals.h>
 #include <lib/mistos/starnix_uapi/vfs.h>
 #include <lib/mistos/util/weak_wrapper.h>
@@ -26,6 +28,7 @@
 
 #include <utility>
 
+#include <fbl/array.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
 #include <ktl/optional.h>
@@ -244,10 +247,9 @@ class CurrentTask : public TaskMemoryAccessor {
   // The process created by this function should always have pid 1. We require the caller to
   // pass the `pid` as an argument to clarify that it's the callers responsibility to determine
   // the pid for the process.
-  static fit::result<Errno, TaskBuilder> create_init_process(const fbl::RefPtr<Kernel>& kernel,
-                                                             pid_t pid,
-                                                             const ktl::string_view& initial_name,
-                                                             fbl::RefPtr<FsContext> fs);
+  static fit::result<Errno, TaskBuilder> create_init_process(
+      const fbl::RefPtr<Kernel>& kernel, pid_t pid, const ktl::string_view& initial_name,
+      fbl::RefPtr<FsContext> fs, fbl::Array<ktl::pair<starnix_uapi::Resource, uint64_t>> rlimits);
 
   /// Create a task that runs inside the kernel.
   ///
@@ -261,7 +263,7 @@ class CurrentTask : public TaskMemoryAccessor {
   /// Rather than calling this function directly, consider using `kthreads`, which provides both
   /// a system task and a threadpool on which the task can do work.
   static fit::result<Errno, CurrentTask> create_system_task(const fbl::RefPtr<Kernel>& kernel,
-                                                            fbl::RefPtr<FsContext> fs);
+                                                            fbl::RefPtr<FsContext> root_fs);
 
  private:
   template <typename TaskInfoFactory>
@@ -274,7 +276,8 @@ class CurrentTask : public TaskMemoryAccessor {
   static fit::result<Errno, TaskBuilder> create_task_with_pid(
       const fbl::RefPtr<Kernel>& kernel, starnix_sync::RwLock<PidTable>::RwLockWriteGuard& pids,
       pid_t pid, const ktl::string_view& initial_name, fbl::RefPtr<FsContext> root_fs,
-      TaskInfoFactory&& task_info_factory);
+      TaskInfoFactory&& task_info_factory, Credentials creds,
+      fbl::Array<ktl::pair<starnix_uapi::Resource, uint64_t>> rlimits);
 
  public:
   /// Clone this task.
@@ -290,6 +293,8 @@ class CurrentTask : public TaskMemoryAccessor {
                                              ktl::optional<Signal> child_exit_signal,
                                              UserRef<pid_t> user_parent_tid,
                                              UserRef<pid_t> user_child_tid) const;
+
+  void thread_group_exit(ExitStatus exit_status);
 
   /// The flags indicates only the flags as in clone3(), and does not use the low 8 bits for the
   /// exit signal as in clone().

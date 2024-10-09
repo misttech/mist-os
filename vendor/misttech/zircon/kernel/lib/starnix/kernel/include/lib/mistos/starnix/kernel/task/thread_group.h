@@ -7,6 +7,8 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
+#include <lib/mistos/starnix/kernel/task/current_task.h>
+#include <lib/mistos/starnix/kernel/task/exit_status.h>
 #include <lib/mistos/starnix/kernel/task/zombie_process.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/resource_limits.h>
@@ -15,6 +17,7 @@
 
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
+#include <fbl/vector.h>
 #include <ktl/optional.h>
 #include <object/handle.h>
 
@@ -56,10 +59,10 @@ class ThreadGroupMutableState {
   // to their parent.
   // It is still expected that these weak references are always valid, as thread groups must
   // unregister themselves before they are deleted.
-  BTreeMapThreadGroup children;
+  BTreeMapThreadGroup children_;
 
   /// Child tasks that have exited, but not yet been waited for.
-  // pub zombie_children: Vec<OwnedRef<ZombieProcess>>,
+  fbl::Vector<fbl::RefPtr<ZombieProcess>> zombie_children;
 
   /// ptracees of this process that have exited, but not yet been waited for.
   // pub zombie_ptracees: ZombiePtraces,
@@ -109,8 +112,12 @@ class ThreadGroupMutableState {
   /// Thread groups allowed to trace tasks in this this thread group.
   // pub allowed_ptracers: PtraceAllowedPtracers,
 
-  /// impl ThreadGroupMutableState<Base = ThreadGroup, BaseType = Arc<ThreadGroup>>
+  /// impl ThreadGroupMutableState<Base = ThreadGroup>
   pid_t leader() const;
+
+  fbl::Vector<fbl::RefPtr<ThreadGroup>> children() const;
+
+  fbl::Vector<fbl::RefPtr<Task>> tasks() const;
 
   pid_t get_ppid() const;
 
@@ -216,6 +223,12 @@ class ThreadGroup : public fbl::RefCountedUpgradeable<ThreadGroup>,
       fbl::RefPtr<Kernel> kernel, KernelHandle<ProcessDispatcher> process,
       ktl::optional<starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent,
       pid_t leader, fbl::RefPtr<ProcessGroup> process_group);
+
+  // Causes the thread group to exit.  If this is being called from a task
+  // that is part of the current thread group, the caller should pass
+  // `current_task`.  If ownership issues prevent passing `current_task`, then
+  // callers should use CurrentTask::thread_group_exit instead.
+  void exit(ExitStatus exit_status, ktl::optional<CurrentTask> current_task);
 
   uint64_t get_rlimit(starnix_uapi::Resource resource) const;
 
