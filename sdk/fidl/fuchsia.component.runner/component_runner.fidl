@@ -25,7 +25,7 @@ const MAX_HANDLE_COUNT uint32 = 128;
 /// Note: The component manager is the only intended direct client of this
 /// interface.
 @discoverable(client="platform")
-closed(removed=NEXT) open(added=NEXT) protocol ComponentRunner {
+closed(removed=24) open(added=24) protocol ComponentRunner {
     /// Start running a component instance described by `start_info`.
     ///
     /// Component manager binds and uses `controller` to control the
@@ -218,7 +218,7 @@ type ComponentStartInfo = resource table {
 ///   of the component runner itself. The component manager may respond to such
 ///   failures by terminating the component runner's job to ensure system
 ///   stability.
-closed(removed=NEXT) open(added=NEXT) protocol ComponentController {
+closed(removed=24) open(added=24) protocol ComponentController {
     /// Request to stop the component instance.
     ///
     /// After stopping the component instance, the server should close this

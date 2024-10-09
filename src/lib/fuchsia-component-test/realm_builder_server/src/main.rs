@@ -1247,7 +1247,7 @@ impl RealmNode2 {
                         }) => {
                             check_for_parent_target_error(availability)?;
                         }
-                        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+                        #[cfg(fuchsia_api_level_at_least = "24")]
                         ftest::Capability::Resolver(ftest::Resolver { .. })
                         | ftest::Capability::Runner(ftest::Runner { .. }) => {
                             // Resolver and Runner capabilities are always required so we do not
@@ -1548,13 +1548,13 @@ fn create_capability_decl(
                 source_path: None,
             })
         }
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "24")]
         ftest::Capability::Resolver(resolver) => {
             let name = try_into_source_name(&resolver.name)?;
             let source_path = Some(try_into_service_path(&resolver.name, &resolver.path)?);
             cm_rust::CapabilityDecl::Resolver(cm_rust::ResolverDecl { name, source_path })
         }
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "24")]
         ftest::Capability::Runner(runner) => {
             let name = try_into_source_name(&runner.name)?;
             let source_path = Some(try_into_service_path(&runner.name, &runner.path)?);
@@ -1704,7 +1704,7 @@ fn create_offer_decl(
                 availability,
             })
         }
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "24")]
         ftest::Capability::Resolver(resolver) => {
             let source_name = try_into_source_name(&resolver.name)?;
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
@@ -1719,7 +1719,7 @@ fn create_offer_decl(
                 target_name,
             })
         }
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "24")]
         ftest::Capability::Runner(runner) => {
             let source_name = try_into_source_name(&runner.name)?;
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
@@ -1850,7 +1850,7 @@ fn create_expose_decl(
                 availability: cm_rust::Availability::Required,
             })
         }
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "24")]
         ftest::Capability::Resolver(resolver) => {
             let source_name = try_into_source_name(&resolver.name)?;
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
@@ -1868,7 +1868,7 @@ fn create_expose_decl(
                 target_name,
             })
         }
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "24")]
         ftest::Capability::Runner(runner) => {
             let source_name = try_into_source_name(&runner.name)?;
             #[cfg(fuchsia_api_level_at_least = "HEAD")]

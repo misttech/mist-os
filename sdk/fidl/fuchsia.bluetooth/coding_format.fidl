@@ -18,7 +18,7 @@ type AssignedCodingFormat = flexible enum : uint8 {
 };
 
 /// Vendor-defined coding format.
-@available(added=NEXT)
+@available(added=24)
 type VendorCodingFormat = table {
     /// Company ID, see Assigned Numbers document for values
     /// https://www.bluetooth.com/specifications/assigned-numbers/
@@ -31,7 +31,7 @@ type VendorCodingFormat = table {
 };
 
 /// Specifies a coding format.
-@available(added=NEXT)
+@available(added=24)
 type CodecId = flexible union {
     /// Coding format defined by Bluetooth SIG.
     1: assigned_format AssignedCodingFormat;
@@ -41,7 +41,7 @@ type CodecId = flexible union {
 };
 
 /// Identifies a codec and its configuration that may be used with a data stream.
-@available(added=NEXT)
+@available(added=24)
 type CodecAttributes = table {
     /// Coding format.
     /// Required.
@@ -54,7 +54,7 @@ type CodecAttributes = table {
 
 /// Indicates direction of data in a stream. Note that these values do not correspond to constants
 /// from the Bluetooth Core specification.
-@available(added=NEXT)
+@available(added=24)
 type DataDirection = strict enum : uint8 {
     /// Host => Controller
     INPUT = 1;
@@ -66,7 +66,7 @@ type DataDirection = strict enum : uint8 {
 /// Logical transport types that may be used with encoded data streams. Note that these values do
 /// not correspond to constants from the Bluetooth Core specification, nor are BR/EDR values
 /// supported yet.
-@available(added=NEXT)
+@available(added=24)
 type LogicalTransportType = flexible enum : uint8 {
     /// LE CIS
     LE_CIS = 1;

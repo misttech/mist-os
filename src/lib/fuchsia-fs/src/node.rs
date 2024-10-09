@@ -264,7 +264,7 @@ pub(crate) async fn verify_node_describe_event(
             info.ok_or(OpenError::MissingOnOpenInfo)?;
         }
         fio::NodeEvent::OnRepresentation { .. } => (),
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "24")]
         fio::NodeEvent::_UnknownEvent { .. } => (),
     }
 
@@ -289,7 +289,7 @@ pub(crate) async fn verify_directory_describe_event(
                 OpenError::UnexpectedNodeKind { expected: Kind::Directory, actual }
             })?;
         }
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "24")]
         fio::DirectoryEvent::_UnknownEvent { .. } => (),
     }
 
@@ -312,7 +312,7 @@ pub(crate) async fn verify_file_describe_event(
             let () = Kind::expect_file2(&payload)
                 .map_err(|actual| OpenError::UnexpectedNodeKind { expected: Kind::File, actual })?;
         }
-        #[cfg(fuchsia_api_level_at_least = "NEXT")]
+        #[cfg(fuchsia_api_level_at_least = "24")]
         fio::FileEvent::_UnknownEvent { .. } => (),
     }
 

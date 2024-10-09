@@ -174,7 +174,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
   }
 
   if ([[maybe_unused]] auto resolver = cpp17_get_if<Resolver>(&capability)) {
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(24)
     fuchsia::component::test::Resolver fidl_capability;
 
     fidl_capability.set_name(std::string(resolver->name));
@@ -191,7 +191,7 @@ fuchsia::component::test::Capability ConvertToFidl(Capability capability) {
   }
 
   if ([[maybe_unused]] auto runner = cpp17_get_if<Runner>(&capability)) {
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(24)
     fuchsia::component::test::Runner fidl_capability;
 
     fidl_capability.set_name(std::string(runner->name));

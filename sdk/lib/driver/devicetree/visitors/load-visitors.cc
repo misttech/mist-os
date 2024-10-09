@@ -43,7 +43,7 @@ zx::result<zx::vmo> SetVmoName(zx::vmo vmo, std::string_view vmo_name) {
 }
 
 zx::result<zx::vmo> LoadVisitorVmo(fdf::Namespace& incoming, std::string_view visitor_file) {
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(24)
   constexpr fio::Flags kVisitorOpenFlags = fio::Flags::kPermRead | fio::Flags::kPermExecute;
 #else
   constexpr fio::OpenFlags kVisitorOpenFlags =

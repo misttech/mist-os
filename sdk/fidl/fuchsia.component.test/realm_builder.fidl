@@ -172,9 +172,9 @@ type Capability = flexible union {
     7: config Config;
     @available(added=HEAD)
     8: dictionary Dictionary;
-    @available(added=NEXT)
+    @available(added=24)
     9: resolver Resolver;
-    @available(added=NEXT)
+    @available(added=24)
     10: runner Runner;
 };
 
@@ -382,7 +382,7 @@ type Dictionary = table {
 };
 
 /// A resolver capability
-@available(added=NEXT)
+@available(added=24)
 type Resolver = table {
     /// The name of the resolver.
     1: name fuchsia.component.name;
@@ -404,7 +404,7 @@ type Resolver = table {
 };
 
 /// A runner capability
-@available(added=NEXT)
+@available(added=24)
 type Runner = table {
     /// The name of the runner.
     1: name fuchsia.component.name;

@@ -262,7 +262,7 @@ mod fuchsia {
                     actual: Kind::kind_of2(&representation),
                 }),
             },
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "24")]
             fio::FileEvent::_UnknownEvent { .. } => Ok(None),
         }
     }

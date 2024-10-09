@@ -10,11 +10,11 @@
 #include <lib/fdf/dispatcher.h>
 #include <zircon/availability.h>
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(24)
 namespace fdf_testing::internal {
 #else
 namespace fdf_testing {
-#endif  // FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(24)
 
 // The |TestEnvironment| manages the mocked test environment that the driver being tested uses.
 // It provides the server backing the driver's incoming namespace. This incoming namespace can
@@ -58,10 +58,10 @@ class TestEnvironment final {
   async::synchronization_checker checker_;
 };
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(24)
 }  // namespace fdf_testing::internal
 #else
 }  // namespace fdf_testing
-#endif  // FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(24)
 
 #endif  // LIB_DRIVER_TESTING_CPP_INTERNAL_TEST_ENVIRONMENT_H_

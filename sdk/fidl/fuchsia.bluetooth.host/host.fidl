@@ -27,7 +27,7 @@ type ProtocolRequest = flexible resource union {
     3: gatt_server server_end:fuchsia.bluetooth.gatt.Server;
     4: gatt2_server server_end:fuchsia.bluetooth.gatt2.Server;
     5: profile server_end:fuchsia.bluetooth.bredr.Profile;
-    @available(added=NEXT)
+    @available(added=24)
     6: privileged_peripheral server_end:fuchsia.bluetooth.le.PrivilegedPeripheral;
 };
 

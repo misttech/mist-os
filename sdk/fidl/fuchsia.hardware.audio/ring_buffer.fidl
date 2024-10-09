@@ -343,7 +343,7 @@ type GetVmoError = strict enum {
     INTERNAL_ERROR = 2;
 };
 
-closed(removed=NEXT) open(added=NEXT) protocol RingBuffer {
+closed(removed=24) open(added=24) protocol RingBuffer {
     /// Accessor for top level static properties.
     strict GetProperties() -> (struct {
         properties RingBufferProperties;

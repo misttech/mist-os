@@ -169,7 +169,7 @@ type RealmArgs = resource table {
     /// capabilities available to it.
     /// Entries should be the component name (eg: "my_driver_component.cm").
     /// Default: empty
-    @available(added=NEXT)
+    @available(added=24)
     19: boot_driver_components vector<string:MAX>:MAX;
 };
 

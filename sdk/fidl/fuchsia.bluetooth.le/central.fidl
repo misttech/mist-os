@@ -93,7 +93,7 @@ closed protocol ScanResultWatcher {
 closed protocol Central {
     /// A [`Central`] may reserve L2CAP connection-oriented channels for
     /// receiving connections from peers.
-    @available(added=NEXT)
+    @available(added=24)
     compose ChannelListenerRegistry;
 
     /// Scans for nearby LE peripherals and broadcasters. If the scan cannot be
@@ -148,7 +148,7 @@ closed protocol Central {
     /// + request `options` Options used to configure the connection.
     /// + request `handle` Handle that remains valid for the duration of this
     ///   connection.
-    @available(added=NEXT)
+    @available(added=24)
     strict Connect(resource struct {
         id bt.PeerId;
         options ConnectionOptions;

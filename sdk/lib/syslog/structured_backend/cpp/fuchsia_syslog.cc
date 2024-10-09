@@ -343,7 +343,7 @@ class Encoder final {
 
   // Begins the log record.
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(24)
   void Begin(RecordState& state, zx::basic_time<ZX_CLOCK_BOOT> timestamp,
              FuchsiaLogSeverity severity) {
 #else
@@ -474,7 +474,7 @@ void LogBuffer::BeginRecord(FuchsiaLogSeverity severity,
                             uint32_t dropped_count, zx_koid_t pid, zx_koid_t tid) {
   // Initialize the encoder targeting the passed buffer, and begin the record.
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(24)
   auto time = zx::clock::get_boot();
 #else
   auto time = zx::clock::get_monotonic();

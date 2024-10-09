@@ -25,7 +25,7 @@ DriverBase::DriverBase(std::string_view name, DriverStartArgs start_args,
     return std::move(incoming.value());
   }();
   logger_ = [&incoming, this]() {
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(24)
     auto logger = Logger::Create2(incoming, dispatcher_, name_, FUCHSIA_LOG_INFO,
                                   logger_wait_for_initial_interest);
     return logger;

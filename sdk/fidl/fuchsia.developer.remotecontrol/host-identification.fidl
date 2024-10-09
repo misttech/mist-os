@@ -55,7 +55,7 @@ type IdentifyHostResponse = table {
     // for identification, the scope ID can serve as additional information,
     // but may tempt its use for connection, which might be incorrect.
     8: addresses vector<fuchsia.net.Subnet>:MAX;
-    @available(added=NEXT)
+    @available(added=24)
     // Boot identifier, guaranteed to be stable within a single boot
     // but changes every reboot. This should be assumed to be
     // a random number with no significance to its value

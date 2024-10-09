@@ -50,23 +50,23 @@ type RouteReport = table {
     6: availability fuchsia.component.decl.Availability;
 
     /// The overall outcome of routing.
-    @available(added=NEXT)
+    @available(added=24)
     7: outcome RouteOutcome;
 };
 
-@available(added=NEXT)
+@available(added=24)
 type RouteOutcome = flexible enum {
     /// Routing succeeded and returned a capability.
-    @available(added=NEXT)
+    @available(added=24)
     SUCCESS = 1;
 
     /// Routing terminated in a `void` source. This is a form of success but it's exposed as
     /// its own state so tooling can report it.
-    @available(added=NEXT)
+    @available(added=24)
     VOID = 2;
 
     /// Routing failed. This will be the state iff `RouteReport.error` is set.
-    @available(added=NEXT)
+    @available(added=24)
     FAILED = 3;
 };
 

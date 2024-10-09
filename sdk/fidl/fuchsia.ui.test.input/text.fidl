@@ -68,7 +68,7 @@ closed protocol KeyboardInputListener {
         2: non_printable fuchsia.ui.input3.NonPrintableKey;
 
         // Identifies the device originating this event.
-        @available(added=NEXT)
+        @available(added=24)
         3: device_id uint32;
     });
 };

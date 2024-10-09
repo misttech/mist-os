@@ -285,7 +285,7 @@ open protocol Profile {
         /// Required.
         3: results client_end:SearchResults;
         /// Required - only one of `full_uuid` or `service_uuid` should be present.
-        @available(added=NEXT)
+        @available(added=24)
         4: full_uuid fuchsia.bluetooth.Uuid;
     });
 

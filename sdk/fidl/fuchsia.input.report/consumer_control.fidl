@@ -32,11 +32,11 @@ type ConsumerControlButton = flexible enum : uint32 {
     CAMERA_DISABLE = 7;
 
     /// This button represents a function.
-    @available(added=NEXT)
+    @available(added=24)
     FUNCTION = 8;
 
     /// This button represents a power button.
-    @available(added=NEXT)
+    @available(added=24)
     POWER = 9;
 };
 

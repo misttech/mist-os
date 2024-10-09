@@ -132,7 +132,7 @@ closed protocol TouchInputListener {
         7: pointer_id uint32;
 
         // Identifies the device originating this event.
-        @available(added=NEXT)
+        @available(added=24)
         8: device_id uint32;
     });
 };

@@ -180,7 +180,7 @@ type WatchMask = strict bits : uint32 {
 };
 
 @discoverable
-closed(removed=NEXT) open(added=NEXT) protocol Directory {
+closed(removed=24) open(added=24) protocol Directory {
     compose Directory1;
     compose Directory2;
 };
@@ -221,7 +221,7 @@ closed protocol Openable {
 };
 
 /// Directory defines a node which is capable of containing other Objects.
-closed(removed=NEXT) open(added=NEXT) protocol Directory1 {
+closed(removed=24) open(added=24) protocol Directory1 {
     compose Node1;
     compose Openable;
 
