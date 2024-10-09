@@ -42,6 +42,8 @@ var diagnosticCmds = []Command{
 	{[]string{"iquery", "show", "bootstrap/driver_manager"}, 10 * time.Second},
 	// Print netstack goroutines while only using shell-builtin commands to
 	// avoid hitting the package resolver.
+	//
+	// TODO(https://fxbug.dev/372466789): Remove this command once Netstack2 has been deleted.
 	{[]string{`(export PATH=; export P="$(component explore /core/network/netstack -c \"cat out/debug/goroutines\")" && test -e "$P" && while IFS='' read line; do echo "$line"; done < "$P";) &`}, 1 * time.Minute},
 	{syslog.LogListenerWithArgs("--dump_logs", "yes"), 1 * time.Minute},
 }
