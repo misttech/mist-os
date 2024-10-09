@@ -13,9 +13,11 @@
 #include <lib/mistos/starnix/kernel/vfs/buffers/io_buffers.h>
 #include <lib/mistos/starnix/kernel/vfs/dir_entry.h>
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
+#include <lib/mistos/starnix/kernel/vfs/fs_context.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/kernel/vfs/lookup_context.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace.h>
+#include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/open_flags.h>
 #include <lib/mistos/util/error_propagation.h>
@@ -23,6 +25,8 @@
 #include <trace.h>
 
 #include <ktl/optional.h>
+#include <ktl/span.h>
+#include <ktl/variant.h>
 
 #include "../kernel_priv.h"
 
@@ -75,6 +79,8 @@ struct LookupFlags {
   bool automount = false;
 
   // impl LookupFlags
+  static LookupFlags no_follow() { return LookupFlags{.symlink_mode = SymlinkMode::NoFollow}; }
+
   static fit::result<Errno, LookupFlags> from_bits(uint32_t flags, uint32_t allowed_flags) {
     if ((flags & ~allowed_flags) != 0) {
       return fit::error(errno(EINVAL));
@@ -251,6 +257,58 @@ fit::result<Errno> sys_newfstatat(const CurrentTask& current_task, FdNumber dir_
       _EP(lflags);
   auto name = lookup_at(current_task, dir_fd, user_path, lflags.value()) _EP(name);
   auto result = name->entry->node_->stat(current_task) _EP(result);
+  return fit::ok();
+}
+
+fit::result<Errno, size_t> sys_readlinkat(const CurrentTask& current_task, FdNumber dir_fd,
+                                          starnix_uapi::UserCString user_path,
+                                          starnix_uapi::UserAddress buffer, size_t buffer_size) {
+  auto path = current_task.read_c_string_to_vec(user_path, static_cast<size_t>(PATH_MAX)) _EP(path);
+  auto lookup_flags = [&]() -> fit::result<Errno, LookupFlags> {
+    if (path->empty()) {
+      if (dir_fd == FdNumber::AT_FDCWD_) {
+        return fit::error(errno(ENOENT));
+      }
+      return fit::ok(LookupFlags{.allow_empty_path = true, .symlink_mode = SymlinkMode::NoFollow});
+    }
+    return fit::ok(LookupFlags::no_follow());
+  }() _EP(lookup_flags);
+
+  auto name = lookup_at(current_task, dir_fd, user_path, lookup_flags.value()) _EP(name);
+
+  auto result = name->readlink(current_task) _EP(result);
+  auto target = [&]() -> FsString {
+    return ktl::visit(
+        SymlinkTarget::overloaded{
+            [](FsString path) { return path; },
+            [&current_task](NamespaceNode node) { return node.path(*current_task.operator->()); },
+        },
+        result->value);
+  }();
+
+  if (buffer_size == 0) {
+    return fit::error(errno(EINVAL));
+  }
+
+  // Cap the returned length at buffer_size.
+  auto length = ktl::min(buffer_size, target.size());
+  _EP(current_task->write_memory(
+      buffer, ktl::span<const uint8_t>(reinterpret_cast<const uint8_t*>(target.data()), length)));
+  return fit::ok(length);
+}
+
+fit::result<Errno> sys_mkdirat(const CurrentTask& current_task, FdNumber dir_fd,
+                               starnix_uapi::UserCString user_path, starnix_uapi::FileMode mode) {
+  auto path = current_task.read_c_string_to_vec(user_path, static_cast<size_t>(PATH_MAX)) _EP(path);
+
+  if (path->empty()) {
+    return fit::error(errno(ENOENT));
+  }
+  auto lc = LookupContext::Default();
+  auto result = current_task.lookup_parent_at(lc, dir_fd, path.value()) _EP(result);
+  auto [parent, basename] = result.value();
+  _EP(parent.create_node(current_task, basename, mode.with_type(FileMode::IFDIR),
+                         DeviceType::NONE));
   return fit::ok();
 }
 
