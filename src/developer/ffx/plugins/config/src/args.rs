@@ -42,22 +42,13 @@ pub struct SetCommand {
     #[argh(positional, from_str_fn(parse_set_value))]
     /// value to associate with name
     pub value: serde_json::Value,
-
-    #[argh(option, default = "ConfigLevel::User", short = 'l')]
-    /// config level. Possible values are "user", "build", "global". Defaults to "user".
-    pub level: ConfigLevel,
-
-    #[argh(option, short = 'b')]
-    /// an optional build directory to associate the build config provided - used for "build"
-    /// configs. If not provided, it may attempt to autodiscover your active build directory.
-    pub build_dir: Option<PathBuf>,
 }
 
 impl SetCommand {
     pub fn query<'a>(&'a self, ctx: &'a EnvironmentContext) -> ConfigQuery<'a> {
         ConfigQuery::new(
             Some(self.name.as_str()),
-            Some(self.level),
+            Some(ConfigLevel::User),
             SelectMode::default(),
             Some(ctx),
         )
@@ -102,11 +93,6 @@ pub struct GetCommand {
     /// If the value is "all", all values across all configuration levels are aggregrated and
     /// returned. Currently only supported if a name is given.
     pub select: SelectMode,
-
-    #[argh(option, short = 'b')]
-    /// an optional build directory to associate the build config provided - used for "build"
-    /// configs. If not provided, it may attempt to autodiscover your active build directory.
-    pub build_dir: Option<PathBuf>,
 }
 
 impl GetCommand {
@@ -119,7 +105,7 @@ impl GetCommand {
 #[argh(
     subcommand,
     name = "remove",
-    description = "remove config for a given level",
+    description = "remove user level config values",
     note = "This will remove the entire value for the given name.  If the value is a subtree or \
        array, the entire subtree or array will be removed.  If you want to remove a specific value \
        from an array, consider editing the configuration file directly.  Configuration file \
@@ -129,22 +115,13 @@ pub struct RemoveCommand {
     #[argh(positional)]
     /// name of the config property
     pub name: String,
-
-    #[argh(option, default = "ConfigLevel::User", short = 'l')]
-    /// config level. Possible values are "user", "build", "global". Defaults to "user".
-    pub level: ConfigLevel,
-
-    #[argh(option, short = 'b')]
-    /// an optional build directory to associate the build config provided - used for "build"
-    /// configs. If not provided, it may attempt to autodiscover your active build directory.
-    pub build_dir: Option<PathBuf>,
 }
 
 impl RemoveCommand {
     pub fn query<'a>(&'a self, ctx: &'a EnvironmentContext) -> ConfigQuery<'a> {
         ConfigQuery::new(
             Some(self.name.as_str()),
-            Some(self.level),
+            Some(ConfigLevel::User),
             SelectMode::default(),
             Some(ctx),
         )
@@ -170,22 +147,13 @@ pub struct AddCommand {
     #[argh(positional)]
     /// value to add to name
     pub value: String,
-
-    #[argh(option, default = "ConfigLevel::User", short = 'l')]
-    /// config level. Possible values are "user", "build", "global". Defaults to "user".
-    pub level: ConfigLevel,
-
-    #[argh(option, short = 'b')]
-    /// an optional build directory to associate the build config provided - used for "build"
-    /// configs. If not provided, it may attempt to autodiscover your active build directory.
-    pub build_dir: Option<PathBuf>,
 }
 
 impl AddCommand {
     pub fn query<'a>(&'a self, ctx: &'a EnvironmentContext) -> ConfigQuery<'a> {
         ConfigQuery::new(
             Some(self.name.as_str()),
-            Some(self.level),
+            Some(ConfigLevel::User),
             SelectMode::default(),
             Some(ctx),
         )
@@ -216,11 +184,6 @@ pub struct EnvSetCommand {
     #[argh(option, default = "ConfigLevel::User", short = 'l')]
     /// config level. Possible values are "user", "build", "global". Defaults to "user".
     pub level: ConfigLevel,
-
-    #[argh(option, short = 'b')]
-    /// an optional build directory to associate the build config provided - used for "build"
-    /// configs. If not provided, it may attempt to autodiscover your active build directory.
-    pub build_dir: Option<PathBuf>,
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -340,7 +303,6 @@ mod tests {
                         access: Some(EnvAccessCommand::Set(EnvSetCommand {
                             level: expected_level,
                             file: "/test/config.json".into(),
-                            build_dir: Some("/test/".into()),
                         })),
                     })
                 })
@@ -354,24 +316,13 @@ mod tests {
         ];
 
         for level_opt in levels.iter() {
-            check(
-                &[
-                    "env",
-                    "set",
-                    "/test/config.json",
-                    "--level",
-                    &level_opt.0,
-                    "--build-dir",
-                    "/test/",
-                ],
-                level_opt.1,
-            );
+            check(&["env", "set", "/test/config.json", "--level", &level_opt.0], level_opt.1);
         }
     }
 
     #[test]
     fn test_get() {
-        fn check(args: &[&str], expected_key: &str, expected_build_dir: Option<PathBuf>) {
+        fn check(args: &[&str], expected_key: &str) {
             assert_eq!(
                 ConfigCommand::from_args(CMD_NAME, args),
                 Ok(ConfigCommand {
@@ -379,35 +330,24 @@ mod tests {
                         process: MappingMode::Substitute,
                         select: SelectMode::First,
                         name: Some(expected_key.to_string()),
-                        build_dir: expected_build_dir,
                     })
                 })
             )
         }
 
         let key = "test-key";
-        let build_dir = "/test/";
-        check(&["get", key], key, None);
-        check(&["get", key, "--build-dir", build_dir], key, Some(build_dir.into()));
+        check(&["get", key], key);
     }
 
     #[test]
     fn test_set() {
-        fn check(
-            args: &[&str],
-            expected_level: ConfigLevel,
-            expected_key: &str,
-            expected_value: &serde_json::Value,
-            expected_build_dir: Option<PathBuf>,
-        ) {
+        fn check(args: &[&str], expected_key: &str, expected_value: &serde_json::Value) {
             assert_eq!(
                 ConfigCommand::from_args(CMD_NAME, args),
                 Ok(ConfigCommand {
                     sub: SubCommand::Set(SetCommand {
-                        level: expected_level,
                         name: expected_key.to_string(),
                         value: expected_value.clone(),
-                        build_dir: expected_build_dir,
                     })
                 })
             )
@@ -416,48 +356,18 @@ mod tests {
         let key = "test-key";
         let value = "test-value";
         let value_json = serde_json::Value::String(value.to_string());
-        let build_dir = "/test/";
-        let levels = [
-            ("build", ConfigLevel::Build),
-            ("user", ConfigLevel::User),
-            ("global", ConfigLevel::Global),
-        ];
-
-        for level_opt in levels.iter() {
-            check(
-                &["set", key, value, "--level", level_opt.0],
-                level_opt.1,
-                key,
-                &value_json,
-                None,
-            );
-            check(
-                &["set", key, value, "--level", level_opt.0, "--build-dir", build_dir],
-                level_opt.1,
-                key,
-                &value_json,
-                Some(build_dir.into()),
-            );
-        }
+        check(&["set", key, value], key, &value_json);
     }
 
     #[test]
     fn test_set_json() {
-        fn check(
-            args: &[&str],
-            expected_level: ConfigLevel,
-            expected_key: &str,
-            expected_value: &serde_json::Value,
-            expected_build_dir: Option<PathBuf>,
-        ) {
+        fn check(args: &[&str], expected_key: &str, expected_value: &serde_json::Value) {
             assert_eq!(
                 ConfigCommand::from_args(CMD_NAME, args),
                 Ok(ConfigCommand {
                     sub: SubCommand::Set(SetCommand {
-                        level: expected_level,
                         name: expected_key.to_string(),
                         value: expected_value.clone(),
-                        build_dir: expected_build_dir,
                     })
                 })
             )
@@ -466,67 +376,22 @@ mod tests {
         let key = "test-key";
         let value = "{\"test\": \"test-value\"}";
         let value_json = serde_json::json!({"test": "test-value"});
-        let build_dir = "/test/";
-        let levels = [
-            ("build", ConfigLevel::Build),
-            ("user", ConfigLevel::User),
-            ("global", ConfigLevel::Global),
-        ];
 
-        for level_opt in levels.iter() {
-            check(
-                &["set", key, value, "--level", level_opt.0],
-                level_opt.1,
-                key,
-                &value_json,
-                None,
-            );
-            check(
-                &["set", key, value, "--level", level_opt.0, "--build-dir", build_dir],
-                level_opt.1,
-                key,
-                &value_json,
-                Some(build_dir.into()),
-            );
-        }
+        check(&["set", key, value], key, &value_json);
     }
 
     #[test]
     fn test_remove() {
-        fn check(
-            args: &[&str],
-            expected_level: ConfigLevel,
-            expected_key: &str,
-            expected_build_dir: Option<PathBuf>,
-        ) {
+        fn check(args: &[&str], expected_key: &str) {
             assert_eq!(
                 ConfigCommand::from_args(CMD_NAME, args),
                 Ok(ConfigCommand {
-                    sub: SubCommand::Remove(RemoveCommand {
-                        level: expected_level,
-                        name: expected_key.to_string(),
-                        build_dir: expected_build_dir,
-                    })
+                    sub: SubCommand::Remove(RemoveCommand { name: expected_key.to_string() })
                 })
             )
         }
 
         let key = "test-key";
-        let build_dir = "/test/";
-        let levels = [
-            ("build", ConfigLevel::Build),
-            ("user", ConfigLevel::User),
-            ("global", ConfigLevel::Global),
-        ];
-
-        for level_opt in levels.iter() {
-            check(&["remove", key, "--level", level_opt.0], level_opt.1, key, None);
-            check(
-                &["remove", key, "--level", level_opt.0, "--build-dir", build_dir],
-                level_opt.1,
-                key,
-                Some(build_dir.into()),
-            );
-        }
+        check(&["remove", key], key);
     }
 }

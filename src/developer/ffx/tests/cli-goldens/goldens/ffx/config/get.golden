@@ -34,18 +34,6 @@
       "short": "s",
       "description": "how to collect results. Possible values are \"first\" and \"all\".  Defaults to \"first\".  If the value is \"first\", the first value found in terms of priority is returned. If the value is \"all\", all values across all configuration levels are aggregrated and returned. Currently only supported if a name is given.",
       "hidden": false
-    },
-    {
-      "kind": {
-        "Option": {
-          "arg_name": "build-dir"
-        }
-      },
-      "optionality": "optional",
-      "long": "--build-dir",
-      "short": "b",
-      "description": "an optional build directory to associate the build config provided - used for \"build\" configs. If not provided, it may attempt to autodiscover your active build directory.",
-      "hidden": false
     }
   ],
   "notes": [],

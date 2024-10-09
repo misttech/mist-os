@@ -655,7 +655,7 @@ mod test {
 
         let value = persistent_config.get("name", SelectMode::First);
         assert!(value.is_some());
-        assert_eq!(value.unwrap(), Value::String(String::from("Build")));
+        assert_eq!(value.unwrap(), Value::String(String::from("User")));
 
         let mut user_file_out = String::new();
         let mut build_file_out = String::new();
@@ -699,8 +699,8 @@ mod test {
 
         let mut test_iter = test.iter();
         assert_eq!(test_iter.next(), Some(Some(&test.runtime)));
-        assert_eq!(test_iter.next(), Some(test.build.as_ref().map(|file| &file.contents)));
         assert_eq!(test_iter.next(), Some(test.user.as_ref().map(|file| &file.contents)));
+        assert_eq!(test_iter.next(), Some(test.build.as_ref().map(|file| &file.contents)));
         assert_eq!(test_iter.next(), Some(test.global.as_ref().map(|file| &file.contents)));
         assert_eq!(test_iter.next(), Some(Some(&test.default)));
         assert_eq!(test_iter.next(), None);
@@ -719,8 +719,8 @@ mod test {
 
         let mut test_iter = test.iter();
         assert_eq!(test_iter.next(), Some(Some(&test.runtime)));
-        assert_eq!(test_iter.next(), Some(test.build.as_ref().map(|file| &file.contents)));
         assert_eq!(test_iter.next(), Some(test.user.as_ref().map(|file| &file.contents)));
+        assert_eq!(test_iter.next(), Some(test.build.as_ref().map(|file| &file.contents)));
         assert_eq!(test_iter.next(), Some(test.global.as_ref().map(|file| &file.contents)));
         assert_eq!(test_iter.next(), Some(Some(&test.default)));
         assert_eq!(test_iter.next(), None);
@@ -739,7 +739,7 @@ mod test {
 
         let value = test.get("name", SelectMode::First);
         assert!(value.is_some());
-        assert_eq!(value.unwrap(), Value::String(String::from("Build")));
+        assert_eq!(value.unwrap(), Value::String(String::from("User")));
 
         let test_build = Config {
             user: Some(ConfigFile::from_buf(None, BufReader::new(USER), true)),
@@ -828,7 +828,7 @@ mod test {
             default: serde_json::from_slice(DEFAULT)?,
             runtime: ConfigMap::default(),
         };
-        test.set("name", ConfigLevel::Build, Value::String(String::from("build-test")))?;
+        test.set("name", ConfigLevel::User, Value::String(String::from("build-test")))?;
         let value = test.get("name", SelectMode::First);
         assert!(value.is_some());
         assert_eq!(value.unwrap(), Value::String(String::from("build-test")));
@@ -845,32 +845,32 @@ mod test {
             runtime: ConfigMap::default(),
         };
         assert!(test.set(
-            "name",
+            "name1",
             ConfigLevel::Build,
             Value::String(String::from("build-test1"))
         )?);
         assert_eq!(
-            test.get("name", SelectMode::First).unwrap(),
+            test.get("name1", SelectMode::First).unwrap(),
             Value::String(String::from("build-test1"))
         );
 
         assert!(!test.set(
-            "name",
+            "name1",
             ConfigLevel::Build,
             Value::String(String::from("build-test1"))
         )?);
         assert_eq!(
-            test.get("name", SelectMode::First).unwrap(),
+            test.get("name1", SelectMode::First).unwrap(),
             Value::String(String::from("build-test1"))
         );
 
         assert!(test.set(
-            "name",
+            "name1",
             ConfigLevel::Build,
             Value::String(String::from("build-test2"))
         )?);
         assert_eq!(
-            test.get("name", SelectMode::First).unwrap(),
+            test.get("name1", SelectMode::First).unwrap(),
             Value::String(String::from("build-test2"))
         );
 
@@ -900,14 +900,16 @@ mod test {
         let value_global = test.get("name", SelectMode::First);
         assert!(value_global.is_some());
         assert_eq!(value_global.unwrap(), Value::String(String::from("global")));
-        test.set("name", ConfigLevel::User, Value::String(String::from("user")))?;
-        let value_user = test.get("name", SelectMode::First);
-        assert!(value_user.is_some());
-        assert_eq!(value_user.unwrap(), Value::String(String::from("user")));
+
         test.set("name", ConfigLevel::Build, Value::String(String::from("build")))?;
         let value_build = test.get("name", SelectMode::First);
         assert!(value_build.is_some());
         assert_eq!(value_build.unwrap(), Value::String(String::from("build")));
+
+        test.set("name", ConfigLevel::User, Value::String(String::from("user")))?;
+        let value_user = test.get("name", SelectMode::First);
+        assert!(value_user.is_some());
+        assert_eq!(value_user.unwrap(), Value::String(String::from("user")));
         Ok(())
     }
 
@@ -1256,8 +1258,8 @@ mod test {
                 assert_eq!(v.len(), 5);
                 let mut v = v.into_iter();
                 assert_eq!(v.next(), Some(Value::String("Runtime".to_string())));
-                assert_eq!(v.next(), Some(Value::String("Build".to_string())));
                 assert_eq!(v.next(), Some(Value::String("User".to_string())));
+                assert_eq!(v.next(), Some(Value::String("Build".to_string())));
                 assert_eq!(v.next(), Some(Value::String("Global".to_string())));
                 assert_eq!(v.next(), Some(Value::String("Default".to_string())));
             }

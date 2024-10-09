@@ -50,14 +50,20 @@ pub mod macro_deps {
 // If you edit this enum, make sure to also change the enum counter below to match.
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Hash)]
 pub enum ConfigLevel {
-    /// Default configurations are provided through GN build rules across all subcommands and are hard-coded and immutable.
+    /// Default configurations are provided through GN build rules across all subcommands and are
+    ///  hard-coded and immutable.
     Default,
-    /// Global configuration is intended to be a system-wide configuration level.
+    /// Global configuration is intended to be a system-wide configuration level. It is intended to
+    /// be used when installing ffx on a host system to set organizational
+    /// properties that would be the same for a collection of users.
     Global,
-    /// User configuration is configuration set in the user's home directory and applies to all invocations of ffx by that user.
-    User,
-    /// Build configuration is associated with a build directory.
+    /// Build configuration is associated with a build directory. It is intended to be used to set
+    /// properties describing the output of the build. It should be generated as part of the build
+    /// process, and is considered read-only by ffx.
     Build,
+    /// User configuration is configuration set in the user's home directory and applies to all
+    /// invocations of ffx by that user. User configuration can be overridden only at runtime.
+    User,
     /// Runtime configuration is set by the user when invoking ffx, and can't be 'set' by any other means.
     Runtime,
 }
@@ -72,9 +78,9 @@ impl ConfigLevel {
         match current {
             Some(Default) => None,
             Some(Global) => Some(Default),
-            Some(User) => Some(Global),
-            Some(Build) => Some(User),
-            Some(Runtime) => Some(Build),
+            Some(Build) => Some(Global),
+            Some(User) => Some(Build),
+            Some(Runtime) => Some(User),
             None => Some(Runtime),
         }
     }
