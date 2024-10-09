@@ -200,6 +200,7 @@ class AudioCompositeServer final
   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_;
   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_;
   std::vector<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> gpio_sclk_clients_;
+  bool first_ring_buffer_has_been_created_ = false;
   bool soc_power_started_ = false;
   zx::time last_started_time_;
   zx::time last_stopped_time_;
