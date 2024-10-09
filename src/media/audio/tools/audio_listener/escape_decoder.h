@@ -5,10 +5,9 @@
 #define SRC_MEDIA_AUDIO_TOOLS_AUDIO_LISTENER_ESCAPE_DECODER_H_
 
 #include <cstdint>
-#include <cstdio>
 
 // This class enables the capturing of four arrow keys. Each is decoded as a three-key sequence
-// Esc+[ (Escape OpenBracket) plus 'A' for up, 'B' for down, 'C' for right, 'D' for right.
+// Esc+[ (Escape OpenBracket) plus 'A' for up, 'B' for down, 'C' for right, 'D' for left.
 // No other escape-key sequences are supported.
 //
 // In state 0, Esc changes state_ to 1 and is otherwise ignored; all other chars are decoded as-is.
