@@ -53,6 +53,9 @@ constexpr double kEpsilon = 0.5f;
 // Touch up is expressed in two: btn_touch, Phase Remove.
 constexpr size_t kDownUpNumEvents = 4;
 
+// Timeout for reading from touch dump socket.
+constexpr zx::duration kSocketTimeout = zx::min(3);
+
 struct TouchEvent {
   float local_x;  // The x-position, in the client's coordinate space.
   float local_y;  // The y-position, in the client's coordinate space.
@@ -249,6 +252,7 @@ class StarnixTouchTest : public ui_testing::PortableUITest {
             FX_LOGS(FATAL) << "unexpected event code in touch event seq, code=" << pkt.code;
         }
       }
+      FX_LOGS(INFO) << "Read " << result.size() << " events of " << num_expected;
     }
 
     EXPECT_EQ(result.size(), num_expected);
@@ -335,7 +339,8 @@ class StarnixTouchTest : public ui_testing::PortableUITest {
     zx_signals_t actual_signals;
 
     FX_LOGS(INFO) << "Waiting for socket to be readable";
-    res = local_socket_.wait_one(ZX_SOCKET_READABLE, zx::time(ZX_TIME_INFINITE), &actual_signals);
+    res = local_socket_.wait_one(ZX_SOCKET_READABLE, zx::deadline_after(kSocketTimeout),
+                                 &actual_signals);
     FX_CHECK(res == ZX_OK) << "wait_one() returned " << zx_status_get_string(res);
     FX_CHECK(actual_signals & ZX_SOCKET_READABLE)
         << "expected signals to include ZX_SOCKET_READABLE, but actual_signals=" << actual_signals;
