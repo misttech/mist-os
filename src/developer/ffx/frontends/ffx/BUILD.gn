@@ -133,7 +133,9 @@ host_test_data("ffx-e2e-test-data") {
   ]
 }
 
-group("tests") {
+group("e2e_tests") {
+  # These are end to end tests, which are different from host-tests since
+  # e2e tests require devices and/or complete images or product bundles.
   testonly = true
   public_deps = [
     # ffx end to end tests, through `ffx self-test` invocations, one includes
@@ -141,7 +143,12 @@ group("tests") {
     # target present.
     ":ffx-e2e-with-target($host_toolchain)",
     ":ffx-e2e-without-target($host_toolchain)",
+  ]
+}
 
+group("tests") {
+  testonly = true
+  public_deps = [
     # Most ffx plugin test suites are included downstream of the group defined
     # by the ffx template above.
     ":ffx_tests($host_toolchain)",
