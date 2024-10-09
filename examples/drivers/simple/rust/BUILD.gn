@@ -1,0 +1,46 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bind/bind.gni")
+import("//build/components.gni")
+import("//build/drivers.gni")
+import("//build/rust/rustc_cdylib.gni")
+import("//build/rust/rustc_staticlib.gni")
+
+driver_bind_rules("bind") {
+  rules = "meta/rust-driver.bind"
+  bind_output = "rust.bindbc"
+  deps = [ "//examples/drivers/bind/bindlib:gizmo.example" ]
+}
+
+fuchsia_rust_driver("driver") {
+  edition = "2021"
+
+  output_name = "simple_rust_driver"
+  sources = [ "src/lib.rs" ]
+  deps = [
+    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_rust",
+    "//sdk/lib/driver/component/rust",
+    "//sdk/lib/driver/runtime/rust",
+    "//sdk/rust/zx",
+    "//src/devices/bind/fuchsia.test:fuchsia.test_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//third_party/rust_crates:tracing",
+  ]
+}
+
+fuchsia_driver_component("component") {
+  component_name = "simple_rust_driver"
+  manifest = "meta/rust-driver.cml"
+  deps = [
+    ":bind",
+    ":driver",
+  ]
+  info = "meta/component-info.json"
+}
+
+fuchsia_driver_package("pkg") {
+  package_name = "simple_rust_driver"
+  driver_components = [ ":component" ]
+}
