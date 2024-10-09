@@ -52,6 +52,7 @@ go_library("targets") {
     "auxiliary_test.go",
     "device.go",
     "device_test.go",
+    "emulator.go",
     "errors.go",
     "gce.go",
     "gce_test.go",

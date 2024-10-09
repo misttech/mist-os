@@ -608,7 +608,7 @@ func runTestOnce(
 	//
 	// This is a bit of a hack, but is a lesser evil than extending the
 	// testrunner CLI just to sidecar the information of 'is QEMU'.
-	againstQEMU := os.Getenv(botanistconstants.NodenameEnvKey) == targets.DefaultQEMUNodename
+	againstQEMU := os.Getenv(botanistconstants.NodenameEnvKey) == targets.DefaultEmulatorNodename
 	if _, ok := t.(*FuchsiaSerialTester); ok && againstQEMU {
 		multistdout = io.MultiWriter(stdio, stdoutForParsing)
 	}
