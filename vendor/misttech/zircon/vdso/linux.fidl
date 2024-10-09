@@ -6,7 +6,9 @@ library zx;
 alias new_utsname = byte;
 alias statx = byte;
 alias stat = byte;
+alias rusage = byte;
 
+//alias Pid = int32;
 @no_protocol_prefix
 @transport("Syscall")
 closed protocol Linux {
@@ -255,28 +257,56 @@ closed protocol Linux {
     // STUB 55
     strict A0055Getsockopt() -> () error int64;
 
-    // STUB 56
-    strict A0056Clone() -> () error int64;
+    // #56, SYSCALL_DEFINE5(clone, unsigned long, clone_flags, unsigned long, newsp,
+    // int __user *, parent_tidptr, int __user *, child_tidptr, unsigned long, tls)
+    strict A0056Clone(resource struct {
+        clone_flags uint64;
+        newsp uint64;
+        @out
+        parent_tidptr int32;
+        @out
+        child_tidptr int32;
+        tls uint64;
+    }) -> () error int64;
 
-    // STUB 57
+    // #57, SYSCALL_DEFINE0(fork)
     strict A0057Fork() -> () error int64;
 
-    // STUB 58
+    // #58, SYSCALL_DEFINE0(vfork)
     strict A0058Vfork() -> () error int64;
 
-    // STUB 59
-    strict A0059Execve() -> () error int64;
+    // #59, SYSCALL_DEFINE3(execve, const char __user *, filename,
+    // const char __user *const __user *, argv,
+    // const char __user *const __user *, envp)
+    strict A0059Execve(resource struct {
+        @in
+        filename experimental_pointer<uchar>;
+        @in
+        argv experimental_pointer<uchar>;
+        @in
+        envp experimental_pointer<uchar>;
+    }) -> () error int64;
 
     // #60, SYSCALL_DEFINE1(exit, int, error_code)
     strict A0060Exit(resource struct {
         error_code int32;
     }) -> () error int64;
 
-    // STUB 61
-    strict A0061Wait4() -> () error int64;
+    // #61, SYSCALL_DEFINE4(wait4, pid_t, upid, int __user *, stat_addr, int, options, struct rusage __user *, ru)
+    strict A0061Wait4(resource struct {
+        upid int32;
+        @in
+        stat_addr experimental_pointer<int32>;
+        options int32;
+        @in
+        ru experimental_pointer<rusage>;
+    }) -> () error int64;
 
-    // STUB 62
-    strict A0062Kill() -> () error int64;
+    // #62, SYSCALL_DEFINE2(kill, pid_t, pid, int, sig)
+    strict A0062Kill(resource struct {
+        pid int32;
+        sig int32;
+    }) -> () error int64;
 
     // #63, SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)
     strict A0063Uname() -> (resource struct {
@@ -803,8 +833,10 @@ closed protocol Linux {
     // STUB 230
     strict A0230ClockNanosleep() -> () error int64;
 
-    // STUB 231
-    strict A0231ExitGroup() -> () error int64;
+    // #231, SYSCALL_DEFINE1(exit_group, int, error_code)
+    strict A0231ExitGroup(resource struct {
+        error_code int32;
+    }) -> () error int64;
 
     // STUB 232
     strict A0232EpollWait() -> () error int64;
@@ -1099,8 +1131,20 @@ closed protocol Linux {
     // STUB 321
     strict A0321Bpf() -> () error int64;
 
-    // STUB 322
-    strict A0322Execveat() -> () error int64;
+    // #322, SYSCALL_DEFINE5(execveat, int, fd, const char __user *, filename,
+    // const char __user *const __user *, argv,
+    // const char __user *const __user *, envp,
+    // int, flags)
+    strict A0322Execveat(resource struct {
+        fd int32;
+        @in
+        filename experimental_pointer<uchar>;
+        @in
+        argv experimental_pointer<uchar>;
+        @in
+        envp experimental_pointer<uchar>;
+        flags int32;
+    }) -> () error int64;
 
     // STUB 323
     strict A0323Userfaultfd() -> () error int64;
