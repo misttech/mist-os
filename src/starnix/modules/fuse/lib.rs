@@ -2427,10 +2427,15 @@ impl FuseResponse {
 
 #[repr(C)]
 #[derive(Clone, Debug, KnownLayout, FromBytes, IntoBytes, Immutable)]
-pub struct CreateResponse {
+struct CreateResponse {
     entry: uapi::fuse_entry_out,
     open: uapi::fuse_open_out,
 }
+
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(CreateResponse, open),
+    std::mem::size_of::<uapi::fuse_entry_out>()
+);
 
 impl FuseOperation {
     fn serialize(&self, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
