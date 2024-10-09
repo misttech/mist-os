@@ -262,11 +262,22 @@ impl Mtu {
         let Self(mtu) = self;
         *mtu
     }
+
+    /// Creates a new `Mtu` with the maximum possible representation.
+    pub const fn max() -> Self {
+        Self(u32::MAX)
+    }
 }
 
 impl From<Mtu> for u32 {
     fn from(Mtu(mtu): Mtu) -> Self {
         mtu
+    }
+}
+
+impl From<Mtu> for usize {
+    fn from(Mtu(mtu): Mtu) -> Self {
+        mtu.try_into().expect("mtu must fit usize")
     }
 }
 

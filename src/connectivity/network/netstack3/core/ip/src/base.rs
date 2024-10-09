@@ -4065,8 +4065,9 @@ pub struct SendIpPacketMeta<I: IpExt, D, Src> {
 
     /// An MTU to artificially impose on the whole IP packet.
     ///
-    /// Note that the device's MTU will still be imposed on the packet.
-    pub mtu: Option<u32>,
+    /// Note that the device's and discovered path MTU may still be imposed on
+    /// the packet.
+    pub mtu: Mtu,
 
     /// Traffic Class (IPv6) or Type of Service (IPv4) field for the packet.
     pub dscp_and_ecn: DscpAndEcn,
@@ -4224,14 +4225,11 @@ where
 
     let body = body.encapsulate(builder);
 
-    if let Some(mtu) = mtu {
-        let body = NestedWithInnerIpPacket::new(body.with_size_limit(mtu as usize));
-        send_ip_frame(core_ctx, bindings_ctx, device, destination, body, packet_metadata)
-            .map_err(|ser| ser.map_serializer(|s| s.into_inner()).into_inner())
-    } else {
-        send_ip_frame(core_ctx, bindings_ctx, device, destination, body, packet_metadata)
-            .map_err(|ser| ser.into_inner())
-    }
+    // TODO(https://fxbug.dev/371593049): Enforce the minimum limit between the
+    // requested value and the device's MTU.
+    let body = NestedWithInnerIpPacket::new(body.with_size_limit(mtu.into()));
+    send_ip_frame(core_ctx, bindings_ctx, device, destination, body, packet_metadata)
+        .map_err(|ser| ser.map_serializer(|s| s.into_inner()).into_inner())
 }
 
 /// Abstracts access to a [`filter::FilterHandler`] for core contexts.

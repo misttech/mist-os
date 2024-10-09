@@ -55,7 +55,6 @@ impl<I: IpExt, C, P: DeviceIdContext<AnyDevice>> IpSocketHandler<I, C>
         _ctx: &mut C,
         _socket: &IpSock<I, Self::WeakDeviceId>,
         _body: S,
-        _mtu: Option<u32>,
         _options: &O,
     ) -> Result<(), IpSockSendError> {
         self.uninstantiable_unreachable()

@@ -18,7 +18,7 @@ use netstack3_ip::marker::OptionDelegationMarker;
 
 use derivative::Derivative;
 use either::Either;
-use net_types::ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv6};
+use net_types::ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv6, Mtu};
 use net_types::{MulticastAddr, MulticastAddress as _, SpecifiedAddr, Witness, ZonedAddr};
 use netstack3_base::socket::{
     self, BoundSocketMap, ConnAddr, ConnInfoAddr, ConnIpAddr, DualStackConnIpAddr,
@@ -587,6 +587,10 @@ impl<I: IpExt, D: WeakDeviceIdentifier> SendOptions<I> for DatagramIpSpecificSoc
 
     fn dscp_and_ecn(&self) -> DscpAndEcn {
         self.dscp_and_ecn
+    }
+
+    fn mtu(&self) -> Mtu {
+        Mtu::max()
     }
 }
 
@@ -3463,7 +3467,6 @@ fn send_oneshot<I: IpExt, S: DatagramSocketSpec, CC: IpSocketHandler<I, BC>, BC,
                     },
                 )
             },
-            None,
         )
         .map_err(|err| match err {
             SendOneShotIpPacketError::CreateAndSendError { err } => SendToError::CreateAndSend(err),
@@ -4227,7 +4230,7 @@ where
                         S::make_packet::<I, _>(body, &ip).map_err(SendError::SerializeError)?;
                     DatagramBoundStateContext::with_transport_context(core_ctx, |core_ctx| {
                         core_ctx
-                            .send_ip_packet(bindings_ctx, &socket, packet, None, &options)
+                            .send_ip_packet(bindings_ctx, &socket, packet, &options)
                             .map_err(|send_error| SendError::IpSock(send_error))
                     })
                 }
@@ -4238,7 +4241,7 @@ where
                         dual_stack,
                         |core_ctx| {
                             core_ctx
-                                .send_ip_packet(bindings_ctx, &socket, packet, None, &options)
+                                .send_ip_packet(bindings_ctx, &socket, packet, &options)
                                 .map_err(|send_error| SendError::IpSock(send_error))
                         },
                     )

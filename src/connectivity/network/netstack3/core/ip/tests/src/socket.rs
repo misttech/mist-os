@@ -9,7 +9,7 @@ use assert_matches::assert_matches;
 use const_unwrap::const_unwrap_option;
 use ip_test_macro::ip_test;
 
-use net_types::ip::{AddrSubnet, GenericOverIp, Ip, IpAddr, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+use net_types::ip::{AddrSubnet, GenericOverIp, Ip, IpAddr, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu};
 use net_types::{SpecifiedAddr, Witness};
 use packet::{Buf, InnerPacketBuilder, ParseBuffer, Serializer as _};
 use packet_formats::ethernet::EthernetFrameLengthCheck;
@@ -30,7 +30,7 @@ use netstack3_ip::marker::OptionDelegationMarker;
 use netstack3_ip::socket::{
     DefaultIpSocketOptions, DelegatedRouteResolutionOptions, DelegatedSendOptions,
     DeviceIpSocketHandler, IpSockCreationError, IpSockDefinition, IpSockSendError, IpSocketHandler,
-    MmsError,
+    MmsError, RouteResolutionOptions, SendOptions,
 };
 use netstack3_ip::{
     self as ip, device, AddableEntryEither, AddableMetric, IpDeviceMtuContext, RawMetric,
@@ -91,6 +91,29 @@ impl<I: IpExt> DelegatedSendOptions<I> for WithHopLimit {
     fn hop_limit(&self, _destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
         let Self(hop_limit) = self;
         *hop_limit
+    }
+}
+
+struct RestrictMtu<T> {
+    mtu: u32,
+    inner: T,
+}
+
+impl<T> OptionDelegationMarker for RestrictMtu<T> {}
+
+impl<T: SendOptions<I>, I: IpExt> DelegatedSendOptions<I> for RestrictMtu<T> {
+    fn delegate(&self) -> &impl SendOptions<I> {
+        &self.inner
+    }
+
+    fn mtu(&self) -> Mtu {
+        Mtu::new(self.mtu)
+    }
+}
+
+impl<T: RouteResolutionOptions<I>, I: Ip> DelegatedRouteResolutionOptions<I> for RestrictMtu<T> {
+    fn delegate(&self) -> &impl RouteResolutionOptions<I> {
+        &self.inner
     }
 }
 
@@ -397,7 +420,6 @@ fn test_send_local<I: IpSocketIpExt + IpExt>(
         bindings_ctx,
         &sock,
         buffer.into_inner().buffer_view().as_ref().into_serializer(),
-        None,
         &DefaultIpSocketOptions,
     )
     .unwrap();
@@ -477,7 +499,6 @@ fn test_send<I: IpSocketIpExt + IpExt>() {
         &mut bindings_ctx,
         &sock,
         (&[0u8][..]).into_serializer(),
-        None,
         &socket_options,
     )
     .unwrap();
@@ -499,8 +520,7 @@ fn test_send<I: IpSocketIpExt + IpExt>() {
         &mut bindings_ctx,
         &sock,
         small_body_serializer,
-        Some(Ipv6::MINIMUM_LINK_MTU.into()),
-        &socket_options,
+        &RestrictMtu { mtu: Ipv6::MINIMUM_LINK_MTU.into(), inner: socket_options },
     );
     assert_eq!(res, Ok(()));
     check_sent_frame(&mut bindings_ctx);
@@ -512,8 +532,7 @@ fn test_send<I: IpSocketIpExt + IpExt>() {
         &mut bindings_ctx,
         &sock,
         small_body_serializer,
-        Some(1), // mtu
-        &socket_options,
+        &RestrictMtu { mtu: 1, inner: socket_options },
     );
     assert_eq!(res, Err(IpSockSendError::Mtu));
 
@@ -525,7 +544,6 @@ fn test_send<I: IpSocketIpExt + IpExt>() {
         &mut bindings_ctx,
         &sock,
         (&[0; Ipv6::MINIMUM_LINK_MTU.get() as usize][..]).into_serializer(),
-        None,
         &socket_options,
     );
     assert_eq!(res, Err(IpSockSendError::Mtu));
@@ -537,7 +555,6 @@ fn test_send<I: IpSocketIpExt + IpExt>() {
         &mut bindings_ctx,
         &sock,
         small_body_serializer,
-        None,
         &socket_options,
     );
     assert_eq!(res, Err(IpSockSendError::Unroutable(ResolveRouteError::Unreachable)));
@@ -608,7 +625,6 @@ fn test_send_hop_limits<I: IpSocketIpExt + IpExt>() {
             bindings_ctx,
             &sock,
             (&[0u8][..]).into_serializer(),
-            None,
             &options,
         )
         .unwrap();

@@ -8,7 +8,7 @@ use core::num::NonZeroU8;
 use core::time::Duration;
 
 use const_unwrap::const_unwrap_option;
-use net_types::ip::{GenericOverIp, Ip, IpMarked};
+use net_types::ip::{GenericOverIp, Ip, IpMarked, Mtu};
 use net_types::SpecifiedAddr;
 use netstack3_base::{
     Counter, IcmpErrorCode, Icmpv4ErrorCode, Icmpv6ErrorCode, IpExt, UnscaledWindowSize,
@@ -255,6 +255,10 @@ impl<I: IpExt> SendOptions<I> for TcpIpSockOptions {
 
     fn dscp_and_ecn(&self) -> DscpAndEcn {
         DscpAndEcn::default()
+    }
+
+    fn mtu(&self) -> Mtu {
+        Mtu::max()
     }
 }
 

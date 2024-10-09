@@ -81,7 +81,6 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         bindings_ctx: &mut BC,
         socket: &IpSock<I, Self::WeakDeviceId>,
         body: S,
-        mtu: Option<u32>,
         options: &O,
     ) -> Result<(), IpSockSendError>
     where
@@ -133,7 +132,6 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         proto: I::Proto,
         options: &O,
         get_body_from_src_ip: F,
-        mtu: Option<u32>,
     ) -> Result<(), SendOneShotIpPacketError<E>>
     where
         S: TransportPacketSerializer<I>,
@@ -146,7 +144,7 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
             .map_err(|err| SendOneShotIpPacketError::CreateAndSendError { err: err.into() })?;
         let packet = get_body_from_src_ip(*tmp.local_ip())
             .map_err(SendOneShotIpPacketError::SerializeError)?;
-        self.send_ip_packet(bindings_ctx, &tmp, packet, mtu, options)
+        self.send_ip_packet(bindings_ctx, &tmp, packet, options)
             .map_err(|err| SendOneShotIpPacketError::CreateAndSendError { err: err.into() })
     }
 
@@ -160,7 +158,6 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         proto: I::Proto,
         options: &O,
         get_body_from_src_ip: F,
-        mtu: Option<u32>,
     ) -> Result<(), IpSockCreateAndSendError>
     where
         S: TransportPacketSerializer<I>,
@@ -177,7 +174,6 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
             proto,
             options,
             |ip| Ok::<_, Infallible>(get_body_from_src_ip(ip)),
-            mtu,
         )
         .map_err(|err| match err {
             SendOneShotIpPacketError::CreateAndSendError { err } => err,
@@ -470,7 +466,6 @@ where
         bindings_ctx: &mut BC,
         ip_sock: &IpSock<I, CC::WeakDeviceId>,
         body: S,
-        mtu: Option<u32>,
         options: &O,
     ) -> Result<(), IpSockSendError>
     where
@@ -481,7 +476,7 @@ where
         // TODO(joshlf): Call `trace!` with relevant fields from the socket.
         self.increment(|counters| &counters.send_ip_packet);
 
-        send_ip_packet(self, bindings_ctx, ip_sock, body, mtu, options)
+        send_ip_packet(self, bindings_ctx, ip_sock, body, options)
     }
 
     fn confirm_reachable<O>(
@@ -554,6 +549,12 @@ pub trait SendOptions<I: IpExt> {
 
     /// Returns TCLASS/TOS field value that should be set in IP headers.
     fn dscp_and_ecn(&self) -> DscpAndEcn;
+
+    /// The IP MTU to use for this transmission.
+    ///
+    /// Note that the minimum overall MTU is used considering the device and
+    /// path. This option can be used to restrict an MTU to an upper bound.
+    fn mtu(&self) -> Mtu;
 }
 
 /// Empty send and creation options that never overrides default values.
@@ -575,6 +576,10 @@ impl<I: IpExt> SendOptions<I> for DefaultIpSocketOptions {
 
     fn dscp_and_ecn(&self) -> DscpAndEcn {
         DscpAndEcn::default()
+    }
+
+    fn mtu(&self) -> Mtu {
+        Mtu::max()
     }
 }
 
@@ -617,6 +622,10 @@ pub trait DelegatedSendOptions<I: IpExt>: OptionDelegationMarker {
     fn dscp_and_ecn(&self) -> DscpAndEcn {
         self.delegate().dscp_and_ecn()
     }
+
+    fn mtu(&self) -> Mtu {
+        self.delegate().mtu()
+    }
 }
 
 impl<O: DelegatedSendOptions<I> + OptionDelegationMarker, I: IpExt> SendOptions<I> for O {
@@ -634,6 +643,10 @@ impl<O: DelegatedSendOptions<I> + OptionDelegationMarker, I: IpExt> SendOptions<
 
     fn dscp_and_ecn(&self) -> DscpAndEcn {
         self.dscp_and_ecn()
+    }
+
+    fn mtu(&self) -> Mtu {
+        self.mtu()
     }
 }
 
@@ -768,7 +781,6 @@ fn send_ip_packet<I, S, BC, CC, O>(
     bindings_ctx: &mut BC,
     socket: &IpSock<I, CC::WeakDeviceId>,
     mut body: S,
-    mtu: Option<u32>,
     options: &O,
 ) -> Result<(), IpSockSendError>
 where
@@ -935,7 +947,7 @@ where
         destination,
         ttl,
         proto: *proto,
-        mtu,
+        mtu: options.mtu(),
         dscp_and_ecn: options.dscp_and_ecn(),
     };
     IpSocketContext::send_ip_packet(core_ctx, bindings_ctx, meta, body, packet_metadata).or_else(
@@ -951,7 +963,7 @@ where
                 destination: IpPacketDestination::Loopback(&egress_device),
                 ttl,
                 proto: *proto,
-                mtu,
+                mtu: options.mtu(),
                 dscp_and_ecn: options.dscp_and_ecn(),
             };
             let packet_metadata = IpLayerPacketMetadata::default();
@@ -1491,7 +1503,6 @@ pub(crate) mod testutil {
             bindings_ctx: &mut BC,
             socket: &IpSock<I, Self::WeakDeviceId>,
             body: S,
-            mtu: Option<u32>,
             options: &O,
         ) -> Result<(), IpSockSendError>
         where
@@ -1499,8 +1510,7 @@ pub(crate) mod testutil {
             S::Buffer: BufferMut,
             O: SendOptions<I> + RouteResolutionOptions<I>,
         {
-            let meta =
-                self.state.fake_ip_socket_ctx_mut().resolve_send_meta(socket, mtu, options)?;
+            let meta = self.state.fake_ip_socket_ctx_mut().resolve_send_meta(socket, options)?;
             self.send_frame(bindings_ctx, meta, body).or_else(
                 |SendFrameError { serializer: _, error }| IpSockSendError::from_send_frame(error),
             )
@@ -1899,7 +1909,6 @@ pub(crate) mod testutil {
         fn resolve_send_meta<O>(
             &mut self,
             socket: &IpSock<I, D::Weak>,
-            mtu: Option<u32>,
             options: &O,
         ) -> Result<SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>, IpSockSendError>
         where
@@ -1933,7 +1942,7 @@ pub(crate) mod testutil {
                 destination,
                 proto: *proto,
                 ttl: options.hop_limit(remote_ip),
-                mtu,
+                mtu: options.mtu(),
                 dscp_and_ecn: DscpAndEcn::default(),
             })
         }

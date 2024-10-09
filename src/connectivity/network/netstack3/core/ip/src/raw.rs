@@ -10,7 +10,7 @@ use core::fmt::{self, Debug, Display};
 use core::num::NonZeroU8;
 use derivative::Derivative;
 use log::debug;
-use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
+use net_types::ip::{GenericOverIp, Ip, IpVersionMarker, Mtu};
 use net_types::{SpecifiedAddr, ZonedAddr};
 use netstack3_base::socket::{DualStackIpExt, DualStackRemoteIp, SocketZonedAddrExt as _};
 use netstack3_base::sync::{PrimaryRc, StrongRc, WeakRc};
@@ -205,7 +205,6 @@ where
                     protocol,
                     &send_options,
                     build_packet_fn,
-                    None,
                 )
                 .map_err(|e| match e {
                     SendOneShotIpPacketError::CreateAndSendError { err } => {
@@ -816,6 +815,10 @@ impl<I: IpExt> SendOptions<I> for RawIpSocketOptions<'_, I> {
     fn dscp_and_ecn(&self) -> DscpAndEcn {
         DscpAndEcn::default()
     }
+
+    fn mtu(&self) -> Mtu {
+        Mtu::max()
+    }
 }
 
 /// A marker type capturing that raw IP sockets don't have ports.
@@ -1413,7 +1416,7 @@ mod test {
             assert_eq!(*device, bound_dev);
         }
         assert_eq!(*proto, <I as IpProtoExt>::Proto::from(PROTO));
-        assert_eq!(*mtu, None);
+        assert_eq!(*mtu, Mtu::max());
         assert_eq!(*ttl, hop_limit);
 
         assert_counters(api.core_ctx(), 1);

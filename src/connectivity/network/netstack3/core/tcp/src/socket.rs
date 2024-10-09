@@ -5248,7 +5248,7 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
         Some(ip_sock) => {
             let body = tcp_serialize_segment(segment, conn_addr);
             core_ctx
-                .send_ip_packet(bindings_ctx, ip_sock, body, None, ip_sock_options)
+                .send_ip_packet(bindings_ctx, ip_sock, body, ip_sock_options)
                 .map_err(|err| IpSockCreateAndSendError::Send(err))
         }
         None => {
@@ -5261,7 +5261,6 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
                 IpProto::Tcp.into(),
                 ip_sock_options,
                 |_addr| tcp_serialize_segment(segment, conn_addr),
-                None,
             )
         }
     };
@@ -5727,7 +5726,6 @@ mod tests {
             bindings_ctx: &mut BC,
             socket: &IpSock<I, Self::WeakDeviceId>,
             body: S,
-            mtu: Option<u32>,
             options: &O,
         ) -> Result<(), IpSockSendError>
         where
@@ -5735,7 +5733,7 @@ mod tests {
             S::Buffer: BufferMut,
             O: SendOptions<I> + RouteResolutionOptions<I>,
         {
-            self.ip_socket_ctx.send_ip_packet(bindings_ctx, socket, body, mtu, options)
+            self.ip_socket_ctx.send_ip_packet(bindings_ctx, socket, body, options)
         }
 
         fn confirm_reachable<O>(
