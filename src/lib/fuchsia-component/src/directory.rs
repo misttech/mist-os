@@ -10,47 +10,39 @@
 use anyhow::{Context, Error};
 use fidl::endpoints::ClientEnd;
 use std::sync::Arc;
+use zx::AsHandleRef as _;
 use {fidl_fuchsia_io as fio, zx};
 
 /// A trait for opening filesystem nodes.
 pub trait Directory {
     /// Open a node relative to the directory.
-    fn open(&self, path: &str, flags: fio::OpenFlags, server_end: zx::Channel)
-        -> Result<(), Error>;
+    fn open(&self, path: &str, flags: fio::Flags, server_end: zx::Channel) -> Result<(), Error>;
 }
 
 impl Directory for fio::DirectoryProxy {
-    fn open(
-        &self,
-        path: &str,
-        flags: fio::OpenFlags,
-        server_end: zx::Channel,
-    ) -> Result<(), Error> {
-        let () = self.open(flags, fio::ModeType::empty(), path, server_end.into())?;
+    fn open(&self, path: &str, flags: fio::Flags, server_end: zx::Channel) -> Result<(), Error> {
+        let () = self.open3(path, flags, &fio::Options::default(), server_end.into())?;
         Ok(())
     }
 }
 
 impl Directory for fio::DirectorySynchronousProxy {
-    fn open(
-        &self,
-        path: &str,
-        flags: fio::OpenFlags,
-        server_end: zx::Channel,
-    ) -> Result<(), Error> {
-        let () = self.open(flags, fio::ModeType::empty(), path, server_end.into())?;
+    fn open(&self, path: &str, flags: fio::Flags, server_end: zx::Channel) -> Result<(), Error> {
+        let () = self.open3(path, flags, &fio::Options::default(), server_end.into())?;
         Ok(())
     }
 }
 
 impl Directory for ClientEnd<fio::DirectoryMarker> {
-    fn open(
-        &self,
-        path: &str,
-        flags: fio::OpenFlags,
-        server_end: zx::Channel,
-    ) -> Result<(), Error> {
-        let () = fdio::open_at(self.channel(), path, flags, server_end)?;
+    fn open(&self, path: &str, flags: fio::Flags, server_end: zx::Channel) -> Result<(), Error> {
+        let raw_handle = self.channel().as_handle_ref().raw_handle();
+        // Safety: we call forget on objects that reference `raw_handle` leaving it usable.
+        unsafe {
+            let borrowed: zx::Channel = zx::Handle::from_raw(raw_handle).into();
+            let proxy = fio::DirectorySynchronousProxy::new(borrowed);
+            proxy.open3(path, flags, &fio::Options::default(), server_end.into())?;
+            std::mem::forget(proxy.into_channel());
+        }
         Ok(())
     }
 }
@@ -101,17 +93,16 @@ impl<T: Directory> AsRefDirectory for &T {
     }
 }
 
-/// Opens the given `path` from the given `parent` directory as a [`DirectoryProxy`]. The target is
-/// not verified to be any particular type and may not implement the fuchsia.io/Directory protocol.
-pub fn open_directory_no_describe(
+/// Opens the given `path` from the given `parent` directory as a [`DirectoryProxy`] asynchronously.
+pub fn open_directory_async(
     parent: &impl AsRefDirectory,
     path: &str,
-    flags: fio::OpenFlags,
+    rights: fio::Rights,
 ) -> Result<fio::DirectoryProxy, Error> {
     let (dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
         .context("creating directory proxy")?;
 
-    let flags = flags | fio::OpenFlags::DIRECTORY;
+    let flags = fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::from_bits_truncate(rights.bits());
     let () = parent
         .as_ref_directory()
         .open(path, flags, server_end.into_channel())
@@ -120,17 +111,16 @@ pub fn open_directory_no_describe(
     Ok(dir)
 }
 
-/// Opens the given `path` from the given `parent` directory as a [`FileProxy`]. The target is not
-/// verified to be any particular type and may not implement the fuchsia.io/File protocol.
-pub fn open_file_no_describe(
+/// Opens the given `path` from the given `parent` directory as a [`FileProxy`] asynchronously.
+pub fn open_file_async(
     parent: &impl AsRefDirectory,
     path: &str,
-    flags: fio::OpenFlags,
+    rights: fio::Rights,
 ) -> Result<fio::FileProxy, Error> {
     let (file, server_end) =
         fidl::endpoints::create_proxy::<fio::FileMarker>().context("creating file proxy")?;
 
-    let flags = flags | fio::OpenFlags::NOT_DIRECTORY;
+    let flags = fio::Flags::PROTOCOL_FILE | fio::Flags::from_bits_truncate(rights.bits());
     let () = parent
         .as_ref_directory()
         .open(path, flags, server_end.into_channel())
@@ -150,43 +140,43 @@ mod tests {
     use vfs::pseudo_directory;
 
     #[fasync::run_singlethreaded(test)]
-    async fn open_directory_no_describe_real() {
+    async fn open_directory_async_real() {
         let dir = pseudo_directory! {
             "dir" => simple(),
         };
         let dir = run_directory_server(dir);
-        let dir = open_directory_no_describe(&dir, "dir", fio::OpenFlags::empty()).unwrap();
+        let dir = open_directory_async(&dir, "dir", fio::Rights::empty()).unwrap();
         fuchsia_fs::directory::close(dir).await.unwrap();
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn open_directory_no_describe_fake() {
+    async fn open_directory_async_fake() {
         let dir = pseudo_directory! {
             "dir" => simple(),
         };
         let dir = run_directory_server(dir);
-        let dir = open_directory_no_describe(&dir, "fake", fio::OpenFlags::empty()).unwrap();
+        let dir = open_directory_async(&dir, "fake", fio::Rights::empty()).unwrap();
         // The open error is not detected until the proxy is interacted with.
         assert_matches!(fuchsia_fs::directory::close(dir).await, Err(_));
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn open_file_no_describe_real() {
+    async fn open_file_async_real() {
         let dir = pseudo_directory! {
             "file" => read_only("read_only"),
         };
         let dir = run_directory_server(dir);
-        let file = open_file_no_describe(&dir, "file", fio::OpenFlags::RIGHT_READABLE).unwrap();
+        let file = open_file_async(&dir, "file", fio::Rights::READ_BYTES).unwrap();
         fuchsia_fs::file::close(file).await.unwrap();
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn open_file_no_describe_fake() {
+    async fn open_file_async_fake() {
         let dir = pseudo_directory! {
             "file" => read_only("read_only"),
         };
         let dir = run_directory_server(dir);
-        let fake = open_file_no_describe(&dir, "fake", fio::OpenFlags::RIGHT_READABLE).unwrap();
+        let fake = open_file_async(&dir, "fake", fio::Rights::READ_BYTES).unwrap();
         // The open error is not detected until the proxy is interacted with.
         assert_matches!(fuchsia_fs::file::close(fake).await, Err(_));
     }

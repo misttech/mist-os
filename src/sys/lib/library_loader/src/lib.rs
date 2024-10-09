@@ -98,11 +98,8 @@ pub async fn load_vmo<'a>(
     dir: &impl fuchsia_component::directory::AsRefDirectory,
     object_name: &'a str,
 ) -> Result<zx::Vmo, Error> {
-    let file_proxy = fuchsia_component::directory::open_file_no_describe(
-        dir,
-        object_name,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-    )?;
+    let file_proxy =
+        fuchsia_component::directory::open_file_async(dir, object_name, fio::RX_STAR_DIR)?;
     // TODO(https://fxbug.dev/42129773): This does not ask or wait for a Describe event, which means a failure to
     // open the file will appear as a PEER_CLOSED error on this call.
     let vmo = file_proxy

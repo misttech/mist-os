@@ -361,13 +361,10 @@ fn get_pkg_and_lib_proxy<'a>(
         .get(&PKG_PATH.parse().unwrap())
         .ok_or_else(|| ComponentError::MissingPkg(url.clone()))?;
 
-    let lib_proxy = fuchsia_component::directory::open_directory_no_describe(
-        pkg_dir,
-        "lib",
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-    )
-    .map_err(Into::into)
-    .map_err(|e| ComponentError::LibraryLoadError(url.clone(), e))?;
+    let lib_proxy =
+        fuchsia_component::directory::open_directory_async(pkg_dir, "lib", fio::RX_STAR_DIR)
+            .map_err(Into::into)
+            .map_err(|e| ComponentError::LibraryLoadError(url.clone(), e))?;
     Ok((pkg_dir, lib_proxy))
 }
 

@@ -491,12 +491,8 @@ mod tests {
 
         {
             // We can open another connection that's not the main outgoing directory connection,
-            let svc = crate::directory::open_directory_no_describe(
-                &client_end,
-                "svc",
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            )
-            .unwrap();
+            let svc = crate::directory::open_directory_async(&client_end, "svc", fio::R_STAR_DIR)
+                .unwrap();
 
             TestExecutor::advance_to(initial + IDLE_DURATION).await;
             assert!(TestExecutor::poll_until_stalled(&mut fs).await.is_pending());
