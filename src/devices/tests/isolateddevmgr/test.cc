@@ -58,8 +58,8 @@ class IsolatedDevMgrTest : public zxtest::Test {
 
   static void CheckMetadata(fidl::WireSyncClient<fuchsia_device_manager_test::Metadata>& client,
                             const std::vector<uint8_t>& expected_metadata) {
-    fidl::WireResult result = client->GetMetadata(fidl::StringView::FromExternal(
-        std::to_string(fuchsia_board_test::wire::kPdevMetadataTypeIdentifier)));
+    fidl::WireResult result = client->GetMetadata(
+        fidl::StringView::FromExternal(fuchsia_board_test::wire::kPdevMetadataId));
     ASSERT_OK(result.status());
     fidl::VectorView<uint8_t> received_metadata = std::move(result->data);
     ASSERT_EQ(received_metadata.count(), expected_metadata.size());
