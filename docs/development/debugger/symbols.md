@@ -47,8 +47,8 @@ When zxdb downloads symbols, it stores them in the symbol cache. The
 
 For example:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] get symbol-cache
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+get symbol-cache
 symbol-cache = /home/me/.fuchsia/debug/symbol-cache
 ```
 
@@ -111,8 +111,8 @@ Note: These directories do not need to be named `.build-id`
   Note: These `build-id-dirs` are only added for the duration of the zxdb
   instance.
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] set build-id-dirs += /home/alice/project/out/x64/.build-id
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  set build-id-dirs += /home/alice/project/out/x64/.build-id
   ```
 
 * {ffx}
@@ -148,14 +148,14 @@ to find binaries with build IDs.
 
 * {File}
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] set symbol-paths += /home/alice/project/a.out
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  set symbol-paths += /home/alice/project/a.out
   ```
 
 * {Directory}
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] set symbol-paths += /home/me/project/build/
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  set symbol-paths += /home/me/project/build/
   ```
 
 You can see the status of the locations you configured with the `sym-stat`
@@ -164,8 +164,8 @@ command. For example:
 Note: You can also see the build IDs and file names of the binaries added with
 the `sym-stat --dump-index` command.
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] sym-stat
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+sym-stat
 Symbol index status
 
   This command just refreshed the index.
@@ -187,8 +187,8 @@ Note: `ids-txts` is a list of file names.
 
 For example, to add `/home/alice/project/build/ids.txt` to the `ids-txts` setting:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] set ids-txts += /home/alice/project/build/ids.txt
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+set ids-txts += /home/alice/project/build/ids.txt
 ```
 
 The symbol files from `ids.txt` files is also displayed when you run the
@@ -204,8 +204,8 @@ settings are set.
 The `symbol-index-files` setting contains one or more JSON-format files that
 are set by the development environment:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] get symbol-index-files
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+get symbol-index-files
 symbol-index-files =
   • /home/alice/.fuchsia/debug/symbol-index.json
 ```

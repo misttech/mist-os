@@ -175,8 +175,8 @@ the `fx test` command with `zxdb`.
   that failed. You can view additional lines of the code from the current frame
   with `list`, for example:
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] list
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  list
     533         expected.sort();
     534
     535         let mut actual = vec![recv_logs.next().await.unwrap(), recv_logs.next().await.unwrap()];
@@ -198,8 +198,8 @@ the `fx test` command with `zxdb`.
 
   You can also examine the entire call stack with `frame`, for example:
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] frame
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  frame
     0…12 «Rust library» (-r expands)
     13 std::panicking::begin_panic_handler(…) • library/std/src/panicking.rs:645
     14 core::panicking::panic_fmt(…) • library/core/src/panicking.rs:72
@@ -236,8 +236,8 @@ the `fx test` command with `zxdb`.
   All commands that you run are in the context of frame #17, as indicated by `▶`.
   You can list the source code again with a little bit of additional context:
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] list -c 10
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  list -c 10
     528         let mut log_helper2 = LogSinkHelper::new(&directory);
     529         log_helper2.write_log("my msg1");
     530         log_helper.write_log("my msg3");
@@ -268,8 +268,8 @@ the `fx test` command with `zxdb`.
   `log_helper` and `log_helper2` instances and by receiving them with the
   mpsc channel `recv_logs`:
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] print expected
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  print expected
   vec!["my msg1", "my msg3"]
   [zxdb] print actual
   vec!["my msg1", "my msg2"]
@@ -280,8 +280,8 @@ the `fx test` command with `zxdb`.
   `"my msg2"`. You can correct the test to expect `"my msg2"`. You can now
   detach from the tests to continue and complete the test suite:
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] quit
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  quit
 
   <...fx test output continues...>
 
@@ -384,8 +384,8 @@ the `fx test` command with `zxdb`.
   straight to the frame from your test. You can view additional lines of code of
   the current frame with `list`, for example:
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] list
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  list
     100   harness.debug_agent()->InjectProcessForTest(std::move(process2));
     101
     102   reply = {};
@@ -399,8 +399,8 @@ the `fx test` command with `zxdb`.
 
   You can see more lines of source code by using `list`'s `-c` flag:
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] list -c 10
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  list -c 10
       95   constexpr uint64_t kProcess2ThreadKoid2 = 0x2;
       96
       97   auto process2 = std::make_unique<MockProcess>(nullptr, kProcessKoid2, kProcessName2);
@@ -427,8 +427,8 @@ the `fx test` command with `zxdb`.
 
   You can also examine the full stack trace with the `frame` command:
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] frame
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  frame
     0 testing::UnitTest::AddTestPartResult(…) • gtest.cc:5383
     1 testing::internal::AssertHelper::operator=(…) • gtest.cc:476
   ▶ 2 debug_agent::DebugAgentTests_OnGlobalStatus_Test::TestBody(…) • debug_agent_unittest.cc:105
@@ -455,8 +455,8 @@ the `fx test` command with `zxdb`.
   happening. The `reply` frame contains a local variable, which should have been
   populated by the function call to `remote_api->OnStatus`:
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] print reply
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  print reply
   {
     processes = {
       [0] = {
@@ -510,8 +510,8 @@ the `fx test` command with `zxdb`.
   You can also print the size method of that vector (general function calling
   support is not implemented yet):
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] print reply.processes
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  print reply.processes
   {
     [0] = {
       process_koid = 4660
@@ -562,8 +562,8 @@ the `fx test` command with `zxdb`.
   2 instead of 3. You can now close zxdb with `quit` to then update and fix the
   tests:
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] quit
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  quit
 
   <...fx test output continues...>
 

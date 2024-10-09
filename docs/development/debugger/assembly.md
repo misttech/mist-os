@@ -10,8 +10,8 @@ the instructions and call destinations are annotated with source line informatio
 
 For example:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] disassemble
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+disassemble
 miscsvc.cc:118
  ▶ 0x20bc1c7aa60a  mov     dword ptr [rbx + 0x10c], eax
 miscsvc.cc:122
@@ -30,8 +30,8 @@ If you specify an address or symbol, the `disassemble` command disassembles on
 the respective address or symbol. If you provide a function name, it
 disassembles the entire function:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] disassemble main
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+disassemble main
 miscsvc.cc:88
    0x20bc1c7aa000  push    rbp
    0x20bc1c7aa001  mov     rbp, rsp
@@ -91,8 +91,8 @@ To step through machine instructions you can use following zxdb commands:
 
 For example:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] nexti
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+nexti
 🛑 main(int, const char**) • main.cc:102
 main.cc:99
  ▶ 0x23f711346233  mov   edx, 0x20
@@ -123,8 +123,8 @@ The `regs` command shows the most common CPU registers.
 
 For example:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] regs
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+regs
 General Purpose Registers
       rax  0xfffffffffffffffa = -6
       rbx          0x50b7085b
@@ -182,8 +182,8 @@ The following values are supports:
 
 This example sets the `vector-format` to `double`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] set vector-format double
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+set vector-format double
 ```
 
 This example returns the vector registers:
@@ -214,8 +214,8 @@ the x86 vector register `ymm1`:
 
 1. Set the `vector-format` to float:
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] set vector-format float
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  set vector-format float
   ```
 
 1. Print the vector register `ymm1`:

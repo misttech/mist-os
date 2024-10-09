@@ -55,8 +55,8 @@ example:
 
     List all of the breakpoints in the session:
 
-    ```none {:.devsite-disable-click-to-copy}
-    [zxdb] breakpoint
+    ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+    breakpoint
     # scope  stop enabled type     Condition                       #addrs hit-count location
     1 global all  true    software command_line.has_argv0 == false      1         0 ../../src/cobalt/bin/app/cobalt_main.cc:352
     ```
@@ -67,8 +67,8 @@ example:
 
     Note: You must `pause` the thread before you can list the stack frames.
 
-    ```none {:.devsite-disable-click-to-copy}
-    [zxdb] frame
+    ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+    frame
     ▶ 0 fxl::CommandLineFromIterators<const char *const *>() • command_line.h:203
       1 fxl::CommandLineFromArgcArgv() • command_line.h:224
       2 main() • main.cc:174
@@ -78,8 +78,8 @@ example:
 
     List attached processes:
 
-    ```none {:.devsite-disable-click-to-copy}
-    [zxdb] process
+    ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+    process
       # State       Koid Name
     ▶ 1 Not running 3471 debug_agent_unit_tests.cm
     ```
@@ -88,8 +88,8 @@ example:
 
     List threads in the current process:
 
-    ```none {:.devsite-disable-click-to-copy}
-    [zxdb] thread
+    ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+    thread
       # State   Koid Name
     ▶ 1 Blocked 1348 initial-thread
       2 Blocked 1356 some-other-thread
@@ -106,8 +106,8 @@ about the new active noun. For example:
 
     Select thread 3 to be the active noun for future commands:
 
-    ```none {:.devsite-disable-click-to-copy}
-    [zxdb] thread 3
+    ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+    thread 3
     Thread 3 Blocked koid=9940 worker-thread
     ```
 
@@ -115,8 +115,8 @@ about the new active noun. For example:
 
     Select breakpoint 2 to be the active noun:
 
-    ```none {:.devsite-disable-click-to-copy}
-    [zxdb] breakpoint 2
+    ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+    breakpoint 2
     Breakpoint 2 (Software) on Global, Enabled, stop=All, @ MyFunction
     ```
 
@@ -139,15 +139,15 @@ current active nouns (for more information on active nouns, see
 
 The zxdb debugger has a built-in help system:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] help
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+help
 ```
 
 You can also get help on a specific command. For example, to see the help of the
 `step` command:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] help step
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+help step
 ```
 
 ## Attributes and settings
@@ -164,8 +164,8 @@ For example, you can get the attributes of the active `process`:
 Note: The `get` command can be used on all zxdb nouns. When using `get`, you can
 also specify a specific process such as `process 1 get`.
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] process get
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+process get
   debug-stepping false
   display        <empty>
   show-stdout    true
@@ -178,8 +178,8 @@ and help associated with it.
 
 For example, to get the help of the `debug-stepping` attribute:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] process get debug-stepping
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+process get debug-stepping
 debug-stepping (bool)
 
   Enable very verbose debug logging for thread stepping.
@@ -197,8 +197,8 @@ You can use the `set` verb to set the settings or attributes of a given object.
 For example, you can set the `show-stdout` attribute of the active `process` to
 `true`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] process set show-stdout true
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+process set show-stdout true
 Set process 1 show-stdout = true
 ```
 
@@ -212,8 +212,8 @@ specific overrides, or override a specific context.
 
 For example, you can set the `show-stdout` global setting to `false`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] set show-stdout false       # Applies to all processes with no override.
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+set show-stdout false       # Applies to all processes with no override.
 Set global show-stdout = false
 ```
 
@@ -225,8 +225,8 @@ to specify a path that contains a space.
 
 * Use `=` to specify a new value:
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] set symbol-paths = /tmp/symbols /fuchsia-settings/symbols "/fuchsia settings/symbols"
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  set symbol-paths = /tmp/symbols /fuchsia-settings/symbols "/fuchsia settings/symbols"
   Set global symbol-paths =
     • /tmp/symbols
     • /fuchsia-settings/symbols
@@ -235,8 +235,8 @@ to specify a path that contains a space.
 
 * Use `+=` to append to the existing values:
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] set symbol-paths += /tmp/symbols2
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  set symbol-paths += /tmp/symbols2
   Set global symbol-paths =
     • /tmp/symbols
     • /fuchsia-settings/symbols
@@ -258,8 +258,8 @@ Note: You should rarely need to set the language.
 
 For example, to set the default language to `rust`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] set language rust
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+set language rust
 Set global language = rust
 ```
 

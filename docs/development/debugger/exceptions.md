@@ -49,8 +49,8 @@ You can then continue with the test by using `--forward`:
 
 Note: The `--forward` option can also be expressed with `-f`.
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] continue --forward
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+continue --forward
 ```
 
 ## Automatically forwarding certain types of exceptions
@@ -73,18 +73,18 @@ examples:
 
 To list the current values of `second-chance-exceptions`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] get second-chance-exceptions
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+get second-chance-exceptions
 ```
 
 To add the general exception type to `second-chance-exceptions`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] set second-chance-exceptions += gen
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+set second-chance-exceptions += gen
 ```
 
 To remove the page fault type from the list of `second-chance-exceptions`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] set second-chance-exceptions -= pf
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+set second-chance-exceptions -= pf
 ```

@@ -14,8 +14,8 @@ current stack frame:
 
 For example, to see the value of a variable `i`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] print i
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+print i
 34
 ```
 
@@ -24,8 +24,8 @@ without switching to that frame.
 
 For example, to see the value of `argv[0]` in stack frame `2`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] frame 2 print argv[0]
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+frame 2 print argv[0]
 "/bin/cowsay"
 ```
 
@@ -48,8 +48,8 @@ The `print` command accepts the following arguments:
 To write an expression beginning with a hyphen, use `--` to mark the end of
 arguments. Hyphens after `--` are treated as part of the expression:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] print -- -i
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+print -- -i
 ```
 
 ## Number formatting options {#number-formatting-options}
@@ -89,8 +89,8 @@ Additionally, zxdb also supports:
 You can refer to CPU registers with the `$reg(register name)` syntax. For
 example, to display the ARM register `v3`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] print $reg(v3)
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+print $reg(v3)
 0x573a420f128
 ```
 
@@ -101,8 +101,8 @@ more complex expressions:
 Note: You can use the `-x` option to display the unsigned hexadecimal value. For
 additional options, see [Number formatting options](#number-formatting-options).
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] print -x rax + rbx
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+print -x rax + rbx
 0x2108aa0032a
 ```
 
@@ -111,8 +111,8 @@ additional options, see [Number formatting options](#number-formatting-options).
 Vector registers can be treated as arrays based on the setting of
 `vector-format`.
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] print ymm1
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+print ymm1
 {3.141593, 1.0, 0, 0}
 
 [zxdb] print ymm[0] * 2
@@ -128,8 +128,8 @@ For example, to list all of the vector registers:
 Note: You can also use `-v` instead of `--vector`.
 
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] regs --vector
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+regs --vector
     (Use "print $registername" to show a single one, or
      "print $registername = newvalue" to set.)
 
@@ -166,8 +166,8 @@ given expression to this list:
 Note: This example uses a variable named `status` and its value is returned
 when the program stops.
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] display status
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+display status
 Added to display for every stop: status
 
 [zxdb] next
@@ -183,8 +183,8 @@ status = 5;
 The `locals` command shows all local variables in the current stack frame. It
 accepts the same arguments as `print` (see [Print with expressions](#print-expressions)):
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] locals
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+locals
 argc = 1
 argv = (const char* const*) 0x59999ec02dc0
 ```
