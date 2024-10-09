@@ -14,7 +14,7 @@ use net_types::{SpecifiedAddr, Witness};
 use packet::{Buf, InnerPacketBuilder, ParseBuffer, Serializer as _};
 use packet_formats::ethernet::EthernetFrameLengthCheck;
 use packet_formats::icmp::{IcmpIpExt, IcmpUnusedCode};
-use packet_formats::ip::{DscpAndEcn, IpPacket};
+use packet_formats::ip::IpPacket;
 use packet_formats::ipv4::{Ipv4OnlyMeta, Ipv4Packet};
 use packet_formats::testutil::{parse_ethernet_frame, parse_ip_packet_in_ethernet_frame};
 use test_case::test_case;
@@ -26,12 +26,14 @@ use netstack3_core::device::{DeviceId, EthernetLinkDevice};
 use netstack3_core::testutil::{CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeCtxBuilder};
 use netstack3_core::IpExt;
 use netstack3_ip::device::IpDeviceIpExt;
+use netstack3_ip::marker::OptionDelegationMarker;
 use netstack3_ip::socket::{
-    DefaultSendOptions, DeviceIpSocketHandler, IpSockCreationError, IpSockDefinition,
-    IpSockSendError, IpSocketHandler, MmsError, SendOptions,
+    DefaultIpSocketOptions, DelegatedRouteResolutionOptions, DelegatedSendOptions,
+    DeviceIpSocketHandler, IpSockCreationError, IpSockDefinition, IpSockSendError, IpSocketHandler,
+    MmsError,
 };
 use netstack3_ip::{
-    self as ip, device, AddableEntryEither, AddableMetric, IpDeviceMtuContext, Marks, RawMetric,
+    self as ip, device, AddableEntryEither, AddableMetric, IpDeviceMtuContext, RawMetric,
     ResolveRouteError,
 };
 
@@ -81,26 +83,14 @@ impl IpSocketIpExt for Ipv6 {
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 struct WithHopLimit(Option<NonZeroU8>);
 
-impl<I: IpExt> SendOptions<I> for WithHopLimit {
+impl OptionDelegationMarker for WithHopLimit {}
+
+impl<I: IpExt> DelegatedRouteResolutionOptions<I> for WithHopLimit {}
+
+impl<I: IpExt> DelegatedSendOptions<I> for WithHopLimit {
     fn hop_limit(&self, _destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
         let Self(hop_limit) = self;
         *hop_limit
-    }
-
-    fn multicast_loop(&self) -> bool {
-        false
-    }
-
-    fn allow_broadcast(&self) -> Option<I::BroadcastMarker> {
-        None
-    }
-
-    fn dscp_and_ecn(&self) -> DscpAndEcn {
-        DscpAndEcn::default()
-    }
-
-    fn marks(&self) -> &Marks {
-        &Marks::UNMARKED
     }
 }
 
@@ -141,6 +131,19 @@ fn remove_all_local_addrs<I: IpExt>(ctx: &mut FakeCtx) {
                 subnet.to_witness()
             );
         }
+    }
+}
+
+struct WithTransparent(bool);
+
+impl OptionDelegationMarker for WithTransparent {}
+
+impl<I: IpExt> DelegatedSendOptions<I> for WithTransparent {}
+
+impl<I: IpExt> DelegatedRouteResolutionOptions<I> for WithTransparent {
+    fn transparent(&self) -> bool {
+        let Self(transparent) = self;
+        *transparent
     }
 }
 
@@ -293,7 +296,6 @@ fn test_new<I: IpSocketIpExt + IpExt>(test_case: NewSocketTestCase) {
         local_ip: IpDeviceAddr::try_from(expected_from_ip).unwrap(),
         device: weak_local_device.clone(),
         proto,
-        transparent,
     };
 
     let res = IpSocketHandler::<I, _>::new_ip_socket(
@@ -303,8 +305,7 @@ fn test_new<I: IpSocketIpExt + IpExt>(test_case: NewSocketTestCase) {
         from_ip.map(|a| IpDeviceAddr::try_from(a).unwrap()),
         SocketIpAddr::try_from(to_ip).unwrap(),
         proto,
-        transparent,
-        &Marks::default(),
+        &WithTransparent(transparent),
     );
     assert_eq!(res.map(|s| s.definition().clone()), get_expected_result(template));
 }
@@ -373,8 +374,7 @@ fn test_send_local<I: IpSocketIpExt + IpExt>(
         from_ip.map(|a| IpDeviceAddr::try_from(a).unwrap()),
         SocketIpAddr::try_from(to_ip).unwrap(),
         I::ICMP_IP_PROTO,
-        false, /* transparent */
-        &Marks::default(),
+        &DefaultIpSocketOptions,
     )
     .unwrap();
 
@@ -398,7 +398,7 @@ fn test_send_local<I: IpSocketIpExt + IpExt>(
         &sock,
         buffer.into_inner().buffer_view().as_ref().into_serializer(),
         None,
-        &DefaultSendOptions,
+        &DefaultIpSocketOptions,
     )
     .unwrap();
 
@@ -431,8 +431,7 @@ fn test_send<I: IpSocketIpExt + IpExt>() {
         None,
         SocketIpAddr::try_from(remote_ip).unwrap(),
         proto,
-        false, /* transparent */
-        &Marks::default(),
+        &socket_options,
     )
     .unwrap();
 
@@ -554,26 +553,14 @@ fn test_send_hop_limits<I: IpSocketIpExt + IpExt>() {
 
     const SET_HOP_LIMIT: NonZeroU8 = const_unwrap_option(NonZeroU8::new(42));
 
-    impl<I: IpExt> SendOptions<I> for SetHopLimitFor<I::Addr> {
+    impl<A> OptionDelegationMarker for SetHopLimitFor<A> {}
+
+    impl<I: IpExt> DelegatedRouteResolutionOptions<I> for SetHopLimitFor<I::Addr> {}
+
+    impl<I: IpExt> DelegatedSendOptions<I> for SetHopLimitFor<I::Addr> {
         fn hop_limit(&self, destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
             let Self(expected_destination) = self;
             (destination == expected_destination).then_some(SET_HOP_LIMIT)
-        }
-
-        fn multicast_loop(&self) -> bool {
-            false
-        }
-
-        fn allow_broadcast(&self) -> Option<I::BroadcastMarker> {
-            None
-        }
-
-        fn dscp_and_ecn(&self) -> DscpAndEcn {
-            DscpAndEcn::default()
-        }
-
-        fn marks(&self) -> &Marks {
-            &Marks::UNMARKED
         }
     }
 
@@ -612,8 +599,7 @@ fn test_send_hop_limits<I: IpSocketIpExt + IpExt>() {
             None,
             destination_ip,
             I::ICMP_IP_PROTO,
-            false, /* transparent */
-            &Marks::default(),
+            &options,
         )
         .unwrap();
 
@@ -694,8 +680,7 @@ fn get_mms_device_removed<I: IpSocketIpExt + IpExt>(remove_device: bool) {
         None,
         SocketIpAddr::try_from(I::multicast_addr(1)).unwrap(),
         I::ICMP_IP_PROTO,
-        false, /* transparent */
-        &Marks::default(),
+        &DefaultIpSocketOptions,
     )
     .unwrap();
 
@@ -715,5 +700,13 @@ fn get_mms_device_removed<I: IpSocketIpExt + IpExt>(remove_device: bool) {
         .unwrap())
     };
     let (mut core_ctx, bindings_ctx) = ctx.contexts();
-    assert_eq!(DeviceIpSocketHandler::get_mms(&mut core_ctx, bindings_ctx, &ip_sock), expected);
+    assert_eq!(
+        DeviceIpSocketHandler::get_mms(
+            &mut core_ctx,
+            bindings_ctx,
+            &ip_sock,
+            &DefaultIpSocketOptions
+        ),
+        expected
+    );
 }

@@ -14,7 +14,7 @@ use netstack3_base::{
     Counter, IcmpErrorCode, Icmpv4ErrorCode, Icmpv6ErrorCode, IpExt, UnscaledWindowSize,
     WeakDeviceIdentifier, WindowSize,
 };
-use netstack3_ip::socket::SendOptions;
+use netstack3_ip::socket::{RouteResolutionOptions, SendOptions};
 use netstack3_ip::Marks;
 use packet_formats::icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode};
 use packet_formats::ip::DscpAndEcn;
@@ -230,6 +230,16 @@ pub struct TcpIpSockOptions {
     pub marks: Marks,
 }
 
+impl<I: Ip> RouteResolutionOptions<I> for TcpIpSockOptions {
+    fn marks(&self) -> &Marks {
+        &self.marks
+    }
+
+    fn transparent(&self) -> bool {
+        false
+    }
+}
+
 impl<I: IpExt> SendOptions<I> for TcpIpSockOptions {
     fn hop_limit(&self, _destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
         None
@@ -245,10 +255,6 @@ impl<I: IpExt> SendOptions<I> for TcpIpSockOptions {
 
     fn dscp_and_ecn(&self) -> DscpAndEcn {
         DscpAndEcn::default()
-    }
-
-    fn marks(&self) -> &Marks {
-        &self.marks
     }
 }
 

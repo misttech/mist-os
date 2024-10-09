@@ -31,7 +31,9 @@ use crate::internal::raw::protocol::RawIpSocketProtocol;
 use crate::internal::raw::state::{RawIpSocketLockedState, RawIpSocketState};
 use crate::internal::routing::rules::{Mark, MarkDomain, Marks};
 use crate::internal::socket::{SendOneShotIpPacketError, SocketHopLimits};
-use crate::socket::{IpSockCreateAndSendError, IpSocketHandler, SendOptions};
+use crate::socket::{
+    IpSockCreateAndSendError, IpSocketHandler, RouteResolutionOptions, SendOptions,
+};
 use crate::DEFAULT_HOP_LIMITS;
 
 mod checksum;
@@ -172,7 +174,7 @@ where
             let (remote_ip, device) = remote_ip
                 .resolve_addr_with_device(bound_device.clone())
                 .map_err(RawIpSocketSendToError::Zone)?;
-            let send_options = RawIpSocketSendOptions {
+            let send_options = RawIpSocketOptions {
                 hop_limits: &hop_limits,
                 multicast_loop: *multicast_loop,
                 marks: &marks,
@@ -204,7 +206,6 @@ where
                     &send_options,
                     build_packet_fn,
                     None,
-                    false, /* transparent */
                 )
                 .map_err(|e| match e {
                     SendOneShotIpPacketError::CreateAndSendError { err } => {
@@ -783,13 +784,23 @@ fn check_packet_for_delivery<I: IpExt, D: StrongDeviceIdentifier, B: SplitByteSl
 }
 
 /// An implementation of [`SendOptions`] for raw IP sockets.
-struct RawIpSocketSendOptions<'a, I: Ip> {
+struct RawIpSocketOptions<'a, I: Ip> {
     hop_limits: &'a SocketHopLimits<I>,
     multicast_loop: bool,
     marks: &'a Marks,
 }
 
-impl<I: IpExt> SendOptions<I> for RawIpSocketSendOptions<'_, I> {
+impl<I: Ip> RouteResolutionOptions<I> for RawIpSocketOptions<'_, I> {
+    fn transparent(&self) -> bool {
+        false
+    }
+
+    fn marks(&self) -> &Marks {
+        self.marks
+    }
+}
+
+impl<I: IpExt> SendOptions<I> for RawIpSocketOptions<'_, I> {
     fn hop_limit(&self, destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
         self.hop_limits.hop_limit_for_dst(destination)
     }
@@ -804,10 +815,6 @@ impl<I: IpExt> SendOptions<I> for RawIpSocketSendOptions<'_, I> {
 
     fn dscp_and_ecn(&self) -> DscpAndEcn {
         DscpAndEcn::default()
-    }
-
-    fn marks(&self) -> &Marks {
-        self.marks
     }
 }
 

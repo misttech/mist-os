@@ -54,7 +54,7 @@ use crate::internal::device::nud::{ConfirmationFlags, NudIpHandler};
 use crate::internal::device::route_discovery::Ipv6DiscoveredRoute;
 use crate::internal::device::{IpAddressState, IpDeviceHandler, Ipv6DeviceHandler};
 use crate::internal::path_mtu::PmtuHandler;
-use crate::internal::socket::{DefaultSendOptions, IpSocketHandler};
+use crate::internal::socket::{DefaultIpSocketOptions, IpSocketHandler};
 
 /// The IP packet hop limit for all NDP packets.
 ///
@@ -1755,10 +1755,9 @@ fn send_icmp_reply<I, BC, CC, S, F>(
             IpDeviceAddr::new_from_socket_ip_addr(original_dst_ip),
             original_src_ip,
             I::ICMP_IP_PROTO,
-            &DefaultSendOptions,
+            &DefaultIpSocketOptions,
             |src_ip| get_body_from_src_ip(src_ip.into()),
             None,
-            false, /* transparent */
         )
         .unwrap_or_else(|err| {
             debug!("failed to send ICMP reply: {}", err);
@@ -2569,7 +2568,7 @@ fn send_icmpv4_error_message<
             None,
             original_src_ip,
             Ipv4Proto::Icmp,
-            &DefaultSendOptions,
+            &DefaultIpSocketOptions,
             |local_ip| {
                 original_packet.encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
                     local_ip.addr(),
@@ -2579,7 +2578,6 @@ fn send_icmpv4_error_message<
                 ))
             },
             None,
-            false, /* transparent */
         )
     );
 }
@@ -2624,7 +2622,7 @@ fn send_icmpv6_error_message<
             None,
             original_src_ip,
             Ipv6Proto::Icmpv6,
-            &DefaultSendOptions,
+            &DefaultIpSocketOptions,
             |local_ip| {
                 let icmp_builder = IcmpPacketBuilder::<Ipv6, _>::new(
                     local_ip.addr(),
@@ -2639,7 +2637,6 @@ fn send_icmpv6_error_message<
                     .encapsulate(icmp_builder)
             },
             Some(Ipv6::MINIMUM_LINK_MTU.get()),
-            false, /* transparent */
         )
     );
 }
@@ -2854,11 +2851,11 @@ mod tests {
     use packet_formats::utils::NonZeroDuration;
 
     use super::*;
-    use crate::internal::routing::rules::Marks;
     use crate::internal::socket::testutil::{FakeDeviceConfig, FakeIpSocketCtx};
     use crate::internal::socket::{
         IpSock, IpSockCreationError, IpSockSendError, IpSocketHandler, SendOptions,
     };
+    use crate::socket::RouteResolutionOptions;
 
     /// The FakeCoreCtx held as the inner state of [`FakeIcmpCoreCtx`].
     type InnerIpSocketCtx<I> = FakeCoreCtx<
@@ -3263,24 +3260,25 @@ mod tests {
     impl_pmtu_handler!(FakeIcmpCoreCtx<Ipv6>, FakeIcmpBindingsCtx<Ipv6>, Ipv6);
 
     impl<I: IpExt> IpSocketHandler<I, FakeIcmpBindingsCtx<I>> for FakeIcmpCoreCtx<I> {
-        fn new_ip_socket(
+        fn new_ip_socket<O>(
             &mut self,
             bindings_ctx: &mut FakeIcmpBindingsCtx<I>,
             device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
             local_ip: Option<IpDeviceAddr<I::Addr>>,
             remote_ip: SocketIpAddr<I::Addr>,
             proto: I::Proto,
-            transparent: bool,
-            marks: &Marks,
-        ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
+            options: &O,
+        ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError>
+        where
+            O: RouteResolutionOptions<I>,
+        {
             self.ip_socket_ctx.new_ip_socket(
                 bindings_ctx,
                 device,
                 local_ip,
                 remote_ip,
                 proto,
-                transparent,
-                marks,
+                options,
             )
         }
 
@@ -3295,18 +3293,20 @@ mod tests {
         where
             S: TransportPacketSerializer<I>,
             S::Buffer: BufferMut,
-            O: SendOptions<I>,
+            O: SendOptions<I> + RouteResolutionOptions<I>,
         {
             self.ip_socket_ctx.send_ip_packet(bindings_ctx, socket, body, mtu, options)
         }
 
-        fn confirm_reachable(
+        fn confirm_reachable<O>(
             &mut self,
             bindings_ctx: &mut FakeIcmpBindingsCtx<I>,
             socket: &IpSock<I, Self::WeakDeviceId>,
-            marks: &Marks,
-        ) {
-            self.ip_socket_ctx.confirm_reachable(bindings_ctx, socket, marks)
+            options: &O,
+        ) where
+            O: RouteResolutionOptions<I>,
+        {
+            self.ip_socket_ctx.confirm_reachable(bindings_ctx, socket, options)
         }
     }
 

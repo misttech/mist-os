@@ -40,15 +40,16 @@ use netstack3_base::{
 use netstack3_datagram::{
     self as datagram, BoundSocketState as DatagramBoundSocketState,
     BoundSocketStateType as DatagramBoundSocketStateType, BoundSockets as DatagramBoundSockets,
-    ConnectError, DatagramApi, DatagramBoundStateContext, DatagramFlowId, DatagramSocketMapSpec,
-    DatagramSocketOptions, DatagramSocketSet, DatagramSocketSpec, DatagramSpecBoundStateContext,
-    DatagramSpecStateContext, DatagramStateContext, DualStackConnState, DualStackConverter,
-    DualStackDatagramBoundStateContext, DualStackDatagramSpecBoundStateContext, DualStackIpExt,
-    EitherIpSocket, ExpectedConnError, ExpectedUnboundError, InUseError, IpExt, IpOptions,
-    MulticastMembershipInterfaceSelector, NonDualStackConverter,
-    NonDualStackDatagramBoundStateContext, NonDualStackDatagramSpecBoundStateContext,
-    SendError as DatagramSendError, SetMulticastMembershipError, SocketInfo,
-    SocketState as DatagramSocketState, WrapOtherStackIpOptions, WrapOtherStackIpOptionsMut,
+    ConnectError, DatagramApi, DatagramBoundStateContext, DatagramFlowId,
+    DatagramIpSpecificSocketOptions, DatagramSocketMapSpec, DatagramSocketSet, DatagramSocketSpec,
+    DatagramSpecBoundStateContext, DatagramSpecStateContext, DatagramStateContext,
+    DualStackConnState, DualStackConverter, DualStackDatagramBoundStateContext,
+    DualStackDatagramSpecBoundStateContext, DualStackIpExt, EitherIpSocket, ExpectedConnError,
+    ExpectedUnboundError, InUseError, IpExt, IpOptions, MulticastMembershipInterfaceSelector,
+    NonDualStackConverter, NonDualStackDatagramBoundStateContext,
+    NonDualStackDatagramSpecBoundStateContext, SendError as DatagramSendError,
+    SetMulticastMembershipError, SocketInfo, SocketState as DatagramSocketState,
+    WrapOtherStackIpOptions, WrapOtherStackIpOptionsMut,
 };
 use netstack3_ip::socket::{
     IpSockCreateAndSendError, IpSockCreationError, IpSockSendError, SocketHopLimits,
@@ -537,7 +538,7 @@ pub struct DualStackSocketState<D: WeakDeviceIdentifier> {
     dual_stack_enabled: bool,
 
     /// Send options used when sending on the IPv4 stack.
-    socket_options: DatagramSocketOptions<Ipv4, D>,
+    socket_options: DatagramIpSpecificSocketOptions<Ipv4, D>,
 }
 
 /// Serialization errors for Udp Packets.
@@ -1956,7 +1957,7 @@ where
                 |(IpInvariant(unicast_hop_limit), WrapOtherStackIpOptionsMut(other_stack))| {
                     let DualStackSocketState {
                         socket_options:
-                            DatagramSocketOptions {
+                            DatagramIpSpecificSocketOptions {
                                 hop_limits: SocketHopLimits { unicast, multicast: _, version: _ },
                                 ..
                             },
@@ -1995,7 +1996,7 @@ where
                 |(IpInvariant(multicast_hop_limit), WrapOtherStackIpOptionsMut(other_stack))| {
                     let DualStackSocketState {
                         socket_options:
-                            DatagramSocketOptions {
+                            DatagramIpSpecificSocketOptions {
                                 hop_limits: SocketHopLimits { unicast: _, multicast, version: _ },
                                 ..
                             },
@@ -2036,7 +2037,7 @@ where
                     )| {
                         let DualStackSocketState {
                             socket_options:
-                                DatagramSocketOptions {
+                                DatagramIpSpecificSocketOptions {
                                     hop_limits:
                                         SocketHopLimits { unicast, multicast: _, version: _ },
                                     ..
@@ -2078,7 +2079,7 @@ where
                     )| {
                         let DualStackSocketState {
                             socket_options:
-                                DatagramSocketOptions {
+                                DatagramIpSpecificSocketOptions {
                                     hop_limits:
                                         SocketHopLimits { unicast: _, multicast, version: _ },
                                     ..
@@ -2613,7 +2614,7 @@ impl<
     fn to_other_socket_options<'a>(
         _core_ctx: &CC,
         state: &'a IpOptions<Ipv6, CC::WeakDeviceId, Udp<BC>>,
-    ) -> &'a DatagramSocketOptions<Ipv4, CC::WeakDeviceId> {
+    ) -> &'a DatagramIpSpecificSocketOptions<Ipv4, CC::WeakDeviceId> {
         &state.other_stack().socket_options
     }
 

@@ -629,7 +629,7 @@ where
 
     match data_acked {
         DataAcked::Yes => {
-            core_ctx.confirm_reachable(bindings_ctx, ip_sock, &socket_options.ip_options.marks)
+            core_ctx.confirm_reachable(bindings_ctx, ip_sock, &socket_options.ip_options)
         }
         DataAcked::No => {}
     }
@@ -651,7 +651,7 @@ where
             if handshake_status
                 .update_if_pending(HandshakeStatus::Completed { reported: accept_queue.is_some() })
             {
-                core_ctx.confirm_reachable(bindings_ctx, ip_sock, &socket_options.ip_options.marks);
+                core_ctx.confirm_reachable(bindings_ctx, ip_sock, &socket_options.ip_options);
             }
         }
         State::Closed(Closed { reason }) => {
@@ -892,8 +892,7 @@ where
         IpDeviceAddr::new_from_socket_ip_addr(local_ip),
         remote_ip,
         IpProto::Tcp.into(),
-        false, /* transparent */
-        &socket_options.ip_options.marks,
+        &socket_options.ip_options,
     ) {
         Ok(ip_sock) => ip_sock,
         err @ Err(IpSockCreationError::Route(_)) => {
@@ -909,7 +908,7 @@ where
         (ip_sock.local_ip().clone().into(), local_port),
         (ip_sock.remote_ip().clone(), remote_port),
     );
-    let device_mms = match core_ctx.get_mms(bindings_ctx, &ip_sock) {
+    let device_mms = match core_ctx.get_mms(bindings_ctx, &ip_sock, &socket_options.ip_options) {
         Ok(mms) => mms,
         Err(err) => {
             // If we cannot find a device or the device's MTU is too small,

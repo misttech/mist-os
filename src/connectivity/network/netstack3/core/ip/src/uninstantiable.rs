@@ -10,13 +10,10 @@ use netstack3_base::{
 };
 use netstack3_filter::Tuple;
 
-use packet::{BufferMut, Serializer};
-
 use crate::internal::base::{BaseTransportIpContext, HopLimits, IpLayerIpExt};
-use crate::internal::routing::rules::Marks;
 use crate::internal::socket::{
     DeviceIpSocketHandler, IpSock, IpSockCreationError, IpSockSendError, IpSocketHandler, MmsError,
-    SendOptions,
+    RouteResolutionOptions,
 };
 
 impl<I: IpExt, C, P: DeviceIdContext<AnyDevice>> BaseTransportIpContext<I, C>
@@ -41,18 +38,18 @@ impl<I: IpExt, C, P: DeviceIdContext<AnyDevice>> BaseTransportIpContext<I, C>
 impl<I: IpExt, C, P: DeviceIdContext<AnyDevice>> IpSocketHandler<I, C>
     for UninstantiableWrapper<P>
 {
-    fn new_ip_socket(
+    fn new_ip_socket<O>(
         &mut self,
         _ctx: &mut C,
         _device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
         _local_ip: Option<IpDeviceAddr<I::Addr>>,
         _remote_ip: SocketIpAddr<I::Addr>,
         _proto: I::Proto,
-        _transparent: bool,
-        _marks: &Marks,
+        _options: &O,
     ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
         self.uninstantiable_unreachable()
     }
+
     fn send_ip_packet<S, O>(
         &mut self,
         _ctx: &mut C,
@@ -60,20 +57,15 @@ impl<I: IpExt, C, P: DeviceIdContext<AnyDevice>> IpSocketHandler<I, C>
         _body: S,
         _mtu: Option<u32>,
         _options: &O,
-    ) -> Result<(), IpSockSendError>
-    where
-        S: Serializer,
-        S::Buffer: BufferMut,
-        O: SendOptions<I>,
-    {
+    ) -> Result<(), IpSockSendError> {
         self.uninstantiable_unreachable()
     }
 
-    fn confirm_reachable(
+    fn confirm_reachable<O>(
         &mut self,
         _bindings_ctx: &mut C,
         _socket: &IpSock<I, Self::WeakDeviceId>,
-        _marks: &Marks,
+        _options: &O,
     ) {
         self.uninstantiable_unreachable()
     }
@@ -82,10 +74,11 @@ impl<I: IpExt, C, P: DeviceIdContext<AnyDevice>> IpSocketHandler<I, C>
 impl<I: IpLayerIpExt, C, P: DeviceIpSocketHandler<I, C>> DeviceIpSocketHandler<I, C>
     for UninstantiableWrapper<P>
 {
-    fn get_mms(
+    fn get_mms<O: RouteResolutionOptions<I>>(
         &mut self,
-        _ctx: &mut C,
+        _bindings_ctx: &mut C,
         _ip_sock: &IpSock<I, Self::WeakDeviceId>,
+        _options: &O,
     ) -> Result<Mms, MmsError> {
         self.uninstantiable_unreachable()
     }

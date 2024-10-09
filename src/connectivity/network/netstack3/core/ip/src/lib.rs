@@ -132,7 +132,9 @@ pub mod icmp {
 /// Marker traits controlling IP context behavior.
 pub mod marker {
     pub use crate::internal::base::{UseIpSocketContextBlanket, UseTransportIpContextBlanket};
-    pub use crate::internal::socket::{UseDeviceIpSocketHandlerBlanket, UseIpSocketHandlerBlanket};
+    pub use crate::internal::socket::{
+        OptionDelegationMarker, UseDeviceIpSocketHandlerBlanket, UseIpSocketHandlerBlanket,
+    };
 }
 
 /// Neighbor Unreachability Detection.
@@ -167,9 +169,10 @@ pub mod socket {
         select_ipv6_source_address, SasCandidate,
     };
     pub use crate::internal::socket::{
-        DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError,
-        IpSockCreationError, IpSockDefinition, IpSockSendError, IpSocketBindingsContext,
-        IpSocketContext, IpSocketHandler, MmsError, SendOneShotIpPacketError, SendOptions,
+        DefaultIpSocketOptions, DelegatedRouteResolutionOptions, DelegatedSendOptions,
+        DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError, IpSockCreationError,
+        IpSockDefinition, IpSockSendError, IpSocketBindingsContext, IpSocketContext,
+        IpSocketHandler, MmsError, RouteResolutionOptions, SendOneShotIpPacketError, SendOptions,
         SocketHopLimits,
     };
 
