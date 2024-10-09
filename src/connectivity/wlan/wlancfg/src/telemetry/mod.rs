@@ -366,6 +366,9 @@ pub enum TelemetryEvent {
     GetTimeSeries {
         sender: oneshot::Sender<Arc<Mutex<TimeSeriesStats>>>,
     },
+    SmeTimeout {
+        source: TimeoutSource,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -464,6 +467,20 @@ impl RecoveryRecord {
             RecoveryReason::DestroyIfaceFailure(_) => self.destroy_iface_failure = Some(reason),
         }
     }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum TimeoutSource {
+    Scan,
+    Connect,
+    Disconnect,
+    ClientStatus,
+    WmmStatus,
+    ApStart,
+    ApStop,
+    ApStatus,
+    GetCounterStats,
+    GetHistogramStats,
 }
 
 pub type RecoveryOutcome = metrics::ConnectivityWlanMetricDimensionResult;
@@ -1511,6 +1528,9 @@ impl Telemetry {
             }
             TelemetryEvent::GetTimeSeries { sender } => {
                 let _result = sender.send(Arc::clone(&self.stats_logger.time_series_stats));
+            }
+            TelemetryEvent::SmeTimeout { source } => {
+                self.stats_logger.log_sme_timeout(source).await
             }
         }
     }
@@ -3965,6 +3985,49 @@ impl StatsLogger {
                 .await;
             }
         }
+    }
+
+    async fn log_sme_timeout(&mut self, source: TimeoutSource) {
+        let dimension = match source {
+            TimeoutSource::Scan => {
+                metrics::SmeOperationTimeoutMetricDimensionStalledOperation::Scan_
+            }
+            TimeoutSource::Connect => {
+                metrics::SmeOperationTimeoutMetricDimensionStalledOperation::Connect_
+            }
+            TimeoutSource::Disconnect => {
+                metrics::SmeOperationTimeoutMetricDimensionStalledOperation::Disconnect_
+            }
+            TimeoutSource::ClientStatus => {
+                metrics::SmeOperationTimeoutMetricDimensionStalledOperation::ClientStatus_
+            }
+            TimeoutSource::WmmStatus => {
+                metrics::SmeOperationTimeoutMetricDimensionStalledOperation::WmmStatus_
+            }
+            TimeoutSource::ApStart => {
+                metrics::SmeOperationTimeoutMetricDimensionStalledOperation::ApStart_
+            }
+            TimeoutSource::ApStop => {
+                metrics::SmeOperationTimeoutMetricDimensionStalledOperation::ApStop_
+            }
+            TimeoutSource::ApStatus => {
+                metrics::SmeOperationTimeoutMetricDimensionStalledOperation::ApStatus_
+            }
+            TimeoutSource::GetCounterStats => {
+                metrics::SmeOperationTimeoutMetricDimensionStalledOperation::GetCounterStats_
+            }
+            TimeoutSource::GetHistogramStats => {
+                metrics::SmeOperationTimeoutMetricDimensionStalledOperation::GetHistogramStats_
+            }
+        };
+
+        self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
+            self.cobalt_1dot1_proxy,
+            log_occurrence,
+            metrics::SME_OPERATION_TIMEOUT_METRIC_ID,
+            1,
+            &[dimension.as_event_code()],
+        ))
     }
 }
 
@@ -9286,6 +9349,82 @@ mod tests {
             test_helper.get_logged_metrics(metrics::CONNECTION_RSSI_AVERAGE_METRIC_ID).len(),
             1
         );
+    }
+
+    #[test_case(
+        TimeoutSource::Scan,
+        metrics::SmeOperationTimeoutMetricDimensionStalledOperation::Scan_ ;
+        "log scan timeout"
+    )]
+    #[test_case(
+        TimeoutSource::Connect,
+        metrics::SmeOperationTimeoutMetricDimensionStalledOperation::Connect_ ;
+        "log connect"
+    )]
+    #[test_case(
+        TimeoutSource::Disconnect,
+        metrics::SmeOperationTimeoutMetricDimensionStalledOperation::Disconnect_ ;
+        "log disconnect timeout"
+    )]
+    #[test_case(
+        TimeoutSource::ClientStatus,
+        metrics::SmeOperationTimeoutMetricDimensionStalledOperation::ClientStatus_ ;
+        "log client status timeout"
+    )]
+    #[test_case(
+        TimeoutSource::WmmStatus,
+        metrics::SmeOperationTimeoutMetricDimensionStalledOperation::WmmStatus_ ;
+        "log WMM status timeout"
+    )]
+    #[test_case(
+        TimeoutSource::ApStart,
+        metrics::SmeOperationTimeoutMetricDimensionStalledOperation::ApStart_ ;
+        "log AP start timeout"
+    )]
+    #[test_case(
+        TimeoutSource::ApStop,
+        metrics::SmeOperationTimeoutMetricDimensionStalledOperation::ApStop_ ;
+        "log Ap stop timeout"
+    )]
+    #[test_case(
+        TimeoutSource::ApStatus,
+        metrics::SmeOperationTimeoutMetricDimensionStalledOperation::ApStatus_ ;
+        "log AP status timeout"
+    )]
+    #[test_case(
+        TimeoutSource::GetCounterStats,
+        metrics::SmeOperationTimeoutMetricDimensionStalledOperation::GetCounterStats_ ;
+        "log counter stats timeout"
+    )]
+    #[test_case(
+        TimeoutSource::GetHistogramStats,
+        metrics::SmeOperationTimeoutMetricDimensionStalledOperation::GetHistogramStats_ ;
+        "log histogram stats timeout"
+    )]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_log_sme_timeout(
+        source: TimeoutSource,
+        expected_dimension: metrics::SmeOperationTimeoutMetricDimensionStalledOperation,
+    ) {
+        let (mut test_helper, mut test_fut) = setup_test();
+
+        // Send the timeout event
+        test_helper.telemetry_sender.send(TelemetryEvent::SmeTimeout { source });
+
+        // Run the telemetry loop until it stalls.
+        assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
+
+        // Expect that Cobalt has been notified of the timeout
+        assert_variant!(
+            test_helper.exec.run_until_stalled(&mut test_helper.cobalt_1dot1_stream.next()),
+            Poll::Ready(Some(Ok(fidl_fuchsia_metrics::MetricEventLoggerRequest::LogOccurrence {
+                metric_id, event_codes, responder, ..
+            }))) => {
+                assert_eq!(metric_id, metrics::SME_OPERATION_TIMEOUT_METRIC_ID);
+                assert_eq!(event_codes, vec![expected_dimension.as_event_code()]);
+
+                assert!(responder.send(Ok(())).is_ok());
+        });
     }
 
     struct TestHelper {
