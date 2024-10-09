@@ -308,8 +308,7 @@ class ProcessDispatcher final
   }
 
   // Restricted mode is allowed to know about the internals of the aspaces.
-  friend zx_status_t RestrictedEnter(uint32_t options, uintptr_t vector_table_ptr,
-                                     uintptr_t context);
+  friend zx_status_t RestrictedEnter(uintptr_t vector_table_ptr, uintptr_t context);
   friend void RedirectRestrictedExceptionToNormalMode(RestrictedState* rs);
   template <typename T>
   friend void RestrictedLeave(const T* restricted_state_source, zx_restricted_reason_t reason);

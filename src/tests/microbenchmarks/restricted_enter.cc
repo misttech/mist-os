@@ -214,8 +214,7 @@ bool RestrictedEnterAndExitViaSyscall(perftest::RepeatState* state) {
   RestrictedState restricted_state(reinterpret_cast<uintptr_t>(bounce));
   uint64_t exit_code;
   while (state->KeepRunning()) {
-    ASSERT_OK(restricted_enter_wrapper(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL,
-                                       reinterpret_cast<uintptr_t>(vectab), &exit_code));
+    ASSERT_OK(restricted_enter_wrapper(0, reinterpret_cast<uintptr_t>(vectab), &exit_code));
   }
   return true;
 }

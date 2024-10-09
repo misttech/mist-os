@@ -1322,10 +1322,6 @@ pub struct zx_thread_state_general_regs_t {
     pub t6: u64,  // x31
 }
 
-multiconst!(u32, [
-    ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL = 1;
-]);
-
 multiconst!(zx_restricted_reason_t, [
     ZX_RESTRICTED_REASON_SYSCALL = 0;
     ZX_RESTRICTED_REASON_EXCEPTION = 1;
