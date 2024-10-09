@@ -456,11 +456,8 @@ pub(super) fn file_system_resolve_security(
         pending_entries
     };
 
-    // TODO: https://fxbug.dev/369328835 - Attempting to label from xattr here can deadlock, with the "fuse" file-system.
-    if file_system.name() != "fuse" {
-        if let Some(root_dir_entry) = file_system.maybe_root() {
-            fs_node_init_with_dentry(security_server, current_task, root_dir_entry)?;
-        }
+    if let Some(root_dir_entry) = file_system.maybe_root() {
+        fs_node_init_with_dentry(security_server, current_task, root_dir_entry)?;
     }
 
     // Label the `FsNode`s for any `pending_entries`.
