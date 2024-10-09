@@ -435,9 +435,6 @@ impl SecurityServer {
 
     /// Computes the precise access vector for `source_sid` targeting `target_sid` as class
     /// `target_class`.
-    //
-    // TODO(http://b/305722921): Implement complete access decision logic. For now, the security
-    // server abides by explicit `allow [source] [target]:[class] [permissions..];` statements.
     pub fn compute_access_vector(
         &self,
         source_sid: SecurityId,
@@ -456,6 +453,12 @@ impl SecurityServer {
         let source_context = state.sid_to_security_context(source_sid);
         let target_context = state.sid_to_security_context(target_sid);
 
+        // Access decisions are currently based solely on explicit "allow" rules.
+        // TODO: https://fxbug.dev/372400976 - Include permissions from matched "constraints"
+        // rules in the policy.
+        // TODO: https://fxbug.dev/372401676 - Include permissions from "attribute"s associated
+        // with the source & target types via "typeattribute" rules.
+        // TODO: https://fxbug.dev/372400419 - Validate that "neverallow" rules are respected.
         match target_class {
             AbstractObjectClass::System(target_class) => policy.parsed.compute_explicitly_allowed(
                 source_context.type_(),
