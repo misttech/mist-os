@@ -25,7 +25,7 @@ per-file             set = olivernewman@google.com
 
 per-file             test = file: /src/sys/test_manager/OWNERS
 
-per-file             testgen = crjohns@google.com,dworsham@google.com,kjharland@google.com
+per-file             testgen = crjohns@google.com,kjharland@google.com
 
 per-file go = olivernewman@google.com
 
