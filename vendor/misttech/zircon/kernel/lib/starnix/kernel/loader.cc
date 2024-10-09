@@ -199,11 +199,11 @@ auto GetDiagnostics() {
                                    [](auto&&... args) {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-nonliteral"
-                                     if (LOCAL_TRACE)
-                                       printf(args...);
+                                     printf(ktl::forward<decltype(args)>(args)...);
+                                     printf("\n");
 #pragma GCC diagnostic pop
                                    },
-                                   "resolve_elf: "),
+                                   "loader: "),
                                elfldltl::DiagnosticsPanicFlags());
 }
 
