@@ -1991,6 +1991,19 @@ impl MemoryManagerState {
             MappingBacking::PrivateAnonymous => self.private_anonymous.zero(addr, length),
         }
     }
+
+    fn get_aio_context(&self, addr: UserAddress) -> Option<(Range<UserAddress>, Arc<AioContext>)> {
+        let Some((range, mapping)) = self.mappings.get(&addr) else {
+            return None;
+        };
+        let MappingName::AioContext(ref aio_context) = mapping.name else {
+            return None;
+        };
+        if !mapping.can_read() {
+            return None;
+        }
+        Some((range.clone(), aio_context.clone()))
+    }
 }
 
 fn create_user_vmar(vmar: &zx::Vmar, vmar_info: &zx::VmarInfo) -> Result<zx::Vmar, zx::Status> {
@@ -3615,16 +3628,13 @@ impl MemoryManager {
 
     pub fn get_aio_context(&self, addr: UserAddress) -> Option<Arc<AioContext>> {
         let state = self.state.read();
-        let Some((_, mapping)) = state.mappings.get(&addr) else {
-            return None;
-        };
-        let MappingName::AioContext(ref aio_context) = mapping.name else {
-            return None;
-        };
-        Some(aio_context.clone())
+        state.get_aio_context(addr).map(|(_, aio_context)| aio_context)
     }
 
-    pub fn destroy_aio_context(self: &Arc<Self>, addr: UserAddress) -> Result<(), Errno> {
+    pub fn destroy_aio_context(
+        self: &Arc<Self>,
+        addr: UserAddress,
+    ) -> Result<Arc<AioContext>, Errno> {
         let mut released_mappings = vec![];
 
         // Hold the lock throughout the operation to uphold memory manager's invariants.
@@ -3634,13 +3644,10 @@ impl MemoryManager {
         // Validate that this address actually has an AioContext. We need to hold the state lock
         // until we actually remove the mappings to ensure that another thread does not manipulate
         // the mappings after we've validated that they contain an AioContext.
-        let Some((range, mapping)) = state.mappings.get(&addr) else {
+        let Some((range, aio_context)) = state.get_aio_context(addr) else {
             return error!(EINVAL);
         };
-        let MappingName::AioContext(_) = mapping.name else {
-            return error!(EINVAL);
-        };
-        let range = range.clone();
+
         let length = range.end - range.start;
         let result = state.unmap(self, range.start, length, &mut released_mappings);
 
@@ -3649,7 +3656,7 @@ impl MemoryManager {
         std::mem::drop(state);
         std::mem::drop(released_mappings);
 
-        result
+        result.map(|_| aio_context)
     }
 
     #[cfg(test)]

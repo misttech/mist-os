@@ -2964,8 +2964,9 @@ pub fn sys_io_destroy(
     current_task: &CurrentTask,
     ctx_id: aio_context_t,
 ) -> Result<(), Errno> {
-    current_task.mm().destroy_aio_context(ctx_id.into())
+    let _aio_context = current_task.mm().destroy_aio_context(ctx_id.into())?;
     // TODO: Drain the operation queue in the AioContext.
+    Ok(())
 }
 
 pub fn sys_io_uring_setup(

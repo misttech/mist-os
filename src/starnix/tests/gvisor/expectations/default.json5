@@ -155,7 +155,6 @@
 
                 // aio_test
                 "AIOTest.MremapExpansion",
-                "AIOTest.Mprotect",
                 "AIOTest.Mremap",
                 "AIOTest.Timeout",
                 "AIOTest.CloneVm",
