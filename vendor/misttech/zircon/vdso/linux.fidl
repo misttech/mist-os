@@ -890,8 +890,13 @@ closed protocol Linux {
         mode uint16;
     }) -> () error int64;
 
-    // STUB 258
-    strict A0258Mkdirat() -> () error int64;
+    // #258, SYSCALL_DEFINE3(mkdirat, int, dfd, const char __user *, pathname, umode_t, mode)
+    strict A0258Mkdirat(resource struct {
+        dfd int32;
+        @in
+        pathname experimental_pointer<uchar>;
+        mode uint16;
+    }) -> () error int64;
 
     // STUB 259
     strict A0259Mknodat() -> () error int64;
@@ -917,8 +922,15 @@ closed protocol Linux {
     // STUB 266
     strict A0266Symlinkat() -> () error int64;
 
-    // STUB 267
-    strict A0267Readlinkat() -> () error int64;
+    // #267, SYSCALL_DEFINE4(readlinkat, int, dfd, const char __user *, pathname, char __user *, buf, int, bufsiz)
+    strict A0267Readlinkat(resource struct {
+        dfd int32;
+        @in
+        pathname experimental_pointer<uchar>;
+        @out
+        buf experimental_pointer<uchar>;
+        bufsiz int32;
+    }) -> () error int64;
 
     // STUB 268
     strict A0268Fchmodat() -> () error int64;
