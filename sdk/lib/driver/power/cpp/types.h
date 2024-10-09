@@ -77,6 +77,10 @@ enum class SagElement : uint32_t {
   kApplicationActivity = 4,
 };
 
+enum class CpuElement : uint32_t {
+  kCpu = 1,
+};
+
 // Identifier for an element that is another element's parent, in other words an element that the
 // other element depends upon.
 class ParentElement {
@@ -92,11 +96,15 @@ class ParentElement {
     // The parent element's access token should be available from
     // /svc/fuchsia.hardware.power.PowerTokenProvider/{instance_name}`.
     kInstanceName,
+
+    kCpu,
   };
 
   static ParentElement WithSag(SagElement sag);
 
   static ParentElement WithInstanceName(std::string instance_name);
+
+  static ParentElement WithCpu(CpuElement cpu);
 
   // Sets the type to `kSag`.
   void SetSag(SagElement sag);
@@ -104,18 +112,23 @@ class ParentElement {
   // Sets the type to `kInstanceName`.
   void SetInstanceName(std::string instance_name);
 
+  void SetCpu(CpuElement);
+
   // Returns nullopt if type is not `kSag`.
   std::optional<SagElement> GetSag() const;
 
   // Returns nullopt if type is not `kInstanceName`.
   std::optional<std::string> GetInstanceName() const;
 
+  std::optional<CpuElement> GetCpu() const;
+
   Type type() const { return type_; }
 
   bool operator==(const ParentElement& rhs) const;
 
  private:
-  using ValueType = std::variant<SagElement, std::string>;
+  using ValueType = std::variant<SagElement, std::string, CpuElement>;
+  void CheckTypeValueAlignment() const;
 
   friend std::hash<ParentElement>;
 
@@ -123,6 +136,7 @@ class ParentElement {
   // in `Type` because it is considered an implementation detail.
   static constexpr size_t kSagIndex = 0;
   static constexpr size_t kInstanceNameIndex = 1;
+  static constexpr size_t kCpuIndex = 2;
 
   explicit ParentElement(Type type, ValueType value) : type_(type), value_(std::move(value)) {}
 

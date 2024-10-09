@@ -176,7 +176,10 @@ zx::result<ParentElement> ParentElement::FromFidl(
       return zx::ok(ParentElement::WithInstanceName(fidl_instance_name.value()));
     }
     case fuchsia_hardware_power::ParentElement::Tag::kCpuControl: {
-      return zx::error(ZX_ERR_NOT_SUPPORTED);
+      if (!src.cpu_control().has_value()) {
+        return zx::error(ZX_ERR_INVALID_ARGS);
+      }
+      return zx::ok(ParentElement::WithCpu(fdf_power::CpuElement::kCpu));
     }
   }
 }
@@ -206,7 +209,12 @@ zx::result<ParentElement> ParentElement::FromFidl(
       return zx::ok(ParentElement::WithInstanceName(std::string{src.instance_name().get()}));
     }
     case fuchsia_hardware_power::wire::ParentElement::Tag::kCpuControl: {
-      return zx::error(ZX_ERR_NOT_SUPPORTED);
+      switch (src.cpu_control()) {
+        case fuchsia_hardware_power::wire::CpuPowerElement::kCpu:
+          return zx::ok(ParentElement::WithCpu(CpuElement::kCpu));
+        default:
+          return zx::error(ZX_ERR_NOT_SUPPORTED);
+      }
     }
   }
 }
@@ -351,13 +359,18 @@ zx::result<PowerElementConfiguration> PowerElementConfiguration::FromFidl(
 }
 
 ParentElement ParentElement::WithSag(SagElement sag) {
-  ValueType value{std::in_place_index<kSagIndex>, std::move(sag)};
+  ValueType value{std::in_place_index<kSagIndex>, sag};
   return ParentElement{Type::kSag, std::move(value)};
 }
 
 ParentElement ParentElement::WithInstanceName(std::string instance_name) {
   ValueType value{std::in_place_index<kInstanceNameIndex>, std::move(instance_name)};
   return ParentElement{Type::kInstanceName, std::move(value)};
+}
+
+ParentElement ParentElement::WithCpu(CpuElement cpu) {
+  ValueType value{std::in_place_index<kCpuIndex>, cpu};
+  return ParentElement{Type::kCpu, std::move(value)};
 }
 
 void ParentElement::SetSag(SagElement sag) {
@@ -370,12 +383,16 @@ void ParentElement::SetInstanceName(std::string instance_name) {
   value_.emplace<kInstanceNameIndex>(std::move(instance_name));
 }
 
+void ParentElement::SetCpu(CpuElement cpu) {
+  type_ = Type::kCpu;
+  value_.emplace<kCpuIndex>(cpu);
+}
+
 std::optional<SagElement> ParentElement::GetSag() const {
   if (type_ != Type::kSag) {
     return std::nullopt;
   }
-  ZX_ASSERT_MSG(value_.index() == kSagIndex, "Incorrect variant index: Expected %lu but got %lu",
-                kSagIndex, value_.index());
+  CheckTypeValueAlignment();
   return std::get<kSagIndex>(value_);
 }
 
@@ -383,10 +400,35 @@ std::optional<std::string> ParentElement::GetInstanceName() const {
   if (type_ != Type::kInstanceName) {
     return std::nullopt;
   }
-  ZX_ASSERT_MSG(value_.index() == kInstanceNameIndex,
-                "Incorrect variant index: Expected %lu but got %lu", kInstanceNameIndex,
-                value_.index());
+  CheckTypeValueAlignment();
   return std::get<kInstanceNameIndex>(value_);
+}
+
+std::optional<CpuElement> ParentElement::GetCpu() const {
+  if (type_ != Type::kCpu) {
+    return std::nullopt;
+  }
+
+  CheckTypeValueAlignment();
+  return std::get<kCpuIndex>(value_);
+}
+
+void ParentElement::CheckTypeValueAlignment() const {
+  size_t expected_idx = 0;
+  switch (type_) {
+    case Type::kSag:
+      expected_idx = kSagIndex;
+      break;
+    case Type::kInstanceName:
+      expected_idx = kInstanceNameIndex;
+      break;
+    case Type::kCpu:
+      expected_idx = kCpuIndex;
+      break;
+  }
+
+  ZX_ASSERT_MSG(value_.index() == expected_idx, "Incorrect variant index: Expected %lu but got %lu",
+                expected_idx, value_.index());
 }
 
 bool ParentElement::operator==(const ParentElement& rhs) const { return value_ == rhs.value_; }

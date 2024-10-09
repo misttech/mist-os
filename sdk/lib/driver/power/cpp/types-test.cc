@@ -430,6 +430,28 @@ TEST(TypesTest, ParentElementFromWireWithInstanceName) {
   ASSERT_EQ(parent_element->GetInstanceName(), std::optional<std::string>{"test parent element"});
 }
 
+TEST(TypesTest, ParentElementFromNaturalWithCpu) {
+  fuchsia_hardware_power::ParentElement fidl =
+      fuchsia_hardware_power::ParentElement::WithCpuControl(
+          fuchsia_hardware_power::CpuPowerElement::kCpu);
+
+  zx::result parent_element = ParentElement::FromFidl(fidl);
+  ASSERT_TRUE(parent_element.is_ok()) << parent_element.status_string();
+  ASSERT_EQ(parent_element->type(), ParentElement::Type::kCpu);
+  ASSERT_EQ(parent_element->GetCpu(), std::optional<CpuElement>(CpuElement::kCpu));
+}
+
+TEST(TypesTest, ParentElementFromWireWithCpu) {
+  fuchsia_hardware_power::wire::ParentElement fidl =
+      fuchsia_hardware_power::wire::ParentElement::WithCpuControl(
+          fuchsia_hardware_power::CpuPowerElement::kCpu);
+
+  zx::result parent_element = ParentElement::FromFidl(fidl);
+  ASSERT_TRUE(parent_element.is_ok()) << parent_element.status_string();
+  ASSERT_EQ(parent_element->type(), ParentElement::Type::kCpu);
+  ASSERT_EQ(parent_element->GetCpu(), std::optional<CpuElement>(CpuElement::kCpu));
+}
+
 // Power dependency tests.
 
 // Verify that `PowerDependency::FromFidl()` can convert a fuchsia_hardware_power::PowerDependency

@@ -153,6 +153,63 @@ fit::result<Error> RegisterDependencyToken(
   return fit::success();
 }
 
+fit::result<Error> GetTokensFromCpuElementManager(
+    ElementDependencyMap& dependencies, TokenMap& tokens,
+    const fidl::ClientEnd<fuchsia_io::Directory>& svcs_dir) {
+  // Connect to the CpuElementManager service.
+  zx::result<fidl::ClientEnd<fuchsia_power_system::CpuElementManager>> cpu_elements_connect =
+      component::ConnectAt<fuchsia_power_system::CpuElementManager>(svcs_dir);
+
+  if (cpu_elements_connect.is_error()) {
+    return fit::error(Error::CPU_ELEMENT_MANAGER_UNAVAILABLE);
+  }
+
+  fidl::WireSyncClient<fuchsia_power_system::CpuElementManager> cpu_elements;
+  cpu_elements.Bind(std::move(cpu_elements_connect.value()));
+
+  // Request the CPU token.
+  fidl::WireResult<fuchsia_power_system::CpuElementManager::GetCpuDependencyToken>
+      token_request_result = cpu_elements->GetCpuDependencyToken();
+  if (!token_request_result.ok()) {
+    if (token_request_result.is_peer_closed()) {
+      return fit::error(Error::CPU_ELEMENT_MANAGER_UNAVAILABLE);
+    }
+    return fit::error(Error::CPU_ELEMENT_MANAGER_REQUEST);
+  }
+
+  zx::event cpu_token = std::move(token_request_result->assertive_dependency_token());
+  if (!cpu_token.is_valid()) {
+    // Should we should assert?
+    return fit::error(Error::CPU_ELEMENT_MANAGER_REQUEST);
+  }
+
+  std::vector<ParentElement> found_parents = {};
+  for (const auto& [parent, deps] : dependencies) {
+    if (parent.type() != ParentElement::Type::kCpu) {
+      continue;
+    }
+
+    for (const fuchsia_power_broker::LevelDependency& dep : deps) {
+      if (dep.dependency_type() != fuchsia_power_broker::DependencyType::kAssertive) {
+        return zx::error(Error::INVALID_ARGS);
+      }
+    }
+    // Clone the token for each of the dependencies in the map that need it.
+    zx::event token_copy;
+    cpu_token.duplicate(ZX_RIGHT_SAME_RIGHTS, &token_copy);
+    tokens.emplace(std::make_pair(parent, std::move(token_copy)));
+
+    // Add the dep to the list we found.
+    found_parents.push_back(parent);
+  }
+
+  for (const ParentElement& found : found_parents) {
+    // Remove the dependency from the map so we record we found it.
+    dependencies.erase(found);
+  }
+  return fit::success();
+}
+
 fit::result<Error> GetTokensFromSag(ElementDependencyMap& dependencies, TokenMap& tokens,
                                     const fidl::ClientEnd<fuchsia_io::Directory>& svcs_dir) {
   zx::result<fidl::ClientEnd<fuchsia_power_system::ActivityGovernor>> governor_connect =
@@ -416,6 +473,7 @@ fit::result<Error, TokenMap> GetDependencyTokens(const PowerElementConfiguration
   // Check which kind of dependencies we have
   bool have_driver_dep = false;
   bool have_sag_dep = false;
+  bool have_cpu_dep = false;
   for (const auto& [parent, deps] : dependencies) {
     switch (parent.type()) {
       case ParentElement::Type::kSag:
@@ -424,10 +482,13 @@ fit::result<Error, TokenMap> GetDependencyTokens(const PowerElementConfiguration
       case ParentElement::Type::kInstanceName:
         have_driver_dep = true;
         break;
+      case ParentElement::Type::kCpu:
+        have_cpu_dep = true;
+        break;
       default:
         return fit::error(Error::INVALID_ARGS);
     }
-    if (have_driver_dep && have_sag_dep) {
+    if (have_driver_dep && have_sag_dep && have_cpu_dep) {
       break;
     }
   }
@@ -444,6 +505,14 @@ fit::result<Error, TokenMap> GetDependencyTokens(const PowerElementConfiguration
     fit::result<Error> sag_token_result = GetTokensFromSag(dependencies, tokens, svcs_dir);
     if (sag_token_result.is_error()) {
       return zx::error(sag_token_result.take_error());
+    }
+  }
+
+  if (have_cpu_dep) {
+    fit::result<Error> cpu_manager_result =
+        GetTokensFromCpuElementManager(dependencies, tokens, svcs_dir);
+    if (cpu_manager_result.is_error()) {
+      return zx::error(cpu_manager_result.take_error());
     }
   }
 

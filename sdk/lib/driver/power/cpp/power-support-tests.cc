@@ -1170,8 +1170,6 @@ TEST_F(PowerLibTest, ApplyPowerConfiguration) {
 
   // Create service token instances
   fidl::ServerBindingGroup<fuchsia_hardware_power::PowerTokenProvider> token_bindings;
-  fbl::RefPtr<fs::PseudoDir> power_token_service = fbl::MakeRefCounted<fs::PseudoDir>();
-
   AddInstanceResult instance_one_data = AddServiceInstance(loop.dispatcher(), &token_bindings);
   AddInstanceResult instance_two_data = AddServiceInstance(loop.dispatcher(), &token_bindings);
 
@@ -1372,6 +1370,33 @@ TEST_F(PowerLibTest, GetTokensOneLevelTwoDeps) {
   loop.JoinThreads();
 }
 
+class CpuElementManager : public fidl::testing::TestBase<fuchsia_power_system::CpuElementManager> {
+ public:
+  explicit CpuElementManager(zx::event cpu_dep_token) : cpu_dep_token_(std::move(cpu_dep_token)) {}
+
+  void GetCpuDependencyToken(GetCpuDependencyTokenCompleter::Sync& completer) override {
+    zx::event copy;
+    cpu_dep_token_.duplicate(ZX_RIGHT_SAME_RIGHTS, &copy);
+    completer.Reply({{std::move(copy)}});
+  }
+
+  void AddExecutionStateDependency(AddExecutionStateDependencyRequest& request,
+                                   AddExecutionStateDependencyCompleter::Sync& completer) override {
+    FAIL();
+  }
+
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_power_system::CpuElementManager> md,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    FAIL();
+  }
+
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override { FAIL(); }
+
+ private:
+  zx::event cpu_dep_token_;
+};
+
 class SystemActivityGovernor
     : public fidl::testing::TestBase<fuchsia_power_system::ActivityGovernor> {
  public:
@@ -1489,6 +1514,402 @@ TEST_F(PowerLibTest, TestSagElements) {
   map.at(parent).get_info(ZX_INFO_HANDLE_BASIC, &info2, sizeof(zx_info_handle_basic_t), nullptr,
                           nullptr);
   EXPECT_EQ(info1.koid, info2.koid);
+}
+
+TEST_F(PowerLibTest, TestCpuElementParent) {
+  // Configure our power dependency
+  fdf_power::ParentElement parent = fdf_power::ParentElement::WithCpu(fdf_power::CpuElement::kCpu);
+  fdf_power::PowerLevel zero({.level = 0, .name = "zero", .transitions{}});
+  fdf_power::PowerLevel one({.level = 1, .name = "one", .transitions{}});
+
+  fdf_power::PowerElement child_element{
+      .name = "child",
+      .levels = {zero, one},
+  };
+
+  // set up the element dependencies
+  fdf_power::LevelTuple one_on_three{
+      .child_level = 1,
+      .parent_level = 3,
+  };
+
+  fdf_power::PowerDependency child_to_parent_dep{
+      .child = "little_one",
+      .parent = parent,
+      .level_deps = {one_on_three},
+      .strength = fdf_power::RequirementType::kAssertive,
+  };
+
+  fdf_power::PowerElementConfiguration pe_config{.element = child_element,
+                                                 .dependencies = {child_to_parent_dep}};
+
+  // Set up fake CPU element server
+  zx::event token;
+  zx::event::create(0, &token);
+  zx::event token_copy;
+  token.duplicate(ZX_RIGHT_SAME_RIGHTS, &token_copy);
+  CpuElementManager cpu_element_mgr(std::move(token_copy));
+
+  // Make the glue for FIDL calls to go to the fake
+  // we'll need a separate dispatcher so we can run sync code in the test
+  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+  loop.StartThread();
+
+  fidl::ServerBindingGroup<fuchsia_power_system::CpuElementManager> bindings;
+  fbl::RefPtr<fs::Service> cpu_element_mgr_server = fbl::MakeRefCounted<fs::Service>(
+      [&](fidl::ServerEnd<fuchsia_power_system::CpuElementManager> chan) {
+        bindings.AddBinding(loop.dispatcher(), std::move(chan), &cpu_element_mgr,
+                            fidl::kIgnoreBindingClosure);
+        return ZX_OK;
+      });
+
+  // Add entry for the service to a directory and serve the directory
+  fbl::RefPtr<fs::PseudoDir> svcs_dir = fbl::MakeRefCounted<fs::PseudoDir>();
+  svcs_dir->AddEntry("fuchsia.power.system.CpuElementManager", cpu_element_mgr_server);
+  fidl::Endpoints<fuchsia_io::Directory> svcs_dir_channel =
+      fidl::Endpoints<fuchsia_io::Directory>::Create();
+  fs::SynchronousVfs vfs(loop.dispatcher());
+  vfs.ServeDirectory(std::move(svcs_dir), std::move(svcs_dir_channel.server));
+
+  // Wire the services directory into the namespace
+  std::vector<fuchsia_component_runner::ComponentNamespaceEntry> namespace_entries;
+  namespace_entries.emplace_back(fuchsia_component_runner::ComponentNamespaceEntry{
+      {.path = "/svc", .directory = std::move(svcs_dir_channel.client)}});
+  fdf::Namespace ns = fdf::Namespace::Create(namespace_entries).value();
+
+  // call the function under test
+  fit::result<fdf_power::Error, fdf_power::TokenMap> token_result =
+      fdf_power::GetDependencyTokens(ns, pe_config);
+
+  loop.Shutdown();
+  loop.JoinThreads();
+
+  EXPECT_TRUE(token_result.is_ok());
+
+  fdf_power::TokenMap tokens = std::move(token_result.value());
+
+  // Check that we have just one token in the map
+  EXPECT_EQ(tokens.size(), size_t{1});
+  const zx::event& retrieved_token = tokens.at(parent);
+
+  // Check that the token we got matches what we expect
+  zx_info_handle_basic_t retreived_info, original_info;
+  retrieved_token.get_info(ZX_INFO_HANDLE_BASIC, &retreived_info, sizeof(zx_info_handle_basic_t),
+                           nullptr, nullptr);
+  token.get_info(ZX_INFO_HANDLE_BASIC, &original_info, sizeof(zx_info_handle_basic_t), nullptr,
+                 nullptr);
+  EXPECT_EQ(retreived_info.koid, original_info.koid);
+}
+
+TEST_F(PowerLibTest, TestCpuElementManagerCloseOnRequest) {
+  class ErrorCpuElementManager
+      : public fidl::testing::TestBase<fuchsia_power_system::CpuElementManager> {
+   public:
+    ErrorCpuElementManager() = default;
+
+    void GetCpuDependencyToken(GetCpuDependencyTokenCompleter::Sync& completer) override {
+      completer.Close(ZX_OK);
+    }
+
+    void AddExecutionStateDependency(
+        AddExecutionStateDependencyRequest& request,
+        AddExecutionStateDependencyCompleter::Sync& completer) override {}
+
+    void handle_unknown_method(
+        fidl::UnknownMethodMetadata<fuchsia_power_system::CpuElementManager> md,
+        fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+    void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {}
+  };
+
+  ErrorCpuElementManager mgr = ErrorCpuElementManager();
+
+  // Configure out power dependency
+  fdf_power::ParentElement parent = fdf_power::ParentElement::WithCpu(fdf_power::CpuElement::kCpu);
+  fdf_power::PowerLevel zero({.level = 0, .name = "zero", .transitions{}});
+  fdf_power::PowerLevel one({.level = 1, .name = "one", .transitions{}});
+
+  fdf_power::PowerElement child_element{
+      .name = "child",
+      .levels = {zero, one},
+  };
+
+  // set up the element dependencies
+  fdf_power::LevelTuple one_on_three{
+      .child_level = 1,
+      .parent_level = 3,
+  };
+
+  fdf_power::PowerDependency child_to_parent_dep{
+      .child = "little_one",
+      .parent = parent,
+      .level_deps = {one_on_three},
+      .strength = fdf_power::RequirementType::kAssertive,
+  };
+
+  fdf_power::PowerElementConfiguration pe_config{.element = child_element,
+                                                 .dependencies = {child_to_parent_dep}};
+
+  // Make the glue for FIDL calls to go to the fake
+  // we'll need a separate dispatcher so we can run sync code in the test
+  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+  loop.StartThread();
+
+  fidl::ServerBindingGroup<fuchsia_power_system::CpuElementManager> bindings;
+  fbl::RefPtr<fs::Service> cpu_element_mgr_server = fbl::MakeRefCounted<fs::Service>(
+      [&](fidl::ServerEnd<fuchsia_power_system::CpuElementManager> chan) {
+        bindings.AddBinding(loop.dispatcher(), std::move(chan), &mgr, fidl::kIgnoreBindingClosure);
+        return ZX_OK;
+      });
+
+  // Add entry for the service to a directory and serve the directory
+  fbl::RefPtr<fs::PseudoDir> svcs_dir = fbl::MakeRefCounted<fs::PseudoDir>();
+  svcs_dir->AddEntry("fuchsia.power.system.CpuElementManager", cpu_element_mgr_server);
+  fidl::Endpoints<fuchsia_io::Directory> svcs_dir_channel =
+      fidl::Endpoints<fuchsia_io::Directory>::Create();
+  fs::SynchronousVfs vfs(loop.dispatcher());
+  vfs.ServeDirectory(std::move(svcs_dir), std::move(svcs_dir_channel.server));
+
+  // Wire the services directory into the namespace
+  std::vector<fuchsia_component_runner::ComponentNamespaceEntry> namespace_entries;
+  namespace_entries.emplace_back(fuchsia_component_runner::ComponentNamespaceEntry{
+      {.path = "/svc", .directory = std::move(svcs_dir_channel.client)}});
+  fdf::Namespace ns = fdf::Namespace::Create(namespace_entries).value();
+
+  // call the function under test
+  fit::result<fdf_power::Error, fdf_power::TokenMap> token_result =
+      fdf_power::GetDependencyTokens(ns, pe_config);
+
+  loop.Shutdown();
+  loop.JoinThreads();
+
+  ASSERT_TRUE(token_result.is_error());
+  ASSERT_EQ(token_result.error_value(), fdf_power::Error::CPU_ELEMENT_MANAGER_UNAVAILABLE);
+}
+
+TEST_F(PowerLibTest, TestCpuElementParentNotAvailable) {
+  // Configure out power dependency
+  fdf_power::ParentElement parent = fdf_power::ParentElement::WithCpu(fdf_power::CpuElement::kCpu);
+  fdf_power::PowerLevel zero({.level = 0, .name = "zero", .transitions{}});
+  fdf_power::PowerLevel one({.level = 1, .name = "one", .transitions{}});
+
+  fdf_power::PowerElement child_element{
+      .name = "child",
+      .levels = {zero, one},
+  };
+
+  // set up the element dependencies
+  fdf_power::LevelTuple one_on_three{
+      .child_level = 1,
+      .parent_level = 3,
+  };
+
+  fdf_power::PowerDependency child_to_parent_dep{
+      .child = "little_one",
+      .parent = parent,
+      .level_deps = {one_on_three},
+      .strength = fdf_power::RequirementType::kAssertive,
+  };
+
+  fdf_power::PowerElementConfiguration pe_config{.element = child_element,
+                                                 .dependencies = {child_to_parent_dep}};
+
+  // Make the glue for FIDL calls to go to the fake
+  // we'll need a separate dispatcher so we can run sync code in the test
+  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+  loop.StartThread();
+
+  // Add directory for the service, but do NOT add a service instance
+  fbl::RefPtr<fs::PseudoDir> svcs_dir = fbl::MakeRefCounted<fs::PseudoDir>();
+  fidl::Endpoints<fuchsia_io::Directory> svcs_dir_channel =
+      fidl::Endpoints<fuchsia_io::Directory>::Create();
+  fs::SynchronousVfs vfs(loop.dispatcher());
+  vfs.ServeDirectory(std::move(svcs_dir), std::move(svcs_dir_channel.server));
+
+  // Wire the services directory into the namespace
+  std::vector<fuchsia_component_runner::ComponentNamespaceEntry> namespace_entries;
+  namespace_entries.emplace_back(fuchsia_component_runner::ComponentNamespaceEntry{
+      {.path = "/svc", .directory = std::move(svcs_dir_channel.client)}});
+  fdf::Namespace ns = fdf::Namespace::Create(namespace_entries).value();
+
+  // call the function under test
+  fit::result<fdf_power::Error, fdf_power::TokenMap> token_result =
+      fdf_power::GetDependencyTokens(ns, pe_config);
+
+  loop.Shutdown();
+  loop.JoinThreads();
+
+  ASSERT_TRUE(token_result.is_error());
+  ASSERT_EQ(token_result.error_value(), fdf_power::Error::CPU_ELEMENT_MANAGER_UNAVAILABLE);
+}
+
+// Test that we can get tokens from all three types of dependencies if we
+// configure them
+TEST_F(PowerLibTest, TestAllParentElementTypes) {
+  // Configure out power dependency
+  fdf_power::PowerLevel zero({.level = 0, .name = "zero", .transitions{}});
+  fdf_power::PowerLevel one({.level = 1, .name = "one", .transitions{}});
+  fdf_power::PowerLevel two({.level = 2, .name = "two", .transitions{}});
+
+  fdf_power::PowerElement child_element{
+      .name = "child",
+      .levels = {zero, one},
+  };
+
+  fdf_power::ParentElement cpu_parent =
+      fdf_power::ParentElement::WithCpu(fdf_power::CpuElement::kCpu);
+  fdf_power::ParentElement sag_parent =
+      fdf_power::ParentElement::WithSag(fdf_power::SagElement::kExecutionState);
+  std::string driver_parent_name = "driver_parent";
+  fdf_power::ParentElement driver_parent =
+      fdf_power::ParentElement::WithInstanceName(driver_parent_name);
+
+  // set up the element dependencies
+  fdf_power::LevelTuple one_on_cpu_three{
+      .child_level = 1,
+      .parent_level = 3,
+  };
+
+  fdf_power::LevelTuple two_on_cpu_four{
+      .child_level = 2,
+      .parent_level = 4,
+  };
+
+  fdf_power::PowerDependency cpu_dep{
+      .child = "little_one",
+      .parent = cpu_parent,
+      .level_deps = {one_on_cpu_three, two_on_cpu_four},
+      .strength = fdf_power::RequirementType::kAssertive,
+  };
+
+  fdf_power::LevelTuple on_exec_state_active{
+      .child_level = 1,
+      .parent_level = 2,
+  };
+
+  fdf_power::PowerDependency sag_dep{
+      .child = "little_one",
+      .parent = sag_parent,
+      .level_deps = {on_exec_state_active},
+      .strength = fdf_power::RequirementType::kOpportunistic,
+  };
+
+  fdf_power::LevelTuple two_on_parent{
+      .child_level = 2,
+      .parent_level = 1,
+  };
+
+  fdf_power::PowerDependency driver_dep{
+      .child = "little_one",
+      .parent = driver_parent,
+      .level_deps = {two_on_parent},
+      .strength = fdf_power::RequirementType::kAssertive,
+  };
+
+  fdf_power::PowerElementConfiguration pe_config{.element = child_element,
+                                                 .dependencies = {cpu_dep, sag_dep, driver_dep}};
+
+  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+  loop.StartThread();
+
+  // Set up fake CPU element server
+  zx::event cpu_token;
+  zx::event::create(0, &cpu_token);
+  zx::event token_copy;
+  cpu_token.duplicate(ZX_RIGHT_SAME_RIGHTS, &token_copy);
+  CpuElementManager cpu_element_mgr(std::move(token_copy));
+
+  // Make the glue for FIDL calls to go to the fake
+  // we'll need a separate dispatcher so we can run sync code in the test
+  fidl::ServerBindingGroup<fuchsia_power_system::CpuElementManager> cpu_bindings;
+  fbl::RefPtr<fs::Service> cpu_element_mgr_server = fbl::MakeRefCounted<fs::Service>(
+      [&](fidl::ServerEnd<fuchsia_power_system::CpuElementManager> chan) {
+        cpu_bindings.AddBinding(loop.dispatcher(), std::move(chan), &cpu_element_mgr,
+                                fidl::kIgnoreBindingClosure);
+        return ZX_OK;
+      });
+
+  // Set up the fake SAG server
+  // Note that `wake_assertive` we don't dupe because we aren't going to use
+  // it for validation.
+  zx::event exec_opportunistic, wake_assertive;
+  zx::event::create(0, &exec_opportunistic);
+  zx::event::create(0, &wake_assertive);
+  zx::event exec_opportunistic_dupe;
+  exec_opportunistic.duplicate(ZX_RIGHT_SAME_RIGHTS, &exec_opportunistic_dupe);
+  SystemActivityGovernor sag(std::move(exec_opportunistic_dupe), std::move(wake_assertive));
+
+  fidl::ServerBindingGroup<fuchsia_power_system::ActivityGovernor> sag_bindings;
+  fbl::RefPtr<fs::Service> sag_server = fbl::MakeRefCounted<fs::Service>(
+      [&](fidl::ServerEnd<fuchsia_power_system::ActivityGovernor> chan) {
+        sag_bindings.AddBinding(loop.dispatcher(), std::move(chan), &sag,
+                                fidl::kIgnoreBindingClosure);
+        return ZX_OK;
+      });
+
+  // Set up the fake parent token provider
+  fidl::ServerBindingGroup<fuchsia_hardware_power::PowerTokenProvider> token_service_bindings;
+  // Service dir which contains the service instances
+  fbl::RefPtr<fs::PseudoDir> power_token_service = fbl::MakeRefCounted<fs::PseudoDir>();
+  AddInstanceResult driver_parent_instance_data =
+      AddServiceInstance(loop.dispatcher(), &token_service_bindings);
+  power_token_service->AddEntry(driver_parent_name, driver_parent_instance_data.service_instance);
+
+  // Add entry for the service to a directory and serve the directory
+  fbl::RefPtr<fs::PseudoDir> svcs_dir = fbl::MakeRefCounted<fs::PseudoDir>();
+  svcs_dir->AddEntry("fuchsia.power.system.CpuElementManager", cpu_element_mgr_server);
+  svcs_dir->AddEntry("fuchsia.power.system.ActivityGovernor", sag_server);
+  svcs_dir->AddEntry(fuchsia_hardware_power::PowerTokenService::Name, power_token_service);
+
+  fidl::Endpoints<fuchsia_io::Directory> svcs_dir_channel =
+      fidl::Endpoints<fuchsia_io::Directory>::Create();
+  fs::SynchronousVfs vfs(loop.dispatcher());
+  vfs.ServeDirectory(std::move(svcs_dir), std::move(svcs_dir_channel.server));
+
+  // Wire the services directory into the namespace
+  std::vector<fuchsia_component_runner::ComponentNamespaceEntry> namespace_entries;
+  namespace_entries.emplace_back(fuchsia_component_runner::ComponentNamespaceEntry{
+      {.path = "/svc", .directory = std::move(svcs_dir_channel.client)}});
+  fdf::Namespace ns = fdf::Namespace::Create(namespace_entries).value();
+
+  // call the function under test
+  fit::result<fdf_power::Error, fdf_power::TokenMap> token_result =
+      fdf_power::GetDependencyTokens(ns, pe_config);
+
+  loop.Shutdown();
+  loop.JoinThreads();
+
+  EXPECT_TRUE(token_result.is_ok())
+      << std::to_string(static_cast<uint8_t>(token_result.error_value()));
+
+  fdf_power::TokenMap tokens = std::move(token_result.value());
+
+  // Check that we have just one token in the map
+  EXPECT_EQ(tokens.size(), size_t(3));
+  const zx::event& retrieved_token = tokens.at(cpu_parent);
+
+  // Check that the cpu token we got matches what we expect
+  zx_info_handle_basic_t retreived_info, original_info;
+  retrieved_token.get_info(ZX_INFO_HANDLE_BASIC, &retreived_info, sizeof(zx_info_handle_basic_t),
+                           nullptr, nullptr);
+  cpu_token.get_info(ZX_INFO_HANDLE_BASIC, &original_info, sizeof(zx_info_handle_basic_t), nullptr,
+                     nullptr);
+  EXPECT_EQ(retreived_info.koid, original_info.koid);
+
+  // Check that the SAG otken matches what we expect
+  const zx::event& retrieved_token_sag = tokens.at(sag_parent);
+  retrieved_token_sag.get_info(ZX_INFO_HANDLE_BASIC, &retreived_info,
+                               sizeof(zx_info_handle_basic_t), nullptr, nullptr);
+  exec_opportunistic.get_info(ZX_INFO_HANDLE_BASIC, &original_info, sizeof(zx_info_handle_basic_t),
+                              nullptr, nullptr);
+  EXPECT_EQ(retreived_info.koid, original_info.koid);
+
+  const zx::event& retrieved_token_driver_parent = tokens.at(driver_parent);
+  retrieved_token_driver_parent.get_info(ZX_INFO_HANDLE_BASIC, &retreived_info,
+                                         sizeof(zx_info_handle_basic_t), nullptr, nullptr);
+  driver_parent_instance_data.token->get_info(ZX_INFO_HANDLE_BASIC, &original_info,
+                                              sizeof(zx_info_handle_basic_t), nullptr, nullptr);
+  EXPECT_EQ(retreived_info.koid, original_info.koid);
 }
 
 /// Test GetTokens when a power element has dependencies on driver/named power
