@@ -8,7 +8,9 @@
 toc:
 - title: "Overview"
   path: /docs/concepts/kernel/time/overview.md
-- title: "Monotonic"
+- title: "Boot time"
+  path: /docs/concepts/kernel/time/boot.md
+- title: "Monotonic time"
   path: /docs/concepts/kernel/time/monotonic.md
 - title: "Local"
   path: /docs/concepts/kernel/time/local.md

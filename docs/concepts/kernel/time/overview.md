@@ -1,12 +1,18 @@
 # Time Overview
 
-Components on Fuchsia can read current time using three different
+Components on Fuchsia can read current time using four different
 [time standards][1]:
 
 * **[Monotonic](monotonic.md)**: Monotonic time is a measurement of the time
-  since the system was powered on. Monotonic time always moves forwards and is
-  always available to all applications but is only meaningful with the context
-  of a single power cycle on a single Fuchsia device.
+  since the system was powered on, not including time spent in Suspend-to-Idle.
+  Monotonic time always moves forwards and is always available to all
+  applications but is only meaningful with the context of a single power cycle
+  on a single Fuchsia device.
+* **[Boot](boot.md)**: Boot time is a measurement of the time since the system
+  was powered on including any time spent in Suspend-to-Idle. Like monotonic
+  time, boot time always moves forward, is always available, and is only
+  meaningful with the context of a single power cycle on a single Fuchsia
+  device.
 * **[UTC](utc/overview.md)**: UTC time is the system’s best estimate of
   [Coordinated Universal Time][2]. UTC is usually acquired over a network
   so there are conditions under which the system may not know UTC. Developers
@@ -24,17 +30,20 @@ These time standards are frequently available through the
 [time syscalls](/reference/syscalls/clock_create.md).
 
 As a developer, you must select the most appropriate time standard to address
-each problem. Monotonic time has the fewest failure modes and the most stable
-behavior so should generally be the default choice unless there is a reason that
-monotonic time will not work. UTC has fewer failure modes and more stable
-behavior than local time so should be preferred over local time unless there is
-some reason that local time is necessary.
+each problem. We recommend using monotonic time unless your program needs
+to be aware of time spent in Suspend-To-Idle. Boot time is recommended if
+timestamps must be kept in sync with underlying hardware or external services,
+and monotonicity is required. UTC can be used if timestamps must be
+correlated with external services and monotonicity is not required. Local time,
+as a derivative of UTC time, is generally only used in UX applications.
 
 For example:
 
 1. Use monotonic time to implement a ten second delay between retries.
    Monotonic time will be available in all cases so provides the simplest and
    most reliable solution.
+1. Use boot time to timestamp trace points in Fuchsia, as traces should display
+   time spent suspended and cannot have their timeline jump back and forth.
 1. Use UTC time to expire and delete a file stored on disk after seven days.
    Here monotonic time would not allow the expiry time to be
    preserved across power cycles and local time would have coupled the
