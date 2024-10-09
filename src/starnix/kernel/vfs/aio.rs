@@ -81,75 +81,21 @@ impl AioContext {
         control_block: iocb,
         iocb_addr: UserAddress,
     ) -> Result<(), Errno> {
-        let file = current_task.files.get(FdNumber::from_raw(control_block.aio_fildes as i32))?;
-        let id = control_block.aio_data;
-        let opcode = control_block.aio_lio_opcode as u32;
-        let offset = control_block.aio_offset as usize;
-        let flags = control_block.aio_flags;
+        let op = IoOperation::new(current_task, control_block, iocb_addr)?;
 
-        let op_type = match opcode {
-            IOCB_CMD_PREAD => IoOperationType::Read,
-            IOCB_CMD_PREADV => IoOperationType::ReadV,
-            IOCB_CMD_PWRITE => IoOperationType::Write,
-            IOCB_CMD_PWRITEV => IoOperationType::WriteV,
-            _ => {
-                track_stub!(TODO("https://fxbug.dev/297433877"), "io_submit opcode", opcode);
-                return error!(ENOSYS);
+        // TODO: We should increase the pending_operations count here as part of ensure that
+        // there's room in the queue for this operation.
+        if !self.state.lock().can_queue() {
+            return error!(EAGAIN);
+        }
+        match op.op_type {
+            OpType::PRead | OpType::PReadV => {
+                self.reader(current_task).send(op).map_err(|_| errno!(EINVAL))
             }
-        };
-        match op_type {
-            IoOperationType::Read | IoOperationType::ReadV => {
-                if !file.can_read() {
-                    return error!(EBADF);
-                }
-            }
-            IoOperationType::Write | IoOperationType::WriteV => {
-                if !file.can_write() {
-                    return error!(EBADF);
-                }
+            OpType::PWrite | OpType::PWriteV => {
+                self.writer(current_task).send(op).map_err(|_| errno!(EINVAL))
             }
         }
-        let mut buffers = match op_type {
-            IoOperationType::Read | IoOperationType::Write => smallvec![UserBuffer {
-                address: control_block.aio_buf.into(),
-                length: control_block.aio_nbytes as usize,
-            }],
-            IoOperationType::ReadV | IoOperationType::WriteV => {
-                let count: i32 = control_block.aio_nbytes.try_into().map_err(|_| errno!(EINVAL))?;
-                current_task.read_iovec(control_block.aio_buf.into(), count.into())?
-            }
-        };
-
-        // Validate the user buffers and offset synchronously.
-        let buffer_length = UserBuffer::cap_buffers_to_max_rw_count(
-            current_task.maximum_valid_address(),
-            &mut buffers,
-        )?;
-        checked_add_offset_and_length(offset, buffer_length)?;
-
-        let eventfd = if flags & IOCB_FLAG_RESFD == IOCB_FLAG_RESFD {
-            let eventfd =
-                current_task.files.get(FdNumber::from_raw(control_block.aio_resfd as i32))?;
-            if eventfd.downcast_file::<EventFdFileObject>().is_none() {
-                return error!(EINVAL);
-            }
-            Some(Arc::downgrade(&eventfd))
-        } else {
-            None
-        };
-
-        self.queue_op(
-            current_task,
-            IoOperation {
-                op_type,
-                file: Arc::downgrade(&file),
-                buffers,
-                offset,
-                id,
-                iocb_addr,
-                eventfd,
-            },
-        )
     }
 
     fn reader(&self, current_task: &CurrentTask) -> &Sender<IoOperation> {
@@ -177,22 +123,6 @@ impl AioContext {
             sender
         })
     }
-
-    fn queue_op(&self, current_task: &CurrentTask, op: IoOperation) -> Result<(), Errno> {
-        // TODO: We should increase the pending_operations count here as part of ensure that
-        // there's room in the queue for this operation.
-        if !self.state.lock().can_queue() {
-            return error!(EAGAIN);
-        }
-        match op.op_type {
-            IoOperationType::Read | IoOperationType::ReadV => {
-                self.reader(current_task).send(op).map_err(|_| errno!(EINVAL))
-            }
-            IoOperationType::Write | IoOperationType::WriteV => {
-                self.writer(current_task).send(op).map_err(|_| errno!(EINVAL))
-            }
-        }
-    }
 }
 
 impl std::fmt::Debug for AioContext {
@@ -209,6 +139,110 @@ impl std::cmp::PartialEq for AioContext {
 
 impl std::cmp::Eq for AioContext {}
 
+enum OpType {
+    PRead,
+    PReadV,
+    // TODO: IOCB_CMD_FSYNC
+    // TODO: IOCB_CMD_FDSYNC
+    // TODO: IOCB_CMD_POLL
+    // TODO: IOCB_CMD_NOOP
+    PWrite,
+    PWriteV,
+}
+
+impl TryFrom<u32> for OpType {
+    type Error = Errno;
+
+    fn try_from(opcode: u32) -> Result<Self, Self::Error> {
+        match opcode {
+            IOCB_CMD_PREAD => Ok(Self::PRead),
+            IOCB_CMD_PREADV => Ok(Self::PReadV),
+            IOCB_CMD_PWRITE => Ok(Self::PWrite),
+            IOCB_CMD_PWRITEV => Ok(Self::PWriteV),
+            _ => {
+                track_stub!(TODO("https://fxbug.dev/297433877"), "io_submit opcode", opcode);
+                return error!(ENOSYS);
+            }
+        }
+    }
+}
+struct IoOperation {
+    op_type: OpType,
+    file: WeakFileHandle,
+    buffers: UserBuffers,
+    offset: usize,
+    id: u64,
+    iocb_addr: UserAddress,
+    eventfd: Option<WeakFileHandle>,
+}
+
+impl IoOperation {
+    fn new(
+        current_task: &CurrentTask,
+        control_block: iocb,
+        iocb_addr: UserAddress,
+    ) -> Result<Self, Errno> {
+        if control_block.aio_reserved2 != 0 {
+            return error!(EINVAL);
+        }
+        let file = current_task.files.get(FdNumber::from_raw(control_block.aio_fildes as i32))?;
+        let op_type = (control_block.aio_lio_opcode as u32).try_into()?;
+        let offset = control_block.aio_offset as usize;
+        let flags = control_block.aio_flags;
+
+        match op_type {
+            OpType::PRead | OpType::PReadV => {
+                if !file.can_read() {
+                    return error!(EBADF);
+                }
+            }
+            OpType::PWrite | OpType::PWriteV => {
+                if !file.can_write() {
+                    return error!(EBADF);
+                }
+            }
+        }
+        let mut buffers = match op_type {
+            OpType::PRead | OpType::PWrite => smallvec![UserBuffer {
+                address: control_block.aio_buf.into(),
+                length: control_block.aio_nbytes as usize,
+            }],
+            OpType::PReadV | OpType::PWriteV => {
+                let count: i32 = control_block.aio_nbytes.try_into().map_err(|_| errno!(EINVAL))?;
+                current_task.read_iovec(control_block.aio_buf.into(), count.into())?
+            }
+        };
+
+        // Validate the user buffers and offset synchronously.
+        let buffer_length = UserBuffer::cap_buffers_to_max_rw_count(
+            current_task.maximum_valid_address(),
+            &mut buffers,
+        )?;
+        checked_add_offset_and_length(offset, buffer_length)?;
+
+        let eventfd = if flags & IOCB_FLAG_RESFD != 0 {
+            let eventfd =
+                current_task.files.get(FdNumber::from_raw(control_block.aio_resfd as i32))?;
+            if eventfd.downcast_file::<EventFdFileObject>().is_none() {
+                return error!(EINVAL);
+            }
+            Some(Arc::downgrade(&eventfd))
+        } else {
+            None
+        };
+
+        Ok(IoOperation {
+            op_type,
+            file: Arc::downgrade(&file),
+            buffers,
+            offset,
+            id: control_block.aio_data,
+            iocb_addr,
+            eventfd,
+        })
+    }
+}
+
 /// Kernel state-machine-based implementation of asynchronous I/O.
 /// See https://man7.org/linux/man-pages/man7/aio.7.html#NOTES
 struct AioContextState {
@@ -220,23 +254,6 @@ struct AioContextState {
     // Return code from async I/O operations.
     // Enqueued from worker threads after an operation is complete.
     results: VecDeque<io_event>,
-}
-
-enum IoOperationType {
-    Read,
-    ReadV,
-    Write,
-    WriteV,
-}
-
-struct IoOperation {
-    op_type: IoOperationType,
-    file: WeakFileHandle,
-    buffers: UserBuffers,
-    offset: usize,
-    id: u64,
-    iocb_addr: UserAddress,
-    eventfd: Option<WeakFileHandle>,
 }
 
 impl AioContextState {

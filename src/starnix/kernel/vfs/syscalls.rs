@@ -2872,8 +2872,11 @@ pub fn sys_io_setup(
     if current_task.read_object(user_ctx_idp)? != 0 {
         return error!(EINVAL);
     }
-    let ctx_idp = AioContext::create(current_task, max_operations)?;
-    current_task.write_object(user_ctx_idp, &ctx_idp)?;
+    let ctx_id = AioContext::create(current_task, max_operations)?;
+    current_task.write_object(user_ctx_idp, &ctx_id).map_err(|e| {
+        let _ = current_task.mm().destroy_aio_context(ctx_id.into());
+        e
+    })?;
     Ok(())
 }
 
@@ -2962,6 +2965,7 @@ pub fn sys_io_destroy(
     ctx_id: aio_context_t,
 ) -> Result<(), Errno> {
     current_task.mm().destroy_aio_context(ctx_id.into())
+    // TODO: Drain the operation queue in the AioContext.
 }
 
 pub fn sys_io_uring_setup(
