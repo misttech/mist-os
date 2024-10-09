@@ -149,8 +149,8 @@ mod test {
                 second_test_case_proxy.run_default_cycle().await.unwrap();
             })
             .detach();
-        // Test the test-mode-lockout logic by giving the spawned second_test_case code an opportunity
-        // to run as far as it can. It shouldn't run its test cycle yet.
+        // Test the test-mode-lockout logic by giving the spawned second_test_case code an
+        // opportunity to run as far as it can. It shouldn't run its test cycle yet.
         let _ = TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
         // Yup, no tests ran yet - right?
         run_receiver.expect_n_messages(0).await;
@@ -174,12 +174,14 @@ mod test {
             fidl::endpoints::create_proxy::<TestCaseControllerMarker>().expect("Creating proxy");
         // We've had controller proxy. What about second controller proxy?
         let second_controller_proxy = get_controller_proxy(&scope, detection_runner);
-        // Second controller connected, but it's not in test mode, so first controller should work normally.
+        // Second controller connected, but it's not in test mode, so first controller should work
+        // normally.
         controller_proxy.enter_test_mode(first_test_case_server_end).await.unwrap();
         run_receiver.expect_n_messages(0).await;
         first_test_case_proxy.run_default_cycle().await.unwrap();
         run_receiver.expect_n_messages(1).await;
-        // Now we'll try to run a test cycle on second controller, while first controller is still in test mode.
+        // Now we'll try to run a test cycle on second controller, while first controller is still
+        // in test mode.
         scope
             .spawn(async move {
                 let (second_test_case_proxy, second_test_case_server_end) =
@@ -189,8 +191,8 @@ mod test {
                 second_test_case_proxy.run_default_cycle().await.unwrap();
             })
             .detach();
-        // Test the test-mode-lockout logic by giving the spawned second_test_case code an opportunity
-        // to run as far as it can. It shouldn't run its test cycle yet.
+        // Test the test-mode-lockout logic by giving the spawned second_test_case code an
+        // opportunity to run as far as it can. It shouldn't run its test cycle yet.
         let _ = TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
         // The first controller is still in test mode. The second was able to connect,
         // but can't enter test mode to run its test cycle. (It'll be waiting for a
