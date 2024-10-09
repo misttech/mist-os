@@ -9,6 +9,8 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
 #include <lib/mistos/starnix/kernel/mm/memory_accessor.h>
+#include <lib/mistos/starnix/kernel/signals/types.h>
+#include <lib/mistos/starnix/kernel/task/exit_status.h>
 #include <lib/mistos/starnix/kernel/vfs/fd_table.h>
 #include <lib/mistos/starnix_uapi/auth.h>
 #include <lib/mistos/util/weak_wrapper.h>
@@ -29,40 +31,22 @@ class ThreadDispatcher;
 
 namespace starnix {
 
-enum class ExitStatusType : uint8_t { Exit, Kill, CoreDump, Stop, Continue };
+class TaskBuilder;
+class Kernel;
+class FsContext;
 
-class ExitStatus {
- public:
-  ExitStatusType type;
-
-#if 0
-  // Define constructors for each variant
-  explicit ExitStatus(uint8_t exit_value) : type(ExitStatusType::Exit), exit(exit_value) {}
-  explicit ExitStatus(const SignalInfo& signal) : type(ExitStatusType::Kill), signal(signal) {}
-  explicit ExitStatus(const SignalInfo& signal, PtraceEvent event)
-      : type(ExitStatusType::CoreDump), signal(signal), event(event) {}
-  explicit ExitStatus(const SignalInfo& signal, PtraceEvent event, bool isStop)
-      : type(isStop ? ExitStatusType::Stop : ExitStatusType::Continue),
-        signal(signal),
-        event(event) {}
-
-  // Define member variables for each variant
-  union {
-    uint8_t exit;
-    SignalInfo signal;
-  };
-  PtraceEvent event;
-#endif
-};
+namespace testing {
+TaskBuilder create_test_init_task(fbl::RefPtr<Kernel> kernel, fbl::RefPtr<FsContext> fs);
+}
 
 class TaskMutableState {
  public:
   // See https://man7.org/linux/man-pages/man2/set_tid_address.2.html
-  // pub clear_child_tid: UserRef<pid_t>,
+  // UserRef<pid_t> clear_child_tid;
 
   /// Signal handler related state. This is grouped together for when atomicity is needed during
   /// signal sending and delivery.
-  // pub signals: SignalState,
+  SignalState signals;
 
  private:
   // The exit status that this task exited with.
@@ -94,7 +78,7 @@ class TaskMutableState {
   bool no_new_privs_;
 
   /// Userspace hint about how to adjust the OOM score for this process.
-  // pub oom_score_adj: i32,
+  // int32_t oom_score_adj_;
 
   /// List of currently installed seccomp_filters
   // pub seccomp_filters: SeccompFilterContainer,
@@ -103,12 +87,13 @@ class TaskMutableState {
   /// userspace. See get_robust_list(2)
   // pub robust_list_head: UserRef<robust_list_head>,
 
+ public:
   /// The timer slack used to group timer expirations for the calling thread.
   ///
   /// Timers may expire up to `timerslack_ns` late, but never early.
   ///
   /// If this value is 0, the task's default timerslack is used.
-  // pub timerslack_ns: u64,
+  uint64_t timerslack_nsl;
 
   /// The default value for `timerslack_ns`. This value cannot change during the lifetime of a
   /// task.
@@ -164,12 +149,12 @@ class TaskPersistentInfoState {
   Credentials creds_;
 
   /// The signal this task generates on exit.
-  // exit_signal: Option<Signal>,
+  ktl::optional<Signal> exit_signal_;
 
  public:
   /// impl TaskPersistentInfoState
   static TaskPersistentInfo New(pid_t tid, pid_t pid, const ktl::string_view& command,
-                                const Credentials& creds /*, exit_signal: Option<Signal>*/);
+                                const Credentials& creds, ktl::optional<Signal> exit_signal);
 
   pid_t tid() const { return tid_; }
 
@@ -181,17 +166,16 @@ class TaskPersistentInfoState {
 
   Credentials& creds_mut() { return creds_; }
 
-  /*
-  pub fn exit_signal(&self) -> &Option<Signal> {
-        &self.exit_signal
-    }
-  */
+  ktl::optional<Signal> exit_signal() const { return exit_signal_; }
 
  private:
   TaskPersistentInfoState(pid_t tid, pid_t pid, const ktl::string_view& command,
-                          const Credentials& creds
-                          /*, exit_signal: Option<Signal>*/)
-      : tid_(tid), pid_(pid), command_(ktl::move(command)), creds_(ktl::move(creds)) {}
+                          const Credentials& creds, ktl::optional<Signal> exit_signal)
+      : tid_(tid),
+        pid_(pid),
+        command_(ktl::move(command)),
+        creds_(ktl::move(creds)),
+        exit_signal_(exit_signal) {}
 };
 
 class MemoryManager;
@@ -321,7 +305,7 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
                                fbl::RefPtr<ThreadGroup> thread_group,
                                ktl::optional<fbl::RefPtr<ThreadDispatcher>> thread, FdTable files,
                                fbl::RefPtr<MemoryManager> mm, fbl::RefPtr<FsContext> fs,
-                               Credentials creds);
+                               Credentials creds, ktl::optional<Signal> exit_signal);
 
   fit::result<Errno, FdNumber> add_file(FileHandle file, FdFlags flags) const;
 
@@ -375,6 +359,9 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
 
  private:
   friend class CurrentTask;
+  friend class ThreadGroup;
+  friend TaskBuilder testing::create_test_init_task(fbl::RefPtr<Kernel> kernel,
+                                                    fbl::RefPtr<FsContext> fs);
 
   Task(pid_t id, fbl::RefPtr<ThreadGroup> thread_group,
        ktl::optional<fbl::RefPtr<ThreadDispatcher>> thread, FdTable files,
@@ -393,12 +380,25 @@ class TaskContainer : public fbl::WAVLTreeContainable<ktl::unique_ptr<TaskContai
     fbl::AllocChecker ac;
     ktl::unique_ptr<TaskContainer> ptr = ktl::unique_ptr<TaskContainer>(
         new (&ac) TaskContainer(util::WeakPtr<Task>(task.get()), task->persistent_info));
-    ASSERT(ac.check());
+    ZX_ASSERT(ac.check());
     return ptr;
   }
 
   // WAVL-tree Index
   pid_t GetKey() const { return (info_->Lock())->tid(); }
+
+  // impl TaskContainer
+  ktl::optional<fbl::RefPtr<Task>> upgrade() const {
+    auto strong = weak_.Lock();
+    if (strong) {
+      return {ktl::move(strong)};
+    }
+    return ktl::nullopt;
+  }
+
+  util::WeakPtr<Task> weak_clone() const { return weak_; }
+
+  auto info() const { info_->Lock(); }
 
  private:
   TaskContainer(util::WeakPtr<Task> weak, TaskPersistentInfo& info)

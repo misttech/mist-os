@@ -102,9 +102,9 @@ fit::result<Errno, Container> create_container(const Config& config) {
   }
 
   // let rlimits = parse_rlimits(&config.rlimits)?;
-  auto init_task = CurrentTask::create_init_process(kernel, init_pid, initial_name, fs_context);
-  if (init_task.is_error())
-    return init_task.take_error();
+  fbl::Array<ktl::pair<starnix_uapi::Resource, uint64_t>> rlimits;
+  auto init_task = CurrentTask::create_init_process(kernel, init_pid, initial_name, fs_context,
+                                                    ktl::move(rlimits)) _EP(init_task);
 
   if (LOCAL_TRACE) {
     TRACEF("creating init task: ");

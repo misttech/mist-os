@@ -24,12 +24,13 @@
 
 namespace starnix {
 
-TaskPersistentInfo TaskPersistentInfoState::New(
-    pid_t tid, pid_t pid, const ktl::string_view& command,
-    const Credentials& creds /*, exit_signal: Option<Signal>*/) {
+TaskPersistentInfo TaskPersistentInfoState::New(pid_t tid, pid_t pid,
+                                                const ktl::string_view& command,
+                                                const Credentials& creds,
+                                                ktl::optional<Signal> exit_signal) {
   fbl::AllocChecker ac;
   auto info = fbl::AdoptRef(new (&ac) StarnixMutex<TaskPersistentInfoState>(
-      TaskPersistentInfoState(tid, pid, command, creds)));
+      TaskPersistentInfoState(tid, pid, command, creds, exit_signal)));
   ASSERT(ac.check());
   return info;
 }
@@ -38,14 +39,14 @@ fbl::RefPtr<Task> Task::New(pid_t id, const ktl::string_view& command,
                             fbl::RefPtr<ThreadGroup> thread_group,
                             ktl::optional<fbl::RefPtr<ThreadDispatcher>> thread, FdTable files,
                             fbl::RefPtr<MemoryManager> mm, fbl::RefPtr<FsContext> fs,
-                            Credentials creds) {
+                            Credentials creds, ktl::optional<Signal> exit_signal) {
   fbl::AllocChecker ac;
   fbl::RefPtr<Task> task =
       fbl::AdoptRef(new (&ac) Task(id, thread_group, ktl::move(thread), ktl::move(files), mm, fs));
   ASSERT(ac.check());
 
   pid_t pid = thread_group->leader;
-  task->persistent_info = TaskPersistentInfoState::New(id, pid, command, creds);
+  task->persistent_info = TaskPersistentInfoState::New(id, pid, command, creds, exit_signal);
 
   return ktl::move(task);
 }  // namespace starnix
