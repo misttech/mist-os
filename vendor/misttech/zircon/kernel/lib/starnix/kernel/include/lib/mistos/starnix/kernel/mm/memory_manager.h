@@ -553,7 +553,7 @@ class MemoryManager : public fbl::RefCounted<MemoryManager> {
                          fbl::Vector<Mapping>& released_mappings);
 
  public:
-  fit::result<Errno> snapshot_to(fbl::RefPtr<MemoryManager>& target);
+  fit::result<Errno> snapshot_to(const fbl::RefPtr<MemoryManager>& target) const;
 
   fit::result<zx_status_t> exec(NamespaceNode exe_node);
 

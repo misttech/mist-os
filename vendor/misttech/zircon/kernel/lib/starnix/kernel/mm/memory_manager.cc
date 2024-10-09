@@ -1233,7 +1233,7 @@ bool MemoryManager::extend_brk(MemoryManagerState& _state, fbl::RefPtr<MemoryMan
       .is_ok();
 }
 
-fit::result<Errno> MemoryManager::snapshot_to(fbl::RefPtr<MemoryManager>& target) {
+fit::result<Errno> MemoryManager::snapshot_to(const fbl::RefPtr<MemoryManager>& target) const {
   // TODO(https://fxbug.dev/42074633): When SNAPSHOT (or equivalent) is supported on
   // pager-backed VMOs we can remove the hack below (which also won't be performant). For now,
   // as a workaround, we use SNAPSHOT_AT_LEAST_ON_WRITE on both the child and the parent.

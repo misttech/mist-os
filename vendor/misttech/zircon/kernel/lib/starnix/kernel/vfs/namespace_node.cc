@@ -286,7 +286,7 @@ ktl::optional<NamespaceNode> NamespaceNode::mountpoint() const {
   return ktl::nullopt;
 }
 
-FsString NamespaceNode::path(Task& task) const {
+FsString NamespaceNode::path(const Task& task) const {
   return path_from_root(task.fs()->root()).into_path();
 }
 
