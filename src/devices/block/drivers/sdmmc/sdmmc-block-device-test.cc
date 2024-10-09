@@ -2193,7 +2193,7 @@ TEST_P(SdmmcBlockDeviceTest, InspectInvalidLifetime) {
   EXPECT_EQ(max_lifetime->value(), 6);  // Only the valid value should be used.
 }
 
-// TODO(b/368636358): Re-enable actual hardware power state manipulation.
+// TODO(b/368636358): Re-enable power suspension.
 TEST_P(SdmmcBlockDeviceTest, DISABLED_PowerSuspendResume) {
   libsync::Completion sleep_complete;
   libsync::Completion awake_complete;

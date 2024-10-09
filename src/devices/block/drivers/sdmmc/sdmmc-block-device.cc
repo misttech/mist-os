@@ -414,6 +414,8 @@ void SdmmcBlockDevice::WatchHardwareRequiredLevel() {
             break;
           }
           case kPowerLevelOff: {
+// TODO(b/368636358): Re-enable power suspension.
+#if 0
             fbl::AutoLock lock(&lock_);
             // Actually lower the hardware's power level.
             zx_status_t status = SuspendPower();
@@ -422,7 +424,7 @@ void SdmmcBlockDevice::WatchHardwareRequiredLevel() {
                        zx_status_get_string(status));
               return;
             }
-
+#endif
             // Communicate to Power Broker that the hardware power level has been lowered.
             UpdatePowerLevel(hardware_power_current_level_client_, kPowerLevelOff);
             break;
@@ -1069,8 +1071,6 @@ zx_status_t SdmmcBlockDevice::SuspendPower() {
     return status;
   }
 
-// TODO(b/368636358): Re-enable actual hardware power state manipulation.
-#if 0
   if (zx_status_t status = sdmmc_->MmcSelectCard(/*select=*/false); status != ZX_OK) {
     FDF_LOGL(ERROR, logger(), "Failed to (de-)SelectCard before sleep: %s",
              zx_status_get_string(status));
@@ -1081,7 +1081,6 @@ zx_status_t SdmmcBlockDevice::SuspendPower() {
     FDF_LOGL(ERROR, logger(), "Failed to sleep: %s", zx_status_get_string(status));
     return status;
   }
-#endif
 
   trace_async_id_ = TRACE_NONCE();
   TRACE_ASYNC_BEGIN("sdmmc", "suspend", trace_async_id_);
@@ -1096,8 +1095,6 @@ zx_status_t SdmmcBlockDevice::ResumePower() {
     return ZX_OK;
   }
 
-// TODO(b/368636358): Re-enable actual hardware power state manipulation.
-#if 0
   if (zx_status_t status = sdmmc_->MmcSleepOrAwake(/*sleep=*/false); status != ZX_OK) {
     FDF_LOGL(ERROR, logger(), "Failed to awake: %s", zx_status_get_string(status));
     return status;
@@ -1107,7 +1104,6 @@ zx_status_t SdmmcBlockDevice::ResumePower() {
     FDF_LOGL(ERROR, logger(), "Failed to SelectCard after awake: %s", zx_status_get_string(status));
     return status;
   }
-#endif
 
   TRACE_ASYNC_END("sdmmc", "suspend", trace_async_id_);
   power_suspended_ = false;

@@ -485,6 +485,8 @@ void AmlSdmmc::WatchHardwareRequiredLevel() {
             break;
           }
           case kPowerLevelOff: {
+// TODO(b/368636358): Re-enable power suspension.
+#if 0
             // Complete any ongoing tuning first.
             std::lock_guard<std::mutex> tuning_lock(tuning_lock_);
             std::lock_guard<std::mutex> lock(lock_);
@@ -495,7 +497,7 @@ void AmlSdmmc::WatchHardwareRequiredLevel() {
                        zx_status_get_string(status));
               return;
             }
-
+#endif
             // Communicate to Power Broker that the hardware power level has been lowered.
             UpdatePowerLevel(hardware_power_current_level_client_, kPowerLevelOff);
             break;
@@ -803,8 +805,6 @@ zx_status_t AmlSdmmc::SuspendPower() {
     return ZX_OK;
   }
 
-// TODO(b/368636358): Re-enable actual hardware power state manipulation.
-#if 0
   // Disable the device clock.
   auto clk = AmlSdmmcClock::Get().ReadFrom(&*mmio_);
   clk_div_saved_ = clk.cfg_div();
@@ -824,7 +824,6 @@ zx_status_t AmlSdmmc::SuspendPower() {
       return result->error_value();
     }
   }
-#endif
 
   trace_async_id_ = TRACE_NONCE();
   TRACE_ASYNC_BEGIN("aml-sdmmc", "suspend", trace_async_id_);
@@ -839,8 +838,6 @@ zx_status_t AmlSdmmc::ResumePower() {
     return ZX_OK;
   }
 
-// TODO(b/368636358): Re-enable actual hardware power state manipulation.
-#if 0
   // Ungate the core clock.
   if (clock_gate_.is_valid()) {
     const fidl::WireResult result = clock_gate_->Enable();
@@ -859,7 +856,6 @@ zx_status_t AmlSdmmc::ResumePower() {
   // Re-enable the device clock.
   auto clk = AmlSdmmcClock::Get().ReadFrom(&*mmio_);
   clk.set_cfg_div(clk_div_saved_).WriteTo(&*mmio_);
-#endif
 
   TRACE_ASYNC_END("aml-sdmmc", "suspend", trace_async_id_);
   power_suspended_ = false;
