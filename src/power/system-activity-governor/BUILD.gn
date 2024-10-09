@@ -9,6 +9,7 @@ rustc_binary("bin") {
   name = "system_activity_governor"
   edition = "2021"
   sources = [
+    "src/cpu_element_manager.rs",
     "src/main.rs",
     "src/system_activity_governor.rs",
   ]
@@ -33,6 +34,7 @@ rustc_binary("bin") {
     "//src/lib/trace/rust:trace-provider",
     "//src/power/broker/client",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-lock",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",

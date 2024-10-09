@@ -58,6 +58,11 @@ fuchsia_component("test-root") {
 }
 
 fuchsia_test_package("system-activity-governor-test") {
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
   test_components = [ ":test-root" ]
   subpackages = [
     "../testing/realm-factory",

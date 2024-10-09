@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use async_trait::async_trait;
 use async_utils::hanging_get::server::{HangingGet, Publisher};
 use fidl::endpoints::{create_endpoints, Proxy};
@@ -14,7 +14,6 @@ use fidl_fuchsia_power_system::{
     FullWakeHandlingLevel, WakeHandlingLevel,
 };
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
-use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{
     ArrayProperty, IntProperty as IInt, Node as INode, NumericProperty, Property,
     UintProperty as IUint,
@@ -28,8 +27,7 @@ use power_broker_client::{
 };
 use std::cell::{OnceCell, RefCell};
 use std::rc::Rc;
-use std::sync::Arc;
-use zx::{self as zx, AsHandleRef, HandleBased};
+use zx::{AsHandleRef, HandleBased};
 use {
     fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_observability as fobs,
     fidl_fuchsia_power_suspend as fsuspend,
@@ -44,12 +42,6 @@ const ON_SUSPEND_STARTED_TIMEOUT: zx::Duration = zx::Duration::from_seconds(1);
 type NotifyFn = Box<dyn Fn(&fsuspend::SuspendStats, fsuspend::StatsWatchResponder) -> bool>;
 type StatsHangingGet = HangingGet<fsuspend::SuspendStats, fsuspend::StatsWatchResponder, NotifyFn>;
 type StatsPublisher = Publisher<fsuspend::SuspendStats, fsuspend::StatsWatchResponder, NotifyFn>;
-
-enum IncomingRequest {
-    ActivityGovernor(fsystem::ActivityGovernorRequestStream),
-    Stats(fsuspend::StatsRequestStream),
-    ElementInfoProviderService(fbroker::ElementInfoProviderServiceRequest),
-}
 
 #[derive(Copy, Clone)]
 enum BootControlLevel {
@@ -92,7 +84,7 @@ trait SuspendResumeListener {
 /// Controls access to CPU power element and suspend management.
 struct CpuManagerInner {
     /// The context used to manage the CPU power element.
-    cpu: PowerElementContext,
+    cpu: Rc<PowerElementContext>,
     /// The FIDL proxy to the device used to trigger system suspend.
     suspender: Option<fhsuspend::SuspenderProxy>,
     /// The suspend state index that will be passed to the suspender when system suspend is
@@ -116,7 +108,7 @@ struct CpuManager {
 impl CpuManager {
     /// Creates a new CpuManager.
     fn new(
-        cpu: PowerElementContext,
+        cpu: Rc<PowerElementContext>,
         suspender: Option<fhsuspend::SuspenderProxy>,
         inspect: INode,
     ) -> Self {
@@ -541,10 +533,16 @@ pub struct SystemActivityGovernor {
     /// The manager used to modify cpu power element and trigger suspend.
     cpu_manager: Rc<CpuManager>,
     /// The context used to manage the boot_control power element.
-    boot_control: Arc<PowerElementContext>,
+    boot_control: Rc<PowerElementContext>,
     /// The collection of information about PowerElements managed
     /// by system-activity-governor.
     element_power_level_names: Vec<fbroker::ElementPowerLevelNames>,
+    /// The signal which is set when the power elements are configured and
+    /// FIDL handlers can run. This is required because a newly constructed
+    /// SystemActivityGovernor initializes and runs power elements
+    /// asynchronously. This signal prevents exposing uninitialized power
+    /// element state to external clients.
+    is_running_signal: async_lock::OnceCell<()>,
 }
 
 impl SystemActivityGovernor {
@@ -552,17 +550,10 @@ impl SystemActivityGovernor {
         topology: &fbroker::TopologyProxy,
         inspect_root: INode,
         suspender: Option<fhsuspend::SuspenderProxy>,
+        cpu: Rc<PowerElementContext>,
+        mut execution_state_dependencies: Vec<fbroker::LevelDependency>,
     ) -> Result<Rc<Self>> {
         let mut element_power_level_names: Vec<fbroker::ElementPowerLevelNames> = Vec::new();
-
-        let cpu = PowerElementContext::builder(
-            topology,
-            "cpu",
-            &[CpuLevel::Inactive.into_primitive(), CpuLevel::Active.into_primitive()],
-        )
-        .build()
-        .await
-        .expect("PowerElementContext encountered error while building cpu");
 
         element_power_level_names.push(generate_element_power_level_names(
             "cpu",
@@ -571,6 +562,13 @@ impl SystemActivityGovernor {
                 (CpuLevel::Active.into_primitive(), "Active".to_string()),
             ],
         ));
+
+        execution_state_dependencies.push(fbroker::LevelDependency {
+            dependency_type: fbroker::DependencyType::Assertive,
+            dependent_level: ExecutionStateLevel::Suspending.into_primitive(),
+            requires_token: cpu.assertive_dependency_token().expect("token not registered"),
+            requires_level_by_preference: vec![CpuLevel::Active.into_primitive()],
+        });
 
         let execution_state = PowerElementContext::builder(
             topology,
@@ -581,12 +579,7 @@ impl SystemActivityGovernor {
                 ExecutionStateLevel::Active.into_primitive(),
             ],
         )
-        .dependencies(vec![fbroker::LevelDependency {
-            dependency_type: fbroker::DependencyType::Assertive,
-            dependent_level: ExecutionStateLevel::Suspending.into_primitive(),
-            requires_token: cpu.assertive_dependency_token().expect("token not registered"),
-            requires_level_by_preference: vec![CpuLevel::Active.into_primitive()],
-        }])
+        .dependencies(execution_state_dependencies)
         .build()
         .await
         .expect("PowerElementContext encountered error while building execution_state");
@@ -691,7 +684,7 @@ impl SystemActivityGovernor {
             ],
         ));
 
-        let boot_control = Arc::new(
+        let boot_control = Rc::new(
             PowerElementContext::builder(
                 topology,
                 "boot_control",
@@ -751,7 +744,7 @@ impl SystemActivityGovernor {
         let cpu_manager =
             Rc::new(CpuManager::new(cpu, suspender, inspect_root.create_child("suspend_events")));
 
-        Ok(Rc::new(Self {
+        let sag = Rc::new(Self {
             inspect_root,
             execution_state,
             application_activity,
@@ -762,13 +755,25 @@ impl SystemActivityGovernor {
             lease_manager,
             listeners: RefCell::new(Vec::new()),
             cpu_manager,
-            boot_control: boot_control.into(),
+            boot_control,
             element_power_level_names,
-        }))
+            is_running_signal: async_lock::OnceCell::new(),
+        });
+
+        let sag2 = sag.clone();
+        fasync::Task::local(async move {
+            tracing::info!("Starting activity governor server...");
+            sag2.run().await.expect("failed to run activity governor server");
+            let _ = sag2.is_running_signal.set(()).await;
+            tracing::info!("Running activity governor server");
+        })
+        .detach();
+
+        Ok(sag)
     }
 
     /// Runs a FIDL server to handle fuchsia.power.suspend and fuchsia.power.system API requests.
-    pub async fn run(self: Rc<Self>) -> Result<()> {
+    async fn run(self: &Rc<Self>) -> Result<()> {
         tracing::info!("Handling power elements");
         self.cpu_manager.set_suspend_resume_listener(self.clone());
 
@@ -809,8 +814,8 @@ impl SystemActivityGovernor {
             tracing::warn!(?error, "failed to update boot_control level to Active");
         }
 
-        tracing::info!("Starting FIDL server");
-        self.run_fidl_server().await
+        self.inspect_root.record(elements_node);
+        Ok(())
     }
 
     fn run_suspend_task(self: &Rc<Self>, mut suspend_signal: Receiver<()>) {
@@ -1009,44 +1014,6 @@ impl SystemActivityGovernor {
         }
     }
 
-    async fn run_fidl_server(self: &Rc<Self>) -> Result<()> {
-        let mut service_fs = ServiceFs::new_local();
-
-        service_fs
-            .dir("svc")
-            .add_fidl_service(IncomingRequest::ActivityGovernor)
-            .add_fidl_service(IncomingRequest::Stats)
-            .add_unified_service_instance(
-                "system_activity_governor",
-                IncomingRequest::ElementInfoProviderService,
-            );
-        service_fs
-            .take_and_serve_directory_handle()
-            .context("failed to serve outgoing namespace")?;
-
-        service_fs
-            .for_each_concurrent(None, move |request: IncomingRequest| {
-                let sag = self.clone();
-                async move {
-                    match request {
-                        IncomingRequest::ActivityGovernor(stream) => {
-                            fasync::Task::local(sag.handle_activity_governor_request(stream))
-                                .detach()
-                        }
-                        IncomingRequest::Stats(stream) => {
-                            fasync::Task::local(sag.handle_stats_request(stream)).detach()
-                        }
-                        IncomingRequest::ElementInfoProviderService(
-                            fbroker::ElementInfoProviderServiceRequest::StatusProvider(stream),
-                        ) => fasync::Task::local(sag.handle_element_info_provider_request(stream))
-                            .detach(),
-                    }
-                }
-            })
-            .await;
-        Ok(())
-    }
-
     async fn get_status_endpoints(&self) -> Vec<fbroker::ElementStatusEndpoint> {
         let mut endpoints = Vec::new();
 
@@ -1085,10 +1052,12 @@ impl SystemActivityGovernor {
         endpoints
     }
 
-    async fn handle_activity_governor_request(
+    pub async fn handle_activity_governor_stream(
         self: Rc<Self>,
         mut stream: fsystem::ActivityGovernorRequestStream,
     ) {
+        // Before handling requests, ensure power elements are initialized and handlers are running.
+        self.is_running_signal.wait().await;
         while let Some(request) = stream.next().await {
             match request {
                 Ok(fsystem::ActivityGovernorRequest::GetPowerElements { responder }) => {
@@ -1200,7 +1169,9 @@ impl SystemActivityGovernor {
         }
     }
 
-    async fn handle_stats_request(self: Rc<Self>, mut stream: fsuspend::StatsRequestStream) {
+    pub async fn handle_stats_stream(self: Rc<Self>, mut stream: fsuspend::StatsRequestStream) {
+        // Before handling requests, ensure power elements are initialized and handlers are running.
+        self.is_running_signal.wait().await;
         let sub = self.suspend_stats.hanging_get.borrow_mut().new_subscriber();
 
         while let Ok(Some(request)) = stream.try_next().await {
@@ -1217,10 +1188,12 @@ impl SystemActivityGovernor {
         }
     }
 
-    async fn handle_element_info_provider_request(
+    pub async fn handle_element_info_provider_stream(
         self: Rc<Self>,
         mut stream: fbroker::ElementInfoProviderRequestStream,
     ) {
+        // Before handling requests, ensure power elements are initialized and handlers are running.
+        self.is_running_signal.wait().await;
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
                 fbroker::ElementInfoProviderRequest::GetElementPowerLevelNames { responder } => {

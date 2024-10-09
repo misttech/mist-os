@@ -11,9 +11,10 @@ use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus};
 use fuchsia_component::client::connect_to_protocol;
 use futures::channel::mpsc;
-use futures::StreamExt;
+use futures::{FutureExt, StreamExt};
 use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
 use realm_proxy_client::RealmProxyClient;
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
@@ -46,6 +47,16 @@ async fn create_realm() -> Result<(RealmProxyClient, String)> {
     let (client, server) = create_endpoints();
     let result = realm_factory
         .create_realm(server)
+        .await?
+        .map_err(realm_proxy_client::Error::OperationError)?;
+    Ok((RealmProxyClient::from(client), result))
+}
+
+async fn create_realm_ext(options: ftest::RealmOptions) -> Result<(RealmProxyClient, String)> {
+    let realm_factory = connect_to_protocol::<ftest::RealmFactoryMarker>()?;
+    let (client, server) = create_endpoints();
+    let result = realm_factory
+        .create_realm_ext(options, server)
         .await?
         .map_err(realm_proxy_client::Error::OperationError)?;
     Ok((RealmProxyClient::from(client), result))
@@ -2745,6 +2756,246 @@ async fn test_activity_governor_handles_1000_wake_leases() -> Result<()> {
                 wait_for_suspending_token: false,
             },
         }
+    );
+
+    Ok(())
+}
+
+async fn create_cpu_driver_topology(
+    realm: &RealmProxyClient,
+) -> Result<(Arc<PowerElementContext>, Arc<Cell<fbroker::PowerLevel>>)> {
+    let topology = realm.connect_to_protocol::<fbroker::TopologyMarker>().await?;
+    let cpu_element_manager =
+        realm.connect_to_protocol::<fsystem::CpuElementManagerMarker>().await?;
+    let cpu_element_token = cpu_element_manager
+        .get_cpu_dependency_token()
+        .await
+        .unwrap()
+        .assertive_dependency_token
+        .unwrap();
+
+    let cpu_driver_controller = Arc::new(
+        PowerElementContext::builder(&topology, "cpu_driver", &[0, 1])
+            .dependencies(vec![fbroker::LevelDependency {
+                dependency_type: fbroker::DependencyType::Assertive,
+                dependent_level: 1,
+                requires_token: cpu_element_token,
+                requires_level_by_preference: vec![1],
+            }])
+            .build()
+            .await?,
+    );
+
+    let cpu_driver_context = cpu_driver_controller.clone();
+    let cpu_driver_power_level = Arc::new(Cell::new(0));
+    let cpu_driver_power_level2 = cpu_driver_power_level.clone();
+
+    fasync::Task::local(async move {
+        let update_fn = Arc::new(basic_update_fn_factory(&cpu_driver_context));
+        let cpu_driver_power_level = cpu_driver_power_level2.clone();
+
+        run_power_element(
+            &cpu_driver_context.name(),
+            &cpu_driver_context.required_level,
+            0,    /* initial_level */
+            None, /* inspect_node */
+            Box::new(move |new_power_level: fbroker::PowerLevel| {
+                let update_fn = update_fn.clone();
+                let cpu_driver_power_level = cpu_driver_power_level.clone();
+
+                async move {
+                    update_fn(new_power_level).await;
+                    cpu_driver_power_level.set(new_power_level);
+                }
+                .boxed_local()
+            }),
+        )
+        .await;
+    })
+    .detach();
+
+    Ok((cpu_driver_controller, cpu_driver_power_level))
+}
+
+#[fuchsia::test]
+async fn test_activity_governor_cpu_element_and_execution_state_interaction() -> Result<()> {
+    let (realm, activity_governor_moniker) = create_realm_ext(ftest::RealmOptions {
+        wait_for_suspending_token: Some(true),
+        ..Default::default()
+    })
+    .await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
+    let cpu_element_manager =
+        realm.connect_to_protocol::<fsystem::CpuElementManagerMarker>().await?;
+    let (cpu_driver_controller, cpu_driver_power_level) =
+        create_cpu_driver_topology(&realm).await.unwrap();
+
+    fasync::Task::local(async move {
+        cpu_element_manager
+            .add_execution_state_dependency(
+                fsystem::CpuElementManagerAddExecutionStateDependencyRequest {
+                    dependency_token: Some(
+                        cpu_driver_controller.assertive_dependency_token().unwrap(),
+                    ),
+                    power_level: Some(1),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap()
+            .unwrap();
+    })
+    .detach();
+
+    // This call should not be processed until the topology is set up.
+    let _wake_lease = activity_governor.take_wake_lease("wake_lease").await?;
+
+    // Trigger "boot complete" signal.
+    {
+        let suspend_controller = create_suspend_topology(&realm).await?;
+        lease(&suspend_controller, 1).await.unwrap();
+    }
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            booting: false,
+            power_elements: contains {
+                execution_state: {
+                    power_level: 1u64,
+                },
+                application_activity: {
+                    power_level: 0u64,
+                },
+                full_wake_handling: {
+                    power_level: 0u64,
+                },
+                wake_handling: {
+                    power_level: 0u64,
+                },
+                cpu: {
+                    power_level: 1u64,
+                },
+            },
+            "fuchsia.inspect.Health": contains {
+                status: "OK",
+            },
+        }
+    );
+
+    assert_eq!(1u8, cpu_driver_power_level.get());
+
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_activity_governor_cpu_element_returns_invalid_args() -> Result<()> {
+    let (realm, _) = create_realm_ext(ftest::RealmOptions {
+        wait_for_suspending_token: Some(true),
+        ..Default::default()
+    })
+    .await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let cpu_element_manager =
+        realm.connect_to_protocol::<fsystem::CpuElementManagerMarker>().await?;
+
+    // Empty request should return InvalidArgs.
+    assert_eq!(
+        fsystem::AddExecutionStateDependencyError::InvalidArgs,
+        cpu_element_manager
+            .add_execution_state_dependency(
+                fsystem::CpuElementManagerAddExecutionStateDependencyRequest {
+                    dependency_token: None,
+                    power_level: None,
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap()
+            .unwrap_err()
+    );
+
+    // Missing token should return InvalidArgs.
+    assert_eq!(
+        fsystem::AddExecutionStateDependencyError::InvalidArgs,
+        cpu_element_manager
+            .add_execution_state_dependency(
+                fsystem::CpuElementManagerAddExecutionStateDependencyRequest {
+                    dependency_token: None,
+                    power_level: Some(1),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap()
+            .unwrap_err()
+    );
+
+    // Missing power level should return InvalidArgs.
+    assert_eq!(
+        fsystem::AddExecutionStateDependencyError::InvalidArgs,
+        cpu_element_manager
+            .add_execution_state_dependency(
+                fsystem::CpuElementManagerAddExecutionStateDependencyRequest {
+                    dependency_token: Some(zx::Event::create()),
+                    power_level: None,
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap()
+            .unwrap_err()
+    );
+
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_activity_governor_cpu_element_returns_bad_state() -> Result<()> {
+    let (realm, _) = create_realm_ext(ftest::RealmOptions {
+        wait_for_suspending_token: Some(true),
+        ..Default::default()
+    })
+    .await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let cpu_element_manager =
+        realm.connect_to_protocol::<fsystem::CpuElementManagerMarker>().await?;
+    let (cpu_driver_controller, _) = create_cpu_driver_topology(&realm).await.unwrap();
+
+    cpu_element_manager
+        .add_execution_state_dependency(
+            fsystem::CpuElementManagerAddExecutionStateDependencyRequest {
+                dependency_token: Some(cpu_driver_controller.assertive_dependency_token().unwrap()),
+                power_level: Some(1),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(
+        fsystem::AddExecutionStateDependencyError::BadState,
+        cpu_element_manager
+            .add_execution_state_dependency(
+                fsystem::CpuElementManagerAddExecutionStateDependencyRequest {
+                    dependency_token: Some(
+                        cpu_driver_controller.assertive_dependency_token().unwrap()
+                    ),
+                    power_level: Some(1),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap()
+            .unwrap_err()
     );
 
     Ok(())

@@ -20,6 +20,7 @@ rustc_binary("bin") {
     "//src/power/broker:component",
     "//src/power/system-activity-governor:component",
     "//src/power/system-activity-governor/integration/testing/fidl:test.systemactivitygovernor_rust",
+    "//src/sys/lib/cm_rust",
     "//src/testing/realm_proxy",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",

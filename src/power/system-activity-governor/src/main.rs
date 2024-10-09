@@ -2,17 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+mod cpu_element_manager;
 mod system_activity_governor;
 
+use crate::cpu_element_manager::{CpuElementManager, SystemActivityGovernorFactory};
 use crate::system_activity_governor::SystemActivityGovernor;
-use anyhow::Result;
+use anyhow::{Context, Result};
 use fuchsia_async::{DurationExt, TimeoutExt};
 use fuchsia_component::client::{connect_to_protocol, connect_to_service_instance, open_service};
+use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::health::Reporter;
-use futures::{TryFutureExt, TryStreamExt};
+use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
+use power_broker_client::PowerElementContext;
 use sag_config::Config;
+use std::rc::Rc;
 use zx::Duration;
-use {fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_power_broker as fbroker};
+use {
+    fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_power_broker as fbroker,
+    fidl_fuchsia_power_suspend as fsuspend, fidl_fuchsia_power_system as fsystem,
+};
 
 const SUSPEND_DEVICE_TIMEOUT: Duration = Duration::from_seconds(10);
 
@@ -56,6 +64,61 @@ async fn connect_to_suspender() -> Result<fhsuspend::SuspenderProxy> {
         .map_err(|e| anyhow::anyhow!("Failed to connect to suspender: {:?}", e))
 }
 
+enum IncomingService {
+    ActivityGovernor(fsystem::ActivityGovernorRequestStream),
+    CpuElementManager(fsystem::CpuElementManagerRequestStream),
+    Stats(fsuspend::StatsRequestStream),
+    ElementInfoProviderService(fbroker::ElementInfoProviderServiceRequest),
+}
+
+async fn run<F>(cpu_service: Rc<CpuElementManager<F>>) -> Result<()>
+where
+    F: SystemActivityGovernorFactory,
+{
+    let mut service_fs = ServiceFs::new_local();
+
+    service_fs
+        .dir("svc")
+        .add_fidl_service(IncomingService::ActivityGovernor)
+        .add_fidl_service(IncomingService::Stats)
+        .add_fidl_service(IncomingService::CpuElementManager)
+        .add_unified_service_instance(
+            "system_activity_governor",
+            IncomingService::ElementInfoProviderService,
+        );
+    service_fs.take_and_serve_directory_handle().context("failed to serve outgoing namespace")?;
+
+    service_fs
+        .for_each_concurrent(None, move |request: IncomingService| {
+            let cpu_service = cpu_service.clone();
+
+            // Before constructing the SystemActivityGovernor type, the system-activity-governor
+            // component must receive a token from another component. To ensure components that
+            // depend on fuchsia.power.system.ActivityGovernor, et. al. have consistent behavior,
+            // this component only handles messages from fuchsia.power.system.CpuElementManager
+            // until the SystemActivityGovernor type is constructed.
+            async move {
+                match request {
+                    IncomingService::ActivityGovernor(stream) => {
+                        cpu_service.sag().await.handle_activity_governor_stream(stream).await
+                    }
+                    IncomingService::CpuElementManager(stream) => {
+                        cpu_service.handle_cpu_element_manager_stream(stream).await
+                    }
+                    IncomingService::Stats(stream) => {
+                        cpu_service.sag().await.handle_stats_stream(stream).await
+                    }
+                    IncomingService::ElementInfoProviderService(
+                        fbroker::ElementInfoProviderServiceRequest::StatusProvider(stream),
+                    ) => cpu_service.sag().await.handle_element_info_provider_stream(stream).await,
+                }
+            }
+        })
+        .await;
+
+    Ok(())
+}
+
 #[fuchsia::main]
 async fn main() -> Result<()> {
     tracing::info!("started");
@@ -70,9 +133,9 @@ async fn main() -> Result<()> {
     inspector.root().record_child("config", |config_node| config.record_inspect(config_node));
 
     // Set up the SystemActivityGovernor.
-    let use_suspender = config.use_suspender;
-    tracing::info!("use_suspender={use_suspender}");
-    let suspender = if use_suspender {
+    tracing::info!(?config, "config");
+
+    let suspender = if config.use_suspender {
         // TODO(https://fxbug.dev/361403498): Re-attempt to connect to suspender indefinitely once
         // dependents have aligned on the use of structured config for SAG.
         tracing::info!("Attempting to connect to suspender...");
@@ -91,20 +154,36 @@ async fn main() -> Result<()> {
         None
     };
 
-    let wait_for_suspending_token = config.wait_for_suspending_token;
-    tracing::info!("wait_for_suspending_token={wait_for_suspending_token}");
+    let topology = connect_to_protocol::<fbroker::TopologyMarker>()?;
+    let topology2 = topology.clone();
 
-    let sag = SystemActivityGovernor::new(
-        &connect_to_protocol::<fbroker::TopologyMarker>()?,
-        inspector.root().clone_weak(),
-        suspender,
-    )
-    .await?;
+    let sag_factory_fn = move |cpu: Rc<PowerElementContext>, execution_state_dependencies| {
+        let topology = topology2.clone();
+        let suspender = suspender.clone();
+        async move {
+            tracing::info!("Starting activity governor server...");
+            SystemActivityGovernor::new(
+                &topology,
+                inspector.root().clone_weak(),
+                suspender,
+                cpu,
+                execution_state_dependencies,
+            )
+            .await
+        }
+        .boxed_local()
+    };
+
+    let cpu_service = if config.wait_for_suspending_token {
+        CpuElementManager::new_wait_for_suspending_token(&topology, sag_factory_fn).await
+    } else {
+        CpuElementManager::new(&topology, sag_factory_fn).await
+    };
 
     fuchsia_inspect::component::health().set_ok();
 
     // This future should never complete.
-    let result = sag.run().await;
+    let result = run(cpu_service).await;
     tracing::error!(?result, "Unexpected exit");
     fuchsia_inspect::component::health().set_unhealthy(&format!("Unexpected exit: {:?}", result));
     result
