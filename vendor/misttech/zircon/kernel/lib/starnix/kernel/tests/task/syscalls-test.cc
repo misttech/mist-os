@@ -12,9 +12,11 @@
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
 #include <lib/mistos/starnix/testing/testing.h>
 #include <lib/mistos/util/default_construct.h>
+#include <lib/mistos/util/testing/unittest.h>
 #include <lib/unittest/unittest.h>
 
 #include <fbl/ref_ptr.h>
+#include <ktl/string_view.h>
 
 #include <linux/prctl.h>
 
@@ -50,77 +52,92 @@ bool test_prctl_set_vma_anon_name() {
   END_TEST;
 }
 
-#if 0
-TEST(Task, test_set_vma_name_special_chars) {
+bool test_set_vma_name_special_chars() {
+  BEGIN_TEST;
+
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
 
-  auto name_addr = map_memory(*current_task, UserAddress(), PAGE_SIZE);
+  auto name_addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE);
 
-  auto mapping_addr = map_memory(*current_task, UserAddress(), PAGE_SIZE);
+  auto mapping_addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE);
 
   for (int c = 1; c <= 255; c++) {
-    fbl::String vma_name(1, static_cast<char>(c));
+    BString vma_name(1, static_cast<char>(c));
     ASSERT_TRUE((*current_task).write_memory(name_addr, {(uint8_t*)vma_name.data(), 2}).is_ok());
 
     auto result = sys_prctl(*current_task, PR_SET_VMA, PR_SET_VMA_ANON_NAME, mapping_addr.ptr(),
                             PAGE_SIZE, name_addr.ptr());
 
     if (c > 0x1f && c < 0x7f && c != '\\' && c != '`' && c != '$' && c != '[' && c != ']') {
-      ASSERT_EQ(starnix_syscalls::SUCCESS, result);
+      ASSERT_TRUE(result.is_ok());
+      ASSERT_EQ(starnix_syscalls::SUCCESS.value(), result->value());
     } else {
-      ASSERT_TRUE(result.is_error(), "c[0x%x]", c);
-      ASSERT_EQ(errno(EINVAL), result.error_value());
+      ASSERT_EQ(errno(EINVAL).error_code(), result.error_value().error_code());
     }
   }
+
+  END_TEST;
 }
 
-TEST(Task, test_set_vma_name_long) {
+bool test_set_vma_name_long() {
+  BEGIN_TEST;
+
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
 
-  auto name_addr = map_memory(*current_task, UserAddress(), PAGE_SIZE);
+  auto name_addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE);
 
-  auto mapping_addr = map_memory(*current_task, UserAddress(), PAGE_SIZE);
+  auto mapping_addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE);
 
-  fbl::String name_too_long(256, 'a');
+  BString name_too_long(256, 'a');
   ASSERT_TRUE(
       (*current_task).write_memory(name_addr, {(uint8_t*)name_too_long.data(), 257}).is_ok());
 
   auto result = sys_prctl(*current_task, PR_SET_VMA, PR_SET_VMA_ANON_NAME, mapping_addr.ptr(),
                           PAGE_SIZE, name_addr.ptr());
   ASSERT_TRUE(result.is_error());
-  ASSERT_EQ(errno(EINVAL), result.error_value());
+  ASSERT_EQ(errno(EINVAL).error_code(), result.error_value().error_code());
 
-  fbl::String name_just_long_enough(255, 'a');
+  BString name_just_long_enough(255, 'a');
 
   ASSERT_TRUE((*current_task)
                   .write_memory(name_addr, {(uint8_t*)name_just_long_enough.data(), 256})
                   .is_ok());
 
-  ASSERT_EQ(starnix_syscalls::SUCCESS, sys_prctl(*current_task, PR_SET_VMA, PR_SET_VMA_ANON_NAME,
-                                                 mapping_addr.ptr(), PAGE_SIZE, name_addr.ptr()));
+  ASSERT_EQ(starnix_syscalls::SUCCESS.value(),
+            sys_prctl(*current_task, PR_SET_VMA, PR_SET_VMA_ANON_NAME, mapping_addr.ptr(),
+                      PAGE_SIZE, name_addr.ptr())
+                ->value());
+
+  END_TEST;
 }
 
-TEST(Task, test_set_vma_name_misaligned) {
-  auto [kernel, current_task] = create_kernel_task_and_unlocked();
-  auto name_addr = map_memory(*current_task, UserAddress(), PAGE_SIZE);
-  auto mapping_addr = map_memory(*current_task, UserAddress(), PAGE_SIZE);
+bool test_set_vma_name_misaligned() {
+  BEGIN_TEST;
 
-  fbl::String name("name");
+  auto [kernel, current_task] = create_kernel_task_and_unlocked();
+  auto name_addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE);
+  auto mapping_addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE);
+
+  BString name("name");
   ASSERT_TRUE((*current_task).write_memory(name_addr, {(uint8_t*)name.data(), 5}).is_ok());
 
   // Passing a misaligned pointer to the start of the named region fails.
   auto result = sys_prctl(*current_task, PR_SET_VMA, PR_SET_VMA_ANON_NAME, 1 + mapping_addr.ptr(),
                           PAGE_SIZE - 1, name_addr.ptr());
   ASSERT_TRUE(result.is_error());
-  ASSERT_EQ(errno(EINVAL), result.error_value());
+  ASSERT_EQ(errno(EINVAL).error_code(), result.error_value().error_code());
 
   // Passing an unaligned length does work, however.
-  ASSERT_EQ(starnix_syscalls::SUCCESS,
+  ASSERT_EQ(starnix_syscalls::SUCCESS.value(),
             sys_prctl(*current_task, PR_SET_VMA, PR_SET_VMA_ANON_NAME, mapping_addr.ptr(),
-                      PAGE_SIZE - 1, name_addr.ptr()));
+                      PAGE_SIZE - 1, name_addr.ptr())
+                ->value());
+
+  END_TEST;
 }
 
-TEST(Task, test_sys_getsid) {
+bool test_sys_getsid() {
+  BEGIN_TEST;
   auto [kernel, current_task] = create_kernel_and_task();
 
   auto result = starnix::sys_getsid(*current_task, 0);
@@ -131,12 +148,18 @@ TEST(Task, test_sys_getsid) {
   auto second_current = create_task(kernel, "second task");
 
   ASSERT_EQ(second_current->get_tid(),
-            starnix::sys_getsid(*current_task, second_current->get_tid()));
+            starnix::sys_getsid(*current_task, second_current->get_tid()).value());
+  END_TEST;
 }
-#endif
+
+}
 
 }  // namespace unit_testing
 
 UNITTEST_START_TESTCASE(starnix_task_syscalls)
 UNITTEST("test prctl set vma anon name", unit_testing::test_prctl_set_vma_anon_name)
+UNITTEST("test set vma name special chars", unit_testing::test_set_vma_name_special_chars)
+UNITTEST("test set vma name long", unit_testing::test_set_vma_name_long)
+UNITTEST("test set vma name misaligned", unit_testing::test_set_vma_name_misaligned)
+UNITTEST("test sys getsid", unit_testing::test_sys_getsid)
 UNITTEST_END_TESTCASE(starnix_task_syscalls, "starnix_task_syscalls", "Tests for Tasks Syscalls")
