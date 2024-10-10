@@ -23,15 +23,10 @@ zx_status_t MonotonicTestClockBase::GetUtcTime(zx_time_t* time) const {
   return ZX_OK;
 }
 
-zx_instant_mono_t MonotonicTestClockBase::GetMonotonicTime() const {
+zx_time_t MonotonicTestClockBase::GetMonotonicTime() const {
   zx_time_t result = std::max(clock_(), last_returned_value_ + 1);
   last_returned_value_ = result;
   return result;
-}
-
-zx_instant_boot_t MonotonicTestClockBase::GetBootTime() const {
-  // For test purposes, treat it as the same.
-  return GetMonotonicTime();
 }
 
 }  // namespace timekeeper

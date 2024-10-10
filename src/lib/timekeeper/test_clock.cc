@@ -15,8 +15,6 @@ zx_status_t TestClock::GetUtcTime(zx_time_t* time) const {
   return ZX_OK;
 }
 
-zx_instant_mono_t TestClock::GetMonotonicTime() const { return current_time_; }
-
-zx_instant_boot_t TestClock::GetBootTime() const { return current_time_; }
+zx_time_t TestClock::GetMonotonicTime() const { return current_time_; }
 
 }  // namespace timekeeper
