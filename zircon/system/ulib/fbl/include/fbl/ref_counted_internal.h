@@ -59,7 +59,143 @@ class RefCountedBase {
   }
 
   // Returns true if the object should self-delete.
+  //
+  // A call to Release() that returns true must synchronize-with the previous
+  // (in the modification order of ref_count_) call to Release().  See below for
+  // details.
   bool Release() const __WARN_UNUSED_RESULT {
+    //
+    // To ensure that all accesses to a ref-counted object happen-before the
+    // last RefPtr to the object is released, we must ensure that a call to
+    // Release() that drops the ref_count_ to zero, synchronizes-with the
+    // previous call that dropped the count to one.
+    //
+    // Both the use of std::memory_order_release when decrementing ref_count_,
+    // and the use of std::memory_order_acquire on the std::atomic_thread_fence
+    // below are critical to ensuring this synchronizes-with behavior.  To
+    // understand why, consider the following example...
+    //
+    //
+    // Example 1: correct if RefPtr provides synchronization
+    //
+    // class Value : public fbl::RefCounted<Value> {
+    //  public:
+    //   explicit Value(int v) : v_(v) {}
+    //   int get() const { return v_; }
+    //  private:
+    //   const int v_;
+    // };
+    //
+    // void Example(int v) {
+    //   fbl::RefPtr<Value> p1 = fbl::AdoptRef(new Value(v));
+    //   fbl::RefPtr<Value> p2 = p1;
+    //
+    //   int v1;
+    //   std::thread t1([&p1, &v1]() {
+    //     v1 = p1->get();
+    //     p1.reset();
+    //   });
+    //
+    //   int v2;
+    //   std::thread t2([&p2, &v2]() {
+    //     v2 = p2->get();
+    //     p2.reset();
+    //   });
+    //
+    //   t1.join();
+    //   t2.join();
+    //
+    //   printf("sum is %d\n", v1 + v2);
+    // }
+    //
+    //
+    // In the example above, we have two threads, t1 and t2.  Each thread
+    // accesses the shared instance using its own RefPtr, makes an observation
+    // via get(), then resets its pointer.  Under the hood, reset() calls
+    // Release().  When Release() returns true, reset() will destroy the object.
+    //
+    // For this example to be correct, RefPtr must ensure all accesses to
+    // the ref-counted object happen-before the last reference to the object is
+    // released, that is, before Release() returns true.
+    //
+    // What happens if Release() does not provide synchronization?  Let's take a
+    // look at a similar, but incorrect example.  If we strip it down, "inline"
+    // RefPtr, and remove the synchronization we get something like...
+    //
+    //
+    // // Example 2: incorrect, no synchronization
+    //
+    // bool Release(std::atomic<int>& rc) {
+    //   return rc.fetch_sub(1, std::memory_order_relaxed) == 1;
+    // }
+    //
+    // void Example(int v) {
+    //   const int* p = new int(v);
+    //   std::atomic<int> ref_count = 2;
+    //
+    //   int v1;
+    //   std::thread t1([&p, &v1]() {
+    //     v1 = *p;
+    //     if (Release(ref_count)) {
+    //       delete p;
+    //     }
+    //   });
+    //
+    //   int v2;
+    //   std::thread t2([&p, &v2]() {
+    //     v2 = *p;
+    //     if (Release(ref_count)) {
+    //       delete p;
+    //     }
+    //   });
+    //
+    //   t1.join();
+    //   t2.join();
+    //
+    //   printf("sum is %d\n", v1 + v2);
+    // }
+    //
+    //
+    // The above example has a bug because there is nothing preventing the
+    // compiler or hardware from reordering the thread's dereference of p with
+    // its decrement of ref_count.  In other words, this,
+    //
+    //     v1 = *p;
+    //     if (Release(ref_count)) {
+    //       delete p;
+    //     }
+    //
+    // could be transformed into this,
+    //
+    //     bool should_delete = Release(ref_count);
+    //     v1 = *p;
+    //     if (should_delete) {
+    //       delete p;
+    //     }
+    //
+    // To prevent the possibility of a reordering-induced use-after-free or a
+    // destructor racing with "previous" object accesses, we to must make
+    // Release() synchronize-with Release().  There are multiple ways to do it.
+    //
+    // **decrement with acq_rel** - This approach uses std::memory_order_acq_rel
+    // when decrementing ref_count_.  By using std::memory_order_acq_rel, every
+    // decrement operation acts as both an acquire operation and a release
+    // operation, so a decrement A, that observes the value written by a
+    // decrement B, synchronizes-with B.
+    //
+    // **decrement with release plus an acquire fence** - Using
+    // std::memory_order_acq_rel for the decrement operation actually provides
+    // more synchronization than is strictly necessary.  We only need to
+    // synchronize the Release calls that decrement the ref_count_ to one or
+    // zero.  Instead of using std::memory_order_acq_rel, we can use
+    // std::memory_order_release and then in the case where we did, in fact,
+    // decrement the ref_count_ to zero, issue an std::atomic_thread_fence with
+    // std::memory_order_acquire (atomic-fence synchronization).
+    //
+    // It should be noted that on some machines one of the two approaches may
+    // perform better than the other.  We have not analyzed the performance and
+    // may wish to revisit our selection.
+    //
     const int32_t rc = ref_count_.fetch_sub(1, std::memory_order_release);
 
     // This assertion will fire if someone manually calls Release()
