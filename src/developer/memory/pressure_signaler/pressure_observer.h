@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVELOPER_MEMORY_MONITOR_PRESSURE_OBSERVER_H_
-#define SRC_DEVELOPER_MEMORY_MONITOR_PRESSURE_OBSERVER_H_
+#ifndef SRC_DEVELOPER_MEMORY_PRESSURE_SIGNALER_PRESSURE_OBSERVER_H_
+#define SRC_DEVELOPER_MEMORY_PRESSURE_SIGNALER_PRESSURE_OBSERVER_H_
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -77,4 +77,4 @@ class PressureObserver {
 
 }  // namespace monitor
 
-#endif  // SRC_DEVELOPER_MEMORY_MONITOR_PRESSURE_OBSERVER_H_
+#endif  // SRC_DEVELOPER_MEMORY_PRESSURE_SIGNALER_PRESSURE_OBSERVER_H_

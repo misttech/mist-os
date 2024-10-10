@@ -35,7 +35,7 @@
 #include "src/developer/memory/metrics/printer.h"
 #include "src/developer/memory/monitor/high_water.h"
 #include "src/developer/memory/monitor/memory_metrics_registry.cb.h"
-#include "src/developer/memory/monitor/pressure_observer.h"
+#include "src/developer/memory/pressure_signaler/pressure_observer.h"
 #include "src/lib/files/file.h"
 #include "src/lib/fsl/socket/strings.h"
 #include "src/lib/fxl/command_line.h"

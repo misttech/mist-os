@@ -1,0 +1,32 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+source_set("lib") {
+  sources = [
+    "debugger.cc",
+    "debugger.h",
+    "pressure_notifier.cc",
+    "pressure_notifier.h",
+    "pressure_observer.cc",
+    "pressure_observer.h",
+  ]
+  public = [
+    "debugger.h",
+    "pressure_notifier.h",
+    "pressure_observer.h",
+  ]
+  deps = [
+    "//sdk/lib/async-default",
+    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/component/incoming/cpp:cpp",
+    "//sdk/lib/sys/cpp:cpp",
+    "//sdk/lib/syslog/cpp",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
+    "//sdk/fidl/fuchsia.memory.debug:fuchsia.memory.debug_hlcpp",
+  ]
+}

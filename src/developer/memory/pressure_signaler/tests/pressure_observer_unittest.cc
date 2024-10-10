@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/developer/memory/monitor/pressure_observer.h"
+#include "src/developer/memory/pressure_signaler/pressure_observer.h"
 
 #include <zircon/types.h>
 

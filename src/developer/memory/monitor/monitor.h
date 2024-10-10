@@ -20,12 +20,12 @@
 
 #include "src/developer/memory/metrics/capture.h"
 #include "src/developer/memory/metrics/digest.h"
-#include "src/developer/memory/monitor/debugger.h"
 #include "src/developer/memory/monitor/high_water.h"
 #include "src/developer/memory/monitor/logger.h"
 #include "src/developer/memory/monitor/memory_monitor_config.h"
 #include "src/developer/memory/monitor/metrics.h"
-#include "src/developer/memory/monitor/pressure_notifier.h"
+#include "src/developer/memory/pressure_signaler/debugger.h"
+#include "src/developer/memory/pressure_signaler/pressure_notifier.h"
 #include "src/lib/fxl/command_line.h"
 
 namespace monitor {

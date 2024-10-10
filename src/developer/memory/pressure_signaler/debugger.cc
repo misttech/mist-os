@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/developer/memory/monitor/debugger.h"
+#include "src/developer/memory/pressure_signaler/debugger.h"
 
 #include <lib/syslog/cpp/macros.h>
 

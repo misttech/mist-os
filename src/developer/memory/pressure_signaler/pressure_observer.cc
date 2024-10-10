@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/developer/memory/monitor/pressure_observer.h"
+#include "src/developer/memory/pressure_signaler/pressure_observer.h"
 
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <lib/async/cpp/task.h>
@@ -19,7 +19,7 @@
 #include <zircon/time.h>
 #include <zircon/types.h>
 
-#include "src/developer/memory/monitor/pressure_notifier.h"
+#include "src/developer/memory/pressure_signaler/pressure_notifier.h"
 
 namespace monitor {
 

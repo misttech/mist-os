@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVELOPER_MEMORY_MONITOR_DEBUGGER_H_
-#define SRC_DEVELOPER_MEMORY_MONITOR_DEBUGGER_H_
+#ifndef SRC_DEVELOPER_MEMORY_PRESSURE_SIGNALER_DEBUGGER_H_
+#define SRC_DEVELOPER_MEMORY_PRESSURE_SIGNALER_DEBUGGER_H_
 
 #include <fuchsia/memory/debug/cpp/fidl.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/sys/cpp/component_context.h>
 
-#include "src/developer/memory/monitor/pressure_notifier.h"
+#include "src/developer/memory/pressure_signaler/pressure_notifier.h"
 
 namespace monitor {
 
@@ -28,4 +28,4 @@ class MemoryDebugger : public fuchsia::memory::debug::MemoryPressure {
 
 }  // namespace monitor
 
-#endif  // SRC_DEVELOPER_MEMORY_MONITOR_DEBUGGER_H_
+#endif  // SRC_DEVELOPER_MEMORY_PRESSURE_SIGNALER_DEBUGGER_H_

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVELOPER_MEMORY_MONITOR_PRESSURE_NOTIFIER_H_
-#define SRC_DEVELOPER_MEMORY_MONITOR_PRESSURE_NOTIFIER_H_
+#ifndef SRC_DEVELOPER_MEMORY_PRESSURE_SIGNALER_PRESSURE_NOTIFIER_H_
+#define SRC_DEVELOPER_MEMORY_PRESSURE_SIGNALER_PRESSURE_NOTIFIER_H_
 
 #include <fuchsia/feedback/cpp/fidl.h>
 #include <fuchsia/memorypressure/cpp/fidl.h>
@@ -12,7 +12,7 @@
 
 #include <vector>
 
-#include "src/developer/memory/monitor/pressure_observer.h"
+#include "src/developer/memory/pressure_signaler/pressure_observer.h"
 
 namespace monitor {
 
@@ -30,7 +30,7 @@ class PressureNotifier : public fuchsia::memorypressure::Provider {
   explicit PressureNotifier(bool watch_for_changes, bool send_critical_pressure_crash_reports,
                             sys::ComponentContext* context = nullptr,
                             async_dispatcher_t* dispatcher = nullptr, NotifyCb notify_cb = nullptr);
-  
+
   PressureNotifier(const PressureNotifier&) = delete;
   PressureNotifier& operator=(const PressureNotifier&) = delete;
 
@@ -74,4 +74,4 @@ class PressureNotifier : public fuchsia::memorypressure::Provider {
 
 }  // namespace monitor
 
-#endif  // SRC_DEVELOPER_MEMORY_MONITOR_PRESSURE_NOTIFIER_H_
+#endif  // SRC_DEVELOPER_MEMORY_PRESSURE_SIGNALER_PRESSURE_NOTIFIER_H_

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/developer/memory/monitor/pressure_notifier.h"
+#include "src/developer/memory/pressure_signaler/pressure_notifier.h"
 
 #include <fuchsia/feedback/cpp/fidl_test_base.h>
 #include <fuchsia/memory/debug/cpp/fidl.h>

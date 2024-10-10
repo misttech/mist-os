@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/developer/memory/monitor/pressure_notifier.h"
+#include "src/developer/memory/pressure_signaler/pressure_notifier.h"
 
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/clock.h>
