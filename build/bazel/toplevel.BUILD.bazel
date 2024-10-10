@@ -98,7 +98,7 @@ load(
 
 fuchsia_devicetree_toolchain_info(
     name = "fuchsia_devicetree_toolchain_info",
-    dtc = "//prebuilt/third_party/dtc/%s/dtc" % build_config.host_tag,
+    dtc = "//:prebuilt/third_party/dtc/%s/dtc" % build_config.host_tag,
 )
 
 toolchain(
