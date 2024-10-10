@@ -837,7 +837,7 @@ Example usage of the modifiers on a protocol.
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/fuchsia.examples.docs/language_reference.test.fidl" region_tag="unknown-interactions" %}
 ```
 
-Keep in mind that unknown interaction handling applies only when the receivng
+Keep in mind that unknown interaction handling applies only when the receiving
 end doesn't recognize the ordinal and doesn't know what the interaction is.
 This means that the receiving end does not know whether the interaction is
 supposed to be strict or flexible. To allow the receiver to know how to handle
