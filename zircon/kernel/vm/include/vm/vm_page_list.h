@@ -937,9 +937,9 @@ class VmPageList final {
   // underlying pages any intermediate data structures can be checked and potentially freed if no
   // longer needed.
   template <typename T>
-  void RemovePages(T per_page_fn, uint64_t start_offset, uint64_t end_offset) {
-    ForEveryPageInRange<VmPageOrMarker*, NodeCheck::CleanupEmpty>(this, per_page_fn, start_offset,
-                                                                  end_offset);
+  zx_status_t RemovePages(T per_page_fn, uint64_t start_offset, uint64_t end_offset) {
+    return ForEveryPageInRange<VmPageOrMarker*, NodeCheck::CleanupEmpty>(this, per_page_fn,
+                                                                         start_offset, end_offset);
   }
 
   // Similar to RemovePages but also takes a |per_gap_fn| callback to allow for iterating over any

@@ -873,7 +873,7 @@ class VmCowPages final : public VmHierarchyBase,
   // The caller provides:
   //  * `self`: Node to begin the iteration from. It must be a visible node.
   //  * `func`: Callback function invoked for each non-empty entry.
-  //  * `offset`: Offset relative to `self` to being iterating at.
+  //  * `offset`: Offset relative to `self` to begin iterating at.
   //  * `size`: Size of the range to iterate.
   //
   // The type `S` must be implicitly convertible to a `VmCowPages` or a `const VmCowPages`.

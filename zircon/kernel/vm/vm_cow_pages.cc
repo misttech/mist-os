@@ -642,99 +642,120 @@ zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRange(S* self, T func, uint6
   DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
   DEBUG_ASSERT(!self->is_hidden_locked());
 
-  const uint64_t end_offset = CheckedAdd(offset, size);
-  uint64_t cur_offset = offset;
-  uint64_t cur_end_offset = end_offset;
+  uint64_t start_in_self = offset;
+  uint64_t end_in_self = CheckedAdd(offset, size);
+  uint64_t start_in_cur = start_in_self;
+  uint64_t end_in_cur = end_in_self;
   S* cur = self;
-  while (offset < end_offset) {
+
+  while (start_in_self < end_in_self) {
     AssertHeld(cur->lock_ref());
 
-    // Treat an interval's "empty" entries as starting at the lower bound of iteration if iteration
-    // begins part-way through an interval. This allows us to skip these "partial" intervals.
-    uint64_t interval_start_offset = cur_offset;
-    zx_status_t user_status = ZX_ERR_NEXT;
-    auto page_callback = [&](auto p, uint64_t page_offset) {
-      if (p->IsIntervalStart()) {
-        // We should only find intervals in a pager-backed root node. This function won't traverse
-        // upwards from a gap into such a node, so if we find an interval then `cur` must be both
-        // pager-backed and the initial visible node we invoked this function on.
-        DEBUG_ASSERT(cur->is_source_preserving_page_content() && cur == self);
-
-        // The underlying `page_list_` iterator guarantees we weren't inside of an interval here.
-        //
-        // Set the offset to the entry after this IntervalStart, as the IntervalStart itself is
-        // accounted for in the additions at the end of this function.
-        interval_start_offset = CheckedAdd(page_offset, PAGE_SIZE);
-      } else if (p->IsIntervalEnd()) {
-        // We should only find intervals in a pager-backed root node. This function won't traverse
-        // upwards from a gap into such a node, so if we find an interval then `cur` must be both
-        // pager-backed and the initial visible node we invoked this function on.
-        DEBUG_ASSERT(cur->is_source_preserving_page_content() && cur == self);
-
-        // The underlying `page_list_` iterator guarantees we were inside of an interval here.
-        //
-        // Compute the length of the empty entries inside of the interval to "skip ahead" over it.
-        // The IntervalStart and IntervalEnd entries are accounted for in the additions after we
-        // invoke `func` below.
-        const uint64_t interval_length = page_offset - interval_start_offset;
-        DEBUG_ASSERT(interval_length <= page_offset);  // Shouldn't overflow.
-        offset += interval_length;
-        cur_offset += interval_length;
+    // Early out if the current node is empty.
+    // TODO(https://fxbug.dev/338300943): This early out shouldn't be necessary as long as the
+    // VmPageList iterator functions like `ForEveryPageInRange` early out instead. Microbenchmarks
+    // slightly regressed when we attempted this though. Investigate adding the `IsEmpty` early-out
+    // to the VMPageList methods and removing this block.
+    if (cur->page_list_.IsEmpty()) {
+      if (cur->is_parent_hidden_locked() && start_in_cur < cur->parent_limit_) {
+        // Some of this range within the parent node is still owned by `self`, so walk up and
+        // process the range from within the parent instead.
+        start_in_cur = start_in_cur + cur->parent_offset_;
+        end_in_cur = ktl::min(end_in_cur, cur->parent_limit_) + cur->parent_offset_;
+        cur = cur->parent_.get();
+      } else {
+        // The range within the current node is owned by `self`, but the same range is not owned by
+        // `self` within the parent node. Either:
+        //  1. The parent is a visible node and owns all its pages, so `self` cannot own them.
+        //  2. This range within the parent is not visible to `self` due to the `parent_limit_`, and
+        //     thus it cannot be owned by `self` either.
+        // Mark the range as processed and restart another walk up from `self`.
+        start_in_self += end_in_cur - start_in_cur;
+        start_in_cur = start_in_self;
+        end_in_cur = end_in_self;
+        cur = self;
       }
-      DEBUG_ASSERT(page_offset == cur_offset);
 
+      continue;
+    }
+
+    // We attempt to always inline these lambdas, as its a huge performance benefit and has minimal
+    // impact on code size.
+    bool stopped_early = false;
+    bool walk_up = false;
+    auto page_callback = [func, cur, cur_to_self = start_in_cur - start_in_self, &stopped_early](
+                             auto p, uint64_t page_offset) __ALWAYS_INLINE {
       // Always provide a constant owner node to the callback - it should only ever be able to
       // modify the passed in entry.
-      user_status = func(p, static_cast<const S*>(cur), offset, cur_offset);
-
-      offset += PAGE_SIZE;
-      cur_offset += PAGE_SIZE;
-      return user_status;
+      zx_status_t status =
+          func(p, static_cast<const S*>(cur), page_offset - cur_to_self, page_offset);
+      if (status == ZX_ERR_STOP) {
+        stopped_early = true;
+      }
+      return status;
     };
-    auto gap_callback = [&](uint64_t gap_start_offset, uint64_t gap_end_offset) {
+    auto gap_callback = [&cur, &start_in_self, &start_in_cur, &end_in_cur, &walk_up](
+                            uint64_t gap_start_offset, uint64_t gap_end_offset) __ALWAYS_INLINE {
       AssertHeld(cur->lock_ref());
-      DEBUG_ASSERT(gap_start_offset == cur_offset);
 
-      // Stop iterating if parent is a visible node. Non-leaf visible nodes represent cases of
-      // unidirectional cloning, and in these cases the parent owns any pages in the gap.
-      if (cur->parent_ && cur_offset < cur->parent_limit_ &&
-          cur->parent_locked().is_hidden_locked()) {
-        // Trim the operating range to the parent and walk up.
-        cur_offset += cur->parent_offset_;
-        cur_end_offset = ktl::min(gap_end_offset, cur->parent_limit_) + cur->parent_offset_;
+      // The gap is empty, so walk up if the parent is accessible from any part of it.
+      // Mark the range immediately preceding the gap as processed.
+      if (gap_start_offset < cur->parent_limit_) {
+        start_in_self += gap_start_offset - start_in_cur;
+        start_in_cur = gap_start_offset + cur->parent_offset_;
+        end_in_cur = ktl::min(gap_end_offset, cur->parent_limit_) + cur->parent_offset_;
         cur = cur->parent_.get();
+        walk_up = true;
         return ZX_ERR_STOP;
       }
 
-      offset += (gap_end_offset - gap_start_offset);
-      cur_offset = gap_end_offset;
       return ZX_ERR_NEXT;
     };
 
-    zx_status_t status;
-    if constexpr (MUTABLE) {
-      status = cur->page_list_.RemovePagesAndIterateGaps(page_callback, gap_callback, cur_offset,
-                                                         cur_end_offset);
-    } else {
-      status = cur->page_list_.ForEveryPageAndGapInRange(page_callback, gap_callback, cur_offset,
-                                                         cur_end_offset);
-    }
-
-    // If the callback wanted to stop or generate an error, then propagate that.
-    if (user_status != ZX_OK && user_status != ZX_ERR_NEXT) {
-      if (user_status == ZX_ERR_STOP) {
-        return ZX_OK;
+    zx_status_t status = ZX_OK;
+    if (cur->is_parent_hidden_locked()) {
+      // We know the parent is hidden here, so we may need to walk up into it if it's accessible
+      // from any empty offset within the range.
+      //
+      // Otherwise process pages within the range directly owned by `cur`.
+      if constexpr (MUTABLE) {
+        status = cur->page_list_.RemovePagesAndIterateGaps(page_callback, gap_callback,
+                                                           start_in_cur, end_in_cur);
+      } else {
+        status = cur->page_list_.ForEveryPageAndGapInRange(page_callback, gap_callback,
+                                                           start_in_cur, end_in_cur);
       }
-      return user_status;
+    } else {
+      // There is either no parent here, or the parent is visible.
+      //
+      // Visible parents represent cases of unidirectional cloning where the parent owns its pages
+      // exclusively, so we don't walk up into them and thus don't need to process any gaps.
+      //
+      // Processing gaps is expensive due to additional per-page overhead involved in tracking the
+      // gaps and intervals, so save time by avoiding that and only processing pages directly owned
+      // by `cur`.
+      if constexpr (MUTABLE) {
+        status = cur->page_list_.RemovePages(page_callback, start_in_cur, end_in_cur);
+      } else {
+        status = cur->page_list_.ForEveryPageInRange(page_callback, start_in_cur, end_in_cur);
+      }
     }
-    DEBUG_ASSERT(status == ZX_OK);  // No other reason for there to be an error.
+    if (status != ZX_OK) {
+      return status;
+    }
 
-    // If the operating range is empty, then no further progress can be made by walking up.
-    // Restart a new upward walk from the initial node to continue making progress.
-    if (cur_offset == cur_end_offset) {
+    // If the page callback wanted to stop early, then do so.
+    if (stopped_early) {
+      return ZX_OK;
+    }
+
+    // If we didn't walk up, then mark the entire range as processed and begin another walk up from
+    // `self`.
+    if (!walk_up) {
+      start_in_self += end_in_cur - start_in_cur;
+      start_in_cur = start_in_self;
+      end_in_cur = end_in_self;
       cur = self;
-      cur_offset = offset;
-      cur_end_offset = end_offset;
     }
   }
 
