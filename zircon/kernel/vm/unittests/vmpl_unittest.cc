@@ -770,7 +770,7 @@ static bool vmpl_merge_onto_test() {
   list_node_t free_list;
   list_initialize(&free_list);
 
-  list1.MergeOnto(list2, [&free_list](VmPageOrMarker&& p) {
+  list1.MergeOnto(list2, [&free_list](VmPageOrMarker&& p, uint64_t offset) {
     if (p.IsPage()) {
       list_add_tail(&free_list, &p.ReleasePage()->queue_node);
     }

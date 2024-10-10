@@ -1533,8 +1533,9 @@ void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_l
     // have a source that was handling frees, which would require more work that simply freeing
     // pages to the PMM.
     DEBUG_ASSERT(!child.is_source_handling_free_locked());
-    child.page_list_.MergeOnto(
-        page_list_, [&covered_remover](VmPageOrMarker&& p) { covered_remover.PushContent(&p); });
+    child.page_list_.MergeOnto(page_list_, [&covered_remover](VmPageOrMarker&& p, uint64_t offset) {
+      covered_remover.PushContent(&p);
+    });
     child.page_list_ = ktl::move(page_list_);
 
     vm_page_t* p;

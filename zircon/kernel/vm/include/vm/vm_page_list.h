@@ -975,8 +975,8 @@ class VmPageList final {
   // **NOTE** unlike MergeOnto, |other| will be empty at the end of this method.
   void MergeFrom(
       VmPageList& other, uint64_t offset, uint64_t end_offset,
-      fit::inline_function<void(VmPageOrMarker&&, uint64_t offset), 3 * sizeof(void*)> release_fn,
-      fit::inline_function<void(VmPageOrMarker*, uint64_t offset)> migrate_fn);
+      fit::inline_function<void(VmPageOrMarker&& p, uint64_t offset), 3 * sizeof(void*)> release_fn,
+      fit::inline_function<void(VmPageOrMarker* p, uint64_t offset)> migrate_fn);
 
   // Merges this pages in |this| onto |other|.
   //
@@ -985,7 +985,8 @@ class VmPageList final {
   // marker) and gives ownership to |release_fn|.
   //
   // **NOTE** unlike MergeFrom, |this| will be empty at the end of this method.
-  void MergeOnto(VmPageList& other, fit::inline_function<void(VmPageOrMarker&&)> release_fn);
+  void MergeOnto(VmPageList& other,
+                 fit::inline_function<void(VmPageOrMarker&& p, uint64_t offset)> release_fn);
 
   // Takes the pages, references and markers in the range [offset, length) out of this page list.
   // This method calls `Finalize` on the splice list prior to returning it, meaning that no more
