@@ -169,7 +169,7 @@ func wireParam(n string, t Type) string {
 			return fmt.Sprintf("const %s& %s", t.String(), n)
 		}
 	}
-	if t.Kind == TypeKinds.Handle || t.Kind == TypeKinds.Request || t.Kind == TypeKinds.Protocol {
+	if t.Kind == TypeKinds.Handle || t.Kind == TypeKinds.Endpoint {
 		return fmt.Sprintf("%s&& %s", t.String(), n)
 	}
 	return fmt.Sprintf("%s %s", t.String(), n)
@@ -204,7 +204,7 @@ func wireForwardParam(n string, t Type) string {
 		if t.IsResource && !t.Nullable {
 			return fmt.Sprintf("std::move(%s)", n)
 		}
-	} else if t.Kind == TypeKinds.Handle || t.Kind == TypeKinds.Request || t.Kind == TypeKinds.Protocol {
+	} else if t.Kind == TypeKinds.Handle || t.Kind == TypeKinds.Endpoint {
 		return fmt.Sprintf("std::move(%s)", n)
 	}
 	return n

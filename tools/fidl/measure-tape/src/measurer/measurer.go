@@ -319,7 +319,7 @@ func (m *Measurer) toDecl(typ fidlgen.Type) (keyedDecl, error) {
 		}, nil
 	case fidlgen.HandleType:
 		fallthrough
-	case fidlgen.RequestType:
+	case fidlgen.EndpointType:
 		return keyedDecl{
 			decl:     handleDecl{},
 			nullable: typ.Nullable,

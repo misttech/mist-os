@@ -94,7 +94,7 @@ type typeKinds struct {
 	Vector    typeKind
 	String    typeKind
 	Handle    typeKind
-	Request   typeKind
+	Endpoint  typeKind
 	Primitive typeKind
 	Bits      typeKind
 	Enum      typeKind
@@ -102,7 +102,6 @@ type typeKinds struct {
 	Struct    typeKind
 	Table     typeKind
 	Union     typeKind
-	Protocol  typeKind
 }
 
 // TypeKinds are the kinds of C++ types (arrays, primitives, structs, ...).
@@ -616,8 +615,8 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 		}
 		r.NaturalFieldConstraint = fmt.Sprintf("fidl::internal::NaturalCodingConstraintHandle<ZX_OBJ_TYPE_%s, 0x%x, %t>", subtype, val.HandleRights, val.Nullable)
 		r.WireFieldConstraint = fmt.Sprintf("fidl::internal::WireCodingConstraintHandle<ZX_OBJ_TYPE_%s, 0x%x, %t>", subtype, val.HandleRights, val.Nullable)
-	case fidlgen.RequestType:
-		p := c.compileNameVariants(val.RequestSubtype)
+	case fidlgen.EndpointType:
+		p := c.compileNameVariants(val.Protocol)
 		if val.ProtocolTransport == "Driver" {
 			c.containsDriverReferences = true
 		}
@@ -625,14 +624,26 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 		if !ok {
 			panic(fmt.Sprintf("unknown transport %q", val.ProtocolTransport))
 		}
-		r.nameVariants = nameVariants{
-			HLCPP:   makeName("fidl::InterfaceRequest").template(p.HLCPP),
-			Unified: makeName(t.Namespace + "::ServerEnd").template(p.Unified),
-			Wire:    makeName(t.Namespace + "::ServerEnd").template(p.Wire),
+
+		switch val.Role {
+		case fidlgen.ClientRole:
+			r.nameVariants = nameVariants{
+				HLCPP:   makeName("fidl::InterfaceHandle").template(p.HLCPP),
+				Unified: makeName(t.Namespace + "::ClientEnd").template(p.Unified),
+				Wire:    makeName(t.Namespace + "::ClientEnd").template(p.Wire),
+			}
+		case fidlgen.ServerRole:
+			r.nameVariants = nameVariants{
+				HLCPP:   makeName("fidl::InterfaceRequest").template(p.HLCPP),
+				Unified: makeName(t.Namespace + "::ServerEnd").template(p.Unified),
+				Wire:    makeName(t.Namespace + "::ServerEnd").template(p.Wire),
+			}
+		default:
+			panic(fmt.Sprintf("unexpected fidlgen.EndpointRole: %#v", val.Role))
 		}
 		r.WireFamily = FamilyKinds.Reference
 		r.NeedsDtor = true
-		r.Kind = TypeKinds.Request
+		r.Kind = TypeKinds.Endpoint
 		r.IsResource = true
 		r.NaturalFieldConstraint = fmt.Sprintf("fidl::internal::NaturalCodingConstraintHandle<ZX_OBJ_TYPE_CHANNEL, ZX_DEFAULT_CHANNEL_RIGHTS, %t>", val.Nullable)
 		r.WireFieldConstraint = fmt.Sprintf("fidl::internal::WireCodingConstraintHandle<ZX_OBJ_TYPE_CHANNEL, ZX_DEFAULT_CHANNEL_RIGHTS, %t>", val.Nullable)
@@ -658,76 +669,55 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 			panic(fmt.Sprintf("unknown identifier: %v", val.Identifier))
 		}
 		declType := declInfo.Type
-		if declType == fidlgen.ProtocolDeclType {
-			if val.ProtocolTransport == "Driver" {
-				c.containsDriverReferences = true
-			}
-			t, ok := transports[val.ProtocolTransport]
-			if !ok {
-				panic(fmt.Sprintf("unknown transport %q", val.ProtocolTransport))
-			}
-			r.nameVariants = nameVariants{
-				HLCPP:   makeName("fidl::InterfaceHandle").template(name.HLCPP),
-				Unified: makeName(t.Namespace + "::ClientEnd").template(name.Unified),
-				Wire:    makeName(t.Namespace + "::ClientEnd").template(name.Wire),
-			}
+		switch declType {
+		case fidlgen.BitsDeclType:
+			r.Kind = TypeKinds.Bits
+			r.WireFamily = FamilyKinds.TrivialCopy
+			r.WireFieldConstraint = "fidl::internal::WireCodingConstraintEmpty"
+		case fidlgen.EnumDeclType:
+			r.Kind = TypeKinds.Enum
+			r.WireFamily = FamilyKinds.TrivialCopy
+			r.WireFieldConstraint = "fidl::internal::WireCodingConstraintEmpty"
+		case fidlgen.ConstDeclType:
+			r.Kind = TypeKinds.Const
 			r.WireFamily = FamilyKinds.Reference
-			r.NeedsDtor = true
-			r.Kind = TypeKinds.Protocol
-			r.IsResource = true
-			r.NaturalFieldConstraint = fmt.Sprintf("fidl::internal::NaturalCodingConstraintHandle<ZX_OBJ_TYPE_CHANNEL, ZX_DEFAULT_CHANNEL_RIGHTS, %t>", val.Nullable)
-			r.WireFieldConstraint = fmt.Sprintf("fidl::internal::WireCodingConstraintHandle<ZX_OBJ_TYPE_CHANNEL, ZX_DEFAULT_CHANNEL_RIGHTS, %t>", val.Nullable)
-		} else {
-			switch declType {
-			case fidlgen.BitsDeclType:
-				r.Kind = TypeKinds.Bits
-				r.WireFamily = FamilyKinds.TrivialCopy
-				r.WireFieldConstraint = "fidl::internal::WireCodingConstraintEmpty"
-			case fidlgen.EnumDeclType:
-				r.Kind = TypeKinds.Enum
-				r.WireFamily = FamilyKinds.TrivialCopy
-				r.WireFieldConstraint = "fidl::internal::WireCodingConstraintEmpty"
-			case fidlgen.ConstDeclType:
-				r.Kind = TypeKinds.Const
-				r.WireFamily = FamilyKinds.Reference
-				r.WireFieldConstraint = "fidl::internal::WireCodingConstraintEmpty"
-			case fidlgen.StructDeclType:
-				r.Kind = TypeKinds.Struct
-				r.DeclarationName = val.Identifier
-				r.WireFamily = FamilyKinds.Reference
-				r.IsResource = declInfo.IsResourceType()
-				r.WireFieldConstraint = "fidl::internal::WireCodingConstraintEmpty"
-			case fidlgen.TableDeclType:
-				r.Kind = TypeKinds.Table
-				r.DeclarationName = val.Identifier
-				r.WireFamily = FamilyKinds.Reference
-				r.IsResource = declInfo.IsResourceType()
-				r.WireFieldConstraint = "fidl::internal::WireCodingConstraintEmpty"
-			case fidlgen.UnionDeclType:
-				r.Kind = TypeKinds.Union
-				r.DeclarationName = val.Identifier
-				r.WireFamily = FamilyKinds.Reference
-				r.IsResource = declInfo.IsResourceType()
-				r.WireFieldConstraint = fmt.Sprintf("fidl::internal::WireCodingConstraintUnion<%t>", val.Nullable)
-			default:
-				panic(fmt.Sprintf("unknown declaration type: %v", declType))
-			}
-
-			if val.Nullable {
-				r.nameVariants.HLCPP = makeName("std::unique_ptr").template(name.HLCPP)
-				r.nameVariants.Unified = makeName("fidl::Box").template(name.Unified)
-				if declType == fidlgen.UnionDeclType {
-					r.nameVariants.Wire = makeName("fidl::WireOptional").template(name.Wire)
-				} else {
-					r.nameVariants.Wire = makeName("fidl::ObjectView").template(name.Wire)
-				}
-				r.NeedsDtor = true
-			} else {
-				r.nameVariants = name
-				r.NeedsDtor = true
-			}
-			r.NaturalFieldConstraint = "fidl::internal::NaturalCodingConstraintEmpty"
+			r.WireFieldConstraint = "fidl::internal::WireCodingConstraintEmpty"
+		case fidlgen.StructDeclType:
+			r.Kind = TypeKinds.Struct
+			r.DeclarationName = val.Identifier
+			r.WireFamily = FamilyKinds.Reference
+			r.IsResource = declInfo.IsResourceType()
+			r.WireFieldConstraint = "fidl::internal::WireCodingConstraintEmpty"
+		case fidlgen.TableDeclType:
+			r.Kind = TypeKinds.Table
+			r.DeclarationName = val.Identifier
+			r.WireFamily = FamilyKinds.Reference
+			r.IsResource = declInfo.IsResourceType()
+			r.WireFieldConstraint = "fidl::internal::WireCodingConstraintEmpty"
+		case fidlgen.UnionDeclType:
+			r.Kind = TypeKinds.Union
+			r.DeclarationName = val.Identifier
+			r.WireFamily = FamilyKinds.Reference
+			r.IsResource = declInfo.IsResourceType()
+			r.WireFieldConstraint = fmt.Sprintf("fidl::internal::WireCodingConstraintUnion<%t>", val.Nullable)
+		default:
+			panic(fmt.Sprintf("unknown declaration type: %v", declType))
 		}
+
+		if val.Nullable {
+			r.nameVariants.HLCPP = makeName("std::unique_ptr").template(name.HLCPP)
+			r.nameVariants.Unified = makeName("fidl::Box").template(name.Unified)
+			if declType == fidlgen.UnionDeclType {
+				r.nameVariants.Wire = makeName("fidl::WireOptional").template(name.Wire)
+			} else {
+				r.nameVariants.Wire = makeName("fidl::ObjectView").template(name.Wire)
+			}
+			r.NeedsDtor = true
+		} else {
+			r.nameVariants = name
+			r.NeedsDtor = true
+		}
+		r.NaturalFieldConstraint = "fidl::internal::NaturalCodingConstraintEmpty"
 	default:
 		panic(fmt.Sprintf("unknown type kind: %v", val.Kind))
 	}

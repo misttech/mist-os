@@ -68,7 +68,7 @@ func (c *compiler) compileServiceMember(val fidlgen.ServiceMember, s *Service) S
 		nameVariants:      serviceMemberContext.transform(val.Name),
 		ClassName:         serviceMemberTypeContext.transform(val.Name),
 		Service:           s,
-		ProtocolType:      c.compileNameVariants(val.Type.Identifier),
+		ProtocolType:      c.compileNameVariants(val.Type.Protocol),
 		ProtocolTransport: *transports[val.Type.ProtocolTransport],
 	}
 }

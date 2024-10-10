@@ -332,7 +332,7 @@ func (c *compiler) compileStructMemberFromNameAndType(name fidlgen.Identifier, t
 			Type: c.compileHandleSubtype(typ.HandleSubtype),
 			Name: c.compileIdentifier(name, ""),
 		}
-	case fidlgen.RequestType:
+	case fidlgen.EndpointType:
 		i = StructMember{
 			Type: Type("flags[fidl_handle_presence, int32]"),
 			Name: c.compileIdentifier(name, ""),
@@ -340,7 +340,7 @@ func (c *compiler) compileStructMemberFromNameAndType(name fidlgen.Identifier, t
 
 		// Out-of-line handles
 		h = &StructMember{
-			Type: Type(fmt.Sprintf("zx_chan_%s_server", c.compileCompoundIdentifier(typ.RequestSubtype, ""))),
+			Type: Type(fmt.Sprintf("zx_chan_%s_%s", c.compileCompoundIdentifier(typ.Protocol, ""), typ.Role)),
 			Name: c.compileIdentifier(name, ""),
 		}
 	case fidlgen.ArrayType:
@@ -427,17 +427,6 @@ func (c *compiler) compileStructMemberFromNameAndType(name fidlgen.Identifier, t
 		case fidlgen.BitsDeclType:
 			i = StructMember{
 				Type: Type(fmt.Sprintf("flags[%s, %s]", c.compileCompoundIdentifier(typ.Identifier, ""), c.compilePrimitiveSubtype(c.bits[typ.Identifier].Type.PrimitiveSubtype))),
-				Name: c.compileIdentifier(name, ""),
-			}
-		case fidlgen.ProtocolDeclType:
-			i = StructMember{
-				Type: Type("flags[fidl_handle_presence, int32]"),
-				Name: c.compileIdentifier(name, ""),
-			}
-
-			// Out-of-line handles
-			h = &StructMember{
-				Type: Type(fmt.Sprintf("zx_chan_%s_client", c.compileCompoundIdentifier(typ.Identifier, ""))),
 				Name: c.compileIdentifier(name, ""),
 			}
 		case fidlgen.UnionDeclType:

@@ -632,23 +632,12 @@ func (c *compiler) computeHandleSubtype(t fidlgen.Type) (fidlgen.ObjectType, boo
 	switch t.Kind {
 	case fidlgen.HandleType:
 		return fidlgen.ObjectType(t.ObjType), true
-	case fidlgen.RequestType:
-		// TODO(https://fxbug.dev/42122583 & https://fxbug.dev/42143256): Currently, fidlc does not emit an
-		// object type for request types. Internally, fidlc does not interpret
-		// request types as special channel handles.
+	case fidlgen.EndpointType:
+		// TODO(https://fxbug.dev/42122583 & https://fxbug.dev/42143256):
+		// Currently, fidlc does not emit an object type for endpoint types.
+		// Internally, fidlc does not interpret endpoint types as special
+		// channel handles.
 		return fidlgen.ObjectTypeChannel, true
-	case fidlgen.IdentifierType:
-		// TODO(https://fxbug.dev/42122583 & https://fxbug.dev/42143256): Same issue as above, but for the
-		// reciprocal. Once we properly represent `client_end:P` and
-		// `server_end:P` as further constraints on a handle, we can solve this
-		// cleanly.
-		declInfo, ok := c.decls[t.Identifier]
-		if !ok {
-			panic(fmt.Sprintf("unknown identifier: %v", t.Identifier))
-		}
-		if declInfo.Type == fidlgen.ProtocolDeclType {
-			return fidlgen.ObjectTypeChannel, true
-		}
 	case fidlgen.ArrayType, fidlgen.VectorType:
 		return c.computeHandleSubtype(*t.ElementType)
 	}
@@ -761,14 +750,25 @@ func (c *compiler) compileType(val fidlgen.Type) (r Type, t StackOfBoundsTag) {
 		}
 		t.reverseOfBounds = append(t.reverseOfBounds, nullability)
 		r = Type(e)
-	case fidlgen.RequestType:
-		e := c.compileCompoundIdentifier(val.RequestSubtype, true, WithCtxInterfaceRequestSuffix)
-		var nullability int
-		if val.Nullable {
-			nullability = 1
+	case fidlgen.EndpointType:
+		// TODO(https://fxbug.dev/42149402): This reimplements a bug from a
+		// previous implementation - `client_end`s cannot be nullable in go. Fix
+		// this separately.
+		switch val.Role {
+		case fidlgen.ClientRole:
+			e := c.compileCompoundIdentifier(val.Protocol, true, WithCtxInterfaceSuffix)
+			r = Type(e)
+		case fidlgen.ServerRole:
+			e := c.compileCompoundIdentifier(val.Protocol, true, WithCtxInterfaceRequestSuffix)
+			var nullability int
+			if val.Nullable {
+				nullability = 1
+			}
+			t.reverseOfBounds = append(t.reverseOfBounds, nullability)
+			r = Type(e)
+		default:
+			panic(fmt.Sprintf("unexpected fidlgen.EndpointRole: %#v", val.Role))
 		}
-		t.reverseOfBounds = append(t.reverseOfBounds, nullability)
-		r = Type(e)
 	case fidlgen.VectorType:
 		e, et := c.compileType(*val.ElementType)
 		if val.ElementCount == nil {
@@ -797,8 +797,6 @@ func (c *compiler) compileType(val fidlgen.Type) (r Type, t StackOfBoundsTag) {
 			fallthrough
 		case fidlgen.EnumDeclType:
 			r = Type(e)
-		case fidlgen.ProtocolDeclType:
-			r = Type(e + WithCtxInterfaceSuffix)
 		case fidlgen.StructDeclType:
 			fallthrough
 		case fidlgen.UnionDeclType:

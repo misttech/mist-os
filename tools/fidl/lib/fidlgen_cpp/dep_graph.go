@@ -258,7 +258,7 @@ func (g *DeclDepGraph) addDepsFromConstant(node *declDepNode, c fidlgen.Constant
 func (g *DeclDepGraph) addDepsFromType(node *declDepNode, typ fidlgen.Type) {
 	// As above, we do not create edges to nullable types or protocols via
 	// endpoint dependencies.
-	if typ.Nullable || typ.ProtocolTransport != "" {
+	if typ.Nullable || typ.Kind == fidlgen.EndpointType {
 		return
 	}
 

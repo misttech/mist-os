@@ -533,7 +533,7 @@ const (
 	VectorType                TypeKind = "vector"
 	StringType                TypeKind = "string"
 	HandleType                TypeKind = "handle"
-	RequestType               TypeKind = "request"
+	EndpointType              TypeKind = "endpoint"
 	PrimitiveType             TypeKind = "primitive"
 	IdentifierType            TypeKind = "identifier"
 	InternalType              TypeKind = "internal"
@@ -555,7 +555,8 @@ type Type struct {
 	ElementCount       *int
 	HandleSubtype      HandleSubtype
 	HandleRights       HandleRights
-	RequestSubtype     EncodedCompoundIdentifier
+	Role               EndpointRole
+	Protocol           EncodedCompoundIdentifier
 	PrimitiveSubtype   PrimitiveSubtype
 	Identifier         EncodedCompoundIdentifier
 	InternalSubtype    InternalSubtype
@@ -567,12 +568,11 @@ type Type struct {
 	PointeeType        *Type
 	MaybeAlias         *PartialTypeConstructor
 
-	// TODO(https://fxbug.dev/42149402): These are fields that will start being
-	// used in fidlgen soon. For now, we just pass them through without
-	// interpreting them.
-	KindV2   *json.RawMessage
-	Role     *json.RawMessage
-	Protocol *json.RawMessage
+	// TODO(https://fxbug.dev/42149402): These are fields that are no longer
+	// used in fidlgen, but still must appear in the IR. We just pass them
+	// through without interpreting them, but will delete them soon.
+	LegacyKind     *json.RawMessage
+	RequestSubtype *json.RawMessage
 }
 
 // UnmarshalJSON customizes the JSON unmarshalling for Type.
@@ -583,32 +583,20 @@ func (t *Type) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	err = json.Unmarshal(*obj["kind"], &t.Kind)
-	if err != nil {
-		return err
-	}
-	err = json.Unmarshal(*obj["type_shape_v2"], &t.TypeShapeV2)
+	err = json.Unmarshal(*obj["kind_v2"], &t.Kind)
 	if err != nil {
 		return err
 	}
 
-	if f := obj["kind_v2"]; f != nil {
-		err = json.Unmarshal(*f, &t.KindV2)
+	if f := obj["kind"]; f != nil {
+		err = json.Unmarshal(*obj["kind"], &t.LegacyKind)
 		if err != nil {
 			return err
 		}
 	}
-	if f := obj["role"]; f != nil {
-		err = json.Unmarshal(*f, &t.Role)
-		if err != nil {
-			return err
-		}
-	}
-	if f := obj["protocol"]; f != nil {
-		err = json.Unmarshal(*f, &t.Protocol)
-		if err != nil {
-			return err
-		}
+	err = json.Unmarshal(*obj["type_shape_v2"], &t.TypeShapeV2)
+	if err != nil {
+		return err
 	}
 
 	if f := obj["experimental_maybe_from_alias"]; f != nil {
@@ -684,10 +672,30 @@ func (t *Type) UnmarshalJSON(b []byte) error {
 		if err != nil {
 			return err
 		}
-	case RequestType:
-		err = json.Unmarshal(*obj["subtype"], &t.RequestSubtype)
+	case EndpointType:
+		err = json.Unmarshal(*obj["role"], &t.Role)
 		if err != nil {
 			return err
+		}
+		err = json.Unmarshal(*obj["protocol"], &t.Protocol)
+		if err != nil {
+			return err
+		}
+
+		// TODO(https://fxbug.dev/42149402): Remove "identifier" and "subtype"
+		// from endpoints.
+		if f := obj["identifier"]; f != nil {
+			err = json.Unmarshal(*f, &t.Identifier)
+			if err != nil {
+				return err
+			}
+		}
+		if f := obj["subtype"]; f != nil {
+			t.RequestSubtype = &json.RawMessage{}
+			err = json.Unmarshal(*f, t.RequestSubtype)
+			if err != nil {
+				return err
+			}
 		}
 		err = json.Unmarshal(*obj["nullable"], &t.Nullable)
 		if err != nil {
@@ -711,12 +719,6 @@ func (t *Type) UnmarshalJSON(b []byte) error {
 		if err != nil {
 			return err
 		}
-		if protocolTransport, ok := obj["protocol_transport"]; ok {
-			err = json.Unmarshal(*protocolTransport, &t.ProtocolTransport)
-			if err != nil {
-				return err
-			}
-		}
 	case InternalType:
 		err = json.Unmarshal(*obj["subtype"], &t.InternalSubtype)
 		if err != nil {
@@ -738,18 +740,15 @@ func (t *Type) UnmarshalJSON(b []byte) error {
 // MarshalJSON customizes the JSON marshalling for Type.
 func (t *Type) MarshalJSON() ([]byte, error) {
 	obj := map[string]interface{}{
-		"kind":          t.Kind,
+		"kind_v2":       t.Kind,
 		"type_shape_v2": t.TypeShapeV2,
 	}
 
-	if f := t.KindV2; f != nil {
-		obj["kind_v2"] = f
+	if f := t.LegacyKind; f != nil {
+		obj["kind"] = f
 	}
-	if f := t.Role; f != nil {
-		obj["role"] = f
-	}
-	if f := t.Protocol; f != nil {
-		obj["protocol"] = f
+	if f := t.RequestSubtype; f != nil {
+		obj["subtype"] = f
 	}
 
 	if f := t.MaybeAlias; f != nil {
@@ -779,18 +778,22 @@ func (t *Type) MarshalJSON() ([]byte, error) {
 		obj["nullable"] = t.Nullable
 		obj["obj_type"] = t.ObjType
 		obj["resource_identifier"] = t.ResourceIdentifier
-	case RequestType:
-		obj["subtype"] = t.RequestSubtype
+	case EndpointType:
+		obj["role"] = t.Role
+		obj["protocol"] = t.Protocol
 		obj["nullable"] = t.Nullable
 		obj["protocol_transport"] = t.ProtocolTransport
+
+		// TODO(https://fxbug.dev/42149402): Remove "identifier" from
+		// client_ends.
+		if t.Identifier != "" {
+			obj["identifier"] = t.Identifier
+		}
 	case PrimitiveType:
 		obj["subtype"] = t.PrimitiveSubtype
 	case IdentifierType:
 		obj["identifier"] = t.Identifier
 		obj["nullable"] = t.Nullable
-		if t.ProtocolTransport != "" {
-			obj["protocol_transport"] = t.ProtocolTransport
-		}
 	case InternalType:
 		obj["subtype"] = t.InternalSubtype
 	case ZxExperimentalPointerType:
@@ -1346,6 +1349,15 @@ const (
 	Closed Openness = "closed"
 )
 
+// The "role" associated with an endpoint - whether it's the client end or the
+// server end.
+type EndpointRole string
+
+const (
+	ClientRole EndpointRole = "client"
+	ServerRole EndpointRole = "server"
+)
+
 func (o Openness) IsClosed() bool {
 	switch o {
 	case Open, Ajar:
@@ -1734,7 +1746,7 @@ func (m DeclInfoMap) LookupResourceness(t Type) Resourceness {
 	switch t.Kind {
 	case PrimitiveType, StringType, InternalType:
 		return IsValueType
-	case HandleType, RequestType:
+	case HandleType, EndpointType:
 		return IsResourceType
 	case ArrayType, VectorType:
 		return m.LookupResourceness(*t.ElementType)
@@ -1748,8 +1760,6 @@ func (m DeclInfoMap) LookupResourceness(t Type) Resourceness {
 		switch info.Type {
 		case BitsDeclType, EnumDeclType:
 			return IsValueType
-		case ProtocolDeclType:
-			return IsResourceType
 		case StructDeclType, TableDeclType, UnionDeclType, OverlayDeclType:
 			return *info.Resourceness
 		default:

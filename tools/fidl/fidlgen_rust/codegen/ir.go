@@ -843,14 +843,23 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 			t.Owned = fmt.Sprintf("Option<%s>", t.Owned)
 			t.Param = fmt.Sprintf("Option<%s>", t.Param)
 		}
-	case fidlgen.RequestType:
+	case fidlgen.EndpointType:
+		role_type := ""
+		switch val.Role {
+		case fidlgen.ClientRole:
+			role_type = "ClientEnd"
+		case fidlgen.ServerRole:
+			role_type = "ServerEnd"
+		default:
+			panic(fmt.Sprintf("unexpected fidlgen.EndpointRole: %#v", val.Role))
+		}
 		s := ""
 		if val.ProtocolTransport != "Driver" {
-			s = fmt.Sprintf("fidl::endpoints::ServerEnd<%sMarker>", c.compileDeclIdentifier(val.RequestSubtype))
+			s = fmt.Sprintf("fidl::endpoints::%s<%sMarker>", role_type, c.compileDeclIdentifier(val.Protocol))
 			t.FidlTemplate = fmt.Sprintf("fidl::encoding::Endpoint<%s>", s)
 		} else {
-			s = fmt.Sprintf("fidl_driver::endpoints::DriverServerEnd<%sMarker>", c.compileDeclIdentifier(val.RequestSubtype))
-			t.FidlTemplate = fmt.Sprintf("fidl_driver::encoding::DriverEndpoint<%sMarker>", c.compileDeclIdentifier(val.RequestSubtype))
+			s = fmt.Sprintf("fidl_driver::endpoints::Driver%s<%sMarker>", role_type, c.compileDeclIdentifier(val.Protocol))
+			t.FidlTemplate = fmt.Sprintf("fidl_driver::encoding::DriverEndpoint<%sMarker>", c.compileDeclIdentifier(val.Protocol))
 		}
 		t.Owned = s
 		t.Param = s
@@ -892,22 +901,6 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 					t.Param = fmt.Sprintf("Option<&%s>", name)
 				}
 			}
-		case fidlgen.ProtocolDeclType:
-			s := ""
-			if val.ProtocolTransport != "Driver" {
-				s = fmt.Sprintf("fidl::endpoints::ClientEnd<%sMarker>", name)
-				t.FidlTemplate = fmt.Sprintf("fidl::encoding::Endpoint<%s>", s)
-			} else {
-				s = fmt.Sprintf("fidl_driver::endpoints::DriverClientEnd<%sMarker>", name)
-				t.FidlTemplate = fmt.Sprintf("fidl_driver::encoding::DriverEndpoint<%sMarker>", name)
-			}
-			t.Owned = s
-			t.Param = s
-			if val.Nullable {
-				t.FidlTemplate = fmt.Sprintf("fidl::encoding::Optional<%s>", t.FidlTemplate)
-				t.Owned = fmt.Sprintf("Option<%s>", t.Owned)
-				t.Param = fmt.Sprintf("Option<%s>", t.Param)
-			}
 		default:
 			panic(fmt.Sprintf("unexpected type: %v", declInfo.Type))
 		}
@@ -935,7 +928,7 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 // complete, since parameter types will be encodable as is.
 func convertParamToEncodeExpr(v string, t Type) string {
 	switch t.Kind {
-	case fidlgen.PrimitiveType, fidlgen.StringType, fidlgen.HandleType, fidlgen.RequestType:
+	case fidlgen.PrimitiveType, fidlgen.StringType, fidlgen.HandleType, fidlgen.EndpointType:
 		return v
 	case fidlgen.ArrayType:
 		if t.IsResourceType() {
@@ -949,7 +942,7 @@ func convertParamToEncodeExpr(v string, t Type) string {
 		return v
 	case fidlgen.IdentifierType:
 		switch t.DeclType {
-		case fidlgen.BitsDeclType, fidlgen.EnumDeclType, fidlgen.ProtocolDeclType:
+		case fidlgen.BitsDeclType, fidlgen.EnumDeclType:
 			return v
 		case fidlgen.StructDeclType, fidlgen.TableDeclType, fidlgen.UnionDeclType:
 			if t.IsResourceType() {
@@ -1038,7 +1031,7 @@ func convertMutRefOwnedToEncodeExpr(v string, t Type) string {
 	switch t.Kind {
 	case fidlgen.PrimitiveType:
 		return "*" + v
-	case fidlgen.HandleType, fidlgen.RequestType:
+	case fidlgen.HandleType, fidlgen.EndpointType:
 		if t.Nullable {
 			return fmt.Sprintf("%s.as_mut().map(|x| std::mem::replace(x, fidl::Handle::invalid().into()))", v)
 		}
@@ -1079,11 +1072,6 @@ func convertMutRefOwnedToEncodeExpr(v string, t Type) string {
 				return v
 			}
 			return "&*" + v
-		case fidlgen.ProtocolDeclType:
-			if t.Nullable {
-				return fmt.Sprintf("%s.as_mut().map(|x| std::mem::replace(x, fidl::Handle::invalid().into()))", v)
-			}
-			return fmt.Sprintf("std::mem::replace(%s, fidl::Handle::invalid().into())", v)
 		default:
 			panic(fmt.Sprintf("unexpected type: %v", t.DeclType))
 		}
@@ -1413,7 +1401,7 @@ func (c *compiler) compileService(val fidlgen.Service) Service {
 			Name:          string(v.Name),
 			CamelName:     compileCamelIdentifier(v.Name),
 			SnakeName:     compileSnakeIdentifier(v.Name),
-			ProtocolType:  c.compileDeclIdentifier(v.Type.Identifier),
+			ProtocolType:  c.compileDeclIdentifier(v.Type.Protocol),
 		}
 		r.Members = append(r.Members, m)
 	}
@@ -1451,7 +1439,7 @@ func (c *compiler) computeUseFidlStructCopy(typ fidlgen.Type) bool {
 	switch typ.Kind {
 	case fidlgen.ArrayType:
 		return c.computeUseFidlStructCopy(*typ.ElementType)
-	case fidlgen.VectorType, fidlgen.StringType, fidlgen.HandleType, fidlgen.RequestType:
+	case fidlgen.VectorType, fidlgen.StringType, fidlgen.HandleType, fidlgen.EndpointType:
 		return false
 	case fidlgen.PrimitiveType:
 		switch typ.PrimitiveSubtype {
@@ -1465,7 +1453,7 @@ func (c *compiler) computeUseFidlStructCopy(typ fidlgen.Type) bool {
 		}
 		declType := c.lookupDeclInfo(typ.Identifier).Type
 		switch declType {
-		case fidlgen.BitsDeclType, fidlgen.EnumDeclType, fidlgen.TableDeclType, fidlgen.UnionDeclType, fidlgen.ProtocolDeclType:
+		case fidlgen.BitsDeclType, fidlgen.EnumDeclType, fidlgen.TableDeclType, fidlgen.UnionDeclType:
 			return false
 		case fidlgen.StructDeclType:
 			st, ok := c.structs[typ.Identifier]
@@ -1806,7 +1794,7 @@ func (dc *derivesCompiler) derivesForType(t Type) derives {
 		return derivesAll &^ derivesCopy & dc.derivesForType(*t.ElementType)
 	case fidlgen.StringType:
 		return derivesAll &^ derivesCopy
-	case fidlgen.HandleType, fidlgen.RequestType:
+	case fidlgen.HandleType, fidlgen.EndpointType:
 		return derivesAll &^ (derivesCopy | derivesClone)
 	case fidlgen.PrimitiveType:
 		switch t.PrimitiveSubtype {
@@ -1834,9 +1822,6 @@ func (dc *derivesCompiler) derivesForType(t Type) derives {
 			return result
 		case fidlgen.TableDeclType:
 			return dc.fillDerivesForECI(t.Identifier)
-		case fidlgen.ProtocolDeclType:
-			// An IdentifierType referring to a Protocol is a client_end.
-			return derivesAll &^ (derivesCopy | derivesClone)
 		default:
 			panic(fmt.Sprintf("unexpected identifier type: %v", t.DeclType))
 		}

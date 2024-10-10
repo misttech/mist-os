@@ -90,15 +90,27 @@ func (n *symbolTable) fidlTypeString(t fidlgen.Type) Type {
 		}
 		ret.addHandleRights(t.HandleRights)
 	case fidlgen.IdentifierType: // E.g. struct, enum, bits, etc.
-		if n.isProtocol(t.Identifier) {
-			ret.setLayout("client_end")
-			ret.addConstraint(string(t.Identifier))
-		} else {
-			ret.setLayout(string(t.Identifier))
+		ret.setLayout(string(t.Identifier))
+	case fidlgen.EndpointType: // E.g. client_end, server_end
+		switch t.Role {
+		case fidlgen.ClientRole:
+			// TODO(https://fxbug.dev/42149402): Reimplement a bug from a
+			// previous implementation. When an endpoint doesn't refer to a
+			// "known protocol", we treat it like a regular identifier and omit
+			// the `client_end:` layout. Fix this separately.
+			if n.isProtocol(t.Protocol) {
+				ret.setLayout("client_end")
+				ret.addConstraint(string(t.Protocol))
+			} else {
+				ret.setLayout(string(t.Protocol))
+			}
+
+		case fidlgen.ServerRole:
+			ret.setLayout("server_end")
+			ret.addConstraint(string(t.Protocol))
+		default:
+			panic(fmt.Sprintf("unexpected fidlgen.EndpointRole: %#v", t.Role))
 		}
-	case fidlgen.RequestType: // E.g. server end
-		ret.setLayout("server_end")
-		ret.addConstraint(string(t.RequestSubtype))
 	default:
 		ret.setLayout(fmt.Sprintf("<not_implemented:%#v>", t))
 	}
