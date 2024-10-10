@@ -4,14 +4,17 @@
 // found in the LICENSE file.
 
 #include <lib/mistos/starnix_uapi/open_flags.h>
+#include <lib/unittest/unittest.h>
 
-#include <zxtest/zxtest.h>
+namespace unit_testing {
 
 namespace {
 
-using namespace starnix_uapi;
+using starnix_uapi::OpenFlagsImpl;
 
-TEST(OpenFlags, test_access) {
+bool test_access() {
+  BEGIN_TEST;
+
   auto read_only = OpenFlagsImpl::from_bits_truncate(O_RDONLY);
   EXPECT_TRUE(read_only.can_read());
   EXPECT_FALSE(read_only.can_write());
@@ -25,6 +28,13 @@ TEST(OpenFlags, test_access) {
   EXPECT_TRUE(read_write.can_write());
 
   EXPECT_TRUE(static_cast<uint64_t>(OpenFlagsImpl::EnumType::ACCESS_MASK) == 3ul);
+
+  END_TEST;
 }
-// using namespace starnix_uapi;
+
 }  // namespace
+}  // namespace unit_testing
+
+UNITTEST_START_TESTCASE(starnix_uapi_openflags)
+UNITTEST("test access", unit_testing::test_access)
+UNITTEST_END_TESTCASE(starnix_uapi_openflags, "starnix_uapi_openflags", "Tests Open Flags")
