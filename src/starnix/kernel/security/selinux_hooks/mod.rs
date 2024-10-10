@@ -452,7 +452,20 @@ pub(super) fn file_system_resolve_security(
         let (resolved_label, pending_entries) = match &mut *label_state {
             FileSystemLabelState::Labeled { .. } => return Ok(()),
             FileSystemLabelState::Unlabeled { name, mount_options, pending_entries } => (
-                security_server.resolve_fs_label((*name).into(), mount_options),
+                {
+                    // TODO: https://fxbug.dev/361297862 - Replace this workaround with more
+                    // general handling of these special Fuchsia filesystems.
+                    let effective_name = if *name == "remotefs" || *name == "remote_bundle" {
+                        track_stub!(
+                            TODO("https://fxbug.dev/361297862"),
+                            "Applying ext4 labeling configuration to remote filesystems"
+                        );
+                        "ext4".into()
+                    } else {
+                        *name
+                    };
+                    security_server.resolve_fs_label(effective_name.into(), mount_options)
+                },
                 std::mem::take(pending_entries),
             ),
         };
