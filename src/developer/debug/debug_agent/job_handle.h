@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 
+#include "src/developer/debug/debug_agent/job_exception_channel_type.h"
 #include "src/developer/debug/debug_agent/job_exception_observer.h"
 #include "src/developer/debug/shared/status.h"
 
@@ -33,9 +34,10 @@ class JobHandle {
   virtual std::vector<std::unique_ptr<JobHandle>> GetChildJobs() const = 0;
   virtual std::vector<std::unique_ptr<ProcessHandle>> GetChildProcesses() const = 0;
 
-  // Registers for job exceptions. On success, the given callback will be issued for all process
-  // launches in this job. Can be called with an empty function to unregister.
-  virtual debug::Status WatchJobExceptions(JobExceptionObserver* observer) = 0;
+  // Registers for job exceptions. On success, the given observer will be issued notifications
+  // relevant to this job. Can be called with a null observer to unregister from exceptions.
+  virtual debug::Status WatchJobExceptions(JobExceptionObserver* observer,
+                                           JobExceptionChannelType type) = 0;
 
   // Recursively searches the job tree from this job/process and returns a handle to it. Returns a
   // null pointer if the job/process was not found. This can also happen if the debug_agent doesn't

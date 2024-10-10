@@ -29,7 +29,8 @@ class MockJobHandle final : public JobHandle {
   std::string GetName() const override { return name_; }
   std::vector<std::unique_ptr<JobHandle>> GetChildJobs() const override;
   std::vector<std::unique_ptr<ProcessHandle>> GetChildProcesses() const override;
-  debug::Status WatchJobExceptions(JobExceptionObserver* observer) override {
+  debug::Status WatchJobExceptions(JobExceptionObserver* observer,
+                                   JobExceptionChannelType type) override {
     // Mock doesn't implement watching job exceptions for now.
     return debug::Status();
   }

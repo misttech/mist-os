@@ -23,7 +23,8 @@ std::vector<std::unique_ptr<ProcessHandle>> LinuxJobHandle::GetChildProcesses() 
   return result;
 }
 
-debug::Status LinuxJobHandle::WatchJobExceptions(JobExceptionObserver* observer) {
+debug::Status LinuxJobHandle::WatchJobExceptions(JobExceptionObserver* observer,
+                                                 JobExceptionChannelType type) {
   return debug::Status("No jobs on Linux");
 }
 

@@ -21,6 +21,7 @@
 #include "src/developer/debug/debug_agent/debugged_process.h"
 #include "src/developer/debug/debug_agent/debugged_thread.h"
 #include "src/developer/debug/debug_agent/exception_handle.h"
+#include "src/developer/debug/debug_agent/job_handle.h"
 #include "src/developer/debug/debug_agent/process_breakpoint.h"
 #include "src/developer/debug/debug_agent/system_interface.h"
 #include "src/developer/debug/debug_agent/time.h"
@@ -76,7 +77,7 @@ DebugAgent::DebugAgent(std::unique_ptr<SystemInterface> system_interface)
 #ifdef __Fuchsia__
   // Watch the root job.
   root_job_ = system_interface_->GetRootJob();
-  auto status = root_job_->WatchJobExceptions(this);
+  auto status = root_job_->WatchJobExceptions(this, JobExceptionChannelType::kDebugger);
   if (status.has_error()) {
     LOGS(Error) << "Failed to watch the root job: " << status.message();
   }

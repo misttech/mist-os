@@ -39,7 +39,8 @@ std::vector<std::unique_ptr<ProcessHandle>> ZirconJobHandle::GetChildProcesses()
   return result;
 }
 
-debug::Status ZirconJobHandle::WatchJobExceptions(JobExceptionObserver* observer) {
+debug::Status ZirconJobHandle::WatchJobExceptions(JobExceptionObserver* observer,
+                                                  JobExceptionChannelType type) {
   debug::Status status;
 
   if (!observer) {
