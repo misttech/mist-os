@@ -456,7 +456,7 @@ TEST(DiscoverAndRunTests, DiscoverAndRunTestsWithSyslogOutput) {
   const fbl::String output_path = JoinPath(output_dir, "summary.json");
   FILE* output_file = fopen(output_path.c_str(), "r");
   ASSERT_TRUE(output_file);
-  char buf[1024];
+  char buf[2048];
   memset(buf, 0, sizeof(buf));
   EXPECT_LT(0, fread(buf, sizeof(buf[0]), sizeof(buf), output_file));
   fclose(output_file);
