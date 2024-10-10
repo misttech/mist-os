@@ -605,13 +605,14 @@ struct ConnectedOptions {
     ess_connect_reason: types::ConnectReason,
     connect_txn_stream: fidl_sme::ConnectTransactionEventStream,
     network_is_likely_hidden: bool,
-    connect_start_time: fasync::MonotonicInstant,
+    ess_connect_start_time: fasync::MonotonicInstant,
+    bss_connect_start_time: fasync::MonotonicInstant,
     initial_signal: types::Signal,
     tracked_signals: HistoricalList<types::TimestampedSignal>,
     roam_monitor_sender: RoamDataSender,
     roam_receiver: mpsc::Receiver<types::ScannedCandidate>,
     post_connect_metric_timer: Fuse<fasync::Timer>,
-    connect_duration_metric_timer: Fuse<fasync::Timer>,
+    bss_connect_duration_metric_timer: Fuse<fasync::Timer>,
 }
 impl ConnectedOptions {
     pub fn new(
@@ -647,7 +648,8 @@ impl ConnectedOptions {
             ess_connect_reason,
             connect_txn_stream,
             network_is_likely_hidden,
-            connect_start_time: fasync::MonotonicInstant::now(),
+            ess_connect_start_time: fasync::MonotonicInstant::now(),
+            bss_connect_start_time: fasync::MonotonicInstant::now(),
             initial_signal,
             tracked_signals: HistoricalList::new(NUM_PAST_SCORES),
             roam_monitor_sender,
@@ -656,7 +658,7 @@ impl ConnectedOptions {
                 AVERAGE_SCORE_DELTA_MINIMUM_DURATION.after_now(),
             )
             .fuse(),
-            connect_duration_metric_timer: fasync::Timer::new(
+            bss_connect_duration_metric_timer: fasync::Timer::new(
                 METRICS_SHORT_CONNECT_DURATION.after_now(),
             )
             .fuse(),
@@ -693,76 +695,22 @@ async fn connected_state(
                         fidl_sme::ConnectTransactionEvent::OnConnectResult { result } => {
                             let connected = result.code == fidl_ieee80211::StatusCode::Success;
                             if connected {
-                                // This OnConnectResult should be for reconnecting to the same AP,
-                                // so keep the same SignalData but reset the connect start time
-                                options.connect_start_time = fasync::MonotonicInstant::now();
+                                // This OnConnectResult should be for SME reconnecting to the same
+                                // AP, so keep the same SignalData but reset the connect start time
+                                // to track as a new connection.
+                                options.ess_connect_start_time = fasync::MonotonicInstant::now();
+                                options.bss_connect_start_time = fasync::MonotonicInstant::now();
                             }
 
                             notify_when_reconnect_detected(&common_options, &options, result);
 
                             !connected
                         }
-                        // TODO(https://fxrev.dev/352787006): Update state after a successful roam.
                         fidl_sme::ConnectTransactionEvent::OnRoamResult { result } => {
-                            let roam_succeeded = result.status_code == fidl_ieee80211::StatusCode::Success;
-                            let connected = roam_succeeded || result.original_association_maintained;
-                            if roam_succeeded {
-                                // Successful roam indicates connection to a different AP, so reset the connect
-                                // start time to track as a new connection.
-                                options.connect_start_time = fasync::MonotonicInstant::now();
-
-                                let bss_description = match result.bss_description {
-                                    Some(ref bss_description) => bss_description,
-                                    None => return Err(ExitReason(Err(format_err!("RoamResult is missing BSS description from FIDL"),),)),
-                                };
-                                let ap_state = types::ApState::from(
-                                    BssDescription::try_from(*bss_description.clone()).map_err(|error| {
-                                        // This only occurs if an invalid `BssDescription` is received from SME, which should
-                                        // never happen.
-                                        ExitReason(Err(
-                                            format_err!("Failed to convert BSS description from FIDL: {:?}", error,),
-                                        ))
-                                    })?,
-                                );
-
-                                *options.ap_state = ap_state;
-                                // Re-initialize roam monitor for new BSS
-                                (options.roam_monitor_sender, options.roam_receiver) =
-                                    common_options.roam_manager.initialize_roam_monitor(
-                                        (*options.ap_state).clone(),
-                                        options.network_identifier.clone(),
-                                        options.credential.clone(),
-                                    );
-                                info!("Roam succeeded");
-                            }
-                            common_options.telemetry_sender.send(TelemetryEvent::RoamResult {
-                                iface_id: common_options.iface_id,
-                                result: result.clone(),
-                                ap_state: (*options.ap_state).clone(),
-                            });
-                            if !connected {
-                                warn!("Roam attempt failed, original association not maintained, disconnecting");
-
-                                let now = fasync::MonotonicInstant::now();
-                                let disconnect_source = match result.disconnect_info {
-                                    Some(info) => info.disconnect_source,
-                                    // RoamResult should always have a source if roam failed, but
-                                    // this check is here in case it is somehow omitted.
-                                    None => fidl_sme::DisconnectSource::Mlme(fidl_sme::DisconnectCause {
-                                        reason_code: fidl_ieee80211::ReasonCode::UnspecifiedReason,
-                                        mlme_event_name: fidl_sme::DisconnectMlmeEventName::RoamResultIndication,
-                                    }),
-                                };
-                                let info = DisconnectInfo {
-                                    connected_duration: now - options.connect_start_time,
-                                    is_sme_reconnecting: false,
-                                    disconnect_source,
-                                    previous_connect_reason: options.ess_connect_reason,
-                                    ap_state: (*options.ap_state).clone(),
-                                    signals: options.tracked_signals.clone(),
-                                };
-                                common_options.telemetry_sender.send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
-                            }
+                            handle_roam_result(&mut common_options, &mut options, &result).await.map_err(|error| {
+                                ExitReason(Err(format_err!("Error handling roam result, cannot proceed with connection: {:?}", error)))
+                            })?;
+                            let connected = result.status_code == fidl_ieee80211::StatusCode::Success || result.original_association_maintained;
                             !connected
                         }
                         fidl_sme::ConnectTransactionEvent::OnSignalReport { ind } => {
@@ -819,7 +767,7 @@ async fn connected_state(
                 match req {
                     Some(ManualRequest::Disconnect((reason, responder))) => {
                         debug!("Disconnect requested");
-                        notify_on_manual_disconnect(
+                        notify_on_manual_disconnect_request_received(
                             &common_options,
                             &options,
                             reason,
@@ -850,7 +798,7 @@ async fn connected_state(
                             error!("Unexpected connection reason: {:?}", new_connect_selection.reason);
                             types::DisconnectReason::Unknown
                         });
-                        notify_on_manual_connect(
+                        notify_on_manual_connect_request_received(
                             &common_options,
                             &options,
                             reason,
@@ -876,13 +824,13 @@ async fn connected_state(
             },
             () = &mut options.post_connect_metric_timer => {
                 common_options.telemetry_sender.send(TelemetryEvent::PostConnectionSignals {
-                        connect_time: options.connect_start_time,
+                        connect_time: options.bss_connect_start_time,
                         signal_at_connect: options.initial_signal,
                         signals: options.tracked_signals.clone()
                 });
             },
-            () = &mut options.connect_duration_metric_timer => {
-                // Log the average connection score metric for a long duration connection.
+            () = &mut options.bss_connect_duration_metric_timer => {
+                // Log the average connection score metric for a long duration BSS connection.
                 common_options.telemetry_sender.send(TelemetryEvent::LongDurationSignals{
                     signals: options.tracked_signals.get_before(fasync::MonotonicInstant::now())
                 });
@@ -904,52 +852,13 @@ async fn notify_when_disconnect_detected(
     options: &ConnectedOptions,
     fidl_info: fidl_sme::DisconnectInfo,
 ) {
-    // Log a disconnect in Cobalt
-    let now = fasync::MonotonicInstant::now();
-    let info = DisconnectInfo {
-        connected_duration: now - options.connect_start_time,
-        is_sme_reconnecting: fidl_info.is_sme_reconnecting,
-        disconnect_source: fidl_info.disconnect_source,
-        previous_connect_reason: options.ess_connect_reason,
-        ap_state: (*options.ap_state).clone(),
-        signals: options.tracked_signals.clone(),
-    };
-    common_options
-        .telemetry_sender
-        .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
-
-    // Record data about the connection and disconnect for future network
-    // selection.
-    record_disconnect(
+    log_disconnect_to_telemetry(common_options, options, fidl_info, true).await;
+    log_disconnect_to_config_manager(
         common_options,
         options,
         types::DisconnectReason::DisconnectDetectedFromSme,
-        options.ap_state.tracked.signal,
     )
-    .await;
-}
-
-async fn record_disconnect(
-    common_options: &CommonStateOptions,
-    options: &ConnectedOptions,
-    reason: types::DisconnectReason,
-    signal: types::Signal,
-) {
-    let curr_time = fasync::MonotonicInstant::now();
-    let uptime = curr_time - options.connect_start_time;
-    let data = PastConnectionData::new(
-        options.ap_state.original().bssid,
-        curr_time,
-        uptime,
-        reason,
-        signal,
-        // TODO: record average phy rate over connection once available
-        0,
-    );
-    common_options
-        .saved_networks_manager
-        .record_disconnect(&options.network_identifier.clone(), &options.credential, data)
-        .await;
+    .await
 }
 
 fn notify_when_reconnect_detected(
@@ -1000,52 +909,221 @@ fn notify_on_channel_switch(
     common_options.status_publisher.publish_status(Status::from_ap_state(&options.ap_state));
 }
 
-async fn notify_on_manual_disconnect(
+async fn notify_on_manual_disconnect_request_received(
     common_options: &CommonStateOptions,
     options: &ConnectedOptions,
     reason: types::DisconnectReason,
 ) {
-    let now = fasync::MonotonicInstant::now();
-
-    record_disconnect(common_options, options, reason, options.ap_state.tracked.signal).await;
-
-    let info = DisconnectInfo {
-        connected_duration: now - options.connect_start_time,
+    let fidl_info = fidl_sme::DisconnectInfo {
         is_sme_reconnecting: false,
         disconnect_source: fidl_sme::DisconnectSource::User(
             types::convert_to_sme_disconnect_reason(reason),
         ),
-        ap_state: *options.ap_state.clone(),
-        previous_connect_reason: options.ess_connect_reason,
-        signals: options.tracked_signals.clone(),
     };
-    common_options
-        .telemetry_sender
-        .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
+    log_disconnect_to_telemetry(common_options, options, fidl_info, false).await;
+    log_disconnect_to_config_manager(common_options, options, reason).await
 }
 
-async fn notify_on_manual_connect(
+async fn notify_on_manual_connect_request_received(
     common_options: &CommonStateOptions,
     options: &ConnectedOptions,
     reason: types::DisconnectReason,
 ) {
-    let now = fasync::MonotonicInstant::now();
-
-    record_disconnect(common_options, options, reason, options.ap_state.tracked.signal).await;
-
-    let info = DisconnectInfo {
-        connected_duration: now - options.connect_start_time,
+    let fidl_info = fidl_sme::DisconnectInfo {
         is_sme_reconnecting: false,
         disconnect_source: fidl_sme::DisconnectSource::User(
             types::convert_to_sme_disconnect_reason(reason),
         ),
-        ap_state: *options.ap_state.clone(),
+    };
+    log_disconnect_to_telemetry(common_options, options, fidl_info, false).await;
+    log_disconnect_to_config_manager(common_options, options, reason).await
+}
+
+/// On a roam success:
+///   - logs a disconnect from the original BSS to saved networks manager
+///   - updates the state machine internal state (see update_internal_state_on_roam_success)
+///
+/// On a roam failure and original association not maintained:
+///   - logs a disconnect from the original BSS to saved networks manager
+///   - logs a disconnect to telemetry
+///
+/// Then the connect attempt, roam result, and any defects are logged (see notify_on_roam_result)
+async fn handle_roam_result(
+    common_options: &mut CommonStateOptions,
+    options: &mut ConnectedOptions,
+    result: &fidl_sme::RoamResult,
+) -> Result<(), anyhow::Error> {
+    let roam_succeeded = result.status_code == fidl_ieee80211::StatusCode::Success;
+    if roam_succeeded {
+        // Record BSS disconnect to config manager. We do not report a disconnect to
+        // telemetry, since we are still connected to the same ESS.
+        log_disconnect_to_config_manager(common_options, options, types::DisconnectReason::Unknown)
+            .await;
+        // Update internals of connected state to proceed with connection.
+        update_internal_state_on_roam_success(common_options, options, result)?;
+        info!("Roam succeeded!");
+    } else if !result.original_association_maintained {
+        // RoamResult should always include disconnect_info on failure, but this check prevents
+        // issues if it's missing.
+        let sme_disconnect_info = match result.disconnect_info {
+            Some(ref info) => *info.clone(),
+            None => {
+                warn!("RoamResult failure does not contain SME disconnect info.");
+                fidl_sme::DisconnectInfo {
+                    is_sme_reconnecting: false,
+                    disconnect_source: fidl_sme::DisconnectSource::Mlme(
+                        fidl_sme::DisconnectCause {
+                            reason_code: fidl_ieee80211::ReasonCode::UnspecifiedReason,
+                            mlme_event_name:
+                                fidl_sme::DisconnectMlmeEventName::RoamResultIndication,
+                        },
+                    ),
+                }
+            }
+        };
+        // Record a disconnect to both config manager and telemetry.
+        log_disconnect_to_telemetry(common_options, options, sme_disconnect_info, true).await;
+        log_disconnect_to_config_manager(common_options, options, types::DisconnectReason::Unknown)
+            .await;
+        info!("Roam attempt failed, original association not maintained, disconnecting");
+    }
+    notify_on_roam_result(common_options, options, result).await;
+    Ok(())
+}
+
+/// Called for each roam result, regardless of success/failure, after any required
+/// internal state updates have been made. This function:
+///   - Records the connect attempt to the target BSS with saved networks manager
+///   - Logs the roam result to telemetry
+///   - Publishes the current ap state (which may have been updates)
+///   - Logs a connect failure defect, if applicable.
+async fn notify_on_roam_result(
+    common_options: &mut CommonStateOptions,
+    options: &mut ConnectedOptions,
+    result: &fidl_sme::RoamResult,
+) {
+    // Record connect result to config manager, regardless of status.
+    common_options
+        .saved_networks_manager
+        .record_connect_result(
+            options.network_identifier.clone(),
+            &options.credential,
+            result.bssid.into(),
+            fidl_sme::ConnectResult {
+                code: result.status_code,
+                is_credential_rejected: result.is_credential_rejected,
+                is_reconnect: match result.disconnect_info {
+                    Some(ref info) => info.is_sme_reconnecting,
+                    None => false,
+                },
+            },
+            types::ScanObservation::Unknown,
+        )
+        .await;
+
+    // Log roam result to telemetry once state is up to date.
+    common_options.telemetry_sender.send(TelemetryEvent::RoamResult {
+        iface_id: common_options.iface_id,
+        result: result.clone(),
+        ap_state: (*options.ap_state).clone(),
+    });
+
+    // Publish state.
+    common_options.status_publisher.publish_status(Status::from_ap_state(&options.ap_state));
+
+    // Log defect on connect failure.
+    if result.status_code != fidl_ieee80211::StatusCode::Success && !result.is_credential_rejected {
+        if let Err(e) = common_options.defect_sender.unbounded_send(Defect::Iface(
+            IfaceFailure::ConnectionFailure { iface_id: common_options.iface_id },
+        )) {
+            warn!("Failed to log connection failure: {}", e);
+        }
+    }
+}
+
+async fn log_disconnect_to_telemetry(
+    common_options: &CommonStateOptions,
+    options: &ConnectedOptions,
+    fidl_info: fidl_sme::DisconnectInfo,
+    track_subsequent_downtime: bool,
+) {
+    let now = fasync::MonotonicInstant::now();
+    let info = DisconnectInfo {
+        connected_duration: now - options.ess_connect_start_time,
+        is_sme_reconnecting: fidl_info.is_sme_reconnecting,
+        disconnect_source: fidl_info.disconnect_source,
         previous_connect_reason: options.ess_connect_reason,
+        ap_state: (*options.ap_state).clone(),
         signals: options.tracked_signals.clone(),
     };
     common_options
         .telemetry_sender
-        .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
+        .send(TelemetryEvent::Disconnected { track_subsequent_downtime, info });
+}
+
+async fn log_disconnect_to_config_manager(
+    common_options: &CommonStateOptions,
+    options: &ConnectedOptions,
+    reason: types::DisconnectReason,
+) {
+    let curr_time = fasync::MonotonicInstant::now();
+    let uptime = curr_time - options.bss_connect_start_time;
+    let data = PastConnectionData::new(
+        options.ap_state.original().bssid,
+        curr_time,
+        uptime,
+        reason,
+        options.ap_state.tracked.signal,
+        // TODO: record average phy rate over connection once available
+        0,
+    );
+    common_options
+        .saved_networks_manager
+        .record_disconnect(&options.network_identifier.clone(), &options.credential, data)
+        .await;
+}
+
+/// Updates all internal state following a roam to a new BSS. This includes updating the ap state,
+/// restarting metrics timers, clearing signal tracking, and re-initializing a new roam monitor.
+fn update_internal_state_on_roam_success(
+    common_options: &mut CommonStateOptions,
+    options: &mut ConnectedOptions,
+    result: &fidl_sme::RoamResult,
+) -> Result<(), anyhow::Error> {
+    // Update internal state, to proceed with connection.
+    let bss_description = match result.bss_description {
+        Some(ref bss_description) => bss_description,
+        None => {
+            return Err(format_err!("RoamResult is missing BSS description from FIDL"));
+        }
+    };
+    let ap_state = types::ApState::from(
+        BssDescription::try_from(*bss_description.clone()).map_err(|error| {
+            // This only occurs if an invalid `BssDescription` is received from SME, which should
+            // never happen.
+            format_err!("Failed to convert BSS description from FIDL: {:?}", error,)
+        })?,
+    );
+    *options.ap_state = ap_state;
+    options.bss_connect_start_time = fasync::MonotonicInstant::now();
+    options.tracked_signals = HistoricalList::new(NUM_PAST_SCORES);
+    options.initial_signal = options.ap_state.tracked.signal;
+    options.tracked_signals.add(types::TimestampedSignal {
+        time: fasync::MonotonicInstant::now(),
+        signal: options.initial_signal,
+    });
+    options.post_connect_metric_timer =
+        fasync::Timer::new(AVERAGE_SCORE_DELTA_MINIMUM_DURATION.after_now()).fuse();
+    options.bss_connect_duration_metric_timer =
+        fasync::Timer::new(METRICS_SHORT_CONNECT_DURATION.after_now()).fuse();
+    // Re-initialize roam monitor for new BSS
+    (options.roam_monitor_sender, options.roam_receiver) =
+        common_options.roam_manager.initialize_roam_monitor(
+            (*options.ap_state).clone(),
+            options.network_identifier.clone(),
+            options.credential.clone(),
+        );
+    Ok(())
 }
 
 /// Get the disconnect reason corresponding to the connect reason. Return an error if the connect
@@ -3164,12 +3242,42 @@ mod tests {
             });
         });
 
-        // Verify telemetry event
+        // Verify a disconnect was logged to saved networks manager
+        assert_variant!(test_values.saved_networks_manager.get_recorded_past_connections().as_slice(), [ConnectionRecord {id, credential, data}] => {
+            assert_eq!(id, &connect_selection.target.network.clone());
+            assert_eq!(credential, &connect_selection.target.credential.clone());
+            assert_variant!(data, PastConnectionData {bssid, disconnect_reason, ..} => {
+                assert_eq!(bssid, &connect_selection.target.bss.bssid);
+                assert_eq!(disconnect_reason, &types::DisconnectReason::Unknown);
+            })
+        });
+
+        // Verify the successful connect result was logged to saved networks manager
+        assert_variant!(test_values.saved_networks_manager.get_recorded_connect_reslts().as_slice(), [data] => {
+            let expected_connect_result = ConnectResultRecord {
+                 id: connect_selection.target.network.clone(),
+                 credential: connect_selection.target.credential.clone(),
+                 bssid: types::Bssid::from(roam_result.bssid),
+                 connect_result: fidl_sme::ConnectResult {
+                    code: roam_result.status_code,
+                    is_credential_rejected: roam_result.is_credential_rejected,
+                    is_reconnect: false,
+                 },
+                 scan_type: types::ScanObservation::Unknown,
+            };
+            assert_eq!(data, &expected_connect_result);
+        });
+
+        // Verify roam result telemetry event
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
             assert_variant!(event, TelemetryEvent::RoamResult { result, .. } => {
                 assert_eq!(result, roam_result);
             });
         });
+
+        // Explicitly verify there is _not_ a disconnect metric logged, since we have not exited the
+        // ESS.
+        assert_variant!(telemetry_receiver.try_next(), Err(_));
     }
 
     #[fuchsia::test]
@@ -3226,14 +3334,40 @@ mod tests {
         connect_txn_handle.send_on_roam_result(&roam_result).expect("failed to send roam result");
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
-        // Verify telemetry event
+        // Verify the failed connect result was logged to saved networks manager
+        assert_variant!(test_values.saved_networks_manager.get_recorded_connect_reslts().as_slice(), [data] => {
+            let expected_connect_result = ConnectResultRecord {
+                 id: connect_selection.target.network.clone(),
+                 credential: connect_selection.target.credential.clone(),
+                 bssid: types::Bssid::from(roam_result.bssid),
+                 connect_result: fidl_sme::ConnectResult {
+                    code: roam_result.status_code,
+                    is_credential_rejected: roam_result.is_credential_rejected,
+                    is_reconnect: false,
+                 },
+                 scan_type: types::ScanObservation::Unknown,
+            };
+            assert_eq!(data, &expected_connect_result);
+        });
+
+        // Verify roam result telemetry event
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
             assert_variant!(event, TelemetryEvent::RoamResult { result, .. } => {
                 assert_eq!(result, roam_result);
             });
         });
 
-        // Verify the roam monitor was *NOT* re-initialized.
+        // A defect should be logged.
+        assert_variant!(
+            test_values.defect_receiver.try_next(),
+            Ok(Some(Defect::Iface(IfaceFailure::ConnectionFailure { iface_id: 1 })))
+        );
+
+        // Explicitly verify there is _not_ a disconnect metric logged, since we have not exited the
+        // ESS.
+        assert_variant!(telemetry_receiver.try_next(), Err(_));
+
+        // Verify the roam monitor was _not_ re-initialized.
         assert_variant!(test_values.roam_service_request_receiver.try_next(), Err(_));
     }
 
@@ -3300,11 +3434,30 @@ mod tests {
         connect_txn_handle.send_on_roam_result(&roam_result).expect("failed to send roam result");
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
-        // Verify telemetry event for roam result
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::RoamResult { result, .. } => {
-                assert_eq!(result, roam_result);
-            });
+        // Verify the failed connect result was logged to saved networks manager
+        assert_variant!(test_values.saved_networks_manager.get_recorded_connect_reslts().as_slice(), [data] => {
+            let expected_connect_result = ConnectResultRecord {
+                 id: connect_selection.target.network.clone(),
+                 credential: connect_selection.target.credential.clone(),
+                 bssid: types::Bssid::from(roam_result.bssid),
+                 connect_result: fidl_sme::ConnectResult {
+                    code: roam_result.status_code,
+                    is_credential_rejected: roam_result.is_credential_rejected,
+                    is_reconnect: false,
+                 },
+                 scan_type: types::ScanObservation::Unknown,
+            };
+            assert_eq!(data, &expected_connect_result);
+        });
+
+        // Verify a disconnect was logged to saved networks manager
+        assert_variant!(test_values.saved_networks_manager.get_recorded_past_connections().as_slice(), [ConnectionRecord {id, credential, data}] => {
+            assert_eq!(id, &connect_selection.target.network.clone());
+            assert_eq!(credential, &connect_selection.target.credential.clone());
+            assert_variant!(data, PastConnectionData {bssid, disconnect_reason, ..} => {
+                assert_eq!(bssid, &connect_selection.target.bss.bssid);
+                assert_eq!(disconnect_reason, &types::DisconnectReason::Unknown);
+            })
         });
 
         // Verify telemetry event for disconnect
@@ -3313,6 +3466,19 @@ mod tests {
                 assert_eq!(info.disconnect_source, disconnect_info.disconnect_source);
             });
         });
+
+        // Verify telemetry event for roam result
+        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
+            assert_variant!(event, TelemetryEvent::RoamResult { result, .. } => {
+                assert_eq!(result, roam_result);
+            });
+        });
+
+        // A defect should be logged.
+        assert_variant!(
+            test_values.defect_receiver.try_next(),
+            Ok(Some(Defect::Iface(IfaceFailure::ConnectionFailure { iface_id: 1 })))
+        );
 
         // Check for an SME disconnect request
         assert_variant!(
