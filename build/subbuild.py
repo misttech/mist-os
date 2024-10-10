@@ -342,7 +342,7 @@ def main() -> int:
         # Adjust the NINJA_STATUS environment variable before launching Ninja
         # in order to add a prefix distinguishing its build actions from
         # the top-level ones.
-        ninja_status = os.environ.get("NINJA_STATUS", "[%f/%t](%r) ")
+        ninja_status = os.environ.get("NINJA_STATUS", "[%f/%t][%p/%w](%r) ")
 
         status_prefix = f"IDK_SUBBUILD_api_{api_level}_{target_cpu} "
         ninja_status = status_prefix + ninja_status
