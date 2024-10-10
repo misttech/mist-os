@@ -67,6 +67,7 @@ class DebugAgent : public RemoteAPI,
 
   void OnProcessStarting(std::unique_ptr<ProcessHandle> process) override;
   void OnProcessNameChanged(std::unique_ptr<ProcessHandle> process) override;
+  void OnUnhandledException(std::unique_ptr<ExceptionHandle> process) override {}
 
   void OnProcessChanged(bool starting, std::unique_ptr<ProcessHandle> process);
 

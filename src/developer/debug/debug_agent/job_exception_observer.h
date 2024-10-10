@@ -9,12 +9,14 @@
 
 namespace debug_agent {
 
+class ExceptionHandle;
 class ProcessHandle;
 
 class JobExceptionObserver {
  public:
   virtual void OnProcessStarting(std::unique_ptr<ProcessHandle> process) = 0;
   virtual void OnProcessNameChanged(std::unique_ptr<ProcessHandle> process) = 0;
+  virtual void OnUnhandledException(std::unique_ptr<ExceptionHandle> exception) = 0;
 };
 
 }  // namespace debug_agent
