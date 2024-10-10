@@ -26,15 +26,6 @@
         { protocol: "fuchsia.diagnostics.ArchiveAccessor" },
     ],
     offer: [
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#stash",
-                "#stash_secure",
-            ],
-        },
-
         // to #stash
         {
             storage: "data",

@@ -35,7 +35,6 @@
             protocol: [
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.diagnostics.ArchiveAccessor",
-                "fuchsia.logger.LogSink",
                 "fuchsia.paver.Paver",
                 "fuchsia.process.Launcher",
             ],

@@ -31,7 +31,6 @@
         },
         {
             protocol: [
-                "fuchsia.logger.LogSink",
                 "fuchsia.pkg.FontResolver",
                 "fuchsia.tracing.provider.Registry",
             ],
@@ -39,12 +38,12 @@
             to: "#coll",
         },
         {
-            from: "#config",
-            to: "#coll",
             config: [
                 "fuchsia.fonts.FontManifest",
                 "fuchsia.fonts.VerboseLogging",
             ],
+            from: "#config",
+            to: "#coll",
         },
     ],
 }

@@ -33,13 +33,6 @@
             from: "#base-subpackaged-component",
         },
     ],
-    offer: [
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [ "#base-subpackaged-component" ],
-        },
-    ],
     expose: [
         {
             protocol: "test.ping.Ping",

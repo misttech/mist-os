@@ -22,11 +22,4 @@
             from: "#puppet",
         },
     ],
-    offer: [
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: "#puppet",
-        },
-    ],
 }
