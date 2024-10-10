@@ -812,16 +812,12 @@ fit::result<Errno, ktl::span<uint8_t>> MemoryManagerState::read_memory_partial(
 
 fit::result<Errno, ktl::span<uint8_t>> MemoryManagerState::read_memory_partial_until_null_byte(
     UserAddress addr, ktl::span<uint8_t>& bytes) const {
-  auto read_bytes_or_error = read_memory_partial(addr, bytes);
-  if (read_bytes_or_error.is_error())
-    return read_bytes_or_error.take_error();
+  auto read_bytes = read_memory_partial(addr, bytes) _EP(read_bytes);
+  auto null_position = ktl::find(read_bytes->begin(), read_bytes->end(), '\0');
 
-  auto read_bytes = read_bytes_or_error.value();
-  auto null_position = ktl::find(read_bytes.begin(), read_bytes.end(), '\0');
-
-  size_t max_len = (null_position == read_bytes.end())
-                       ? read_bytes.size()
-                       : ktl::distance(read_bytes.begin(), null_position) + 1;
+  size_t max_len = (null_position == read_bytes->end())
+                       ? read_bytes->size()
+                       : ktl::distance(read_bytes->begin(), null_position) + 1;
 
   return fit::ok(ktl::span<uint8_t>(bytes.data(), max_len));
 }
@@ -1711,14 +1707,6 @@ fit::result<Errno> MemoryManager::set_mapping_name(UserAddress addr, size_t leng
     // TODO(b/310255065): We have no place to store names in a way visible to programs outside
     // of Starnix such as memory analysis tools.
 #if STARNIX_ANON_ALLOCS
-#[cfg(not(feature = "alternate_anon_allocs"))]
-    {
-      let MappingBacking::Vmo(backing) = &mapping.backing;
-      match& name {
-        Some(vmo_name) = > { set_zx_name(&*backing.vmo, vmo_name); }
-        None = > { set_zx_name(&*backing.vmo, b ""); }
-      }
-    }
 #endif
     if (range.end > end) {
       // The named region ends before the last mapping ends. Split the tail off of the
