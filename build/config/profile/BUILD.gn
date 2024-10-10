@@ -72,15 +72,7 @@ variant("coverage") {
     rustflags = [ "-Clink-arg=$dynamic_linker_flags" ]
   }
 
-  cflags = [
-    # Enable binary profile correlation.
-    "-mllvm",
-    "-profile-correlate=binary",
-
-    # Enable single byte coverage.
-    "-mllvm",
-    "-enable-single-byte-coverage=true",
-  ]
+  cflags = []
 
   # Enable runtime counter relocation in Linux.
   if (is_linux) {
@@ -97,6 +89,12 @@ variant("coverage") {
       "-system-headers-coverage",
     ]
   }
+
+  # Enable binary profile correlation.
+  cflags += [
+    "-mllvm",
+    "-profile-correlate=binary",
+  ]
 }
 
 # This can be appended with:
@@ -136,15 +134,7 @@ variant("coverage-cts") {
     rustflags = [ "-Clink-arg=$dynamic_linker_flags" ]
   }
 
-  cflags = [
-    # Enable binary profile correlation.
-    "-mllvm",
-    "-profile-correlate=binary",
-
-    # Enable single byte coverage.
-    "-mllvm",
-    "-enable-single-byte-coverage=true",
-  ]
+  cflags = []
 
   # Enable runtime counter relocation in Linux.
   if (is_linux) {
@@ -161,6 +151,12 @@ variant("coverage-cts") {
       "-system-headers-coverage",
     ]
   }
+
+  # Enable binary profile correlation.
+  cflags += [
+    "-mllvm",
+    "-profile-correlate=binary",
+  ]
 }
 
 # Only enable either "coverage-rust" or clang coverage (variant("profile") or variant("coverage")),
