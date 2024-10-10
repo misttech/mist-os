@@ -156,15 +156,7 @@ impl StoredMessage {
     }
 
     pub fn parse(&self, source: &ComponentIdentity) -> Result<LogsData> {
-        let mut data = diagnostics_message::from_structured(source.into(), &self.bytes)?;
-        // TODO(https://fxbug.dev/368426475): fix chromium, then remove. The problematic logs are
-        // being ingested as sturctured logs. Not a legacy logs too.
-        match i8::from_le_bytes(data.metadata.raw_severity().to_le_bytes()) {
-            -1 => data.set_severity(Severity::Debug),
-            -2 => data.set_severity(Severity::Trace),
-            0 => data.set_severity(Severity::Info),
-            _ => {}
-        }
+        let data = diagnostics_message::from_structured(source.into(), &self.bytes)?;
         Ok(data)
     }
 }
