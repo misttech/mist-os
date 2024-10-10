@@ -32,6 +32,12 @@
 
 #include <ktl/enforce.h>
 
+// This flag enables usage of split bits instead of share counts when tracking COW pages.
+//
+// TODO(https://fxbug.dev/issues/338300808): Remove this flag when the new attribution code (and
+// thus share counts) are the default.
+#define ENABLE_COW_SPLIT_BITS true
+
 #define LOCAL_TRACE VM_GLOBAL_TRACE(0)
 
 // add expensive code to do a full validation of the VMO at various points.
@@ -510,7 +516,7 @@ void VmCowPages::DeadTransition(Guard<CriticalMutex>& guard) {
   // At the point of destruction we should no longer have any mappings or children still
   // referencing us, and by extension our priority count must therefore be back to zero.
   DEBUG_ASSERT(high_priority_count_ == 0);
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
   // If we're not a hidden vmo, then we need to remove ourself from our parent. This needs
@@ -824,7 +830,7 @@ bool VmCowPages::DedupZeroPage(vm_page_t* page, uint64_t offset) {
 
     reclamation_event_count_++;
     IncrementHierarchyGenerationCountLocked();
-    VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+    VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
     VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
     return true;
   }
@@ -864,6 +870,43 @@ zx_status_t VmCowPages::CreateExternal(fbl::RefPtr<PageSource> src, VmCowPagesOp
 
   *cow_pages = ktl::move(cow);
   return ZX_OK;
+}
+
+VmCowPages& VmCowPages::left_child_locked() {
+  DEBUG_ASSERT(ENABLE_COW_SPLIT_BITS);
+  DEBUG_ASSERT(is_hidden_locked());
+  DEBUG_ASSERT(children_list_len_ == 2);
+
+  auto& ret = children_list_.front();
+  AssertHeld(ret.lock_ref());
+  return ret;
+}
+
+VmCowPages& VmCowPages::right_child_locked() {
+  DEBUG_ASSERT(ENABLE_COW_SPLIT_BITS);
+  DEBUG_ASSERT(is_hidden_locked());
+  DEBUG_ASSERT(children_list_len_ == 2);
+  auto& ret = children_list_.back();
+  AssertHeld(ret.lock_ref());
+  return ret;
+}
+
+const VmCowPages& VmCowPages::left_child_locked() const {
+  DEBUG_ASSERT(ENABLE_COW_SPLIT_BITS);
+  DEBUG_ASSERT(is_hidden_locked());
+  DEBUG_ASSERT(children_list_len_ == 2);
+  const auto& ret = children_list_.front();
+  AssertHeld(ret.lock_ref());
+  return ret;
+}
+
+const VmCowPages& VmCowPages::right_child_locked() const {
+  DEBUG_ASSERT(ENABLE_COW_SPLIT_BITS);
+  DEBUG_ASSERT(is_hidden_locked());
+  DEBUG_ASSERT(children_list_len_ == 2);
+  const auto& ret = children_list_.back();
+  AssertHeld(ret.lock_ref());
+  return ret;
 }
 
 void VmCowPages::ReplaceChildLocked(VmCowPages* old, VmCowPages* new_child) {
@@ -956,10 +999,10 @@ zx_status_t VmCowPages::CreateChildSliceLocked(uint64_t offset, uint64_t size,
   AddChildLocked(slice.get(), offset, size);
 
   // Checking this node's hierarchy will also check the parent's hierarchy.
-  // It will not check the child's hierarchy, so check that independently.
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  // It will not check the child's page sharing however, so check that independently.
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
-  VMO_VALIDATION_ASSERT(slice->DebugValidatePageSplitsLocked());
+  VMO_VALIDATION_ASSERT(slice->DebugValidatePageSharingLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(slice->DebugValidateVmoPageBorrowingLocked());
 
   *cow_slice = slice;
@@ -1062,6 +1105,15 @@ zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t size,
                                                  fbl::RefPtr<VmCowPages>* cow_child) {
   canary_.Assert();
 
+  if constexpr (ENABLE_COW_SPLIT_BITS) {
+    return CloneBidirectionalUsingSplitsLocked(offset, size, cow_child);
+  }
+}
+
+zx_status_t VmCowPages::CloneBidirectionalUsingSplitsLocked(uint64_t offset, uint64_t size,
+                                                            fbl::RefPtr<VmCowPages>* cow_child) {
+  canary_.Assert();
+
   // The parent must be `this` node.
   // TODO(b/42058561): After switching to share counts, allow walking the hierarchy to select a
   // parent further up.
@@ -1113,14 +1165,14 @@ zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t size,
   parent->AddChildLocked(cow_clone.get(), child_range.parent_offset, child_range.parent_limit);
 
   // Checking this node's hierarchy will also check the parent's hierarchy.
-  // It will not check either child's hierarchies, so check those independently.
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  // It will not check either child's page sharing however, so check those independently.
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(parent->DebugValidateVmoPageBorrowingLocked());
-  VMO_VALIDATION_ASSERT(cow_clone->DebugValidatePageSplitsLocked());
+  VMO_VALIDATION_ASSERT(cow_clone->DebugValidatePageSharingLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(cow_clone->DebugValidateVmoPageBorrowingLocked());
   if (parent_clone) {
     AssertHeld(parent_clone->lock_ref());
-    VMO_VALIDATION_ASSERT(parent_clone->DebugValidatePageSplitsLocked());
+    VMO_VALIDATION_ASSERT(parent_clone->DebugValidatePageSharingLocked());
     VMO_FRUGAL_VALIDATION_ASSERT(parent_clone->DebugValidateVmoPageBorrowingLocked());
   }
 
@@ -1151,10 +1203,10 @@ zx_status_t VmCowPages::CloneUnidirectionalLocked(uint64_t offset, uint64_t size
   parent->AddChildLocked(cow_clone.get(), child_range.parent_offset, child_range.parent_limit);
 
   // Checking this node's hierarchy will also check the parent's hierarchy.
-  // It will not check the child's hierarchy, so check that independently.
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  // It will not check the child's page sharing however, so check that independently.
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(parent->DebugValidateVmoPageBorrowingLocked());
-  VMO_VALIDATION_ASSERT(cow_clone->DebugValidatePageSplitsLocked());
+  VMO_VALIDATION_ASSERT(cow_clone->DebugValidatePageSharingLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(cow_clone->DebugValidateVmoPageBorrowingLocked());
 
   *cow_child = ktl::move(cow_clone);
@@ -1171,7 +1223,7 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
   DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
   DEBUG_ASSERT(!is_hidden_locked());
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
   // Upgrade clone type, if possible.
@@ -1274,13 +1326,13 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
   canary_.Assert();
 
   AssertHeld(removed->lock_ref());
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
   if (!is_hidden_locked()) {
     DropChildLocked(removed);
     // Things should be consistent after dropping the child.
-    VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+    VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
     VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
     return;
   }
@@ -1382,13 +1434,22 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
   parent_offset_ = parent_limit_ = parent_start_limit_ = 0;
 
   // Things should be consistent after dropping one child and merging with the other.
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
-  VMO_VALIDATION_ASSERT(child->DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
+  VMO_VALIDATION_ASSERT(child->DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(child->DebugValidateVmoPageBorrowingLocked());
 }
 
 void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_left) {
+  canary_.Assert();
+
+  if constexpr (ENABLE_COW_SPLIT_BITS) {
+    MergeContentWithChildUsingSplitsLocked(removed, removed_left);
+    return;
+  }
+}
+
+void VmCowPages::MergeContentWithChildUsingSplitsLocked(VmCowPages* removed, bool removed_left) {
   canary_.Assert();
 
   DEBUG_ASSERT(children_list_len_ == 1);
@@ -1677,15 +1738,23 @@ void VmCowPages::DumpLocked(uint depth, bool verbose) const {
       }
       if (p->IsMarker()) {
         printf("offset %#" PRIx64 " zero page marker\n", offset);
-      } else if (p->IsPage()) {
+      } else if (p->IsPage() && ENABLE_COW_SPLIT_BITS) {
         vm_page_t* page = p->Page();
         printf("offset %#" PRIx64 " page %p paddr %#" PRIxPTR "(%c%c%c)\n", offset, page,
                page->paddr(), IsSplit(SplitDir::Left, page) ? 'L' : '.',
                IsSplit(SplitDir::Right, page) ? 'R' : '.', page->object.always_need ? 'A' : '.');
-      } else if (p->IsReference()) {
+      } else if (p->IsReference() && ENABLE_COW_SPLIT_BITS) {
         const uint64_t cookie = p->Reference().value();
         printf("offset %#" PRIx64 " reference %#" PRIx64 "(%c%c)\n", offset, cookie,
                IsSplit(SplitDir::Left, p) ? 'L' : '.', IsSplit(SplitDir::Right, p) ? 'R' : '.');
+      } else if (p->IsPage()) {
+        vm_page_t* page = p->Page();
+        printf("offset %#" PRIx64 " page %p paddr %#" PRIxPTR " share %" PRIu32 "(%c)\n", offset,
+               page, page->paddr(), GetShareCount(page), page->object.always_need ? 'A' : '.');
+      } else if (p->IsReference()) {
+        const uint64_t cookie = p->Reference().value();
+        printf("offset %#" PRIx64 " reference %#" PRIx64 " share %" PRIu32 "\n", offset, cookie,
+               GetShareCount(p));
       } else if (p->IsIntervalStart()) {
         printf("offset %#" PRIx64 " page interval start\n", offset);
       } else if (p->IsIntervalEnd()) {
@@ -1715,6 +1784,15 @@ uint32_t VmCowPages::DebugLookupDepthLocked() const {
 }
 
 VmCowPages::AttributionCounts VmCowPages::GetAttributedMemoryInRangeLocked(
+    uint64_t offset_bytes, uint64_t len_bytes) const {
+  canary_.Assert();
+
+  if constexpr (ENABLE_COW_SPLIT_BITS) {
+    return GetAttributedMemoryInRangeUsingSplitsLocked(offset_bytes, len_bytes);
+  }
+}
+
+VmCowPages::AttributionCounts VmCowPages::GetAttributedMemoryInRangeUsingSplitsLocked(
     uint64_t offset_bytes, uint64_t len_bytes) const {
   canary_.Assert();
 
@@ -2109,7 +2187,7 @@ VmPageOrMarker VmCowPages::CompleteAddPageLocked(AddPageTransaction& transaction
     }
   }
 
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
   VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
   return old;
@@ -2206,7 +2284,7 @@ zx_status_t VmCowPages::AddNewPagesLocked(uint64_t start_offset, list_node_t* pa
     RangeChangeUpdateLocked(start_offset, offset - start_offset, RangeChangeOp::Unmap);
   }
 
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
   return ZX_OK;
 }
@@ -2236,6 +2314,17 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
                                            uint64_t owner_offset,
                                            AnonymousPageRequest* page_request,
                                            vm_page_t** out_page) {
+  if constexpr (ENABLE_COW_SPLIT_BITS) {
+    return CloneCowPageUsingSplitsLocked(offset, alloc_list, page_owner, page, owner_offset,
+                                         page_request, out_page);
+  }
+}
+
+zx_status_t VmCowPages::CloneCowPageUsingSplitsLocked(uint64_t offset, list_node_t* alloc_list,
+                                                      VmCowPages* page_owner, vm_page_t* page,
+                                                      uint64_t owner_offset,
+                                                      AnonymousPageRequest* page_request,
+                                                      vm_page_t** out_page) {
   DEBUG_ASSERT(page != vm_get_zero_page());
   DEBUG_ASSERT(parent_);
   DEBUG_ASSERT(page_request);
@@ -2407,6 +2496,17 @@ zx_status_t VmCowPages::CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* f
                                                  VmCowPages* page_owner, vm_page_t* page,
                                                  uint64_t owner_offset,
                                                  AnonymousPageRequest* page_request) {
+  if constexpr (ENABLE_COW_SPLIT_BITS) {
+    return CloneCowPageAsZeroUsingSplitsLocked(offset, freed_list, page_owner, page, owner_offset,
+                                               page_request);
+  }
+}
+
+zx_status_t VmCowPages::CloneCowPageAsZeroUsingSplitsLocked(uint64_t offset,
+                                                            list_node_t* freed_list,
+                                                            VmCowPages* page_owner, vm_page_t* page,
+                                                            uint64_t owner_offset,
+                                                            AnonymousPageRequest* page_request) {
   DEBUG_ASSERT(parent_);
 
   DEBUG_ASSERT(!page_source_ || page_source_->DebugIsPageOk(page, offset));
@@ -2461,6 +2561,16 @@ zx_status_t VmCowPages::CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* f
   // We cannot be forking a page to here if there's already something.
   DEBUG_ASSERT(old.IsEmpty());
   return ZX_OK;
+}
+
+void VmCowPages::ReleaseCowParentPagesLocked(uint64_t start, uint64_t end,
+                                             BatchPQRemove* page_remover) {
+  canary_.Assert();
+
+  if constexpr (ENABLE_COW_SPLIT_BITS) {
+    ReleaseCowParentPagesUsingSplitsLocked(start, end, page_remover);
+    return;
+  }
 }
 
 VMPLCursor VmCowPages::FindInitialPageContentLocked(uint64_t offset, VmCowPages** owner_out,
@@ -3376,7 +3486,7 @@ zx::result<VmCowPages::LookupCursor> VmCowPages::GetLookupCursorLocked(uint64_t 
   DEBUG_ASSERT(!is_hidden_locked());
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset) && max_len > 0 && IS_PAGE_ALIGNED(max_len));
   DEBUG_ASSERT(life_cycle_ == LifeCycle::Alive);
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
 
   if (unlikely(offset >= size_ || !InRange(offset, max_len, size_))) {
     return zx::error{ZX_ERR_OUT_OF_RANGE};
@@ -3484,7 +3594,7 @@ zx_status_t VmCowPages::CommitRangeLocked(uint64_t offset, uint64_t len, uint64_
   // Clear the alloc list from the cursor and let list_cleanup free any remaining pages.
   cursor->ClearAllocList();
 
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
   return status;
 }
@@ -3629,7 +3739,7 @@ zx::result<uint64_t> VmCowPages::UnmapAndFreePagesLocked(uint64_t offset, uint64
     FreePagesLocked(&freed_list, /*freeing_owned_pages=*/true);
   }
 
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
   return zx::ok(page_remover.freed_count());
 }
@@ -4267,7 +4377,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
       },
       start, end);
 
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
   return status;
@@ -4818,8 +4928,8 @@ void VmCowPages::ReleaseCowParentPagesLockedHelper(uint64_t start, uint64_t end,
       parent_range_start, parent_range_end);
 }
 
-void VmCowPages::ReleaseCowParentPagesLocked(uint64_t start, uint64_t end,
-                                             BatchPQRemove* page_remover) {
+void VmCowPages::ReleaseCowParentPagesUsingSplitsLocked(uint64_t start, uint64_t end,
+                                                        BatchPQRemove* page_remover) {
   // This function releases |this| references to any ancestor vmo's COW pages.
   //
   // To do so, we divide |this| parent into three (possibly 0-length) regions: the region
@@ -5182,7 +5292,7 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
 
   IncrementHierarchyGenerationCountLocked();
 
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
   return ZX_OK;
@@ -5425,7 +5535,7 @@ zx_status_t VmCowPages::TakePagesWithParentLocked(uint64_t offset, uint64_t len,
     RangeChangeUpdateLocked(offset, new_pages_len, RangeChangeOp::Unmap);
   }
 
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
   // We need to finalize the splice page list as soon as we know that we will not be adding pages
@@ -5522,7 +5632,7 @@ zx_status_t VmCowPages::TakePagesLocked(uint64_t offset, uint64_t len, VmPageSpl
   *taken_len = len;
   RangeChangeUpdateLocked(offset, len, RangeChangeOp::Unmap);
 
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
   return ZX_OK;
@@ -5767,7 +5877,7 @@ zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageS
     FreePagesLocked(&freed_list, /*freeing_owned_pages=*/true);
   }
 
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
   *supplied_len = offset - start;
@@ -6693,7 +6803,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEvictionLocked(vm_page_t* pa
 
   reclamation_event_count_++;
   IncrementHierarchyGenerationCountLocked();
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
   return ReclaimCounts{
       .evicted_non_loaned = loaned ? 0u : 1u,
@@ -7065,14 +7175,14 @@ zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offse
   return ZX_OK;
 }
 
-bool VmCowPages::DebugValidatePageSplitsHierarchyLocked() const {
+bool VmCowPages::DebugValidateHierarchyLocked() const {
   canary_.Assert();
 
   const VmCowPages* cur = this;
   AssertHeld(cur->lock_ref());
   const VmCowPages* parent_most = cur;
   do {
-    if (!cur->DebugValidatePageSplitsLocked()) {
+    if (!cur->DebugValidatePageSharingLocked()) {
       return false;
     }
     cur = cur->parent_.get();
@@ -7125,6 +7235,14 @@ bool VmCowPages::DebugValidatePageSplitsHierarchyLocked() const {
     DEBUG_ASSERT(cur);
   }
   return true;
+}
+
+bool VmCowPages::DebugValidatePageSharingLocked() const {
+  canary_.Assert();
+
+  if constexpr (ENABLE_COW_SPLIT_BITS) {
+    return DebugValidatePageSplitsLocked();
+  }
 }
 
 bool VmCowPages::DebugValidatePageSplitsLocked() const {

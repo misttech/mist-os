@@ -1958,23 +1958,23 @@ static bool vmo_eviction_test() {
   END_TEST;
 }
 
-// This test exists to provide a location for VmObjectPaged::DebugValidatePageSplits to be
+// This test exists to provide a location for VmObjectPaged::DebugValidatePageSharing to be
 // regularly called so that it doesn't bitrot. Additionally it *might* detect VMO object corruption,
-// but it's primary goal is to test the implementation of DebugValidatePageSplits
-static bool vmo_validate_page_splits_test() {
+// but it's primary goal is to test the implementation of DebugValidatePageSharing.
+static bool vmo_validate_page_shares_test() {
   BEGIN_TEST;
 
   zx_status_t status = VmObject::ForEach([](const VmObject& vmo) -> zx_status_t {
     if (vmo.is_paged()) {
       const VmObjectPaged& paged = static_cast<const VmObjectPaged&>(vmo);
-      if (!paged.DebugValidatePageSplits()) {
+      if (!paged.DebugValidatePageSharing()) {
         return ZX_ERR_INTERNAL;
       }
     }
     return ZX_OK;
   });
 
-  // Although DebugValidatePageSplits says to panic as soon as possible if it returns false, this
+  // Although DebugValidatePageSharing says to panic as soon as possible if it returns false, this
   // test errs on side of assuming that the validation is broken, and not the hierarchy, and so does
   // not panic. Either way the test still fails, this is just more graceful.
   EXPECT_EQ(ZX_OK, status);
@@ -4490,7 +4490,7 @@ VM_UNITTEST(vmo_eviction_hints_test)
 VM_UNITTEST(vmo_always_need_evicts_loaned_test)
 VM_UNITTEST(vmo_eviction_hints_clone_test)
 VM_UNITTEST(vmo_eviction_test)
-VM_UNITTEST(vmo_validate_page_splits_test)
+VM_UNITTEST(vmo_validate_page_shares_test)
 VM_UNITTEST(vmo_attribution_clones_test)
 VM_UNITTEST(vmo_attribution_ops_test)
 VM_UNITTEST(vmo_attribution_ops_contiguous_test)
