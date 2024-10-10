@@ -208,12 +208,13 @@ async fn route() {
     // fuchsia.sys2.RealmQuery
     // fuchsia.sys2.RouteValidator
     // void-protocol
+    // runner
     //
     // The expected exposed capabilities are:
     // fuchsia.foo.bar
     // fuchsia.test.Suite
     // data
-    assert_eq!(reports.len(), 7 + 3);
+    assert_eq!(reports.len(), 8 + 3);
 }
 
 #[fuchsia::test]
