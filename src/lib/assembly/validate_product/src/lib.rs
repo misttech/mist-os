@@ -262,10 +262,137 @@ impl fmt::Display for PackageValidationError {
                 write!(f, "\n└── {cause}")?;
                 Ok(())
             }
-            UnsupportedAbiRevision(cause) => {
-                write!(f, "Error validating abi revision: {cause}")?;
-                Ok(())
+            UnsupportedAbiRevision(version_history::AbiRevisionError::TooNew {
+                abi_revision,
+                supported_versions,
+            }) => write!(
+                f,
+                "Package targets an unknown target ABI revision: 0x{}.
+
+Your Fuchsia SDK is probably too old to support it. Either update your
+SDK to a newer version, or target one of the following supported API levels
+when building this package:{}",
+                abi_revision, supported_versions
+            ),
+            UnsupportedAbiRevision(version_history::AbiRevisionError::PlatformMismatch {
+                abi_revision,
+                package_date,
+                package_commit_hash,
+                platform_date,
+                platform_commit_hash,
+            }) => {
+                write!(
+                    f,
+                    "Package targets an unsupported platform ABI revision: 0x{}
+
+Assembly inputs must come from *exactly* the same Fuchsia version as the SDK.
+",
+                    abi_revision
+                )?;
+                if package_date == platform_date {
+                    write!(
+                        f,
+                        "
+Your assembly inputs and SDK appear to be both from the same day ({}), but
+from different `integration.git` repos (Git revision prefix {:#X} vs {:#X}).
+",
+                        package_date, package_commit_hash, platform_commit_hash
+                    )?;
+                } else {
+                    write!(
+                        f,
+                        "
+Your assembly inputs are from: {}
+Your Fuchsia SDK is from: {}
+",
+                        package_date, platform_date
+                    )?;
+                }
+
+                write!(
+                    f,
+                    "
+You probably updated your SDK without updating your assembly inputs, or vice
+versa. Ensure your SDK and assembly inputs come from the same release and try
+again."
+                )
             }
+            UnsupportedAbiRevision(version_history::AbiRevisionError::UnstableMismatch {
+                abi_revision,
+                package_sdk_date,
+                package_sdk_commit_hash,
+                platform_date,
+                platform_commit_hash,
+                supported_versions,
+            }) => {
+                write!(
+                    f,
+                    "Package targets an unsupported unstable ABI revision: 0x{}.
+
+Packages that target unstable API levels like HEAD and NEXT must be built and
+assembled by *exactly* the same version of the SDK.
+",
+                    abi_revision
+                )?;
+
+                if package_sdk_date == platform_date {
+                    write!(
+                        f,
+                        "
+The SDK that built the package comes from the same day as this SDK ({}), but
+they appear to come from different `integration.git` repos (Git revision prefix
+{:#X} vs {:#X}).
+",
+                        package_sdk_date, package_sdk_commit_hash, platform_commit_hash
+                    )?;
+                } else {
+                    write!(
+                        f,
+                        "
+The SDK that built the package is from: {}
+Your Fuchsia SDK is from: {}
+",
+                        package_sdk_date, platform_date
+                    )?;
+                }
+                write!(
+                    f,
+                    "
+Ensure that the build and assembly steps use exactly the same SDK and try
+again, or rebuild the package targeting one of the following stable API
+levels:{}",
+                    supported_versions
+                )
+            }
+            UnsupportedAbiRevision(version_history::AbiRevisionError::Retired {
+                version,
+                supported_versions,
+            }) => write!(
+                f,
+                "Package targets retired API level {} (0x{}).
+
+API level {} has been retired and is no longer supported. The package's owner
+must update it to target one of the following API levels:{}",
+                version.api_level, version.abi_revision, version.api_level, supported_versions
+            ),
+            UnsupportedAbiRevision(version_history::AbiRevisionError::Invalid) => write!(
+                f,
+                "The package was marked with the 'Invalid' ABI revision:
+0x{}. This is unusual and probably represents a bug.",
+                AbiRevision::INVALID
+            ),
+            UnsupportedAbiRevision(version_history::AbiRevisionError::Malformed {
+                abi_revision,
+            }) => write!(
+                f,
+                "The package was marked with an unrecognized 'special'
+ABI revision 0x{}.
+
+This is unusual. The ABI revision may be malformed, or your Fuchsia SDK may be
+too old to know what this means. Consider updating your SDK to a newer
+version.",
+                abi_revision
+            ),
         }
     }
 }
