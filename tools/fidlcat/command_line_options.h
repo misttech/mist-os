@@ -25,7 +25,8 @@ struct CommandLineOptions {
   std::optional<std::string> unix_connect;
   std::vector<std::string> symbol_index_files;
   std::vector<std::string> build_id_dirs;
-  std::vector<std::string> symbol_servers;
+  std::vector<std::string> private_symbol_servers;
+  std::vector<std::string> public_symbol_servers;
   std::vector<std::string> symbol_paths;
   std::optional<std::string> symbol_cache;
   // fidlcat system option:

@@ -115,7 +115,8 @@ class InterceptionWorkflow : public zxdb::ComponentObserver {
                   const std::vector<std::string>& build_id_dirs,
                   const std::vector<std::string>& ids_txts,
                   const std::optional<std::string>& symbol_cache,
-                  const std::vector<std::string>& symbol_servers,
+                  const std::vector<std::string>& private_symbol_servers,
+                  const std::vector<std::string>& public_symbol_servers,
                   std::unique_ptr<SyscallDecoderDispatcher> syscall_decoder_dispatcher);
 
   // Connect the workflow to the host/port pair given.  |and_then| is posted to

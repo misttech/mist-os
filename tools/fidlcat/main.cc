@@ -197,8 +197,8 @@ int ConsoleMain(int argc, const char* argv[]) {
   } else {
     InterceptionWorkflow workflow;
     workflow.Initialize(options.symbol_index_files, options.symbol_paths, options.build_id_dirs,
-                        options.ids_txts, options.symbol_cache, options.symbol_servers,
-                        std::move(decoder_dispatcher));
+                        options.ids_txts, options.symbol_cache, options.private_symbol_servers,
+                        options.public_symbol_servers, std::move(decoder_dispatcher));
 
     {
       // EnqueueStartup is called when the last reference to |start| is dropped, i.e., when all

@@ -57,9 +57,18 @@ const char kSymbolCacheHelp[] = R"(  --symbol-cache=<path>
       be read from this location as though you had specified
       "--build-id-dir=<path>".)";
 
-const char kSymbolServerHelp[] = R"(  --symbol-server=<url>
+const char kPrivateSymbolServerHelp[] = R"(  --symbol-server=<url>
       Adds the given URL to symbol servers. Symbol servers host the debug
-      symbols for prebuilt binaries and dynamic libraries.)";
+      symbols for prebuilt binaries and dynamic libraries. All URLs passed using
+      this flag will need to correctly authenticate. Failure to authenticate
+      will result in an unusable server. For public servers, use
+      --public-symbol-server or set DEBUGINFOD_URLS in your environment.)";
+
+const char kPublicSymbolServerHelp[] = R"(  --public-symbol-server=<url>
+      Adds the given URL to symbol servers. Symbol servers host the debug
+      symbols for prebuilt binaries and dynamic libraries. Public servers
+      perform no authentication. Use --symbol-servers to specify private symbol
+      servers using supported authentication schemes.)";
 
 const char kHelpHelp[] = R"(  --help
   -h
@@ -98,7 +107,10 @@ Error ParseCommandLine(int argc, const char* argv[], CommandLineOptions* options
   parser.AddSwitch("build-id-dir", 0, kBuildIdDirHelp, &CommandLineOptions::build_id_dirs);
   parser.AddSwitch("ids-txt", 0, kIdsTxtHelp, &CommandLineOptions::ids_txts);
   parser.AddSwitch("symbol-cache", 0, kSymbolCacheHelp, &CommandLineOptions::symbol_cache);
-  parser.AddSwitch("symbol-server", 0, kSymbolServerHelp, &CommandLineOptions::symbol_servers);
+  parser.AddSwitch("symbol-server", 0, kPrivateSymbolServerHelp,
+                   &CommandLineOptions::private_symbol_servers);
+  parser.AddSwitch("public-symbol-server", 0, kPublicSymbolServerHelp,
+                   &CommandLineOptions::public_symbol_servers);
   parser.AddSwitch("auth", 0, kAuthHelp, &CommandLineOptions::auth_mode);
   parser.AddSwitch("version", 'v', kVersionHelp, &CommandLineOptions::requested_version);
   parser.AddSwitch("omit-module-lines", 0, kOmitModuleLinesHelp,
@@ -143,9 +155,9 @@ Error ParseCommandLine(int argc, const char* argv[], CommandLineOptions* options
     if (std::istringstream urls(raw_urls); !urls.str().empty()) {
       std::string url;
       while (std::getline(urls, url, ' ')) {
-        if (std::find(options->symbol_servers.begin(), options->symbol_servers.end(), url) ==
-            options->symbol_servers.end()) {
-          options->symbol_servers.push_back(url);
+        if (std::find(options->public_symbol_servers.begin(), options->public_symbol_servers.end(),
+                      url) == options->public_symbol_servers.end()) {
+          options->public_symbol_servers.push_back(url);
         }
       }
     }

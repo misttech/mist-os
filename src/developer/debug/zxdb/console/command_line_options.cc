@@ -113,7 +113,12 @@ const char kSymbolCacheHelp[] = R"(  --symbol-cache=<path>
       be read from this location as though you had specified
       "--build-id-dir=<path>".)";
 
-const char kSymbolServerHelp[] = R"(  --symbol-server=<url>
+const char kPrivateSymbolServerHelp[] = R"(  --symbol-server=<url>
+      Adds the given URL to symbol servers. Symbol servers host the debug
+      symbols for prebuilt binaries and dynamic libraries. Servers specified
+      with this option will be required to authenticate against the given url.)";
+
+const char kPublicSymbolServerHelp[] = R"(  --public-symbol-server=<url>
       Adds the given URL to symbol servers. Symbol servers host the debug
       symbols for prebuilt binaries and dynamic libraries.)";
 
@@ -167,7 +172,10 @@ cmdline::Status ParseCommandLine(int argc, const char* argv[], CommandLineOption
   parser.AddSwitch("build-id-dir", 0, kBuildIdDirHelp, &CommandLineOptions::build_id_dirs);
   parser.AddSwitch("ids-txt", 0, kIdsTxtHelp, &CommandLineOptions::ids_txts);
   parser.AddSwitch("symbol-cache", 0, kSymbolCacheHelp, &CommandLineOptions::symbol_cache);
-  parser.AddSwitch("symbol-server", 0, kSymbolServerHelp, &CommandLineOptions::symbol_servers);
+  parser.AddSwitch("symbol-server", 0, kPrivateSymbolServerHelp,
+                   &CommandLineOptions::private_symbol_servers);
+  parser.AddSwitch("public-symbol-server", 0, kPublicSymbolServerHelp,
+                   &CommandLineOptions::public_symbol_servers);
   parser.AddSwitch("version", 'v', kVersionHelp, &CommandLineOptions::requested_version);
   parser.AddSwitch("analytics", 0, kAnalyticsHelp, &CommandLineOptions::analytics);
   parser.AddSwitch("analytics-show", 0, kAnalyticsShowHelp, &CommandLineOptions::analytics_show);

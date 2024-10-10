@@ -138,8 +138,12 @@ static const char* kIdsTxtsDescription =
 
   To view the currently indexed files run "sym-stat --dump-index".)";
 
-const char* ClientSettings::System::kSymbolServers = "symbol-servers";
-static const char* kSymbolServersDescription = R"(  List of symbol server URLs.)";
+const char* ClientSettings::System::kPrivateSymbolServers = "private-symbol-servers";
+static const char* kPrivateSymbolServersDescription =
+    R"(  List of all private symbol server URLs.)";
+
+const char* ClientSettings::System::kPublicSymbolServers = "public-symbol-servers";
+static const char* kPublicSymbolServersDescription = R"(  List of all public symbol server URLs.)";
 
 const char* ClientSettings::System::kSymbolCache = "symbol-cache";
 static const char* kSymbolCacheDescription =
@@ -211,7 +215,10 @@ fxl::RefPtr<SettingSchema> CreateSchema() {
   schema->AddList(ClientSettings::System::kSymbolPaths, kSymbolPathsDescription, {});
   schema->AddList(ClientSettings::System::kBuildIdDirs, kBuildIdDirsDescription, {});
   schema->AddList(ClientSettings::System::kIdsTxts, kIdsTxtsDescription, {});
-  schema->AddList(ClientSettings::System::kSymbolServers, kSymbolServersDescription, {});
+  schema->AddList(ClientSettings::System::kPrivateSymbolServers, kPrivateSymbolServersDescription,
+                  {});
+  schema->AddList(ClientSettings::System::kPublicSymbolServers, kPublicSymbolServersDescription,
+                  {});
   schema->AddString(ClientSettings::System::kSymbolCache, kSymbolCacheDescription, "");
   schema->AddList(ClientSettings::Target::kSourceMap,
                   ClientSettings::Target::kSourceMapDescription);
@@ -265,7 +272,8 @@ System::System(Session* session)
   settings_.AddObserver(ClientSettings::System::kSymbolPaths, this);
   settings_.AddObserver(ClientSettings::System::kBuildIdDirs, this);
   settings_.AddObserver(ClientSettings::System::kIdsTxts, this);
-  settings_.AddObserver(ClientSettings::System::kSymbolServers, this);
+  settings_.AddObserver(ClientSettings::System::kPrivateSymbolServers, this);
+  settings_.AddObserver(ClientSettings::System::kPublicSymbolServers, this);
   settings_.AddObserver(ClientSettings::System::kSecondChanceExceptions, this);
   settings_.AddObserver(ClientSettings::System::kContextLines, this);
 }
@@ -617,7 +625,8 @@ void System::OnSettingChanged(const SettingStore& store, const std::string& sett
       setting_name == ClientSettings::System::kBuildIdDirs ||
       setting_name == ClientSettings::System::kIdsTxts ||
       setting_name == ClientSettings::System::kSymbolCache ||
-      setting_name == ClientSettings::System::kSymbolServers) {
+      setting_name == ClientSettings::System::kPrivateSymbolServers ||
+      setting_name == ClientSettings::System::kPublicSymbolServers) {
     // Clear the symbol sources and add them back to sync the index with the setting.
     BuildIDIndex& build_id_index = GetSymbols()->build_id_index();
     build_id_index.ClearAll();
@@ -636,8 +645,11 @@ void System::OnSettingChanged(const SettingStore& store, const std::string& sett
     for (const std::string& path : store.GetList(ClientSettings::System::kIdsTxts)) {
       build_id_index.AddIdsTxt(path);
     }
-    for (const std::string& url : store.GetList(ClientSettings::System::kSymbolServers)) {
-      build_id_index.AddSymbolServer(url);
+    for (const std::string& url : store.GetList(ClientSettings::System::kPrivateSymbolServers)) {
+      build_id_index.AddSymbolServer(url, true);
+    }
+    for (const std::string& url : store.GetList(ClientSettings::System::kPublicSymbolServers)) {
+      build_id_index.AddSymbolServer(url, false);
     }
 
     // Cache directory.

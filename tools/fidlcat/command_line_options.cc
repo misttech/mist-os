@@ -61,9 +61,18 @@ const char* const kBuildIdDirHelp = R"(  --build-id-dir=<path>
       the first two characters of the build ID and yyyyyyyy is the rest.
       However, the name of the directory doesn't need to be .build-id.)";
 
-const char* const kSymbolServerHelp = R"(  --symbol-server=<url>
+const char kPrivateSymbolServerHelp[] = R"(  --symbol-server=<url>
       Adds the given URL to symbol servers. Symbol servers host the debug
-      symbols for prebuilt binaries and dynamic libraries.)";
+      symbols for prebuilt binaries and dynamic libraries. All URLs passed using
+      this flag will need to correctly authenticate. Failure to authenticate
+      will result in an unusable server. For public servers, use
+      --public-symbol-server or set DEBUGINFOD_URLS in your environment.)";
+
+const char kPublicSymbolServerHelp[] = R"(  --public-symbol-server=<url>
+      Adds the given URL to symbol servers. Symbol servers host the debug
+      symbols for prebuilt binaries and dynamic libraries. Public servers
+      perform no authentication. Use --symbol-servers to specify private symbol
+      servers using supported authentication schemes.)";
 
 const char* const kSymbolPathHelp = R"(  --symbol-path=<path>
   -s <path>
@@ -354,7 +363,10 @@ std::string ParseCommandLine(int argc, const char* argv[], CommandLineOptions* o
   parser.AddSwitch("unix-connect", 0, kUnixConnectHelp, &CommandLineOptions::unix_connect);
   parser.AddSwitch("symbol-index", 0, kSymbolIndexHelp, &CommandLineOptions::symbol_index_files);
   parser.AddSwitch("build-id-dir", 0, kBuildIdDirHelp, &CommandLineOptions::build_id_dirs);
-  parser.AddSwitch("symbol-server", 0, kSymbolServerHelp, &CommandLineOptions::symbol_servers);
+  parser.AddSwitch("symbol-server", 0, kPrivateSymbolServerHelp,
+                   &CommandLineOptions::private_symbol_servers);
+  parser.AddSwitch("public-symbol-server", 0, kPublicSymbolServerHelp,
+                   &CommandLineOptions::public_symbol_servers);
   parser.AddSwitch("symbol-path", 's', kSymbolPathHelp, &CommandLineOptions::symbol_paths);
   parser.AddSwitch("symbol-cache", 0, kSymbolCacheHelp, &CommandLineOptions::symbol_cache);
   // Fidlcat system options:
