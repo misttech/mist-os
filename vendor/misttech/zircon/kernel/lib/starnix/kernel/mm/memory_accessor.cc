@@ -69,24 +69,19 @@ fit::result<Errno, FsString> MemoryAccessorExt::read_c_string_to_vec(UserCString
 
   do {
     // This operation should never overflow: we should fail to read before that.
-    auto addr = string.checked_add(index);
+    auto addr = string->checked_add(index);
     if (!addr.has_value()) {
       return fit::error(errno(EFAULT));
     }
-
     ASSERT(index + chunk_size <= buf.capacity());
 
     ktl::span<uint8_t> spare_capacity{buf.data() + buf.size(), buf.capacity() - buf.size()};
     auto to_read = spare_capacity.subspan(0, chunk_size);
-    auto read_or_error = read_memory_partial_until_null_byte(addr.value(), to_read);
-    if (read_or_error.is_error())
-      return read_or_error.take_error();
-
-    auto read_bytes = read_or_error.value();
-    auto read_len = read_bytes.size();
+    auto read_bytes = read_memory_partial_until_null_byte(addr.value(), to_read) _EP(read_bytes);
+    auto read_len = read_bytes->size();
 
     // Check if the last byte read is the null byte.
-    if (read_bytes.last(1)[0] == '\0') {
+    if (read_bytes->last(1)[0] == '\0') {
       auto null_index = index + read_len - 1;
       buf.set_size(null_index);
       if (buf.size() > max_size) {
@@ -102,8 +97,10 @@ fit::result<Errno, FsString> MemoryAccessorExt::read_c_string_to_vec(UserCString
       return fit::error(errno(ENAMETOOLONG));
     }
 
-    // Trigger a capacity increase.
+    // Set the correct size for the next iteration.
     buf.set_size(index);
+
+    // Trigger a capacity increase.
     buf.reserve(index + chunk_size, &ac);
     if (!ac.check()) {
       return fit::error(errno(ENOMEM));
@@ -114,7 +111,7 @@ fit::result<Errno, FsString> MemoryAccessorExt::read_c_string_to_vec(UserCString
 
 fit::result<Errno, FsString> MemoryAccessorExt::read_c_string(UserCString string,
                                                               ktl::span<uint8_t>& buffer) const {
-  auto buffer_or_error = this->read_memory_partial_until_null_byte(string, buffer);
+  auto buffer_or_error = this->read_memory_partial_until_null_byte(*string, buffer);
   if (buffer_or_error.is_error()) {
     return buffer_or_error.take_error();
   }

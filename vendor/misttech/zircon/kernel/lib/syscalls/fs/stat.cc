@@ -21,7 +21,7 @@ long sys_a0004_stat(user_in_ptr<const char> filename, user_out_ptr<void> buf) {
   auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
   return execute_syscall(
       starnix::sys_stat, current_task,
-      starnix_uapi::UserCString::from_ptr((zx_vaddr_t)(filename.get())),
+      starnix_uapi::UserCString::New(UserAddress::from_ptr((zx_vaddr_t)(filename.get()))),
       starnix_uapi::UserRef<struct ::stat>::New(starnix_uapi::UserAddress::from_ptr(
           (zx_vaddr_t)(buf.reinterpret<struct ::stat>().get()))));
 }
@@ -45,16 +45,18 @@ long sys_a0332_statx(int dfd, user_in_ptr<const char> path, unsigned flags, unsi
 long sys_a0089_readlink(user_in_ptr<const char> path, user_out_ptr<char> buf, int32_t bufsiz) {
   LTRACEF_LEVEL(2, "path=%p buf=%p bufsiz=%d\n", path.get(), buf.get(), bufsiz);
   auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
-  return execute_syscall(starnix::sys_readlink, current_task,
-                         starnix_uapi::UserCString::from_ptr((zx_vaddr_t)(path.get())),
-                         starnix_uapi::UserAddress::from_ptr((zx_vaddr_t)(buf.get())), bufsiz);
+  return execute_syscall(
+      starnix::sys_readlink, current_task,
+      starnix_uapi::UserCString::New(UserAddress::from_ptr((zx_vaddr_t)(path.get()))),
+      starnix_uapi::UserAddress::from_ptr((zx_vaddr_t)(buf.get())), bufsiz);
 }
 
 long sys_a0267_readlinkat(int32_t dfd, user_in_ptr<const char> pathname, user_out_ptr<char> buf,
                           int32_t bufsiz) {
   LTRACEF_LEVEL(2, "dfd=%d path=%p buf=%p bufsiz=%d\n", dfd, pathname.get(), buf.get(), bufsiz);
   auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
-  return execute_syscall(starnix::sys_readlinkat, current_task, starnix::FdNumber::from_raw(dfd),
-                         starnix_uapi::UserCString::from_ptr((zx_vaddr_t)(pathname.get())),
-                         starnix_uapi::UserAddress::from_ptr((zx_vaddr_t)(buf.get())), bufsiz);
+  return execute_syscall(
+      starnix::sys_readlinkat, current_task, starnix::FdNumber::from_raw(dfd),
+      starnix_uapi::UserCString::New(UserAddress::from_ptr((zx_vaddr_t)(pathname.get()))),
+      starnix_uapi::UserAddress::from_ptr((zx_vaddr_t)(buf.get())), bufsiz);
 }

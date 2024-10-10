@@ -35,9 +35,10 @@ int64_t sys_a0001_write(unsigned int fd, user_in_ptr<const char> buf, size_t cou
 
 int64_t sys_a0002_open(user_in_ptr<const char> filename, int flags, umode_t mode) {
   auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
-  return execute_syscall(starnix::sys_open, current_task,
-                         starnix_uapi::UserAddress::from_ptr((zx_vaddr_t)filename.get()), flags,
-                         FileMode(mode));
+  return execute_syscall(
+      starnix::sys_open, current_task,
+      starnix_uapi::UserCString::New(UserAddress::from_ptr((zx_vaddr_t)filename.get())), flags,
+      FileMode(mode));
 }
 
 int64_t sys_a0003_close(unsigned int fd) {
