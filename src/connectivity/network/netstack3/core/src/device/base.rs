@@ -295,10 +295,6 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
         cb(devices.iter(), locked)
     }
 
-    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
-        get_mtu(self, device_id)
-    }
-
     fn loopback_id(&mut self) -> Option<Self::DeviceId> {
         let devices = &*self.read_lock::<crate::lock_ordering::DeviceLayerState>();
         devices.loopback.as_ref().map(|primary| DeviceId::Loopback(primary.clone_strong()))
@@ -563,10 +559,6 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
     ) -> O {
         let (devices, locked) = self.read_lock_and::<crate::lock_ordering::DeviceLayerState>();
         cb(devices.iter(), locked)
-    }
-
-    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
-        get_mtu(self, device_id)
     }
 
     fn loopback_id(&mut self) -> Option<Self::DeviceId> {
@@ -855,7 +847,10 @@ pub(crate) fn ip_device_state_and_core_ctx<'a, BC: BindingsContext, L>(
     )
 }
 
-fn get_mtu<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceLayerState>>(
+pub(crate) fn get_mtu<
+    BC: BindingsContext,
+    L: LockBefore<crate::lock_ordering::DeviceLayerState>,
+>(
     core_ctx: &mut CoreCtx<'_, BC, L>,
     device: &DeviceId<BC>,
 ) -> Mtu {

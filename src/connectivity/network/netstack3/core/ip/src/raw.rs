@@ -817,7 +817,7 @@ impl<I: IpExt> SendOptions<I> for RawIpSocketOptions<'_, I> {
     }
 
     fn mtu(&self) -> Mtu {
-        Mtu::max()
+        Mtu::no_limit()
     }
 }
 

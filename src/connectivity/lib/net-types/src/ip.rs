@@ -267,6 +267,13 @@ impl Mtu {
     pub const fn max() -> Self {
         Self(u32::MAX)
     }
+
+    /// Equivalent to [`Mtu::max`], but with a name more telling for usage in
+    /// contexts where many `Mtu` instances are composed to enforce a minimum
+    /// `Mtu` value.
+    pub const fn no_limit() -> Self {
+        Self::max()
+    }
 }
 
 impl From<Mtu> for u32 {

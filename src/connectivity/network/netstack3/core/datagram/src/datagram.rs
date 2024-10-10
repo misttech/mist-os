@@ -590,7 +590,7 @@ impl<I: IpExt, D: WeakDeviceIdentifier> SendOptions<I> for DatagramIpSpecificSoc
     }
 
     fn mtu(&self) -> Mtu {
-        Mtu::max()
+        Mtu::no_limit()
     }
 }
 

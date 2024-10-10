@@ -1072,7 +1072,7 @@ where
             destination: IpPacketDestination::from_addr(dst_ip),
             ttl: NonZeroU8::new(REQUIRED_NDP_IP_PACKET_HOP_LIMIT),
             proto: Ipv6Proto::Icmpv6,
-            mtu: Mtu::max(),
+            mtu: Mtu::no_limit(),
             dscp_and_ecn: DscpAndEcn::default(),
         },
         body.encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(

@@ -121,13 +121,12 @@ where
     const MIN_BODY_LEN: usize = 0;
 
     let local_mac = get_mac(core_ctx, device_id);
-    let frame = body.encapsulate(EthernetFrameBuilder::new(
-        local_mac.get(),
-        dst_mac,
-        ether_type,
-        MIN_BODY_LEN,
-    ));
-    send_ethernet_frame(core_ctx, bindings_ctx, device_id, frame).map_err(|err| err.into_inner())
+    let max_frame_size = get_max_frame_size(core_ctx, device_id);
+    let frame = body
+        .encapsulate(EthernetFrameBuilder::new(local_mac.get(), dst_mac, ether_type, MIN_BODY_LEN))
+        .with_size_limit(max_frame_size.into());
+    send_ethernet_frame(core_ctx, bindings_ctx, device_id, frame)
+        .map_err(|err| err.into_inner().into_inner())
 }
 
 fn send_ethernet_frame<S, BC, CC>(
@@ -211,6 +210,12 @@ impl MaxEthernetFrameSize {
     pub const fn from_mtu(mtu: Mtu) -> Option<MaxEthernetFrameSize> {
         let frame_size = mtu.get().saturating_add(ETHERNET_HDR_LEN_NO_TAG_U32);
         Self::new(frame_size)
+    }
+}
+
+impl From<MaxEthernetFrameSize> for usize {
+    fn from(MaxEthernetFrameSize(v): MaxEthernetFrameSize) -> Self {
+        v.get().try_into().expect("u32 doesn't fit in usize")
     }
 }
 
@@ -393,8 +398,6 @@ where
 
     trace!("ethernet::send_ip_frame: destination = {:?}; device = {:?}", destination, device_id);
 
-    let body = body.with_size_limit(get_mtu(core_ctx, device_id).get() as usize);
-
     match destination {
         IpPacketDestination::Broadcast(marker) => {
             I::map_ip::<_, ()>(
@@ -430,7 +433,6 @@ where
             unreachable!("Loopback packets must be delivered through the loopback device")
         }
     }
-    .map_err(|e| e.into_inner())
 }
 
 /// Metadata for received ethernet frames.
@@ -645,6 +647,17 @@ pub fn leave_link_multicast<
     })
 }
 
+pub fn get_max_frame_size<
+    BC: EthernetIpLinkDeviceBindingsContext,
+    CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
+>(
+    core_ctx: &mut CC,
+    device_id: &CC::DeviceId,
+) -> MaxEthernetFrameSize {
+    core_ctx
+        .with_ethernet_state(device_id, |_static_state, dynamic_state| dynamic_state.max_frame_size)
+}
+
 /// Get the MTU associated with this device.
 pub fn get_mtu<
     BC: EthernetIpLinkDeviceBindingsContext,
@@ -653,9 +666,7 @@ pub fn get_mtu<
     core_ctx: &mut CC,
     device_id: &CC::DeviceId,
 ) -> Mtu {
-    core_ctx.with_ethernet_state(device_id, |_static_state, dynamic_state| {
-        dynamic_state.max_frame_size.as_mtu()
-    })
+    get_max_frame_size(core_ctx, device_id).as_mtu()
 }
 
 /// Enables a blanket implementation of [`SendableFrameData`] for

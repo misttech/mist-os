@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use alloc::rc::Rc;
+use alloc::vec;
 use core::cell::RefCell;
 use core::convert::Infallible as Never;
 
@@ -31,6 +32,7 @@ struct IpFakeCoreCtx<I: IpLayerIpExt> {
             >,
         >,
     >,
+    device_mtu: Mtu,
 }
 
 impl<I: IpLayerIpExt> Default for IpFakeCoreCtx<I> {
@@ -45,6 +47,7 @@ impl<I: IpLayerIpExt> Default for IpFakeCoreCtx<I> {
             routing_tables: Rc::new(RefCell::new(route_tables)),
             main_table_id,
             counters: Default::default(),
+            device_mtu: Mtu::max(),
         }
     }
 }
@@ -55,13 +58,16 @@ impl<I: IpLayerIpExt> CounterContext<IpCounters<I>> for IpFakeCoreCtx<I> {
     }
 }
 
-type FakeCoreCtx<I> = netstack3_base::testutil::FakeCoreCtx<
-    IpFakeCoreCtx<I>,
-    SendIpPacketMeta<I, MultipleDevicesId, SpecifiedAddr<<I as Ip>::Addr>>,
-    MultipleDevicesId,
->;
+type FakeCoreCtx<I> =
+    netstack3_base::testutil::FakeCoreCtx<IpFakeCoreCtx<I>, (), MultipleDevicesId>;
 type FakeBindingsCtx = netstack3_base::testutil::FakeBindingsCtx<(), (), (), ()>;
 type FakeCtx<I> = CtxPair<FakeCoreCtx<I>, FakeBindingsCtx>;
+
+impl<I: IpLayerIpExt> IpDeviceMtuContext<I> for FakeCoreCtx<I> {
+    fn get_mtu(&mut self, _device_id: &Self::DeviceId) -> Mtu {
+        self.state.device_mtu
+    }
+}
 
 impl<I: IpLayerIpExt, BC> IpDeviceSendContext<I, BC> for FakeCoreCtx<I> {
     fn send_ip_frame<S>(
@@ -69,14 +75,23 @@ impl<I: IpLayerIpExt, BC> IpDeviceSendContext<I, BC> for FakeCoreCtx<I> {
         _bindings_ctx: &mut BC,
         _device_id: &Self::DeviceId,
         _destination: IpPacketDestination<I, &Self::DeviceId>,
-        _body: S,
+        body: S,
         _egress_proof: filter::ProofOfEgressCheck,
     ) -> Result<(), netstack3_base::SendFrameError<S>>
     where
         S: Serializer + IpPacket<I>,
         S::Buffer: BufferMut,
     {
-        unimplemented!()
+        let frame = body
+            .serialize_vec_outer()
+            .map_err(|(err, serializer)| netstack3_base::SendFrameError {
+                error: err.into(),
+                serializer,
+            })?
+            .unwrap_b()
+            .into_inner();
+        self.frames.push((), frame);
+        Ok(())
     }
 }
 
@@ -98,6 +113,7 @@ fn no_loopback_addrs_on_the_wire<I: IpLayerIpExt + TestIpExt>() {
         IpPacketDestination::Neighbor(I::TEST_ADDRS.remote_ip),
         frame,
         IpLayerPacketMetadata::default(),
+        Mtu::no_limit(),
     )
     .map_err(|e| e.into_err());
     assert_eq!(result, Err(IpSendFrameErrorReason::IllegalLoopbackAddress));
@@ -114,8 +130,17 @@ impl<I: IpLayerIpExt> IpRoutingDeviceContext<I> for FakeCoreCtx<I> {
 }
 
 impl<I: IpLayerIpExt> IpDeviceStateContext<I> for FakeCoreCtx<I> {
-    fn with_next_packet_id<O, F: FnOnce(&I::PacketIdState) -> O>(&self, _cb: F) -> O {
-        unimplemented!()
+    fn with_next_packet_id<O, F: FnOnce(&I::PacketIdState) -> O>(&self, cb: F) -> O {
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct WrapPacketId<I: IpLayerIpExt>(I::PacketIdState);
+
+        // Implementing solely to satisfy traits, use an arbitrary packet ID
+        // here. This should be changed if this fake is used to verify packet
+        // IDs in IP packets.
+        let WrapPacketId(packet_id_state) =
+            I::map_ip_out((), |()| WrapPacketId(AtomicU16::new(1234)), |()| WrapPacketId(()));
+        cb(&packet_id_state)
     }
 
     fn get_local_addr_for_remote(
@@ -127,7 +152,7 @@ impl<I: IpLayerIpExt> IpDeviceStateContext<I> for FakeCoreCtx<I> {
     }
 
     fn get_hop_limit(&mut self, _device_id: &Self::DeviceId) -> NonZeroU8 {
-        unimplemented!()
+        DEFAULT_TTL
     }
 
     fn address_status_for_device(
@@ -363,4 +388,59 @@ fn test_walk_rules<I: IpLayerIpExt + TestIpExt>() {
             }))
         );
     });
+}
+
+#[ip_test(I)]
+fn send_respects_device_mtu<I: IpLayerIpExt + TestIpExt>() {
+    let mut core_ctx = FakeCoreCtx::<I>::default();
+    let mut bindings_ctx = FakeBindingsCtx::default();
+
+    let body = Buf::new(vec![1, 2, 3, 4, 5, 6], ..).encapsulate(());
+    let meta = SendIpPacketMeta {
+        device: &MultipleDevicesId::A,
+        src_ip: Some(I::TEST_ADDRS.local_ip),
+        dst_ip: I::TEST_ADDRS.remote_ip,
+        destination: IpPacketDestination::Loopback(&MultipleDevicesId::A),
+        proto: IpProto::Udp.into(),
+        ttl: None,
+        mtu: Mtu::no_limit(),
+        dscp_and_ecn: Default::default(),
+    };
+
+    send_ip_packet_from_device(
+        &mut core_ctx,
+        &mut bindings_ctx,
+        meta.clone(),
+        body.clone(),
+        IpLayerPacketMetadata::default(),
+    )
+    .expect("send ip packet");
+    let [((), frame)] = core_ctx.frames.take_frames().try_into().expect("more than one frame sent");
+
+    let frame_len = u32::try_from(frame.len()).unwrap();
+
+    // Set the MTU so that it wouldn't fit the entire packet.
+    core_ctx.state.device_mtu = Mtu::new(frame_len - 1);
+    assert_eq!(
+        send_ip_packet_from_device(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            meta.clone(),
+            body.clone(),
+            IpLayerPacketMetadata::default(),
+        )
+        .map_err(|ErrorAndSerializer { error, serializer: _ }| error),
+        Err(IpSendFrameErrorReason::Device(SendFrameErrorReason::SizeConstraintsViolation))
+    );
+
+    // Still works if MTU matches exactly.
+    core_ctx.state.device_mtu = Mtu::new(frame_len);
+    send_ip_packet_from_device(
+        &mut core_ctx,
+        &mut bindings_ctx,
+        meta,
+        body,
+        IpLayerPacketMetadata::default(),
+    )
+    .expect("send ip packet")
 }

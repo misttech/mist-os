@@ -59,7 +59,7 @@ use packet_formats::icmp::IcmpUnusedCode;
 
 use crate::context::prelude::*;
 use crate::context::WrapLockLevel;
-use crate::{BindingsContext, BindingsTypes, CoreCtx, StackState};
+use crate::{BindingsContext, BindingsTypes, CoreCtx, IpExt, StackState};
 
 pub struct SlaacAddrs<'a, BC: BindingsContext> {
     pub(crate) core_ctx: CoreCtxWithIpDeviceConfiguration<
@@ -511,15 +511,11 @@ impl<
     }
 }
 
-#[netstack3_macros::instantiate_ip_impl_block(I)]
-impl<
-        I: IpExt,
-        BC: BindingsContext,
-        L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<I>>,
-    > ip::IpDeviceMtuContext<I> for CoreCtx<'_, BC, L>
+impl<I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceLayerState>>
+    ip::IpDeviceMtuContext<I> for CoreCtx<'_, BC, L>
 {
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
-        device::IpDeviceConfigurationContext::<I, _>::get_mtu(self, device_id)
+        crate::device::integration::get_mtu(self, device_id)
     }
 }
 
@@ -912,6 +908,18 @@ impl<'a, Config: Borrow<Ipv6DeviceConfiguration>, BC: BindingsContext> RsContext
             IcmpUnusedCode,
             message,
         )
+    }
+}
+
+impl<
+        I: IpExt,
+        Config,
+        BC: BindingsContext,
+        L: LockBefore<crate::lock_ordering::DeviceLayerState>,
+    > ip::IpDeviceMtuContext<I> for CoreCtxWithIpDeviceConfiguration<'_, Config, L, BC>
+{
+    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
+        ip::IpDeviceMtuContext::<I>::get_mtu(&mut self.core_ctx, device_id)
     }
 }
 

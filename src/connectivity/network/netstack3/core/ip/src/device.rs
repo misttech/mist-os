@@ -41,7 +41,7 @@ use packet_formats::icmp::ndp::NonZeroNdpLifetime;
 use packet_formats::utils::NonZeroDuration;
 use zerocopy::SplitByteSlice;
 
-use crate::internal::base::{IpCounters, IpPacketDestination};
+use crate::internal::base::{IpCounters, IpDeviceMtuContext, IpPacketDestination};
 use crate::internal::device::config::{
     IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
 };
@@ -711,7 +711,7 @@ pub trait WithIpDeviceConfigurationMutInner<I: IpDeviceIpExt, BT: IpDeviceStateB
 pub trait IpDeviceConfigurationContext<
     I: IpDeviceIpExt,
     BC: IpDeviceBindingsContext<I, Self::DeviceId>,
->: IpDeviceStateContext<I, BC> + DeviceIdContext<AnyDevice>
+>: IpDeviceStateContext<I, BC> + IpDeviceMtuContext<I> + DeviceIdContext<AnyDevice>
 {
     /// The iterator provided by this context.
     type DevicesIter<'s>: Iterator<Item = Self::DeviceId> + 's;
@@ -721,6 +721,7 @@ pub trait IpDeviceConfigurationContext<
         + NudIpHandler<I, BC>
         + DadHandler<I, BC>
         + IpAddressRemovalHandler<I, BC>
+        + IpDeviceMtuContext<I>
         + 's;
     /// The inner mutable configuration context.
     type WithIpDeviceConfigurationMutInner<'s>: WithIpDeviceConfigurationMutInner<I, BC, DeviceId = Self::DeviceId>
@@ -760,11 +761,6 @@ pub trait IpDeviceConfigurationContext<
         &mut self,
         cb: F,
     ) -> O;
-
-    /// Gets the MTU for a device.
-    ///
-    /// The MTU is the maximum size of an IP packet.
-    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu;
 
     /// Returns the ID of the loopback interface, if one exists on the system
     /// and is initialized.

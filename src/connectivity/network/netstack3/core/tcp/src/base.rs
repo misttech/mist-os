@@ -258,7 +258,7 @@ impl<I: IpExt> SendOptions<I> for TcpIpSockOptions {
     }
 
     fn mtu(&self) -> Mtu {
-        Mtu::max()
+        Mtu::no_limit()
     }
 }
 

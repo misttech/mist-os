@@ -552,7 +552,7 @@ mod tests {
     use alloc::vec::Vec;
     use assert_matches::assert_matches;
 
-    use net_types::ip::{Ip, IpVersionMarker};
+    use net_types::ip::{Ip, IpVersionMarker, Mtu};
     use netstack3_base::testutil::{
         assert_empty, new_rng, run_with_many_seeds, FakeDeviceId, FakeInstant, FakeTimerCtxExt,
         FakeWeakDeviceId,
@@ -570,8 +570,8 @@ mod tests {
 
     use super::*;
     use crate::internal::base::{
-        self, IpCounters, IpLayerPacketMetadata, IpPacketDestination, IpSendFrameError,
-        SendIpPacketMeta,
+        self, IpCounters, IpDeviceMtuContext, IpLayerPacketMetadata, IpPacketDestination,
+        IpSendFrameError, SendIpPacketMeta,
     };
     use crate::internal::gmp::{
         GmpHandler as _, GmpState, GroupJoinResult, GroupLeaveResult, MemberState,
@@ -697,7 +697,14 @@ mod tests {
                 destination,
                 body,
                 IpLayerPacketMetadata::default(),
+                Mtu::no_limit(),
             )
+        }
+    }
+
+    impl IpDeviceMtuContext<Ipv4> for FakeCoreCtx {
+        fn get_mtu(&mut self, _device_id: &Self::DeviceId) -> Mtu {
+            Mtu::max()
         }
     }
 

@@ -579,7 +579,7 @@ impl<I: IpExt> SendOptions<I> for DefaultIpSocketOptions {
     }
 
     fn mtu(&self) -> Mtu {
-        Mtu::max()
+        Mtu::no_limit()
     }
 }
 

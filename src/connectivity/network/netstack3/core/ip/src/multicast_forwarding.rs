@@ -536,7 +536,7 @@ mod testutil {
 
     impl<I: IpLayerIpExt, D: FakeStrongDeviceId> IpDeviceMtuContext<I> for FakeCoreCtx<I, D> {
         fn get_mtu(&mut self, _device_id: &Self::DeviceId) -> Mtu {
-            unimplemented!()
+            Mtu::max()
         }
     }
 
