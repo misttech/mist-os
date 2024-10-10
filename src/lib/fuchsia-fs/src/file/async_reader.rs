@@ -151,8 +151,7 @@ mod tests {
         let path =
             dir.path().join("read_to_end_with_expected_contents").to_str().unwrap().to_owned();
         let () = file::write_in_namespace(&path, expected_contents).await.unwrap();
-        let file =
-            file::open_in_namespace_deprecated(&path, fio::OpenFlags::RIGHT_READABLE).unwrap();
+        let file = file::open_in_namespace(&path, fio::PERM_READABLE).unwrap();
 
         let mut reader = AsyncReader::from_proxy(file).unwrap();
         let mut actual_contents = vec![];

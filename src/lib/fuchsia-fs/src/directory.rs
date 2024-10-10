@@ -29,8 +29,7 @@ pub use host::*;
 mod fuchsia {
     use super::*;
 
-    /// *WARNING* - In the process of being deprecated. Only use [`open_in_namespace`] once all
-    /// out-of-tree servers support open3.
+    /// *DEPRECATED* - Use [`open_in_namespace`] instead.
     ///
     /// Opens the given `path` from the current namespace as a [`DirectoryProxy`].
     ///
@@ -52,27 +51,25 @@ mod fuchsia {
         Ok(node)
     }
 
-    // Opens the given `path` from the current namespace as a [`DirectoryProxy`].
-    //
-    // The target is assumed to implement fuchsia.io.Directory but this isn't verified. To connect
-    // to a filesystem node which doesn't implement fuchsia.io.Directory, use the functions in
-    // [`fuchsia_component::client`] instead.
-    //
-    // If the namespace path doesn't exist, or we fail to make the channel pair, this returns an
-    // error. However, if incorrect flags are sent, or if the rest of the path sent to the
-    // filesystem server doesn't exist, this will still return success. Instead, the returned
-    // DirectoryProxy channel pair will be closed with an epitaph.
-    //
-    // TODO(https://fxbug.dev/361450366): Make public when out-of-tree servers support open3.
-    #[allow(dead_code)]
-    fn open_in_namespace(path: &str, flags: fio::Flags) -> Result<fio::DirectoryProxy, OpenError> {
+    /// Opens the given `path` from the current namespace as a [`DirectoryProxy`].
+    ///
+    /// To connect to a filesystem node which doesn't implement fuchsia.io.Directory, use the
+    /// functions in [`fuchsia_component::client`] instead.
+    ///
+    /// If the namespace path doesn't exist, or we fail to make the channel pair, this returns an
+    /// error. However, if incorrect flags are sent, or if the rest of the path sent to the
+    /// filesystem server doesn't exist, this will still return success. Instead, the returned
+    /// DirectoryProxy channel pair will be closed with an epitaph.
+    pub fn open_in_namespace(
+        path: &str,
+        flags: fio::Flags,
+    ) -> Result<fio::DirectoryProxy, OpenError> {
         let (node, request) = fidl::endpoints::create_proxy().map_err(OpenError::CreateProxy)?;
         open_channel_in_namespace(path, flags, request)?;
         Ok(node)
     }
 
-    /// *WARNING* - In the process of being deprecated. Only use [`open_channel_in_namespace`] once
-    /// all out-of-tree servers support open3.
+    /// *DEPRECATED* - Use [`open_in_namespace`] instead.
     ///
     /// Asynchronously opens the given [`path`] in the current namespace, serving the connection
     /// over [`request`]. Once the channel is connected, any calls made prior are serviced.
@@ -95,20 +92,16 @@ mod fuchsia {
         namespace.open(path, flags, request.into_channel()).map_err(OpenError::Namespace)
     }
 
-    // Asynchronously opens the given [`path`] in the current namespace, serving the connection
-    // over [`request`]. Once the channel is connected, any calls made prior are serviced.
-    //
-    // The target is assumed to implement fuchsia.io.Directory but this isn't verified. To connect
-    // to a filesystem node which doesn't implement fuchsia.io.Directory, use the functions in
-    // [`fuchsia_component::client`] instead.
-    //
-    // If the namespace path doesn't exist, this returns an error. However, if incorrect flags are
-    // sent, or if the rest of the path sent to the filesystem server doesn't exist, this will
-    // still return success. Instead, the [`request`] channel will be closed with an epitaph.
-    //
-    // TODO(https://fxbug.dev/361450366): Make public when out-of-tree servers support open3.
-    #[allow(dead_code)]
-    fn open_channel_in_namespace(
+    /// Asynchronously opens the given [`path`] in the current namespace, serving the connection
+    /// over [`request`]. Once the channel is connected, any calls made prior are serviced.
+    ///
+    /// To connect to a filesystem node which doesn't implement fuchsia.io.Directory, use the
+    /// functions in [`fuchsia_component::client`] instead.
+    ///
+    /// If the namespace path doesn't exist, this returns an error. However, if incorrect flags are
+    /// sent, or if the rest of the path sent to the filesystem server doesn't exist, this will
+    /// still return success. Instead, the [`request`] channel will be closed with an epitaph.
+    pub fn open_channel_in_namespace(
         path: &str,
         flags: fio::Flags,
         request: fidl::endpoints::ServerEnd<fio::DirectoryMarker>,
@@ -188,8 +181,7 @@ pub enum DecodeDirentError {
     InvalidUtf8(Utf8Error),
 }
 
-/// *WARNING* - In the process of being deprecated. Only use [`open_directory_async`] once all
-/// out-of-tree servers support open3.
+/// *DEPRECATED* - Use [`open_directory_async`] instead.
 ///
 /// Opens the given `path` from the given `parent` directory as a [`DirectoryProxy`]. If open fails,
 /// the returned `DirectoryProxy` will be closed with an epitaph.
@@ -211,12 +203,9 @@ pub fn open_directory_no_describe_deprecated(
     Ok(dir)
 }
 
-// Opens the given `path` from the given `parent` directory as a [`DirectoryProxy`]. If open fails,
-// the returned `DirectoryProxy` will be closed with an epitaph.
-//
-// TODO(https://fxbug.dev/361450366): Make public when out-of-tree servers support open3.
-#[allow(dead_code)]
-fn open_directory_async(
+/// Opens the given `path` from the given `parent` directory as a [`DirectoryProxy`]. If open fails,
+/// the returned `DirectoryProxy` will be closed with an epitaph.
+pub fn open_directory_async(
     parent: &fio::DirectoryProxy,
     path: &str,
     flags: fio::Flags,
@@ -233,8 +222,7 @@ fn open_directory_async(
     Ok(dir)
 }
 
-/// *WARNING* - In the process of being deprecated. Only use [`open_directory`] once all out-of-tree
-/// servers support open3.
+/// *DEPRECATED* - Use [`open_directory`] instead.
 ///
 /// Opens the given `path` from given `parent` directory as a [`DirectoryProxy`], verifying that
 /// the target implements the fuchsia.io.Directory protocol.
@@ -257,12 +245,9 @@ pub async fn open_directory_deprecated(
     node::verify_directory_describe_event(dir).await
 }
 
-// Opens the given `path` from given `parent` directory as a [`DirectoryProxy`], verifying that
-// the target implements the fuchsia.io.Directory protocol.
-//
-// TODO(https://fxbug.dev/361450366): Make public when out-of-tree servers support open3.
-#[allow(dead_code)]
-async fn open_directory(
+/// Opens the given `path` from given `parent` directory as a [`DirectoryProxy`], verifying that
+/// the target implements the fuchsia.io.Directory protocol.
+pub async fn open_directory(
     parent: &fio::DirectoryProxy,
     path: &str,
     flags: fio::Flags,
@@ -280,8 +265,7 @@ async fn open_directory(
     node::verify_directory_describe_event(dir).await
 }
 
-/// *WARNING* - In the process of being deprecated. Only use [`create_directory`] once all
-/// out-of-tree servers support open3.
+/// *DEPRECATED* - Use [`create_directory`] instead.
 ///
 /// Creates a directory named `path` within the `parent` directory.
 // TODO(https://fxbug.dev/361450366): Migrate to [`create_directory`] and remove this.
@@ -307,11 +291,8 @@ pub async fn create_directory_deprecated(
     node::verify_directory_describe_event(dir).await
 }
 
-// Creates a directory named `path` within the `parent` directory.
-//
-// TODO(https://fxbug.dev/361450366): Make public when out-of-tree servers support open3.
-#[allow(dead_code)]
-async fn create_directory(
+/// Creates a directory named `path` within the `parent` directory.
+pub async fn create_directory(
     parent: &fio::DirectoryProxy,
     path: &str,
     flags: fio::Flags,
@@ -335,8 +316,7 @@ async fn create_directory(
     node::verify_directory_describe_event(dir).await
 }
 
-/// *WARNING* - In the process of being deprecated. Only use [`create_directory_recursive`] once all
-/// out-of-tree servers support open3.
+/// *DEPRECATED* - Use [`create_directory_recursive`] instead.
 ///
 /// Creates a directory named `path` (including all segments leading up to the terminal segment)
 /// within the `parent` directory.  Returns a connection to the terminal directory.
@@ -360,12 +340,9 @@ pub async fn create_directory_recursive_deprecated(
     dir.ok_or(OpenError::OpenError(zx_status::Status::INVALID_ARGS))
 }
 
-// Creates a directory named `path` (including all segments leading up to the terminal segment)
-// within the `parent` directory.  Returns a connection to the terminal directory.
-//
-// TODO(https://fxbug.dev/361450366): Make public when out-of-tree servers support open3.
-#[allow(dead_code)]
-async fn create_directory_recursive(
+/// Creates a directory named `path` (including all segments leading up to the terminal segment)
+/// within the `parent` directory.  Returns a connection to the terminal directory.
+pub async fn create_directory_recursive(
     parent: &fio::DirectoryProxy,
     path: &str,
     flags: fio::Flags,
@@ -384,8 +361,7 @@ async fn create_directory_recursive(
     dir.ok_or(OpenError::OpenError(zx_status::Status::INVALID_ARGS))
 }
 
-/// *WARNING* - In the process of being deprecated. Only use [`open_file_async`] once all
-/// out-of-tree servers support open3.
+/// *DEPRECATED* - Use [`open_file_async`] instead.
 ///
 /// Opens the given `path` from the given `parent` directory as a [`FileProxy`]. If open fails,
 /// the returned `FileProxy` will be closed with an epitaph.
@@ -406,12 +382,9 @@ pub fn open_file_no_describe_deprecated(
     Ok(file)
 }
 
-// Opens the given `path` from the given `parent` directory as a [`FileProxy`]. If open fails,
-// the returned `FileProxy` will be closed with an epitaph.
-//
-// TODO(https://fxbug.dev/361450366): Make public when out-of-tree servers support open3.
-#[allow(dead_code)]
-fn open_file_async(
+/// Opens the given `path` from the given `parent` directory as a [`FileProxy`]. If open fails,
+/// the returned `FileProxy` will be closed with an epitaph.
+pub fn open_file_async(
     parent: &fio::DirectoryProxy,
     path: &str,
     flags: fio::Flags,
@@ -428,8 +401,7 @@ fn open_file_async(
     Ok(file)
 }
 
-/// *WARNING* - In the process of being deprecated. Use [`open_file`] once all out-of-tree servers
-/// support open3.
+/// *DEPRECATED* - Use [`open_file`] instead.
 ///
 /// Opens the given `path` from given `parent` directory as a [`FileProxy`], verifying that the
 /// target implements the fuchsia.io.File protocol.
@@ -452,12 +424,9 @@ pub async fn open_file_deprecated(
     node::verify_file_describe_event(file).await
 }
 
-// Opens the given `path` from given `parent` directory as a [`FileProxy`], verifying that the
-// target implements the fuchsia.io.File protocol.
-//
-// TODO(https://fxbug.dev/361450366): Make public when out-of-tree servers support open3.
-#[allow(dead_code)]
-async fn open_file(
+/// Opens the given `path` from given `parent` directory as a [`FileProxy`], verifying that the
+/// target implements the fuchsia.io.File protocol.
+pub async fn open_file(
     parent: &fio::DirectoryProxy,
     path: &str,
     flags: fio::Flags,
@@ -475,8 +444,7 @@ async fn open_file(
     node::verify_file_describe_event(file).await
 }
 
-/// *WARNING* - In the process of being deprecated. Only use [`open_node`] once all out-of-tree
-/// servers support open3.
+/// *DEPRECATED* - Use [`open_node`] instead.
 ///
 /// Opens the given `path` from the given `parent` directory as a [`NodeProxy`], verifying that the
 /// target implements the fuchsia.io.Node protocol.
@@ -499,12 +467,9 @@ pub async fn open_node_deprecated(
     node::verify_node_describe_event(file).await
 }
 
-// Opens the given `path` from the given `parent` directory as a [`NodeProxy`], verifying that the
-// target implements the fuchsia.io.Node protocol.
-//
-// TODO(https://fxbug.dev/361450366): Make public when out-of-tree servers support open3.
-#[allow(dead_code)]
-async fn open_node(
+/// Opens the given `path` from the given `parent` directory as a [`NodeProxy`], verifying that the
+/// target implements the fuchsia.io.Node protocol.
+pub async fn open_node(
     parent: &fio::DirectoryProxy,
     path: &str,
     flags: fio::Flags,
@@ -522,35 +487,7 @@ async fn open_node(
     node::verify_node_describe_event(file).await
 }
 
-/// *WARNING* - In the process of being deprecated. Only use [`open_node_async`] once all
-/// out-of-tree servers support open3.
-///
-/// Opens the given `path` from the given `parent` directory as a [`NodeProxy`]. If open fails,
-/// the returned `NodeProxy` will be closed with an epitaph.
-// TODO(https://fxbug.dev/361450366): Migrate to [`open_node_async`] and remove this.
-pub fn open_node_no_describe_deprecated(
-    parent: &fio::DirectoryProxy,
-    path: &str,
-    flags: fio::OpenFlags,
-) -> Result<fio::NodeProxy, OpenError> {
-    open_no_describe_deprecated::<fio::NodeMarker>(parent, path, flags)
-}
-
-// Opens the given `path` from the given `parent` directory as a [`NodeProxy`]. If open fails,
-// the returned `NodeProxy` will be closed with an epitaph.
-//
-// TODO(https://fxbug.dev/361450366): Make public when out-of-tree servers support open3.
-#[allow(dead_code)]
-fn open_node_async(
-    parent: &fio::DirectoryProxy,
-    path: &str,
-    flags: fio::Flags,
-) -> Result<fio::NodeProxy, OpenError> {
-    open_async::<fio::NodeMarker>(parent, path, flags)
-}
-
-/// *WARNING* - In the process of being deprecated. Use [`open_async`] once all out-of-tree servers
-/// support open3.
+/// *DEPRECATED* - Use [`open_async`] instead.
 ///
 /// Opens the given `path` from the given `parent` directory as a [`P::Proxy`]. If open fails,
 /// the returned proxy will be closed with an epitaph.
@@ -569,12 +506,9 @@ pub fn open_no_describe_deprecated<P: fidl::endpoints::ProtocolMarker>(
     ClientEnd::<P>::new(client.into_channel()).into_proxy().map_err(OpenError::CreateProxy)
 }
 
-// Opens the given `path` from the given `parent` directory as a [`P::Proxy`]. The target is not
-// verified to be any particular type and may not implement the [`P`] protocol.
-//
-// TODO(https://fxbug.dev/361450366): Make public when out-of-tree servers support open3.
-#[allow(dead_code)]
-fn open_async<P: fidl::endpoints::ProtocolMarker>(
+/// Opens the given `path` from the given `parent` directory as a [`P::Proxy`]. The target is not
+/// verified to be any particular type and may not implement the [`P`] protocol.
+pub fn open_async<P: fidl::endpoints::ProtocolMarker>(
     parent: &fio::DirectoryProxy,
     path: &str,
     flags: fio::Flags,
@@ -618,8 +552,7 @@ pub async fn close(dir: fio::DirectoryProxy) -> Result<(), CloseError> {
     result.map_err(|s| CloseError::CloseError(zx_status::Status::from_raw(s)))
 }
 
-/// *WARNING* - In the process of being deprecated. Only use [`create_randomly_named_file`] once all
-/// out-of-tree servers support open3.
+/// *DEPRECATED* - Use [`create_randomly_named_file`] instead.
 ///
 /// Create a randomly named file in the given directory with the given prefix, and return its path
 /// and `FileProxy`. `prefix` may contain "/".
@@ -647,12 +580,9 @@ pub async fn create_randomly_named_file_deprecated(
     }
 }
 
-// Create a randomly named file in the given directory with the given prefix, and return its path
-// and `FileProxy`. `prefix` may contain "/".
-//
-// TODO(https://fxbug.dev/361450366): Make public when out-of-tree servers support open3.
-#[allow(dead_code)]
-async fn create_randomly_named_file(
+/// Create a randomly named file in the given directory with the given prefix, and return its path
+/// and `FileProxy`. `prefix` may contain "/".
+pub async fn create_randomly_named_file(
     dir: &fio::DirectoryProxy,
     prefix: &str,
     flags: fio::Flags,
@@ -684,7 +614,8 @@ async fn split_path<'a>(
     match path.rsplit_once('/') {
         Some((parent, name)) => {
             let proxy =
-                open_directory_deprecated(dir, parent, fio::OpenFlags::RIGHT_WRITABLE).await?;
+                open_directory(dir, parent, fio::Flags::from_bits(fio::W_STAR_DIR.bits()).unwrap())
+                    .await?;
             Ok((Some(proxy), name))
         }
         None => Ok((None, path)),
@@ -1070,8 +1001,8 @@ mod tests {
     use vfs::directory::entry_container::Directory;
     use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_only;
-    use vfs::pseudo_directory;
     use vfs::remote::remote_dir;
+    use vfs::{pseudo_directory, ObjectRequest};
 
     const DATA_FILE_CONTENTS: &str = "Hello World!\n";
 
@@ -1090,29 +1021,29 @@ mod tests {
     }
 
     fn open_pkg() -> fio::DirectoryProxy {
-        open_in_namespace_deprecated("/pkg", fio::OpenFlags::RIGHT_READABLE).unwrap()
+        open_in_namespace("/pkg", fio::PERM_READABLE).unwrap()
     }
 
     fn open_tmp() -> (TempDir, fio::DirectoryProxy) {
         let tempdir = TempDir::new().expect("failed to create tmp dir");
-        let proxy = open_in_namespace_deprecated(
+        let proxy = open_in_namespace(
             tempdir.path().to_str().unwrap(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
         )
         .unwrap();
         (tempdir, proxy)
     }
 
-    // open_in_namespace
+    // open_in_namespace_deprecated
 
     #[fasync::run_singlethreaded(test)]
-    async fn open_in_namespace_opens_real_dir() {
+    async fn open_in_namespace_deprecated_opens_real_dir() {
         let exists = open_in_namespace_deprecated("/pkg", fio::OpenFlags::RIGHT_READABLE).unwrap();
         assert_matches!(close(exists).await, Ok(()));
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn open_in_namespace_opens_fake_subdir_of_root_namespace_entry() {
+    async fn open_in_namespace_deprecated_opens_fake_subdir_of_root_namespace_entry() {
         let notfound =
             open_in_namespace_deprecated("/pkg/fake", fio::OpenFlags::RIGHT_READABLE).unwrap();
         // The open error is not detected until the proxy is interacted with.
@@ -1120,16 +1051,38 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn open_in_namespace_rejects_fake_root_namespace_entry() {
+    async fn open_in_namespace_deprecated_rejects_fake_root_namespace_entry() {
         let result = open_in_namespace_deprecated("/fake", fio::OpenFlags::RIGHT_READABLE);
         assert_matches!(result, Err(OpenError::Namespace(zx_status::Status::NOT_FOUND)));
         assert_matches!(result, Err(e) if e.is_not_found_error());
     }
 
-    // open_directory_no_describe
+    // open_in_namespace
 
     #[fasync::run_singlethreaded(test)]
-    async fn open_directory_no_describe_opens_real_dir() {
+    async fn open_in_namespace_opens_real_dir() {
+        let exists = open_in_namespace("/pkg", fio::PERM_READABLE).unwrap();
+        assert_matches!(close(exists).await, Ok(()));
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn open_in_namespace_opens_fake_subdir_of_root_namespace_entry() {
+        let notfound = open_in_namespace("/pkg/fake", fio::PERM_READABLE).unwrap();
+        // The open error is not detected until the proxy is interacted with.
+        assert_matches!(close(notfound).await, Err(_));
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn open_in_namespace_rejects_fake_root_namespace_entry() {
+        let result = open_in_namespace("/fake", fio::PERM_READABLE);
+        assert_matches!(result, Err(OpenError::Namespace(zx_status::Status::NOT_FOUND)));
+        assert_matches!(result, Err(e) if e.is_not_found_error());
+    }
+
+    // open_directory_no_describe_deprecated
+
+    #[fasync::run_singlethreaded(test)]
+    async fn open_directory_no_describe_deprecated_opens_real_dir() {
         let pkg = open_pkg();
         let data =
             open_directory_no_describe_deprecated(&pkg, "data", fio::OpenFlags::RIGHT_READABLE)
@@ -1138,7 +1091,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn open_directory_no_describe_opens_fake_dir() {
+    async fn open_directory_no_describe_deprecated_opens_fake_dir() {
         let pkg = open_pkg();
         let fake =
             open_directory_no_describe_deprecated(&pkg, "fake", fio::OpenFlags::RIGHT_READABLE)
@@ -1147,10 +1100,27 @@ mod tests {
         assert_matches!(close(fake).await, Err(_));
     }
 
-    // open_directory
+    // open_directory_async
 
     #[fasync::run_singlethreaded(test)]
-    async fn open_directory_opens_real_dir() {
+    async fn open_directory_async_opens_real_dir() {
+        let pkg = open_pkg();
+        let data = open_directory_async(&pkg, "data", fio::PERM_READABLE).unwrap();
+        close(data).await.unwrap();
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn open_directory_async_opens_fake_dir() {
+        let pkg = open_pkg();
+        let fake = open_directory_async(&pkg, "fake", fio::PERM_READABLE).unwrap();
+        // The open error is not detected until the proxy is interacted with.
+        assert_matches!(close(fake).await, Err(_));
+    }
+
+    // open_directory_deprecated
+
+    #[fasync::run_singlethreaded(test)]
+    async fn open_directory_deprecated_opens_real_dir() {
         let pkg = open_pkg();
         let data =
             open_directory_deprecated(&pkg, "data", fio::OpenFlags::RIGHT_READABLE).await.unwrap();
@@ -1158,10 +1128,38 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn open_directory_rejects_fake_dir() {
+    async fn open_directory_deprecated_rejects_fake_dir() {
         let pkg = open_pkg();
 
         let result = open_directory_deprecated(&pkg, "fake", fio::OpenFlags::RIGHT_READABLE).await;
+        assert_matches!(result, Err(OpenError::OpenError(zx_status::Status::NOT_FOUND)));
+        assert_matches!(result, Err(e) if e.is_not_found_error());
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn open_directory_deprecated_rejects_file() {
+        let pkg = open_pkg();
+
+        assert_matches!(
+            open_directory_deprecated(&pkg, "data/file", fio::OpenFlags::RIGHT_READABLE).await,
+            Err(OpenError::OpenError(zx_status::Status::NOT_DIR))
+        );
+    }
+
+    // open_directory
+
+    #[fasync::run_singlethreaded(test)]
+    async fn open_directory_opens_real_dir() {
+        let pkg = open_pkg();
+        let data = open_directory(&pkg, "data", fio::PERM_READABLE).await.unwrap();
+        close(data).await.unwrap();
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn open_directory_rejects_fake_dir() {
+        let pkg = open_pkg();
+
+        let result = open_directory(&pkg, "fake", fio::PERM_READABLE).await;
         assert_matches!(result, Err(OpenError::OpenError(zx_status::Status::NOT_FOUND)));
         assert_matches!(result, Err(e) if e.is_not_found_error());
     }
@@ -1171,15 +1169,15 @@ mod tests {
         let pkg = open_pkg();
 
         assert_matches!(
-            open_directory_deprecated(&pkg, "data/file", fio::OpenFlags::RIGHT_READABLE).await,
+            open_directory(&pkg, "data/file", fio::PERM_READABLE).await,
             Err(OpenError::OpenError(zx_status::Status::NOT_DIR))
         );
     }
 
-    // create_directory
+    // create_directory_deprecated
 
     #[fasync::run_singlethreaded(test)]
-    async fn create_directory_simple() {
+    async fn create_directory_deprecated_simple() {
         let (_tmp, proxy) = open_tmp();
         let dir = create_directory_deprecated(&proxy, "dir", fio::OpenFlags::RIGHT_READABLE)
             .await
@@ -1188,7 +1186,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn create_directory_add_file() {
+    async fn create_directory_deprecated_add_file() {
         let (_tmp, proxy) = open_tmp();
         let dir = create_directory_deprecated(
             &proxy,
@@ -1210,7 +1208,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn create_directory_existing_dir_opens() {
+    async fn create_directory_deprecated_existing_dir_opens() {
         let (_tmp, proxy) = open_tmp();
         let dir = create_directory_deprecated(&proxy, "dir", fio::OpenFlags::RIGHT_READABLE)
             .await
@@ -1220,7 +1218,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn create_directory_existing_dir_fails_if_flag_set() {
+    async fn create_directory_deprecated_existing_dir_fails_if_flag_set() {
         let (_tmp, proxy) = open_tmp();
         let dir = create_directory_deprecated(
             &proxy,
@@ -1241,10 +1239,53 @@ mod tests {
         );
     }
 
-    // open_file_no_describe
+    // create_directory
 
     #[fasync::run_singlethreaded(test)]
-    async fn open_file_no_describe_opens_real_file() {
+    async fn create_directory_simple() {
+        let (_tmp, proxy) = open_tmp();
+        let dir = create_directory(&proxy, "dir", fio::PERM_READABLE).await.unwrap();
+        crate::directory::close(dir).await.unwrap();
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn create_directory_add_file() {
+        let (_tmp, proxy) = open_tmp();
+        let dir =
+            create_directory(&proxy, "dir", fio::PERM_READABLE | fio::PERM_WRITABLE).await.unwrap();
+        let file = open_file(&dir, "data", fio::Flags::FLAG_MUST_CREATE | fio::PERM_READABLE)
+            .await
+            .unwrap();
+        crate::file::close(file).await.unwrap();
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn create_directory_existing_dir_opens() {
+        let (_tmp, proxy) = open_tmp();
+        let dir = create_directory(&proxy, "dir", fio::PERM_READABLE).await.unwrap();
+        crate::directory::close(dir).await.unwrap();
+        create_directory(&proxy, "dir", fio::PERM_READABLE).await.unwrap();
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn create_directory_existing_dir_fails_if_must_create() {
+        let (_tmp, proxy) = open_tmp();
+        let dir =
+            create_directory(&proxy, "dir", fio::Flags::FLAG_MUST_CREATE | fio::PERM_READABLE)
+                .await
+                .unwrap();
+        crate::directory::close(dir).await.unwrap();
+        assert_matches!(
+            create_directory(&proxy, "dir", fio::Flags::FLAG_MUST_CREATE | fio::PERM_READABLE)
+                .await,
+            Err(_)
+        );
+    }
+
+    // open_file_no_describe_deprecated
+
+    #[fasync::run_singlethreaded(test)]
+    async fn open_file_no_describe_deprecated_opens_real_file() {
         let pkg = open_pkg();
         let file =
             open_file_no_describe_deprecated(&pkg, "data/file", fio::OpenFlags::RIGHT_READABLE)
@@ -1253,7 +1294,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn open_file_no_describe_opens_fake_file() {
+    async fn open_file_no_describe_deprecated_opens_fake_file() {
         let pkg = open_pkg();
         let fake =
             open_file_no_describe_deprecated(&pkg, "data/fake", fio::OpenFlags::RIGHT_READABLE)
@@ -1262,10 +1303,27 @@ mod tests {
         assert_matches!(crate::file::close(fake).await, Err(_));
     }
 
-    // open_file
+    // open_file_async
 
     #[fasync::run_singlethreaded(test)]
-    async fn open_file_opens_real_file() {
+    async fn open_file_no_describe_opens_real_file() {
+        let pkg = open_pkg();
+        let file = open_file_async(&pkg, "data/file", fio::PERM_READABLE).unwrap();
+        crate::file::close(file).await.unwrap();
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn open_file_no_describe_opens_fake_file() {
+        let pkg = open_pkg();
+        let fake = open_file_async(&pkg, "data/fake", fio::PERM_READABLE).unwrap();
+        // The open error is not detected until the proxy is interacted with.
+        assert_matches!(crate::file::close(fake).await, Err(_));
+    }
+
+    // open_file_deprecated
+
+    #[fasync::run_singlethreaded(test)]
+    async fn open_file_deprecated_opens_real_file() {
         let pkg = open_pkg();
         let file =
             open_file_deprecated(&pkg, "data/file", fio::OpenFlags::RIGHT_READABLE).await.unwrap();
@@ -1277,7 +1335,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn open_file_rejects_fake_file() {
+    async fn open_file_deprecated_rejects_fake_file() {
         let pkg = open_pkg();
 
         let result = open_file_deprecated(&pkg, "data/fake", fio::OpenFlags::RIGHT_READABLE).await;
@@ -1286,7 +1344,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn open_file_rejects_dir() {
+    async fn open_file_deprecated_rejects_dir() {
         let pkg = open_pkg();
 
         assert_matches!(
@@ -1299,7 +1357,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn open_file_flags() {
+    async fn open_file_deprecated_flags() {
         let tempdir = TempDir::new().expect("failed to create tmp dir");
         std::fs::write(tempdir.path().join("read_write"), "rw/read_write")
             .expect("failed to write file");
@@ -1340,7 +1398,7 @@ mod tests {
             ),
             ("rw/read_write", fio::OpenFlags::RIGHT_WRITABLE, true),
         ] {
-            // open_file_no_describe
+            // open_file_no_describe_deprecated
 
             let file =
                 open_file_no_describe_deprecated(&example_dir_proxy, file_name, flags).unwrap();
@@ -1368,7 +1426,7 @@ mod tests {
             }
             crate::file::close(file).await.unwrap();
 
-            // open_file
+            // open_file_deprecated
 
             match open_file_deprecated(&example_dir_proxy, file_name, flags).await {
                 Ok(file) if should_succeed => {
@@ -1397,29 +1455,139 @@ mod tests {
         }
     }
 
-    // open_node_no_describe
+    // open_file
 
     #[fasync::run_singlethreaded(test)]
-    async fn open_node_no_describe_opens_real_node() {
+    async fn open_file_opens_real_file() {
         let pkg = open_pkg();
-        let node =
-            open_node_no_describe_deprecated(&pkg, "data", fio::OpenFlags::RIGHT_READABLE).unwrap();
-        crate::node::close(node).await.unwrap();
+        let file = open_file(&pkg, "data/file", fio::PERM_READABLE).await.unwrap();
+        assert_eq!(
+            file.seek(fio::SeekOrigin::End, 0).await.unwrap(),
+            Ok(DATA_FILE_CONTENTS.len() as u64),
+        );
+        crate::file::close(file).await.unwrap();
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn open_node_no_describe_opens_fake_node() {
+    async fn open_file_rejects_fake_file() {
         let pkg = open_pkg();
-        let fake =
-            open_node_no_describe_deprecated(&pkg, "fake", fio::OpenFlags::RIGHT_READABLE).unwrap();
-        // The open error is not detected until the proxy is interacted with.
-        assert_matches!(crate::node::close(fake).await, Err(_));
+
+        let result = open_file(&pkg, "data/fake", fio::PERM_READABLE).await;
+        assert_matches!(result, Err(OpenError::OpenError(zx_status::Status::NOT_FOUND)));
+        assert_matches!(result, Err(e) if e.is_not_found_error());
     }
 
-    // open_node
+    #[fasync::run_singlethreaded(test)]
+    async fn open_file_rejects_dir() {
+        let pkg = open_pkg();
+
+        assert_matches!(
+            open_file(&pkg, "data", fio::PERM_READABLE).await,
+            Err(OpenError::UnexpectedNodeKind {
+                expected: node::Kind::File,
+                actual: node::Kind::Directory,
+            } | node::OpenError::OpenError(zx_status::Status::NOT_FILE))
+        );
+    }
 
     #[fasync::run_singlethreaded(test)]
-    async fn open_node_opens_real_node() {
+    async fn open_file_flags() {
+        let tempdir = TempDir::new().expect("failed to create tmp dir");
+        std::fs::write(tempdir.path().join("read_write"), "rw/read_write")
+            .expect("failed to write file");
+        let dir = crate::directory::open_in_namespace(
+            tempdir.path().to_str().unwrap(),
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
+        )
+        .expect("could not open tmp dir");
+        let example_dir = pseudo_directory! {
+            "ro" => pseudo_directory! {
+                "read_only" => read_only("ro/read_only"),
+            },
+            "rw" => remote_dir(dir)
+        };
+        let (example_dir_proxy, example_dir_service) =
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let scope = ExecutionScope::new();
+        let example_dir_flags =
+            fio::Flags::PROTOCOL_DIRECTORY | fio::PERM_READABLE | fio::PERM_WRITABLE;
+        ObjectRequest::new3(
+            example_dir_flags,
+            &fio::Options::default(),
+            example_dir_service.into(),
+        )
+        .handle(|request| {
+            example_dir.open3(scope, vfs::path::Path::dot(), example_dir_flags, request)
+        });
+
+        for (file_name, flags, should_succeed) in vec![
+            ("ro/read_only", fio::PERM_READABLE, true),
+            ("ro/read_only", fio::PERM_READABLE | fio::PERM_WRITABLE, false),
+            ("ro/read_only", fio::PERM_WRITABLE, false),
+            ("rw/read_write", fio::PERM_READABLE, true),
+            ("rw/read_write", fio::PERM_READABLE | fio::PERM_WRITABLE, true),
+            ("rw/read_write", fio::PERM_WRITABLE, true),
+        ] {
+            // open_file_async
+
+            let file = open_file_async(&example_dir_proxy, file_name, flags).unwrap();
+            match (should_succeed, file.query().await) {
+                (true, Ok(_)) => (),
+                (false, Err(_)) => continue,
+                (true, Err(e)) => {
+                    panic!("failed to open when expected success, couldn't describe: {:?}", e)
+                }
+                (false, Ok(d)) => {
+                    panic!("successfully opened when expected failure, could describe: {:?}", d)
+                }
+            }
+            if flags.intersects(fio::Flags::PERM_READ) {
+                assert_eq!(crate::file::read_to_string(&file).await.unwrap(), file_name);
+            }
+            if flags.intersects(fio::Flags::PERM_WRITE) {
+                let _ = file.seek(fio::SeekOrigin::Start, 0).await.expect("Seek failed!");
+                let _: u64 = file
+                    .write(file_name.as_bytes())
+                    .await
+                    .unwrap()
+                    .map_err(zx_status::Status::from_raw)
+                    .unwrap();
+            }
+            crate::file::close(file).await.unwrap();
+
+            // open_file
+
+            match open_file(&example_dir_proxy, file_name, flags).await {
+                Ok(file) if should_succeed => {
+                    if flags.intersects(fio::Flags::PERM_READ) {
+                        assert_eq!(crate::file::read_to_string(&file).await.unwrap(), file_name);
+                    }
+                    if flags.intersects(fio::Flags::PERM_WRITE) {
+                        let _ = file.seek(fio::SeekOrigin::Start, 0).await.expect("Seek failed!");
+                        let _: u64 = file
+                            .write(file_name.as_bytes())
+                            .await
+                            .unwrap()
+                            .map_err(zx_status::Status::from_raw)
+                            .unwrap();
+                    }
+                    crate::file::close(file).await.unwrap();
+                }
+                Ok(_) => {
+                    panic!("successfully opened when expected failure: {:?}", (file_name, flags))
+                }
+                Err(e) if should_succeed => {
+                    panic!("failed to open when expected success: {:?}", (e, file_name, flags))
+                }
+                Err(_) => {}
+            }
+        }
+    }
+
+    // open_node_deprecated
+
+    #[fasync::run_singlethreaded(test)]
+    async fn open_node_deprecated_opens_real_node() {
         let pkg = open_pkg();
         let node =
             open_node_deprecated(&pkg, "data", fio::OpenFlags::RIGHT_READABLE).await.unwrap();
@@ -1427,13 +1595,29 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn open_node_opens_fake_node() {
+    async fn open_node_deprecated_opens_fake_node() {
         let pkg = open_pkg();
         // The open error should be detected immediately.
         assert_matches!(
             open_node_deprecated(&pkg, "fake", fio::OpenFlags::RIGHT_READABLE).await,
             Err(_)
         );
+    }
+
+    // open_node
+
+    #[fasync::run_singlethreaded(test)]
+    async fn open_node_opens_real_node() {
+        let pkg = open_pkg();
+        let node = open_node(&pkg, "data", fio::PERM_READABLE).await.unwrap();
+        crate::node::close(node).await.unwrap();
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn open_node_opens_fake_node() {
+        let pkg = open_pkg();
+        // The open error should be detected immediately.
+        assert_matches!(open_node(&pkg, "fake", fio::PERM_READABLE).await, Err(_));
     }
 
     // clone_no_describe
@@ -1466,8 +1650,10 @@ mod tests {
         );
     }
 
+    // create_randomly_named_file_deprecated
+
     #[fasync::run_singlethreaded(test)]
-    async fn create_randomly_named_file_simple() {
+    async fn create_randomly_named_file_deprecated_simple() {
         let (_tmp, proxy) = open_tmp();
         let (path, file) =
             create_randomly_named_file_deprecated(&proxy, "prefix", fio::OpenFlags::RIGHT_WRITABLE)
@@ -1478,7 +1664,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn create_randomly_named_file_subdir() {
+    async fn create_randomly_named_file_deprecated_subdir() {
         let (_tmp, proxy) = open_tmp();
         let _subdir = create_directory_deprecated(&proxy, "subdir", fio::OpenFlags::RIGHT_WRITABLE)
             .await
@@ -1495,7 +1681,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn create_randomly_named_file_no_prefix() {
+    async fn create_randomly_named_file_deprecated_no_prefix() {
         let (_tmp, proxy) = open_tmp();
         let (_path, file) = create_randomly_named_file_deprecated(
             &proxy,
@@ -1508,7 +1694,7 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn create_randomly_named_file_error() {
+    async fn create_randomly_named_file_deprecated_error() {
         let pkg = open_pkg();
         assert_matches!(
             create_randomly_named_file_deprecated(&pkg, "", fio::OpenFlags::empty()).await,
@@ -1516,13 +1702,50 @@ mod tests {
         );
     }
 
+    // create_randomly_named_file
+
+    #[fasync::run_singlethreaded(test)]
+    async fn create_randomly_named_file_simple() {
+        let (_tmp, proxy) = open_tmp();
+        let (path, file) =
+            create_randomly_named_file(&proxy, "prefix", fio::PERM_WRITABLE).await.unwrap();
+        assert!(path.starts_with("prefix"));
+        crate::file::close(file).await.unwrap();
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn create_randomly_named_file_subdir() {
+        let (_tmp, proxy) = open_tmp();
+        let _subdir = create_directory(&proxy, "subdir", fio::PERM_WRITABLE).await.unwrap();
+        let (path, file) =
+            create_randomly_named_file(&proxy, "subdir/file", fio::PERM_WRITABLE).await.unwrap();
+        assert!(path.starts_with("subdir/file"));
+        crate::file::close(file).await.unwrap();
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn create_randomly_named_file_no_prefix() {
+        let (_tmp, proxy) = open_tmp();
+        let (_path, file) =
+            create_randomly_named_file(&proxy, "", fio::PERM_READABLE | fio::PERM_WRITABLE)
+                .await
+                .unwrap();
+        crate::file::close(file).await.unwrap();
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn create_randomly_named_file_error() {
+        let pkg = open_pkg();
+        assert_matches!(create_randomly_named_file(&pkg, "", fio::Flags::empty()).await, Err(_));
+    }
+
+    // rename
+
     #[fasync::run_singlethreaded(test)]
     async fn rename_simple() {
         let (tmp, proxy) = open_tmp();
         let (path, file) =
-            create_randomly_named_file_deprecated(&proxy, "", fio::OpenFlags::RIGHT_WRITABLE)
-                .await
-                .unwrap();
+            create_randomly_named_file(&proxy, "", fio::PERM_WRITABLE).await.unwrap();
         crate::file::close(file).await.unwrap();
         rename(&proxy, &path, "new_path").await.unwrap();
         assert!(!tmp.path().join(path).exists());
@@ -1532,21 +1755,10 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn rename_with_subdir() {
         let (tmp, proxy) = open_tmp();
-        let _subdir1 =
-            create_directory_deprecated(&proxy, "subdir1", fio::OpenFlags::RIGHT_WRITABLE)
-                .await
-                .unwrap();
-        let _subdir2 =
-            create_directory_deprecated(&proxy, "subdir2", fio::OpenFlags::RIGHT_WRITABLE)
-                .await
-                .unwrap();
-        let (path, file) = create_randomly_named_file_deprecated(
-            &proxy,
-            "subdir1/file",
-            fio::OpenFlags::RIGHT_WRITABLE,
-        )
-        .await
-        .unwrap();
+        let _subdir1 = create_directory(&proxy, "subdir1", fio::PERM_WRITABLE).await.unwrap();
+        let _subdir2 = create_directory(&proxy, "subdir2", fio::PERM_WRITABLE).await.unwrap();
+        let (path, file) =
+            create_randomly_named_file(&proxy, "subdir1/file", fio::PERM_WRITABLE).await.unwrap();
         crate::file::close(file).await.unwrap();
         rename(&proxy, &path, "subdir2/file").await.unwrap();
         assert!(!tmp.path().join(path).exists());
@@ -1556,9 +1768,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn rename_directory() {
         let (tmp, proxy) = open_tmp();
-        let dir = create_directory_deprecated(&proxy, "dir", fio::OpenFlags::RIGHT_WRITABLE)
-            .await
-            .unwrap();
+        let dir = create_directory(&proxy, "dir", fio::PERM_WRITABLE).await.unwrap();
         close(dir).await.unwrap();
         rename(&proxy, "dir", "dir2").await.unwrap();
         assert!(!tmp.path().join("dir").exists());
@@ -1607,6 +1817,8 @@ mod tests {
         );
         assert!(!tmp.path().join("bar").exists());
     }
+
+    // parse_dir_entries
 
     #[test]
     fn test_parse_dir_entries_rejects_invalid_utf8() {
@@ -1661,6 +1873,8 @@ mod tests {
         assert_eq!(parse_dir_entries(buf), vec![Err(DecodeDirentError::BufferOverrun)]);
     }
 
+    // readdir
+
     #[fasync::run_singlethreaded(test)]
     async fn test_readdir() {
         let (dir_client, server_end) =
@@ -1693,6 +1907,8 @@ mod tests {
             );
         }
     }
+
+    // dir_contains
 
     #[fasync::run_singlethreaded(test)]
     async fn test_dir_contains() {
@@ -1735,6 +1951,8 @@ mod tests {
             .expect("error checking dir contains a");
         assert!(second);
     }
+
+    // readdir_recursive
 
     #[fasync::run_singlethreaded(test)]
     async fn test_readdir_recursive() {
@@ -1807,6 +2025,8 @@ mod tests {
         );
     }
 
+    // remove_dir
+
     #[fasync::run_singlethreaded(test)]
     async fn test_remove_dir_recursive() {
         {
@@ -1852,13 +2072,9 @@ mod tests {
         {
             let tempdir = TempDir::new().expect("failed to create tmp dir");
             let dir = create_nested_dir(&tempdir).await;
-            let subdir = open_directory_deprecated(
-                &dir,
-                "subdir",
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            )
-            .await
-            .expect("could not open subdir");
+            let subdir = open_directory(&dir, "subdir", fio::PERM_READABLE | fio::PERM_WRITABLE)
+                .await
+                .expect("could not open subdir");
             remove_dir_recursive(&subdir, "subsubdir").await.expect("remove_dir_recursive failed");
             let entries = readdir_recursive(&dir, None)
                 .collect::<Vec<Result<DirEntry, RecursiveEnumerateError>>>()
@@ -1879,13 +2095,10 @@ mod tests {
         {
             let tempdir = TempDir::new().expect("failed to create tmp dir");
             let dir = create_nested_dir(&tempdir).await;
-            let subsubdir = open_directory_deprecated(
-                &dir,
-                "subdir/subsubdir",
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            )
-            .await
-            .expect("could not open subsubdir");
+            let subsubdir =
+                open_directory(&dir, "subdir/subsubdir", fio::PERM_READABLE | fio::PERM_WRITABLE)
+                    .await
+                    .expect("could not open subsubdir");
             remove_dir_recursive(&subsubdir, "emptydir")
                 .await
                 .expect("remove_dir_recursive failed");
@@ -1930,8 +2143,10 @@ mod tests {
         }
     }
 
+    // create_directory_recursive_deprecated
+
     #[fasync::run_singlethreaded(test)]
-    async fn create_directory_recursive_test() {
+    async fn create_directory_recursive_deprecated_test() {
         let tempdir = TempDir::new().unwrap();
 
         let path = "path/to/example/dir";
@@ -1968,23 +2183,54 @@ mod tests {
         assert_eq!(&contents, &data, "File contents did not match");
     }
 
-    async fn create_nested_dir(tempdir: &TempDir) -> fio::DirectoryProxy {
-        let dir = open_in_namespace_deprecated(
+    // create_directory_recursive
+
+    #[fasync::run_singlethreaded(test)]
+    async fn create_directory_recursive_test() {
+        let tempdir = TempDir::new().unwrap();
+
+        let path = "path/to/example/dir";
+        let file_name = "example_file_name";
+        let data = "file contents";
+
+        let root_dir = open_in_namespace(
             tempdir.path().to_str().unwrap(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
         )
-        .expect("could not open tmp dir");
-        create_directory_recursive_deprecated(
-            &dir,
-            "emptydir",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        .expect("open_in_namespace failed");
+
+        let sub_dir =
+            create_directory_recursive(&root_dir, &path, fio::PERM_READABLE | fio::PERM_WRITABLE)
+                .await
+                .expect("create_directory_recursive failed");
+        let file = open_file(
+            &sub_dir,
+            &file_name,
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE | fio::PERM_WRITABLE,
         )
         .await
-        .expect("failed to create emptydir");
-        create_directory_recursive_deprecated(
+        .expect("open_file failed");
+
+        write(&file, &data).await.expect("writing to the file failed");
+
+        let contents = std::fs::read_to_string(tempdir.path().join(path).join(file_name))
+            .expect("read_to_string failed");
+        assert_eq!(&contents, &data, "File contents did not match");
+    }
+
+    async fn create_nested_dir(tempdir: &TempDir) -> fio::DirectoryProxy {
+        let dir = open_in_namespace(
+            tempdir.path().to_str().unwrap(),
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
+        )
+        .expect("could not open tmp dir");
+        create_directory_recursive(&dir, "emptydir", fio::PERM_READABLE | fio::PERM_WRITABLE)
+            .await
+            .expect("failed to create emptydir");
+        create_directory_recursive(
             &dir,
             "subdir/subsubdir/emptydir",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
         )
         .await
         .expect("failed to create subdir/subsubdir/emptydir");
@@ -1996,12 +2242,10 @@ mod tests {
     }
 
     async fn create_file(dir: &fio::DirectoryProxy, path: &str) {
-        open_file_deprecated(
+        open_file(
             dir,
             path,
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::CREATE,
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE | fio::PERM_WRITABLE,
         )
         .await
         .unwrap_or_else(|e| panic!("failed to create {}: {:?}", path, e));
@@ -2010,6 +2254,8 @@ mod tests {
     fn build_direntry(name: &str, kind: DirentKind) -> DirEntry {
         DirEntry { name: name.to_string(), kind }
     }
+
+    // DirEntry
 
     #[test]
     fn test_direntry_is_dir() {
@@ -2034,6 +2280,8 @@ mod tests {
         assert_eq!(&chained2.name, "foo/baz");
         assert_eq!(chained2.kind, DirentKind::File);
     }
+
+    // read_file
 
     #[fasync::run_singlethreaded(test)]
     async fn test_read_file() {
