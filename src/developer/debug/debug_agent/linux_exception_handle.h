@@ -31,6 +31,7 @@ class LinuxExceptionHandle : public ExceptionHandle {
 
   // ExceptionHandle implementation:
   std::unique_ptr<ThreadHandle> GetThreadHandle() const override;
+  std::unique_ptr<ProcessHandle> GetProcessHandle() const override;
   debug_ipc::ExceptionType GetType(const ThreadHandle& thread) const override;
   fit::result<debug::Status, Resolution> GetResolution() const override;
   debug::Status SetResolution(Resolution resolution) override;

@@ -14,6 +14,7 @@
 
 namespace debug_agent {
 
+class ProcessHandle;
 class ThreadHandle;
 
 // ExceptionHandle abstracts zx::exception, allowing for a more straightforward implementation in
@@ -28,6 +29,8 @@ class ExceptionHandle {
 
   // Returns a handle to the excepting thread. Will return a null pointer on failure.
   virtual std::unique_ptr<ThreadHandle> GetThreadHandle() const = 0;
+
+  virtual std::unique_ptr<ProcessHandle> GetProcessHandle() const = 0;
 
   // Returns the type of the exception for this and the current thread state.
   //

@@ -38,6 +38,8 @@ class MockExceptionHandle : public ExceptionHandle {
 
   ~MockExceptionHandle() = default;
 
+  std::unique_ptr<ProcessHandle> GetProcessHandle() const override { return nullptr; }
+
   std::unique_ptr<ThreadHandle> GetThreadHandle() const override {
     return std::make_unique<MockThreadHandle>(thread_koid_);
   }

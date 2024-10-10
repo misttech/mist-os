@@ -4,6 +4,7 @@
 #include "src/developer/debug/debug_agent/zircon_exception_handle.h"
 
 #include "src/developer/debug/debug_agent/zircon_arch.h"
+#include "src/developer/debug/debug_agent/zircon_process_handle.h"
 #include "src/developer/debug/debug_agent/zircon_thread_handle.h"
 
 namespace debug_agent {
@@ -13,6 +14,13 @@ std::unique_ptr<ThreadHandle> ZirconExceptionHandle::GetThreadHandle() const {
   if (zx_status_t status = exception_.get_thread(&thread); status != ZX_OK)
     return nullptr;
   return std::make_unique<ZirconThreadHandle>(std::move(thread));
+}
+
+std::unique_ptr<ProcessHandle> ZirconExceptionHandle::GetProcessHandle() const {
+  zx::process process;
+  if (zx_status_t status = exception_.get_process(&process); status != ZX_OK)
+    return nullptr;
+  return std::make_unique<ZirconProcessHandle>(std::move(process));
 }
 
 debug_ipc::ExceptionType ZirconExceptionHandle::GetType(const ThreadHandle& thread) const {

@@ -40,6 +40,11 @@ std::unique_ptr<ThreadHandle> LinuxExceptionHandle::GetThreadHandle() const {
   return std::make_unique<LinuxThreadHandle>(task_);
 }
 
+std::unique_ptr<ProcessHandle> LinuxExceptionHandle::GetProcessHandle() const {
+  // not implemented yet.
+  return nullptr;
+}
+
 debug_ipc::ExceptionType LinuxExceptionHandle::GetType(const ThreadHandle& thread) const {
   return type_;
 }
