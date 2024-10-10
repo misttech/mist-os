@@ -110,7 +110,28 @@ class UserAddress {
   uint64_t address_ = NULL_PTR;
 };
 
-using UserCString = UserAddress;
+class UserCString {
+ public:
+  static UserCString New(UserAddress addr) { return UserCString(addr); }
+
+  UserAddress addr() { return addr_; }
+
+  // Deref
+  UserAddress* operator->() { return &addr_; }
+  const UserAddress* operator->() const { return &addr_; }
+
+  UserAddress& operator*() { return addr_; }
+  const UserAddress& operator*() const { return addr_; }
+
+ private:
+  template <typename U>
+  friend U mtl::DefaultConstruct();
+
+  explicit UserCString(UserAddress addr) : addr_(addr) {}
+  UserCString() = default;
+
+  UserAddress addr_ = mtl::DefaultConstruct<UserAddress>();
+};
 
 template <typename T>
 class UserRef {
@@ -137,7 +158,6 @@ class UserRef {
   friend U mtl::DefaultConstruct();
 
   UserRef() = default;
-
   explicit UserRef(UserAddress addr) : addr_(addr) {}
 
   UserAddress addr_ = mtl::DefaultConstruct<UserAddress>();
