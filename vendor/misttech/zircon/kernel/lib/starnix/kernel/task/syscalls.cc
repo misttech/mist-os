@@ -182,7 +182,7 @@ fit::result<Errno, SyscallResult> sys_prctl(const CurrentTask& current_task, int
 
       auto name = ktl::optional<FsString>();
       if (!name_addr.is_null()) {
-        auto uname = UserCString(UserAddress::from(arg5));
+        auto uname = UserCString::New(UserAddress::from(arg5));
         auto name_or_error = current_task.read_c_string_to_vec(uname, 256).map_error([](Errno e) {
           // An overly long name produces EINVAL and not ENAMETOOLONG in Linux 5.15.
           if (e == errno(ENAMETOOLONG)) {

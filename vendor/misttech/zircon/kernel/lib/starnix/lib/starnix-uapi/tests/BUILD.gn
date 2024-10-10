@@ -7,10 +7,11 @@ source_set("tests") {
     #"device_types-tests.cc",
     #"file_mode-tests.cc",
     #"open_flags-test.cc",
+    "user_address-test.cc",
     "user_buffer-tests.cc",
   ]
   deps = [
-    "////vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-uapi",
+    "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-uapi",
     "//zircon/kernel/lib/unittest",
   ]
 }

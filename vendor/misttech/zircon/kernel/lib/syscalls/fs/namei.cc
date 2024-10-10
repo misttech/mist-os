@@ -18,7 +18,8 @@
 int64_t sys_a0258_mkdirat(int32_t dfd, user_in_ptr<const char> pathname, uint16_t mode) {
   LTRACEF_LEVEL(2, "dfd=%d path=%p mode=%x\n", dfd, pathname.get(), mode);
   auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
-  return execute_syscall(starnix::sys_mkdirat, current_task, starnix::FdNumber::from_raw(dfd),
-                         starnix_uapi::UserCString::from_ptr((zx_vaddr_t)(pathname.get())),
-                         FileMode::from_bits(mode));
+  return execute_syscall(
+      starnix::sys_mkdirat, current_task, starnix::FdNumber::from_raw(dfd),
+      starnix_uapi::UserCString::New(UserAddress::from_ptr((zx_vaddr_t)(pathname.get()))),
+      FileMode::from_bits(mode));
 }

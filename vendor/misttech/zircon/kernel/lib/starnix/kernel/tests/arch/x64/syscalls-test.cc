@@ -28,7 +28,8 @@ bool test_sys_creat() {
   ktl::string_view path("newfile.txt");
   auto result = (*current_task).write_memory(path_addr, {(uint8_t*)path.data(), path.size()});
   ASSERT_TRUE(result.is_ok());
-  auto fd_or_error = sys_creat(*current_task, path_addr, starnix_uapi::FileMode());
+  auto fd_or_error =
+      sys_creat(*current_task, UserCString::New(path_addr), starnix_uapi::FileMode());
   ASSERT_TRUE(fd_or_error.is_ok());
   auto file_handle = (*current_task).open_file(path, OpenFlags(OpenFlagsEnum::RDONLY));
 
