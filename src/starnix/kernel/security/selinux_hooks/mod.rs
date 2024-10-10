@@ -139,7 +139,11 @@ pub(super) fn fs_node_init_with_dentry(
                         // at run-time, and therefore labeled by `fs_node_init_on_create()`.
                         // If an unlabeled node is somehow encountered then log a warning and treat
                         // it in the same way as an "fs_use_xattr" node that is missing the xattr.
-                        log_warn!("Unlabeled node in {} ({:?}-labeled) filesystem", fs.name(), fs_use_type);
+                        log_warn!(
+                            "Unlabeled node in {} ({:?}-labeled) filesystem",
+                            fs.name(),
+                            fs_use_type
+                        );
                         def_sid
                     }
                 }
