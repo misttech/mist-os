@@ -7,27 +7,34 @@ pub mod args;
 use crate::args::{Args, ShowCommand, SubCommand};
 use anyhow::{format_err, Result};
 use fidl_fuchsia_io as fio;
-use fuchsia_fs::directory::read_file;
 use fuchsia_pkg::MetaContents;
 use std::collections::{HashMap, HashSet};
-use std::io::Cursor;
+use std::fs::File;
+use std::io::{Cursor, Read};
 
-pub async fn bootpkg(boot_dir: fio::DirectoryProxy, args: Args) -> Result<()> {
+pub fn bootpkg(boot_dir: File, args: Args) -> Result<()> {
     match args.command {
-        SubCommand::List(_) => list(&boot_dir).await,
-        SubCommand::Show(ShowCommand { package_name }) => show(&boot_dir, &package_name).await,
+        SubCommand::List(_) => list(&boot_dir),
+        SubCommand::Show(ShowCommand { package_name }) => show(&boot_dir, &package_name),
     }
 }
 
 type PackageList = HashMap<String, fuchsia_merkle::Hash>;
 
-async fn get_package_list(boot_dir: &fio::DirectoryProxy) -> Result<PackageList> {
-    let contents = read_file(boot_dir, "data/bootfs_packages").await?;
+fn read_file(boot_dir: &File, path: &str) -> Result<Vec<u8>> {
+    let mut file = fdio::open_fd_at(boot_dir, path, fio::OpenFlags::RIGHT_READABLE)?;
+    let mut buffer = Vec::new();
+    file.read_to_end(&mut buffer)?;
+    Ok(buffer)
+}
+
+fn get_package_list(boot_dir: &File) -> Result<PackageList> {
+    let contents = read_file(boot_dir, "data/bootfs_packages")?;
     Ok(MetaContents::deserialize(&contents[..])?.into_contents())
 }
 
-async fn list(boot_dir: &fio::DirectoryProxy) -> Result<()> {
-    let package_list = get_package_list(boot_dir).await?;
+fn list(boot_dir: &File) -> Result<()> {
+    let package_list = get_package_list(boot_dir)?;
     let mut package_list = package_list.iter().map(|(name, _)| name).collect::<Vec<_>>();
     package_list.sort();
     for name in package_list {
@@ -37,12 +44,12 @@ async fn list(boot_dir: &fio::DirectoryProxy) -> Result<()> {
     Ok(())
 }
 
-async fn show(boot_dir: &fio::DirectoryProxy, package_name: &str) -> Result<()> {
-    let package_list = get_package_list(boot_dir).await?;
+fn show(boot_dir: &File, package_name: &str) -> Result<()> {
+    let package_list = get_package_list(boot_dir)?;
     let Some(merkle) = package_list.get(package_name) else {
         return Err(format_err!("package '{package_name}' not found in package list"));
     };
-    let meta_far = read_file(boot_dir, &format!("blob/{merkle}")).await?;
+    let meta_far = read_file(boot_dir, &format!("blob/{merkle}"))?;
 
     let mut reader = fuchsia_archive::Reader::new(Cursor::new(meta_far))?;
     let reader_list = reader.list();
@@ -118,8 +125,11 @@ mod test {
             vfs::path::Path::dot(),
             ServerEnd::new(server.into_channel()),
         );
-        let client = client.into_proxy().unwrap();
-        list(&client).await.unwrap();
+        fasync::unblock(move || {
+            let client: File = fdio::create_fd(client.into_channel().into()).unwrap().into();
+            list(&client).unwrap();
+        })
+        .await;
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -160,7 +170,10 @@ mod test {
             vfs::path::Path::dot(),
             ServerEnd::new(server.into_channel()),
         );
-        let client = client.into_proxy().unwrap();
-        show(&client, "foo").await.unwrap();
+        fasync::unblock(move || {
+            let client: File = fdio::create_fd(client.into_channel().into()).unwrap().into();
+            show(&client, "foo").unwrap();
+        })
+        .await;
     }
 }

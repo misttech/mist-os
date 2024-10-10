@@ -38,7 +38,7 @@ rustc_library("lib") {
   with_unit_tests = true
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//src/lib/fuchsia-fs",
+    "//src/lib/fdio/rust:fdio",
     "//src/sys/pkg/lib/far/rust:fuchsia-archive",
     "//src/sys/pkg/lib/fuchsia-merkle",
     "//src/sys/pkg/lib/fuchsia-pkg",
@@ -64,8 +64,8 @@ rustc_binary("bootpkg") {
 
   deps = [
     ":lib",
-    "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-fs",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//src/lib/fdio/rust:fdio",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
   ]
