@@ -2269,8 +2269,10 @@ pub struct zx_processor_power_state_t {
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct zx_processor_power_domain_t {
-    pub domain_id: u32,
     pub cpus: zx_cpu_set_t,
+    pub domain_id: u32,
+    // Padding.
+    pub padding1: [PadByte; 4],
 }
 
 multiconst!(u32, [

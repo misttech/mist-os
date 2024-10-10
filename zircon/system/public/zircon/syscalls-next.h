@@ -176,8 +176,11 @@ typedef struct {
 } zx_processor_power_state_t;
 
 typedef struct {
-  uint32_t domain_id;
   zx_cpu_set_t cpus;
+  uint32_t domain_id;
+  // Padding.
+  uint8_t padding1[4];
+
 } zx_processor_power_domain_t;
 
 // ====== End of runtime processor power management support ====== //
