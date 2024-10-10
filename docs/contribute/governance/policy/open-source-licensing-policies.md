@@ -109,7 +109,8 @@ of code.
 
 The following are the approved licenses for production target devices:
 
-*   BSD 3-clause license, specifically the text at [/LICENSE](/LICENSE)
+*   BSD 3-clause license, specifically the text at
+    [https://opensource.org/license/BSD-3-Clause](https://opensource.org/license/BSD-3-Clause)
 
 *   BSD 2-clause license, specifically the text at
     [https://opensource.org/licenses/BSD-2-Clause](https://opensource.org/licenses/BSD-2-Clause)
