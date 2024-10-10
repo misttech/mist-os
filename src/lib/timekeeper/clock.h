@@ -33,13 +33,20 @@ class Clock {
   }
 
   // Returns the current monotonic time. See |zx_clock_get_monotonic|.
-  zx::time Now() const { return zx::time(GetMonotonicTime()); }
+  zx::basic_time<ZX_CLOCK_MONOTONIC> Now() const { return zx::time(GetMonotonicTime()); }
+
+  // Returns the current boot time. See |zx_clock_get_boot|.
+  zx::basic_time<ZX_CLOCK_BOOT> BootNow() const {
+    return zx::basic_time<ZX_CLOCK_BOOT>(GetBootTime());
+  }
 
  protected:
   // Returns the current UTC time.
   virtual zx_status_t GetUtcTime(zx_time_t* time) const = 0;
   // Returns the current monotonic time. See |zx_clock_get_monotonic|.
-  virtual zx_time_t GetMonotonicTime() const = 0;
+  virtual zx_instant_mono_t GetMonotonicTime() const = 0;
+  // Returns the current boot time. See |zx_clock_get_boot|.
+  virtual zx_instant_boot_t GetBootTime() const = 0;
 };
 
 }  // namespace timekeeper

@@ -18,7 +18,8 @@ namespace timekeeper {
 class SystemClock : public Clock {
  private:
   zx_status_t GetUtcTime(zx_time_t* time) const override { return utc_clock_->read(time); }
-  zx_time_t GetMonotonicTime() const override { return zx_clock_get_monotonic(); }
+  zx_instant_mono_t GetMonotonicTime() const override { return zx_clock_get_monotonic(); }
+  zx_instant_boot_t GetBootTime() const override { return zx_clock_get_boot(); }
 
   zx::unowned_clock utc_clock_ = zx::unowned_clock(zx_utc_reference_get());
 };

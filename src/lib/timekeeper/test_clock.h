@@ -22,7 +22,8 @@ class TestClock : public Clock {
 
  private:
   zx_status_t GetUtcTime(zx_time_t* time) const override;
-  zx_time_t GetMonotonicTime() const override;
+  zx_instant_mono_t GetMonotonicTime() const override;
+  zx_instant_boot_t GetBootTime() const override;
 
   zx_time_t current_time_;
 };
