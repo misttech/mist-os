@@ -84,7 +84,7 @@ pub(crate) trait NatHook<I: IpExt> {
         packet: &P,
         interfaces: &Interfaces<'_, CC::DeviceId>,
         result: RoutineResult<I>,
-    ) -> ControlFlow<(Self::Verdict, bool)>
+    ) -> ControlFlow<ConfigureNatResult<Self::Verdict>>
     where
         P: IpPacket<I>,
         CC: NatContext<I, BC>,
@@ -114,6 +114,18 @@ impl FilterVerdict for Verdict {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub(crate) struct ConfigureNatResult<V> {
+    verdict: V,
+    should_nat: bool,
+}
+
+impl<V: From<Verdict>> ConfigureNatResult<V> {
+    fn drop_packet() -> Self {
+        Self { verdict: Verdict::Drop.into(), should_nat: false }
+    }
+}
+
 pub(crate) enum IngressHook {}
 
 impl<I: IpExt> NatHook<I> for IngressHook {
@@ -129,7 +141,7 @@ impl<I: IpExt> NatHook<I> for IngressHook {
         packet: &P,
         interfaces: &Interfaces<'_, CC::DeviceId>,
         result: RoutineResult<I>,
-    ) -> ControlFlow<(Self::Verdict, bool)>
+    ) -> ControlFlow<ConfigureNatResult<Self::Verdict>>
     where
         P: IpPacket<I>,
         CC: NatContext<I, BC>,
@@ -137,12 +149,15 @@ impl<I: IpExt> NatHook<I> for IngressHook {
     {
         match result {
             RoutineResult::Accept | RoutineResult::Return => ControlFlow::Continue(()),
-            RoutineResult::Drop => ControlFlow::Break((Verdict::Drop.into(), false)),
+            RoutineResult::Drop => ControlFlow::Break(ConfigureNatResult::drop_packet()),
             RoutineResult::TransparentLocalDelivery { addr, port } => {
-                ControlFlow::Break((IngressVerdict::TransparentLocalDelivery { addr, port }, false))
+                ControlFlow::Break(ConfigureNatResult {
+                    verdict: IngressVerdict::TransparentLocalDelivery { addr, port },
+                    should_nat: false,
+                })
             }
             RoutineResult::Redirect { dst_port } => {
-                let (verdict, nat_type) = configure_redirect_nat::<Self, _, _, _, _>(
+                ControlFlow::Break(configure_redirect_nat::<Self, _, _, _, _>(
                     core_ctx,
                     bindings_ctx,
                     table,
@@ -150,8 +165,7 @@ impl<I: IpExt> NatHook<I> for IngressHook {
                     packet,
                     interfaces,
                     dst_port,
-                );
-                ControlFlow::Break((verdict.into(), nat_type))
+                ))
             }
             result @ RoutineResult::Masquerade { .. } => {
                 unreachable!("masquerade NAT is only valid in EGRESS hook; got {result:?}")
@@ -207,7 +221,7 @@ impl<I: IpExt> NatHook<I> for LocalEgressHook {
         packet: &P,
         interfaces: &Interfaces<'_, CC::DeviceId>,
         result: RoutineResult<I>,
-    ) -> ControlFlow<(Self::Verdict, bool)>
+    ) -> ControlFlow<ConfigureNatResult<Self::Verdict>>
     where
         P: IpPacket<I>,
         CC: NatContext<I, BC>,
@@ -215,7 +229,7 @@ impl<I: IpExt> NatHook<I> for LocalEgressHook {
     {
         match result {
             RoutineResult::Accept | RoutineResult::Return => ControlFlow::Continue(()),
-            RoutineResult::Drop => ControlFlow::Break((Verdict::Drop.into(), false)),
+            RoutineResult::Drop => ControlFlow::Break(ConfigureNatResult::drop_packet()),
             result @ RoutineResult::TransparentLocalDelivery { .. } => {
                 unreachable!(
                     "transparent local delivery is only valid in INGRESS hook; got {result:?}"
@@ -263,7 +277,7 @@ impl<I: IpExt> NatHook<I> for LocalIngressHook {
         _packet: &P,
         _interfaces: &Interfaces<'_, CC::DeviceId>,
         result: RoutineResult<I>,
-    ) -> ControlFlow<(Self::Verdict, bool)>
+    ) -> ControlFlow<ConfigureNatResult<Self::Verdict>>
     where
         P: IpPacket<I>,
         CC: NatContext<I, BC>,
@@ -297,7 +311,7 @@ impl<I: IpExt> NatHook<I> for EgressHook {
         _packet: &P,
         _interfaces: &Interfaces<'_, CC::DeviceId>,
         result: RoutineResult<I>,
-    ) -> ControlFlow<(Self::Verdict, bool)>
+    ) -> ControlFlow<ConfigureNatResult<Self::Verdict>>
     where
         P: IpPacket<I>,
         CC: NatContext<I, BC>,
@@ -412,7 +426,7 @@ where
             }
             NatType::Destination => {}
         }
-        let (verdict, config) = configure_nat::<N, _, _, _, _>(
+        let ConfigureNatResult { verdict, should_nat } = configure_nat::<N, _, _, _, _>(
             core_ctx,
             bindings_ctx,
             table,
@@ -426,9 +440,9 @@ where
         }
         conn.external_data()
             .destination
-            .set(config)
+            .set(should_nat)
             .expect("DNAT should not have been configured yet");
-        config
+        should_nat
     };
 
     if !should_nat_conn {
@@ -451,7 +465,7 @@ fn configure_nat<N, I, P, CC, BC>(
     hook: &Hook<I, BC::DeviceClass, ()>,
     packet: &P,
     interfaces: Interfaces<'_, CC::DeviceId>,
-) -> (N::Verdict, bool)
+) -> ConfigureNatResult<N::Verdict>
 where
     N: NatHook<I>,
     I: IpExt,
@@ -475,7 +489,7 @@ where
             ControlFlow::Continue(()) => {}
         }
     }
-    (Verdict::Accept.into(), false)
+    ConfigureNatResult { verdict: Verdict::Accept.into(), should_nat: false }
 }
 
 /// Configure Redirect NAT, a special case of DNAT that redirects the packet to
@@ -488,7 +502,7 @@ fn configure_redirect_nat<N, I, P, CC, BC>(
     packet: &P,
     interfaces: &Interfaces<'_, CC::DeviceId>,
     dst_port: Option<RangeInclusive<NonZeroU16>>,
-) -> (Verdict, bool)
+) -> ConfigureNatResult<N::Verdict>
 where
     N: NatHook<I>,
     I: IpExt,
@@ -508,18 +522,21 @@ where
     // If we are in INGRESS, use the primary address of the incoming interface; if
     // we are in LOCAL_EGRESS, use the loopback address.
     let Some(new_dst_addr) = N::redirect_addr(core_ctx, packet, interfaces.ingress) else {
-        return (Verdict::Drop, false);
+        return ConfigureNatResult::drop_packet();
     };
     reply_tuple.src_addr = new_dst_addr;
 
     let verdict = dst_port
         .map(|range| rewrite_tuple_src_port(bindings_ctx, table, reply_tuple, range))
         .unwrap_or(Verdict::Accept);
-    let should_nat = match verdict {
-        Verdict::Drop => false,
-        Verdict::Accept => true,
-    };
-    (verdict, should_nat)
+
+    ConfigureNatResult {
+        verdict: verdict.into(),
+        should_nat: match verdict {
+            Verdict::Drop => false,
+            Verdict::Accept => true,
+        },
+    }
 }
 
 /// Attempt to rewrite the source port of the provided tuple such that it fits
@@ -649,6 +666,12 @@ mod tests {
     };
     use crate::state::{Action, Routine, Rule, TransparentProxy};
 
+    impl<V: From<Verdict>> ConfigureNatResult<V> {
+        fn accept_packet() -> Self {
+            Self { verdict: Verdict::Accept.into(), should_nat: false }
+        }
+    }
+
     #[test]
     fn accept_by_default_if_no_matching_rules_in_hook() {
         let mut bindings_ctx = FakeBindingsCtx::<Ipv4>::new();
@@ -666,7 +689,7 @@ mod tests {
                 &packet,
                 Interfaces { ingress: None, egress: None },
             ),
-            (Verdict::Accept, false)
+            ConfigureNatResult::accept_packet()
         );
     }
 
@@ -692,7 +715,7 @@ mod tests {
                 &packet,
                 Interfaces { ingress: None, egress: None },
             ),
-            (Verdict::Accept, false)
+            ConfigureNatResult::accept_packet()
         );
     }
 
@@ -722,7 +745,7 @@ mod tests {
                 &packet,
                 Interfaces { ingress: None, egress: None },
             ),
-            (Verdict::Accept, false)
+            ConfigureNatResult::accept_packet()
         );
 
         // The first installed routine should terminate at its `Accept` result, but the
@@ -748,7 +771,7 @@ mod tests {
                 &packet,
                 Interfaces { ingress: None, egress: None },
             ),
-            (Verdict::Drop, false)
+            ConfigureNatResult::drop_packet()
         );
     }
 
@@ -786,7 +809,7 @@ mod tests {
                 &packet,
                 Interfaces { ingress: None, egress: None },
             ),
-            (Verdict::Drop, false)
+            ConfigureNatResult::drop_packet()
         );
     }
 
@@ -824,10 +847,13 @@ mod tests {
                 &packet,
                 Interfaces { ingress: None, egress: None },
             ),
-            (
-                IngressVerdict::TransparentLocalDelivery { addr: Ipv4::DST_IP, port: LOCAL_PORT },
-                false
-            )
+            ConfigureNatResult {
+                verdict: IngressVerdict::TransparentLocalDelivery {
+                    addr: Ipv4::DST_IP,
+                    port: LOCAL_PORT
+                },
+                should_nat: false,
+            }
         );
     }
 
@@ -865,7 +891,7 @@ mod tests {
                 &packet,
                 Interfaces { ingress: None, egress: None },
             ),
-            (Verdict::Accept, true)
+            ConfigureNatResult { verdict: Verdict::Accept.into(), should_nat: true }
         );
     }
 
@@ -895,7 +921,7 @@ mod tests {
                 &packet,
                 Interfaces { ingress: Some(&ethernet_interface()), egress: None },
             ),
-            (Verdict::Drop.into(), false)
+            ConfigureNatResult::drop_packet()
         );
     }
 
