@@ -146,7 +146,7 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
           dispatcher_,
           [this](Capture* c) { return capture_maker_->GetCapture(c, CaptureLevel::VMO); },
           [this](const Capture& c, Digest* d) { GetDigest(c, d); }, &config_),
-      level_(Level::kNumLevels) {
+      level_(pressure_signaler::Level::kNumLevels) {
   auto bucket_matches = CreateBucketMatchesFromConfigData();
   digester_ = std::make_unique<Digester>(Digester(bucket_matches));
   high_water_ = std::make_unique<HighWater>(
@@ -223,11 +223,11 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
                   << " Total Heap: " << kmem.total_heap_bytes;
   }
 
-  pressure_notifier_ = std::make_unique<PressureNotifier>(
+  pressure_notifier_ = std::make_unique<pressure_signaler::PressureNotifier>(
       watch_memory_pressure, send_critical_pressure_crash_reports, component_context_.get(),
-      dispatcher, [this](Level l) { PressureLevelChanged(l); });
+      dispatcher, [this](pressure_signaler::Level l) { PressureLevelChanged(l); });
   memory_debugger_ =
-      std::make_unique<MemoryDebugger>(component_context_.get(), pressure_notifier_.get());
+      std::make_unique<pressure_signaler::MemoryDebugger>(component_context_.get(), pressure_notifier_.get());
   SampleAndPost();
 }
 
@@ -584,8 +584,8 @@ void Monitor::GetDigest(const memory::Capture& capture, memory::Digest* digest) 
   digester_->Digest(capture, digest);
 }
 
-void Monitor::PressureLevelChanged(Level level) {
-  if (level == kImminentOOM) {
+void Monitor::PressureLevelChanged(pressure_signaler::Level level) {
+  if (level == pressure_signaler::Level::kImminentOOM) {
     // Force the current state to be written as the high_waters. Later is better.
     memory::Capture c;
     auto s = capture_maker_->GetCapture(&c, CaptureLevel::VMO);
@@ -599,10 +599,10 @@ void Monitor::PressureLevelChanged(Level level) {
   if (level == level_) {
     return;
   }
-  FX_LOGS(INFO) << "Memory pressure level changed from " << kLevelNames[level_] << " to "
-                << kLevelNames[level];
+  FX_LOGS(INFO) << "Memory pressure level changed from " << pressure_signaler::kLevelNames[level_] << " to "
+                << pressure_signaler::kLevelNames[level];
   TRACE_INSTANT("memory_monitor", "MemoryPressureLevelChange", TRACE_SCOPE_THREAD, "from",
-                kLevelNames[level_], "to", kLevelNames[level]);
+                pressure_signaler::kLevelNames[level_], "to", pressure_signaler::kLevelNames[level]);
 
   level_ = level;
   logger_.SetPressureLevel(level_);

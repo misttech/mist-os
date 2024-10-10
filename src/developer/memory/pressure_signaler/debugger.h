@@ -11,7 +11,7 @@
 
 #include "src/developer/memory/pressure_signaler/pressure_notifier.h"
 
-namespace monitor {
+namespace pressure_signaler {
 
 class MemoryDebugger : public fuchsia::memory::debug::MemoryPressure {
  public:
@@ -26,6 +26,6 @@ class MemoryDebugger : public fuchsia::memory::debug::MemoryPressure {
   PressureNotifier *const notifier_;
 };
 
-}  // namespace monitor
+}  // namespace pressure_signaler
 
 #endif  // SRC_DEVELOPER_MEMORY_PRESSURE_SIGNALER_DEBUGGER_H_

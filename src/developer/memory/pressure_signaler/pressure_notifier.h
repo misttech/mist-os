@@ -14,7 +14,7 @@
 
 #include "src/developer/memory/pressure_signaler/pressure_observer.h"
 
-namespace monitor {
+namespace pressure_signaler {
 
 struct WatcherState {
   fuchsia::memorypressure::WatcherPtr proxy;
@@ -72,6 +72,6 @@ class PressureNotifier : public fuchsia::memorypressure::Provider {
   friend class test::PressureNotifierUnitTest;
 };
 
-}  // namespace monitor
+}  // namespace pressure_signaler
 
 #endif  // SRC_DEVELOPER_MEMORY_PRESSURE_SIGNALER_PRESSURE_NOTIFIER_H_

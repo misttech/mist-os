@@ -16,7 +16,7 @@
 #include <memory>
 #include <string>
 
-namespace monitor {
+namespace pressure_signaler {
 
 namespace test {
 class PressureObserverUnitTest;
@@ -75,6 +75,6 @@ class PressureObserver {
   friend class test::PressureNotifierUnitTest;
 };
 
-}  // namespace monitor
+}  // namespace pressure_signaler
 
 #endif  // SRC_DEVELOPER_MEMORY_PRESSURE_SIGNALER_PRESSURE_OBSERVER_H_

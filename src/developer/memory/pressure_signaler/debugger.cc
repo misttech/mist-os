@@ -6,7 +6,7 @@
 
 #include <lib/syslog/cpp/macros.h>
 
-namespace monitor {
+namespace pressure_signaler {
 
 MemoryDebugger::MemoryDebugger(sys::ComponentContext* context, PressureNotifier* notifier)
     : notifier_(notifier) {
@@ -18,4 +18,4 @@ MemoryDebugger::MemoryDebugger(sys::ComponentContext* context, PressureNotifier*
 
 void MemoryDebugger::Signal(fuchsia::memorypressure::Level level) { notifier_->DebugNotify(level); }
 
-}  // namespace monitor
+}  // namespace pressure_signaler

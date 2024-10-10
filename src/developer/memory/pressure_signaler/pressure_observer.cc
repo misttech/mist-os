@@ -21,7 +21,7 @@
 
 #include "src/developer/memory/pressure_signaler/pressure_notifier.h"
 
-namespace monitor {
+namespace pressure_signaler {
 
 PressureObserver::PressureObserver(bool watch_for_changes, PressureNotifier* notifier)
     : notifier_(notifier) {
@@ -163,4 +163,4 @@ Level PressureObserver::GetCurrentLevelForWatcher() const {
   return (current_level == Level::kImminentOOM) ? Level::kCritical : current_level;
 }
 
-}  // namespace monitor
+}  // namespace pressure_signaler

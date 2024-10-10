@@ -8,7 +8,7 @@
 #include <lib/zx/clock.h>
 #include <lib/zx/result.h>
 
-namespace monitor {
+namespace pressure_signaler {
 
 namespace {
 
@@ -248,4 +248,4 @@ void PressureNotifier::FileCrashReport(CrashReportType type) {
   }
 }
 
-}  // namespace monitor
+}  // namespace pressure_signaler

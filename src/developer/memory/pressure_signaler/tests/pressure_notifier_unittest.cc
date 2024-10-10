@@ -17,8 +17,8 @@
 
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
-namespace monitor {
-namespace test {
+
+namespace pressure_signaler::test {
 
 namespace fmp = fuchsia::memorypressure;
 
@@ -650,5 +650,4 @@ TEST_F(PressureNotifierUnitTest, SimulatePressure) {
   ASSERT_EQ(GetWatcherCount(), 0ul);
 }
 
-}  // namespace test
-}  // namespace monitor
+} // namespace pressure_signaler::test
