@@ -5,7 +5,7 @@
     {{#each const_declarations}}
         <tr id="{{rpn name}}">
             <td><a href="{{sl @root.config @root.tag location}}">{{rpn name}}</a></td>
-            {{#if (eq type.kind "primitive")}}
+            {{#if (eq type.kind_v2 "primitive")}}
                 <td>
                     <code>
                         {{~ #if (eq value.kind "literal")}}
@@ -19,7 +19,7 @@
                 </td>
                 <td><code>{{~ type.subtype ~}}</code></td>
             {{else}}
-                {{#if (eq type.kind "string")}}
+                {{#if (eq type.kind_v2 "string")}}
                     <td><code>{{~ value.literal.value ~}}</code></td>
                     <td><code>String</code></td>
                 {{/if}}

@@ -546,13 +546,13 @@
         <tr>
             <td><code>client_end</code></td>
             <td>
-                <code><a class='link' href='#Protocol'>Protocol</a></code>
+                <code>client_end:<a class='link' href='#Protocol'>Protocol</a></code>
             </td>
         </tr>
         <tr>
             <td><code>server_end</code></td>
             <td>
-                <code>server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
+                <code>server_end:<a class='link' href='#Protocol'>Protocol</a></code>
             </td>
         </tr>
         <tr>
@@ -588,13 +588,13 @@
         <tr>
             <td><code>opt_client_end</code></td>
             <td>
-                <code><a class='link' href='#Protocol'>Protocol</a>?</code>
+                <code>client_end:<a class='link' href='#Protocol'>Protocol</a>?</code>
             </td>
         </tr>
         <tr>
             <td><code>opt_server_end</code></td>
             <td>
-                <code>server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;?</code>
+                <code>server_end:<a class='link' href='#Protocol'>Protocol</a>?</code>
             </td>
         </tr>
         <tr>
@@ -624,13 +624,13 @@
         <tr>
             <td><code>array_client_end</code></td>
             <td>
-                <code>array&lt;<a class='link' href='#Protocol'>Protocol</a>,&nbsp;5&gt;</code>
+                <code>array&lt;client_end:<a class='link' href='#Protocol'>Protocol</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_server_end</code></td>
             <td>
-                <code>array&lt;server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;,&nbsp;5&gt;</code>
+                <code>array&lt;server_end:<a class='link' href='#Protocol'>Protocol</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
@@ -666,13 +666,13 @@
         <tr>
             <td><code>vector_client_end</code></td>
             <td>
-                <code>vector&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
+                <code>vector&lt;client_end:<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>vector_server_end</code></td>
             <td>
-                <code>vector&lt;server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;&gt;</code>
+                <code>vector&lt;server_end:<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
             </td>
         </tr>
         <tr>
@@ -1205,13 +1205,13 @@
         <tr>
             <td><code>client_end</code></td>
             <td>
-                <code><a class='link' href='#Protocol'>Protocol</a></code>
+                <code>client_end:<a class='link' href='#Protocol'>Protocol</a></code>
             </td>
         </tr>
         <tr>
             <td><code>server_end</code></td>
             <td>
-                <code>server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
+                <code>server_end:<a class='link' href='#Protocol'>Protocol</a></code>
             </td>
         </tr>
         <tr>
@@ -1247,13 +1247,13 @@
         <tr>
             <td><code>opt_client_end</code></td>
             <td>
-                <code><a class='link' href='#Protocol'>Protocol</a>?</code>
+                <code>client_end:<a class='link' href='#Protocol'>Protocol</a>?</code>
             </td>
         </tr>
         <tr>
             <td><code>opt_server_end</code></td>
             <td>
-                <code>server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;?</code>
+                <code>server_end:<a class='link' href='#Protocol'>Protocol</a>?</code>
             </td>
         </tr>
         <tr>
@@ -1283,13 +1283,13 @@
         <tr>
             <td><code>array_client_end</code></td>
             <td>
-                <code>array&lt;<a class='link' href='#Protocol'>Protocol</a>,&nbsp;5&gt;</code>
+                <code>array&lt;client_end:<a class='link' href='#Protocol'>Protocol</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_server_end</code></td>
             <td>
-                <code>array&lt;server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;,&nbsp;5&gt;</code>
+                <code>array&lt;server_end:<a class='link' href='#Protocol'>Protocol</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
@@ -1325,13 +1325,13 @@
         <tr>
             <td><code>vector_client_end</code></td>
             <td>
-                <code>vector&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
+                <code>vector&lt;client_end:<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>vector_server_end</code></td>
             <td>
-                <code>vector&lt;server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;&gt;</code>
+                <code>vector&lt;server_end:<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
             </td>
         </tr>
         <tr>
@@ -2147,13 +2147,13 @@
         <tr>
             <td><code>client_end</code></td>
             <td>
-                <code><a class='link' href='#Protocol'>Protocol</a></code>
+                <code>client_end:<a class='link' href='#Protocol'>Protocol</a></code>
             </td>
         </tr>
         <tr>
             <td><code>server_end</code></td>
             <td>
-                <code>server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
+                <code>server_end:<a class='link' href='#Protocol'>Protocol</a></code>
             </td>
         </tr>
         <tr>
@@ -2189,13 +2189,13 @@
         <tr>
             <td><code>opt_client_end</code></td>
             <td>
-                <code><a class='link' href='#Protocol'>Protocol</a>?</code>
+                <code>client_end:<a class='link' href='#Protocol'>Protocol</a>?</code>
             </td>
         </tr>
         <tr>
             <td><code>opt_server_end</code></td>
             <td>
-                <code>server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;?</code>
+                <code>server_end:<a class='link' href='#Protocol'>Protocol</a>?</code>
             </td>
         </tr>
         <tr>
@@ -2225,13 +2225,13 @@
         <tr>
             <td><code>array_client_end</code></td>
             <td>
-                <code>array&lt;<a class='link' href='#Protocol'>Protocol</a>,&nbsp;5&gt;</code>
+                <code>array&lt;client_end:<a class='link' href='#Protocol'>Protocol</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_server_end</code></td>
             <td>
-                <code>array&lt;server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;,&nbsp;5&gt;</code>
+                <code>array&lt;server_end:<a class='link' href='#Protocol'>Protocol</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
@@ -2267,13 +2267,13 @@
         <tr>
             <td><code>vector_client_end</code></td>
             <td>
-                <code>vector&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
+                <code>vector&lt;client_end:<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>vector_server_end</code></td>
             <td>
-                <code>vector&lt;server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;&gt;</code>
+                <code>vector&lt;server_end:<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
             </td>
         </tr>
         <tr>
@@ -2316,13 +2316,13 @@
         <tr>
             <td><code>client_end</code></td>
             <td>
-                <code><a class='link' href='#Protocol'>Protocol</a></code>
+                <code>client_end:<a class='link' href='#Protocol'>Protocol</a></code>
             </td>
         </tr>
         <tr>
             <td><code>server_end</code></td>
             <td>
-                <code>server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
+                <code>server_end:<a class='link' href='#Protocol'>Protocol</a></code>
             </td>
         </tr>
         <tr>
@@ -2358,13 +2358,13 @@
         <tr>
             <td><code>opt_client_end</code></td>
             <td>
-                <code><a class='link' href='#Protocol'>Protocol</a>?</code>
+                <code>client_end:<a class='link' href='#Protocol'>Protocol</a>?</code>
             </td>
         </tr>
         <tr>
             <td><code>opt_server_end</code></td>
             <td>
-                <code>server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;?</code>
+                <code>server_end:<a class='link' href='#Protocol'>Protocol</a>?</code>
             </td>
         </tr>
         <tr>
@@ -2394,13 +2394,13 @@
         <tr>
             <td><code>array_client_end</code></td>
             <td>
-                <code>array&lt;<a class='link' href='#Protocol'>Protocol</a>,&nbsp;5&gt;</code>
+                <code>array&lt;client_end:<a class='link' href='#Protocol'>Protocol</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_server_end</code></td>
             <td>
-                <code>array&lt;server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;,&nbsp;5&gt;</code>
+                <code>array&lt;server_end:<a class='link' href='#Protocol'>Protocol</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
@@ -2436,13 +2436,13 @@
         <tr>
             <td><code>vector_client_end</code></td>
             <td>
-                <code>vector&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
+                <code>vector&lt;client_end:<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>vector_server_end</code></td>
             <td>
-                <code>vector&lt;server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;&gt;</code>
+                <code>vector&lt;server_end:<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
             </td>
         </tr>
         <tr>
@@ -3193,7 +3193,7 @@
         <tr id="Resource.client_end">
             <td><code>client_end</code></td>
             <td>
-                <code><a class='link' href='#Protocol'>Protocol</a></code>
+                <code>client_end:<a class='link' href='#Protocol'>Protocol</a></code>
             </td>
             <td></td>
             <td>No default</td>
@@ -3201,7 +3201,7 @@
         <tr id="Resource.server_end">
             <td><code>server_end</code></td>
             <td>
-                <code>server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
+                <code>server_end:<a class='link' href='#Protocol'>Protocol</a></code>
             </td>
             <td></td>
             <td>No default</td>
@@ -3249,7 +3249,7 @@
         <tr id="Resource.opt_client_end">
             <td><code>opt_client_end</code></td>
             <td>
-                <code><a class='link' href='#Protocol'>Protocol</a>?</code>
+                <code>client_end:<a class='link' href='#Protocol'>Protocol</a>?</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -3257,7 +3257,7 @@
         <tr id="Resource.opt_server_end">
             <td><code>opt_server_end</code></td>
             <td>
-                <code>server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;?</code>
+                <code>server_end:<a class='link' href='#Protocol'>Protocol</a>?</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -3297,7 +3297,7 @@
         <tr id="Resource.array_client_end">
             <td><code>array_client_end</code></td>
             <td>
-                <code>array&lt;<a class='link' href='#Protocol'>Protocol</a>,&nbsp;5&gt;</code>
+                <code>array&lt;client_end:<a class='link' href='#Protocol'>Protocol</a>,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -3305,7 +3305,7 @@
         <tr id="Resource.array_server_end">
             <td><code>array_server_end</code></td>
             <td>
-                <code>array&lt;server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;,&nbsp;5&gt;</code>
+                <code>array&lt;server_end:<a class='link' href='#Protocol'>Protocol</a>,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -3353,7 +3353,7 @@
         <tr id="Resource.vector_client_end">
             <td><code>vector_client_end</code></td>
             <td>
-                <code>vector&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
+                <code>vector&lt;client_end:<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -3361,7 +3361,7 @@
         <tr id="Resource.vector_server_end">
             <td><code>vector_server_end</code></td>
             <td>
-                <code>vector&lt;server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;&gt;</code>
+                <code>vector&lt;server_end:<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
             </td>
             <td></td>
             <td>No default</td>

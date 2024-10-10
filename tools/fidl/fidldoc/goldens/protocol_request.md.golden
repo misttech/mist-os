@@ -32,7 +32,7 @@
         <tr>
             <td><code>c</code></td>
             <td>
-                <code><a class='link' href='#Child'>Child</a></code>
+                <code>client_end:<a class='link' href='#Child'>Child</a></code>
             </td>
         </tr>
 </table>
@@ -54,7 +54,7 @@
         <tr>
             <td><code>r</code></td>
             <td>
-                <code>server_end&lt;<a class='link' href='#Child'>Child</a>&gt;</code>
+                <code>server_end:<a class='link' href='#Child'>Child</a></code>
             </td>
         </tr>
 </table>
@@ -71,7 +71,7 @@
         <tr>
             <td><code>c</code></td>
             <td>
-                <code><a class='link' href='#Child'>Child</a></code>
+                <code>client_end:<a class='link' href='#Child'>Child</a></code>
             </td>
         </tr>
 </table>
@@ -89,7 +89,7 @@
         <tr>
             <td><code>r</code></td>
             <td>
-                <code>server_end&lt;<a class='link' href='#Child'>Child</a>&gt;</code>
+                <code>server_end:<a class='link' href='#Child'>Child</a></code>
             </td>
         </tr>
 </table>

@@ -23,7 +23,7 @@
         <tr>
             <td><code>request</code></td>
             <td>
-                <code>server_end&lt;<a class='link' href='#Parent'>Parent</a>&gt;</code>
+                <code>server_end:<a class='link' href='#Parent'>Parent</a></code>
             </td>
         </tr>
 </table>
@@ -41,7 +41,7 @@
         <tr>
             <td><code>request</code></td>
             <td>
-                <code>server_end&lt;<a class='link' href='#Parent'>Parent</a>&gt;</code>
+                <code>server_end:<a class='link' href='#Parent'>Parent</a></code>
             </td>
         </tr>
 </table>
@@ -63,7 +63,7 @@
         <tr>
             <td><code>request</code></td>
             <td>
-                <code>server_end&lt;<a class='link' href='#Parent'>Parent</a>&gt;</code>
+                <code>server_end:<a class='link' href='#Parent'>Parent</a></code>
             </td>
         </tr>
 </table>
