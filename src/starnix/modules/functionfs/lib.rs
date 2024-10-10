@@ -7,7 +7,7 @@ use fidl_fuchsia_hardware_adb as fadb;
 use starnix_core::power::{clear_wake_proxy_signal, create_proxy_for_wake_events};
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::{
-    fileops_impl_nonseekable, fileops_impl_noop_sync, fs_args, fs_node_impl_dir_readonly,
+    fileops_impl_noop_sync, fileops_impl_seekless, fs_args, fs_node_impl_dir_readonly,
     fs_node_impl_not_dir, CacheMode, DirectoryEntryType, FileObject, FileOps, FileSystem,
     FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeInfo, FsNodeOps, FsStr,
     InputBuffer, OutputBuffer, VecDirectory, VecDirectoryEntry,
@@ -405,7 +405,7 @@ impl FsNodeOps for FunctionFsControlEndpoint {
 }
 
 impl FileOps for FunctionFsControlEndpoint {
-    fileops_impl_nonseekable!();
+    fileops_impl_seekless!();
     fileops_impl_noop_sync!();
 
     fn close(&self, file: &FileObject, _current_task: &CurrentTask) {
@@ -514,7 +514,7 @@ impl FsNodeOps for FunctionFsInputEndpoint {
 }
 
 impl FileOps for FunctionFsInputEndpoint {
-    fileops_impl_nonseekable!();
+    fileops_impl_seekless!();
     fileops_impl_noop_sync!();
 
     fn read(
@@ -567,7 +567,7 @@ impl FsNodeOps for FunctionFsOutputEndpoint {
 struct FunctionFsOutputFileObject;
 
 impl FileOps for FunctionFsOutputFileObject {
-    fileops_impl_nonseekable!();
+    fileops_impl_seekless!();
     fileops_impl_noop_sync!();
 
     fn read(
