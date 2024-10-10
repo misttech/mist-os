@@ -9,6 +9,7 @@
 #include <lib/fidl/cpp/enum.h>
 #include <lib/fidl/cpp/framework_err.h>
 #include <lib/fidl/cpp/string.h>
+#include <lib/fidl/cpp/time.h>
 #include <lib/fidl/cpp/wire/wire_types.h>
 
 #include <optional>
@@ -67,6 +68,16 @@ template <typename HLCPP>
 struct HLCPPToNaturalTraits<
     HLCPP, std::enable_if_t<std::is_integral_v<HLCPP> || std::is_floating_point_v<HLCPP>>>
     final : public HLCPPToNaturalTraitsIdentical<HLCPP> {};
+
+/* HLCPP to Natural traits for time types. */
+template <zx_clock_t ClockId>
+struct HLCPPToNaturalTraits<fidl::basic_time<ClockId>> final
+    : public HLCPPToNaturalTraitsIdentical<fidl::basic_time<ClockId>> {};
+
+/* Natural to HLCPP traits for time types. */
+template <zx_clock_t ClockId>
+struct NaturalToHLCPPTraits<fidl::basic_time<ClockId>> final
+    : public NaturalToHLCPPTraitsIdentical<fidl::basic_time<ClockId>> {};
 
 #ifdef __Fuchsia__
 /* Natural to HLCPP types for handle types */
