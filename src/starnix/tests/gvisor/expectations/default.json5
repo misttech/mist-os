@@ -155,9 +155,6 @@
 
                 // aio_test
                 "AIOTest.MremapExpansion",
-                "AIOTest.Mremap",
-                "AIOTest.Timeout",
-                "AIOTest.CloneVm",
 
                 // cgroup_test
                 "CPUAcctCgroup.CPUAcctStat",
@@ -951,9 +948,6 @@
 
                 // TODO(https://fxbug.dev/329684663): Re-enable once falke is resolved.
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4MappedEphemeralPortReservedReuseAddr/*",
-
-                // Crashes due to assuming the aio context is a pointer.
-                "AIOTest.BasicWrite",
 
                 // This hangs on debug builds.
                 //

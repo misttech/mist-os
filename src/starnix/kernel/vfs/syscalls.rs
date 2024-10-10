@@ -2126,6 +2126,18 @@ where
     Ok(num_fds)
 }
 
+fn deadline_after_timespec(
+    current_task: &CurrentTask,
+    user_timespec: UserRef<timespec>,
+) -> Result<zx::MonotonicInstant, Errno> {
+    if user_timespec.is_null() {
+        Ok(zx::MonotonicInstant::INFINITE)
+    } else {
+        let timespec = current_task.read_object(user_timespec)?;
+        Ok(zx::MonotonicInstant::after(duration_from_timespec(timespec)?))
+    }
+}
+
 pub fn sys_pselect6(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
@@ -2136,14 +2148,7 @@ pub fn sys_pselect6(
     timeout_addr: UserRef<timespec>,
     sigmask_addr: UserRef<pselect6_sigmask>,
 ) -> Result<i32, Errno> {
-    let start_time = zx::MonotonicInstant::get();
-
-    let deadline = if timeout_addr.is_null() {
-        zx::MonotonicInstant::INFINITE
-    } else {
-        let timespec = current_task.read_object(timeout_addr)?;
-        start_time + duration_from_timespec(timespec)?
-    };
+    let deadline = deadline_after_timespec(current_task, timeout_addr)?;
 
     let num_fds = select(
         locked,
@@ -2335,12 +2340,7 @@ pub fn sys_epoll_pwait2(
     user_timespec: UserRef<timespec>,
     user_sigmask: UserRef<SigSet>,
 ) -> Result<usize, Errno> {
-    let deadline = if user_timespec.is_null() {
-        zx::MonotonicInstant::INFINITE
-    } else {
-        let ts = current_task.read_object(user_timespec)?;
-        zx::MonotonicInstant::after(duration_from_timespec(ts)?)
-    };
+    let deadline = deadline_after_timespec(current_task, user_timespec)?;
     do_epoll_pwait(locked, current_task, epfd, events, max_events, deadline, user_sigmask)
 }
 
@@ -2924,22 +2924,17 @@ pub fn sys_io_getevents(
     min_nr: i64,
     nr: i64,
     events_ref: UserRef<io_event>,
-    timeout_ref: UserRef<timespec>,
+    user_timeout: UserRef<timespec>,
 ) -> Result<i32, Errno> {
     if min_nr < 0 || min_nr > nr || nr < 0 {
         return error!(EINVAL);
     }
-
-    if !timeout_ref.addr().is_null() && min_nr != 0 {
-        let timeout = current_task.read_object(timeout_ref)?;
-        if (timeout.tv_sec, timeout.tv_nsec) != (0, 0) {
-            track_stub!(TODO("https://fxbug.dev/297433877"), "io_getevents with blocking");
-            return error!(ENOSYS);
-        }
-    }
+    let min_results = min_nr as usize;
+    let max_results = nr as usize;
+    let deadline = deadline_after_timespec(current_task, user_timeout)?;
 
     let ctx = current_task.mm().get_aio_context(ctx_id.into()).ok_or_else(|| errno!(EINVAL))?;
-    let events = ctx.get_events(nr as usize);
+    let events = ctx.get_events(current_task, min_results, max_results, deadline)?;
     current_task.write_objects(events_ref, &events)?;
 
     Ok(events.len() as i32)
@@ -2964,8 +2959,8 @@ pub fn sys_io_destroy(
     current_task: &CurrentTask,
     ctx_id: aio_context_t,
 ) -> Result<(), Errno> {
-    let _aio_context = current_task.mm().destroy_aio_context(ctx_id.into())?;
-    // TODO: Drain the operation queue in the AioContext.
+    let aio_context = current_task.mm().destroy_aio_context(ctx_id.into())?;
+    aio_context.destroy();
     Ok(())
 }
 
