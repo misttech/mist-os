@@ -7,8 +7,6 @@
 #include <lib/mistos/util/small_vector.h>
 #include <lib/unittest/unittest.h>
 
-#include <cstdint>
-
 namespace unit_testing {
 
 using namespace starnix_uapi;
