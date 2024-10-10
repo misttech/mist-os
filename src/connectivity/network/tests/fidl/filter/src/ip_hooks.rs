@@ -143,7 +143,21 @@ pub(crate) trait SocketType {
 
     fn matcher<I: Ip>() -> Matchers;
 
-    async fn bind_sockets(realms: Realms<'_>, addrs: Addrs) -> (Sockets<Self>, SockAddrs);
+    async fn bind_sockets(realms: Realms<'_>, addrs: Addrs) -> (Sockets<Self>, SockAddrs) {
+        Self::bind_sockets_to_ports(
+            realms,
+            addrs,
+            // Let netstack pick the ports by default
+            Ports { src: 0, dst: 0 },
+        )
+        .await
+    }
+
+    async fn bind_sockets_to_ports(
+        realms: Realms<'_>,
+        addrs: Addrs,
+        ports: Ports,
+    ) -> (Sockets<Self>, SockAddrs);
 
     async fn run_test<I: ping::FuchsiaIpExt>(
         realms: Realms<'_>,
@@ -151,7 +165,7 @@ pub(crate) trait SocketType {
         sock_addrs: SockAddrs,
         expected_connectivity: ExpectedConnectivity,
         expected_original_dst: Option<OriginalDestination>,
-    ) -> OpaqueSocketHandles;
+    ) -> (Self::Server, OpaqueSocketHandle);
 }
 
 const CLIENT_PAYLOAD: &'static str = "hello from client";
@@ -179,8 +193,13 @@ impl SocketType for IrrelevantToTest {
         <UdpSocket as SocketType>::matcher::<I>()
     }
 
-    async fn bind_sockets(realms: Realms<'_>, addrs: Addrs) -> (Sockets<Self>, SockAddrs) {
-        let (Sockets { client, server }, addrs) = UdpSocket::bind_sockets(realms, addrs).await;
+    async fn bind_sockets_to_ports(
+        realms: Realms<'_>,
+        addrs: Addrs,
+        ports: Ports,
+    ) -> (Sockets<Self>, SockAddrs) {
+        let (Sockets { client, server }, addrs) =
+            UdpSocket::bind_sockets_to_ports(realms, addrs, ports).await;
         (Sockets { client, server }, addrs)
     }
 
@@ -190,7 +209,7 @@ impl SocketType for IrrelevantToTest {
         sock_addrs: SockAddrs,
         expected_connectivity: ExpectedConnectivity,
         expected_original_dst: Option<OriginalDestination>,
-    ) -> OpaqueSocketHandles {
+    ) -> (Self::Server, OpaqueSocketHandle) {
         let Sockets { client: client_sock, server: server_sock } = sockets;
         UdpSocket::run_test::<I>(
             realms,
@@ -224,17 +243,20 @@ impl SocketType for TcpSocket {
         }
     }
 
-    async fn bind_sockets(realms: Realms<'_>, addrs: Addrs) -> (Sockets<Self>, SockAddrs) {
+    async fn bind_sockets_to_ports(
+        realms: Realms<'_>,
+        addrs: Addrs,
+        ports: Ports,
+    ) -> (Sockets<Self>, SockAddrs) {
         let Realms { client, server } = realms;
         let Addrs { client: client_addr, server: server_addr } = addrs;
+        let Ports { src: client_port, dst: server_port } = ports;
 
         let fnet_ext::IpAddress(client_addr) = client_addr.into();
-        let client_addr =
-            std::net::SocketAddr::new(client_addr, /* let netstack pick the port */ 0);
+        let client_addr = std::net::SocketAddr::new(client_addr, client_port);
 
         let fnet_ext::IpAddress(server_addr) = server_addr.into();
-        let server_addr =
-            std::net::SocketAddr::new(server_addr, /* let netstack pick the port */ 0);
+        let server_addr = std::net::SocketAddr::new(server_addr, server_port);
 
         let server = fasync::net::TcpListener::listen_in_realm(&server, server_addr)
             .await
@@ -270,7 +292,7 @@ impl SocketType for TcpSocket {
         sock_addrs: SockAddrs,
         expected_connectivity: ExpectedConnectivity,
         expected_original_dst: Option<OriginalDestination>,
-    ) -> OpaqueSocketHandles {
+    ) -> (Self::Server, OpaqueSocketHandle) {
         let Sockets { client, mut server } = sockets;
         let SockAddrs { client: client_addr, server: server_addr } = sock_addrs;
 
@@ -406,10 +428,7 @@ impl SocketType for TcpSocket {
         };
 
         let (server, client) = futures::future::join(server_fut, client_fut).await;
-        OpaqueSocketHandles {
-            _client: OpaqueSocketHandle::new(client),
-            _server: OpaqueSocketHandle::new(server),
-        }
+        (server, OpaqueSocketHandle::new(client))
     }
 }
 
@@ -430,17 +449,20 @@ impl SocketType for UdpSocket {
         }
     }
 
-    async fn bind_sockets(realms: Realms<'_>, addrs: Addrs) -> (Sockets<Self>, SockAddrs) {
+    async fn bind_sockets_to_ports(
+        realms: Realms<'_>,
+        addrs: Addrs,
+        ports: Ports,
+    ) -> (Sockets<Self>, SockAddrs) {
         let Realms { client, server } = realms;
         let Addrs { client: client_addr, server: server_addr } = addrs;
+        let Ports { src: client_port, dst: server_port } = ports;
 
         let fnet_ext::IpAddress(client_addr) = client_addr.into();
-        let client_addr =
-            std::net::SocketAddr::new(client_addr, /* let netstack pick the port */ 0);
+        let client_addr = std::net::SocketAddr::new(client_addr, client_port);
 
         let fnet_ext::IpAddress(server_addr) = server_addr.into();
-        let server_addr =
-            std::net::SocketAddr::new(server_addr, /* let netstack pick the port */ 0);
+        let server_addr = std::net::SocketAddr::new(server_addr, server_port);
 
         let client_sock =
             fasync::net::UdpSocket::bind_in_realm(&client, client_addr).await.expect("bind socket");
@@ -462,7 +484,7 @@ impl SocketType for UdpSocket {
         expected_connectivity: ExpectedConnectivity,
         // NB: SO_ORIGINAL_DST is not supported for UDP sockets.
         _expected_original_dst: Option<OriginalDestination>,
-    ) -> OpaqueSocketHandles {
+    ) -> (Self::Server, OpaqueSocketHandle) {
         let Sockets { client, server } = sockets;
         let SockAddrs { client: client_addr, server: server_addr } = sock_addrs;
 
@@ -554,10 +576,7 @@ impl SocketType for UdpSocket {
             client
         };
         let (server, client) = futures::future::join(server_fut, client_fut).await;
-        OpaqueSocketHandles {
-            _server: OpaqueSocketHandle::new(server),
-            _client: OpaqueSocketHandle::new(client),
-        }
+        (server, OpaqueSocketHandle::new(client))
     }
 }
 
@@ -582,14 +601,19 @@ impl SocketType for IcmpSocket {
         }
     }
 
-    async fn bind_sockets(_realms: Realms<'_>, addrs: Addrs) -> (Sockets<Self>, SockAddrs) {
+    async fn bind_sockets_to_ports(
+        _realms: Realms<'_>,
+        addrs: Addrs,
+        ports: Ports,
+    ) -> (Sockets<Self>, SockAddrs) {
         let Addrs { client: client_addr, server: server_addr } = addrs;
+        let Ports { src: client_port, dst: server_port } = ports;
 
         let fnet_ext::IpAddress(client_addr) = client_addr.into();
-        let client_addr = std::net::SocketAddr::new(client_addr, 0);
+        let client_addr = std::net::SocketAddr::new(client_addr, client_port);
 
         let fnet_ext::IpAddress(server_addr) = server_addr.into();
-        let server_addr = std::net::SocketAddr::new(server_addr, 0);
+        let server_addr = std::net::SocketAddr::new(server_addr, server_port);
 
         let addrs = SockAddrs { client: client_addr, server: server_addr };
 
@@ -603,7 +627,7 @@ impl SocketType for IcmpSocket {
         expected_connectivity: ExpectedConnectivity,
         // NB: SO_ORIGINAL_DST is not supported for ICMP sockets.
         _expected_original_dst: Option<OriginalDestination>,
-    ) -> OpaqueSocketHandles {
+    ) -> (Self::Server, OpaqueSocketHandle) {
         let Realms { client, server } = realms;
 
         const SEQ: u16 = 1;
@@ -644,10 +668,7 @@ impl SocketType for IcmpSocket {
         }
 
         let Sockets { client, server } = sockets;
-        OpaqueSocketHandles {
-            _client: OpaqueSocketHandle::new(client),
-            _server: OpaqueSocketHandle::new(server),
-        }
+        (server, OpaqueSocketHandle::new(client))
     }
 }
 
@@ -665,11 +686,6 @@ pub(crate) struct Addrs {
 pub(crate) struct Sockets<S: SocketType + ?Sized> {
     pub client: S::Client,
     pub server: S::Server,
-}
-
-pub(crate) struct OpaqueSocketHandles {
-    _client: OpaqueSocketHandle,
-    _server: OpaqueSocketHandle,
 }
 
 #[derive(Clone, Copy)]
@@ -824,7 +840,7 @@ impl<'a> TestNet<'a> {
     pub(crate) async fn run_test<I, S>(
         &mut self,
         expected_connectivity: ExpectedConnectivity,
-    ) -> OpaqueSocketHandles
+    ) -> (S::Server, OpaqueSocketHandle)
     where
         I: TestIpExt,
         S: SocketType,
@@ -848,7 +864,7 @@ impl<'a> TestNet<'a> {
         &'params mut self,
         expected_connectivity: ExpectedConnectivity,
         setup: F,
-    ) -> OpaqueSocketHandles
+    ) -> (S::Server, OpaqueSocketHandle)
     where
         I: TestIpExt,
         S: SocketType,
@@ -871,7 +887,7 @@ pub(crate) struct TestRealm<'a> {
     namespace: NamespaceId,
     ip_routine: Option<RoutineId>,
     pub nat_routine: Option<RoutineId>,
-    local_subnet: fnet::Subnet,
+    pub local_subnet: fnet::Subnet,
     remote_subnet: fnet::Subnet,
 }
 
@@ -1321,14 +1337,14 @@ impl RouterTestIpExt for Ipv6 {
     const OTHER_SUBNET: fnet::Subnet = fidl_subnet!("c::/64");
 }
 
-struct TestRouterNet<'a, I: RouterTestIpExt> {
+pub(crate) struct TestRouterNet<'a, I: RouterTestIpExt> {
     // Router resources. We keep handles around to the test realm and networks
     // so that they are not torn down for the lifetime of the test.
-    router: netemul::TestRealm<'a>,
-    _router_client_net: netemul::TestNetwork<'a>,
+    pub router: netemul::TestRealm<'a>,
+    pub _router_client_net: netemul::TestNetwork<'a>,
     router_client_interface: netemul::TestInterface<'a>,
-    _router_server_net: netemul::TestNetwork<'a>,
-    router_server_interface: netemul::TestInterface<'a>,
+    pub _router_server_net: netemul::TestNetwork<'a>,
+    pub router_server_interface: netemul::TestInterface<'a>,
 
     // Client resources. We keep the handle to the interface around so that it is
     // not torn down for the lifetime of the test.
@@ -1337,23 +1353,31 @@ struct TestRouterNet<'a, I: RouterTestIpExt> {
 
     // Server resources. We keep the handle to the interface around so that it is
     // not torn down for the lifetime of the test.
-    server: netemul::TestRealm<'a>,
+    pub server: netemul::TestRealm<'a>,
     _server_interface: netemul::TestInterface<'a>,
 
     // Filtering resources (for the router).
     controller: Controller,
     namespace: NamespaceId,
-    routine: RoutineId,
+    ip_routine: Option<RoutineId>,
+    nat_routine: Option<RoutineId>,
 
     _ip_version: IpVersionMarker<I>,
 }
 
 impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
-    // These just need to be unique.
+    // These two just need to be unique since they may be installed on the same routine.
     const CLIENT_FILTER_RULE_INDEX: u32 = 0;
     const SERVER_FILTER_RULE_INDEX: u32 = 1;
 
-    async fn new(sandbox: &'a netemul::TestSandbox, name: &str, hook: IpHook) -> Self {
+    const NAT_RULE_INDEX: u32 = 0;
+
+    pub async fn new(
+        sandbox: &'a netemul::TestSandbox,
+        name: &str,
+        ip_hook: Option<IpHook>,
+        nat_hook: Option<NatHook>,
+    ) -> Self {
         let router = sandbox
             .create_netstack_realm::<Netstack3, _>(format!("{name}_router"))
             .expect("create realm");
@@ -1414,18 +1438,39 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
             .await
             .expect("create controller");
         let namespace = NamespaceId(name.to_owned());
-        let routine = RoutineId { namespace: namespace.clone(), name: format!("{hook:?}") };
+        let ip_routine = ip_hook.map(|hook| {
+            (hook, RoutineId { namespace: namespace.clone(), name: format!("{hook:?}") })
+        });
+        let nat_routine = nat_hook.map(|hook| {
+            (hook, RoutineId { namespace: namespace.clone(), name: format!("{hook:?}") })
+        });
         controller
-            .push_changes(vec![
-                Change::Create(Resource::Namespace(Namespace {
+            .push_changes(
+                [Change::Create(Resource::Namespace(Namespace {
                     id: namespace.clone(),
                     domain: Domain::AllIp,
-                })),
-                Change::Create(Resource::Routine(Routine {
-                    id: routine.clone(),
-                    routine_type: RoutineType::Ip(Some(InstalledIpRoutine { hook, priority: 0 })),
-                })),
-            ])
+                }))]
+                .into_iter()
+                .chain(ip_routine.clone().map(|(hook, routine)| {
+                    Change::Create(Resource::Routine(Routine {
+                        id: routine.clone(),
+                        routine_type: RoutineType::Ip(Some(InstalledIpRoutine {
+                            hook,
+                            priority: 0,
+                        })),
+                    }))
+                }))
+                .chain(nat_routine.clone().map(|(hook, routine)| {
+                    Change::Create(Resource::Routine(Routine {
+                        id: routine.clone(),
+                        routine_type: RoutineType::Nat(Some(InstalledNatRoutine {
+                            hook,
+                            priority: 0,
+                        })),
+                    }))
+                }))
+                .collect(),
+            )
             .await
             .expect("push changes");
         controller.commit().await.expect("commit changes");
@@ -1442,7 +1487,8 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
             _server_interface: server_interface,
             controller,
             namespace,
-            routine,
+            ip_routine: ip_routine.map(|(_hook, routine)| routine),
+            nat_routine: nat_routine.map(|(_hook, routine)| routine),
             _ip_version: IpVersionMarker::new(),
         }
     }
@@ -1485,10 +1531,13 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
         matcher: &M,
         ports: SockAddrs,
     ) {
-        let Self { controller, routine, router_server_interface, .. } = self;
+        let Self { controller, ip_routine, router_server_interface, .. } = self;
         Self::drop_traffic::<M>(
             controller,
-            RuleId { routine: routine.clone(), index: Self::CLIENT_FILTER_RULE_INDEX },
+            RuleId {
+                routine: ip_routine.clone().expect("IP routine should be installed"),
+                index: Self::CLIENT_FILTER_RULE_INDEX,
+            },
             matcher,
             Interfaces { ingress: Some(router_server_interface), egress: None },
             Subnets {
@@ -1506,10 +1555,13 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
         matcher: &M,
         ports: SockAddrs,
     ) {
-        let Self { controller, routine, router_client_interface, .. } = self;
+        let Self { controller, ip_routine, router_client_interface, .. } = self;
         Self::drop_traffic::<M>(
             controller,
-            RuleId { routine: routine.clone(), index: Self::SERVER_FILTER_RULE_INDEX },
+            RuleId {
+                routine: ip_routine.clone().expect("IP routine should be installed"),
+                index: Self::SERVER_FILTER_RULE_INDEX,
+            },
             matcher,
             Interfaces { ingress: Some(router_client_interface), egress: None },
             Subnets {
@@ -1527,10 +1579,13 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
         matcher: &M,
         ports: SockAddrs,
     ) {
-        let Self { controller, routine, router_client_interface, .. } = self;
+        let Self { controller, ip_routine, router_client_interface, .. } = self;
         Self::drop_traffic::<M>(
             controller,
-            RuleId { routine: routine.clone(), index: Self::CLIENT_FILTER_RULE_INDEX },
+            RuleId {
+                routine: ip_routine.clone().expect("IP routine should be installed"),
+                index: Self::CLIENT_FILTER_RULE_INDEX,
+            },
             matcher,
             Interfaces { ingress: None, egress: Some(router_client_interface) },
             Subnets {
@@ -1548,10 +1603,13 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
         matcher: &M,
         ports: SockAddrs,
     ) {
-        let Self { controller, routine, router_server_interface, .. } = self;
+        let Self { controller, ip_routine, router_server_interface, .. } = self;
         Self::drop_traffic::<M>(
             controller,
-            RuleId { routine: routine.clone(), index: Self::SERVER_FILTER_RULE_INDEX },
+            RuleId {
+                routine: ip_routine.clone().expect("IP routine should be installed"),
+                index: Self::SERVER_FILTER_RULE_INDEX,
+            },
             matcher,
             Interfaces { ingress: None, egress: Some(router_server_interface) },
             Subnets {
@@ -1563,16 +1621,21 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
         )
         .await;
     }
+
     async fn install_filter_forwarded_server_to_client<M: Matcher>(
         &mut self,
         matcher: &M,
         ports: SockAddrs,
     ) {
-        let Self { controller, routine, router_client_interface, router_server_interface, .. } =
-            self;
+        let Self {
+            controller, ip_routine, router_client_interface, router_server_interface, ..
+        } = self;
         Self::drop_traffic::<M>(
             controller,
-            RuleId { routine: routine.clone(), index: Self::CLIENT_FILTER_RULE_INDEX },
+            RuleId {
+                routine: ip_routine.clone().expect("IP routine should be installed"),
+                index: Self::CLIENT_FILTER_RULE_INDEX,
+            },
             matcher,
             Interfaces {
                 ingress: Some(router_server_interface),
@@ -1593,11 +1656,15 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
         matcher: &M,
         ports: SockAddrs,
     ) {
-        let Self { controller, routine, router_client_interface, router_server_interface, .. } =
-            self;
+        let Self {
+            controller, ip_routine, router_client_interface, router_server_interface, ..
+        } = self;
         Self::drop_traffic::<M>(
             controller,
-            RuleId { routine: routine.clone(), index: Self::SERVER_FILTER_RULE_INDEX },
+            RuleId {
+                routine: ip_routine.clone().expect("IP routine should be installed"),
+                index: Self::SERVER_FILTER_RULE_INDEX,
+            },
             matcher,
             Interfaces {
                 ingress: Some(router_client_interface),
@@ -1613,6 +1680,22 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
         .await;
     }
 
+    pub async fn install_nat_rule(&mut self, matchers: Matchers, action: Action) {
+        let Self { controller, nat_routine, .. } = self;
+        controller
+            .push_changes(vec![Change::Create(Resource::Rule(Rule {
+                id: RuleId {
+                    routine: nat_routine.clone().expect("NAT routine should be installed"),
+                    index: Self::NAT_RULE_INDEX,
+                },
+                matchers,
+                action,
+            }))])
+            .await
+            .expect("push changes");
+        controller.commit().await.expect("commit changes");
+    }
+
     async fn clear_filter(&mut self) {
         self.controller
             .push_changes(vec![Change::Remove(ResourceId::Namespace(self.namespace.clone()))])
@@ -1621,19 +1704,19 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
         self.controller.commit().await.expect("commit changes");
     }
 
-    fn realms(&'a self) -> Realms<'a> {
+    pub fn realms(&'a self) -> Realms<'a> {
         let Self { client, server, .. } = self;
         Realms { client, server }
     }
 
-    fn addrs() -> Addrs {
+    pub fn addrs() -> Addrs {
         Addrs { client: I::CLIENT_ADDR_WITH_PREFIX.addr, server: I::SERVER_ADDR_WITH_PREFIX.addr }
     }
 
-    async fn run_test<S: SocketType>(
+    pub async fn run_test<S: SocketType>(
         &mut self,
         expected_connectivity: ExpectedConnectivity,
-    ) -> OpaqueSocketHandles {
+    ) -> (S::Server, OpaqueSocketHandle) {
         let (sockets, sock_addrs) = S::bind_sockets(self.realms(), Self::addrs()).await;
         S::run_test::<I>(self.realms(), sockets, sock_addrs, expected_connectivity, None).await
     }
@@ -1646,11 +1729,11 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
     /// implies the bound.
     ///
     /// See https://stackoverflow.com/a/72673740 for a more thorough explanation.
-    async fn run_test_with<'params, S, F>(
+    pub async fn run_test_with<'params, S, F>(
         &'params mut self,
         expected_connectivity: ExpectedConnectivity,
         setup: F,
-    ) -> OpaqueSocketHandles
+    ) -> (S::Server, OpaqueSocketHandle)
     where
         S: SocketType,
         F: for<'b> FnOnce(
@@ -1679,10 +1762,11 @@ async fn forwarded_traffic_skips_local_ingress<I: RouterTestIpExt, M: Matcher>(
     let mut net = TestRouterNet::<I>::new(
         &sandbox,
         &name,
-        match hook {
+        Some(match hook {
             IncomingHook::Ingress => IpHook::Ingress,
             IncomingHook::LocalIngress => IpHook::LocalIngress,
-        },
+        }),
+        None, /* nat_hook */
     )
     .await;
 
@@ -1759,10 +1843,11 @@ async fn forwarded_traffic_skips_local_egress<I: RouterTestIpExt, M: Matcher>(
     let mut net = TestRouterNet::<I>::new(
         &sandbox,
         &name,
-        match hook {
+        Some(match hook {
             OutgoingHook::LocalEgress => IpHook::LocalEgress,
             OutgoingHook::Egress => IpHook::Egress,
-        },
+        }),
+        None, /* nat_hook */
     )
     .await;
 
@@ -1833,7 +1918,13 @@ async fn drop_forwarded<I: RouterTestIpExt, M: Matcher>(name: &str, matcher: M) 
     // Set up a network with two hosts (client and server) and a router. The client
     // and server are both link-layer neighbors with the router but on isolated L2
     // networks.
-    let mut net = TestRouterNet::<I>::new(&sandbox, &name, IpHook::Forwarding).await;
+    let mut net = TestRouterNet::<I>::new(
+        &sandbox,
+        &name,
+        Some(IpHook::Forwarding),
+        None, /* nat_hook */
+    )
+    .await;
 
     // Send from the client to server and back; assert that we have two-way
     // connectivity when no filtering has been configured.
@@ -1879,7 +1970,13 @@ async fn local_traffic_skips_forwarding<I: RouterTestIpExt, M: Matcher>(name: &s
     // Set up a network with two hosts (client and server) and a router. The client
     // and server are both link-layer neighbors with the router but on isolated L2
     // networks.
-    let mut net = TestRouterNet::<I>::new(&sandbox, &name, IpHook::Forwarding).await;
+    let mut net = TestRouterNet::<I>::new(
+        &sandbox,
+        &name,
+        Some(IpHook::Forwarding),
+        None, /* nat_hook */
+    )
+    .await;
 
     // Send from the client to server and back; assert that we have two-way
     // connectivity when no filtering has been configured. Having client-server
@@ -1923,7 +2020,7 @@ async fn local_traffic_skips_forwarding<I: RouterTestIpExt, M: Matcher>(name: &s
         matcher: &M,
         realms: Realms<'_>,
         subnets: Subnets,
-    ) -> OpaqueSocketHandles {
+    ) -> (<M::SocketType as SocketType>::Server, OpaqueSocketHandle) {
         let (sockets, sock_addrs) = M::SocketType::bind_sockets(
             realms,
             Addrs { client: subnets.src.addr, server: subnets.dst.addr },
@@ -1950,7 +2047,12 @@ async fn local_traffic_skips_forwarding<I: RouterTestIpExt, M: Matcher>(name: &s
     }
 
     let TestRouterNet {
-        ref mut controller, ref routine, ref client, ref server, ref router, ..
+        ref mut controller,
+        ref ip_routine,
+        ref client,
+        ref server,
+        ref router,
+        ..
     } = net;
 
     // Dropping traffic between the client and router in the forwarding hook
@@ -1958,7 +2060,7 @@ async fn local_traffic_skips_forwarding<I: RouterTestIpExt, M: Matcher>(name: &s
     // never forwarded; it is always locally-generated and locally-delivered.
     let _handles = drop_forwarded_traffic_and_assert_connectivity::<I, M>(
         controller,
-        routine.clone(),
+        ip_routine.clone().expect("IP routine should be installed"),
         &matcher,
         Realms { client, server: router },
         Subnets {
@@ -1974,7 +2076,7 @@ async fn local_traffic_skips_forwarding<I: RouterTestIpExt, M: Matcher>(name: &s
     // never forwarded; it is always locally-generated and locally-delivered.
     let _handles = drop_forwarded_traffic_and_assert_connectivity::<I, M>(
         controller,
-        routine.clone(),
+        ip_routine.clone().expect("IP routine should be installed"),
         &matcher,
         Realms { client: server, server: router },
         Subnets {
