@@ -27,7 +27,7 @@
 namespace fio = fuchsia_io;
 namespace fio_test = fuchsia_io_test;
 
-class TestHarness : public fidl::Server<fio_test::Io1Harness> {
+class TestHarness : public fidl::Server<fio_test::TestHarness> {
  public:
   explicit TestHarness() : vfs_loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
     vfs_loop_.StartThread("vfs_thread");
@@ -48,7 +48,7 @@ class TestHarness : public fidl::Server<fio_test::Io1Harness> {
   }
 
   void GetConfig(GetConfigCompleter::Sync& completer) final {
-    fio_test::Io1Config config;
+    fio_test::HarnessConfig config;
 
     // Supported options
     config.supports_get_backing_memory(true);
@@ -136,7 +136,7 @@ int main(int argc, const char** argv) {
     return EXIT_FAILURE;
   }
 
-  result = outgoing.AddProtocol<fio_test::Io1Harness>(std::make_unique<TestHarness>());
+  result = outgoing.AddProtocol<fio_test::TestHarness>(std::make_unique<TestHarness>());
   if (result.is_error()) {
     FX_LOGS(ERROR) << "Failed to server test harness: " << result.status_string();
     return EXIT_FAILURE;

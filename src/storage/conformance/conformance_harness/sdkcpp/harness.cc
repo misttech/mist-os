@@ -17,23 +17,20 @@
 #include <zircon/status.h>
 
 #include <cstdint>
-#include <limits>
 #include <memory>
 #include <vector>
 
 namespace fio = fuchsia_io;
 namespace fio_test = fuchsia_io_test;
 
-zx_status_t DummyWriter(const std::vector<uint8_t>&) { return ZX_OK; }
-
-class SdkCppHarness : public fidl::Server<fio_test::Io1Harness> {
+class SdkCppHarness : public fidl::Server<fio_test::TestHarness> {
  public:
   explicit SdkCppHarness() = default;
 
   ~SdkCppHarness() override = default;
 
   void GetConfig(GetConfigCompleter::Sync& completer) final {
-    fio_test::Io1Config config;
+    fio_test::HarnessConfig config;
 
     // The SDK VFS uses the in-tree C++ VFS under the hood, and thus should support at *least* the
     // same feature set. Other than adding additional supported options, the remainder of this
@@ -60,10 +57,7 @@ class SdkCppHarness : public fidl::Server<fio_test::Io1Harness> {
       AddEntry(std::move(*entry), *dir);
     }
 
-    // TODO(https://fxbug.dev/311176363): Support the new C++ bindings in the SDK VFS so that we can
-    // use `fuchsia_io::OpenFlags` instead of the deprecated HLCPP `fuchsia::io::OpenFlags` type.
-    fuchsia::io::OpenFlags flags = fuchsia::io::OpenFlags{static_cast<uint32_t>(request.flags())};
-    ZX_ASSERT_MSG(dir->Serve(flags, request.directory_request().TakeChannel()) == ZX_OK,
+    ZX_ASSERT_MSG(dir->Serve(request.flags(), request.directory_request().TakeChannel()) == ZX_OK,
                   "Failed to serve directory!");
     directories_.push_back(std::move(dir));
   }
@@ -84,11 +78,8 @@ class SdkCppHarness : public fidl::Server<fio_test::Io1Harness> {
       }
       case fio_test::DirectoryEntry::Tag::kRemoteDirectory: {
         fio_test::RemoteDirectory remote_directory = std::move(entry.remote_directory().value());
-
-        // TODO(https://fxbug.dev/311176363): Support the new C++ bindings in the SDK VFS so we can
-        // construct a `vfs::RemoteDir` using a `fidl::ClientEnd` directly.
         auto remote_dir_entry =
-            std::make_unique<vfs::RemoteDir>(remote_directory.remote_client().TakeChannel());
+            std::make_unique<vfs::RemoteDir>(std::move(remote_directory.remote_client()));
         dest.AddEntry(remote_directory.name(), std::move(remote_dir_entry));
         break;
       }
@@ -122,7 +113,8 @@ int main(int argc, const char** argv) {
   fuchsia_logging::LogSettingsBuilder builder;
   builder.WithTags({"io_conformance_harness_sdkcpp_new"}).BuildAndInitialize();
   component::OutgoingDirectory outgoing(loop.dispatcher());
-  zx::result result = outgoing.AddProtocol<fio_test::Io1Harness>(std::make_unique<SdkCppHarness>());
+  zx::result result =
+      outgoing.AddProtocol<fio_test::TestHarness>(std::make_unique<SdkCppHarness>());
   ZX_ASSERT_MSG(result.is_ok(), "Failed to add protocol: %s", result.status_string());
   result = outgoing.ServeFromStartupInfo();
   ZX_ASSERT_MSG(result.is_ok(), "Failed to serve outgoing directory: %s", result.status_string());

@@ -38,7 +38,7 @@ namespace minfs {
 
 constexpr uint64_t kBlockCount = 1 << 11;
 
-class MinfsHarness : public fidl::Server<fio_test::Io1Harness> {
+class MinfsHarness : public fidl::Server<fio_test::TestHarness> {
  public:
   explicit MinfsHarness() : vfs_loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
     vfs_loop_.StartThread("vfs_thread");
@@ -68,7 +68,7 @@ class MinfsHarness : public fidl::Server<fio_test::Io1Harness> {
   }
 
   void GetConfig(GetConfigCompleter::Sync& completer) final {
-    fio_test::Io1Config config;
+    fio_test::HarnessConfig config;
 
     // Supported options
     config.supports_open3(true);
@@ -180,7 +180,7 @@ int main(int argc, const char** argv) {
     return EXIT_FAILURE;
   }
 
-  result = outgoing.AddProtocol<fio_test::Io1Harness>(std::make_unique<minfs::MinfsHarness>());
+  result = outgoing.AddProtocol<fio_test::TestHarness>(std::make_unique<minfs::MinfsHarness>());
   if (result.is_error()) {
     FX_LOGS(ERROR) << "Failed to server test harness: " << result.status_string();
     return EXIT_FAILURE;

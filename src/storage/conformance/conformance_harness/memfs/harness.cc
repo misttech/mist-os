@@ -68,13 +68,13 @@ void AddEntry(const fio_test::DirectoryEntry& entry, memfs::VnodeDir& dir) {
   }
 }
 
-class TestHarness : public fidl::Server<fio_test::Io1Harness> {
+class TestHarness : public fidl::Server<fio_test::TestHarness> {
  public:
   explicit TestHarness(std::unique_ptr<memfs::Memfs> memfs, fbl::RefPtr<memfs::VnodeDir> root)
       : memfs_(std::move(memfs)), root_(std::move(root)) {}
 
   void GetConfig(GetConfigCompleter::Sync& completer) final {
-    fio_test::Io1Config config;
+    fio_test::HarnessConfig config;
 
     // Supported options
     config.supports_open3(true);
@@ -139,7 +139,7 @@ int main(int argc, const char** argv) {
     return EXIT_FAILURE;
   }
 
-  result = outgoing.AddProtocol<fio_test::Io1Harness>(
+  result = outgoing.AddProtocol<fio_test::TestHarness>(
       std::make_unique<TestHarness>(std::move(memfs->first), std::move(memfs->second)));
   if (result.is_error()) {
     FX_LOGS(ERROR) << "Failed to server test harness: " << result.status_string();

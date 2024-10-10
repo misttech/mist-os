@@ -7,7 +7,7 @@
 use anyhow::{anyhow, Context as _, Error};
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_io_test::{
-    self as io_test, Io1Config, Io1HarnessRequest, Io1HarnessRequestStream,
+    self as io_test, HarnessConfig, TestHarnessRequest, TestHarnessRequestStream,
 };
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
@@ -21,7 +21,7 @@ use vfs::file::vmo;
 use vfs::path::Path;
 use vfs::remote::remote_dir;
 
-struct Harness(Io1HarnessRequestStream);
+struct Harness(TestHarnessRequestStream);
 
 const HARNESS_EXEC_PATH: &'static str = "/pkg/bin/io_conformance_harness_rustvfs";
 
@@ -68,11 +68,11 @@ fn add_entry(entry: io_test::DirectoryEntry, dest: &Arc<Simple>) -> Result<(), E
     Ok(())
 }
 
-async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
+async fn run(mut stream: TestHarnessRequestStream) -> Result<(), Error> {
     while let Some(request) = stream.try_next().await.context("error running harness server")? {
         let (dir, flags, directory_request) = match request {
-            Io1HarnessRequest::GetConfig { responder } => {
-                let config = Io1Config {
+            TestHarnessRequest::GetConfig { responder } => {
+                let config = HarnessConfig {
                     // Supported options:
                     supports_executable_file: true,
                     supports_get_backing_memory: true,
@@ -93,7 +93,7 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
                 responder.send(&config)?;
                 continue;
             }
-            Io1HarnessRequest::GetDirectory {
+            TestHarnessRequest::GetDirectory {
                 root,
                 flags,
                 directory_request,

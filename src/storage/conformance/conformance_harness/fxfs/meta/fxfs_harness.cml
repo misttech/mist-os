@@ -12,11 +12,11 @@
         use_next_vdso: "true",
     },
     capabilities: [
-        { protocol: "fuchsia.io.test.Io1Harness" },
+        { protocol: "fuchsia.io.test.TestHarness" },
     ],
     expose: [
         {
-            protocol: "fuchsia.io.test.Io1Harness",
+            protocol: "fuchsia.io.test.TestHarness",
             from: "self",
         },
     ],

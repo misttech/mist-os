@@ -7,7 +7,7 @@
 use anyhow::{Context as _, Error};
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_io_test::{
-    self as io_test, Io1Config, Io1HarnessRequest, Io1HarnessRequestStream,
+    self as io_test, HarnessConfig, TestHarnessRequest, TestHarnessRequestStream,
 };
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
@@ -15,7 +15,7 @@ use fxfs_testing::{open_dir, open_file, TestFixture};
 use std::sync::atomic::{AtomicU64, Ordering};
 use tracing::error;
 
-struct Harness(Io1HarnessRequestStream);
+struct Harness(TestHarnessRequestStream);
 
 const FLAGS: fio::OpenFlags = fio::OpenFlags::CREATE
     .union(fio::OpenFlags::RIGHT_READABLE)
@@ -54,13 +54,13 @@ async fn add_entries(
     Ok(())
 }
 
-async fn run(mut stream: Io1HarnessRequestStream, fixture: &TestFixture) -> Result<(), Error> {
+async fn run(mut stream: TestHarnessRequestStream, fixture: &TestFixture) -> Result<(), Error> {
     static COUNTER: AtomicU64 = AtomicU64::new(0);
 
     while let Some(request) = stream.try_next().await.context("error running harness server")? {
         match request {
-            Io1HarnessRequest::GetConfig { responder } => {
-                responder.send(&Io1Config {
+            TestHarnessRequest::GetConfig { responder } => {
+                responder.send(&HarnessConfig {
                     supports_executable_file: false,
                     supports_get_backing_memory: true,
                     supports_remote_dir: false,
@@ -87,7 +87,7 @@ async fn run(mut stream: Io1HarnessRequestStream, fixture: &TestFixture) -> Resu
                         | fio::NodeAttributesQuery::SELINUX_CONTEXT,
                 })?;
             }
-            Io1HarnessRequest::GetDirectory {
+            TestHarnessRequest::GetDirectory {
                 root,
                 flags,
                 directory_request,

@@ -12,10 +12,10 @@ use {
 /// Helper struct for connecting to an io1 test harness and running a conformance test on it.
 pub struct TestHarness {
     /// FIDL proxy to the io1 test harness.
-    pub proxy: io_test::Io1HarnessProxy,
+    pub proxy: io_test::TestHarnessProxy,
 
     /// Config for the filesystem.
-    pub config: io_test::Io1Config,
+    pub config: io_test::HarnessConfig,
 
     /// All [`io_test::Directory`] rights supported by the filesystem.
     pub dir_rights: Rights,
@@ -118,8 +118,8 @@ impl TestHarness {
     }
 }
 
-async fn connect_to_harness() -> io_test::Io1HarnessProxy {
-    // Connect to the realm to get acccess to the outgoing directory for the harness.
+async fn connect_to_harness() -> io_test::TestHarnessProxy {
+    // Connect to the realm to get access to the outgoing directory for the harness.
     let (client, server) = zx::Channel::create();
     fuchsia_component::client::connect_channel_to_protocol::<fcomponent::RealmMarker>(server)
         .expect("Cannot connect to Realm service");
@@ -138,14 +138,14 @@ async fn connect_to_harness() -> io_test::Io1HarnessProxy {
 
     let exposed_dir = fio::DirectoryProxy::new(fidl::AsyncChannel::from_channel(client));
 
-    fuchsia_component::client::connect_to_protocol_at_dir_root::<io_test::Io1HarnessMarker>(
+    fuchsia_component::client::connect_to_protocol_at_dir_root::<io_test::TestHarnessMarker>(
         &exposed_dir,
     )
     .expect("Cannot connect to test harness protocol")
 }
 
 /// Returns the aggregate of all io1 rights that are supported for [`io_test::Directory`] objects.
-fn get_supported_dir_rights(config: &io_test::Io1Config) -> fio::OpenFlags {
+fn get_supported_dir_rights(config: &io_test::HarnessConfig) -> fio::OpenFlags {
     fio::OpenFlags::RIGHT_READABLE
         | fio::OpenFlags::RIGHT_WRITABLE
         | if config.supports_executable_file {
@@ -156,7 +156,7 @@ fn get_supported_dir_rights(config: &io_test::Io1Config) -> fio::OpenFlags {
 }
 
 /// Returns the aggregate of all io1 rights that are supported for [`io_test::File`] objects.
-fn get_supported_file_rights(config: &io_test::Io1Config) -> fio::OpenFlags {
+fn get_supported_file_rights(config: &io_test::HarnessConfig) -> fio::OpenFlags {
     let mut rights = fio::OpenFlags::RIGHT_READABLE;
     if config.supports_mutable_file {
         rights |= fio::OpenFlags::RIGHT_WRITABLE;

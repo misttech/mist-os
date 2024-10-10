@@ -7,13 +7,5 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.io.test") {
   sdk_category = "internal"
   sources = [ "io.test.fidl" ]
-  public_deps = [
-    "//sdk/fidl/fuchsia.io",
-    "//zircon/vdso/zx",
-  ]
-  excluded_checks = [
-    "string-bounds-not-specified",
-    "vector-bounds-not-specified",
-  ]
-  enable_hlcpp = true
+  public_deps = [ "//sdk/fidl/fuchsia.io" ]
 }

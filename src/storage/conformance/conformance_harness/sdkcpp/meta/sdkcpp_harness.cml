@@ -11,11 +11,11 @@
         binary: "bin/io_conformance_harness_sdkcpp",
     },
     capabilities: [
-        { protocol: "fuchsia.io.test.Io1Harness" },
+        { protocol: "fuchsia.io.test.TestHarness" },
     ],
     expose: [
         {
-            protocol: "fuchsia.io.test.Io1Harness",
+            protocol: "fuchsia.io.test.TestHarness",
             from: "self",
         },
     ],
