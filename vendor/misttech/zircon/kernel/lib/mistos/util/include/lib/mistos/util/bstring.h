@@ -42,6 +42,10 @@ class BString {
   // |data| must not be null.
   BString(const char* data, size_t length) { Init(data, length); }
 
+  // Creates a string with |count| copies of |ch|.
+  // Allocates heap memory only if |count| is non-zero.
+  BString(size_t count, char ch) { Init(count, ch); }
+
   // Creates a string from the contents of a string.
   // Allocates heap memory only if |str.length()| is non-zero.
   BString(ktl::string_view str) : BString(str.data(), str.length()) {}
@@ -96,6 +100,7 @@ class BString {
 
  private:
   void Init(const char* data, size_t length);
+  void Init(size_t count, char ch);
   void InitWithEmpty();
 
   fbl::Vector<char> data_;
