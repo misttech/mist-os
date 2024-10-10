@@ -13,6 +13,16 @@ use tee_internal::{
     Result as TeeResult, Storage, Type, Usage, ValueFields, Whence,
 };
 
+pub(crate) fn on_entrypoint_creation() {
+    // TODO(https://fxbug.dev/360942417): Object-related setup (e.g., persistent object protocol
+    // connection).
+}
+
+pub(crate) fn on_entrypoint_destruction() {
+    // TODO(https://fxbug.dev/360942417): Object-related teardown (e.g., transient object
+    // destruction).
+}
+
 pub fn get_object_handle1(object: ObjectHandle) -> TeeResult<ObjectInfo> {
     unimplemented!()
 }

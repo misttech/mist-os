@@ -5,7 +5,7 @@
 #![allow(dead_code)]
 
 use anyhow::Error;
-
+use api_impl::{on_entrypoint_creation, on_entrypoint_destruction};
 use tee_internal::binding::{TEE_Param, TEE_Result};
 use tee_internal::{
     param_list_to_binding_mut, Error as TeeError, Param, ParamTypes, Result as TeeResult,
@@ -49,6 +49,9 @@ struct TAFunctions {
 
 impl TAInterface for TAFunctions {
     fn create(&self) -> TeeResult {
+        // Make resources available to the TA before it runs its own setup logic.
+        on_entrypoint_creation();
+
         match TeeError::from_tee_result((self.create_fn)()) {
             None => Ok(()),
             Some(error) => Err(error),
@@ -56,7 +59,10 @@ impl TAInterface for TAFunctions {
     }
 
     fn destroy(&self) {
-        (self.destroy_fn)()
+        (self.destroy_fn)();
+
+        // Clean up resources only after the TA has run its own teardown logic.
+        on_entrypoint_destruction();
     }
 
     fn open_session(
