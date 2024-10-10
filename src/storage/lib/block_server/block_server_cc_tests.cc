@@ -162,6 +162,40 @@ TEST(BlockServer, Termination) {
   EXPECT_EQ(test_interface.threads_running(), 0);
 }
 
+TEST(BlockServer, AsyncTermination) {
+  fidl::ServerEnd<fvolume::Volume> server_end;
+  zx::result client_end = fidl::CreateEndpoints(&server_end);
+  ASSERT_EQ(client_end.status_value(), ZX_OK);
+
+  TestInterface test_interface;
+
+  std::unique_ptr<block_client::RemoteBlockDevice> client;
+
+  BlockServer block_server(
+      PartitionInfo{
+          .block_count = kBlocks,
+          .block_size = kBlockSize,
+          .type_guid = {1, 2, 3, 4},
+          .instance_guid = {5, 6, 7, 8},
+          .name = "partition",
+      },
+      &test_interface);
+
+  block_server.Serve(std::move(server_end));
+
+  auto client_result = block_client::RemoteBlockDevice::Create(*std::move(client_end));
+  ASSERT_EQ(client_result.status_value(), ZX_OK);
+  client = *std::move(client_result);
+
+  sync_completion_t completion;
+  std::move(block_server).DestroyAsync([&] {
+    EXPECT_EQ(test_interface.threads_running(), 0);
+    sync_completion_signal(&completion);
+  });
+
+  sync_completion_wait(&completion, ZX_TIME_INFINITE);
+}
+
 TEST(BlockServer, FullFifo) {
   fidl::ServerEnd<fvolume::Volume> server_end;
   zx::result client_end = fidl::CreateEndpoints(&server_end);

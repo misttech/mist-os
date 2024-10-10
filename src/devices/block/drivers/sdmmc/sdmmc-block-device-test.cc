@@ -21,6 +21,8 @@
 #include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
+#include <lib/fdio/cpp/caller.h>
+#include <lib/fdio/watcher.h>
 #include <lib/fidl/cpp/wire/client.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fidl/cpp/wire/server.h>
@@ -33,6 +35,7 @@
 #include <memory>
 
 #include <fbl/algorithm.h>
+#include <fbl/unique_fd.h>
 #include <zxtest/zxtest.h>
 
 #include "fake-sdmmc-device.h"
@@ -40,6 +43,7 @@
 #include "sdmmc-root-device.h"
 #include "sdmmc-rpmb-device.h"
 #include "sdmmc-types.h"
+#include "src/storage/lib/block_client/cpp/remote_block_device.h"
 
 namespace sdmmc {
 
@@ -415,7 +419,6 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
 
     // Initialize driver test environment.
     fuchsia_driver_framework::DriverStartArgs start_args;
-    fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client;
     fit::result metadata = fidl::Persist(CreateMetadata(/*removable=*/is_sd, speed_capabilities));
     if (!metadata.is_ok()) {
       return metadata.error_value().status();
@@ -424,7 +427,7 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
       auto start_args_result = incoming->node.CreateStartArgsAndServe();
       ASSERT_TRUE(start_args_result.is_ok());
       start_args = std::move(start_args_result->start_args);
-      outgoing_directory_client = std::move(start_args_result->outgoing_directory_client);
+      outgoing_directory_client_ = std::move(start_args_result->outgoing_directory_client);
 
       ASSERT_OK(incoming->env.Initialize(std::move(start_args_result->incoming_directory_server)));
 
@@ -663,6 +666,7 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
   fidl::WireSharedClient<fuchsia_hardware_rpmb::Rpmb> rpmb_client_;
   std::atomic<bool> run_threads_ = true;
   async::Loop loop_;
+  fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client_;
 
  private:
   static constexpr uint8_t kTestData[] = {
@@ -2267,6 +2271,104 @@ TEST_P(SdmmcBlockDeviceTest, DISABLED_PowerSuspendResume) {
   power_suspended = root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
   ASSERT_NOT_NULL(power_suspended);
   EXPECT_TRUE(power_suspended->value());
+}
+
+TEST_P(SdmmcBlockDeviceTest, BlockServer) {
+  ASSERT_OK(StartDriverForMmc(/*speed_capabilities=*/0, /*supply_power_framework=*/false));
+
+  runtime_.PerformBlockingWork([&] {
+    auto [service_client, service_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+    std::string path = std::string(component::kServiceDirectory) + "/" +
+                       fuchsia_hardware_block_volume::Service::Name;
+    ASSERT_OK(fdio_open_at(outgoing_directory_client_.channel().get(), path.c_str(),
+                           static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
+                           service_server.TakeChannel().release()));
+
+    fbl::unique_fd service_dir;
+    ASSERT_OK(fdio_fd_create(service_client.TakeChannel().release(),
+                             service_dir.reset_and_get_address()));
+
+    std::string instance_name;
+
+    ASSERT_EQ(fdio_watch_directory(
+                  service_dir.get(),
+                  [](int fd, int event, const char* name, void* cookie) {
+                    if (strcmp(name, ".") == 0)
+                      return ZX_OK;
+                    *reinterpret_cast<std::string*>(cookie) = name;
+                    return ZX_ERR_STOP;
+                  },
+                  ZX_TIME_INFINITE, &instance_name),
+              ZX_ERR_STOP);
+
+    fdio_cpp::FdioCaller service_dir_caller(std::move(service_dir));
+    auto [volume_client, volume_server] =
+        fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
+    std::string volume_path = instance_name + "/volume";
+    ASSERT_OK(fdio_open_at(service_dir_caller.borrow_channel(), volume_path.c_str(), 0,
+                           volume_server.TakeChannel().release()));
+
+    auto client = block_client::RemoteBlockDevice::Create(std::move(volume_client));
+    ASSERT_OK(client);
+
+    fuchsia_hardware_block::wire::BlockInfo info;
+    EXPECT_OK(client->BlockGetInfo(&info));
+
+    const int len = 2 * info.block_size;
+
+    zx::vmo vmo;
+    ASSERT_OK(zx::vmo::create(len, 0, &vmo));
+
+    storage::Vmoid owned_vmoid;
+    EXPECT_OK(client->BlockAttachVmo(vmo, &owned_vmoid));
+
+    // It doesn't matter if we leak the ID.
+    vmoid_t vmoid = owned_vmoid.TakeId();
+
+    auto buffer = std::make_unique<uint8_t[]>(len);
+    uint8_t c = 0;
+    for (int i = 0; i < len; ++i) {
+      buffer[i] = c;
+      c += 7;
+    }
+
+    EXPECT_OK(vmo.write(buffer.get(), 0, len));
+
+    block_fifo_request_t requests[] = {{
+                                           .command =
+                                               {
+                                                   .opcode = BLOCK_OPCODE_WRITE,
+                                               },
+                                           .vmoid = vmoid,
+                                           .length = 1,
+                                           .vmo_offset = 0,
+                                           .dev_offset = 0,
+                                       },
+                                       {
+                                           .command =
+                                               {
+                                                   .opcode = BLOCK_OPCODE_WRITE,
+                                               },
+                                           .vmoid = vmoid,
+                                           .length = 1,
+                                           .vmo_offset = 1,
+                                           .dev_offset = 1,
+                                       }};
+
+    EXPECT_OK(client->FifoTransaction(requests, 2));
+
+    requests[0].command.opcode = BLOCK_OPCODE_READ;
+    requests[0].vmo_offset += 2;
+    requests[1].command.opcode = BLOCK_OPCODE_READ;
+    requests[1].vmo_offset += 2;
+
+    EXPECT_OK(client->FifoTransaction(requests, 2));
+
+    auto read_buffer = std::make_unique<uint8_t[]>(len);
+    EXPECT_OK(vmo.read(read_buffer.get(), len, len));
+
+    EXPECT_BYTES_EQ(read_buffer.get(), buffer.get(), len);
+  });
 }
 
 INSTANTIATE_TEST_SUITE_P(SdmmcProtocolUsingFidlTest, SdmmcBlockDeviceTest, zxtest::Bool());

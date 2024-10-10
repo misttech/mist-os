@@ -301,17 +301,22 @@ pub struct BlockServer {
 struct ExecutorMailbox(Mutex<Mail>, Condvar);
 
 impl ExecutorMailbox {
-    fn post(&self, mail: Mail) {
-        *self.0.lock().unwrap() = mail;
+    /// Returns the old mail.
+    fn post(&self, mail: Mail) -> Mail {
+        let old = std::mem::replace(&mut *self.0.lock().unwrap(), mail);
         self.1.notify_all();
+        old
     }
 }
+
+type ShutdownCallback = unsafe extern "C" fn(*mut c_void);
 
 #[derive(Default)]
 enum Mail {
     #[default]
     None,
     Initialized(EHandle, AbortHandle),
+    AsyncShutdown(Box<BlockServer>, ShutdownCallback, *mut c_void),
     Finished,
 }
 
@@ -395,7 +400,7 @@ pub unsafe extern "C" fn block_server_new(
             abort_handle,
         })),
         Mail::Finished => std::ptr::null_mut(),
-        Mail::None => unreachable!(),
+        _ => unreachable!(),
     }
 }
 
@@ -422,9 +427,19 @@ pub unsafe extern "C" fn block_server_thread(arg: *const c_void) {
 /// `arg` must be the value passed to the `start_thread` callback.
 #[no_mangle]
 pub unsafe extern "C" fn block_server_thread_delete(arg: *const c_void) {
-    let session_manager = Arc::from_raw(arg as *const SessionManager);
-    session_manager.mbox.post(Mail::Finished);
-    debug_assert!(Arc::strong_count(&session_manager) > 0);
+    let mail = {
+        let session_manager = Arc::from_raw(arg as *const SessionManager);
+        debug_assert!(Arc::strong_count(&session_manager) > 0);
+        session_manager.mbox.post(Mail::Finished)
+    };
+
+    if let Mail::AsyncShutdown(server, callback, arg) = mail {
+        std::mem::drop(server);
+        // SAFETY: Whoever supplied the callback must guarantee it's safe.
+        unsafe {
+            callback(arg);
+        }
+    }
 }
 
 /// # Safety
@@ -433,6 +448,22 @@ pub unsafe extern "C" fn block_server_thread_delete(arg: *const c_void) {
 #[no_mangle]
 pub unsafe extern "C" fn block_server_delete(block_server: *mut BlockServer) {
     let _ = Box::from_raw(block_server);
+}
+
+/// # Safety
+///
+/// `block_server` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn block_server_delete_async(
+    block_server: *mut BlockServer,
+    callback: ShutdownCallback,
+    arg: *mut c_void,
+) {
+    let block_server = Box::from_raw(block_server);
+    let session_manager = block_server.server.session_manager.clone();
+    let abort_handle = block_server.abort_handle.clone();
+    session_manager.mbox.post(Mail::AsyncShutdown(block_server, callback, arg));
+    abort_handle.abort();
 }
 
 /// Serves the Volume protocol for this server.  `handle` is consumed.

@@ -42,6 +42,7 @@ source_set("sdmmc-driver-source") {
     "sdmmc-rpmb-device.h",
   ]
   deps = [
+    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp",
     "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
@@ -81,6 +82,7 @@ source_set("sdmmc-driver-source") {
     "//src/devices/block/lib/sdio",
     "//src/devices/block/lib/sdmmc",
     "//src/devices/lib/dev-operation",
+    "//src/storage/lib/block_server:block_server_cc",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zircon-internal",
@@ -160,6 +162,8 @@ test("sdmmc-block-test-bin") {
     "//sdk/lib/driver/power/cpp/testing",
     "//sdk/lib/driver/testing/cpp:cpp",
     "//sdk/lib/inspect/testing/cpp:zxtest",
+    "//src/storage/lib/block_client/cpp",
+    "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/zxtest",
   ]
 }
