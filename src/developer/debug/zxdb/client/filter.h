@@ -38,10 +38,10 @@ class Filter : public ClientObject {
   zx_koid_t job_koid() const { return filter_.job_koid; }
 
   void SetWeak(bool weak);
-  bool weak() const { return filter_.weak; }
+  bool weak() const { return filter_.config.weak; }
 
   void SetRecursive(bool recursive);
-  bool recursive() const { return filter_.recursive; }
+  bool recursive() const { return filter_.config.recursive; }
 
   // Accessing the underlying filter storage.
   const debug_ipc::Filter& filter() const { return filter_; }

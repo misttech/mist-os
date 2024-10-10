@@ -7,7 +7,6 @@
 
 #include <set>
 
-#include "lib/syslog/cpp/macros.h"
 #include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/shared/arch.h"
 #include "src/developer/debug/shared/platform.h"
@@ -38,7 +37,7 @@ namespace debug_ipc {
 // CURRENT_SUPPORTED_API_LEVEL is equal to the numbered API level currently represented by "NEXT".
 // If not, continue reading the comments below.
 
-constexpr uint32_t kCurrentProtocolVersion = 63;
+constexpr uint32_t kCurrentProtocolVersion = 64;
 
 // How to decide kMinimumProtocolVersion
 // -------------------------------------
@@ -266,14 +265,16 @@ struct KillReply {
 struct AttachRequest {
   uint64_t koid = 0;
 
-  // Attaching weakly means that the backend will only be listening for exceptions on the process,
-  // the frontend must explicitly request and load the modules to do anything with symbols.
-  bool weak = false;
+  AttachConfig config;
 
   void Serialize(Serializer& ser, uint32_t ver) {
     ser | koid;
-    if (ver >= 61) {
-      ser | weak;
+    if (ver < 64) {
+      if (ver >= 61) {
+        ser | config.weak;
+      }
+    } else {
+      ser | config;
     }
   }
 };

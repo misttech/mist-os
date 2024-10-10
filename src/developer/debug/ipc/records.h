@@ -492,6 +492,18 @@ struct AddressRegion {
   }
 };
 
+struct AttachConfig {
+  // Attaching weakly means that the backend will only be listening for exceptions on the process,
+  // the frontend must explicitly request and load the modules to do anything with symbols.
+  bool weak = false;
+
+  void Serialize(Serializer& ser, uint32_t ver) {
+    if (ver >= 64) {
+      ser | weak;
+    }
+  }
+};
+
 // LoadInfoHandleTable -----------------------------------------------------------------------------
 
 // VMO-specific handle information from zx_info_vmo that's not in the InfoHandle structure.
@@ -538,6 +550,23 @@ struct InfoHandle {
 // Filters -----------------------------------------------------------------------------------------
 constexpr uint32_t kInvalidFilterId = static_cast<uint32_t>(-1);
 
+struct FilterConfig {
+  // Whether or not this is a weak filter. The backend needs to know this so when newly spawned
+  // processes that match a filter hit the loader breakpoint can know whether or not to eagerly send
+  // modules to the front end.
+  bool weak = false;
+
+  // Indicates a recursive filter, which should match all child components spawned in the realm of
+  // this filter's matching component.
+  bool recursive = false;
+
+  void Serialize(Serializer& ser, uint32_t ver) {
+    if (ver >= 64) {
+      ser | weak | recursive;
+    }
+  }
+};
+
 struct Filter {
   enum class Type : uint32_t {
     kUnset,
@@ -559,22 +588,20 @@ struct Filter {
   // Set by the frontend. Different from the console's id for "active" filters in the ui.
   uint32_t id = kInvalidFilterId;
 
-  // Whether or not this is a weak filter. The backend needs to know this so when newly spawned
-  // processes that match a filter hit the loader breakpoint can know whether or not to eagerly send
-  // modules to the front end.
-  bool weak = false;
-
-  // Indicates a recursive filter, which should match all child components spawned in the realm of
-  // this filter's matching component.
-  bool recursive = false;
+  FilterConfig config;
 
   void Serialize(Serializer& ser, uint32_t ver) {
     ser | type | pattern | job_koid;
-    if (ver >= 61) {
-      ser | id | weak;
-    }
-    if (ver >= 62) {
-      ser | recursive;
+
+    if (ver < 64) {
+      if (ver >= 61) {
+        ser | id | config.weak;
+      }
+      if (ver >= 62) {
+        ser | config.recursive;
+      }
+    } else {
+      ser | id | config;
     }
   }
 };

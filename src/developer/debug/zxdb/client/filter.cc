@@ -39,6 +39,13 @@ const char* ClientSettings::Filter::kWeakDescription =
   the matched process only when an exception or breakpoint is raised for that
   process in the backend.)";
 
+const char* ClientSettings::Filter::kRecursive = "recursive";
+const char* ClientSettings::Filter::kRecursiveDescription =
+    R"(  Whether or not this is a recursive filter. When matched, a recursive
+  filter will match all child monikers of this filter. Therefore, the recursive
+  option is only valid with component moniker filters.
+  )";
+
 namespace {
 
 fxl::RefPtr<SettingSchema> CreateSchema() {
@@ -55,6 +62,8 @@ fxl::RefPtr<SettingSchema> CreateSchema() {
   schema->AddString(ClientSettings::Filter::kPattern, ClientSettings::Filter::kPatternDescription);
   schema->AddInt(ClientSettings::Filter::kJob, ClientSettings::Filter::kJobDescription);
   schema->AddBool(ClientSettings::Filter::kWeak, ClientSettings::Filter::kWeakDescription);
+  schema->AddBool(ClientSettings::Filter::kRecursive,
+                  ClientSettings::Filter::kRecursiveDescription);
   return schema;
 }
 
@@ -81,7 +90,9 @@ SettingValue Filter::Settings::GetStorageValue(const std::string& key) const {
   if (key == ClientSettings::Filter::kJob)
     return SettingValue(static_cast<int64_t>(filter_->filter_.job_koid));
   if (key == ClientSettings::Filter::kWeak)
-    return SettingValue(filter_->filter_.weak);
+    return SettingValue(filter_->filter_.config.weak);
+  if (key == ClientSettings::Filter::kRecursive)
+    return SettingValue(filter_->filter_.config.recursive);
   return SettingValue();
 }
 
@@ -99,6 +110,8 @@ Err Filter::Settings::SetStorageValue(const std::string& key, SettingValue value
     filter_->SetJobKoid(value.get_int());
   } else if (key == ClientSettings::Filter::kWeak) {
     filter_->SetWeak(value.get_bool());
+  } else if (key == ClientSettings::Filter::kRecursive) {
+    filter_->SetRecursive(value.get_bool());
   }
   return Err();
 }
@@ -123,12 +136,12 @@ void Filter::SetJobKoid(zx_koid_t job_koid) {
 }
 
 void Filter::SetWeak(bool weak) {
-  filter_.weak = weak;
+  filter_.config.weak = weak;
   Sync();
 }
 
 void Filter::SetRecursive(bool recursive) {
-  filter_.recursive = recursive;
+  filter_.config.recursive = recursive;
   Sync();
 }
 

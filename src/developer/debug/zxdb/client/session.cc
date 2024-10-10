@@ -499,7 +499,7 @@ void Session::OpenMinidump(const std::string& path, fit::callback<void(const Err
   SendLocalHello(std::move(callback));
 
   system().GetTargets()[0]->Attach(
-      minidump->ProcessID(), Target::AttachMode::kStrong,
+      minidump->ProcessID(), debug_ipc::AttachConfig(),
       [](fxl::WeakPtr<Target> target, const Err&, uint64_t timestamp) {});
 }
 
@@ -771,8 +771,8 @@ void Session::DispatchNotifyComponentDiscovered(
   filter->SetPattern(notify.filter.pattern);
   filter->SetType(notify.filter.type);
   filter->SetJobKoid(notify.filter.job_koid);
-  filter->SetWeak(notify.filter.weak);
-  filter->SetRecursive(notify.filter.recursive);
+  filter->SetWeak(notify.filter.config.weak);
+  filter->SetRecursive(notify.filter.config.recursive);
 }
 
 void Session::DispatchNotifyComponentStarting(const debug_ipc::NotifyComponentStarting& notify) {
@@ -910,7 +910,7 @@ void Session::SyncAgentStatus() {
             client_filter->SetType(remote_filter.type);
             client_filter->SetPattern(remote_filter.pattern);
             client_filter->SetJobKoid(remote_filter.job_koid);
-            client_filter->SetWeak(remote_filter.weak);
+            client_filter->SetWeak(remote_filter.config.weak);
           }
         }
 
@@ -973,8 +973,8 @@ void Session::ListenForSystemSettings() {
 
 void Session::AttachToLimboProcessAndNotify(uint64_t koid, const std::string& process_name) {
   if (koid_seen_in_limbo_.insert(koid).second) {
-    system().AttachToProcess(koid, Target::AttachMode::kStrong,
-                             [](fxl::WeakPtr<Target> target, const Err&, uint64_t timestamp) {});
+    system().AttachToPid(koid, debug_ipc::AttachConfig(),
+                         [](fxl::WeakPtr<Target> target, const Err&, uint64_t timestamp) {});
 
   } else {
     // We've already seen this koid in limbo during this session, alert the user and do not

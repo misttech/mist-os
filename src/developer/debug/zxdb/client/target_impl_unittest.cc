@@ -175,7 +175,7 @@ TEST_F(TargetImplTest, LaunchKill) {
   EXPECT_TRUE(out_err.has_error());
 
   // Should not be able to attach.
-  target->Attach(1234, Target::AttachMode::kStrong,
+  target->Attach(1234, debug_ipc::AttachConfig(),
                  [&out_err](fxl::WeakPtr<Target> target, const Err& err, uint64_t timestamp) {
                    out_err = err;
                    MessageLoop::Current()->QuitNow();
@@ -207,7 +207,7 @@ TEST_F(TargetImplTest, AttachDetach) {
   sink().set_attach_err(Err());
 
   Err out_err;
-  target->Attach(kKoid, Target::AttachMode::kStrong,
+  target->Attach(kKoid, debug_ipc::AttachConfig(),
                  [&out_err](fxl::WeakPtr<Target> target, const Err& err, uint64_t timestamp) {
                    out_err = err;
                    MessageLoop::Current()->QuitNow();

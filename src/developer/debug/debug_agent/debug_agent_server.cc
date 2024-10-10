@@ -90,10 +90,10 @@ debug::Result<debug_ipc::Filter, fuchsia_debugger::FilterError> ToDebugIpcFilter
   filter.pattern = request.pattern();
 
   // Filters are always weak when attached via this interface.
-  filter.weak = true;
+  filter.config.weak = true;
 
   if (request.options().recursive()) {
-    filter.recursive = *request.options().recursive();
+    filter.config.recursive = *request.options().recursive();
   }
 
   return filter;
@@ -206,7 +206,7 @@ uint32_t DebugAgentServer::AttachToKoids(const std::vector<zx_koid_t>& koids) co
   for (auto koid : koids) {
     debug_ipc::AttachRequest attach_request;
     attach_request.koid = koid;
-    attach_request.weak = true;
+    attach_request.config.weak = true;
 
     debug_ipc::AttachReply attach_reply;
     debug_agent_->OnAttach(attach_request, &attach_reply);

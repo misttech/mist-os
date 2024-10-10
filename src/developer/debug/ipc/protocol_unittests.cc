@@ -715,11 +715,14 @@ TEST(Protocol, AspaceReply) {
 
 TEST(Protocol, UpdateFilterRequest) {
   UpdateFilterRequest initial;
-  initial.filters.push_back({Filter::Type::kProcessNameSubstr, "Clock", 1234, 1, false, false});
-  initial.filters.push_back({Filter::Type::kProcessName, "Time", 2345, 2, true, false});
-  initial.filters.push_back({Filter::Type::kComponentName, "Network", 0, 3, false, false});
-  initial.filters.push_back(
-      {Filter::Type::kComponentUrl, "fuchsia-pkg://test.com/test#meta/test.cm", 0, 4, true, true});
+  initial.filters.push_back({Filter::Type::kProcessNameSubstr, "Clock", 1234, 1, {false, false}});
+  initial.filters.push_back({Filter::Type::kProcessName, "Time", 2345, 2, {true, false}});
+  initial.filters.push_back({Filter::Type::kComponentName, "Network", 0, 3, {false, false}});
+  initial.filters.push_back({Filter::Type::kComponentUrl,
+                             "fuchsia-pkg://test.com/test#meta/test.cm",
+                             0,
+                             4,
+                             {true, true}});
 
   UpdateFilterRequest second;
   ASSERT_TRUE(SerializeDeserialize(initial, &second));
@@ -729,8 +732,8 @@ TEST(Protocol, UpdateFilterRequest) {
     EXPECT_EQ(initial.filters[i].pattern, second.filters[i].pattern);
     EXPECT_EQ(initial.filters[i].job_koid, second.filters[i].job_koid);
     EXPECT_EQ(initial.filters[i].id, second.filters[i].id);
-    EXPECT_EQ(initial.filters[i].weak, second.filters[i].weak);
-    EXPECT_EQ(initial.filters[i].recursive, second.filters[i].recursive);
+    EXPECT_EQ(initial.filters[i].config.weak, second.filters[i].config.weak);
+    EXPECT_EQ(initial.filters[i].config.recursive, second.filters[i].config.recursive);
   }
 }
 

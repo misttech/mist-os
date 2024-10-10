@@ -299,8 +299,9 @@ void InterceptionWorkflow::Attach(const std::vector<zx_koid_t>& process_koids) {
       continue;
     }
 
-    // The debugger is not yet attached to the process.  Attach to it.
-    target->Attach(process_koid, zxdb::Target::AttachMode::kStrong,
+    // The debugger is not yet attached to the process.  Attach to it. The default configuration is
+    // always what we want.
+    target->Attach(process_koid, debug_ipc::AttachConfig(),
                    [this, target, process_koid](fxl::WeakPtr<zxdb::Target> /*target*/,
                                                 const zxdb::Err& err, uint64_t timestamp) {
                      if (!err.ok()) {

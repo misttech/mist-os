@@ -90,7 +90,7 @@ TEST_F(DebugAgentServerTest, AddNewFilter) {
   EXPECT_EQ(status_reply.filters[0].type, debug_ipc::Filter::Type::kComponentMonikerSuffix);
   // The recursive flag was left unspecified, which should leave the default value of false in the
   // debug_ipc filter.
-  EXPECT_EQ(status_reply.filters[0].recursive, false);
+  EXPECT_EQ(status_reply.filters[0].config.recursive, false);
   EXPECT_EQ(status_reply.processes.size(), 1u);
   EXPECT_EQ(status_reply.processes[0].process_koid,
             reply.matched_processes_for_filter[0].matched_pids[0]);
@@ -153,7 +153,7 @@ TEST_F(DebugAgentServerTest, AddNewFilter) {
   ASSERT_EQ(status_reply.filters.size(), 3u);
   EXPECT_EQ(status_reply.filters[2].pattern, kFullRootMoniker);
   EXPECT_EQ(status_reply.filters[2].type, debug_ipc::Filter::Type::kComponentMonikerPrefix);
-  EXPECT_EQ(status_reply.filters[2].recursive, false);
+  EXPECT_EQ(status_reply.filters[2].config.recursive, false);
 
   // Koid of job4 from MockSystemInterface.
   constexpr zx_koid_t kJob4Koid = 32;

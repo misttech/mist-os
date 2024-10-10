@@ -142,6 +142,9 @@ struct ClientSettings {
 
     static const char* kWeak;
     static const char* kWeakDescription;
+
+    static const char* kRecursive;
+    static const char* kRecursiveDescription;
   };
 };
 

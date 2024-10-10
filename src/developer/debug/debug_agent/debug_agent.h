@@ -153,7 +153,8 @@ class DebugAgent : public RemoteAPI,
   // Attempts to attach to the given process and sends a AttachReply message
   // to the client with the result.
   debug::Status AttachToLimboProcess(zx_koid_t process_koid, debug_ipc::AttachReply* reply);
-  debug::Status AttachToExistingProcess(zx_koid_t process_koid, bool weak,
+  debug::Status AttachToExistingProcess(zx_koid_t process_koid,
+                                        const debug_ipc::AttachConfig& config,
                                         debug_ipc::AttachReply* reply);
 
   void LaunchProcess(const debug_ipc::RunBinaryRequest&, debug_ipc::RunBinaryReply*);

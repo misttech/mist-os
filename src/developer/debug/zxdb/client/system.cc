@@ -720,7 +720,7 @@ void System::OnFilterMatches(const std::vector<debug_ipc::FilterMatch>& matches)
   // A collection of pids that we are going to attach to. The corresponding mode will determine if
   // it should be performed as a weak attach. If a pid is matched by multiple filters, they must
   // ALL be configured as weak filters for a weak attach to occur.
-  std::map<uint64_t, Target::AttachMode> pids_to_attach;
+  std::map<uint64_t, debug_ipc::AttachConfig> pids_to_attach;
 
   for (const auto& match : matches) {
     // Check that we don't accidentally attach to too many processes.
@@ -744,7 +744,10 @@ void System::OnFilterMatches(const std::vector<debug_ipc::FilterMatch>& matches)
         mode = Target::AttachMode::kWeak;
       }
 
-      auto inserted = pids_to_attach.insert({matched_pid, mode});
+      auto inserted = pids_to_attach.insert({matched_pid,
+                                             {
+                                                 .weak = mode == Target::AttachMode::kWeak,
+                                             }});
 
       // Make sure we double check weak_attach after the insertion. If the pid had already been
       // added to the map by a weak filter and this is a strong filter that also matched, then we
@@ -752,21 +755,19 @@ void System::OnFilterMatches(const std::vector<debug_ipc::FilterMatch>& matches)
       // filter. If the filter id for this match is invalid or isn't found, perform a strong
       // attach.
       if (mode != Target::AttachMode::kWeak)
-        inserted.first->second = Target::AttachMode::kStrong;
+        inserted.first->second.weak = false;
     }
   }
 
   // Now we can attach to all of the matched pids.
-  for (const auto& [pid, mode] : pids_to_attach) {
-    // The pid = pid assignment capture is because capturing from a structured binding is a C++20
-    // extension and causes a compilation error.
-    AttachToProcess(pid, mode,
-                    [pid = pid](fxl::WeakPtr<Target> target, const Err& err, uint64_t timestamp) {
-                      if (err.has_error()) {
-                        LOGS(Error) << "Could not attach to process " << pid << ": " << err.msg();
-                        return;
-                      }
-                    });
+  for (const auto& [pid, config] : pids_to_attach) {
+    AttachToPid(pid, config,
+                [pid](fxl::WeakPtr<Target> target, const Err& err, uint64_t timestamp) {
+                  if (err.has_error()) {
+                    LOGS(Error) << "Could not attach to process " << pid << ": " << err.msg();
+                    return;
+                  }
+                });
   }
 }
 
@@ -798,8 +799,8 @@ Target* System::GetNextTarget() {
   return open_slot;
 }
 
-void System::AttachToProcess(uint64_t pid, Target::AttachMode mode,
-                             Target::CallbackWithTimestamp callback) {
+void System::AttachToPid(uint64_t pid, debug_ipc::AttachConfig config,
+                         Target::CallbackWithTimestamp callback) {
   // Don't allow attaching to a process more than once.
   if (Process* process = ProcessFromKoid(pid)) {
     debug::MessageLoop::Current()->PostTask(
@@ -811,7 +812,7 @@ void System::AttachToProcess(uint64_t pid, Target::AttachMode mode,
     return;
   }
 
-  GetNextTarget()->Attach(pid, mode, std::move(callback));
+  GetNextTarget()->Attach(pid, config, std::move(callback));
 }
 
 void System::HandlePreviousConnectedProcesses(const std::vector<debug_ipc::ProcessRecord>& procs) {

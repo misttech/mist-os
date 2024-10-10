@@ -531,7 +531,7 @@ TEST_F(DebugAgentTests, WeakFilterMatchDoesNotSendModules) {
   filter.type = debug_ipc::Filter::Type::kProcessName;
   filter.pattern = kProcessName;
   filter.id = 1;
-  filter.weak = true;
+  filter.config.weak = true;
 
   debug_ipc::UpdateFilterReply reply;
   remote_api->OnUpdateFilter(request, &reply);
@@ -559,7 +559,7 @@ TEST_F(DebugAgentTests, RecursiveFilterAppliesImplicitFilter) {
   auto& filter = request.filters.emplace_back();
   filter.type = debug_ipc::Filter::Type::kComponentUrl;
   filter.pattern = kRootComponentUrl;
-  filter.recursive = true;
+  filter.config.recursive = true;
 
   debug_ipc::UpdateFilterReply reply;
   remote_api->OnUpdateFilter(request, &reply);

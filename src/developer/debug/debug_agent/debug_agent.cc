@@ -670,7 +670,7 @@ void DebugAgent::OnAttach(const debug_ipc::AttachRequest& request, debug_ipc::At
   }
 
   // Attempt to attach to an existing process. Sends the appropriate replies/notifications.
-  reply->status = AttachToExistingProcess(request.koid, request.weak, reply);
+  reply->status = AttachToExistingProcess(request.koid, request.config, reply);
   if (reply->status.ok())
     return;
 
@@ -734,7 +734,8 @@ debug::Status DebugAgent::AttachToLimboProcess(zx_koid_t process_koid,
   return debug::Status();
 }
 
-debug::Status DebugAgent::AttachToExistingProcess(zx_koid_t process_koid, bool weak,
+debug::Status DebugAgent::AttachToExistingProcess(zx_koid_t process_koid,
+                                                  const debug_ipc::AttachConfig& config,
                                                   debug_ipc::AttachReply* reply) {
   std::unique_ptr<ProcessHandle> process_handle = system_interface_->GetProcess(process_koid);
   if (!process_handle)
@@ -742,7 +743,7 @@ debug::Status DebugAgent::AttachToExistingProcess(zx_koid_t process_koid, bool w
 
   DebuggedProcess* process = nullptr;
   DebuggedProcessCreateInfo create_info(std::move(process_handle));
-  create_info.weak = weak;
+  create_info.weak = config.weak;
   if (auto status = AddDebuggedProcess(std::move(create_info), &process); status.has_error())
     return status;
 
@@ -753,12 +754,12 @@ debug::Status DebugAgent::AttachToExistingProcess(zx_koid_t process_koid, bool w
 
   // Send the reply first, then the notifications about the process and threads.
   debug::MessageLoop::Current()->PostTask(
-      FROM_HERE, [weak_this = GetWeakPtr(), koid = reply->koid, weak]() mutable {
+      FROM_HERE, [weak_this = GetWeakPtr(), koid = reply->koid, config]() mutable {
         if (!weak_this)
           return;
         if (DebuggedProcess* process = weak_this->GetDebuggedProcess(koid)) {
           process->PopulateCurrentThreads();
-          if (!weak)
+          if (!config.weak)
             process->SuspendAndSendModules();
         }
       });
@@ -848,7 +849,7 @@ void DebugAgent::OnProcessChanged(bool starting, std::unique_ptr<ProcessHandle> 
   notify.components = system_interface_->GetComponentManager().FindComponentInfo(*process_handle);
   notify.filter_id = matched_filter ? matched_filter->id : debug_ipc::kInvalidFilterId;
 
-  bool weak = matched_filter ? matched_filter->weak : false;
+  bool weak = matched_filter ? matched_filter->config.weak : false;
 
   DebuggedProcessCreateInfo create_info(std::move(process_handle));
   create_info.stdio = std::move(stdio);
@@ -880,7 +881,7 @@ void DebugAgent::OnComponentDiscovered(const std::string& moniker, const std::st
   auto matched_filters = GetMatchingFiltersForComponentInfo(moniker, url);
 
   for (auto filter : matched_filters) {
-    if (filter != nullptr && filter->filter().recursive) {
+    if (filter != nullptr && filter->filter().config.recursive) {
       // When any recursive filter matches here, we install a component moniker prefix filter so
       // that any sub-components created as children of this one are attached implicitly. Only one
       // filter match needs to be recursive for us to install the prefix filter for |moniker|, and
@@ -893,7 +894,7 @@ void DebugAgent::OnComponentDiscovered(const std::string& moniker, const std::st
       debug_ipc::Filter realm_filter;
       realm_filter.type = debug_ipc::Filter::Type::kComponentMonikerPrefix;
       realm_filter.pattern = moniker;
-      realm_filter.weak = filter->filter().weak;
+      realm_filter.config.weak = filter->filter().config.weak;
 
       filters_.emplace_back(realm_filter);
 

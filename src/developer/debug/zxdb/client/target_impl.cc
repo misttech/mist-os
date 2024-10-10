@@ -140,7 +140,8 @@ void TargetImpl::Kill(Callback callback) {
       });
 }
 
-void TargetImpl::Attach(uint64_t koid, AttachMode mode, CallbackWithTimestamp callback) {
+void TargetImpl::Attach(uint64_t koid, debug_ipc::AttachConfig config,
+                        CallbackWithTimestamp callback) {
   if (state_ != State::kNone) {
     // Avoid reentering caller to dispatch the error.
     debug::MessageLoop::Current()->PostTask(
@@ -155,7 +156,7 @@ void TargetImpl::Attach(uint64_t koid, AttachMode mode, CallbackWithTimestamp ca
 
   debug_ipc::AttachRequest request;
   request.koid = koid;
-  request.weak = mode == AttachMode::kWeak;
+  request.config = config;
   session()->remote_api()->Attach(request, [koid, callback = std::move(callback),
                                             weak_target = impl_weak_factory_.GetWeakPtr()](
                                                const Err& err,
