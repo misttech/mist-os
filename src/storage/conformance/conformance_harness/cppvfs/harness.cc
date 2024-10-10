@@ -54,7 +54,6 @@ class TestHarness : public fidl::Server<fio_test::TestHarness> {
     config.supports_get_backing_memory(true);
     config.supports_remote_dir(true);
     config.supports_get_token(true);
-    config.supports_open3(true);
     config.supports_mutable_file(true);
     config.supported_attributes(fio::NodeAttributesQuery::kContentSize |
                                 fio::NodeAttributesQuery::kStorageSize);

@@ -65,7 +65,6 @@ async fn run(mut stream: TestHarnessRequestStream, fixture: &TestFixture) -> Res
                     supports_get_backing_memory: true,
                     supports_remote_dir: false,
                     supports_get_token: true,
-                    supports_open3: true,
                     supports_link_into: true,
                     supports_append: true,
                     supports_modify_directory: true,

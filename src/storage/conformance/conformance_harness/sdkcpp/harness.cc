@@ -37,7 +37,6 @@ class SdkCppHarness : public fidl::Server<fio_test::TestHarness> {
     // test harness should be the exact same as the current SDK VFS one.
 
     // Supported options:
-    config.supports_open3(true);
     config.supports_get_backing_memory(true);
     config.supports_remote_dir(true);
     config.supports_get_token(true);

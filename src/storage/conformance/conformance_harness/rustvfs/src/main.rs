@@ -77,7 +77,6 @@ async fn run(mut stream: TestHarnessRequestStream) -> Result<(), Error> {
                     supports_executable_file: true,
                     supports_get_backing_memory: true,
                     supports_remote_dir: true,
-                    supports_open3: true,
                     supported_attributes: fio::NodeAttributesQuery::PROTOCOLS
                         | fio::NodeAttributesQuery::ABILITIES
                         | fio::NodeAttributesQuery::CONTENT_SIZE

@@ -111,7 +111,7 @@ async fn create_file_with_insufficient_rights() {
 #[fuchsia::test]
 async fn create_directory() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_modify_directory || !harness.config.supports_open3 {
+    if !harness.config.supports_modify_directory {
         return;
     }
 
@@ -166,7 +166,7 @@ async fn create_directory() {
 #[fuchsia::test]
 async fn create_directory_with_insufficient_rights() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_modify_directory || !harness.config.supports_open3 {
+    if !harness.config.supports_modify_directory {
         return;
     }
 
@@ -205,7 +205,6 @@ async fn create_directory_with_insufficient_rights() {
 async fn create_directory_with_create_attributes() {
     let harness = TestHarness::new().await;
     if !harness.config.supports_modify_directory
-        || !harness.config.supports_open3
         || !harness.config.supported_attributes.contains(fio::NodeAttributesQuery::MODE)
     {
         return;
@@ -266,7 +265,6 @@ async fn create_directory_with_create_attributes() {
 async fn open_directory_with_never_create_and_create_attributes() {
     let harness = TestHarness::new().await;
     if !harness.config.supports_modify_directory
-        || !harness.config.supports_open3
         || !harness.config.supported_attributes.contains(fio::NodeAttributesQuery::MODE)
     {
         return;
@@ -301,7 +299,7 @@ async fn open_directory_with_never_create_and_create_attributes() {
 #[fuchsia::test]
 async fn create_file() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_modify_directory || !harness.config.supports_open3 {
+    if !harness.config.supports_modify_directory {
         return;
     }
 
@@ -336,7 +334,7 @@ async fn create_file() {
 #[fuchsia::test]
 async fn create_file_with_insufficient_rights_open3() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_modify_directory || !harness.config.supports_open3 {
+    if !harness.config.supports_modify_directory {
         return;
     }
 
@@ -373,7 +371,6 @@ async fn create_file_with_insufficient_rights_open3() {
 async fn create_file_with_create_attributes() {
     let harness = TestHarness::new().await;
     if !harness.config.supports_modify_directory
-        || !harness.config.supports_open3
         || !harness.config.supported_attributes.contains(fio::NodeAttributesQuery::MODE)
     {
         return;
@@ -433,7 +430,6 @@ async fn create_file_with_create_attributes() {
 async fn open_file_with_never_create_and_create_attributes() {
     let harness = TestHarness::new().await;
     if !harness.config.supports_modify_directory
-        || !harness.config.supports_open3
         || !harness.config.supported_attributes.contains(fio::NodeAttributesQuery::MODE)
     {
         return;
