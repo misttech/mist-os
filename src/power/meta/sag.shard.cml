@@ -20,13 +20,15 @@
             dependency: "weak",
         },
         {
-            config: [
-                "fuchsia.power.UseSuspender",
-                "fuchsia.power.WaitForSuspendingToken",
-            ],
+            config: [ "fuchsia.power.UseSuspender" ],
             from: "void",
             to: "#system-activity-governor",
             availability: "optional",
+        },
+        {
+            config: [ "fuchsia.power.WaitForSuspendingToken" ],
+            from: "parent",
+            to: "#system-activity-governor",
         },
         {
             protocol: [

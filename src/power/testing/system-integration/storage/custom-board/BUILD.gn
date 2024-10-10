@@ -17,6 +17,7 @@ board_configuration("power_testing_storage_vim3") {
   provided_features = [
     "fuchsia::driver_framework_v2_support",
     "fuchsia::pmm_checker",
+    "fuchsia::suspending_token",
   ]
   devicetree = "//src/devices/board/drivers/vim3-devicetree:vim3"
   input_bundles = [
