@@ -198,7 +198,7 @@ mod tests {
             .unwrap();
 
             // Open a connection to the ramdisk and use it to create the RemoteBackend.
-            let channel = ramdisk_client.open().await.unwrap();
+            let channel = ramdisk_client.open().unwrap();
             let backend = RemoteBackend::new(channel).await.unwrap();
             let controller = RemoteBackendController::new(ramdisk_client, vmo);
             Ok((backend, controller))

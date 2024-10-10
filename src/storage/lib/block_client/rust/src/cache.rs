@@ -304,7 +304,7 @@ mod tests {
         let ramdisk = RamdiskClient::create(RAMDISK_BLOCK_SIZE, RAMDISK_BLOCK_COUNT)
             .await
             .expect("RamdiskClient::create failed");
-        let client_end = ramdisk.open().await.expect("ramdisk.open failed");
+        let client_end = ramdisk.open().expect("ramdisk.open failed");
         let block_client =
             RemoteBlockClientSync::new(client_end).expect("RemoteBlockClientSync::new failed");
         (ramdisk, block_client)
@@ -398,7 +398,7 @@ mod tests {
         assert_eq!(cache.stats(), &Stats { read_count: 2, write_count: 0, cache_hits: 0 });
 
         drop(cache);
-        let client_end = ramdisk.open().await.expect("ramdisk.open failed");
+        let client_end = ramdisk.open().expect("ramdisk.open failed");
         let block_client =
             RemoteBlockClientSync::new(client_end).expect("RemoteBlockClientSync::new failed");
         let mut cache = Cache::new(block_client).expect("Cache::new failed");
@@ -504,7 +504,7 @@ mod tests {
         let ramdisk = RamdiskClient::create(super::BLOCK_SIZE * 2, 10)
             .await
             .expect("RamdiskClient::create failed");
-        let client_end = ramdisk.open().await.expect("ramdisk.open failed");
+        let client_end = ramdisk.open().expect("ramdisk.open failed");
         let block_client =
             RemoteBlockClientSync::new(client_end).expect("RemoteBlockClientSync::new failed");
         Cache::new(block_client).err().expect("Cache::new succeeded");

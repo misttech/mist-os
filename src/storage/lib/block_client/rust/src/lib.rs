@@ -874,11 +874,11 @@ mod tests {
         let ramdisk = RamdiskClient::create(RAMDISK_BLOCK_SIZE, RAMDISK_BLOCK_COUNT)
             .await
             .expect("RamdiskClient::create failed");
-        let client_end = ramdisk.open().await.expect("ramdisk.open failed");
+        let client_end = ramdisk.open().expect("ramdisk.open failed");
         let proxy = client_end.into_proxy().expect("into_proxy failed");
         let block_client = RemoteBlockClient::new(proxy).await.expect("new failed");
         assert_eq!(block_client.block_size(), 1024);
-        let client_end = ramdisk.open().await.expect("ramdisk.open failed");
+        let client_end = ramdisk.open().expect("ramdisk.open failed");
         let proxy = client_end.into_proxy().expect("into_proxy failed");
         (ramdisk, proxy, block_client)
     }

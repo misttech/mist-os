@@ -445,7 +445,7 @@ mod tests {
         );
 
         let ramdisk = RamdiskClient::create(512, 1 << 16).await.unwrap();
-        let channel = ramdisk.open().await.unwrap();
+        let channel = ramdisk.open().unwrap();
 
         assert_matches!(export_directory(&dir_proxy, channel).await, Ok(()));
     }

@@ -268,9 +268,7 @@ impl RamdiskClient {
     }
 
     /// Get an open channel to the underlying ramdevice.
-    pub async fn open(
-        &self,
-    ) -> Result<fidl::endpoints::ClientEnd<fhardware_block::BlockMarker>, Error> {
+    pub fn open(&self) -> Result<fidl::endpoints::ClientEnd<fhardware_block::BlockMarker>, Error> {
         match self {
             Self::V1 { .. } => {
                 // At this point, we have already waited on the block path to appear so we can
@@ -483,7 +481,7 @@ mod tests {
     #[fuchsia::test]
     async fn create_open_destroy() {
         let ramdisk = RamdiskClient::create(512, 2048).await.unwrap();
-        let client = ramdisk.open().await.unwrap().into_proxy().unwrap();
+        let client = ramdisk.open().unwrap().into_proxy().unwrap();
         client.get_info().await.expect("get_info failed").unwrap();
         ramdisk.destroy().await.expect("failed to destroy the ramdisk");
         // The ramdisk will be scheduled to be unbound, so `client` may be valid for some time.
@@ -492,7 +490,7 @@ mod tests {
     #[fuchsia::test]
     async fn create_open_forget() {
         let ramdisk = RamdiskClient::create(512, 2048).await.unwrap();
-        let client = ramdisk.open().await.unwrap().into_proxy().unwrap();
+        let client = ramdisk.open().unwrap().into_proxy().unwrap();
         client.get_info().await.expect("get_info failed").unwrap();
         assert!(ramdisk.forget().is_ok());
         // We should succeed calling `get_info` as the ramdisk should still exist.
