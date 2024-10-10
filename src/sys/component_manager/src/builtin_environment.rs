@@ -1,4 +1,4 @@
-// Copyr, ExtendedMoniker::ComponentManageright 2019 The Fuchsia Authors. All rights reserved.
+// Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -209,14 +209,16 @@ impl BuiltinEnvironmentBuilder {
             .ok_or(format_err!("Runtime config should be set to add builtin runner."))?;
 
         let top_instance = self.top_instance.clone().unwrap();
+
+        let elf_runner_resources = ElfRunnerResources {
+            security_policy: runtime_config.security_policy.clone(),
+            utc_clock: self.utc_clock.clone(),
+            crash_records: self.crash_records.clone(),
+            instance_registry: self.instance_registry.clone(),
+        };
         let runner = Arc::new(BuiltinRunner::new(
             top_instance.task_group(),
-            ElfRunnerResources {
-                security_policy: runtime_config.security_policy.clone(),
-                utc_clock: self.utc_clock.clone(),
-                crash_records: self.crash_records.clone(),
-                instance_registry: self.instance_registry.clone(),
-            },
+            BuiltinRunner::get_builtin_programs(Arc::new(elf_runner_resources)),
         ));
         Ok(self.add_runner("builtin".parse().unwrap(), runner))
     }
