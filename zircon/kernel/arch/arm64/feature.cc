@@ -6,6 +6,7 @@
 #include "arch/arm64/feature.h"
 
 #include <bits.h>
+#include <ctype.h>
 #include <inttypes.h>
 #include <lib/arch/arm64/feature.h>
 #include <lib/arch/intrin.h>
@@ -150,9 +151,9 @@ void arm64_dump_cache_info(cpu_num_t cpu) {
   }
 }
 
-enum arm64_microarch midr_to_microarch(uint32_t midr) {
-  uint32_t implementer = BITS_SHIFT(midr, 31, 24);
-  uint32_t partnum = BITS_SHIFT(midr, 15, 4);
+enum arm64_microarch midr_to_microarch(uint64_t midr) {
+  uint64_t implementer = BITS_SHIFT(midr, 31, 24);
+  uint64_t partnum = BITS_SHIFT(midr, 15, 4);
 
   if (implementer == 'A') {
     // ARM cores
@@ -253,13 +254,13 @@ enum arm64_microarch midr_to_microarch(uint32_t midr) {
   }
 }
 
-static void midr_to_core_string(uint32_t midr, char* str, size_t len) {
+static void midr_to_core_string(uint64_t midr, char* str, size_t len) {
   auto microarch = midr_to_microarch(midr);
-  uint32_t implementer = BITS_SHIFT(midr, 31, 24);
-  uint32_t variant = BITS_SHIFT(midr, 23, 20);
-  [[maybe_unused]] uint32_t architecture = BITS_SHIFT(midr, 19, 16);
-  uint32_t partnum = BITS_SHIFT(midr, 15, 4);
-  uint32_t revision = BITS_SHIFT(midr, 3, 0);
+  uint64_t implementer = BITS_SHIFT(midr, 31, 24);
+  uint64_t variant = BITS_SHIFT(midr, 23, 20);
+  [[maybe_unused]] uint64_t architecture = BITS_SHIFT(midr, 19, 16);
+  uint64_t partnum = BITS_SHIFT(midr, 15, 4);
+  uint64_t revision = BITS_SHIFT(midr, 3, 0);
 
   const char* partnum_str = "unknown";
   switch (microarch) {
@@ -372,24 +373,24 @@ static void midr_to_core_string(uint32_t midr, char* str, size_t len) {
       partnum_str = "QEMU TCG";
       break;
     case UNKNOWN: {
-      const char i = (implementer ? (char)implementer : '0');
-      snprintf(str, len, "Unknown implementer %c partnum 0x%x r%up%u", i, partnum, variant,
+      const char i = isprint(static_cast<int>(implementer)) ? static_cast<char>(implementer) : '0';
+      snprintf(str, len, "Unknown implementer %c partnum %#lx r%lup%lu", i, partnum, variant,
                revision);
       return;
     }
   }
 
-  snprintf(str, len, "%s r%up%u", partnum_str, variant, revision);
+  snprintf(str, len, "%s r%lup%lu", partnum_str, variant, revision);
 }
 
 static void print_cpu_info() {
-  uint32_t midr = (uint32_t)__arm_rsr64("midr_el1");
+  uint64_t midr = __arm_rsr64("midr_el1");
   char cpu_name[128];
   midr_to_core_string(midr, cpu_name, sizeof(cpu_name));
 
   uint64_t mpidr = __arm_rsr64("mpidr_el1");
 
-  dprintf(INFO, "ARM cpu %u: midr %#x '%s' mpidr %#" PRIx64 " aff %u:%u:%u:%u\n",
+  dprintf(INFO, "ARM cpu %u: midr %#lx '%s' mpidr %#" PRIx64 " aff %u:%u:%u:%u\n",
           arch_curr_cpu_num(), midr, cpu_name, mpidr,
           (uint32_t)((mpidr & MPIDR_AFF3_MASK) >> MPIDR_AFF3_SHIFT),
           (uint32_t)((mpidr & MPIDR_AFF2_MASK) >> MPIDR_AFF2_SHIFT),
@@ -399,6 +400,16 @@ static void print_cpu_info() {
 
 bool arm64_feature_current_is_first_in_cluster() {
   const uint64_t mpidr = __arm_rsr64("mpidr_el1");
+
+  // Note: this test is not strictly correct, since the affinity fields really do not encode the
+  // cluster layout of the cores anymore. Since about cortex-a75 and somewhere in the mid armv8
+  // spec, the layout of these fields has been somewhat retconned to mean whatever the vendor wants,
+  // and true cluster layout comes from external sources (such as device tree). However, the MT
+  // bit says whether or not AFF0 is purely listing threads within a cpu, and all new cores have
+  // it set all the time, even if they're not SMT capable.
+  if (mpidr & MPIDR_MT) {
+    return ((mpidr & MPIDR_AFF1_MASK) >> MPIDR_AFF1_SHIFT) == 0;
+  }
   return ((mpidr & MPIDR_AFF0_MASK) >> MPIDR_AFF0_SHIFT) == 0;
 }
 

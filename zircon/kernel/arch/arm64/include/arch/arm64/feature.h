@@ -59,7 +59,7 @@ enum arm64_microarch {
   QEMU_TCG,
 };
 
-enum arm64_microarch midr_to_microarch(uint32_t midr);
+enum arm64_microarch midr_to_microarch(uint64_t midr);
 
 extern uint32_t arm64_isa_features;
 extern bool feat_pmuv3_enabled;
