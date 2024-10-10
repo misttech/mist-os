@@ -13,31 +13,24 @@ use fidl_fuchsia_power_system::{
     self as fsystem, ApplicationActivityLevel, CpuLevel, ExecutionStateLevel,
     FullWakeHandlingLevel, WakeHandlingLevel,
 };
-use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use fuchsia_inspect::{
-    ArrayProperty, IntProperty as IInt, Node as INode, NumericProperty, Property,
-    UintProperty as IUint,
+    ArrayProperty, IntProperty as IInt, Node as INode, Property, UintProperty as IUint,
 };
 use fuchsia_inspect_contrib::nodes::{BoundedListNode as IRingBuffer, NodeExt};
 use futures::channel::mpsc::{self, Receiver, Sender};
+use futures::future::FutureExt;
 use futures::lock::Mutex;
 use futures::prelude::*;
 use power_broker_client::{
     basic_update_fn_factory, run_power_element, LeaseHelper, PowerElementContext,
 };
-use std::cell::{OnceCell, RefCell};
+use std::cell::{Cell, OnceCell, RefCell};
 use std::rc::Rc;
 use zx::{AsHandleRef, HandleBased};
 use {
     fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_observability as fobs,
-    fidl_fuchsia_power_suspend as fsuspend,
+    fidl_fuchsia_power_suspend as fsuspend, fuchsia_async as fasync,
 };
-
-const SUSPEND_FAILURE_RETRY_DELAY: zx::Duration = zx::Duration::from_seconds(1);
-
-// SAG will wait up to this long for an OnSuspendStarted callback to complete.
-// TODO(b/363055581): Remove this timeout when it is no longer needed.
-const ON_SUSPEND_STARTED_TIMEOUT: zx::Duration = zx::Duration::from_seconds(1);
 
 type NotifyFn = Box<dyn Fn(&fsuspend::SuspendStats, fsuspend::StatsWatchResponder) -> bool>;
 type StatsHangingGet = HangingGet<fsuspend::SuspendStats, fsuspend::StatsWatchResponder, NotifyFn>;
@@ -73,12 +66,16 @@ impl From<BootControlLevel> for fbroker::PowerLevel {
 trait SuspendResumeListener {
     /// Gets the manager of suspend stats.
     fn suspend_stats(&self) -> &SuspendStatsManager;
-    /// Called when system suspension is about to begin.
-    async fn on_suspend(&self);
-    /// Called after system suspension ends.
-    async fn on_resume(&self);
-    /// Called when Suspender reports a suspend failure.
-    async fn on_suspend_fail(&self);
+    /// Leases (Execution State, Suspending). Called after system suspension ends.
+    async fn on_suspend_ended(&self, suspend_suceeded: bool);
+    /// Notify the listeners that system suspension is about to begin
+    async fn notify_on_suspend(&self);
+    /// Notify the listeners of suspend results.
+    async fn notify_suspend_ended(&self);
+    /// Notify the listeners of a suspend failure.
+    async fn notify_on_suspend_fail(&self);
+    /// Notify the listeners of a suspend success.
+    async fn notify_on_resume(&self);
 }
 
 /// Controls access to CPU power element and suspend management.
@@ -137,12 +134,6 @@ impl CpuManager {
     async fn set_suspend_state_index(&self, suspend_state_index: u64) {
         tracing::debug!(?suspend_state_index, "set_suspend_state_index: acquiring inner lock");
         self.inner.lock().await.suspend_state_index = suspend_state_index;
-    }
-
-    /// Gets the value that indicates whether suspend is allowed.
-    async fn is_suspend_allowed(&self) -> bool {
-        tracing::debug!("is_suspend_allowed: acquiring inner lock");
-        self.inner.lock().await.suspend_allowed
     }
 
     /// Updates the power level of the CPU power element.
@@ -205,7 +196,6 @@ impl CpuManager {
             // LINT.IfChange
             tracing::info!("Suspending");
             // LINT.ThenChange(//src/testing/end_to_end/honeydew/honeydew/affordances/starnix/system_power_state_controller.py)
-            listener.on_suspend().await;
 
             let response = if let Some(suspender) = inner.suspender.as_ref() {
                 // LINT.IfChange
@@ -274,15 +264,10 @@ impl CpuManager {
         // At this point, the suspend request is no longer in flight and has been handled. With
         // `inner` going out of scope, other tasks can modify flags and update the power level of
         // CPU power element.
+        listener.on_suspend_ended(!suspend_failed).await;
         if suspend_failed {
-            // This is needed in order to allow listener to request power level changes when they
-            // process the suspend failure.
-            listener.on_suspend_fail().await;
             SuspendResult::Fail
         } else {
-            // This is needed in order to allow listeners to request power level changes when they
-            // get the `ActivityGovernorListener::OnResume` call.
-            listener.on_resume().await;
             SuspendResult::Success
         }
     }
@@ -543,6 +528,16 @@ pub struct SystemActivityGovernor {
     /// asynchronously. This signal prevents exposing uninitialized power
     /// element state to external clients.
     is_running_signal: async_lock::OnceCell<()>,
+    /// The flag which indicates a successful suspension.
+    suspend_succeeded: Cell<bool>,
+    /// The flag used to synchronize the resume_control_lease.
+    /// It's set to true when a resume_control_lease is created and to false
+    /// when it needs to be dropped.
+    // TODO(https://fxbug.dev/372695129): Optimize resume_control_lease.
+    waiting_for_es_activation_after_resume: Cell<bool>,
+    /// The lease which hold execution_state at suspending state temporarily
+    /// after suspension.
+    resume_control_lease: RefCell<Option<fbroker::LeaseControlProxy>>,
 }
 
 impl SystemActivityGovernor {
@@ -757,6 +752,9 @@ impl SystemActivityGovernor {
             cpu_manager,
             boot_control,
             element_power_level_names,
+            suspend_succeeded: Cell::new(false),
+            waiting_for_es_activation_after_resume: Cell::new(false),
+            resume_control_lease: RefCell::new(None),
             is_running_signal: async_lock::OnceCell::new(),
         });
 
@@ -822,40 +820,17 @@ impl SystemActivityGovernor {
         let this = self.clone();
 
         fasync::Task::local(async move {
-            let unhandled_suspend_failures_node =
+            let _unhandled_suspend_failures_node =
                 this.inspect_root.create_uint(fobs::UNHANDLED_SUSPEND_FAILURES_COUNT, 0);
-            let mut suspend_result = SuspendResult::Success;
+            let mut _suspend_result = SuspendResult::Success;
             loop {
                 tracing::debug!("awaiting suspend signals");
-                if suspend_result != SuspendResult::Fail {
-                    suspend_signal.next().await;
-                } else {
-                    let mut timed_out = false;
-                    suspend_signal
-                        .next()
-                        .on_timeout(SUSPEND_FAILURE_RETRY_DELAY.after_now(), || {
-                            timed_out = true;
-                            None
-                        })
-                        .await;
-
-                    if timed_out && this.cpu_manager.is_suspend_allowed().await {
-                        tracing::warn!("!!! Failure to suspend was not handled !!!");
-                        unhandled_suspend_failures_node.add(1);
-
-                        // Loop again without attempting to suspend.
-                        // On products that don't handle a suspend failure by retrying or raising
-                        // CPU level, we'll timeout waiting for a new signal and log/inspect
-                        // without triggering a suspension. This covers the minimum required
-                        // behavior defined by RFC-0255: System Activity Governor.
-                        continue;
-                    }
-                }
+                suspend_signal.next().await;
 
                 // Check that the conditions to suspend are still satisfied.
                 tracing::debug!("attempting to suspend");
 
-                suspend_result = this.cpu_manager.trigger_suspend().await;
+                _suspend_result = this.cpu_manager.trigger_suspend().await;
             }
         })
         .detach();
@@ -955,14 +930,52 @@ impl SystemActivityGovernor {
     fn run_execution_state(self: &Rc<Self>, inspect_node: &INode) {
         let execution_state_node = inspect_node.create_child("execution_state");
         let this = self.clone();
+        let this_clone = this.clone();
 
         fasync::Task::local(async move {
+            let update_fn = Rc::new(basic_update_fn_factory(&this.execution_state));
+            let previous_power_level =
+                Rc::new(Cell::new(ExecutionStateLevel::Inactive.into_primitive()));
+
             run_power_element(
                 &this.execution_state.name(),
                 &this.execution_state.required_level,
-                ExecutionStateLevel::Inactive.into_primitive(),
+                previous_power_level.get(),
                 Some(execution_state_node),
-                basic_update_fn_factory(&this.execution_state),
+                Box::new(move |new_power_level: fbroker::PowerLevel| {
+                    let update_fn = update_fn.clone();
+                    let previous_power_level = previous_power_level.clone();
+                    let this = this_clone.clone();
+
+                    async move {
+                        // Call suspend callback before ExecutionState power level changes.
+                        if new_power_level == ExecutionStateLevel::Inactive.into_primitive() {
+                            this.notify_on_suspend().await;
+                        } else if previous_power_level.get()
+                            == ExecutionStateLevel::Inactive.into_primitive()
+                        {
+                            // If leaving Inactive, we need to notify listeners that we exited
+                            // suspend. This cannot block, as a listener may need to raise Execution
+                            // State.
+                            let this2 = this.clone();
+                            fasync::Task::local(async move {
+                                this2.notify_suspend_ended().await;
+                            })
+                            .detach();
+                        }
+
+                        // If entering Active, SAG drops the resume control lease to re-enable
+                        // suspension.
+                        if new_power_level == ExecutionStateLevel::Active.into_primitive() {
+                            this.waiting_for_es_activation_after_resume.set(false);
+                            drop(this.resume_control_lease.borrow_mut().take());
+                        }
+
+                        update_fn(new_power_level).await;
+                        previous_power_level.set(new_power_level);
+                    }
+                    .boxed_local()
+                }),
             )
             .await;
         })
@@ -1228,26 +1241,55 @@ impl SuspendResumeListener for SystemActivityGovernor {
         &self.suspend_stats
     }
 
-    async fn on_suspend(&self) {
+    async fn on_suspend_ended(&self, suspend_succeeded: bool) {
+        tracing::debug!(?suspend_succeeded, "on_suspend_ended");
+        self.suspend_succeeded.set(suspend_succeeded);
+        self.waiting_for_es_activation_after_resume.set(true);
+
+        let lease = self
+            .execution_state
+            .lessor
+            .lease(ExecutionStateLevel::Suspending.into_primitive())
+            .await
+            .expect("Failed to request ExecutionState lease")
+            .expect("Failed to acquire ExecutionState lease")
+            .into_proxy()
+            .expect("Failed to convert the ExecutionState lease ClientEnd into a Proxy");
+
+        // TODO(https://fxbug.dev/333947976): Use RequiredLevel when LeaseStatus is removed.
+        let mut lease_status = fbroker::LeaseStatus::Unknown;
+        while lease_status != fbroker::LeaseStatus::Satisfied {
+            lease_status = lease.watch_status(lease_status).await.unwrap();
+        }
+
+        if self.waiting_for_es_activation_after_resume.get() {
+            let _ = self.resume_control_lease.borrow_mut().insert(lease);
+        }
+    }
+
+    async fn notify_on_suspend(&self) {
+        tracing::debug!("notify_on_suspend");
         // A client may call RegisterListener while handling on_suspend which may cause another
         // mutable borrow of listeners. Clone the listeners to prevent this.
         let listeners: Vec<_> = self.listeners.borrow_mut().clone();
         for l in listeners {
             // TODO(b/363055581): Remove the timeout when it is no longer needed.
-            let _ = l
-                .on_suspend_started()
-                .on_timeout(ON_SUSPEND_STARTED_TIMEOUT.after_now(), || {
-                    tracing::warn!(
-                        "OnSuspendStarted callback did not complete after {:?}.",
-                        ON_SUSPEND_STARTED_TIMEOUT
-                    );
-                    Ok(())
-                })
-                .await;
+            let _ = l.on_suspend_started().await;
         }
     }
 
-    async fn on_resume(&self) {
+    async fn notify_suspend_ended(&self) {
+        let suspend_succeeded = self.suspend_succeeded.get();
+        tracing::debug!(?suspend_succeeded, "notify_suspend_ended");
+        if suspend_succeeded {
+            self.notify_on_resume().await;
+            self.suspend_succeeded.set(false);
+        } else {
+            self.notify_on_suspend_fail().await;
+        }
+    }
+
+    async fn notify_on_resume(&self) {
         // A client may call RegisterListener while handling on_resume which may cause another
         // mutable borrow of listeners. Clone the listeners to prevent this.
         let listeners: Vec<_> = self.listeners.borrow_mut().clone();
@@ -1256,7 +1298,7 @@ impl SuspendResumeListener for SystemActivityGovernor {
         }
     }
 
-    async fn on_suspend_fail(&self) {
+    async fn notify_on_suspend_fail(&self) {
         // A client may call RegisterListener while handling on_suspend_fail which may cause another
         // mutable borrow of listeners. Clone the listeners to prevent this.
         let listeners: Vec<_> = self.listeners.borrow_mut().clone();
