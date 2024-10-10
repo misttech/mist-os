@@ -62,7 +62,7 @@ async fn main() -> Result<(), Error> {
         })?;
 
     let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<service::FshostShutdownResponder>(1);
-    let (watcher, device_stream) = watcher::Watcher::new(&config).await?;
+    let (_watcher, device_stream) = watcher::Watcher::new(&config).await?;
 
     // Potentially launch the boot items ramdisk. It's not fatal, so if it fails we print an error
     // and continue.
@@ -113,8 +113,6 @@ async fn main() -> Result<(), Error> {
                 launcher,
                 matcher_lock.clone()
             ),
-        fshost::BlockWatcherMarker::PROTOCOL_NAME =>
-            service::fshost_block_watcher(watcher),
     };
     if config.fxfs_blob {
         svc_dir

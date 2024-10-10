@@ -9,7 +9,7 @@ use crate::device::constants::{
 };
 use crate::device::{BlockDevice, Device};
 use crate::environment::{Environment, FilesystemLauncher, ServeFilesystemStatus};
-use crate::{debug_log, fxblob, watcher};
+use crate::{debug_log, fxblob};
 use anyhow::{anyhow, Context, Error};
 use device_watcher::recursive_wait_and_open;
 use fidl::endpoints::{Proxy, RequestStream, ServerEnd};
@@ -698,47 +698,6 @@ pub fn fshost_admin(
                     }
                     Err(e) => {
                         tracing::error!("admin server failed: {:?}", e);
-                        return;
-                    }
-                }
-            }
-        }
-    })
-}
-
-/// Create a new service node which implements the fuchsia.fshost.BlockWatcher protocol.
-pub fn fshost_block_watcher(pauser: watcher::Watcher) -> Arc<service::Service> {
-    service::host(move |mut stream: fshost::BlockWatcherRequestStream| {
-        let mut pauser = pauser.clone();
-        async move {
-            while let Some(request) = stream.next().await {
-                match request {
-                    Ok(fshost::BlockWatcherRequest::Pause { responder }) => {
-                        let res = match pauser.pause().await {
-                            Ok(()) => zx::Status::OK.into_raw(),
-                            Err(e) => {
-                                tracing::error!("block watcher service: failed to pause: {:?}", e);
-                                zx::Status::BAD_STATE.into_raw()
-                            }
-                        };
-                        responder.send(res).unwrap_or_else(|e| {
-                            tracing::error!("failed to send Pause response. error: {:?}", e);
-                        });
-                    }
-                    Ok(fshost::BlockWatcherRequest::Resume { responder }) => {
-                        let res = match pauser.resume().await {
-                            Ok(()) => zx::Status::OK.into_raw(),
-                            Err(e) => {
-                                tracing::error!("block watcher service: failed to resume: {:?}", e);
-                                zx::Status::BAD_STATE.into_raw()
-                            }
-                        };
-                        responder.send(res).unwrap_or_else(|e| {
-                            tracing::error!("failed to send Resume response. error: {:?}", e);
-                        });
-                    }
-                    Err(e) => {
-                        tracing::error!("block watcher server failed: {:?}", e);
                         return;
                     }
                 }

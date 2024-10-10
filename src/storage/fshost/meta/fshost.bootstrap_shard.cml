@@ -58,8 +58,6 @@
             to: "#fshost",
         },
         {
-            from: "parent",
-            to: "#fshost",
             config: [
                 "fuchsia.fshost.Blobfs",
                 "fuchsia.fshost.BlobfsInitialInodes",
@@ -87,15 +85,17 @@
                 "fuchsia.fshost.StorageHost",
                 "fuchsia.fshost.UseDiskMigration",
             ],
-        },
-        {
             from: "parent",
             to: "#fshost",
+        },
+        {
             config: [
                 "fuchsia.blobfs.CacheEvictionPolicy",
                 "fuchsia.blobfs.WriteCompressionAlgorithm",
                 "fuchsia.fshost.DisableAutomount",
             ],
+            from: "parent",
+            to: "#fshost",
             availability: "optional",
         },
     ],
@@ -115,10 +115,7 @@
             availability: "optional",
         },
         {
-            protocol: [
-                "fuchsia.fshost.Admin",
-                "fuchsia.fshost.BlockWatcher",
-            ],
+            protocol: [ "fuchsia.fshost.Admin" ],
             from: "#fshost",
         },
         {

@@ -208,10 +208,7 @@
             source_availability: "unknown",
         },
         {
-            protocol: [
-                "fuchsia.fshost.Admin",
-                "fuchsia.fshost.BlockWatcher",
-            ],
+            protocol: [ "fuchsia.fshost.Admin" ],
             from: "#fshost",
             to: "#console-launcher",
             source_availability: "unknown",

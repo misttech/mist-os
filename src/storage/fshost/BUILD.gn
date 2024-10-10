@@ -65,7 +65,6 @@ rustc_binary("fshost") {
     "//src/sys/pkg/fidl/fuchsia.update.verify:fuchsia.update.verify_rust",
     "//third_party/rust_crates:aes-gcm-siv",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:hkdf",
