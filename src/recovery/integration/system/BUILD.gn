@@ -36,7 +36,6 @@ fuchsia_test_component("recovery_integration_test_component") {
   deps = [
     ":bin",
     "//src/recovery/system:component",
-    "//src/recovery/system:values_from_gn",
   ]
 }
 
