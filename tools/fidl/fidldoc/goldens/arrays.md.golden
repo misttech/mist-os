@@ -16,7 +16,7 @@
         <tr id="StructLargeArray.a">
             <td><code>a</code></td>
             <td>
-                <code>uint32[100]</code>
+                <code>array&lt;uint32,&nbsp;100&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -31,7 +31,7 @@
         <tr id="StructSmallArray.a">
             <td><code>a</code></td>
             <td>
-                <code>uint32[2]</code>
+                <code>array&lt;uint32,&nbsp;2&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -53,7 +53,7 @@
 <td><h3 id="TableLargeArray.a" class="add-link hide-from-toc">1</h3></td>
             <td><code>a</code></td>
             <td>
-                <code>uint32[100]</code>
+                <code>array&lt;uint32,&nbsp;100&gt;</code>
             </td>
             <td></td>
         </tr>
@@ -70,7 +70,7 @@
 <td><h3 id="TableSmallArray.a" class="add-link hide-from-toc">1</h3></td>
             <td><code>a</code></td>
             <td>
-                <code>uint32[2]</code>
+                <code>array&lt;uint32,&nbsp;2&gt;</code>
             </td>
             <td></td>
         </tr>
@@ -87,7 +87,7 @@
 <td><h3 id="UnionLargeArray.a" class="add-link hide-from-toc">1</h3></td>
             <td><code>a</code></td>
             <td>
-                <code>uint32[100]</code>
+                <code>array&lt;uint32,&nbsp;100&gt;</code>
             </td>
             <td></td>
         </tr>
@@ -101,7 +101,7 @@
 <td><h3 id="UnionSmallArray.a" class="add-link hide-from-toc">1</h3></td>
             <td><code>a</code></td>
             <td>
-                <code>uint32[2]</code>
+                <code>array&lt;uint32,&nbsp;2&gt;</code>
             </td>
             <td></td>
         </tr>

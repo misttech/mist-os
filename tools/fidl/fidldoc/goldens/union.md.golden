@@ -86,7 +86,7 @@
         <tr id="Pasta.sauce">
             <td><code>sauce</code></td>
             <td>
-                <code>string[16]</code>
+                <code>string:16</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -101,7 +101,7 @@
         <tr id="Pizza.toppings">
             <td><code>toppings</code></td>
             <td>
-                <code>vector&lt;string&gt;</code>
+                <code>vector&lt;string:16&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -464,7 +464,7 @@
 <td><h3 id="StrictBoundedUnion.v" class="add-link hide-from-toc">1</h3></td>
             <td><code>v</code></td>
             <td>
-                <code>vector&lt;uint8&gt;[10]</code>
+                <code>vector&lt;uint8&gt;:10</code>
             </td>
             <td></td>
         </tr>

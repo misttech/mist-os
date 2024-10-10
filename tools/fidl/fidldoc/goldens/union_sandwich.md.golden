@@ -168,7 +168,7 @@
 <td><h3 id="UnionSize12Alignment4.variant" class="add-link hide-from-toc">1</h3></td>
             <td><code>variant</code></td>
             <td>
-                <code>uint8[6]</code>
+                <code>array&lt;uint8,&nbsp;6&gt;</code>
             </td>
             <td></td>
         </tr>
@@ -196,7 +196,7 @@
 <td><h3 id="UnionSize36Alignment4.variant" class="add-link hide-from-toc">1</h3></td>
             <td><code>variant</code></td>
             <td>
-                <code>uint8[32]</code>
+                <code>array&lt;uint8,&nbsp;32&gt;</code>
             </td>
             <td></td>
         </tr>

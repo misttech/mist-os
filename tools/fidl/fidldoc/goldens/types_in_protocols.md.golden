@@ -222,73 +222,73 @@
         <tr>
             <td><code>array_uint8</code></td>
             <td>
-                <code>uint8[5]</code>
+                <code>array&lt;uint8,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_uint16</code></td>
             <td>
-                <code>uint16[5]</code>
+                <code>array&lt;uint16,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_uint32</code></td>
             <td>
-                <code>uint32[5]</code>
+                <code>array&lt;uint32,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_uint64</code></td>
             <td>
-                <code>uint64[5]</code>
+                <code>array&lt;uint64,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_int8</code></td>
             <td>
-                <code>int8[5]</code>
+                <code>array&lt;int8,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_int16</code></td>
             <td>
-                <code>int16[5]</code>
+                <code>array&lt;int16,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_int32</code></td>
             <td>
-                <code>int32[5]</code>
+                <code>array&lt;int32,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_int64</code></td>
             <td>
-                <code>int64[5]</code>
+                <code>array&lt;int64,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_float32</code></td>
             <td>
-                <code>float32[5]</code>
+                <code>array&lt;float32,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_float64</code></td>
             <td>
-                <code>float64[5]</code>
+                <code>array&lt;float64,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_string</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;string,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_opt_string</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;string?,&nbsp;5&gt;</code>
             </td>
         </tr>
 </table>
@@ -306,43 +306,43 @@
         <tr>
             <td><code>array_bits</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Bits'>Bits</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_enum</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Enum'>Enum</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_struct</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Struct'>Struct</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_table</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Table'>Table</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_union</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Union'>Union</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_opt_struct</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Struct'>Struct</a>?,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_opt_union</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Union'>Union</a>?,&nbsp;5&gt;</code>
             </td>
         </tr>
 </table>
@@ -360,19 +360,19 @@
         <tr>
             <td><code>array_array_uint8</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;array&lt;uint8,&nbsp;5&gt;,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_vector_uint8</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;vector&lt;uint8&gt;,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>vector_array_uint8</code></td>
             <td>
-                <code>vector&lt;array&gt;</code>
+                <code>vector&lt;array&lt;uint8,&nbsp;5&gt;&gt;</code>
             </td>
         </tr>
         <tr>
@@ -612,55 +612,55 @@
         <tr>
             <td><code>array_handle</code></td>
             <td>
-                <code>handle[5]</code>
+                <code>array&lt;handle&lt;handle&gt;,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_vmo</code></td>
             <td>
-                <code>vmo[5]</code>
+                <code>array&lt;handle&lt;vmo&gt;,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_client_end</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Protocol'>Protocol</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_server_end</code></td>
             <td>
-                <code>test.typesinprotocols/Protocol[5]</code>
+                <code>array&lt;server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_struct</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#ResourceStruct'>ResourceStruct</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_table</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#ResourceTable'>ResourceTable</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_union</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#ResourceUnion'>ResourceUnion</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>vector_handle</code></td>
             <td>
-                <code>vector&lt;handle&gt;</code>
+                <code>vector&lt;handle&lt;handle&gt;&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>vector_vmo</code></td>
             <td>
-                <code>vector&lt;vmo&gt;</code>
+                <code>vector&lt;handle&lt;vmo&gt;&gt;</code>
             </td>
         </tr>
         <tr>
@@ -672,7 +672,7 @@
         <tr>
             <td><code>vector_server_end</code></td>
             <td>
-                <code>vector&lt;test.typesinprotocols/Protocol&gt;</code>
+                <code>vector&lt;server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;&gt;</code>
             </td>
         </tr>
         <tr>
@@ -774,7 +774,7 @@
         <tr>
             <td><code>vector_opt_string</code></td>
             <td>
-                <code>vector&lt;string&gt;</code>
+                <code>vector&lt;string?&gt;</code>
             </td>
         </tr>
 </table>
@@ -822,13 +822,13 @@
         <tr>
             <td><code>vector_opt_struct</code></td>
             <td>
-                <code>vector&lt;<a class='link' href='#Struct'>Struct</a>&gt;</code>
+                <code>vector&lt;<a class='link' href='#Struct'>Struct</a>?&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>vector_opt_union</code></td>
             <td>
-                <code>vector&lt;<a class='link' href='#Union'>Union</a>&gt;</code>
+                <code>vector&lt;<a class='link' href='#Union'>Union</a>?&gt;</code>
             </td>
         </tr>
 </table>
@@ -864,7 +864,7 @@
         <tr>
             <td><code>opt_vector_opt_struct</code></td>
             <td>
-                <code>vector&lt;<a class='link' href='#Struct'>Struct</a>&gt;?</code>
+                <code>vector&lt;<a class='link' href='#Struct'>Struct</a>?&gt;?</code>
             </td>
         </tr>
 </table>
@@ -881,73 +881,73 @@
         <tr>
             <td><code>array_uint8</code></td>
             <td>
-                <code>uint8[5]</code>
+                <code>array&lt;uint8,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_uint16</code></td>
             <td>
-                <code>uint16[5]</code>
+                <code>array&lt;uint16,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_uint32</code></td>
             <td>
-                <code>uint32[5]</code>
+                <code>array&lt;uint32,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_uint64</code></td>
             <td>
-                <code>uint64[5]</code>
+                <code>array&lt;uint64,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_int8</code></td>
             <td>
-                <code>int8[5]</code>
+                <code>array&lt;int8,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_int16</code></td>
             <td>
-                <code>int16[5]</code>
+                <code>array&lt;int16,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_int32</code></td>
             <td>
-                <code>int32[5]</code>
+                <code>array&lt;int32,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_int64</code></td>
             <td>
-                <code>int64[5]</code>
+                <code>array&lt;int64,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_float32</code></td>
             <td>
-                <code>float32[5]</code>
+                <code>array&lt;float32,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_float64</code></td>
             <td>
-                <code>float64[5]</code>
+                <code>array&lt;float64,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_string</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;string,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_opt_string</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;string?,&nbsp;5&gt;</code>
             </td>
         </tr>
 </table>
@@ -965,43 +965,43 @@
         <tr>
             <td><code>array_bits</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Bits'>Bits</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_enum</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Enum'>Enum</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_struct</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Struct'>Struct</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_table</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Table'>Table</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_union</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Union'>Union</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_opt_struct</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Struct'>Struct</a>?,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_opt_union</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Union'>Union</a>?,&nbsp;5&gt;</code>
             </td>
         </tr>
 </table>
@@ -1019,19 +1019,19 @@
         <tr>
             <td><code>array_array_uint8</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;array&lt;uint8,&nbsp;5&gt;,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_vector_uint8</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;vector&lt;uint8&gt;,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>vector_array_uint8</code></td>
             <td>
-                <code>vector&lt;array&gt;</code>
+                <code>vector&lt;array&lt;uint8,&nbsp;5&gt;&gt;</code>
             </td>
         </tr>
         <tr>
@@ -1271,55 +1271,55 @@
         <tr>
             <td><code>array_handle</code></td>
             <td>
-                <code>handle[5]</code>
+                <code>array&lt;handle&lt;handle&gt;,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_vmo</code></td>
             <td>
-                <code>vmo[5]</code>
+                <code>array&lt;handle&lt;vmo&gt;,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_client_end</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Protocol'>Protocol</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_server_end</code></td>
             <td>
-                <code>test.typesinprotocols/Protocol[5]</code>
+                <code>array&lt;server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_struct</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#ResourceStruct'>ResourceStruct</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_table</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#ResourceTable'>ResourceTable</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_union</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#ResourceUnion'>ResourceUnion</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>vector_handle</code></td>
             <td>
-                <code>vector&lt;handle&gt;</code>
+                <code>vector&lt;handle&lt;handle&gt;&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>vector_vmo</code></td>
             <td>
-                <code>vector&lt;vmo&gt;</code>
+                <code>vector&lt;handle&lt;vmo&gt;&gt;</code>
             </td>
         </tr>
         <tr>
@@ -1331,7 +1331,7 @@
         <tr>
             <td><code>vector_server_end</code></td>
             <td>
-                <code>vector&lt;test.typesinprotocols/Protocol&gt;</code>
+                <code>vector&lt;server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;&gt;</code>
             </td>
         </tr>
         <tr>
@@ -1433,7 +1433,7 @@
         <tr>
             <td><code>vector_opt_string</code></td>
             <td>
-                <code>vector&lt;string&gt;</code>
+                <code>vector&lt;string?&gt;</code>
             </td>
         </tr>
 </table>
@@ -1481,13 +1481,13 @@
         <tr>
             <td><code>vector_opt_struct</code></td>
             <td>
-                <code>vector&lt;<a class='link' href='#Struct'>Struct</a>&gt;</code>
+                <code>vector&lt;<a class='link' href='#Struct'>Struct</a>?&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>vector_opt_union</code></td>
             <td>
-                <code>vector&lt;<a class='link' href='#Union'>Union</a>&gt;</code>
+                <code>vector&lt;<a class='link' href='#Union'>Union</a>?&gt;</code>
             </td>
         </tr>
 </table>
@@ -1523,7 +1523,7 @@
         <tr>
             <td><code>opt_vector_opt_struct</code></td>
             <td>
-                <code>vector&lt;<a class='link' href='#Struct'>Struct</a>&gt;?</code>
+                <code>vector&lt;<a class='link' href='#Struct'>Struct</a>?&gt;?</code>
             </td>
         </tr>
 </table>
@@ -1541,73 +1541,73 @@
         <tr>
             <td><code>array_uint8</code></td>
             <td>
-                <code>uint8[5]</code>
+                <code>array&lt;uint8,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_uint16</code></td>
             <td>
-                <code>uint16[5]</code>
+                <code>array&lt;uint16,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_uint32</code></td>
             <td>
-                <code>uint32[5]</code>
+                <code>array&lt;uint32,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_uint64</code></td>
             <td>
-                <code>uint64[5]</code>
+                <code>array&lt;uint64,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_int8</code></td>
             <td>
-                <code>int8[5]</code>
+                <code>array&lt;int8,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_int16</code></td>
             <td>
-                <code>int16[5]</code>
+                <code>array&lt;int16,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_int32</code></td>
             <td>
-                <code>int32[5]</code>
+                <code>array&lt;int32,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_int64</code></td>
             <td>
-                <code>int64[5]</code>
+                <code>array&lt;int64,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_float32</code></td>
             <td>
-                <code>float32[5]</code>
+                <code>array&lt;float32,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_float64</code></td>
             <td>
-                <code>float64[5]</code>
+                <code>array&lt;float64,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_string</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;string,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_opt_string</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;string?,&nbsp;5&gt;</code>
             </td>
         </tr>
 </table>
@@ -1620,73 +1620,73 @@
         <tr>
             <td><code>array_uint8</code></td>
             <td>
-                <code>uint8[5]</code>
+                <code>array&lt;uint8,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_uint16</code></td>
             <td>
-                <code>uint16[5]</code>
+                <code>array&lt;uint16,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_uint32</code></td>
             <td>
-                <code>uint32[5]</code>
+                <code>array&lt;uint32,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_uint64</code></td>
             <td>
-                <code>uint64[5]</code>
+                <code>array&lt;uint64,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_int8</code></td>
             <td>
-                <code>int8[5]</code>
+                <code>array&lt;int8,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_int16</code></td>
             <td>
-                <code>int16[5]</code>
+                <code>array&lt;int16,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_int32</code></td>
             <td>
-                <code>int32[5]</code>
+                <code>array&lt;int32,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_int64</code></td>
             <td>
-                <code>int64[5]</code>
+                <code>array&lt;int64,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_float32</code></td>
             <td>
-                <code>float32[5]</code>
+                <code>array&lt;float32,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_float64</code></td>
             <td>
-                <code>float64[5]</code>
+                <code>array&lt;float64,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_string</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;string,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_opt_string</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;string?,&nbsp;5&gt;</code>
             </td>
         </tr>
 </table>
@@ -1703,43 +1703,43 @@
         <tr>
             <td><code>array_bits</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Bits'>Bits</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_enum</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Enum'>Enum</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_struct</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Struct'>Struct</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_table</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Table'>Table</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_union</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Union'>Union</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_opt_struct</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Struct'>Struct</a>?,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_opt_union</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Union'>Union</a>?,&nbsp;5&gt;</code>
             </td>
         </tr>
 </table>
@@ -1752,43 +1752,43 @@
         <tr>
             <td><code>array_bits</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Bits'>Bits</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_enum</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Enum'>Enum</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_struct</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Struct'>Struct</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_table</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Table'>Table</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_union</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Union'>Union</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_opt_struct</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Struct'>Struct</a>?,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_opt_union</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Union'>Union</a>?,&nbsp;5&gt;</code>
             </td>
         </tr>
 </table>
@@ -1805,19 +1805,19 @@
         <tr>
             <td><code>array_array_uint8</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;array&lt;uint8,&nbsp;5&gt;,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_vector_uint8</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;vector&lt;uint8&gt;,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>vector_array_uint8</code></td>
             <td>
-                <code>vector&lt;array&gt;</code>
+                <code>vector&lt;array&lt;uint8,&nbsp;5&gt;&gt;</code>
             </td>
         </tr>
         <tr>
@@ -1836,19 +1836,19 @@
         <tr>
             <td><code>array_array_uint8</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;array&lt;uint8,&nbsp;5&gt;,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_vector_uint8</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;vector&lt;uint8&gt;,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>vector_array_uint8</code></td>
             <td>
-                <code>vector&lt;array&gt;</code>
+                <code>vector&lt;array&lt;uint8,&nbsp;5&gt;&gt;</code>
             </td>
         </tr>
         <tr>
@@ -2213,55 +2213,55 @@
         <tr>
             <td><code>array_handle</code></td>
             <td>
-                <code>handle[5]</code>
+                <code>array&lt;handle&lt;handle&gt;,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_vmo</code></td>
             <td>
-                <code>vmo[5]</code>
+                <code>array&lt;handle&lt;vmo&gt;,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_client_end</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Protocol'>Protocol</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_server_end</code></td>
             <td>
-                <code>test.typesinprotocols/Protocol[5]</code>
+                <code>array&lt;server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_struct</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#ResourceStruct'>ResourceStruct</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_table</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#ResourceTable'>ResourceTable</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_union</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#ResourceUnion'>ResourceUnion</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>vector_handle</code></td>
             <td>
-                <code>vector&lt;handle&gt;</code>
+                <code>vector&lt;handle&lt;handle&gt;&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>vector_vmo</code></td>
             <td>
-                <code>vector&lt;vmo&gt;</code>
+                <code>vector&lt;handle&lt;vmo&gt;&gt;</code>
             </td>
         </tr>
         <tr>
@@ -2273,7 +2273,7 @@
         <tr>
             <td><code>vector_server_end</code></td>
             <td>
-                <code>vector&lt;test.typesinprotocols/Protocol&gt;</code>
+                <code>vector&lt;server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;&gt;</code>
             </td>
         </tr>
         <tr>
@@ -2382,55 +2382,55 @@
         <tr>
             <td><code>array_handle</code></td>
             <td>
-                <code>handle[5]</code>
+                <code>array&lt;handle&lt;handle&gt;,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_vmo</code></td>
             <td>
-                <code>vmo[5]</code>
+                <code>array&lt;handle&lt;vmo&gt;,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_client_end</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Protocol'>Protocol</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_server_end</code></td>
             <td>
-                <code>test.typesinprotocols/Protocol[5]</code>
+                <code>array&lt;server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_struct</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#ResourceStruct'>ResourceStruct</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_table</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#ResourceTable'>ResourceTable</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>array_union</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#ResourceUnion'>ResourceUnion</a>,&nbsp;5&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>vector_handle</code></td>
             <td>
-                <code>vector&lt;handle&gt;</code>
+                <code>vector&lt;handle&lt;handle&gt;&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>vector_vmo</code></td>
             <td>
-                <code>vector&lt;vmo&gt;</code>
+                <code>vector&lt;handle&lt;vmo&gt;&gt;</code>
             </td>
         </tr>
         <tr>
@@ -2442,7 +2442,7 @@
         <tr>
             <td><code>vector_server_end</code></td>
             <td>
-                <code>vector&lt;test.typesinprotocols/Protocol&gt;</code>
+                <code>vector&lt;server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;&gt;</code>
             </td>
         </tr>
         <tr>
@@ -2543,7 +2543,7 @@
         <tr>
             <td><code>vector_opt_string</code></td>
             <td>
-                <code>vector&lt;string&gt;</code>
+                <code>vector&lt;string?&gt;</code>
             </td>
         </tr>
 </table>
@@ -2622,7 +2622,7 @@
         <tr>
             <td><code>vector_opt_string</code></td>
             <td>
-                <code>vector&lt;string&gt;</code>
+                <code>vector&lt;string?&gt;</code>
             </td>
         </tr>
 </table>
@@ -2669,13 +2669,13 @@
         <tr>
             <td><code>vector_opt_struct</code></td>
             <td>
-                <code>vector&lt;<a class='link' href='#Struct'>Struct</a>&gt;</code>
+                <code>vector&lt;<a class='link' href='#Struct'>Struct</a>?&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>vector_opt_union</code></td>
             <td>
-                <code>vector&lt;<a class='link' href='#Union'>Union</a>&gt;</code>
+                <code>vector&lt;<a class='link' href='#Union'>Union</a>?&gt;</code>
             </td>
         </tr>
 </table>
@@ -2718,13 +2718,13 @@
         <tr>
             <td><code>vector_opt_struct</code></td>
             <td>
-                <code>vector&lt;<a class='link' href='#Struct'>Struct</a>&gt;</code>
+                <code>vector&lt;<a class='link' href='#Struct'>Struct</a>?&gt;</code>
             </td>
         </tr>
         <tr>
             <td><code>vector_opt_union</code></td>
             <td>
-                <code>vector&lt;<a class='link' href='#Union'>Union</a>&gt;</code>
+                <code>vector&lt;<a class='link' href='#Union'>Union</a>?&gt;</code>
             </td>
         </tr>
 </table>
@@ -2759,7 +2759,7 @@
         <tr>
             <td><code>opt_vector_opt_struct</code></td>
             <td>
-                <code>vector&lt;<a class='link' href='#Struct'>Struct</a>&gt;?</code>
+                <code>vector&lt;<a class='link' href='#Struct'>Struct</a>?&gt;?</code>
             </td>
         </tr>
 </table>
@@ -2790,7 +2790,7 @@
         <tr>
             <td><code>opt_vector_opt_struct</code></td>
             <td>
-                <code>vector&lt;<a class='link' href='#Struct'>Struct</a>&gt;?</code>
+                <code>vector&lt;<a class='link' href='#Struct'>Struct</a>?&gt;?</code>
             </td>
         </tr>
 </table>
@@ -2806,7 +2806,7 @@
         <tr id="ArrayBasic.array_uint8">
             <td><code>array_uint8</code></td>
             <td>
-                <code>uint8[5]</code>
+                <code>array&lt;uint8,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -2814,7 +2814,7 @@
         <tr id="ArrayBasic.array_uint16">
             <td><code>array_uint16</code></td>
             <td>
-                <code>uint16[5]</code>
+                <code>array&lt;uint16,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -2822,7 +2822,7 @@
         <tr id="ArrayBasic.array_uint32">
             <td><code>array_uint32</code></td>
             <td>
-                <code>uint32[5]</code>
+                <code>array&lt;uint32,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -2830,7 +2830,7 @@
         <tr id="ArrayBasic.array_uint64">
             <td><code>array_uint64</code></td>
             <td>
-                <code>uint64[5]</code>
+                <code>array&lt;uint64,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -2838,7 +2838,7 @@
         <tr id="ArrayBasic.array_int8">
             <td><code>array_int8</code></td>
             <td>
-                <code>int8[5]</code>
+                <code>array&lt;int8,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -2846,7 +2846,7 @@
         <tr id="ArrayBasic.array_int16">
             <td><code>array_int16</code></td>
             <td>
-                <code>int16[5]</code>
+                <code>array&lt;int16,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -2854,7 +2854,7 @@
         <tr id="ArrayBasic.array_int32">
             <td><code>array_int32</code></td>
             <td>
-                <code>int32[5]</code>
+                <code>array&lt;int32,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -2862,7 +2862,7 @@
         <tr id="ArrayBasic.array_int64">
             <td><code>array_int64</code></td>
             <td>
-                <code>int64[5]</code>
+                <code>array&lt;int64,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -2870,7 +2870,7 @@
         <tr id="ArrayBasic.array_float32">
             <td><code>array_float32</code></td>
             <td>
-                <code>float32[5]</code>
+                <code>array&lt;float32,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -2878,7 +2878,7 @@
         <tr id="ArrayBasic.array_float64">
             <td><code>array_float64</code></td>
             <td>
-                <code>float64[5]</code>
+                <code>array&lt;float64,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -2886,7 +2886,7 @@
         <tr id="ArrayBasic.array_string">
             <td><code>array_string</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;string,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -2894,7 +2894,7 @@
         <tr id="ArrayBasic.array_opt_string">
             <td><code>array_opt_string</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;string?,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -2909,7 +2909,7 @@
         <tr id="ArrayCompound.array_bits">
             <td><code>array_bits</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Bits'>Bits</a>,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -2917,7 +2917,7 @@
         <tr id="ArrayCompound.array_enum">
             <td><code>array_enum</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Enum'>Enum</a>,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -2925,7 +2925,7 @@
         <tr id="ArrayCompound.array_struct">
             <td><code>array_struct</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Struct'>Struct</a>,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -2933,7 +2933,7 @@
         <tr id="ArrayCompound.array_table">
             <td><code>array_table</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Table'>Table</a>,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -2941,7 +2941,7 @@
         <tr id="ArrayCompound.array_union">
             <td><code>array_union</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Union'>Union</a>,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -2949,7 +2949,7 @@
         <tr id="ArrayCompound.array_opt_struct">
             <td><code>array_opt_struct</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Struct'>Struct</a>?,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -2957,7 +2957,7 @@
         <tr id="ArrayCompound.array_opt_union">
             <td><code>array_opt_union</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Union'>Union</a>?,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -2972,7 +2972,7 @@
         <tr id="ArrayVectorNested.array_array_uint8">
             <td><code>array_array_uint8</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;array&lt;uint8,&nbsp;5&gt;,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -2980,7 +2980,7 @@
         <tr id="ArrayVectorNested.array_vector_uint8">
             <td><code>array_vector_uint8</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;vector&lt;uint8&gt;,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -2988,7 +2988,7 @@
         <tr id="ArrayVectorNested.vector_array_uint8">
             <td><code>vector_array_uint8</code></td>
             <td>
-                <code>vector&lt;array&gt;</code>
+                <code>vector&lt;array&lt;uint8,&nbsp;5&gt;&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -3281,7 +3281,7 @@
         <tr id="Resource.array_handle">
             <td><code>array_handle</code></td>
             <td>
-                <code>handle[5]</code>
+                <code>array&lt;handle&lt;handle&gt;,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -3289,7 +3289,7 @@
         <tr id="Resource.array_vmo">
             <td><code>array_vmo</code></td>
             <td>
-                <code>vmo[5]</code>
+                <code>array&lt;handle&lt;vmo&gt;,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -3297,7 +3297,7 @@
         <tr id="Resource.array_client_end">
             <td><code>array_client_end</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#Protocol'>Protocol</a>,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -3305,7 +3305,7 @@
         <tr id="Resource.array_server_end">
             <td><code>array_server_end</code></td>
             <td>
-                <code>test.typesinprotocols/Protocol[5]</code>
+                <code>array&lt;server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -3313,7 +3313,7 @@
         <tr id="Resource.array_struct">
             <td><code>array_struct</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#ResourceStruct'>ResourceStruct</a>,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -3321,7 +3321,7 @@
         <tr id="Resource.array_table">
             <td><code>array_table</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#ResourceTable'>ResourceTable</a>,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -3329,7 +3329,7 @@
         <tr id="Resource.array_union">
             <td><code>array_union</code></td>
             <td>
-                <code>[5]</code>
+                <code>array&lt;<a class='link' href='#ResourceUnion'>ResourceUnion</a>,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -3337,7 +3337,7 @@
         <tr id="Resource.vector_handle">
             <td><code>vector_handle</code></td>
             <td>
-                <code>vector&lt;handle&gt;</code>
+                <code>vector&lt;handle&lt;handle&gt;&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -3345,7 +3345,7 @@
         <tr id="Resource.vector_vmo">
             <td><code>vector_vmo</code></td>
             <td>
-                <code>vector&lt;vmo&gt;</code>
+                <code>vector&lt;handle&lt;vmo&gt;&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -3361,7 +3361,7 @@
         <tr id="Resource.vector_server_end">
             <td><code>vector_server_end</code></td>
             <td>
-                <code>vector&lt;test.typesinprotocols/Protocol&gt;</code>
+                <code>vector&lt;server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -3498,7 +3498,7 @@
         <tr id="VectorBasic.vector_opt_string">
             <td><code>vector_opt_string</code></td>
             <td>
-                <code>vector&lt;string&gt;</code>
+                <code>vector&lt;string?&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -3553,7 +3553,7 @@
         <tr id="VectorCompound.vector_opt_struct">
             <td><code>vector_opt_struct</code></td>
             <td>
-                <code>vector&lt;<a class='link' href='#Struct'>Struct</a>&gt;</code>
+                <code>vector&lt;<a class='link' href='#Struct'>Struct</a>?&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -3561,7 +3561,7 @@
         <tr id="VectorCompound.vector_opt_union">
             <td><code>vector_opt_union</code></td>
             <td>
-                <code>vector&lt;<a class='link' href='#Union'>Union</a>&gt;</code>
+                <code>vector&lt;<a class='link' href='#Union'>Union</a>?&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -3600,7 +3600,7 @@
         <tr id="VectorOptional.opt_vector_opt_struct">
             <td><code>opt_vector_opt_struct</code></td>
             <td>
-                <code>vector&lt;<a class='link' href='#Struct'>Struct</a>&gt;?</code>
+                <code>vector&lt;<a class='link' href='#Struct'>Struct</a>?&gt;?</code>
             </td>
             <td></td>
             <td>No default</td>

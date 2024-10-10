@@ -48,7 +48,7 @@
         <tr id="ExampleOfUseOfAliases.field_of_vec_of_ref_me_at_most_5">
             <td><code>field_of_vec_of_ref_me_at_most_5</code></td>
             <td>
-                <code>vector&lt;<a class='link' href='../test.someotherlibrary/'>test.someotherlibrary</a>/<a class='link' href='../test.someotherlibrary/#ReferenceMe'>ReferenceMe</a>&gt;[5]</code>
+                <code>vector&lt;<a class='link' href='#ReferenceMe'>ReferenceMe</a>&gt;:5</code>
             </td>
             <td></td>
             <td>No default</td>
