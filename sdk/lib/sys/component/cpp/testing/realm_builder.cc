@@ -27,7 +27,6 @@
 #include <zircon/errors.h>
 
 #include <cstddef>
-#include <functional>
 #include <memory>
 #include <optional>
 #include <sstream>
@@ -442,12 +441,6 @@ RealmRoot::RealmRoot(std::unique_ptr<internal::LocalComponentRunner> local_compo
       dispatcher_(dispatcher) {}
 
 RealmRoot::~RealmRoot() = default;
-
-zx_status_t RealmRoot::Connect(const std::string& interface_name, zx::channel request) const {
-  return root_.Connect(interface_name, std::move(request));
-}
-
-std::string RealmRoot::GetChildName() const { return root_.GetChildName(); }
 
 void RealmRoot::Teardown(ScopedChild::TeardownCallback on_teardown_complete) {
   root_.Teardown(dispatcher_, std::move(on_teardown_complete));

@@ -40,8 +40,6 @@ constexpr char kDefaultCollection[] = "realm_builder";
 
 // Root of a constructed Realm. This object can not be instantiated directly.
 // Instead, it can only be constructed with the Realm::Builder/Build().
-//
-// TODO(https://fxbug.dev/42071205): Remove all deprecated methods below, e.g. |Connect|.
 class RealmRoot final {
  public:
   RealmRoot(RealmRoot&& other) = default;
@@ -50,58 +48,7 @@ class RealmRoot final {
   RealmRoot(const RealmRoot& other) = delete;
   RealmRoot& operator=(const RealmRoot& other) = delete;
 
-  virtual ~RealmRoot();
-
-  // Connect to an interface in the exposed directory of the root component.
-  //
-  // The discovery name of the interface is inferred from the C++ type of the
-  // interface. Callers can supply an interface name explicitly to override
-  // the default name.
-  //
-  // This overload for |Connect| panics if the connection operation
-  // doesn't return ZX_OK. Callers that wish to receive that status should use
-  // one of the other overloads that returns a |zx_status_t|.
-  //
-  // # Example
-  //
-  // ```
-  // auto echo = realm.Connect<test::placeholders::Echo>();
-  // ```
-  template <typename Interface>
-  fidl::InterfacePtr<Interface> Connect(const std::string& interface_name = Interface::Name_) const
-      ZX_DEPRECATED_SINCE(1, 11, "Use component() instead") {
-    return root_.Connect<Interface>(interface_name);
-  }
-
-  // SynchronousInterfacePtr method overload of |Connect|. See
-  // method above for more details.
-  template <typename Interface>
-  fidl::SynchronousInterfacePtr<Interface> ConnectSync(
-      const std::string& interface_name = Interface::Name_) const
-      ZX_DEPRECATED_SINCE(1, 11, "Use component() instead") {
-    return root_.ConnectSync<Interface>(interface_name);
-  }
-
-  // Connect to exposed directory of the root component.
-  template <typename Interface>
-  zx_status_t Connect(fidl::InterfaceRequest<Interface> request) const
-      ZX_DEPRECATED_SINCE(1, 11, "Use component() instead") {
-    return root_.Connect<Interface>(std::move(request));
-  }
-
-  // Connect to an interface in the exposed directory using the supplied
-  // channel.
-  zx_status_t Connect(const std::string& interface_name, zx::channel request) const
-      ZX_DEPRECATED_SINCE(1, 11, "Use component() instead");
-
-  // Return a handle to the exposed directory of the root component.
-  fidl::InterfaceHandle<fuchsia::io::Directory> CloneRoot() const
-      ZX_DEPRECATED_SINCE(1, 11, "Use component().CloneExposedDir() instead") {
-    return root_.CloneExposedDir();
-  }
-
-  // Get the child name of the root component.
-  std::string GetChildName() const ZX_DEPRECATED_SINCE(1, 11, "Use component() instead");
+  ~RealmRoot();
 
   // Destructs the root component and sends Component Manager a request to
   // destroy its realm, which will stop all child components. Each
