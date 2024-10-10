@@ -13,6 +13,7 @@
 #include <fbl/ref_counted.h>
 #include <kernel/mutex.h>
 #include <ktl/optional.h>
+#include <ktl/tuple.h>
 #include <ktl/variant.h>
 #include <vm/compressor.h>
 #include <vm/page.h>
@@ -54,8 +55,8 @@ class VmCompressedStorage : public fbl::RefCounted<VmCompressedStorage> {
   // previous result of |CompressedData| must not be used.
   virtual void Free(CompressedRef ref) = 0;
 
-  // Retrieve a reference to original data that was stored. The length of the data is also returned,
-  // alleviating the need to retain that separately.
+  // Retrieve a reference to original data that was stored. The metadata and length of the data are
+  // also returned, alleviating the need to retain them separately.
   //
   // The return address remains valid as long as this specific reference is not freed, and otherwise
   // any other calls to |Store| or |Free| do not invalidate.
@@ -66,7 +67,13 @@ class VmCompressedStorage : public fbl::RefCounted<VmCompressedStorage> {
   // alignment.
   // TODO(https://fxbug.dev/42138396): Consider providing an alignment guarantee if needed by
   // decompressors.
-  virtual ktl::pair<const void*, size_t> CompressedData(CompressedRef ref) const = 0;
+  virtual ktl::tuple<const void*, uint32_t, size_t> CompressedData(CompressedRef ref) const = 0;
+
+  // Retrieve the metadata for the original page referred to by ref.
+  virtual uint32_t GetMetadata(CompressedRef ref) = 0;
+
+  // Set the metadata for the original page referred to by ref.
+  virtual void SetMetadata(CompressedRef ref, uint32_t metadata) = 0;
 
   // Perform an information dump of the internal state to the debuglog.
   virtual void Dump() const = 0;
@@ -158,19 +165,20 @@ class VmCompression final : public fbl::RefCounted<VmCompression> {
   // Wrapper that passes current_ticks() as |now|
   CompressResult Compress(const void* page_src) { return Compress(page_src, current_ticks()); }
 
-  // Decompresses and frees the provided reference into |page_dest|. This cannot fail, and always
-  // produces PAGE_SIZE worth of data. After calling this the reference is not longer valid.
+  // Decompresses and frees the provided reference into |page_dest| and |metadata_dest|. This cannot
+  // fail and always produces PAGE_SIZE worth of data. After calling this the reference is no longer
+  // valid.
   //
   // The |now| parameter is compared with the value given in |Compress| to determine how long this
   // page was store for.
   //
   // Note that the temporary reference may be passed into here, however the same locking
   // requirements as |MoveReference| must be observed.
-  void Decompress(CompressedRef ref, void* page_dest, zx_ticks_t now);
+  void Decompress(CompressedRef ref, void* page_dest, uint32_t* metadata_dest, zx_ticks_t now);
 
   // Wrapper that passes current_ticks() as |now|
-  void Decompress(CompressedRef ref, void* page_dest) {
-    Decompress(ref, page_dest, current_ticks());
+  void Decompress(CompressedRef ref, void* page_dest, uint32_t* metadata_dest) {
+    Decompress(ref, page_dest, metadata_dest, current_ticks());
   }
 
   // Free the compressed reference without decompressing it.
@@ -179,9 +187,10 @@ class VmCompression final : public fbl::RefCounted<VmCompression> {
   // requirements as |MoveReference| must be observed.
   void Free(CompressedRef ref);
 
-  // Must be called if a reference is being moved in or from a VmPageList, will return a nullopt if
-  // the reference is safe to move, or a vm_page_t that is now owned by the caller and should be
-  // used to replace the reference before moving.
+  // Must be called if a reference is being moved in or from a VmPageList. Will return a nullopt if
+  // the reference is safe to move without being converted to a page. Otherwise returns a vm_page_t
+  // along with associated metadata which is now owned by the caller and should be used to replace
+  // the reference before moving.
   //
   // For performance reasons the check is performed inline here, with the unlikely case handled by a
   // separate method.
@@ -190,7 +199,8 @@ class VmCompression final : public fbl::RefCounted<VmCompression> {
   // into is held.
   //
   // See |VmCompressor| for a full explanation of temporary references and why this is needed.
-  ktl::optional<vm_page_t*> MoveReference(CompressedRef ref) {
+  using PageAndMetadata = VmCompressor::PageAndMetadata;
+  ktl::optional<PageAndMetadata> MoveReference(CompressedRef ref) {
     if (unlikely(IsTempReference(ref))) {
       return MoveTempReference(ref);
     }
@@ -201,6 +211,16 @@ class VmCompression final : public fbl::RefCounted<VmCompression> {
   //
   // See |VmCompressor| for a full explanation of temporary references.
   bool IsTempReference(const CompressedRef& ref) { return ref.value() == kTempReferenceValue; }
+
+  // Retrieve the metadata for the original page referred to by ref.
+  //
+  // This may only be called if the VMO lock for the VMO that ref was placed into is held.
+  uint32_t GetMetadata(CompressedRef ref);
+
+  // Set the metadata for the original page referred to by ref.
+  //
+  // This may only be called if the VMO lock for the VMO that ref was placed into is held.
+  void SetMetadata(CompressedRef ref, uint32_t metadata);
 
   // An RAII wrapper around holding a locked reference to a VmCompressor.
   class CompressorGuard {
@@ -276,8 +296,8 @@ class VmCompression final : public fbl::RefCounted<VmCompression> {
   vm_page_t* buffer_page_ TA_GUARDED(compression_lock_) = nullptr;
 
   // Internal helpers to operate on the temporary references.
-  ktl::optional<vm_page_t*> MoveTempReference(CompressedRef ref);
-  void DecompressTempReference(CompressedRef ref, void* page_dest);
+  ktl::optional<PageAndMetadata> MoveTempReference(CompressedRef ref);
+  void DecompressTempReference(CompressedRef ref, void* page_dest, uint32_t* metadata_dest);
   void FreeTempReference(CompressedRef ref);
 
   // Statistics

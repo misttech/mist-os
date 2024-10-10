@@ -112,6 +112,8 @@ VmCompression::CompressResult VmCompression::Compress(const void* page_src, zx_t
   *reinterpret_cast<zx_ticks_t*>(reinterpret_cast<uintptr_t>(buffer_ptr) + compressed_size) = now;
 
   // Store the data, it takes ownership of the buffer_page_ and might return ownership of a page.
+  // Metadata associated with the page will be stored later, when the caller reaccquires the VMO
+  // lock and requests compression results.
   auto [maybe_ref, page] = storage_->Store(buffer_page_, storage_size);
   buffer_page_ = page;
 
@@ -125,16 +127,18 @@ VmCompression::CompressResult VmCompression::Compress(const void* page_src, zx_t
   return FailTag{};
 }
 
-void VmCompression::Decompress(CompressedRef ref, void* page_dest, zx_ticks_t now) {
+void VmCompression::Decompress(CompressedRef ref, void* page_dest, uint32_t* metadata_dest,
+                               zx_ticks_t now) {
   if (unlikely(IsTempReference(ref))) {
-    DecompressTempReference(ref, page_dest);
+    DecompressTempReference(ref, page_dest, metadata_dest);
     return;
   }
 
   decompressions_.fetch_add(1);
 
   // Lookup the data so we can decompress out.
-  auto [src, len] = storage_->CompressedData(ref);
+  auto [src, metadata, len] = storage_->CompressedData(ref);
+  *metadata_dest = metadata;
 
   // pull out the timestamp and determine how long this was compressed for.
   DEBUG_ASSERT(len >= sizeof(zx_ticks_t));
@@ -162,6 +166,25 @@ void VmCompression::Free(CompressedRef ref) {
   }
   storage_->Free(ref);
   decompression_skipped_.fetch_add(1);
+}
+
+// Metadata manipulations need to disable analysis. The caller is required to hold the lock for the
+// VMO who created the reference, but we can't refer to that lock here.
+uint32_t VmCompression::GetMetadata(CompressedRef ref) TA_NO_THREAD_SAFETY_ANALYSIS {
+  if (unlikely(IsTempReference(ref))) {
+    return instance_.temp_reference_metadata_;
+  }
+  return storage_->GetMetadata(ref);
+}
+
+// Metadata manipulations need to disable analysis. The caller is required to hold the lock for the
+// VMO who created the reference, but we can't refer to that lock here.
+void VmCompression::SetMetadata(CompressedRef ref, uint32_t metadata) TA_NO_THREAD_SAFETY_ANALYSIS {
+  if (unlikely(IsTempReference(ref))) {
+    instance_.temp_reference_metadata_ = metadata;
+  } else {
+    storage_->SetMetadata(ref, metadata);
+  }
 }
 
 VmCompression::Stats VmCompression::GetStats() const {
@@ -266,7 +289,7 @@ fbl::RefPtr<VmCompression> VmCompression::CreateDefault() {
 // These need to disable analysis as there is a requirement on the caller that the lock for the VMO
 // who created this temporary reference is held, however at this point here we have no way to refer
 // to that lock.
-ktl::optional<vm_page_t*> VmCompression::MoveTempReference(CompressedRef ref)
+ktl::optional<VmCompression::PageAndMetadata> VmCompression::MoveTempReference(CompressedRef ref)
     TA_NO_THREAD_SAFETY_ANALYSIS {
   DEBUG_ASSERT(IsTempReference(ref));
   // The owner of the temp ref is the owner as page. So if we are seeing the temporary reference
@@ -277,26 +300,26 @@ ktl::optional<vm_page_t*> VmCompression::MoveTempReference(CompressedRef ref)
   ASSERT(instance_.spare_page_);
   void* addr = paddr_to_physmap(instance_.spare_page_->paddr());
   ASSERT(addr);
-  Decompress(ref, addr);
+  uint32_t metadata;
+  Decompress(ref, addr, &metadata);
   vm_page_t* ret = instance_.spare_page_;
   instance_.spare_page_ = nullptr;
-  return ret;
+  return VmCompression::PageAndMetadata{.page = ret, .metadata = metadata};
 }
 
 void VmCompression::FreeTempReference(CompressedRef ref) TA_NO_THREAD_SAFETY_ANALYSIS {
   DEBUG_ASSERT(IsTempReference(ref));
-  ASSERT(instance_.using_temp_reference_);
-  ASSERT(instance_.page_);
-  instance_.using_temp_reference_ = false;
+  instance_.ReturnTempReference(ref);
 }
 
-void VmCompression::DecompressTempReference(CompressedRef ref,
-                                            void* page_dest) TA_NO_THREAD_SAFETY_ANALYSIS {
+void VmCompression::DecompressTempReference(CompressedRef ref, void* page_dest,
+                                            uint32_t* metadata_dest) TA_NO_THREAD_SAFETY_ANALYSIS {
   DEBUG_ASSERT(IsTempReference(ref));
   ASSERT(instance_.using_temp_reference_);
   ASSERT(instance_.page_);
   void* addr = paddr_to_physmap(instance_.page_->paddr());
   ASSERT(addr);
   memcpy(page_dest, addr, PAGE_SIZE);
+  *metadata_dest = instance_.temp_reference_metadata_;
   FreeTempReference(ref);
 }

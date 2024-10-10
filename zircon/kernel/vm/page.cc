@@ -25,8 +25,9 @@ void vm_page::dump() const {
   printf("page %p: address %#" PRIxPTR " state %s", this, paddr(),
          page_state_to_string(page_state));
   if (page_state == vm_page_state::OBJECT) {
-    printf(" pin_count %d split_bits %d%d\n", object.pin_count, object.cow_left_split,
-           object.cow_right_split);
+    // When split bits are in use, the share_count will actually encode the split bits. See
+    // |IsSplit|, |SetSplit|, |ClearSplits| in the VmCowPages implementation for details.
+    printf(" pin_count %d share_count %" PRIu32 "\n", object.pin_count, object.share_count);
   } else {
     printf("\n");
   }

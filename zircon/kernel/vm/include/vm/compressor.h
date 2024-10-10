@@ -55,19 +55,44 @@ class VmCompression;
 // between slots in the page list (or between different page lists). This represents the one time
 // where a compressed reference must be eagerly decompressed even if the data is not being accessed.
 //
-//
 // This process of using a temporary reference that can resolve to performing a parallel copy
 // provides some important properties:
 //  1. Requesting a page blocks either on decompression, or a memcpy, but never compression.
 //  2. Compression is performed on an owned page, and not on a page still in the VmPageList,
 //     ensuring that the compression algorithm does not have to tolerate mutations during
 //     compression.
+//
+//
+// The VmCompressor also helps to manage the update of metadata associated with the vm_page_t being
+// compressed. The owner of the VmCompressor provides the current value of this metadata to |Start|
+// along with the vm_page_t.
+//
+// The holder of the lock to the VMO that owns the temporary reference may update this metadata at
+// any time after |Start| is called and prior to |TakeCompressionResult| being called.
+//
+// Only the lock holder may call |TakeCompressionResult|, so at this time the VmCompressor will
+// ensure that the final compressed reference points to the updated metadata (when compression
+// succeeds) or the updated metadata is returned to the caller (when compression fails).
+//
+// The updated metadata is also returned to the caller when decompressing a page. In both the cases
+// of compression failure or active decompression, it is the caller's responsibiliy to handle the
+// updated metadata in whatever way it deems appropriate. The meaning of the metadata is opaque to
+// the VmCompressor.
 class VmCompressor {
  public:
   ~VmCompressor();
-  using CompressedRef = VmPageOrMarker::ReferenceValue;
 
-  struct FailTag {};
+  // Convenience struct to contain both a page and its associated metadata.
+  struct PageAndMetadata {
+    vm_page_t* page = nullptr;
+    uint32_t metadata = 0;
+  };
+
+  // Possible results of a compression attempt.  See |TakeCompressionResult| for details.
+  using CompressedRef = VmPageOrMarker::ReferenceValue;
+  struct FailTag {
+    PageAndMetadata src_page;
+  };
   struct ZeroTag {};
   using CompressResult = ktl::variant<CompressedRef, ZeroTag, FailTag>;
 
@@ -76,14 +101,38 @@ class VmCompressor {
   zx_status_t Arm();
 
   // Start the compression process. Gives ownership of the page to the compressor, and returns the
-  // temporary compression reference that should be installed in the page list in its place.
-  // |Arm| must be called prior to calling |Start|.
-  CompressedRef Start(vm_page_t* page);
+  // temporary compression reference that should be installed in the page list in its place. |Arm|
+  // must be called prior to calling |Start|.
+  //
+  // The caller may update the metadata associated with the page at any time after calling |Start|
+  // and prior to calling |TakeCompressionResult|.
+  CompressedRef Start(PageAndMetadata src_page);
 
   // Perform compression. |Start| must have been called prior, and this may be called without any
   // other locks held.
-  // See VmCompression::Compress for an explanation of the |CompressResult| type.
-  CompressResult Compress();
+  void Compress();
+
+  // Takes the result of the prior compression attempt and ensures that page metadata is up-to-date.
+  // This function may only be called by the holder of the VMO lock, and |Compress| must be called
+  // prior to calling |TakeCompressionResult|.
+  //
+  // The caller must ensure that there was a prior compression attempt, and thus a result to take.
+  //
+  // This returns one of:
+  //  CompressedRef - Compression was successful and the provided reference can be passed to
+  //                  |Decompress| or |Free|.
+  //  ZeroTag - Input was the zero page. The compressor is not required to detect zero pages, and
+  //            the absence of this value should not be used to assume the input was not zero.
+  //  FailTag - Input could not be compressed or stored. The FailTag contains the original source
+  //            page provided to |Start| along with the most up-to-date metadata for that page (as
+  //            the metadata may have been altered while compression was in-progress).
+  //
+  // If compression succeeded, the returned |CompressedRef| will refer to the metadata for the
+  // compressed page, including any metadata updates the caller made after calling |Start| but
+  // before calling |TakeCompressionResult|.
+  // If compression failed, the returned |FailTag| will contain the original source page and the
+  // up-to-date metadata.
+  CompressResult TakeCompressionResult();
 
   // Indicates that the temporary reference is no longer in use, and the compressor is now able to
   // be re-armed.
@@ -128,10 +177,11 @@ class VmCompressor {
     Ready,
     // The temporary reference has been given out and page_ is non-null. using_temp_reference_ and
     // spare_page_ will only read/written from the VmCompression coordinator at request of someone
-    // who holds the VMO lock.
+    // who holds the VMO lock. compression_result_ will be written to by us.
     Started,
     // Using temp_reference_ and spare_page_ may be read/written via VmCompression, similar to the
-    // Started state, and also by us, provided we hold the VMO lock.
+    // Started state, and also by us, provided we hold the VMO lock. compression_result_ may be read
+    // by the holder of the VMO lock.
     Compressed,
     // Compression has completed, no fields are valid, and needs to be re-armed.
     Finalized,
@@ -155,6 +205,15 @@ class VmCompressor {
   // In the Started and Compressed states this field is wholly owned, for reads and writes, by the
   // holder of the VMO lock.
   vm_page_t* spare_page_ = nullptr;
+
+  // Result of the most recent compression attempt.
+  // Read-only, and must only be accessed in the Compressed state by the holder of the VMO lock.
+  ktl::optional<CompressResult> compression_result_ = ktl::nullopt;
+
+  // User-provided metadata for the page backing the temp reference.
+  // In the Started and Compressed states this field is wholly owned, for reads and writes, by the
+  // holder of the VMO lock.
+  uint32_t temp_reference_metadata_ = 0;
 };
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_COMPRESSOR_H_

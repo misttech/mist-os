@@ -41,7 +41,11 @@ class VmTriPageStorage final : public VmCompressedStorage {
 
   void Free(CompressedRef ref) override;
   std::pair<ktl::optional<CompressedRef>, vm_page_t*> Store(vm_page_t* page, size_t len) override;
-  std::pair<const void*, size_t> CompressedData(CompressedRef ref) const override;
+  ktl::tuple<const void*, uint32_t, size_t> CompressedData(CompressedRef ref) const override;
+
+  uint32_t GetMetadata(CompressedRef ref) override;
+  void SetMetadata(CompressedRef ref, uint32_t metadata) override;
+
   void Dump() const override;
   MemoryUsage GetMemoryUsage() const override;
 
@@ -95,6 +99,12 @@ class VmTriPageStorage final : public VmCompressedStorage {
 
   // Calculate the offset for a slot from the start of a page.
   static size_t offset_for_slot(PageSlot slot, size_t len);
+
+  // Sets the metadata for a particular slot in a page.
+  static void set_slot_metadata(vm_page_t* page, PageSlot slot, uint32_t metadata);
+
+  // Retrieves the metadata for a particular slot in a page.
+  static uint32_t get_slot_metadata(vm_page_t* page, PageSlot slot);
 
   // Updates the book keeping the given page to set the specific slot as having an allocation of
   // len.
