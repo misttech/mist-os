@@ -23,5 +23,8 @@ group("bench") {
 
 group("tests") {
   testonly = true
-  deps = [ "snapshot_filter:tests" ]
+  deps = [
+    "snapshot_filter:tests",
+    "utils:tests",
+  ]
 }

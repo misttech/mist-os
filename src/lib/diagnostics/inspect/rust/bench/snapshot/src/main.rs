@@ -3,12 +3,11 @@
 // found in the LICENSE file.
 
 use fuchsia_async as fasync;
-use fuchsia_criterion::{criterion, FuchsiaCriterion};
+use fuchsia_criterion::criterion;
 use fuchsia_inspect::reader::snapshot::{Snapshot, SnapshotTree};
 use fuchsia_inspect::{Inspector, InspectorConfig, NumericProperty};
 use futures::FutureExt;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 enum InspectorState {
     Running,
@@ -153,18 +152,12 @@ fn reader_snapshot_tree_vmo_bench(b: &mut criterion::Bencher, size: usize, fille
 }
 
 fn main() {
-    let mut c = FuchsiaCriterion::default();
-    let internal_c: &mut criterion::Criterion = &mut c;
-    *internal_c = std::mem::take(internal_c)
-        .warm_up_time(Duration::from_millis(1))
-        .measurement_time(Duration::from_millis(100))
-        // We must reduce the sample size from the default of 100, otherwise
-        // Criterion will sometimes override the 1ms + 500ms suggested times
-        // and run for much longer.
-        .sample_size(10);
+    let mut c = fuchsia_inspect_bench_utils::configured_criterion(
+        fuchsia_inspect_bench_utils::CriterionConfig::default(),
+    );
 
-    // TODO(https://fxbug.dev/42119817): Implement benchmarks where the real size doesn't match the inspector
-    // size.
+    // TODO(https://fxbug.dev/42119817): Implement benchmarks where the real size doesn't match the
+    // inspector size.
     // TODO(https://fxbug.dev/42119817): Enforce threads starting before benches run.
 
     // SNAPSHOT BENCHMARKS

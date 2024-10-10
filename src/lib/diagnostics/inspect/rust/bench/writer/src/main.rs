@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_async as fasync;
-use fuchsia_criterion::{criterion, FuchsiaCriterion};
+use fuchsia_criterion::criterion;
 use fuchsia_inspect::reader::ReadableTree;
 use fuchsia_inspect::{
     ArithmeticArrayProperty, ArrayProperty, ExponentialHistogramParams, Heap, HistogramProperty,
@@ -14,7 +14,6 @@ use num::traits::FromPrimitive;
 use num::{pow, One};
 use rand::Rng;
 use std::ops::{Add, Mul};
-use std::time::Duration;
 
 const NAME: &str = "name";
 
@@ -544,15 +543,9 @@ bench_histogram_property_fn!(uint, u64, "UintExponentialHistogramProperty", expo
 bench_histogram_property_fn!(double, f64, "DoubleExponentialHistogramProperty", exponential);
 
 fn main() {
-    let mut c = FuchsiaCriterion::default();
-    let internal_c: &mut criterion::Criterion = &mut c;
-    *internal_c = std::mem::take(internal_c)
-        .warm_up_time(Duration::from_millis(1))
-        .measurement_time(Duration::from_millis(100))
-        // We must reduce the sample size from the default of 100, otherwise
-        // Criterion will sometimes override the 1ms + 500ms suggested times
-        // and run for much longer.
-        .sample_size(10);
+    let mut c = fuchsia_inspect_bench_utils::configured_criterion(
+        fuchsia_inspect_bench_utils::CriterionConfig::default(),
+    );
 
     let mut bench = criterion::Benchmark::new("Inspector/new", |b| {
         b.iter_with_large_drop(|| Inspector::default());

@@ -17,15 +17,11 @@ rustc_binary("snapshot-filter-bin") {
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//src/developer/fuchsia-criterion",
     "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/diagnostics/inspect/rust/bench/utils:fuchsia_inspect_bench_utils",
     "//src/lib/diagnostics/selectors",
-    "//third_party/rust_crates:rand",
   ]
 
-  test_deps = [
-    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
-    "//src/lib/fuchsia",
-    "//third_party/rust_crates:pretty_assertions",
-  ]
+  test_deps = [ "//src/lib/fuchsia" ]
 
   sources = [ "src/main.rs" ]
 }
