@@ -237,6 +237,7 @@ impl<T: AsRef<str>> CheckEnv for AvailabilityFlag<T> {
 
 /// A connector lets a tool make multiple attempts to connect to an object. It
 /// retains the environment in the tool body to allow this.
+#[derive(Clone)]
 pub struct Connector<T: TryFromEnv> {
     env: FhoEnvironment,
     _connects_to: std::marker::PhantomData<T>,
