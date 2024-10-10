@@ -61,10 +61,11 @@ vmstat_pid="$!"
 
 cmd_status=0
 
-# No need to kill the vmstat process inside a trap function,
-# the kill signals will already propagate to the vmstat process,
-# and the default termination is what we want.
+# terminate vmstat when main command is complete (or interrupted)
+function shutdown() {
+  kill "$vmstat_pid"
+}
+trap shutdown EXIT
 
 "${cmd[@]}" || cmd_status="$?"
-kill -INT "$vmstat_pid"
 exit "$cmd_status"
