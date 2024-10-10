@@ -289,7 +289,7 @@ bool SdmmcBlockDevice::MmcSupportsHs400() {
   return (device_type & (1 << 6));
 }
 
-zx_status_t SdmmcBlockDevice::ProbeMmcLocked(
+zx_status_t SdmmcBlockDevice::ProbeMmc(
     const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata) {
   sdmmc_->SetRequestRetries(10);
 
@@ -337,13 +337,12 @@ zx_status_t SdmmcBlockDevice::ProbeMmcLocked(
   }
 
   // Read CSD register
-  std::array<uint8_t, SDMMC_CSD_SIZE> raw_csd;
-  if ((st = sdmmc_->MmcSendCsd(raw_csd)) != ZX_OK) {
+  if ((st = sdmmc_->MmcSendCsd(raw_csd_)) != ZX_OK) {
     FDF_LOGL(ERROR, logger(), "MMC_SEND_CSD failed: %s", zx_status_get_string(st));
     return st;
   }
 
-  if ((st = DecodeCsd(raw_csd, logger())) != ZX_OK) {
+  if ((st = DecodeCsd(raw_csd_, logger())) != ZX_OK) {
     return st;
   }
 

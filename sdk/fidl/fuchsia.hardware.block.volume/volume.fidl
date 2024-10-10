@@ -223,7 +223,3 @@ open protocol VolumeAndNode {
     compose io.Node;
     compose device.Controller;
 };
-
-service Service {
-    volume client_end:Volume;
-};
