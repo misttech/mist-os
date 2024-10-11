@@ -27,6 +27,7 @@
 #include <lib/mistos/starnix_uapi/file_mode.h>
 #include <lib/mistos/starnix_uapi/signals.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
+#include <lib/mistos/util/bstring.h>
 #include <lib/mistos/util/default_construct.h>
 #include <lib/mistos/util/strings/split_string.h>
 #include <lib/mistos/util/weak_wrapper.h>
@@ -448,8 +449,8 @@ starnix::testing::AutoReleasableTask CurrentTask::clone_task_for_test(
 }
 
 fit::result<Errno> CurrentTask::exec(const FileHandle& executable, const ktl::string_view& path,
-                                     const fbl::Vector<ktl::string_view>& argv,
-                                     const fbl::Vector<ktl::string_view>& environ) {
+                                     const fbl::Vector<BString>& argv,
+                                     const fbl::Vector<BString>& environ) {
   LTRACEF_LEVEL(2, "path=[%.*s]\n", static_cast<int>(path.size()), path.data());
 
   // Executable must be a regular file

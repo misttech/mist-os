@@ -202,8 +202,7 @@ class CurrentTask : public TaskMemoryAccessor {
   fit::result<Errno, NamespaceNode> lookup_path_from_root(const FsStr& path) const;
 
   fit::result<Errno> exec(const FileHandle& executable, const ktl::string_view& path,
-                          const fbl::Vector<ktl::string_view>& argv,
-                          const fbl::Vector<ktl::string_view>& environ);
+                          const fbl::Vector<BString>& argv, const fbl::Vector<BString>& environ);
 
  private:
   // After the memory is unmapped, any failure in exec is unrecoverable and results in the
