@@ -3,8 +3,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_USER_ADDRESS_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_USER_ADDRESS_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_USER_ADDRESS_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_USER_ADDRESS_H_
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix_uapi/errors.h>
@@ -112,11 +112,12 @@ class UserAddress {
 
 class UserCString {
  public:
+  // impl UserCString
   static UserCString New(UserAddress addr) { return UserCString(addr); }
 
   UserAddress addr() { return addr_; }
 
-  // Deref
+  // ops::Deref
   UserAddress* operator->() { return &addr_; }
   const UserAddress* operator->() const { return &addr_; }
 
@@ -153,6 +154,13 @@ class UserRef {
   // impl<T> From<UserAddress> for UserRef<T>
   static UserRef<T> From(UserAddress addr) { return UserRef::New(addr); }
 
+  // ops::Deref
+  UserAddress* operator->() { return &addr_; }
+  const UserAddress* operator->() const { return &addr_; }
+
+  UserAddress& operator*() { return addr_; }
+  const UserAddress& operator*() const { return addr_; }
+
  private:
   template <typename U>
   friend U mtl::DefaultConstruct();
@@ -165,4 +173,4 @@ class UserRef {
 
 }  // namespace starnix_uapi
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_USER_ADDRESS_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_LIB_STARNIX_UAPI_INCLUDE_LIB_MISTOS_STARNIX_UAPI_USER_ADDRESS_H_
