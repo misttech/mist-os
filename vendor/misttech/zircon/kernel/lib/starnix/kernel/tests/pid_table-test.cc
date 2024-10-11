@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/mistos/starnix/kernel/task/pidtable.h>
+#include <lib/mistos/starnix/kernel/task/pid_table.h>
 #include <lib/unittest/unittest.h>
 
 namespace unit_testing {

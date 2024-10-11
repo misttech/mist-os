@@ -7,7 +7,7 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/lifecycle/atomic_counter.h>
-#include <lib/mistos/starnix/kernel/task/pidtable.h>
+#include <lib/mistos/starnix/kernel/task/pid_table.h>
 #include <lib/mistos/util/onecell.h>
 #include <lib/starnix_sync/locks.h>
 #include <zircon/types.h>
