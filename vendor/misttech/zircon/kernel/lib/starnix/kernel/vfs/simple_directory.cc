@@ -34,7 +34,7 @@ fit::result<Errno> SimpleDirectory::add_entry(const FsStr name, FsNodeHandle ent
 
 fit::result<Errno, ktl::unique_ptr<FileOps>> SimpleDirectory::create_file_ops(
     /*FileOpsCore& locked,*/ const FsNode& node, const CurrentTask& current_task, OpenFlags flags) {
-  return fit::error(errno(ENOMEM));
+  return fit::error(errno(ENOSYS));
 }
 
 fit::result<Errno, FsNodeHandle> SimpleDirectory::lookup(const FsNode& node,
@@ -42,8 +42,9 @@ fit::result<Errno, FsNodeHandle> SimpleDirectory::lookup(const FsNode& node,
                                                          const FsStr& name) {
   LTRACEF("this(%p) name=[%.*s]\n", this, static_cast<int>(name.length()), name.data());
   auto it = entries_.find(name);
-  if (it != entries_.end())
+  if (it != entries_.end()) {
     return fit::ok(it->second);
+  }
   return fit::error(errno(ENOENT));
 }
 
