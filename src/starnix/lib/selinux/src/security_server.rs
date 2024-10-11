@@ -390,7 +390,7 @@ impl SecurityServer {
                 },
             }
         } else if let Some(context) =
-            loaded_policy.parsed.genfscon_label_for_fs_and_path(fs_type, ROOT_PATH.into())
+            loaded_policy.parsed.genfscon_label_for_fs_and_path(fs_type, ROOT_PATH.into(), None)
         {
             // There is a `genfscon` statement for this file-system type in the policy.
             let genfscon_sid = locked_state.security_context_to_sid(context);
@@ -422,6 +422,7 @@ impl SecurityServer {
         &self,
         fs_type: NullessByteStr<'_>,
         node_path: NullessByteStr<'_>,
+        class_id: Option<ClassId>,
     ) -> Option<SecurityId> {
         let mut locked_state = self.state.lock();
         let security_context = locked_state
@@ -429,7 +430,7 @@ impl SecurityServer {
             .as_ref()
             .unwrap()
             .parsed
-            .genfscon_label_for_fs_and_path(fs_type, node_path.into())?;
+            .genfscon_label_for_fs_and_path(fs_type, node_path.into(), class_id)?;
         Some(locked_state.security_context_to_sid(security_context))
     }
 

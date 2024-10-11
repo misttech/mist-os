@@ -18,7 +18,8 @@ use selinux::permission_check::{PermissionCheck, PermissionCheckResult};
 use selinux::policy::FsUseType;
 use selinux::{
     ClassPermission, FileClass, FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions,
-    InitialSid, Permission, ProcessPermission, SecurityId, SecurityPermission, SecurityServer,
+    InitialSid, ObjectClass, Permission, ProcessPermission, SecurityId, SecurityPermission,
+    SecurityServer,
 };
 use starnix_logging::{log_debug, log_error, log_warn, track_stub};
 use starnix_sync::Mutex;
@@ -157,8 +158,17 @@ pub(super) fn fs_node_init_with_dentry(
             // fs_node is "/proc/bootconfig" then, get_fs_relative_path will return
             // "/bootconfig". This matches the path definitions in the genfscon statements.
             let sub_path = get_fs_relative_path(dir_entry);
+            let class_id = security_server
+                .class_id_by_name(
+                    ObjectClass::from(file_class_from_file_mode(fs_node.info().mode)?).name(),
+                )
+                .map_err(|_| errno!(EINVAL))?;
             security_server
-                .genfscon_label_for_fs_and_path(fs_type.into(), sub_path.as_slice().into())
+                .genfscon_label_for_fs_and_path(
+                    fs_type.into(),
+                    sub_path.as_slice().into(),
+                    Some(class_id),
+                )
                 .unwrap_or(SecurityId::initial(InitialSid::Unlabeled))
         }
     };
@@ -182,21 +192,16 @@ fn make_fs_node_security_xattr(
         .ok_or_else(|| errno!(EINVAL))
 }
 
-fn file_class_from_file_mode(mode: FileMode) -> FileClass {
-    if mode.is_lnk() {
-        FileClass::Link
-    } else if mode.is_reg() || mode.is_dir() {
-        FileClass::File
-    } else if mode.is_chr() {
-        FileClass::Character
-    } else if mode.is_blk() {
-        FileClass::Block
-    } else if mode.is_fifo() {
-        FileClass::Fifo
-    } else if mode.is_sock() {
-        FileClass::Socket
-    } else {
-        panic!("Unrecognized file mode {:?}!", mode);
+fn file_class_from_file_mode(mode: FileMode) -> Result<FileClass, Errno> {
+    match mode.bits() & starnix_uapi::S_IFMT {
+        starnix_uapi::S_IFLNK => Ok(FileClass::Link),
+        starnix_uapi::S_IFREG => Ok(FileClass::File),
+        starnix_uapi::S_IFDIR => Ok(FileClass::Dir),
+        starnix_uapi::S_IFCHR => Ok(FileClass::Character),
+        starnix_uapi::S_IFBLK => Ok(FileClass::Block),
+        starnix_uapi::S_IFIFO => Ok(FileClass::Fifo),
+        starnix_uapi::S_IFSOCK => Ok(FileClass::Socket),
+        _ => error!(EINVAL),
     }
 }
 
@@ -247,7 +252,7 @@ pub(super) fn fs_node_init_on_create(
                     .compute_new_file_sid(
                         current_task_sid,
                         parent_sid,
-                        file_class_from_file_mode(new_node.info().mode),
+                        file_class_from_file_mode(new_node.info().mode)?,
                     )
                     // TODO: https://fxbug.dev/355180447 - is EPERM right here? What does it mean
                     // for compute_new_file_sid to have failed?

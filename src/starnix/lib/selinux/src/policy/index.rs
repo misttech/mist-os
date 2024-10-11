@@ -11,7 +11,7 @@ use super::symbols::{
     Class, ClassDefault, ClassDefaultRange, Classes, CommonSymbol, CommonSymbols, MlsLevel,
     Permission,
 };
-use super::{CategoryId, ParsedPolicy, RoleId, TypeId};
+use super::{CategoryId, ClassId, ParsedPolicy, RoleId, TypeId};
 
 use crate::{ClassPermission as _, NullessByteStr};
 use std::collections::HashMap;
@@ -314,11 +314,14 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
     }
 
     /// If there is a genfscon statement for the given filesystem type, returns the associated
-    /// [`SecurityContext`], taking the `node_path` into account.
+    /// [`SecurityContext`], taking the `node_path` into account. `class_id` defines the type
+    /// of the file in the given `node_path`. It can only be omitted when looking up the filesystem
+    /// label.
     pub(super) fn genfscon_label_for_fs_and_path(
         &self,
         fs_type: NullessByteStr<'_>,
         node_path: NullessByteStr<'_>,
+        class_id: Option<ClassId>,
     ) -> Option<SecurityContext> {
         // All contexts listed in the policy for the file system type.
         let fs_contexts = self
@@ -342,7 +345,14 @@ impl<PS: ParseStrategy> PolicyIndex<PS> {
                 if result.is_none()
                     || result.unwrap().partial_path().len() < fs_context.partial_path().len()
                 {
-                    result = Some(fs_context);
+                    if class_id.is_none()
+                        || fs_context
+                            .class()
+                            .map(|other| other == class_id.unwrap())
+                            .unwrap_or(true)
+                    {
+                        result = Some(fs_context);
+                    }
                 }
             }
         }

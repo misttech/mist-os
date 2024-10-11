@@ -241,8 +241,9 @@ impl<PS: ParseStrategy> Policy<PS> {
         &self,
         fs_type: NullessByteStr<'_>,
         node_path: NullessByteStr<'_>,
+        class_id: Option<ClassId>,
     ) -> Option<SecurityContext> {
-        self.0.genfscon_label_for_fs_and_path(fs_type, node_path)
+        self.0.genfscon_label_for_fs_and_path(fs_type, node_path, class_id)
     }
 
     /// Returns the [`SecurityContext`] defined by this policy for the specified

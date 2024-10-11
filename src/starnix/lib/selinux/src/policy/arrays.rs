@@ -1189,6 +1189,10 @@ impl<PS: ParseStrategy> FsContext<PS> {
     pub(super) fn context(&self) -> &Context<PS> {
         &self.context
     }
+
+    pub(super) fn class(&self) -> Option<ClassId> {
+        NonZeroU32::new((*PS::deref(&self.class)).into()).map(ClassId)
+    }
 }
 
 impl<PS: ParseStrategy> Parse<PS> for FsContext<PS>
