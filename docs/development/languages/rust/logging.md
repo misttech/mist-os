@@ -128,7 +128,7 @@ work for your program.
 For more details, see the [standard streams][std-streams] section in the
 language-agnostic logging documentation.
 
-[doc-logging]: /docs/concepts/components/diagnostics/logs/README.md
+[doc-logging]: /docs/concepts/components/diagnostics/README.md#logs
 [ref-fuchsia]: https://fuchsia-docs.firebaseapp.com/rust/fuchsia/
 [rust-dev]: /docs/development/languages/rust/README.md
 [std-streams]: /docs/development/diagnostics/logs/recording.md#stdout-stderr

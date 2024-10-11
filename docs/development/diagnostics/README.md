@@ -142,7 +142,7 @@ You can also follow the tracing tutorials and guides:
 [ffx-triage-ref]: https://fuchsia.dev/reference/tools/sdk/ffx.md#ffx_triage
 [understand-log]: /docs/development/diagnostics/logs/viewing.md
 [zxdb-docs]: /docs/development/debugger/README.md
-[logs-concepts]: /docs/concepts/components/diagnostics/logs/README.md
+[logs-concepts]: /docs/concepts/components/diagnostics/README.md#logs
 [inspect-codelab]: /docs/development/diagnostics/inspect/codelab/codelab.md
 [diagnostics-test-codelab]: /docs/development/diagnostics/workshop/codelab.md
 [triage-codelab]: /docs/development/diagnostics/triage/codelab.md

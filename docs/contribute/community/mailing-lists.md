@@ -83,7 +83,7 @@ Fuchsia:
    <td>
     Discussions about the development of diagnostics features and services, such as
     <a href="/docs/development/diagnostics/inspect/README.md">Inspect</a>,
-    <a href="/docs/concepts/components/diagnostics/logs/README.md">Logs</a>, and the Archivist.
+    <a href="/docs/concepts/components/diagnostics/README.md#logs">Logs</a>, and the Archivist.
    </td>
   </tr>
   <tr>

@@ -177,7 +177,7 @@ The details of a recipe step, including the command run and environmental detail
 This log is often helpful for reproducing the recipe step locally.
 
 [monotonic clock]: /reference/syscalls/clock_get_monotonic.md
-[Concepts: Storage]: /docs/concepts/components/diagnostics/logs/README.md#storage
+[Concepts: Storage]: /docs/concepts/components/diagnostics/README.md#log_storage
 [forwarded from the klog]: /docs/development/diagnostics/logs/recording.md#forwarding-klog-to-syslog
 [`log_listener`]: /src/diagnostics/log_listener/README.md
 [`fuchsia.logger.Log`]: https://fuchsia.dev/reference/fidl/fuchsia.logger#Log

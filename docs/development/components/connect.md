@@ -837,7 +837,7 @@ troubleshoot the cause:
 [doc-epitaphs]: /docs/reference/fidl/language/wire-format/README.md#epitaph_control_message_ordinal_0xffffffff
 [doc-fidlcat]: /docs/development/monitoring/fidlcat/README.md
 [doc-lifecycle]: /docs/concepts/components/v2/lifecycle.md
-[doc-logs]: /docs/concepts/components/diagnostics/logs/README.md
+[doc-logs]: /docs/concepts/components/diagnostics/README.md#logs
 [doc-manifests]: /docs/concepts/components/v2/component_manifests.md
 [doc-packages]: /docs/concepts/packages/package.md
 [doc-package-set]: /docs/concepts/packages/package.md#types_of_packages

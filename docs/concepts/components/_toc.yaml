@@ -41,16 +41,8 @@ toc:
   path: /docs/concepts/components/configuration.md
 - title: "Diagnostics"
   section:
-  - title: "Lifecycle events"
-    section:
     - title: "Overview"
-      path: /docs/concepts/components/diagnostics/lifecycle_events/README.md
-  - title: "Logs"
-    section:
-    - title: "Overview"
-      path: /docs/concepts/components/diagnostics/logs/README.md
-    - title: "Attributing LogSink connections"
-      path: /docs/concepts/components/diagnostics/logs/attribution.md
+      path: /docs/concepts/components/diagnostics/README.md
 - title: "Internals"
   section:
   - title: "Component manifest design principles"

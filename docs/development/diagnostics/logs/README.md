@@ -31,7 +31,7 @@ You may want to learn more about:
 * [Understanding the details of a log][viewing-logs]
 
 [ffx-command-docs]: /docs/development/tools/ffx/commands/log.md
-[logs-concepts]: /docs/concepts/components/diagnostics/logs/README.md
+[logs-concepts]: /docs/concepts/components/diagnostics/README.md#logs
 [recording-logs]: /docs/development/diagnostics/logs/recording.md
 [viewing-logs]: /docs/development/diagnostics/logs/viewing.md
 [ffx-log-ref]: /reference/tools/sdk/ffx.md#ffx_log
