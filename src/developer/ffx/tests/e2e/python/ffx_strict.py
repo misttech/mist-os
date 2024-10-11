@@ -109,9 +109,7 @@ class FfxStrictTest(ffxtestcase.FfxTestCase):
         )
         output_json = json.loads(output)
 
-        asserts.assert_equal(
-            output_json, {"message": 'SUCCESS: received "From a Test"'}
-        )
+        asserts.assert_equal(output_json, {"message": "From a Test"})
         with asserts.assert_raises(FfxCommandError):
             self.dut.ffx.run(["-c", "daemon.autostart=false", "daemon", "echo"])
 
