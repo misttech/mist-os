@@ -1098,6 +1098,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/Peer.advertising_sid",
+        "ordinal": "9",
+        "type": "uint8"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.bluetooth.le/Peer.bonded",
         "ordinal": "7",
         "type": "bool"
@@ -1131,6 +1137,12 @@
         "name": "fuchsia.bluetooth.le/Peer.name",
         "ordinal": "5",
         "type": "string:248"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth.le/Peer.periodic_advertising_interval",
+        "ordinal": "10",
+        "type": "uint16"
     },
     {
         "kind": "table/member",
