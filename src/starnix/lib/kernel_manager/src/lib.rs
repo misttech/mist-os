@@ -459,8 +459,8 @@ fn forward_message(
                 }
             };
 
-            // Clear any remaining signals from the event before continuing the proxy.
-            let (clear_mask, set_mask) = (KERNEL_SIGNAL | RUNNER_SIGNAL, zx::Signals::NONE);
+            // Clear the kernel signal for this message before continuing.
+            let (clear_mask, set_mask) = (KERNEL_SIGNAL, zx::Signals::NONE);
             event.signal_handle(clear_mask, set_mask)?;
         }
     }
