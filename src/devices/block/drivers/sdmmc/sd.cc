@@ -28,7 +28,8 @@ constexpr uint8_t kCsdStructV2 = 0x1;
 
 namespace sdmmc {
 
-zx_status_t SdmmcBlockDevice::ProbeSd(const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata) {
+zx_status_t SdmmcBlockDevice::ProbeSdLocked(
+    const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata) {
   sdmmc_->SetRequestRetries(0);
 
   // Issue the SEND_IF_COND command, this will tell us that we can talk to
@@ -123,14 +124,15 @@ zx_status_t SdmmcBlockDevice::ProbeSd(const fuchsia_hardware_sdmmc::wire::SdmmcM
   }
 
   // Determine the size of the card.
-  if ((st = sdmmc_->MmcSendCsd(raw_csd_)) != ZX_OK) {
+  std::array<uint8_t, SDMMC_CSD_SIZE> raw_csd;
+  if ((st = sdmmc_->MmcSendCsd(raw_csd)) != ZX_OK) {
     FDF_LOGL(ERROR, logger(), "failed to send app cmd, retcode = %d", st);
     return st;
   }
 
   // For now we only support SDHC cards. These cards must have a CSD type = 1,
   // since CSD type 0 is unable to support SDHC sized cards.
-  const auto csd_structure = static_cast<uint8_t>((raw_csd_[15] >> 6) & 0x3);
+  const auto csd_structure = static_cast<uint8_t>((raw_csd[15] >> 6) & 0x3);
   if (csd_structure != kCsdStructV2) {
     FDF_LOGL(ERROR, logger(),
              "sd: unsupported card type, expected CSD version = %d, "
@@ -139,7 +141,7 @@ zx_status_t SdmmcBlockDevice::ProbeSd(const fuchsia_hardware_sdmmc::wire::SdmmcM
     return ZX_ERR_INTERNAL;
   }
 
-  const uint32_t c_size = (raw_csd_[6] | (raw_csd_[7] << 8) | (raw_csd_[8] << 16)) & 0x3f'ffff;
+  const uint32_t c_size = (raw_csd[6] | (raw_csd[7] << 8) | (raw_csd[8] << 16)) & 0x3f'ffff;
   block_info_.block_count = (c_size + 1ul) * 1024ul;
   block_info_.block_size = 512ul;
   FDF_LOGL(INFO, logger(), "found card with capacity = %" PRIu64 "B",
