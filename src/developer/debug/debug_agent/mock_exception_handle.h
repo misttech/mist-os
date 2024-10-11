@@ -12,6 +12,7 @@
 
 #include "sdk/lib/syslog/cpp/macros.h"
 #include "src/developer/debug/debug_agent/exception_handle.h"
+#include "src/developer/debug/debug_agent/mock_process_handle.h"
 #include "src/developer/debug/debug_agent/mock_thread_handle.h"
 #include "src/lib/fxl/macros.h"
 
@@ -28,6 +29,10 @@ class MockExceptionHandle : public ExceptionHandle {
 
   MockExceptionHandle() = default;
 
+  explicit MockExceptionHandle(uint64_t process_koid, uint64_t thread_koid,
+                               debug_ipc::ExceptionType type = debug_ipc::ExceptionType::kGeneral)
+      : process_koid_(process_koid), thread_koid_(thread_koid), type_(type) {}
+
   explicit MockExceptionHandle(uint64_t thread_koid,
                                debug_ipc::ExceptionType type = debug_ipc::ExceptionType::kGeneral)
       : thread_koid_(thread_koid), type_(type) {}
@@ -38,7 +43,9 @@ class MockExceptionHandle : public ExceptionHandle {
 
   ~MockExceptionHandle() = default;
 
-  std::unique_ptr<ProcessHandle> GetProcessHandle() const override { return nullptr; }
+  std::unique_ptr<ProcessHandle> GetProcessHandle() const override {
+    return std::make_unique<MockProcessHandle>(process_koid_);
+  }
 
   std::unique_ptr<ThreadHandle> GetThreadHandle() const override {
     return std::make_unique<MockThreadHandle>(thread_koid_);
@@ -69,6 +76,7 @@ class MockExceptionHandle : public ExceptionHandle {
   }
 
  private:
+  uint64_t process_koid_ = ZX_KOID_INVALID;
   uint64_t thread_koid_ = ZX_KOID_INVALID;
   debug_ipc::ExceptionType type_ = debug_ipc::ExceptionType::kGeneral;
   Resolution resolution_ = Resolution::kTryNext;

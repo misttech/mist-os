@@ -37,7 +37,7 @@ namespace debug_ipc {
 // CURRENT_SUPPORTED_API_LEVEL is equal to the numbered API level currently represented by "NEXT".
 // If not, continue reading the comments below.
 
-constexpr uint32_t kCurrentProtocolVersion = 64;
+constexpr uint32_t kCurrentProtocolVersion = 65;
 
 // How to decide kMinimumProtocolVersion
 // -------------------------------------
@@ -761,9 +761,22 @@ struct NotifyException {
   // Otherwise this is just an empty vector.
   std::vector<MemoryBlock> memory_blocks;
 
+  // A job only exception means that we received an exception while attached to a job's exception
+  // channel, instead of the typical process exception channel. In this attach state, we need to
+  // inform the client to be very careful with the actions it takes after receiving this
+  // notification, since the backend will drop the exception handle immediately after sending this
+  // notification, meaning the thread will be in an unknown state by the time the client receives
+  // this and decides what to do. Things like syncing threads, frames, or requesting modules is
+  // invalid after receiving an exception from a job.
+  bool job_only = false;
+
   void Serialize(Serializer& ser, uint32_t ver) {
     ser | timestamp | thread | type | exception | hit_breakpoints | other_affected_threads |
         memory_blocks;
+
+    if (ver >= 65) {
+      ser | job_only;
+    }
   }
 };
 

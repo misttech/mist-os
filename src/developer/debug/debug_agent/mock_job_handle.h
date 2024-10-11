@@ -6,9 +6,16 @@
 #define SRC_DEVELOPER_DEBUG_DEBUG_AGENT_MOCK_JOB_HANDLE_H_
 
 #include "src/developer/debug/debug_agent/job_handle.h"
+#include "src/developer/debug/debug_agent/mock_exception_handle.h"
 #include "src/developer/debug/debug_agent/mock_process_handle.h"
 
 namespace debug_agent {
+
+enum class MockJobExceptionInfo {
+  kProcessStarting,
+  kProcessNameChanged,
+  kException,
+};
 
 class MockJobHandle final : public JobHandle {
  public:
@@ -23,6 +30,15 @@ class MockJobHandle final : public JobHandle {
     child_processes_ = std::move(processes);
   }
 
+  // Simulate a job exception, typically zircon would provide an exception_info struct that lets us
+  // determine which JobExceptionObserver method to call, for the purposes of this mock, the caller
+  // decides. Since in Zircon, it isn't possible to receive e.g. process starting notifications
+  // without being subscribed to the "Debugger" exception channel, and similarly, to receive an
+  // exception without being subscribed to the "normal" exception channel, this function will assert
+  // if an invalid info is passed to this method with an observer that previously registered with
+  // the incorrect job exception channel.
+  void OnException(std::unique_ptr<MockExceptionHandle> exception, MockJobExceptionInfo info);
+
   // JobHandle implementation.
   std::unique_ptr<JobHandle> Duplicate() const override;
   zx_koid_t GetKoid() const override { return job_koid_; }
@@ -31,13 +47,17 @@ class MockJobHandle final : public JobHandle {
   std::vector<std::unique_ptr<ProcessHandle>> GetChildProcesses() const override;
   debug::Status WatchJobExceptions(JobExceptionObserver* observer,
                                    JobExceptionChannelType type) override {
-    // Mock doesn't implement watching job exceptions for now.
+    observer_ = observer;
+    observer_type_ = type;
     return debug::Status();
   }
 
  private:
   zx_koid_t job_koid_;
   std::string name_;
+
+  JobExceptionObserver* observer_;
+  JobExceptionChannelType observer_type_;
 
   std::vector<MockJobHandle> child_jobs_;
   std::vector<MockProcessHandle> child_processes_;
