@@ -13,7 +13,9 @@
 #include <lib/mistos/starnix_uapi/user_buffer.h>
 #include <lib/mistos/starnix_uapi/user_value.h>
 #include <lib/mistos/util/error_propagation.h>
+#include <lib/mistos/util/maybe_uninit.h>
 
+#include <fbl/array.h>
 #include <fbl/vector.h>
 #include <ktl/array.h>
 #include <ktl/byte.h>
@@ -24,6 +26,16 @@
 using namespace starnix_uapi;
 
 namespace starnix {
+
+template <typename T>
+inline ktl::span<uint8_t> object_as_mut_bytes(mtl::MaybeUninit<T>& object) {
+  return ktl::span<uint8_t>{reinterpret_cast<uint8_t*>(object.as_mut_ptr()), sizeof(T)};
+}
+
+template <typename T>
+inline ktl::span<uint8_t> array_as_mut_bytes(fbl::Array<mtl::MaybeUninit<T>> array) {
+  return ktl::span<uint8_t>{reinterpret_cast<uint8_t*>(array.data()), array.size() * sizeof(T)};
+}
 
 /// Holds the number of _elements_ read by the callback to [`read_to_vec`].
 ///
@@ -90,17 +102,14 @@ inline fit::result<E, ktl::array<T, N>> read_to_array(ReadFn&& read_fn) {
 /// THe read function must only return `Ok(())` if all the bytes were read to.
 template <typename E, typename T, typename ReadFn>
 inline fit::result<E, T> read_to_object_as_bytes(ReadFn&& read_fn) {
-  static_assert(std::is_invocable_r_v<fit::result<E>, ReadFn, ktl::span<T>&>);
+  static_assert(std::is_invocable_r_v<fit::result<E>, ReadFn, ktl::span<uint8_t>&>);
 
-  T object;
-  ktl::span<uint8_t> span{reinterpret_cast<uint8_t*>(&object), sizeof(T)};
+  auto object = mtl::MaybeUninit<T>::uninit();
+  auto span = object_as_mut_bytes(object);
   auto read_fn_result = read_fn(span) _EP(read_fn_result);
-  return fit::ok(ktl::move(object));
-}
-
-template <typename T>
-inline ktl::span<uint8_t> object_as_mut_bytes(T& object) {
-  return ktl::span<uint8_t>{reinterpret_cast<uint8_t*>(&object), sizeof(T)};
+  // SAFETY: The call to `read_fn` succeeded so we know that `object`
+  // has been initialized.
+  return fit::ok(ktl::move(object).assume_init());
 }
 
 class MemoryAccessor {
@@ -184,8 +193,9 @@ class MemoryAccessorExt : public MemoryAccessor {
   /// Read an instance of T from `user`.
   template <typename T>
   fit::result<Errno, T> read_object(UserRef<T> user) const {
-    return read_to_object_as_bytes([&](ktl::span<uint8_t>& buf) -> fit::result<Errno> {
+    return read_to_object_as_bytes<Errno, T>([&](ktl::span<uint8_t>& buf) -> fit::result<Errno> {
       auto read_result = this->read_memory(user.addr(), buf) _EP(read_result);
+      // SAFETY: `read_memory` only returns `Ok` if all bytes were read to.
       DEBUG_ASSERT(sizeof(T) == read_result->size());
       return fit::ok();
     });
@@ -207,7 +217,7 @@ class MemoryAccessorExt : public MemoryAccessor {
 
     // This implementation involves an extra memcpy compared to read_object but avoids unsafe
     // code. This isn't currently called very often.
-    T object;
+    auto object = mtl::MaybeUninit<T>::uninit();
     auto span = object_as_mut_bytes(object);
     ktl::span<uint8_t> to_read{span.data(), partial_size};
     ktl::span<uint8_t> to_zero = span.subspan(partial_size);
@@ -220,7 +230,7 @@ class MemoryAccessorExt : public MemoryAccessor {
     // Zero pad out to the correct size.
     memset(to_zero.data(), 0x00, to_zero.size());
 
-    return fit::ok(ktl::move(object));
+    return fit::ok(ktl::move(object).assume_init());
   }
 
   /// Read exactly `objects.len()` objects into `objects` from `user`.
