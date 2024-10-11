@@ -186,7 +186,12 @@ type EventHeader = table {
     3: component_url fuchsia.url.Url;
 
     /// Time when the event occurred.
+    @available(replaced=NEXT)
     4: timestamp zx.Time;
+
+    /// Boot time when the event occurred.
+    @available(added=NEXT)
+    4: timestamp zx.InstantBoot;
 };
 
 /// Contains all information about a single event

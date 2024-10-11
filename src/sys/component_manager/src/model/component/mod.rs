@@ -623,6 +623,7 @@ impl ComponentInstance {
         let stop_result = {
             if let Some(started) = started {
                 let started_timestamp = started.timestamp;
+                let started_timestamp_monotonic = started.timestamp_monotonic;
                 let stop_timer = Box::pin(async move {
                     let timer = fasync::Timer::new(fasync::MonotonicInstant::after(
                         zx::Duration::from(self.environment.stop_timeout()),
@@ -660,7 +661,7 @@ impl ComponentInstance {
                         .map_err(|_| StopActionError::GetTopInstanceFailed)?;
                     top_instance.trigger_reboot();
                 }
-                Some((ret, started_timestamp))
+                Some((ret, started_timestamp, started_timestamp_monotonic))
             } else {
                 None
             }
@@ -679,7 +680,12 @@ impl ComponentInstance {
             .await
             .map_err(|err| StopActionError::DestroyDynamicChildrenFailed { err: Box::new(err) })?;
 
-        if let Some((StopConclusion { disposition, escrow_request }, start_time)) = stop_result {
+        if let Some((
+            StopConclusion { disposition, escrow_request },
+            _start_time,
+            start_time_monotonic,
+        )) = stop_result
+        {
             let requested_escrow = escrow_request.is_some();
 
             // Store any escrowed state.
@@ -692,12 +698,14 @@ impl ComponentInstance {
                 };
             }
 
-            let stop_time = zx::MonotonicInstant::get();
+            let stop_time = zx::BootInstant::get();
+            let stop_time_monotonic = zx::MonotonicInstant::get();
             let event = self.new_event(EventPayload::Stopped {
                 status: disposition.stop_info().termination_status,
                 exit_code: disposition.stop_info().exit_code,
                 stop_time,
-                execution_duration: stop_time - start_time,
+                stop_time_monotonic,
+                execution_duration: stop_time_monotonic - start_time_monotonic,
                 requested_escrow,
             });
             self.hooks.dispatch(&event).await;
@@ -1252,13 +1260,13 @@ impl ComponentInstance {
     }
 
     pub fn new_event(&self, payload: EventPayload) -> Event {
-        self.new_event_with_timestamp(payload, zx::MonotonicInstant::get())
+        self.new_event_with_timestamp(payload, zx::BootInstant::get())
     }
 
     pub fn new_event_with_timestamp(
         &self,
         payload: EventPayload,
-        timestamp: zx::MonotonicInstant,
+        timestamp: zx::BootInstant,
     ) -> Event {
         Event {
             target_moniker: self.moniker.clone().into(),
@@ -1481,7 +1489,7 @@ pub mod testing {
     pub async fn wait_until_event_get_timestamp(
         event_stream: &mut EventStream,
         event_type: EventType,
-    ) -> zx::MonotonicInstant {
+    ) -> zx::BootInstant {
         event_stream.wait_until(event_type, Moniker::root()).await.unwrap().event.timestamp.clone()
     }
 }

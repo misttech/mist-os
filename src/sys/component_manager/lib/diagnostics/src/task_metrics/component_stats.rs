@@ -117,7 +117,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentStats<T> {
         self.tasks = final_tasks;
     }
 
-    pub async fn gather_dead_tasks(&self) -> Vec<(zx::MonotonicInstant, Arc<Mutex<TaskInfo<T>>>)> {
+    pub async fn gather_dead_tasks(&self) -> Vec<(zx::BootInstant, Arc<Mutex<TaskInfo<T>>>)> {
         let mut dead_tasks = vec![];
         for task in &self.tasks {
             if let Some(t) = task.lock().await.most_recent_measurement().await {

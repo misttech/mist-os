@@ -1073,8 +1073,12 @@ pub struct StartedInstanceState {
     /// If set, that means this component is associated with a running program.
     program: Option<ProgramRuntime>,
 
-    /// Approximates when the component was started.
-    pub timestamp: zx::MonotonicInstant,
+    /// Approximates when the component was started in nanoseconds since boot.
+    pub timestamp: zx::BootInstant,
+
+    /// Approximates when the component was started in monotonic time. This time doesn't measure
+    /// the time since boot and won't include time the system spent suspended.
+    pub timestamp_monotonic: zx::MonotonicInstant,
 
     /// Describes why the component instance was started
     pub start_reason: StartReason,
@@ -1106,10 +1110,12 @@ impl StartedInstanceState {
         execution_controller_task: Option<controller::ExecutionControllerTask>,
         logger: Option<ScopedLogger>,
     ) -> Self {
-        let timestamp = zx::MonotonicInstant::get();
+        let timestamp = zx::BootInstant::get();
+        let timestamp_monotonic = zx::MonotonicInstant::get();
         StartedInstanceState {
             program: program.map(|p| ProgramRuntime::new(p, component)),
             timestamp,
+            timestamp_monotonic,
             binder_server_ends: vec![],
             start_reason,
             execution_controller_task,

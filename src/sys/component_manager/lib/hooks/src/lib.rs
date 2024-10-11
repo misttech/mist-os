@@ -239,7 +239,8 @@ pub enum EventPayload {
     Stopped {
         status: zx::Status,
         exit_code: Option<i64>,
-        stop_time: zx::MonotonicInstant,
+        stop_time: zx::BootInstant,
+        stop_time_monotonic: zx::MonotonicInstant,
         execution_duration: zx::Duration,
         requested_escrow: bool,
     },
@@ -254,16 +255,22 @@ pub enum EventPayload {
 pub struct RuntimeInfo {
     pub diagnostics_receiver:
         Arc<Mutex<Option<oneshot::Receiver<fdiagnostics::ComponentDiagnostics>>>>,
-    pub start_time: zx::MonotonicInstant,
+    pub start_time: zx::BootInstant,
+    pub start_time_monotonic: zx::MonotonicInstant,
 }
 
 impl RuntimeInfo {
     pub fn new(
-        timestamp: zx::MonotonicInstant,
+        timestamp: zx::BootInstant,
+        timestamp_monotonic: zx::MonotonicInstant,
         diagnostics_receiver: oneshot::Receiver<fdiagnostics::ComponentDiagnostics>,
     ) -> Self {
         let diagnostics_receiver = Arc::new(Mutex::new(Some(diagnostics_receiver)));
-        Self { diagnostics_receiver, start_time: timestamp }
+        Self {
+            diagnostics_receiver,
+            start_time: timestamp,
+            start_time_monotonic: timestamp_monotonic,
+        }
     }
 }
 
@@ -303,7 +310,7 @@ pub struct Event {
     pub payload: EventPayload,
 
     /// Time when this event was created
-    pub timestamp: zx::MonotonicInstant,
+    pub timestamp: zx::BootInstant,
 }
 
 impl Event {
@@ -312,7 +319,7 @@ impl Event {
             target_moniker: ExtendedMoniker::ComponentManager,
             component_url: "file:///bin/component_manager".parse().unwrap(),
             payload,
-            timestamp: zx::MonotonicInstant::get(),
+            timestamp: zx::BootInstant::get(),
         }
     }
 }
@@ -450,7 +457,7 @@ mod tests {
                 name: "foo".to_string(),
                 receiver,
             },
-            timestamp: zx::MonotonicInstant::get(),
+            timestamp: zx::BootInstant::get(),
         };
 
         // Verify the transferred event carries the capability.
