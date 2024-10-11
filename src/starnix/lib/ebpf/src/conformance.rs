@@ -6,13 +6,13 @@
 pub mod test {
     use crate::{
         new_bpf_type_identifier, BpfValue, DataWidth, EbpfHelper, EbpfProgramBuilder,
-        FunctionSignature, MemoryParameterSize, NullVerifierLogger, PacketAccessor,
-        PacketDescriptor, Type, BPF_ABS, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH,
-        BPF_ATOMIC, BPF_B, BPF_CALL, BPF_CMPXCHG, BPF_DIV, BPF_DW, BPF_END, BPF_EXIT, BPF_FETCH,
-        BPF_H, BPF_IMM, BPF_IND, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP,
-        BPF_JMP32, BPF_JNE, BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_LD, BPF_LDX,
-        BPF_LSH, BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_RSH, BPF_SRC_IMM,
-        BPF_SRC_REG, BPF_ST, BPF_STX, BPF_SUB, BPF_TO_BE, BPF_TO_LE, BPF_W, BPF_XCHG, BPF_XOR,
+        EmptyPacketAccessor, FunctionSignature, MemoryParameterSize, NullVerifierLogger,
+        PacketAccessor, Type, BPF_ABS, BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH, BPF_ATOMIC,
+        BPF_B, BPF_CALL, BPF_CMPXCHG, BPF_DIV, BPF_DW, BPF_END, BPF_EXIT, BPF_FETCH, BPF_H,
+        BPF_IMM, BPF_IND, BPF_JA, BPF_JEQ, BPF_JGE, BPF_JGT, BPF_JLE, BPF_JLT, BPF_JMP, BPF_JMP32,
+        BPF_JNE, BPF_JSET, BPF_JSGE, BPF_JSGT, BPF_JSLE, BPF_JSLT, BPF_LD, BPF_LDX, BPF_LSH,
+        BPF_MEM, BPF_MOD, BPF_MOV, BPF_MUL, BPF_NEG, BPF_OR, BPF_RSH, BPF_SRC_IMM, BPF_SRC_REG,
+        BPF_ST, BPF_STX, BPF_SUB, BPF_TO_BE, BPF_TO_LE, BPF_W, BPF_XCHG, BPF_XOR,
     };
     use linux_uapi::bpf_insn;
     use pest::iterators::Pair;
@@ -441,6 +441,54 @@ pub mod test {
         }
     }
 
+    // The `PacketAccessor` used in the conformance test. It assumes that consider that the data
+    // of the packet is at offset 8 of the packet buffer.
+    struct TestPacketAccessor {
+        packet_size: usize,
+    }
+
+    impl TestPacketAccessor {
+        const DATA_OFFSET: usize = 8;
+
+        fn new(buffer_size: usize) -> Self {
+            Self { packet_size: buffer_size.checked_sub(Self::DATA_OFFSET).unwrap_or(0) }
+        }
+    }
+
+    impl PacketAccessor<()> for TestPacketAccessor {
+        fn load(
+            &self,
+            _context: &mut (),
+            packet_ptr: BpfValue,
+            offset: i32,
+            width: DataWidth,
+        ) -> Option<BpfValue> {
+            if offset < 0 || offset as usize + width.bytes() > self.packet_size {
+                return None;
+            }
+            let addr = packet_ptr.add(Self::DATA_OFFSET as u64 + offset as u64);
+            let value = match width {
+                DataWidth::U8 => {
+                    BpfValue::from(unsafe { std::ptr::read_unaligned(addr.as_ptr::<u8>()) })
+                }
+                DataWidth::U16 => {
+                    BpfValue::from(unsafe { std::ptr::read_unaligned(addr.as_ptr::<u16>()) })
+                }
+                DataWidth::U32 => {
+                    BpfValue::from(unsafe { std::ptr::read_unaligned(addr.as_ptr::<u32>()) })
+                }
+                DataWidth::U64 => {
+                    BpfValue::from(unsafe { std::ptr::read_unaligned(addr.as_ptr::<u64>()) })
+                }
+            };
+            Some(value)
+        }
+
+        fn packet_len(&self, _context: &mut (), _packet_ptr: BpfValue) -> usize {
+            self.packet_size
+        }
+    }
+
     struct TestCase {
         code: Vec<bpf_insn>,
         result: Option<u64>,
@@ -656,32 +704,6 @@ pub mod test {
         0.into()
     }
 
-    /// The read packet helper method. The conformance test consider that the data of the packet is
-    /// at offset 8 of the packet itself.
-    fn read_packet(
-        _context: &mut (),
-        packet_ptr: BpfValue,
-        offset: i32,
-        width: DataWidth,
-    ) -> Option<BpfValue> {
-        let addr = packet_ptr.add(8 + offset as u64);
-        let value = match width {
-            DataWidth::U8 => {
-                BpfValue::from(unsafe { std::ptr::read_unaligned(addr.as_ptr::<u8>()) })
-            }
-            DataWidth::U16 => {
-                BpfValue::from(unsafe { std::ptr::read_unaligned(addr.as_ptr::<u16>()) })
-            }
-            DataWidth::U32 => {
-                BpfValue::from(unsafe { std::ptr::read_unaligned(addr.as_ptr::<u32>()) })
-            }
-            DataWidth::U64 => {
-                BpfValue::from(unsafe { std::ptr::read_unaligned(addr.as_ptr::<u64>()) })
-            }
-        };
-        Some(value)
-    }
-
     pub fn parse_asm(data: &str) -> Vec<bpf_insn> {
         let mut pairs =
             TestGrammar::parse(Rule::ASM_INSTRUCTIONS, data).expect("Parsing must be successful");
@@ -855,10 +877,7 @@ pub mod test {
         if let Some(memory) = test_case.memory.as_ref() {
             let memory_id = new_bpf_type_identifier();
             let buffer_size = memory.len() as u64;
-            builder.set_packet_descriptor(PacketDescriptor {
-                packet_memory_id: memory_id.clone(),
-                packet_accessor: PacketAccessor::new(read_packet),
-            });
+            builder.set_packet_memory_id(memory_id.clone());
             builder.set_args(&[
                 Type::PtrToMemory {
                     id: memory_id,
@@ -1035,9 +1054,17 @@ pub mod test {
         if let Some(value) = test_case.result {
             let program = program.expect("program must be loadable");
             let result = if let Some(memory) = test_case.memory.as_mut() {
-                program.run_with_slice(&mut (), memory.as_mut_slice())
+                program.run_with_slice(
+                    &mut (),
+                    &TestPacketAccessor::new(memory.len()),
+                    memory.as_mut_slice(),
+                )
             } else {
-                program.run_with_arguments(&mut (), &[0, 0])
+                program.run_with_arguments(
+                    &mut (),
+                    &EmptyPacketAccessor::default(),
+                    &[0.into(), 0.into()],
+                )
             };
             assert_eq!(result, value);
         } else {

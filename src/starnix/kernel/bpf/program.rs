@@ -4,15 +4,15 @@
 
 use crate::bpf::fs::{get_bpf_object, BpfHandle};
 use crate::bpf::helpers::{
-    get_bpf_args, get_packet_descriptor, HelperFunctionContext, HelperFunctionContextMarker,
+    get_bpf_args, get_packet_memory_id, HelperFunctionContext, HelperFunctionContextMarker,
     BPF_HELPERS,
 };
 use crate::bpf::map::Map;
 use crate::task::CurrentTask;
 use crate::vfs::{FdNumber, OutputBuffer};
-use ebpf::error::EbpfError;
-use ebpf::program::{EbpfProgram, EbpfProgramBuilder};
-use ebpf::{VerifierLogger, BPF_LDDW};
+use ebpf::{
+    EbpfError, EbpfProgram, EbpfProgramBuilder, EmptyPacketAccessor, VerifierLogger, BPF_LDDW,
+};
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{BpfHelperOps, LockBefore, Locked};
 use starnix_uapi::errors::Errno;
@@ -113,8 +113,8 @@ impl Program {
                 }
             }
             builder.set_args(get_bpf_args(info.program_type));
-            if let Some(descriptor) = get_packet_descriptor(info.program_type) {
-                builder.set_packet_descriptor(descriptor);
+            if let Some(memory_id) = get_packet_memory_id(info.program_type) {
+                builder.set_packet_memory_id(memory_id);
             }
             let mut logger = BufferVeriferLogger::new(logger);
             builder.load(code, &mut logger)
@@ -143,7 +143,8 @@ impl Program {
                 current_task,
             };
 
-            Ok(vm.run(&mut context, data, std::mem::size_of::<T>()))
+            // TODO(https://fxbug.dev/287120494) Use real PacketAccessor.
+            Ok(vm.run(&mut context, &EmptyPacketAccessor {}, data))
         } else {
             // vm is only None when bpf is faked. Return an error on execution, as random value
             // might have stronger side effects.
