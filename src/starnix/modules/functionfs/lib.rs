@@ -229,6 +229,14 @@ impl FunctionFsRootDir {
         Ok(())
     }
 
+    fn from_file(file: &FileObject) -> &Self {
+        file.fs
+            .root()
+            .node
+            .downcast_ops::<FunctionFsRootDir>()
+            .expect("failed to downcast functionfs root dir")
+    }
+
     fn on_control_opened(&self) {
         let mut state = self.state.lock();
         state.num_control_file_objects += 1;
@@ -407,12 +415,7 @@ impl FileOps for FunctionFsControlEndpoint {
     fileops_impl_noop_sync!();
 
     fn close(&self, file: &FileObject, _current_task: &CurrentTask) {
-        let rootdir = file
-            .fs
-            .root()
-            .node
-            .downcast_ops::<FunctionFsRootDir>()
-            .expect("failed to downcast functionfs root dir");
+        let rootdir = FunctionFsRootDir::from_file(file);
         rootdir.on_control_closed();
     }
 
@@ -431,12 +434,7 @@ impl FileOps for FunctionFsControlEndpoint {
             "FunctionFS blocking read on control endpoint"
         );
 
-        let rootdir = file
-            .fs
-            .root()
-            .node
-            .downcast_ops::<FunctionFsRootDir>()
-            .expect("failed to downcast functionfs root dir");
+        let rootdir = FunctionFsRootDir::from_file(file);
 
         let mut state = rootdir.state.lock();
         if !state.event_queue.is_empty() {
@@ -463,12 +461,7 @@ impl FileOps for FunctionFsControlEndpoint {
         // Here we directly attempt to connect to the driver via FIDL, and create endpoints for data transfer.
         track_stub!(TODO("https://fxbug.dev/329699340"), "FunctionFS should parse descriptors");
 
-        let rootdir = file
-            .fs
-            .root()
-            .node
-            .downcast_ops::<FunctionFsRootDir>()
-            .expect("failed to downcast functionfs root dir");
+        let rootdir = FunctionFsRootDir::from_file(file);
         rootdir.create_endpoints(current_task.kernel().deref())?;
 
         Ok(data.drain())
@@ -480,12 +473,7 @@ impl FileOps for FunctionFsControlEndpoint {
         file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
-        let rootdir = file
-            .fs
-            .root()
-            .node
-            .downcast_ops::<FunctionFsRootDir>()
-            .expect("failed to downcast functionfs root dir");
+        let rootdir = FunctionFsRootDir::from_file(file);
         if rootdir.available() > 0 {
             Ok(FdEvents::POLLIN)
         } else {
@@ -535,12 +523,7 @@ impl FileOps for FunctionFsInputEndpoint {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         let bytes = data.read_all()?;
-        let rootdir = file
-            .fs
-            .root()
-            .node
-            .downcast_ops::<FunctionFsRootDir>()
-            .expect("failed to downcast functionfs root dir");
+        let rootdir = FunctionFsRootDir::from_file(file);
         rootdir.write(&bytes)
     }
 }
@@ -576,12 +559,7 @@ impl FileOps for FunctionFsOutputFileObject {
         _offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        let rootdir = file
-            .fs
-            .root()
-            .node
-            .downcast_ops::<FunctionFsRootDir>()
-            .expect("failed to downcast functionfs root dir");
+        let rootdir = FunctionFsRootDir::from_file(file);
         let payload = rootdir.read()?;
         if payload.len() > data.available() {
             // This means the data will only be partially written, with the rest discarded.
