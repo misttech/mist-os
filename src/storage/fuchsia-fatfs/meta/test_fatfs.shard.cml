@@ -6,7 +6,6 @@
         {
             protocol: [
                 "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
             ],
             from: "parent",

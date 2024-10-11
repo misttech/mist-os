@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "inspect/offer.shard.cml" ],
+    include: [
+        "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
+    ],
     collections: [
         {
             name: "fxfs-crypt",
@@ -60,15 +63,6 @@
         },
     ],
     offer: [
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [
-                "#fxfs",
-                "#fxfs-crypt",
-                "#storage_host",
-            ],
-        },
         {
             protocol: [ "fuchsia.tracing.provider.Registry" ],
             from: "parent",
