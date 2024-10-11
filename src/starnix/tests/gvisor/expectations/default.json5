@@ -985,11 +985,6 @@
                 // Times out.
                 "ItimerTest.DeliversSIGPROFToThreadsRoughlyFairlyIdle",
 
-                // Flaky b/352233059. We generate the error asynchronously, which means the
-                // test passes or fails depending on whether we generate the error before the
-                // test calls GetEvents.
-                "AIOTest.BadWrite",
-
                 // https://fxbug.dev/42085936
                 "AllSocketPairTest.RecvTimeoutRecvmsgOneSecondSucceeds/*",
                 "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutUsecNeg/*",
