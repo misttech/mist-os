@@ -324,7 +324,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
 
     def test_serial_transport_error(self) -> None:
         """Test case to make sure fuchsia_device raises error when we try to
-        access "serial" transport without device_serial_socket."""
+        access "serial" transport without serial_socket."""
 
         device_info: custom_types.DeviceInfo = self.fd_fc_obj._device_info
 
@@ -336,7 +336,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
 
         with self.assertRaisesRegex(
             errors.FuchsiaDeviceError,
-            "'device_serial_socket' arg need to be provided during the init to use Serial affordance",
+            "'serial_socket' arg need to be provided during the init to use Serial affordance",
         ):
             _: serial_interface.Serial = self.fd_fc_obj.serial
 
