@@ -18,6 +18,7 @@ use serde::Serialize;
 use std::any::Any;
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::pin::pin;
 use std::sync::Arc;
 
 const SETTINGS_PREFIX: &str = "settings";
@@ -225,16 +226,16 @@ impl DeviceStorage {
                     // Each key has an independent flush queue.
                     Task::spawn(async move {
                         let mut next_allowed_flush = MonotonicInstant::now();
-                        let mut next_flush_timer = OptionFuture::from(None).fuse();
+                        let mut next_flush_timer = pin!(OptionFuture::from(None).fuse());
                         let flush_requested = flush_receiver.fuse();
                         futures::pin_mut!(flush_requested);
                         loop {
                             futures::select! {
                                 () = flush_requested.select_next_some() => {
-                                    next_flush_timer = OptionFuture::from(Some(Timer::new(
+                                    next_flush_timer.set(OptionFuture::from(Some(Timer::new(
                                         next_allowed_flush
                                     )))
-                                    .fuse();
+                                    .fuse());
                                 },
                                 o = next_flush_timer => {
                                     if let Some(()) = o {

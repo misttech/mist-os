@@ -134,6 +134,7 @@ mod test {
     use fidl::endpoints::create_proxy_and_stream;
     use fuchsia_async as fasync;
     use futures::{FutureExt, StreamExt};
+    use std::pin::pin;
 
     const DEFAULT_WIN_SIZE: fpty::WindowSize = fpty::WindowSize { width: 99, height: 29 };
 
@@ -199,7 +200,7 @@ mod test {
         std::thread::spawn(move || drop(raw_pty));
 
         const TIMEOUT: i64 = 5000;
-        let mut timeout = fasync::Timer::new(fasync::Duration::from_millis(TIMEOUT)).fuse();
+        let mut timeout = pin!(fasync::Timer::new(fasync::Duration::from_millis(TIMEOUT)));
 
         futures::select_biased! {
             result = mock_pty.run().fuse() => result.expect("MockPty::run terminated with failure"),

@@ -5,6 +5,7 @@
 use std::cmp;
 use std::collections::BinaryHeap;
 use std::fmt::Debug;
+use std::pin::Pin;
 use std::sync::atomic::{self, AtomicI64, AtomicUsize};
 use std::sync::{Arc, Weak};
 use std::task::Poll;
@@ -488,8 +489,8 @@ const MIN_TARGET_HEAP_SIZE: usize = 10;
 /// It also works around the limitation that an `fasync::Timer` can only be
 /// rescheduled after it has fired.
 struct TimerWaiter {
-    timers: BinaryHeap<TimeAndValue<fasync::Timer>>,
-    selected: Option<TimeAndValue<fasync::Timer>>,
+    timers: BinaryHeap<TimeAndValue<Pin<Box<fasync::Timer>>>>,
+    selected: Option<TimeAndValue<Pin<Box<fasync::Timer>>>>,
     wakeup: fasync::MonotonicInstant,
     /// The target heap size controls when we let go of expired fasync::Timers
     /// instead of reusing them.
@@ -548,13 +549,13 @@ impl TimerWaiter {
             .unwrap_or_else(|| {
                 // If there are no timers available in the heap then we need to
                 // allocate a new timer.
-                TimeAndValue { time: new_wakeup, value: fasync::Timer::new(new_wakeup) }
+                TimeAndValue { time: new_wakeup, value: Box::pin(fasync::Timer::new(new_wakeup)) }
             });
 
         *selected = Some(time_and_value);
     }
 
-    fn maybe_return_fired_timer_to_pool(&mut self, entry: TimeAndValue<fasync::Timer>) {
+    fn maybe_return_fired_timer_to_pool(&mut self, entry: TimeAndValue<Pin<Box<fasync::Timer>>>) {
         // Place the timer back in the heap if we're not over the threshold.
         //
         // We don't store anything special in the heap saying this timer has
@@ -591,7 +592,7 @@ impl Future for TimerWaiter {
         }
         // If our selected timer was scheduled for earlier than our wakeup
         // reset the timer now that it fired and poll again.
-        taken_selected.value.reset(*wakeup);
+        taken_selected.value.as_mut().reset(*wakeup);
         taken_selected.time = *wakeup;
 
         match taken_selected.value.poll_unpin(cx) {
@@ -967,6 +968,10 @@ mod tests {
         tw.set(T1);
         tw.assert_timers([], Some(T1));
         assert_eq!(tw.is_terminated(), false);
+
+        // Timers aren't registered until they're polled, so run the executor first.
+        let _ = executor.run_until_stalled(&mut tw);
+
         assert_eq!(executor.wake_next_timer(), Some(T1));
         assert_eq!(executor.run_until_stalled(&mut tw), Poll::Ready(()));
         assert_eq!(tw.is_terminated(), true);

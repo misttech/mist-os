@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::resolved_driver::ResolvedDriver;
-use futures::{SinkExt, StreamExt};
+use futures::SinkExt;
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::{RngCore, SeedableRng};
@@ -61,10 +61,7 @@ impl Session {
                     )
                 };
 
-                let mut timer = fasync::Interval::new(delay);
-                if timer.next().await.is_none() {
-                    return;
-                }
+                fasync::Timer::new(delay).await;
             }
 
             driver_buffer.push(driver);
@@ -87,6 +84,7 @@ mod tests {
     use super::*;
     use crate::resolved_driver::DriverPackageType;
     use bind::interpreter::decode_bind_rules::DecodedRules;
+    use futures::StreamExt as _;
 
     fn make_fake_boot_driver(name: &str) -> ResolvedDriver {
         let test_rules = bind::compiler::BindRules {

@@ -22,6 +22,7 @@ use fidl_fuchsia_vulkan_loader::LoaderMarker;
 use fuchsia_async::{MonotonicInstant, Timer};
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use futures::{future, StreamExt};
+use std::pin::pin;
 use test_case::test_case;
 use zx::Duration;
 
@@ -107,7 +108,7 @@ async fn enters_idle_state_without_activity(suspend_enabled: bool) {
     );
 
     // Do nothing. Activity service transitions to idle state in five seconds.
-    let activity_timeout_upper_bound = Timer::new(MonotonicInstant::after(TEST_TIMEOUT));
+    let activity_timeout_upper_bound = pin!(Timer::new(MonotonicInstant::after(TEST_TIMEOUT)));
     match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
         future::Either::Left((result, _)) => {
             assert_eq!(result.unwrap().expect("Expected state transition."), State::Idle);
@@ -142,7 +143,7 @@ async fn does_not_enter_active_state_with_keyboard(suspend_enabled: bool) {
     );
 
     // Do nothing. Activity service transitions to idle state in five seconds.
-    let activity_timeout_upper_bound = Timer::new(MonotonicInstant::after(TEST_TIMEOUT));
+    let activity_timeout_upper_bound = pin!(Timer::new(MonotonicInstant::after(TEST_TIMEOUT)));
     match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
         future::Either::Left((result, _)) => {
             assert_eq!(result.unwrap().expect("Expected state transition."), State::Idle);
@@ -176,7 +177,7 @@ async fn does_not_enter_active_state_with_keyboard(suspend_enabled: bool) {
         .expect("Failed to send key event 'a'.");
 
     // Activity service does not transition to active state.
-    let activity_timeout_upper_bound = Timer::new(MonotonicInstant::after(TEST_TIMEOUT));
+    let activity_timeout_upper_bound = pin!(Timer::new(MonotonicInstant::after(TEST_TIMEOUT)));
     match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
         future::Either::Left((_, _)) => {
             panic!("Activity should not have changed.");
@@ -211,7 +212,7 @@ async fn enters_active_state_with_mouse(suspend_enabled: bool) {
     );
 
     // Do nothing. Activity service transitions to idle state in five seconds.
-    let activity_timeout_upper_bound = Timer::new(MonotonicInstant::after(TEST_TIMEOUT));
+    let activity_timeout_upper_bound = pin!(Timer::new(MonotonicInstant::after(TEST_TIMEOUT)));
     match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
         future::Either::Left((result, _)) => {
             assert_eq!(result.unwrap().expect("Expected state transition."), State::Idle);
@@ -279,7 +280,7 @@ async fn enters_active_state_with_touchscreen(suspend_enabled: bool) {
     );
 
     // Do nothing. Activity service transitions to idle state in five seconds.
-    let activity_timeout_upper_bound = Timer::new(MonotonicInstant::after(TEST_TIMEOUT));
+    let activity_timeout_upper_bound = pin!(Timer::new(MonotonicInstant::after(TEST_TIMEOUT)));
     match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
         future::Either::Left((result, _)) => {
             assert_eq!(result.unwrap().expect("Expected state transition."), State::Idle);
@@ -346,7 +347,7 @@ async fn enters_active_state_with_media_buttons(suspend_enabled: bool) {
     );
 
     // Do nothing. Activity service transitions to idle state in five seconds.
-    let activity_timeout_upper_bound = Timer::new(MonotonicInstant::after(TEST_TIMEOUT));
+    let activity_timeout_upper_bound = pin!(Timer::new(MonotonicInstant::after(TEST_TIMEOUT)));
     match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
         future::Either::Left((result, _)) => {
             assert_eq!(result.unwrap().expect("Expected state transition."), State::Idle);
@@ -411,7 +412,7 @@ async fn does_not_enter_active_state_with_handoff_wake_suspend_disabled() {
     );
 
     // Do nothing. Activity service transitions to idle state in one minute.
-    let activity_timeout_upper_bound = Timer::new(MonotonicInstant::after(TEST_TIMEOUT));
+    let activity_timeout_upper_bound = pin!(Timer::new(MonotonicInstant::after(TEST_TIMEOUT)));
     match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
         future::Either::Left((result, _)) => {
             assert_eq!(result.unwrap().expect("Expected state transition."), State::Idle);
@@ -430,7 +431,7 @@ async fn does_not_enter_active_state_with_handoff_wake_suspend_disabled() {
     );
 
     // Activity service does not transition to active state.
-    let activity_timeout_upper_bound = Timer::new(MonotonicInstant::after(TEST_TIMEOUT));
+    let activity_timeout_upper_bound = pin!(Timer::new(MonotonicInstant::after(TEST_TIMEOUT)));
     match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
         future::Either::Left((result, _)) => {
             panic!("Activity should not have changed, received new state: {:?}", result);
@@ -463,7 +464,7 @@ async fn enters_active_state_with_handoff_wake_suspend_enabled() {
     );
 
     // Do nothing. Activity service transitions to idle state in one minute.
-    let activity_timeout_upper_bound = Timer::new(MonotonicInstant::after(TEST_TIMEOUT));
+    let activity_timeout_upper_bound = pin!(Timer::new(MonotonicInstant::after(TEST_TIMEOUT)));
     match future::select(watch_state_stream.next(), activity_timeout_upper_bound).await {
         future::Either::Left((result, _)) => {
             assert_eq!(result.unwrap().expect("Expected state transition."), State::Idle);

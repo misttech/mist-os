@@ -21,7 +21,7 @@ pub struct Ringer {
     /// incoming.
     frequency: zx::Duration,
     /// Internal timer used to trigger the next ring.
-    timer: Option<fasync::Timer>,
+    timer: Option<Pin<Box<fasync::Timer>>>,
     /// Stream should produce a ring.
     ringing: bool,
 }
@@ -57,13 +57,13 @@ impl Stream for Ringer {
 
         match &mut self.timer {
             None => {
-                let timer = fasync::Timer::new(self.frequency.after_now());
+                let timer = Box::pin(fasync::Timer::new(self.frequency.after_now()));
                 self.timer = Some(timer);
                 Poll::Ready(Some(()))
             }
             Some(timer) => match timer.poll_unpin(cx) {
                 Poll::Ready(()) => {
-                    timer.reset(freq.after_now());
+                    timer.as_mut().reset(freq.after_now());
                     Poll::Ready(Some(()))
                 }
                 Poll::Pending => Poll::Pending,

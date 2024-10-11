@@ -20,6 +20,7 @@ use fuchsia_fs::directory::readdir;
 use futures::{future, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use rand::rngs::StdRng;
 use rand::{distributions, Rng, SeedableRng};
+use std::pin::pin;
 use std::sync::Arc;
 use storage_isolated_driver_manager::fvm;
 use uuid::Uuid;
@@ -118,7 +119,7 @@ async fn handle_controller<T: Test + 'static>(
                 // If a non-zero duration is provided, spawn the test and then return after that
                 // duration.
                 tracing::info!("starting test and replying in {} seconds...", duration);
-                let timer = fasync::Timer::new(std::time::Duration::from_secs(duration));
+                let timer = pin!(fasync::Timer::new(std::time::Duration::from_secs(duration)));
                 let res = match future::select(test_fut, timer).await {
                     future::Either::Left((res, _)) => res,
                     future::Either::Right((_, test_fut)) => {

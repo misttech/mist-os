@@ -356,7 +356,7 @@ enum InterfaceConfigState {
 enum Dhcpv4ClientState {
     NotRunning,
     Running(dhcpv4::ClientState),
-    ScheduledRestart(fasync::Timer),
+    ScheduledRestart(Pin<Box<fasync::Timer>>),
 }
 
 #[derive(Debug)]
@@ -1331,9 +1331,10 @@ impl<'a> NetCfg<'a> {
                                     AllowClientRestart::Yes => {
                                         // The client exited due to an unexpected error. Schedule it
                                         // to be restarted after waiting a backoff period.
-                                        *dhcpv4_client = Dhcpv4ClientState::ScheduledRestart(
-                                            fasync::Timer::new(DHCP_CLIENT_RESTART_WAIT_TIME),
-                                        );
+                                        *dhcpv4_client =
+                                            Dhcpv4ClientState::ScheduledRestart(Box::pin(
+                                                fasync::Timer::new(DHCP_CLIENT_RESTART_WAIT_TIME),
+                                            ));
                                     }
                                 }
                             }

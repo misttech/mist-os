@@ -113,6 +113,8 @@ impl<F: Future + Sized> NamedTimeoutExt for F {}
 mod test {
     use super::*;
     use core::task::Poll;
+    use std::pin::pin;
+
     // When the fake-clock library is not linked in, these timers should behave identical to
     // fasync::Timer. These tests verify that the fake time utilities provided by
     // fasync::TestExecutor continue to work when fake-clock is NOT linked in. Behavior with
@@ -125,7 +127,7 @@ mod test {
     fn test_timer() {
         let mut executor = fasync::TestExecutor::new_with_fake_time();
         let start_time = executor.now();
-        let mut timer = NamedTimer::new(&DEADLINE_ID, ONE_HOUR);
+        let mut timer = pin!(NamedTimer::new(&DEADLINE_ID, ONE_HOUR));
         assert!(executor.run_until_stalled(&mut timer).is_pending());
 
         executor.set_fake_time(start_time + ONE_HOUR);
@@ -138,7 +140,8 @@ mod test {
         let mut executor = fasync::TestExecutor::new_with_fake_time();
 
         let mut ready_future =
-            futures::future::ready("ready").on_timeout_named(&DEADLINE_ID, ONE_HOUR, || "timeout");
+            pin!(futures::future::ready("ready")
+                .on_timeout_named(&DEADLINE_ID, ONE_HOUR, || "timeout"));
         assert_eq!(executor.run_until_stalled(&mut ready_future), Poll::Ready("ready"));
     }
 
@@ -148,7 +151,7 @@ mod test {
 
         let start_time = executor.now();
         let mut stalled_future =
-            futures::future::pending().on_timeout_named(&DEADLINE_ID, ONE_HOUR, || "timeout");
+            pin!(futures::future::pending().on_timeout_named(&DEADLINE_ID, ONE_HOUR, || "timeout"));
         assert!(executor.run_until_stalled(&mut stalled_future).is_pending());
         executor.set_fake_time(start_time + ONE_HOUR);
         assert_eq!(executor.wake_next_timer(), Some(start_time + ONE_HOUR));

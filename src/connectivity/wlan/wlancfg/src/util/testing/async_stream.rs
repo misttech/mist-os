@@ -32,13 +32,13 @@ where
     // Set an arbitrary timeout to catch the case where `result_fut` never provides a result.
     // Even a few milliseconds should be sufficient on all but the slowest hardware.
     const RESULT_TIMEOUT: zx::Duration = zx::Duration::from_seconds(5);
-    let result_fut_with_timeout = result_fut.on_timeout(RESULT_TIMEOUT, || {
+    let result_fut_with_timeout = pin!(result_fut.on_timeout(RESULT_TIMEOUT, || {
         panic!("Future failed to produce a result within {} seconds", RESULT_TIMEOUT.into_seconds())
-    });
+    }));
 
     // Advance both futures, with the expectation that only `result_fut` will finish.
     let mut select_fut = futures::future::select(background_fut, result_fut_with_timeout);
-    match exec.run_singlethreaded(&mut select_fut) {
+    match exec.run_singlethreaded(pin!(select_fut)) {
         Either::Left(_) => panic!("Background future finished"),
         Either::Right((result, _background_fut)) => result,
     }

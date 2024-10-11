@@ -168,7 +168,7 @@ const PCM_SAMPLE_SIZE: usize = 2;
 
 struct SilenceStream {
     pcm_format: PcmFormat,
-    next_frame_timer: fasync::Timer,
+    next_frame_timer: Pin<Box<fasync::Timer>>,
     /// the last time we delivered frames.
     last_frame_time: Option<zx::MonotonicInstant>,
 }
@@ -184,7 +184,8 @@ impl futures::Stream for SilenceStream {
         let last_time = self.last_frame_time.as_ref().unwrap().clone();
         let repeats = (now - last_time).into_seconds();
         if repeats == 0 {
-            self.next_frame_timer = fasync::Timer::new(last_time + zx::Duration::from_seconds(1));
+            self.next_frame_timer =
+                Box::pin(fasync::Timer::new(last_time + zx::Duration::from_seconds(1)));
             let poll = self.next_frame_timer.poll_unpin(cx);
             assert_eq!(Poll::Pending, poll);
             return Poll::Pending;
@@ -201,7 +202,7 @@ impl SilenceStream {
     fn build(pcm_format: PcmFormat) -> Self {
         Self {
             pcm_format,
-            next_frame_timer: fasync::Timer::new(fasync::MonotonicInstant::INFINITE_PAST),
+            next_frame_timer: Box::pin(fasync::Timer::new(fasync::MonotonicInstant::INFINITE_PAST)),
             last_frame_time: None,
         }
     }

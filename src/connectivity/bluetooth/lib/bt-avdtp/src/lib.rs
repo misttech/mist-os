@@ -291,7 +291,7 @@ impl Peer {
 /// A future representing the result of a AVDTP command. Decodes the response when it arrives.
 struct CommandResponseFut<D: Decodable> {
     id: SignalIdentifier,
-    fut: MaybeDone<OnTimeout<CommandResponse, fn() -> Result<Vec<u8>>>>,
+    fut: Pin<Box<MaybeDone<OnTimeout<CommandResponse, fn() -> Result<Vec<u8>>>>>>,
     _phantom: PhantomData<D>,
 }
 
@@ -303,7 +303,7 @@ impl<D: Decodable<Error = Error>> CommandResponseFut<D> {
             Err(e) => {
                 return Self {
                     id: SignalIdentifier::Abort,
-                    fut: MaybeDone::Done(Err(e)),
+                    fut: Box::pin(MaybeDone::Done(Err(e))),
                     _phantom: PhantomData,
                 }
             }
@@ -315,7 +315,7 @@ impl<D: Decodable<Error = Error>> CommandResponseFut<D> {
 
         Self {
             id: header.signal(),
-            fut: futures::future::maybe_done(timedout_fut),
+            fut: Box::pin(futures::future::maybe_done(timedout_fut)),
             _phantom: PhantomData,
         }
     }
@@ -326,9 +326,9 @@ impl<D: Decodable<Error = Error>> Future for CommandResponseFut<D> {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         ready!(self.fut.poll_unpin(cx));
-        let maybe_done = Pin::new(&mut self.fut);
         Poll::Ready(
-            maybe_done
+            self.fut
+                .as_mut()
                 .take_output()
                 .unwrap_or(Err(Error::AlreadyReceived))
                 .and_then(|buf| decode_signaling_response(self.id, buf)),

@@ -24,6 +24,7 @@ use futures::select;
 use futures::stream::{self, Fuse, FuturesUnordered, StreamExt, TryStreamExt};
 use std::convert::Infallible;
 use std::fmt::Debug;
+use std::pin::pin;
 use std::sync::Arc;
 use tracing::{info, warn};
 use wlan_common::channel::{Cbw, Channel};
@@ -445,10 +446,9 @@ async fn starting_state(
             // PHY associated with this AP interface is busy scanning.  A future attempt to start
             // may succeed.
             if remaining_retries > 0 {
-                let retry_timer = fasync::Timer::new(
+                let mut retry_timer = pin!(fasync::Timer::new(
                     zx::Duration::from_seconds(AP_START_RETRY_INTERVAL).after_now(),
-                );
-                let mut retry_timer = retry_timer.fuse();
+                ));
 
                 // To ensure that the state machine remains responsive, process any incoming
                 // requests while waiting for the timer to expire.

@@ -11,8 +11,9 @@ use fidl::endpoints::create_proxy;
 use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_fs::directory;
 use fuchsia_runtime::UtcInstant;
-use futures::{select, FutureExt, StreamExt, TryFutureExt};
+use futures::{select, StreamExt, TryFutureExt};
 use std::path::PathBuf;
+use std::pin::pin;
 use thiserror::Error;
 use tracing::{debug, error, warn};
 use {fidl_fuchsia_hardware_rtc as frtc, fidl_fuchsia_io as fio};
@@ -112,7 +113,7 @@ impl RtcImpl {
                     ))
                 })?
                 .fuse();
-            let mut timeout = fasync::Timer::new(RTC_DEVICE_OPEN_TIMEOUT).fuse();
+            let mut timeout = pin!(fasync::Timer::new(RTC_DEVICE_OPEN_TIMEOUT));
             select! {
                 device = rtc_devices.next() => {
                     match device {

@@ -716,6 +716,7 @@ mod tests {
     use super::*;
     use anyhow::anyhow;
     use fuchsia_async::{DurationExt, Timer};
+    use std::pin::pin;
 
     use futures::future::Either;
 
@@ -1033,7 +1034,7 @@ mod tests {
     ) -> Result<(), Error> {
         #[allow(clippy::never_loop)] // TODO(https://fxbug.dev/42177030)
         loop {
-            let timeout = Timer::new(zx::Duration::from_millis(5000_i64).after_now());
+            let timeout = pin!(Timer::new(zx::Duration::from_millis(5000_i64).after_now()));
             let either = futures::future::select(timeout, receiver.next());
             let resolved = either.await;
             match resolved {

@@ -7,7 +7,9 @@
 use fidl::endpoints::RequestStream;
 use fuchsia_sync::Mutex;
 use futures::channel::oneshot::{self, Receiver};
-use futures::{ready, FutureExt, Stream, StreamExt};
+use futures::{ready, Stream, StreamExt};
+use pin_project_lite::pin_project;
+use std::future::Future as _;
 use std::pin::Pin;
 use std::sync::{Arc, Weak};
 use std::task::{Context, Poll};
@@ -47,12 +49,15 @@ pub trait StreamAndControlHandle<RS, Item>: Stream<Item = Item> {
     fn control_handle(&self) -> WeakControlHandle<RS>;
 }
 
-/// The stream returned from [`until_stalled`].
-pub struct StallableRequestStream<RS, F> {
-    stream: Arc<Mutex<Option<RS>>>,
-    debounce_interval: Duration,
-    unbind_callback: Option<F>,
-    timer: Option<fasync::Timer>,
+pin_project! {
+    /// The stream returned from [`until_stalled`].
+    pub struct StallableRequestStream<RS, F> {
+        stream: Arc<Mutex<Option<RS>>>,
+        debounce_interval: Duration,
+        unbind_callback: Option<F>,
+        #[pin]
+        timer: Option<fasync::Timer>,
+    }
 }
 
 impl<RS, F> StallableRequestStream<RS, F> {
@@ -112,7 +117,7 @@ impl<RS: RequestStream + Unpin, F: FnOnce(Option<zx::Channel>) + Unpin> Stream
 {
     type Item = <RS as Stream>::Item;
 
-    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let poll_result = self
             .stream
             .as_ref()
@@ -120,28 +125,30 @@ impl<RS: RequestStream + Unpin, F: FnOnce(Option<zx::Channel>) + Unpin> Stream
             .as_mut()
             .expect("Stream already resolved")
             .poll_next_unpin(cx);
+        let mut this = self.project();
         match poll_result {
             Poll::Ready(message) => {
-                self.timer = None;
+                this.timer.set(None);
                 if message.is_none() {
-                    self.unbind_callback.take().unwrap()(None);
+                    this.unbind_callback.take().unwrap()(None);
                 }
                 Poll::Ready(message)
             }
             Poll::Pending => {
-                let debounce_interval = self.debounce_interval;
+                let debounce_interval = *this.debounce_interval;
                 loop {
-                    let timer =
-                        self.timer.get_or_insert_with(|| fasync::Timer::new(debounce_interval));
-                    ready!(timer.poll_unpin(cx));
-                    self.timer = None;
+                    if this.timer.is_none() {
+                        this.timer.set(Some(fasync::Timer::new(debounce_interval)));
+                    }
+                    ready!(this.timer.as_mut().as_pin_mut().unwrap().poll(cx));
+                    this.timer.set(None);
 
                     // Try and unbind, which will fail if there are outstanding responders or
                     // control handles.
-                    let (inner, is_terminated) = self.stream.lock().take().unwrap().into_inner();
+                    let (inner, is_terminated) = this.stream.lock().take().unwrap().into_inner();
                     match Arc::try_unwrap(inner) {
                         Ok(inner) => {
-                            self.unbind_callback.take().unwrap()(Some(
+                            this.unbind_callback.take().unwrap()(Some(
                                 inner.into_channel().into_zx_channel(),
                             ));
                             return Poll::Ready(None);
@@ -149,7 +156,7 @@ impl<RS: RequestStream + Unpin, F: FnOnce(Option<zx::Channel>) + Unpin> Stream
                         Err(inner) => {
                             // We can't unbind because there are outstanding responders or control
                             // handles, so we'll try again after another debounce interval.
-                            *self.stream.lock() = Some(RS::from_inner(inner, is_terminated));
+                            *this.stream.lock() = Some(RS::from_inner(inner, is_terminated));
                         }
                     }
                 }
@@ -165,7 +172,8 @@ mod tests {
     use fasync::TestExecutor;
     use fidl::endpoints::Proxy;
     use fidl::AsHandleRef;
-    use futures::{pin_mut, TryStreamExt};
+    use futures::{FutureExt, TryStreamExt};
+    use std::pin::pin;
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
 
     #[fuchsia::test(allow_stalls = false)]
@@ -177,7 +185,8 @@ mod tests {
 
         let (_proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
-        let (mut stream, stalled) = until_stalled(stream, idle_duration);
+        let (stream, stalled) = until_stalled(stream, idle_duration);
+        let mut stream = pin!(stream);
 
         assert_matches!(
             futures::join!(
@@ -204,7 +213,7 @@ mod tests {
 
         // The connection does not stall, because there is `strong_control_handle`.
         TestExecutor::advance_to(initial + idle_duration * 2).await;
-        let mut stream = stream.fuse();
+        let mut stream = pin!(stream.fuse());
         futures::select! {
             _ = stream.next() => unreachable!(),
             _ = stalled => unreachable!(),
@@ -231,11 +240,12 @@ mod tests {
 
         let (_proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
-        let (mut stream, stalled) = until_stalled(stream, idle_duration);
+        let (stream, stalled) = until_stalled(stream, idle_duration);
 
         // Just getting a weak control handle should not block the connection from stalling.
         let weak_control_handle = stream.control_handle();
 
+        let mut stream = pin!(stream);
         assert_matches!(
             futures::join!(
                 stream.next(),
@@ -256,15 +266,15 @@ mod tests {
 
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
-        let (mut stream, stalled) = until_stalled(stream, idle_duration);
+        let (stream, stalled) = until_stalled(stream, idle_duration);
 
-        pin_mut!(stalled);
+        let mut stalled = pin!(stalled);
         assert_matches!(TestExecutor::poll_until_stalled(&mut stalled).await, Poll::Pending);
 
         let _ = proxy.get_flags();
 
-        let message = stream.next();
-        pin_mut!(message);
+        let mut stream = pin!(stream);
+        let mut message = pin!(stream.next());
         // Reply to the request so that the stream doesn't have any pending replies.
         let message = TestExecutor::poll_until_stalled(&mut message).await;
         let Poll::Ready(Some(Ok(fio::DirectoryRequest::GetFlags { responder }))) = message else {
@@ -277,8 +287,7 @@ mod tests {
         assert!(TestExecutor::poll_until_stalled(&mut stalled).await.is_pending());
 
         // Poll the stream such that it is stalled.
-        let message = stream.next();
-        pin_mut!(message);
+        let mut message = pin!(stream.next());
         assert_matches!(TestExecutor::poll_until_stalled(&mut message).await, Poll::Pending);
         assert_matches!(TestExecutor::poll_until_stalled(&mut stalled).await, Poll::Pending);
 
@@ -299,7 +308,7 @@ mod tests {
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
         let (stream, mut stalled) = until_stalled(stream, idle_duration);
-        let mut stream = stream.fuse();
+        let mut stream = pin!(stream.fuse());
 
         let _ = proxy.get_flags();
 
@@ -343,11 +352,13 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
         let (mut stream, stalled) = until_stalled(stream, idle_duration);
 
-        pin_mut!(stalled);
+        let mut stalled = pin!(stalled);
         assert_matches!(TestExecutor::poll_until_stalled(&mut stalled).await, Poll::Pending);
 
         // Close the proxy such that the stream completes.
         drop(proxy);
+
+        let mut stream = pin!(stream);
 
         {
             // Read the `None` from the stream.
@@ -375,10 +386,11 @@ mod tests {
         const DURATION_NANOS: i64 = 40_000_000;
         let idle_duration = Duration::from_nanos(DURATION_NANOS);
         let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ServiceAMarker>().unwrap();
-        let (mut stream, stalled) = until_stalled(stream, idle_duration);
+        let (stream, stalled) = until_stalled(stream, idle_duration);
 
         // Launch a task that serves the stream.
         let task = fasync::Task::spawn(async move {
+            let mut stream = pin!(stream);
             while let Some(request) = stream.try_next().await.unwrap() {
                 match request {
                     ServiceARequest::Foo { responder } => responder.send().unwrap(),

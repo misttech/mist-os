@@ -597,7 +597,7 @@ mod tests {
                 },
                 async {
                     let mut fired = 0;
-                    let mut interval = Interval::new(zx::Duration::from_seconds(1));
+                    let mut interval = pin!(Interval::new(zx::Duration::from_seconds(1)));
                     while let Some(_) = interval.next().await {
                         fired += 1;
                         if fired == 3 {

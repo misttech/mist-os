@@ -11,16 +11,18 @@ use crate::runtime::{EHandle, MonotonicInstant, WakeupTime};
 use crate::PacketReceiver;
 use fuchsia_sync::Mutex;
 
+use futures::future::FusedFuture;
 use futures::stream::FusedStream;
 use futures::task::{AtomicWaker, Context};
 use futures::{FutureExt, Stream};
-use std::collections::BinaryHeap;
+use std::cell::UnsafeCell;
+use std::fmt;
 use std::future::Future;
+use std::marker::PhantomPinned;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Weak};
-use std::task::Poll;
-use std::{cmp, fmt};
+use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::Arc;
+use std::task::{ready, Poll, Waker};
 use zx::AsHandleRef as _;
 
 pub trait TimeInterface:
@@ -28,19 +30,29 @@ pub trait TimeInterface:
 {
     type Timeline: zx::Timeline + Send + Sync + 'static;
 
-    fn into_zx(self) -> zx::Instant<Self::Timeline>;
-    fn now() -> Self;
+    fn from_nanos(nanos: i64) -> Self;
+    fn into_nanos(self) -> i64;
+    fn zx_instant(nanos: i64) -> zx::Instant<Self::Timeline>;
+    fn now() -> i64;
 }
 
 impl TimeInterface for MonotonicInstant {
     type Timeline = zx::MonotonicTimeline;
 
-    fn into_zx(self) -> zx::MonotonicInstant {
-        self.into_zx()
+    fn from_nanos(nanos: i64) -> Self {
+        Self::from_nanos(nanos)
     }
 
-    fn now() -> Self {
-        EHandle::local().inner().now()
+    fn into_nanos(self) -> i64 {
+        self.into_nanos()
+    }
+
+    fn zx_instant(nanos: i64) -> zx::MonotonicInstant {
+        zx::MonotonicInstant::from_nanos(nanos)
+    }
+
+    fn now() -> i64 {
+        EHandle::local().inner().now().into_nanos()
     }
 }
 
@@ -65,92 +77,173 @@ impl WakeupTime for zx::MonotonicInstant {
 }
 
 /// An asynchronous timer.
-#[derive(Debug)]
 #[must_use = "futures do nothing unless polled"]
-pub struct Timer {
-    waker_and_bool: Arc<(AtomicWaker, AtomicBool)>,
-}
-
-impl Unpin for Timer {}
+pub struct Timer(TimerState);
 
 impl Timer {
     /// Create a new timer scheduled to fire at `time`.
-    pub fn new<WT>(time: WT) -> Self
-    where
-        WT: WakeupTime,
-    {
-        let waker_and_bool = Arc::new((AtomicWaker::new(), AtomicBool::new(false)));
-        let this = Timer { waker_and_bool };
-        EHandle::local().register_timer(time.into_time(), this.handle());
-        this
-    }
-
-    fn handle(&self) -> TimerHandle {
-        TimerHandle { inner: Arc::downgrade(&self.waker_and_bool) }
+    pub fn new(time: impl WakeupTime) -> Self {
+        EHandle::local().timers().new_timer(time)
     }
 
     /// Reset the `Timer` to a fire at a new time.
-    /// The `Timer` must have already fired since last being reset.
-    pub fn reset(&mut self, time: MonotonicInstant) {
-        assert!(self.did_fire());
-        self.waker_and_bool.1.store(false, Ordering::SeqCst);
-        EHandle::local().register_timer(time, self.handle());
+    pub fn reset(self: Pin<&mut Self>, time: MonotonicInstant) {
+        let nanos = time.into_nanos();
+        // This can be Relaxed because because there are no loads or stores that follow that could
+        // possibly be reordered before here that matter: the first thing `try_reset_timer` does is
+        // take a lock which will have its own memory barriers, and the store to the time is next
+        // going to be read by this same task prior to taking the lock in `Timers::inner`.
+        if self.0.state.load(Ordering::Relaxed) != REGISTERED
+            || !self.0.timers.try_reset_timer(&self.0, nanos)
+        {
+            // SAFETY: This is safe because we know the timer isn't registered which means we truly
+            // have exclusive access to TimerState.
+            unsafe { *self.0.nanos.get() = nanos };
+            self.0.state.store(0, Ordering::Relaxed);
+        }
     }
+}
 
-    fn did_fire(&self) -> bool {
-        self.waker_and_bool.1.load(Ordering::SeqCst)
+impl fmt::Debug for Timer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        f.debug_struct("Timer").field("time", &self.0.nanos).finish()
     }
+}
 
-    fn register_task(&self, cx: &mut Context<'_>) {
-        self.waker_and_bool.0.register(cx.waker());
+impl Drop for Timer {
+    fn drop(&mut self) {
+        self.0.timers.unregister(&self.0);
     }
 }
 
 impl Future for Timer {
     type Output = ();
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        // See https://docs.rs/futures/0.3.5/futures/task/struct.AtomicWaker.html
-        // for more information.
-        // quick check to avoid registration if already done.
-        if self.did_fire() {
-            return Poll::Ready(());
-        }
+        // SAFETY: We call `unregister` when `Timer` is dropped.
+        unsafe { self.0.timers.poll(self.as_ref(), cx) }
+    }
+}
 
-        self.register_task(cx);
+struct TimerState {
+    timers: Arc<dyn TimersInterface>,
 
-        // Need to check condition **after** `register` to avoid a race
-        // condition that would result in lost notifications.
-        if self.did_fire() {
-            Poll::Ready(())
+    // This is safe to access/mutate if the lock on `Timers::inner` is held.
+    nanos: UnsafeCell<i64>,
+
+    waker: AtomicWaker,
+    state: AtomicU8,
+
+    // Holds the index in the heap.  This is safe to access/mutate if the lock on `Timers::inner` is
+    // held.
+    index: UnsafeCell<HeapIndex>,
+
+    // StateRef stores a pointer to `TimerState`, so this must be pinned.
+    _pinned: PhantomPinned,
+}
+
+// SAFETY: TimerState is thread-safe.  See the safety comments elsewhere.
+unsafe impl Send for TimerState {}
+unsafe impl Sync for TimerState {}
+
+// Set when the timer is in the heap.
+const REGISTERED: u8 = 1;
+
+// Set when the timer has fired.
+const FIRED: u8 = 2;
+
+// Set when the timer is terminated.
+const TERMINATED: u8 = 3;
+
+/// An index in the heap.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct HeapIndex(usize);
+
+impl HeapIndex {
+    const NULL: HeapIndex = HeapIndex(usize::MAX);
+
+    fn get(&self) -> Option<usize> {
+        if *self == HeapIndex::NULL {
+            None
         } else {
-            Poll::Pending
+            Some(self.0)
         }
     }
 }
 
-pub(crate) struct TimerHandle {
-    inner: Weak<(AtomicWaker, AtomicBool)>,
+impl From<usize> for HeapIndex {
+    fn from(value: usize) -> Self {
+        Self(value)
+    }
 }
 
-impl TimerHandle {
-    fn is_defunct(&self) -> bool {
-        self.inner.upgrade().is_none()
+impl FusedFuture for Timer {
+    fn is_terminated(&self) -> bool {
+        self.0.state.load(Ordering::Relaxed) == TERMINATED
+    }
+}
+
+// A note on safety:
+//
+//  1. We remove the timer from the heap before we drop TimerState, and TimerState is pinned, so
+//     it's safe to store pointers in the heap i.e. the pointers are live since we make sure we
+//     remove them before dropping `TimerState`.
+//
+//  2. Provided we do #1, it is always safe to access the atomic fields of TimerState.
+//
+//  3. Once the timer has been registered, it is safe to access the non-atomic fields of TimerState
+//     whilst holding the lock on `Timers::inner`.
+#[derive(Copy, Clone, Debug)]
+struct StateRef(*const TimerState);
+
+// SAFETY: See the notes above regarding safety.
+unsafe impl Send for StateRef {}
+unsafe impl Sync for StateRef {}
+
+impl StateRef {
+    fn into_waker(self, _inner: &mut Inner) -> Option<Waker> {
+        // SAFETY: `inner` is locked.
+        unsafe {
+            let waker = (*self.0).waker.take();
+            // As soon as we do this, we no longer own the timer and it can be reused.  This is safe
+            // to be Relaxed.  It doesn't matter if the load and store of the waker is reordered
+            // past here because it can't move past when `inner` is unlocked, and the waker cannot
+            // be set again until the lock on `inner` is taken again if/when the timer is registered
+            // again.
+            (*self.0).state.store(FIRED, Ordering::Relaxed);
+            waker
+        }
     }
 
-    pub fn wake(&self) {
-        if let Some(wb) = self.inner.upgrade() {
-            wb.1.store(true, Ordering::SeqCst);
-            wb.0.wake();
-        }
+    // # Safety
+    //
+    // `Timers::inner` must be locked.
+    unsafe fn nanos(&self) -> i64 {
+        *(*self.0).nanos.get()
+    }
+
+    // # Safety
+    //
+    // `Timers::inner` must be locked.
+    unsafe fn nanos_mut(&mut self) -> &mut i64 {
+        &mut *(*self.0).nanos.get()
+    }
+
+    // # Safety
+    //
+    // `Timers::inner` must be locked.
+    unsafe fn set_index(&mut self, index: HeapIndex) -> HeapIndex {
+        std::mem::replace(&mut *(*self.0).index.get(), index)
     }
 }
 
 /// An asynchronous interval timer.
-/// This is a stream of events resolving at a rate of once-per interval.
+///
+/// This is a stream of events resolving at a rate of once-per interval.  This generates an event
+/// for *every* elapsed duration, even if multiple have elapsed since last polled.
 #[derive(Debug)]
 #[must_use = "streams do nothing unless polled"]
 pub struct Interval {
-    timer: Timer,
+    timer: Pin<Box<Timer>>,
     next: MonotonicInstant,
     duration: zx::Duration,
 }
@@ -159,11 +252,9 @@ impl Interval {
     /// Create a new `Interval` which yields every `duration`.
     pub fn new(duration: zx::Duration) -> Self {
         let next = MonotonicInstant::after(duration);
-        Interval { timer: Timer::new(next), next, duration }
+        Interval { timer: Box::pin(Timer::new(next)), next, duration }
     }
 }
-
-impl Unpin for Interval {}
 
 impl FusedStream for Interval {
     fn is_terminated(&self) -> bool {
@@ -175,48 +266,62 @@ impl FusedStream for Interval {
 impl Stream for Interval {
     type Item = ();
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let this = &mut *self;
-        match this.timer.poll_unpin(cx) {
-            Poll::Ready(()) => {
-                this.timer.register_task(cx);
-                this.next += this.duration;
-                this.timer.reset(this.next);
-                Poll::Ready(Some(()))
-            }
-            Poll::Pending => {
-                this.timer.register_task(cx);
-                Poll::Pending
-            }
-        }
+        ready!(self.timer.poll_unpin(cx));
+        let next = self.next + self.duration;
+        self.timer.as_mut().reset(next);
+        self.next = next;
+        Poll::Ready(Some(()))
     }
 }
 
-pub(crate) struct TimerHeap<T: TimeInterface> {
-    inner: Mutex<Inner<T>>,
-}
+pub(crate) struct Timers<T: TimeInterface> {
+    inner: Mutex<Inner>,
 
-struct Inner<T: TimeInterface> {
     // We can't easily use ReceiverRegistration because there would be a circular dependency we'd
-    // have to break: Executor -> TimerHeap -> ReceiverRegistration -> EHandle -> ScopeRef ->
+    // have to break: Executor -> Timers -> ReceiverRegistration -> EHandle -> ScopeRef ->
     // Executor, so instead we just store the port key and then change the executor to drop the
     // registration at the appropriate place.
     port_key: u64,
 
     fake: bool,
 
-    heap: BinaryHeap<TimeWaker<T>>,
-
-    // True if there's a pending async_wait.
-    async_wait: bool,
-
     timer: zx::Timer<T::Timeline>,
 }
 
-impl<T: TimeInterface> Inner<T> {
-    fn set_timer(&mut self, time: T) {
-        self.timer.set(time.into_zx(), Default::default()).unwrap();
+struct Inner {
+    timers: Heap,
 
-        if !self.async_wait {
+    // True if there's a pending async_wait.
+    async_wait: bool,
+}
+
+impl Timers<MonotonicInstant> {
+    pub fn new(port_key: u64, fake: bool) -> Self {
+        Self {
+            inner: Mutex::new(Inner { timers: Heap::default(), async_wait: false }),
+            port_key,
+            fake,
+            timer: zx::Timer::<zx::MonotonicTimeline>::create(),
+        }
+    }
+}
+
+impl<T: TimeInterface> Timers<T> {
+    fn new_timer(self: &Arc<Self>, time: impl WakeupTime) -> Timer {
+        Timer(TimerState {
+            timers: self.clone(),
+            nanos: UnsafeCell::new(time.into_time().into_nanos()),
+            waker: AtomicWaker::new(),
+            state: AtomicU8::new(0),
+            index: UnsafeCell::new(HeapIndex::NULL),
+            _pinned: PhantomPinned,
+        })
+    }
+
+    fn set_timer(&self, inner: &mut Inner, time: i64) {
+        self.timer.set(T::zx_instant(time), Default::default()).unwrap();
+
+        if !inner.async_wait {
             if self.fake {
                 // Clear the signal used for fake timers so that we can use it to trigger
                 // next time.
@@ -232,41 +337,12 @@ impl<T: TimeInterface> Inner<T> {
                 )
                 .unwrap();
 
-            self.async_wait = true;
+            inner.async_wait = true;
         }
     }
-}
 
-impl TimerHeap<MonotonicInstant> {
-    pub fn new(port_key: u64, fake: bool) -> Self {
-        Self {
-            inner: Mutex::new(Inner {
-                port_key,
-                fake,
-                heap: BinaryHeap::default(),
-                async_wait: false,
-                timer: zx::Timer::<zx::MonotonicTimeline>::create(),
-            }),
-        }
-    }
-}
-
-impl<T: TimeInterface> TimerHeap<T> {
     pub fn port_key(&self) -> u64 {
-        self.inner.lock().port_key
-    }
-
-    /// Adds a timer.
-    pub fn add_timer(&self, time: T, handle: TimerHandle) {
-        let mut inner = self.inner.lock();
-        if T::now() >= time {
-            handle.wake();
-            return;
-        }
-        if inner.heap.peek().map_or(true, |t| time < t.time) {
-            inner.set_timer(time);
-        }
-        inner.heap.push(TimeWaker { time, handle });
+        self.port_key
     }
 
     /// Wakes timers that should be firing now.  Returns true if any timers were woken.
@@ -278,31 +354,31 @@ impl<T: TimeInterface> TimerHeap<T> {
         let now = T::now();
         let mut timers_woken = false;
         loop {
-            let timer = {
+            let waker = {
                 let mut inner = self.inner.lock();
 
                 if from_receive_packet {
                     inner.async_wait = false;
                 }
 
-                while inner.heap.peek().map_or(false, |t| t.handle.is_defunct()) {
-                    inner.heap.pop();
-                }
-
-                match inner.heap.peek() {
-                    Some(t) => {
-                        if t.time <= now {
-                            inner.heap.pop().unwrap()
+                match inner.timers.peek() {
+                    Some(timer) => {
+                        // SAFETY: `inner` is locked.
+                        let nanos = unsafe { timer.nanos() };
+                        if nanos <= now {
+                            let timer = inner.timers.pop().unwrap();
+                            timer.into_waker(&mut inner)
                         } else {
-                            let time = t.time;
-                            inner.set_timer(time);
+                            self.set_timer(&mut inner, nanos);
                             break;
                         }
                     }
                     _ => break,
                 }
             };
-            timer.handle.wake();
+            if let Some(waker) = waker {
+                waker.wake()
+            }
             timers_woken = true;
         }
         timers_woken
@@ -310,36 +386,23 @@ impl<T: TimeInterface> TimerHeap<T> {
 
     /// Wakes the next timer and returns its time.
     pub fn wake_next_timer(&self) -> Option<T> {
-        let mut inner = self.inner.lock();
-        loop {
-            let timer = inner.heap.pop();
-            if let Some(timer) = timer {
-                if timer.handle.is_defunct() {
-                    continue;
-                }
-                std::mem::drop(inner);
-                timer.handle.wake();
-                return Some(timer.time);
-            } else {
-                return None;
-            }
+        let (nanos, waker) = {
+            let mut inner = self.inner.lock();
+            let Some(timer) = inner.timers.pop() else { return None };
+            // SAFETY: `inner` is locked.
+            let nanos = unsafe { timer.nanos() };
+            (nanos, timer.into_waker(&mut inner))
+        };
+        if let Some(waker) = waker {
+            waker.wake();
         }
+        Some(T::from_nanos(nanos))
     }
 
     /// Returns the next timer due to expire.
     pub fn next_timer(&self) -> Option<T> {
-        let mut inner = self.inner.lock();
-        loop {
-            if let Some(timer) = inner.heap.peek() {
-                if timer.handle.is_defunct() {
-                    inner.heap.pop();
-                    continue;
-                }
-                return Some(timer.time);
-            } else {
-                return None;
-            }
-        }
+        // SAFETY: `inner` is locked.
+        self.inner.lock().timers.peek().map(|state| T::from_nanos(unsafe { state.nanos() }))
     }
 
     /// If there's a timer ready, sends a notification to wake up the receiver.
@@ -348,48 +411,248 @@ impl<T: TimeInterface> TimerHeap<T> {
     ///
     /// This will panic if we are not using fake time.
     pub fn maybe_notify(&self, now: T) {
-        let inner = self.inner.lock();
-        assert!(inner.fake);
-        if inner.heap.peek().map_or(false, |t| t.time <= now) {
-            inner.timer.signal_handle(zx::Signals::empty(), zx::Signals::USER_0).unwrap();
+        assert!(self.fake);
+        // SAFETY: `inner` is locked.
+        if self
+            .inner
+            .lock()
+            .timers
+            .peek()
+            .map_or(false, |state| unsafe { state.nanos() } <= now.into_nanos())
+        {
+            self.timer.signal_handle(zx::Signals::empty(), zx::Signals::USER_0).unwrap();
         }
     }
 }
 
-impl<T: TimeInterface> PacketReceiver for TimerHeap<T> {
+impl<T: TimeInterface> PacketReceiver for Timers<T> {
     fn receive_packet(&self, _packet: zx::Packet) {
         self.wake_timers_impl(true);
     }
 }
 
-struct TimeWaker<T> {
-    time: T,
-    handle: TimerHandle,
+// See comments on the implementation below.
+trait TimersInterface: Send + Sync + 'static {
+    unsafe fn poll(&self, timer: Pin<&Timer>, cx: &mut Context<'_>) -> Poll<()>;
+    fn unregister(&self, state: &TimerState);
+    fn try_reset_timer(&self, timer: &TimerState, nanos: i64) -> bool;
 }
 
-impl<T: TimeInterface> Ord for TimeWaker<T> {
-    fn cmp(&self, other: &Self) -> cmp::Ordering {
-        self.time.cmp(&other.time).reverse() // Reverse to get min-heap rather than max
+impl<T: TimeInterface> TimersInterface for Timers<T> {
+    // # Safety
+    //
+    // `unregister` must be called before `Timer` is dropped.
+    unsafe fn poll(&self, timer: Pin<&Timer>, cx: &mut Context<'_>) -> Poll<()> {
+        // See https://docs.rs/futures/0.3.5/futures/task/struct.AtomicWaker.html
+        // for more information.
+        // Quick check to avoid registration if already done.
+        //
+        // This is safe to be Relaxed because `AtomicWaker::register` has barriers which means that
+        // the load further down can't be moved before registering the waker, which means we can't
+        // miss the timer firing.  If the timer isn't registered, the time might have been reset but
+        // that would have been by the same task, so there should be no ordering issue there.  If we
+        // then try and register the timer, we take the lock on `inner` so there will be barriers
+        // there.
+        let state = timer.0.state.load(Ordering::Relaxed);
+
+        if state == TERMINATED {
+            return Poll::Ready(());
+        }
+
+        if state == FIRED {
+            timer.0.state.store(TERMINATED, Ordering::Relaxed);
+            return Poll::Ready(());
+        }
+
+        if state == 0 {
+            // SAFETY: The state is 0, so we have exclusive access.
+            let nanos = unsafe { *timer.0.nanos.get() };
+            if nanos <= T::now() {
+                timer.0.state.store(FIRED, Ordering::Relaxed);
+                return Poll::Ready(());
+            }
+            let mut inner = self.inner.lock();
+            // SAFETY: `inner` is locked.
+            if inner.timers.peek().map_or(true, |s| nanos < unsafe { s.nanos() }) {
+                self.set_timer(&mut inner, nanos);
+            }
+
+            // We store a pointer to `timer` here. This is safe to do because `timer` is pinned, and
+            // we always make sure we call `unregister` before `timer` is dropped.
+            inner.timers.push(StateRef(&timer.0));
+
+            timer.0.state.store(REGISTERED, Ordering::Relaxed);
+        }
+
+        timer.0.waker.register(cx.waker());
+
+        // Need to check condition **after** `register` to avoid a race
+        // condition that would result in lost notifications.
+        if timer.0.state.load(Ordering::Relaxed) == FIRED {
+            timer.0.state.store(TERMINATED, Ordering::Relaxed);
+            Poll::Ready(())
+        } else {
+            Poll::Pending
+        }
+    }
+
+    fn unregister(&self, timer: &TimerState) {
+        // This is safe to be Relaxed because we take the lock on `inner` immediately afterwards
+        // which will include a barrier.
+        if timer.state.load(Ordering::Relaxed) != REGISTERED {
+            return;
+        }
+        let mut inner = self.inner.lock();
+        // SAFETY: `inner` is locked.
+        let index = unsafe { *timer.index.get() };
+        if let Some(index) = index.get() {
+            inner.timers.remove(index);
+            if index == 0 {
+                match inner.timers.peek() {
+                    Some(next) => {
+                        // SAFETY: `inner` is locked.
+                        let nanos = unsafe { next.nanos() };
+                        self.set_timer(&mut inner, nanos);
+                    }
+                    None => self.timer.cancel().unwrap(),
+                }
+            }
+            timer.state.store(0, Ordering::Relaxed);
+        } else {
+            // We must have raced.
+            assert_eq!(timer.state.load(Ordering::Relaxed), FIRED);
+        }
+    }
+
+    /// Returns true if the timer was successfully reset.
+    fn try_reset_timer(&self, timer: &TimerState, nanos: i64) -> bool {
+        let mut inner = self.inner.lock();
+        // SAFETY: `inner` is locked.
+        let index = unsafe { *timer.index.get() };
+        if let Some(index) = index.get() {
+            if inner.timers.reset(index, nanos) == 0 && index != 0 {
+                self.set_timer(&mut inner, nanos);
+            }
+            timer.state.store(REGISTERED, Ordering::Relaxed);
+            true
+        } else {
+            false
+        }
     }
 }
 
-impl<T: TimeInterface> PartialOrd for TimeWaker<T> {
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
+#[derive(Default)]
+struct Heap(Vec<StateRef>);
 
-impl<T: TimeInterface> PartialEq for TimeWaker<T> {
-    /// BinaryHeap requires `TimeWaker: Ord` above so that there's a total ordering between
-    /// elements, and `T: Ord` requires `T: Eq` even we don't actually need to check these for
-    /// equality. We could use `Weak::ptr_eq` to check the handles here, but then that would cause
-    /// the `PartialEq` implementation to return false in some cases where `Ord` returns
-    /// `Ordering::Equal`, which is asking for logic errors down the line.
-    fn eq(&self, other: &Self) -> bool {
-        self.time == other.time
+// BinaryHeap doesn't support removal, and BTreeSet ends up increasing binary size significantly,
+// so we roll our own binary heap.
+impl Heap {
+    fn push(&mut self, mut timer: StateRef) {
+        let index = self.0.len();
+        self.0.push(timer);
+        // SAFETY: `inner` is locked.
+        unsafe {
+            timer.set_index(index.into());
+        }
+        self.fix_up(index);
+    }
+
+    fn peek(&self) -> Option<&StateRef> {
+        self.0.first()
+    }
+
+    fn pop(&mut self) -> Option<StateRef> {
+        if let Some(&first) = self.0.first() {
+            self.remove(0);
+            Some(first)
+        } else {
+            None
+        }
+    }
+
+    fn swap(&mut self, a: usize, b: usize) {
+        self.0.swap(a, b);
+        // SAFETY: `inner` is locked.
+        unsafe {
+            self.0[a].set_index(a.into());
+            self.0[b].set_index(b.into());
+        }
+    }
+
+    /// Resets the timer at the given index to the new time and returns the new index.
+    fn reset(&mut self, index: usize, nanos: i64) -> usize {
+        // SAFETY: `inner` is locked.
+        if nanos < std::mem::replace(unsafe { self.0[index].nanos_mut() }, nanos) {
+            self.fix_up(index)
+        } else {
+            self.fix_down(index)
+        }
+    }
+
+    fn remove(&mut self, index: usize) {
+        // SAFETY: `inner` is locked.
+        unsafe {
+            let old_index = self.0[index].set_index(HeapIndex::NULL);
+            debug_assert_eq!(old_index, index.into());
+        }
+        let last = self.0.len() - 1;
+
+        if index < last {
+            self.0[index] = self.0[last];
+            // SAFETY: `inner` is locked.
+            unsafe {
+                self.0[index].set_index(index.into());
+            }
+        }
+        self.0.truncate(last);
+        self.fix_down(index);
+    }
+
+    /// Returns the new index
+    fn fix_up(&mut self, mut index: usize) -> usize {
+        while index > 0 {
+            let parent = (index - 1) / 2;
+            // SAFETY: `inner` is locked.
+            if unsafe { self.0[parent].nanos() <= self.0[index].nanos() } {
+                return index;
+            }
+            self.swap(parent, index);
+            index = parent;
+        }
+        index
+    }
+
+    /// Returns the new index
+    fn fix_down(&mut self, mut index: usize) -> usize {
+        let len = self.0.len();
+        loop {
+            let left = index * 2 + 1;
+            if left >= len {
+                return index;
+            }
+
+            let mut swap_with = None;
+
+            // SAFETY: `inner` is locked.
+            unsafe {
+                let mut nanos = self.0[index].nanos();
+                let left_nanos = self.0[left].nanos();
+                if left_nanos < nanos {
+                    swap_with = Some(left);
+                    nanos = left_nanos;
+                }
+                let right = left + 1;
+                if right < len && self.0[right].nanos() < nanos {
+                    swap_with = Some(right);
+                }
+            }
+
+            let Some(swap_with) = swap_with else { return index };
+            self.swap(index, swap_with);
+            index = swap_with;
+        }
     }
 }
-impl<T: TimeInterface> Eq for TimeWaker<T> {}
 
 #[cfg(test)]
 mod test {
@@ -398,13 +661,16 @@ mod test {
     use assert_matches::assert_matches;
     use futures::future::Either;
     use futures::prelude::*;
+    use rand::seq::SliceRandom;
+    use rand::{thread_rng, Rng};
+    use std::pin::pin;
     use zx::Duration;
 
     #[test]
     fn shorter_fires_first() {
         let mut exec = LocalExecutor::new();
-        let shorter = Timer::new(MonotonicInstant::after(Duration::from_millis(100)));
-        let longer = Timer::new(MonotonicInstant::after(Duration::from_seconds(1)));
+        let shorter = pin!(Timer::new(MonotonicInstant::after(Duration::from_millis(100))));
+        let longer = pin!(Timer::new(MonotonicInstant::after(Duration::from_seconds(1))));
         match exec.run_singlethreaded(future::select(shorter, longer)) {
             Either::Left(_) => {}
             Either::Right(_) => panic!("wrong timer fired"),
@@ -413,13 +679,14 @@ mod test {
 
     #[test]
     fn shorter_fires_first_multithreaded() {
-        let mut exec = SendExecutor::new(4);
-        let shorter = Timer::new(MonotonicInstant::after(Duration::from_millis(100)));
-        let longer = Timer::new(MonotonicInstant::after(Duration::from_seconds(1)));
-        match exec.run(future::select(shorter, longer)) {
-            Either::Left(_) => {}
-            Either::Right(_) => panic!("wrong timer fired"),
-        }
+        SendExecutor::new(4).run(async {
+            let shorter = pin!(Timer::new(MonotonicInstant::after(Duration::from_millis(100))));
+            let longer = pin!(Timer::new(MonotonicInstant::after(Duration::from_seconds(1))));
+            match future::select(shorter, longer).await {
+                Either::Left(_) => {}
+                Either::Right(_) => panic!("wrong timer fired"),
+            }
+        });
     }
 
     #[test]
@@ -427,7 +694,7 @@ mod test {
         let mut exec = TestExecutor::new_with_fake_time();
         exec.set_fake_time(MonotonicInstant::from_nanos(0));
         let deadline = MonotonicInstant::after(Duration::from_seconds(5));
-        let mut future = Timer::new(deadline);
+        let mut future = pin!(Timer::new(deadline));
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut future));
         exec.set_fake_time(deadline);
         assert_eq!(Poll::Ready(()), exec.run_until_stalled(&mut future));
@@ -437,8 +704,8 @@ mod test {
     fn timer_before_now_fires_immediately() {
         let mut exec = TestExecutor::new();
         let now = MonotonicInstant::now();
-        let before = Timer::new(now - Duration::from_nanos(1));
-        let after = Timer::new(now + Duration::from_nanos(1));
+        let before = pin!(Timer::new(now - Duration::from_nanos(1)));
+        let after = pin!(Timer::new(now + Duration::from_nanos(1)));
         assert_matches!(
             exec.run_singlethreaded(futures::future::select(before, after)),
             Either::Left(_),
@@ -453,14 +720,14 @@ mod test {
         exec.set_fake_time(start);
 
         let counter = Arc::new(::std::sync::atomic::AtomicUsize::new(0));
-        let mut future = {
+        let mut future = pin!({
             let counter = counter.clone();
             Interval::new(Duration::from_seconds(5))
                 .map(move |()| {
                     counter.fetch_add(1, Ordering::SeqCst);
                 })
                 .collect::<()>()
-        };
+        });
 
         // PollResult for the first time before the timer runs
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut future));
@@ -491,10 +758,92 @@ mod test {
         let mut exec = TestExecutor::new_with_fake_time();
         exec.set_fake_time(MonotonicInstant::from_nanos(0));
 
-        let mut timer = Timer::new(MonotonicInstant::after(Duration::from_seconds(1)));
+        let mut timer = pin!(Timer::new(MonotonicInstant::after(Duration::from_seconds(1))));
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut timer));
 
         exec.set_fake_time(MonotonicInstant::after(Duration::from_seconds(1)));
         assert_eq!(Poll::Ready(()), exec.run_until_stalled(&mut timer));
+    }
+
+    fn create_timers(
+        timers: &Arc<Timers<MonotonicInstant>>,
+        nanos: &[i64],
+        timer_futures: &mut Vec<Pin<Box<Timer>>>,
+    ) {
+        let waker = futures::task::noop_waker();
+        let mut cx = Context::from_waker(&waker);
+        for &n in nanos {
+            let mut timer = Box::pin(timers.new_timer(MonotonicInstant::from_nanos(n)));
+            let _ = timer.poll_unpin(&mut cx);
+            timer_futures.push(timer);
+        }
+    }
+
+    #[test]
+    fn timer_heap() {
+        let _exec = TestExecutor::new_with_fake_time();
+        let timers = Arc::new(Timers::new(0, true));
+
+        let mut timer_futures = Vec::new();
+        let mut nanos: Vec<_> = (0..1000).collect();
+        let mut rng = thread_rng();
+        nanos.shuffle(&mut rng);
+
+        create_timers(&timers, &nanos, &mut timer_futures);
+
+        // Make sure the timers fire in the correct order.
+        for i in 0..1000 {
+            assert_eq!(timers.wake_next_timer(), Some(MonotonicInstant::from_nanos(i)));
+        }
+
+        timer_futures.clear();
+        create_timers(&timers, &nanos, &mut timer_futures);
+
+        // Remove them in random order.
+        timer_futures.shuffle(&mut rng);
+        for _timer_fut in timer_futures.drain(..) {}
+
+        assert_eq!(timers.wake_next_timer(), None);
+
+        create_timers(&timers, &nanos, &mut timer_futures);
+
+        // Replace them all in random order.
+        timer_futures.shuffle(&mut rng);
+        let mut nanos: Vec<_> = (1000..2000).collect();
+        nanos.shuffle(&mut rng);
+
+        for (fut, n) in timer_futures.iter_mut().zip(nanos) {
+            fut.as_mut().reset(MonotonicInstant::from_nanos(n));
+        }
+
+        // Check they all get changed and now fire in the correct order.
+        for i in 1000..2000 {
+            assert_eq!(timers.wake_next_timer(), Some(MonotonicInstant::from_nanos(i)));
+        }
+    }
+
+    #[test]
+    fn timer_heap_with_same_time() {
+        let _exec = TestExecutor::new_with_fake_time();
+        let timers = Arc::new(Timers::new(0, true));
+
+        let mut timer_futures = Vec::new();
+        let mut nanos: Vec<_> = (1..100).collect();
+        let mut rng = thread_rng();
+        nanos.shuffle(&mut rng);
+
+        create_timers(&timers, &nanos, &mut timer_futures);
+
+        // Create some timers with the same time.
+        let time = rng.gen_range(0..101);
+        let same_time = [time; 100];
+        create_timers(&timers, &same_time, &mut timer_futures);
+
+        nanos.extend(&same_time);
+        nanos.sort();
+
+        for n in nanos {
+            assert_eq!(timers.wake_next_timer(), Some(MonotonicInstant::from_nanos(n)));
+        }
     }
 }

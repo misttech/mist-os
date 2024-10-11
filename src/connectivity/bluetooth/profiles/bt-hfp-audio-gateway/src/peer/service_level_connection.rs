@@ -257,7 +257,7 @@ pub struct ServiceLevelConnection {
     unparsed_bytes: DeserializeBytes,
     /// The SlcRequests that have not yet been processed.
     unprocessed_slc_requests: VecDeque<SlcRequest>,
-    initialization_timeout: Option<Timer>,
+    initialization_timeout: Option<Pin<Box<Timer>>>,
     inspect: ServiceLevelConnectionInspect,
 }
 
@@ -293,7 +293,7 @@ impl ServiceLevelConnection {
 
     pub fn with_init_timeout(timeout: Timer) -> Self {
         let mut conn = Self::new();
-        conn.initialization_timeout = Some(timeout);
+        conn.initialization_timeout = Some(Box::pin(timeout));
         conn
     }
 

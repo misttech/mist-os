@@ -360,9 +360,9 @@ fn add_phy(exec: &mut TestExecutor, test_values: &mut TestValues) {
         }
     );
 
-    exec.run_singlethreaded(
-        &mut add_phy_fut.expect_within(zx::Duration::from_seconds(5), "future didn't complete"),
-    );
+    exec.run_singlethreaded(pin!(
+        add_phy_fut.expect_within(zx::Duration::from_seconds(5), "future didn't complete")
+    ));
 }
 
 fn security_support_with_wpa3() -> fidl_common::SecuritySupport {

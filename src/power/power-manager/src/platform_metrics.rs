@@ -1159,6 +1159,10 @@ mod tests {
                 msg_ok_return!(ReadTemperature(temperature)),
             ));
 
+            // Timers aren't registered until they're polled so run the executor first before waking
+            // the next timer.
+            assert!(executor.run_until_stalled(&mut futures_out).is_pending());
+
             assert_eq!(executor.wake_next_timer().unwrap(), (current_time + Seconds(1.0)).into());
             current_time += Seconds(1.0);
             executor.set_fake_time(current_time.into());

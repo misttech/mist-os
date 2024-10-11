@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::super::timer::{TimerHandle, TimerHeap};
+use super::super::timer::Timers;
 use super::packets::{PacketReceiver, PacketReceiverMap, ReceiverRegistration};
 use super::scope::ScopeRef;
 use super::time::MonotonicInstant;
@@ -60,7 +60,7 @@ static ACTIVE_EXECUTORS: AtomicUsize = AtomicUsize::new(0);
 
 pub(crate) struct Executor {
     pub(super) port: zx::Port,
-    monotonic_timers: Arc<TimerHeap<MonotonicInstant>>,
+    monotonic_timers: Arc<Timers<MonotonicInstant>>,
     pub(super) done: AtomicBool,
     is_local: bool,
     receivers: Mutex<PacketReceiverMap<Arc<dyn PacketReceiver>>>,
@@ -84,7 +84,7 @@ impl Executor {
 
         let mut receivers: PacketReceiverMap<Arc<dyn PacketReceiver>> = PacketReceiverMap::new();
         let monotonic_timers = receivers.insert(|key| {
-            let timers = Arc::new(TimerHeap::new(key, matches!(time, ExecutorTime::FakeTime(_))));
+            let timers = Arc::new(Timers::new(key, matches!(time, ExecutorTime::FakeTime(_))));
             (timers.clone(), timers)
         });
 
@@ -512,7 +512,7 @@ impl Executor {
     }
 
     /// Returns the monotonic timers.
-    pub fn monotonic_timers(&self) -> &TimerHeap<MonotonicInstant> {
+    pub fn monotonic_timers(&self) -> &Timers<MonotonicInstant> {
         &self.monotonic_timers
     }
 }
@@ -595,11 +595,6 @@ impl EHandle {
         }
     }
 
-    pub(crate) fn register_timer(&self, time: MonotonicInstant, handle: TimerHandle) {
-        let executor = self.root_scope.executor();
-        executor.monotonic_timers.add_timer(time, handle);
-    }
-
     /// See `Inner::spawn`.
     pub(crate) fn spawn<R: Send + 'static>(
         &self,
@@ -633,6 +628,10 @@ impl EHandle {
     /// this executor is a LocalExecutor.
     pub fn spawn_local_detached(&self, future: impl Future<Output = ()> + 'static) {
         self.inner().spawn_local(self.root_scope(), future, true);
+    }
+
+    pub(crate) fn timers(&self) -> &Arc<Timers<MonotonicInstant>> {
+        &self.inner().monotonic_timers
     }
 }
 

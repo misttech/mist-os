@@ -6,6 +6,7 @@ use fidl_fidl_test_components::{TriggerMarker, TriggerRequestStream};
 use fuchsia_async as fasync;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use futures::{StreamExt, TryStreamExt};
+use std::pin::pin;
 
 /// See the `stop_with_delivery_on_readable_request` test case.
 #[fuchsia::main]
@@ -21,8 +22,8 @@ pub async fn main() {
 }
 
 async fn handle_trigger(stream: TriggerRequestStream) {
-    let (mut stream, stalled) =
-        detect_stall::until_stalled(stream, fasync::Duration::from_micros(1));
+    let (stream, stalled) = detect_stall::until_stalled(stream, fasync::Duration::from_micros(1));
+    let mut stream = pin!(stream);
     while let Ok(Some(request)) = stream.try_next().await {
         match request {
             fidl_fidl_test_components::TriggerRequest::Run { responder } => {

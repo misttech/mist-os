@@ -247,7 +247,7 @@ async fn handle_passthrough_command<'a>(
 ) -> Result<(), Error> {
     // Passthrough commands need to be handled in 100ms
     let timer =
-        fasync::Timer::new(fasync::MonotonicInstant::after(Duration::from_millis(100))).fuse();
+        pin!(fasync::Timer::new(fasync::MonotonicInstant::after(Duration::from_millis(100))));
 
     // As per Table 9.27 in AV/C 4.0, send back the state_flag, operation_id, and operation_data.
     let buf: Vec<u8> = command.body().to_vec();

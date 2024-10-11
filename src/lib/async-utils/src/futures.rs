@@ -8,11 +8,14 @@ use std::pin::Pin;
 
 use futures::future::FusedFuture;
 use futures::{task, Future};
+use pin_project::pin_project;
 
 /// Future for the [`FutureExt::replace_value`] method.
 #[derive(Debug)]
 #[must_use = "futures do nothing unless you `.await` or poll them"]
+#[pin_project]
 pub struct ReplaceValue<Fut: Future<Output = ()>, T> {
+    #[pin]
     future: Fut,
     value: Option<T>,
 }
@@ -46,14 +49,16 @@ impl<Fut: Future<Output = ()>, T> ReplaceValue<Fut, T> {
 
 impl<T: ?Sized + Future<Output = ()>> FutureExt for T {}
 
-impl<Fut: Future<Output = ()> + Unpin, T: Unpin> Future for ReplaceValue<Fut, T> {
+impl<Fut: Future<Output = ()>, T: Unpin> Future for ReplaceValue<Fut, T> {
     type Output = T;
 
     fn poll(self: Pin<&mut Self>, cx: &mut task::Context<'_>) -> task::Poll<Self::Output> {
-        let Self { future, value } = self.get_mut();
-        let () = futures::ready!(Pin::new(future).poll(cx));
+        let this = self.project();
+        let () = futures::ready!(this.future.poll(cx));
         task::Poll::Ready(
-            value.take().expect("ReplaceValue must not be polled after it returned `Poll::Ready`"),
+            this.value
+                .take()
+                .expect("ReplaceValue must not be polled after it returned `Poll::Ready`"),
         )
     }
 }

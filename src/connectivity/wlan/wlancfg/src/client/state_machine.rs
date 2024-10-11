@@ -22,10 +22,11 @@ use fuchsia_inspect::{Node as InspectNode, StringReference};
 use fuchsia_inspect_contrib::inspect_insert;
 use fuchsia_inspect_contrib::log::WriteInspect;
 use futures::channel::{mpsc, oneshot};
-use futures::future::{Fuse, FutureExt};
+use futures::future::FutureExt;
 use futures::select;
 use futures::stream::{self, StreamExt, TryStreamExt};
 use std::convert::Infallible;
+use std::pin::Pin;
 use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 use wlan_common::bss::BssDescription;
@@ -611,8 +612,8 @@ struct ConnectedOptions {
     tracked_signals: HistoricalList<types::TimestampedSignal>,
     roam_monitor_sender: RoamDataSender,
     roam_receiver: mpsc::Receiver<types::ScannedCandidate>,
-    post_connect_metric_timer: Fuse<fasync::Timer>,
-    bss_connect_duration_metric_timer: Fuse<fasync::Timer>,
+    post_connect_metric_timer: Pin<Box<fasync::Timer>>,
+    bss_connect_duration_metric_timer: Pin<Box<fasync::Timer>>,
 }
 impl ConnectedOptions {
     pub fn new(
@@ -654,14 +655,12 @@ impl ConnectedOptions {
             tracked_signals: HistoricalList::new(NUM_PAST_SCORES),
             roam_monitor_sender,
             roam_receiver,
-            post_connect_metric_timer: fasync::Timer::new(
+            post_connect_metric_timer: Box::pin(fasync::Timer::new(
                 AVERAGE_SCORE_DELTA_MINIMUM_DURATION.after_now(),
-            )
-            .fuse(),
-            bss_connect_duration_metric_timer: fasync::Timer::new(
+            )),
+            bss_connect_duration_metric_timer: Box::pin(fasync::Timer::new(
                 METRICS_SHORT_CONNECT_DURATION.after_now(),
-            )
-            .fuse(),
+            )),
         }
     }
 }
@@ -1113,9 +1112,9 @@ fn update_internal_state_on_roam_success(
         signal: options.initial_signal,
     });
     options.post_connect_metric_timer =
-        fasync::Timer::new(AVERAGE_SCORE_DELTA_MINIMUM_DURATION.after_now()).fuse();
+        Box::pin(fasync::Timer::new(AVERAGE_SCORE_DELTA_MINIMUM_DURATION.after_now()));
     options.bss_connect_duration_metric_timer =
-        fasync::Timer::new(METRICS_SHORT_CONNECT_DURATION.after_now()).fuse();
+        Box::pin(fasync::Timer::new(METRICS_SHORT_CONNECT_DURATION.after_now()));
     // Re-initialize roam monitor for new BSS
     (options.roam_monitor_sender, options.roam_receiver) =
         common_options.roam_manager.initialize_roam_monitor(

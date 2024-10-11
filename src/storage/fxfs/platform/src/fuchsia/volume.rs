@@ -31,6 +31,7 @@ use fxfs::object_store::directory::{replace_child_with_object, Directory};
 use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
 use fxfs::object_store::{HandleOptions, HandleOwner, ObjectDescriptor, ObjectStore, Timestamp};
 use std::future::Future;
+use std::pin::pin;
 use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 use vfs::directory::entry::DirectoryEntry;
@@ -489,7 +490,7 @@ impl FxVolume {
         // Default to the normal period until updates come from the `level_stream`.
         let mut level = MemoryPressureLevel::Normal;
         let mut timer =
-            fasync::Timer::new(config.for_level(&level).background_task_initial_delay).fuse();
+            pin!(fasync::Timer::new(config.for_level(&level).background_task_initial_delay));
 
         loop {
             let mut should_terminate = false;
@@ -509,9 +510,7 @@ impl FxVolume {
                     if new_level != level {
                         level = new_level;
                         should_update_cache_limit = true;
-                        timer =
-                            fasync::Timer::new(config.for_level(&level).background_task_period)
-                            .fuse();
+                        timer.as_mut().reset(fasync::MonotonicInstant::after(config.for_level(&level).background_task_period.into()));
                         debug!(
                             "Background task period changed to {:?} due to new memory pressure \
                             level ({:?}).",
@@ -520,8 +519,7 @@ impl FxVolume {
                     }
                 }
                 _ = timer => {
-                    timer =
-                        fasync::Timer::new(config.for_level(&level).background_task_period).fuse();
+                    timer.as_mut().reset(fasync::MonotonicInstant::after(config.for_level(&level).background_task_period.into()));
                     should_flush = true;
                     // Only purge layer file caches once we have elevated memory pressure.
                     should_purge_layer_files = !matches!(level, MemoryPressureLevel::Normal);

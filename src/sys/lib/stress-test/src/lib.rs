@@ -16,6 +16,7 @@ use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
+use std::pin::pin;
 use std::time::Duration;
 use tracing::{error, info};
 
@@ -64,8 +65,8 @@ pub async fn run_test<E: 'static + Environment>(mut env: E) {
     let (counter_task, counter_tx) = start_counter(target_operations);
 
     // Create a timeout task
-    let timeout = Timer::new(MonotonicInstant::after(timeout_secs.into()));
-    let mut test_end = select(counter_task, timeout);
+    let timeout = pin!(Timer::new(MonotonicInstant::after(timeout_secs.into())));
+    let mut test_end = pin!(select(counter_task, timeout));
 
     // A monotonically increasing counter representing the current generation.
     // On every environment reset, the generation is incremented.

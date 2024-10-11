@@ -758,7 +758,8 @@ async fn wait_for_view_controller_close_or_timeout(
     proxy: felement::ViewControllerProxy,
     timeout: fasync::Timer,
 ) {
-    let _ = futures::future::select(timeout, Box::pin(wait_for_view_controller_close(proxy))).await;
+    let _ = futures::future::select(pin!(timeout), Box::pin(wait_for_view_controller_close(proxy)))
+        .await;
 }
 
 /// Handles element Controller protocol requests.

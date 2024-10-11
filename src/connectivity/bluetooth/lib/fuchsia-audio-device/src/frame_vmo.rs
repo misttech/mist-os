@@ -6,6 +6,7 @@ use fidl_fuchsia_hardware_audio::*;
 use fuchsia_async as fasync;
 use futures::task::{Context, Poll, Waker};
 use futures::FutureExt;
+use std::pin::Pin;
 use tracing::debug;
 use zx::{self as zx, HandleBased};
 
@@ -34,7 +35,7 @@ pub(crate) struct FrameVmo {
     waker: Option<Waker>,
 
     /// A timer which will fire when there are enough frames to return min_duration frames.
-    timer: Option<fasync::Timer>,
+    timer: Option<Pin<Box<fasync::Timer>>>,
 
     /// The number of frames per second.
     frames_per_second: u32,
@@ -147,7 +148,7 @@ impl FrameVmo {
         deadline: fasync::MonotonicInstant,
         cx: &mut Context<'_>,
     ) -> Poll<()> {
-        let mut timer = fasync::Timer::new(deadline);
+        let mut timer = Box::pin(fasync::Timer::new(deadline));
         let Poll::Pending = timer.poll_unpin(cx) else {
             return Poll::Ready(());
         };
