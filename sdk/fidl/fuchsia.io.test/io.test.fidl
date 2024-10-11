@@ -57,6 +57,9 @@ type HarnessConfig = struct {
 
     /// Directories support creating files, Rename, Link, and Unlink.
     supports_modify_directory bool;
+
+    /// Supports services.
+    supports_services bool;
 };
 
 /// Directory entries should support opening with any combination of read/write/execute rights.
@@ -125,5 +128,12 @@ closed protocol TestHarness {
         root Directory;
         flags fuchsia.io.OpenFlags;
         directory_request server_end:fuchsia.io.Directory;
+    });
+
+    /// Serves a service directory that contains a fuchsia.test.placeholders/Echo instance.
+    /// The test harness must have `supports_services` reported in it's config to use this method,
+    /// and the service instance should match the discoverable protocol name.
+    strict GetServiceDir() -> (resource struct {
+        svc_dir client_end:fuchsia.io.Directory;
     });
 };

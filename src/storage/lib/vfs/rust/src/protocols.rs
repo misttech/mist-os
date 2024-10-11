@@ -296,7 +296,13 @@ impl ProtocolsExt for fio::Flags {
         if !self.difference(fio::Flags::PROTOCOL_SERVICE).is_empty()
             && !self.contains(fio::Flags::PROTOCOL_NODE)
         {
-            return Err(Status::INVALID_ARGS);
+            return if self.is_dir_allowed() {
+                Err(Status::NOT_DIR)
+            } else if self.is_file_allowed() {
+                Err(Status::NOT_FILE)
+            } else {
+                Err(Status::WRONG_TYPE)
+            };
         }
 
         Ok(ServiceOptions)

@@ -29,6 +29,9 @@
 namespace fio = fuchsia_io;
 namespace fio_test = fuchsia_io_test;
 
+namespace {
+
+// NOLINTNEXTLINE(misc-no-recursion): Test-only code, recursion is acceptable here.
 void AddEntry(const fio_test::DirectoryEntry& entry, memfs::VnodeDir& dir) {
   switch (entry.Which()) {
     case fio_test::DirectoryEntry::Tag::kDirectory: {
@@ -67,6 +70,8 @@ void AddEntry(const fio_test::DirectoryEntry& entry, memfs::VnodeDir& dir) {
       break;
   }
 }
+
+}  // namespace
 
 class TestHarness : public fidl::Server<fio_test::TestHarness> {
  public:
@@ -110,6 +115,8 @@ class TestHarness : public fidl::Server<fio_test::TestHarness> {
         memfs_->ServeDeprecated(root_dir, request.directory_request().TakeChannel(), *options);
     ZX_ASSERT_MSG(status == ZX_OK, "Failed to serve directory: %s", zx_status_get_string(status));
   }
+
+  void GetServiceDir(GetServiceDirCompleter::Sync& completer) final { ZX_PANIC("Not supported."); }
 
  private:
   std::unique_ptr<memfs::Memfs> memfs_;

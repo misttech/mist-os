@@ -66,6 +66,14 @@ impl TestHarness {
         client
     }
 
+    /// Helper function which gets service directory from the harness as a [`fio::DirectoryProxy`].
+    /// Requires that the harness supports service directories, otherwise will panic.
+    pub async fn get_service_dir(&self) -> fio::DirectoryProxy {
+        assert!(self.config.supports_services);
+        let client_end = self.proxy.get_service_dir().await.unwrap();
+        client_end.into_proxy().unwrap()
+    }
+
     /// Returns the abilities [`io_test::File`] objects should have for the harness.
     pub fn supported_file_abilities(&self) -> fio::Abilities {
         let mut abilities = fio::Abilities::READ_BYTES | fio::Abilities::GET_ATTRIBUTES;

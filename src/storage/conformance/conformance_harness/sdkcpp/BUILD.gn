@@ -17,6 +17,7 @@ executable("bin") {
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/vfs/cpp",
+    "//src/testing/fidl:placeholders_cpp",
   ]
 }
 

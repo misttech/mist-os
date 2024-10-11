@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.io.test/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/fidl.h>
+#include <fidl/test.placeholders/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/default.h>
@@ -13,15 +14,23 @@
 #include <lib/vfs/cpp/pseudo_dir.h>
 #include <lib/vfs/cpp/pseudo_file.h>
 #include <lib/vfs/cpp/remote_dir.h>
+#include <lib/vfs/cpp/service.h>
 #include <lib/vfs/cpp/vmo_file.h>
 #include <zircon/status.h>
 
-#include <cstdint>
 #include <memory>
 #include <vector>
 
+#include "fidl/fuchsia.io/cpp/common_types.h"
+
 namespace fio = fuchsia_io;
 namespace fio_test = fuchsia_io_test;
+
+class EchoServer : public fidl::Server<test_placeholders::Echo> {
+  void EchoString(EchoStringRequest& request, EchoStringCompleter::Sync& completer) override {
+    completer.Reply(request.value());
+  }
+};
 
 class SdkCppHarness : public fidl::Server<fio_test::TestHarness> {
  public:
@@ -41,6 +50,7 @@ class SdkCppHarness : public fidl::Server<fio_test::TestHarness> {
     config.supports_remote_dir(true);
     config.supports_get_token(true);
     config.supports_mutable_file(true);
+    config.supports_services(true);
     config.supported_attributes(fio::NodeAttributesQuery::kContentSize |
                                 fio::NodeAttributesQuery::kStorageSize);
 
@@ -59,6 +69,24 @@ class SdkCppHarness : public fidl::Server<fio_test::TestHarness> {
     ZX_ASSERT_MSG(dir->Serve(request.flags(), request.directory_request().TakeChannel()) == ZX_OK,
                   "Failed to serve directory!");
     directories_.push_back(std::move(dir));
+  }
+
+  void GetServiceDir(GetServiceDirCompleter::Sync& completer) final {
+    // Create a directory with a fuchsia.test.placeholders/Echo server at the discoverable name.
+    auto svc_dir = std::make_unique<vfs::PseudoDir>();
+    auto handler = [](fidl::ServerEnd<test_placeholders::Echo> server_end) {
+      auto instance = std::make_unique<EchoServer>();
+      fidl::BindServer(async_get_default_dispatcher(), std::move(server_end), std::move(instance));
+    };
+    ZX_ASSERT(
+        svc_dir->AddEntry(std::string(fidl::DiscoverableProtocolName<test_placeholders::Echo>),
+                          std::make_unique<vfs::Service>(std::move(handler))) == ZX_OK);
+    // Serve it and reply to the request with the client end.
+    auto [client_end, server_end] = fidl::Endpoints<fio::Directory>::Create();
+    ZX_ASSERT(svc_dir->Serve(fio::OpenFlags::kRightReadable, server_end.TakeChannel()) == ZX_OK);
+    completer.Reply({std::move(client_end)});
+    // Make sure we keep the pseudo-dir alive since it will close all connections when destroyed.
+    directories_.push_back(std::move(svc_dir));
   }
 
  private:

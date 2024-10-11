@@ -96,6 +96,9 @@ class MinfsHarness : public fidl::Server<fio_test::TestHarness> {
                   zx_status_get_string(status));
   }
 
+  void GetServiceDir(GetServiceDirCompleter::Sync& completer) final { ZX_PANIC("Not supported."); }
+
+  // NOLINTNEXTLINE(misc-no-recursion): Test-only code, recursion is acceptable here.
   void PopulateDirectory(const std::vector<fidl::Box<fio_test::DirectoryEntry>>& entries,
                          Directory& dir) {
     for (const auto& entry : entries) {
@@ -103,6 +106,7 @@ class MinfsHarness : public fidl::Server<fio_test::TestHarness> {
     }
   }
 
+  // NOLINTNEXTLINE(misc-no-recursion): Test-only code, recursion is acceptable here.
   void AddEntry(const fio_test::DirectoryEntry& entry, Directory& parent) {
     switch (entry.Which()) {
       case fio_test::DirectoryEntry::Tag::kDirectory: {

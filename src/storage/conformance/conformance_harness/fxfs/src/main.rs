@@ -84,6 +84,7 @@ async fn run(mut stream: TestHarnessRequestStream, fixture: &TestFixture) -> Res
                         | fio::NodeAttributesQuery::ACCESS_TIME
                         | fio::NodeAttributesQuery::CASEFOLD
                         | fio::NodeAttributesQuery::SELINUX_CONTEXT,
+                    supports_services: false,
                 })?;
             }
             TestHarnessRequest::GetDirectory {
@@ -113,6 +114,9 @@ async fn run(mut stream: TestHarnessRequestStream, fixture: &TestFixture) -> Res
                     directory_request.into_channel().into(),
                 )
                 .unwrap();
+            }
+            TestHarnessRequest::GetServiceDir { responder: _ } => {
+                panic!("fxfs does not support service directories")
             }
         };
     }
