@@ -91,4 +91,11 @@ fit::result<Errno> sys_stat(const CurrentTask& current_task, starnix_uapi::UserC
   return sys_newfstatat(current_task, FdNumber::AT_FDCWD_, user_path, buffer, 0);
 }
 
+fit::result<Errno, pid_t> sys_vfork(const CurrentTask& current_task) {
+  return do_clone(current_task, {
+                                    .flags = (CLONE_VFORK | CLONE_VM),
+                                    .exit_signal = kSIGCHLD.number(),
+                                });
+}
+
 }  // namespace starnix

@@ -59,6 +59,8 @@ fit::result<Errno, size_t> sys_readlink(const CurrentTask& current_task,
 fit::result<Errno> sys_stat(const CurrentTask& current_task, starnix_uapi::UserCString user_path,
                             starnix_uapi::UserRef<struct ::stat> buffer);
 
+fit::result<Errno, pid_t> sys_vfork(const CurrentTask& current_task);
+
 }  // namespace starnix
 
 #endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_ARCH_X64_SYSCALLS_H_
