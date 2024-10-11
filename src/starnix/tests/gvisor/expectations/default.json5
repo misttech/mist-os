@@ -153,9 +153,6 @@
                 "AffinityTest.NewThread",
                 "AffinityTest.Sanity",
 
-                // aio_test
-                "AIOTest.MremapExpansion",
-
                 // cgroup_test
                 "CPUAcctCgroup.CPUAcctStat",
                 "CPUAcctCgroup.CPUAcctUsage",

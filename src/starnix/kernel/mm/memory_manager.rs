@@ -135,15 +135,16 @@ pub static PAGE_SIZE: Lazy<u64> = Lazy::new(|| zx::system_get_page_size() as u64
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct MappingOptions: u32 {
-      const SHARED = 1;
-      const ANONYMOUS = 2;
-      const LOWER_32BIT = 4;
-      const GROWSDOWN = 8;
-      const ELF_BINARY = 16;
-      const DONTFORK = 32;
-      const WIPEONFORK = 64;
-      const DONT_SPLIT = 128;
-      const POPULATE = 256;
+      const SHARED      = 1 << 0;
+      const ANONYMOUS   = 1 << 1;
+      const LOWER_32BIT = 1 << 2;
+      const GROWSDOWN   = 1 << 3;
+      const ELF_BINARY  = 1 << 4;
+      const DONTFORK    = 1 << 5;
+      const WIPEONFORK  = 1 << 6;
+      const DONT_SPLIT  = 1 << 7;
+      const DONT_EXPAND = 1 << 8;
+      const POPULATE    = 1 << 9;
     }
 }
 
@@ -201,6 +202,7 @@ bitflags! {
         const DONTFORK    = 1 <<  8;
         const WIPEONFORK  = 1 <<  9;
         const DONT_SPLIT  = 1 << 10;
+        const DONT_EXPAND = 1 << 11;
     }
 }
 
@@ -218,6 +220,7 @@ const_assert_eq!(MappingFlags::ELF_BINARY.bits(), MappingOptions::ELF_BINARY.bit
 const_assert_eq!(MappingFlags::DONTFORK.bits(), MappingOptions::DONTFORK.bits() << 3);
 const_assert_eq!(MappingFlags::WIPEONFORK.bits(), MappingOptions::WIPEONFORK.bits() << 3);
 const_assert_eq!(MappingFlags::DONT_SPLIT.bits(), MappingOptions::DONT_SPLIT.bits() << 3);
+const_assert_eq!(MappingFlags::DONT_EXPAND.bits(), MappingOptions::DONT_EXPAND.bits() << 3);
 
 impl MappingFlags {
     fn prot_flags(&self) -> ProtectionFlags {
@@ -1190,6 +1193,12 @@ impl MemoryManagerState {
                 DesiredAddress::Fixed(dst_addr)
             }
         };
+
+        // According to gVisor's aio_test, Linux checks for DONT_EXPAND after unmapping the dst
+        // range.
+        if dst_length > src_length && src_mapping.flags.contains(MappingFlags::DONT_EXPAND) {
+            return error!(EFAULT);
+        }
 
         if src_range.end > original_range.end {
             // The source range is not one contiguous mapping. This check must be done only after

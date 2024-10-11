@@ -54,7 +54,7 @@ impl AioContext {
             DesiredAddress::Any,
             AIO_RING_SIZE,
             ProtectionFlags::READ | ProtectionFlags::WRITE,
-            MappingOptions::ANONYMOUS,
+            MappingOptions::ANONYMOUS | MappingOptions::DONT_EXPAND,
             MappingName::AioContext(context),
         )?;
         Ok(context_addr.ptr() as aio_context_t)
