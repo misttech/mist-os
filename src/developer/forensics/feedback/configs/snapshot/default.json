@@ -32,6 +32,7 @@
         "system.user-activity.current.duration"
     ],
     "attachment_allowlist": [
+        "build.kernel-boot-options.txt",
         "build.snapshot.xml",
         "inspect.json",
         "log.kernel.txt",

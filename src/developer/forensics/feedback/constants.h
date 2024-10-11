@@ -96,6 +96,7 @@ constexpr char kCurrentBootIdPath[] = "/data/boot_id.txt";
 constexpr char kPreviousBuildVersionPath[] = "/tmp/build_version.txt";
 constexpr char kCurrentBuildVersionPath[] = "/data/build_version.txt";
 constexpr char kDataRegisterPath[] = "/tmp/data_register.json";
+constexpr char kKernelBootOptionsPath[] = "/boot/kernel/boot-options.txt";
 
 constexpr size_t kRedactionIdCacheCapacity = 1500;
 
