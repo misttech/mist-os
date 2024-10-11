@@ -8,6 +8,7 @@ import("//build/test.gni")
 
 sdk_shared_library("svc") {
   category = "partner"
+  sdk_name = "svc"
 
   sources = [
     "dir.cc",

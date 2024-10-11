@@ -47,9 +47,8 @@ import("//build/sdk/sdk_atom_alias.gni")
 #     "none" or "static".
 #     Defaults to "none".
 #
-#   sdk_name (optional)
+#   sdk_name (required)
 #     Name of the library in the SDK.
-#     Defaults to the library's output name.
 #
 #   include_base (optional)
 #     Path to the root directory for includes.
@@ -162,16 +161,17 @@ template("sdk_shared_library") {
       defined(invoker.symbols_api),
       "Must define path to an ifs file. See comment in //build/cpp/verify_public_symbols.gni")
 
-  output_name = target_name
   if (defined(invoker.output_name)) {
     output_name = invoker.output_name
+  } else {
+    output_name = target_name
   }
 
-  if (defined(invoker.sdk_name)) {
-    atom_name = invoker.sdk_name
-  } else {
-    atom_name = output_name
-  }
+  assert(
+      defined(invoker.sdk_name),
+      "Libraries in the IDK must specify a name that is meaningful in that context.")
+  atom_name = invoker.sdk_name
+
   sdk_id = "sdk://pkg/${atom_name}"
 
   no_headers = defined(invoker.no_headers) && invoker.no_headers

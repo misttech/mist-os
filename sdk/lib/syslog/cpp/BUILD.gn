@@ -86,6 +86,7 @@ group("backend") {
 
 sdk_shared_library("backend_fuchsia_globals") {
   category = "partner"
+  sdk_name = "backend_fuchsia_globals"
 
   libcxx_linkage = "static"
 
