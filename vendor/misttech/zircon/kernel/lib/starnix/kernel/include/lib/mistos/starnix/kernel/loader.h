@@ -54,9 +54,9 @@ struct ResolvedElf {
   /// An ELF interpreter, if specified in the ELF executable header.
   ktl::optional<ResolvedInterpElf> interp;
   /// Arguments to be passed to the new process.
-  fbl::Vector<ktl::string_view> argv;
+  fbl::Vector<BString> argv;
   /// The environment to initialize for the new process.
-  fbl::Vector<ktl::string_view> environ;
+  fbl::Vector<BString> environ;
   /// The SELinux state for the new process. None if SELinux is disabled.
   // pub selinux_state: Option<SeLinuxResolvedElfState>,
   /// Exec/write lock.
@@ -77,9 +77,8 @@ struct StackResult {
 // recursion depth. `argv` may change due to script interpreter logic.
 fit::result<Errno, ResolvedElf> resolve_executable(
     const CurrentTask& current_task, const FileHandle& file, const ktl::string_view& path,
-    const fbl::Vector<ktl::string_view>& argv,
-    const fbl::Vector<ktl::string_view>&
-        environ /*,selinux_state: Option<SeLinuxResolvedElfState>*/);
+    const fbl::Vector<BString>& argv,
+    const fbl::Vector<BString>& environ /*,selinux_state: Option<SeLinuxResolvedElfState>*/);
 
 // Loads a resolved ELF into memory, along with an interpreter if one is defined, and initializes
 // the stack.
@@ -88,9 +87,9 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
                                                     const ktl::string_view& original_path);
 
 fit::result<Errno, StackResult> test_populate_initial_stack(
-    const MemoryAccessor& ma, const ktl::string_view& path,
-    const fbl::Vector<ktl::string_view>& argv, const fbl::Vector<ktl::string_view>& envp,
-    fbl::Vector<ktl::pair<uint32_t, uint64_t>>& auxv, UserAddress original_stack_start_addr);
+    const MemoryAccessor& ma, const ktl::string_view& path, const fbl::Vector<BString>& argv,
+    const fbl::Vector<BString>& envp, fbl::Vector<ktl::pair<uint32_t, uint64_t>>& auxv,
+    UserAddress original_stack_start_addr);
 
 }  // namespace starnix
 

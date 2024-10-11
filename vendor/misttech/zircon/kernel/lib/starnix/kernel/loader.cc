@@ -67,9 +67,8 @@ using starnix::StarnixLoader;
 constexpr size_t kMaxSegments = 4;
 constexpr size_t kRandomSeedBytes = 16;
 
-size_t get_initial_stack_size(const ktl::string_view& path,
-                              const fbl::Vector<ktl::string_view>& argv,
-                              const fbl::Vector<ktl::string_view>& environ,
+size_t get_initial_stack_size(const ktl::string_view& path, const fbl::Vector<BString>& argv,
+                              const fbl::Vector<BString>& environ,
                               const fbl::Vector<ktl::pair<uint32_t, uint64_t>>& auxv) {
   auto accumulate_size = [](size_t accumulator, const auto& arg) {
     return accumulator + arg.length() + 1;
@@ -85,9 +84,9 @@ size_t get_initial_stack_size(const ktl::string_view& path,
 }
 
 fit::result<Errno, StackResult> populate_initial_stack(
-    const MemoryAccessor& ma, const ktl::string_view& path,
-    const fbl::Vector<ktl::string_view>& argv, const fbl::Vector<ktl::string_view>& envp,
-    fbl::Vector<ktl::pair<uint32_t, uint64_t>>& auxv, UserAddress original_stack_start_addr) {
+    const MemoryAccessor& ma, const ktl::string_view& path, const fbl::Vector<BString>& argv,
+    const fbl::Vector<BString>& envp, fbl::Vector<ktl::pair<uint32_t, uint64_t>>& auxv,
+    UserAddress original_stack_start_addr) {
   auto stack_pointer = original_stack_start_addr;
 
   auto write_stack = [&ma](const ktl::span<const uint8_t>& data,
@@ -287,8 +286,8 @@ ktl::optional<ktl::string_view> from_bytes_until_nul(const char* bytes, size_t l
 // Resolves a file handle into a validated executable ELF.
 fit::result<Errno, starnix::ResolvedElf> resolve_elf(
     const CurrentTask& current_task, const starnix::FileHandle& file,
-    const fbl::RefPtr<MemoryObject>& memory, const fbl::Vector<ktl::string_view>& argv,
-    const fbl::Vector<ktl::string_view>& environ
+    const fbl::RefPtr<MemoryObject>& memory, const fbl::Vector<BString>& argv,
+    const fbl::Vector<BString>& environ
     /*,selinux_state: Option<SeLinuxResolvedElfState>*/) {
   auto vmo = memory->as_vmo();
   if (!vmo) {
@@ -349,10 +348,10 @@ fit::result<Errno, starnix::ResolvedElf> resolve_elf(
       file.name.entry.node.create_write_guard(FileWriteGuardMode::Exec)?.into_ref();
   */
 
-  fbl::Vector<ktl::string_view> argv_cpy;
+  fbl::Vector<BString> argv_cpy;
   ktl::copy(argv.begin(), argv.end(), util::back_inserter(argv_cpy));
 
-  fbl::Vector<ktl::string_view> environ_cpy;
+  fbl::Vector<BString> environ_cpy;
   ktl::copy(environ.begin(), environ.end(), util::back_inserter(environ_cpy));
 
   return fit::ok(starnix::ResolvedElf{
@@ -366,8 +365,8 @@ fit::result<Errno, starnix::ResolvedElf> resolve_elf(
 // Resolves a #! script file into a validated executable ELF.
 fit::result<Errno, starnix::ResolvedElf> resolve_script(
     const starnix::CurrentTask& current_task, const fbl::RefPtr<MemoryObject>& memory,
-    const ktl::string_view& path, const fbl::Vector<ktl::string_view>& argv,
-    const fbl::Vector<ktl::string_view>& environ, size_t recursion_depth
+    const ktl::string_view& path, const fbl::Vector<BString>& argv,
+    const fbl::Vector<BString>& environ, size_t recursion_depth
     /*,selinux_state: Option<SeLinuxResolvedElfState>*/) {
   return fit::error(errno(-1));
 }
@@ -376,8 +375,8 @@ fit::result<Errno, starnix::ResolvedElf> resolve_script(
 // recursion depth.
 fit::result<Errno, starnix::ResolvedElf> resolve_executable_impl(
     const starnix::CurrentTask& current_task, const starnix::FileHandle& file,
-    ktl::string_view path, const fbl::Vector<ktl::string_view>& argv,
-    const fbl::Vector<ktl::string_view>& environ, size_t recursion_depth
+    ktl::string_view path, const fbl::Vector<BString>& argv, const fbl::Vector<BString>& environ,
+    size_t recursion_depth
     /*,selinux_state: Option<SeLinuxResolvedElfState>*/) {
   if (recursion_depth > MAX_RECURSION_DEPTH) {
     return fit::error(errno(ELOOP));
@@ -413,9 +412,8 @@ namespace starnix {
 
 fit::result<Errno, ResolvedElf> resolve_executable(
     const CurrentTask& current_task, const FileHandle& file, const ktl::string_view& path,
-    const fbl::Vector<ktl::string_view>& argv,
-    const fbl::Vector<ktl::string_view>&
-        environ /*,selinux_state: Option<SeLinuxResolvedElfState>*/) {
+    const fbl::Vector<BString>& argv,
+    const fbl::Vector<BString>& environ /*,selinux_state: Option<SeLinuxResolvedElfState>*/) {
   return resolve_executable_impl(current_task, file, path, argv, environ, 0);
 }
 
@@ -572,9 +570,9 @@ fit::result<Errno, ThreadStartInfo> load_executable(const CurrentTask& current_t
 }
 
 fit::result<Errno, StackResult> test_populate_initial_stack(
-    const MemoryAccessor& ma, const ktl::string_view& path,
-    const fbl::Vector<ktl::string_view>& argv, const fbl::Vector<ktl::string_view>& envp,
-    fbl::Vector<ktl::pair<uint32_t, uint64_t>>& auxv, UserAddress original_stack_start_addr) {
+    const MemoryAccessor& ma, const ktl::string_view& path, const fbl::Vector<BString>& argv,
+    const fbl::Vector<BString>& envp, fbl::Vector<ktl::pair<uint32_t, uint64_t>>& auxv,
+    UserAddress original_stack_start_addr) {
   return populate_initial_stack(ma, path, argv, envp, auxv, original_stack_start_addr);
 }
 
