@@ -11,6 +11,10 @@
             name: "fxfs-crypt",
             durability: "transient",
         },
+        {
+            name: "storage-host",
+            durability: "transient",
+        },
     ],
     capabilities: [
         {
@@ -25,6 +29,14 @@
                 "rw*",
             ],
             path: "/fs/blob/root",
+        },
+        {
+            directory: "partitions",
+            rights: [
+                "execute",
+                "rw*",
+            ],
+            path: "/partitions",
         },
         {
             protocol: [ "fuchsia.update.verify.BlobfsVerifier" ],
@@ -43,16 +55,6 @@
     ],
     use: [
         {
-            protocol: "fuchsia.storagehost.StorageHost",
-            from: "#storage_host",
-        },
-        {
-            directory: "partitions",
-            from: "#storage_host",
-            rights: [ "rw*" ],
-            path: "/partitions",
-        },
-        {
             protocol: "fuchsia.fs.startup.Startup",
             from: "#fxfs",
             path: "/fxfs/svc/fuchsia.fs.startup.Startup",
@@ -68,7 +70,7 @@
             from: "parent",
             to: [
                 "#fxfs",
-                "#storage_host",
+                "#storage-host",
             ],
             availability: "optional",
         },
@@ -91,10 +93,6 @@
                 "blob-exec",
             ],
             from: "self",
-        },
-        {
-            directory: "partitions",
-            from: "#storage_host",
         },
         {
             directory: "volumes",

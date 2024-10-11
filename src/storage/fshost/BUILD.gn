@@ -66,6 +66,7 @@ rustc_binary("fshost") {
     "//third_party/rust_crates:aes-gcm-siv",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:either",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:hkdf",
     "//third_party/rust_crates:scopeguard",
@@ -104,6 +105,7 @@ rustc_binary("fshost") {
     "src/matcher.rs",
     "src/ramdisk.rs",
     "src/service.rs",
+    "src/storage_host.rs",
     "src/volume.rs",
     "src/watcher.rs",
   ]

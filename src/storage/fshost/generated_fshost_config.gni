@@ -77,6 +77,7 @@ template("generated_fshost_config") {
       nand = false
       use_disk_migration = false
       storage_host = false
+      storage_host_url = "fuchsia-boot:///storage-host#meta/storage-host.cm"
       disable_automount = false
       blobfs_write_compression_algorithm = ""
       blobfs_cache_eviction_policy = ""

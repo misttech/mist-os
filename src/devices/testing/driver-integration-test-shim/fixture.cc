@@ -67,6 +67,7 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
               Config{"fuchsia.fshost.NoZxcrypt"},
               Config{"fuchsia.fshost.RamdiskImage"},
               Config{"fuchsia.fshost.StorageHost"},
+              Config{"fuchsia.fshost.StorageHostUrl"},
               Config{"fuchsia.fshost.UseDiskMigration"},
               Config{"fuchsia.fshost.FxfsCryptUrl"},
           },

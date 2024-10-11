@@ -11,8 +11,8 @@ use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
 use fidl_fuchsia_hardware_block::{BlockMarker, BlockProxy};
 use fidl_fuchsia_hardware_block_partition::{PartitionMarker, PartitionProxy};
 use fidl_fuchsia_hardware_block_volume::{VolumeMarker, VolumeProxy};
-use fidl_fuchsia_io::OpenFlags;
-use fs_management::filesystem::{BlockConnector, PathBasedBlockConnector};
+use fidl_fuchsia_io::{self as fio, OpenFlags};
+use fs_management::filesystem::{BlockConnector, DirBasedBlockConnector};
 use fs_management::format::{detect_disk_format, DiskFormat};
 use fuchsia_component::client::connect_to_protocol_at_path;
 
@@ -367,7 +367,7 @@ impl Device for BlockDevice {
 /// A block device running out of the storage-host component.
 #[derive(Debug)]
 pub struct StorageHostDevice {
-    connector: Box<PathBasedBlockConnector>,
+    connector: Box<DirBasedBlockConnector>,
 
     // Cache a proxy to the device's Partition interface so we can use it internally.  (This assumes
     // that devices speak Partition, which is currently always true).
@@ -381,8 +381,8 @@ pub struct StorageHostDevice {
 }
 
 impl StorageHostDevice {
-    pub fn new(path: impl ToString) -> Result<Self, Error> {
-        let connector = Box::new(PathBasedBlockConnector::new(path.to_string() + "/block"));
+    pub fn new(dir: fio::DirectoryProxy, path: impl ToString) -> Result<Self, Error> {
+        let connector = Box::new(DirBasedBlockConnector::new(dir, path.to_string() + "/block"));
         let partition_proxy = connector.connect_partition()?.into_proxy()?;
         Ok(Self {
             connector,

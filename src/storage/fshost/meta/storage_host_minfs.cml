@@ -8,13 +8,14 @@
     ],
     children: [
         {
-            name: "storage_host",
-            url: "#meta/storage-host.cm",
-            startup: "eager",
-        },
-        {
             name: "fvm",
             url: "#meta/fvm2.cm",
+        },
+    ],
+    collections: [
+        {
+            name: "storage-host",
+            durability: "transient",
         },
     ],
     capabilities: [
@@ -45,16 +46,6 @@
     ],
     use: [
         {
-            protocol: "fuchsia.storagehost.StorageHost",
-            from: "#storage_host",
-        },
-        {
-            directory: "partitions",
-            from: "#storage_host",
-            rights: [ "rw*" ],
-            path: "/partitions",
-        },
-        {
             protocol: "fuchsia.component.Realm",
             from: "framework",
         },
@@ -63,7 +54,7 @@
         {
             protocol: [ "fuchsia.tracing.provider.Registry" ],
             from: "parent",
-            to: [ "#storage_host" ],
+            to: [ "#storage-host" ],
             availability: "optional",
         },
     ],
@@ -74,10 +65,6 @@
                 "blob-exec",
             ],
             from: "self",
-        },
-        {
-            directory: "partitions",
-            from: "#storage_host",
         },
         {
             directory: "volumes",

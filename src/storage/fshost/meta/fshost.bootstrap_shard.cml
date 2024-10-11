@@ -83,6 +83,7 @@
                 "fuchsia.fshost.NoZxcrypt",
                 "fuchsia.fshost.RamdiskImage",
                 "fuchsia.fshost.StorageHost",
+                "fuchsia.fshost.StorageHostUrl",
                 "fuchsia.fshost.UseDiskMigration",
             ],
             from: "parent",

@@ -6,6 +6,7 @@ use crate::boot_args::BootArgs;
 use crate::config::apply_boot_args_to_config;
 use crate::environment::{Environment, FshostEnvironment};
 use crate::inspect::register_stats;
+use crate::watcher::{PathSource, PathSourceType, Watcher};
 use anyhow::{format_err, Error};
 use fidl::prelude::*;
 use fuchsia_runtime::{take_startup_handle, HandleType};
@@ -34,8 +35,12 @@ mod manager;
 mod matcher;
 mod ramdisk;
 mod service;
+mod storage_host;
 mod volume;
 mod watcher;
+
+const DEV_CLASS_BLOCK: &'static str = "/dev/class/block";
+const DEV_CLASS_NAND: &'static str = "/dev/class/nand";
 
 // Logs directly to the serial port.  To be used when it's expected that fshost will terminate
 // shortly afterwards since messages via the log subsystem often don't make it.
@@ -62,8 +67,11 @@ async fn main() -> Result<(), Error> {
         })?;
 
     let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<service::FshostShutdownResponder>(1);
-    let (_watcher, device_stream) = watcher::Watcher::new(&config).await?;
-
+    let (watcher, device_stream) = Watcher::new(vec![
+        Box::new(PathSource::new(DEV_CLASS_BLOCK, PathSourceType::Block)),
+        Box::new(PathSource::new(DEV_CLASS_NAND, PathSourceType::Nand)),
+    ])
+    .await?;
     // Potentially launch the boot items ramdisk. It's not fatal, so if it fails we print an error
     // and continue.
     let ramdisk_path = if config.ramdisk_image {
@@ -87,6 +95,7 @@ async fn main() -> Result<(), Error> {
         ramdisk_path.clone(),
         matcher_lock.clone(),
         inspector.clone(),
+        watcher,
     );
 
     let launcher = env.launcher();
@@ -96,7 +105,6 @@ async fn main() -> Result<(), Error> {
     let blob_exposed_dir = env.blobfs_exposed_dir()?;
     let data_exposed_dir = env.data_exposed_dir()?;
     let crypt_service_exposed_dir = env.crypt_service_exposed_dir()?;
-    let env: Arc<Mutex<dyn Environment>> = Arc::new(Mutex::new(env));
     let export = vfs::pseudo_directory! {
         "fs" => vfs::pseudo_directory! {
             "blob" => remote_dir(blob_exposed_dir),
@@ -104,6 +112,11 @@ async fn main() -> Result<(), Error> {
         },
         "mnt" => vfs::pseudo_directory! {},
     };
+    if config.storage_host {
+        let storage_host_partitions_dir = env.storage_host_partitions_dir()?;
+        export.add_entry("partitions", remote_dir(storage_host_partitions_dir)).unwrap();
+    }
+    let env: Arc<Mutex<dyn Environment>> = Arc::new(Mutex::new(env));
     let svc_dir = vfs::pseudo_directory! {
         fshost::AdminMarker::PROTOCOL_NAME =>
             service::fshost_admin(

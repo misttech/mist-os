@@ -16,10 +16,13 @@ use crate::device::constants::{
 };
 use crate::device::{BlockDevice, Device};
 use crate::inspect::register_migration_status;
+use crate::storage_host::StorageHostInstance;
+use crate::watcher::{DirSource, Watcher};
 use anyhow::{anyhow, bail, Context, Error};
 use async_trait::async_trait;
 use device_watcher::{recursive_wait, recursive_wait_and_open};
-use fidl::endpoints::{create_proxy, Proxy as _, ServerEnd};
+use either::Either;
+use fidl::endpoints::{create_proxy, ServerEnd};
 use fidl_fuchsia_fs_startup::MountOptions;
 use fidl_fuchsia_hardware_block_partition::Guid;
 use fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeMarker};
@@ -53,8 +56,8 @@ pub trait Environment: Send + Sync {
     /// Attaches the specified driver to the device.
     async fn attach_driver(&self, device: &mut dyn Device, driver_path: &str) -> Result<(), Error>;
 
-    /// Binds storage-host to the given device.
-    async fn launch_storage_host(&self, device: &mut dyn Device) -> Result<(), Error>;
+    /// Binds an instance of storage-host to the given device.
+    async fn launch_storage_host(&mut self, device: &mut dyn Device) -> Result<(), Error>;
 
     /// Binds the fvm driver and returns a list of the names of the child partitions.
     async fn bind_and_enumerate_fvm(
@@ -334,6 +337,9 @@ impl MaybeFs for Option<Box<dyn Container>> {
 /// Implements the Environment trait and keeps track of mounted filesystems.
 pub struct FshostEnvironment {
     config: Arc<fshost_config::Config>,
+    // A queue of Directory requests, which are connected to the partitions dir of the resolved
+    // storage-host instance once it is bound.
+    storage_host: Either<Vec<ServerEnd<fio::DirectoryMarker>>, StorageHostInstance>,
     // `container` is set inside mount_fxblob() or mount_fvm() and represents the overall
     // Fxfs/Fvm instance which contains both a data and blob volume.
     container: Option<Box<dyn Container>>,
@@ -345,6 +351,7 @@ pub struct FshostEnvironment {
     /// ignored the next time they appear to the Watcher/Matcher code.
     matcher_lock: Arc<Mutex<HashSet<String>>>,
     inspector: fuchsia_inspect::Inspector,
+    watcher: Watcher,
 }
 
 impl FshostEnvironment {
@@ -353,9 +360,11 @@ impl FshostEnvironment {
         ramdisk_prefix: Option<String>,
         matcher_lock: Arc<Mutex<HashSet<String>>>,
         inspector: fuchsia_inspect::Inspector,
+        watcher: Watcher,
     ) -> Self {
         Self {
             config: config.clone(),
+            storage_host: Either::Left(vec![]),
             container: None,
             blobfs: Filesystem::Queue(FilesystemQueue::default()),
             data: Filesystem::Queue(FilesystemQueue::default()),
@@ -363,6 +372,7 @@ impl FshostEnvironment {
             launcher: Arc::new(FilesystemLauncher { config, ramdisk_prefix }),
             matcher_lock,
             inspector,
+            watcher,
         }
     }
 
@@ -387,6 +397,19 @@ impl FshostEnvironment {
     /// "/data" is mounted and it will get routed once the data partition is mounted.
     pub fn data_exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
         self.data.exposed_dir(self.container.maybe_fs())
+    }
+
+    /// Returns a proxy for the partitions dir of storage-host.  This must be called before
+    /// storage-host is mounted and it will get routed once bound.
+    pub fn storage_host_partitions_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
+        let (proxy, server) = create_proxy::<fio::DirectoryMarker>()?;
+        match self.storage_host {
+            Either::Left(ref mut requests) => {
+                requests.push(server);
+            }
+            Either::Right(_) => unreachable!(),
+        }
+        Ok(proxy)
     }
 
     /// Returns a proxy for the exposed dir of the data filesystem's crypt service. This can be
@@ -714,8 +737,28 @@ impl Environment for FshostEnvironment {
         self.launcher.attach_driver(device, driver_path).await
     }
 
-    async fn launch_storage_host(&self, device: &mut dyn Device) -> Result<(), Error> {
-        self.launcher.launch_storage_host(device).await.context("Failed to launch storage-host")
+    async fn launch_storage_host(&mut self, device: &mut dyn Device) -> Result<(), Error> {
+        tracing::info!(path = %device.path(), "Binding storage-host to device");
+        let requests = if let Either::Left(ref mut requests) = self.storage_host {
+            std::mem::take(requests)
+        } else {
+            bail!("storage-host instance was already bound")
+        };
+        let instance = StorageHostInstance::new(device, &self.config.storage_host_url)
+            .await
+            .context("Failed to launch storage-host")?;
+        let partitions_dir =
+            instance.partitions_dir().await.context("Failed to open partitions dir")?;
+        for request in requests {
+            partitions_dir
+                .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, request.into_channel().into())?;
+        }
+        self.watcher
+            .add_source(Box::new(DirSource::new(partitions_dir)))
+            .await
+            .context("Failed to watch storage-host partitions dir")?;
+        self.storage_host = Either::Right(instance);
+        Ok(())
     }
 
     async fn bind_and_enumerate_fvm(
@@ -1055,16 +1098,6 @@ impl FilesystemLauncher {
             Err(e) => Err(e.into()),
             Ok(()) => Ok(()),
         }
-    }
-
-    pub async fn launch_storage_host(&self, device: &mut dyn Device) -> Result<(), Error> {
-        tracing::info!(path = %device.path(), "Binding storage-host to device");
-        let proxy = connect_to_protocol::<fidl_fuchsia_storagehost::StorageHostMarker>()?;
-        proxy
-            .start(device.device_controller()?.into_client_end().unwrap())
-            .await?
-            .map_err(zx::Status::from_raw)?;
-        Ok(())
     }
 
     /// This helper method returns true if the given device is a ramdisk.

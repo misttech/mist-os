@@ -692,7 +692,7 @@ mod tests {
             Ok(())
         }
 
-        async fn launch_storage_host(&self, _device: &mut dyn Device) -> Result<(), Error> {
+        async fn launch_storage_host(&mut self, _device: &mut dyn Device) -> Result<(), Error> {
             assert_eq!(
                 std::mem::take(&mut *self.expect_launch_storage_host.lock().unwrap()),
                 true,
