@@ -243,12 +243,10 @@ impl FunctionFsRootDir {
             state.adb_proxy = None;
             state.event_queue.clear();
 
-            let _ = state
-                .device_proxy
-                .as_ref()
-                .expect("Device Proxy is required")
-                .stop(zx::MonotonicInstant::INFINITE)
-                .map_err(|_| errno!(EINVAL));
+            if let Some(device_proxy) = state.device_proxy.as_ref() {
+                let _ =
+                    device_proxy.stop(zx::MonotonicInstant::INFINITE).map_err(|_| errno!(EINVAL));
+            }
         }
     }
 
