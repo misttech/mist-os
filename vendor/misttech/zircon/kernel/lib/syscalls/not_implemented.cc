@@ -23,7 +23,7 @@
 
 #define RETURN_ \
   do {          \
-    return -88; \
+    return -38; \
   } while (0)
 
 // These don't have kernel entry points.
