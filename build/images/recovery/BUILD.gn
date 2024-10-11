@@ -79,8 +79,6 @@ if (is_fuchsia) {
 
     ramdisk_in_zbi = true
 
-    base_packages = board_recovery_package_labels
-
     product_assembly_config_label = ":for-fdr"
     board_config_label = recovery_board_configuration_label
 
