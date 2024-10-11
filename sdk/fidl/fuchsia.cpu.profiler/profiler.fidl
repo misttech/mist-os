@@ -77,12 +77,16 @@ type Sample = table {
 
 /// An adhoc set of running tasks to attach to.
 type Task = flexible union {
-    /// Profile a process and all threads associated with it
+    /// Profile a process and all threads associated with it.
     1: process zx.Koid;
-    /// Profile a single thread
+    /// Profile a single thread.
     2: thread zx.Koid;
-    /// Profile a job and all processes and threads associated with it
+    /// Profile a job and all processes and threads associated with it.
     3: job zx.Koid;
+    /// Profile everything running on the system.
+    ///
+    /// Equivalent to finding root job's koid and passing it as a Task::job.
+    4: system_wide struct {};
 };
 
 /// A component to optionally launch and attach to
@@ -178,6 +182,14 @@ closed protocol Session {
         3: median_sample_time uint64;
         4: min_sample_time uint64;
         5: max_sample_time uint64;
+        // The session may be unable to extract information about where symbols
+        // are in a process's address space due to the process being too short
+        // lived, or otherwise unable to be read. In this case, functions
+        // sampled from this process may not be able to be fully symbolized.
+        //
+        // missing_process_mappings contains processes for which this occurred
+        // during the run.
+        6: missing_process_mappings vector<zx.Koid>:MAX;
     });
 
     /// Clean up and unconfigure the profiler. Flushes the remaining data and

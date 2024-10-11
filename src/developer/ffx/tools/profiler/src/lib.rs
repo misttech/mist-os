@@ -15,6 +15,7 @@ use std::io::{stdin, BufRead};
 use std::process::Command;
 use std::time::Duration;
 use tempfile::Builder;
+use termion::{color, style};
 use {fidl_fuchsia_cpu_profiler as profiler, fidl_fuchsia_test_manager as test_manager};
 
 use schemars::JsonSchema;
@@ -27,6 +28,7 @@ pub struct ShowCpuProfilerCmd {
     pub mean_sample_time: Option<u64>,
     pub max_sample_time: Option<u64>,
     pub min_sample_time: Option<u64>,
+    pub missing_process_mappings: Option<Vec<u64>>,
 }
 
 impl fmt::Display for ShowCpuProfilerCmd {
@@ -46,6 +48,9 @@ impl fmt::Display for ShowCpuProfilerCmd {
         }
         if let Some(min_sample_time) = self.min_sample_time {
             write!(f, "    Min sample time: {}us\n", min_sample_time)?;
+        }
+        if let Some(ref pids) = self.missing_process_mappings {
+            write!(f, "    Processes missing mappings: {:?}\n", pids)?;
         }
         Ok(())
     }
@@ -71,7 +76,11 @@ impl FfxMain for ProfilerTool {
 
 fn gather_targets(opts: &args::Attach) -> Result<fidl_fuchsia_cpu_profiler::TargetConfig> {
     if let Some(moniker) = &opts.moniker {
-        if !opts.pids.is_empty() || !opts.tids.is_empty() || !opts.job_ids.is_empty() {
+        if !opts.pids.is_empty()
+            || !opts.tids.is_empty()
+            || !opts.job_ids.is_empty()
+            || opts.system_wide
+        {
             ffx_bail!(
                 "Targeting both a component and specific jobs/processes/threads is not supported"
             )
@@ -79,7 +88,11 @@ fn gather_targets(opts: &args::Attach) -> Result<fidl_fuchsia_cpu_profiler::Targ
         let component_config = profiler::AttachConfig::AttachToComponentMoniker(moniker.clone());
         Ok(profiler::TargetConfig::Component(component_config))
     } else if let Some(url) = &opts.url {
-        if !opts.pids.is_empty() || !opts.tids.is_empty() || !opts.job_ids.is_empty() {
+        if !opts.pids.is_empty()
+            || !opts.tids.is_empty()
+            || !opts.job_ids.is_empty()
+            || opts.system_wide
+        {
             ffx_bail!(
                 "Targeting both a component and specific jobs/processes/threads is not supported"
             )
@@ -87,13 +100,16 @@ fn gather_targets(opts: &args::Attach) -> Result<fidl_fuchsia_cpu_profiler::Targ
         let component_config = profiler::AttachConfig::AttachToComponentUrl(url.clone());
         Ok(profiler::TargetConfig::Component(component_config))
     } else {
-        let tasks: Vec<_> = opts
+        let mut tasks: Vec<_> = opts
             .job_ids
             .iter()
             .map(|&id| profiler::Task::Job(id))
             .chain(opts.pids.iter().map(|&id| profiler::Task::Process(id)))
             .chain(opts.tids.iter().map(|&id| profiler::Task::Thread(id)))
             .collect();
+        if opts.system_wide {
+            tasks.push(profiler::Task::SystemWide(profiler::SystemWide {}));
+        }
         if tasks.is_empty() {
             ffx_bail!("No targets were specified")
         }
@@ -152,6 +168,7 @@ struct SessionOpts {
     pprof_conversion: bool,
     output: String,
     duration: Option<u64>,
+    color_output: bool,
 }
 
 async fn run_session(
@@ -200,6 +217,22 @@ async fn run_session(
         .await;
     }
     let stats = controller.stop().await?;
+    if let Some(ref pids) = &stats.missing_process_mappings {
+        if !pids.is_empty() {
+            writeln!(
+                writer.stderr(),
+                "{}[WARNING] Failed to get symbols for some processes: {:?}\n\
+                This can occur when processes exit before the profiler is able to read their modules.{}",
+                if opts.color_output {
+                    format!("{}", color::Fg(color::Red))
+                } else {
+                    String::from("")
+                },
+                pids,
+                if opts.color_output { format!("{}", style::Reset) } else { String::from("") },
+            )?;
+        }
+    }
     if opts.print_stats {
         let output = ShowCpuProfilerCmd {
             samples_collected: stats.samples_collected,
@@ -207,6 +240,7 @@ async fn run_session(
             mean_sample_time: stats.mean_sample_time,
             max_sample_time: stats.max_sample_time,
             min_sample_time: stats.min_sample_time,
+            missing_process_mappings: stats.missing_process_mappings,
         };
         writer.machine(&output)?;
         writer.line(format!("\n{output}"))?;
@@ -258,6 +292,7 @@ pub async fn profiler(
                 output: opts.output,
                 duration: opts.duration,
                 pprof_conversion: opts.pprof_conversion,
+                color_output: opts.color_output,
             };
             (target, config, session_opts)
         }
@@ -299,6 +334,7 @@ pub async fn profiler(
                 output: opts.output,
                 duration: opts.duration,
                 pprof_conversion: opts.pprof_conversion,
+                color_output: opts.color_output,
             };
             (target, config, session_opts)
         }
