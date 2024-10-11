@@ -377,18 +377,19 @@ impl SocketOps for ZxioBackedSocket {
 
     fn close(&self, _socket: &Socket) {}
 
-    fn getsockname(&self, socket: &Socket) -> Vec<u8> {
+    fn getsockname(&self, socket: &Socket) -> Result<SocketAddress, Errno> {
         match self.zxio.getsockname() {
-            Err(_) | Ok(Err(_)) => SocketAddress::default_for_domain(socket.domain).to_bytes(),
-            Ok(Ok(addr)) => addr,
+            Err(_) | Ok(Err(_)) => Ok(SocketAddress::default_for_domain(socket.domain)),
+            Ok(Ok(addr)) => SocketAddress::from_bytes(addr),
         }
     }
 
-    fn getpeername(&self, _socket: &Socket) -> Result<Vec<u8>, Errno> {
+    fn getpeername(&self, _socket: &Socket) -> Result<SocketAddress, Errno> {
         self.zxio
             .getpeername()
             .map_err(|status| from_status_like_fdio!(status))?
             .map_err(|out_code| errno_from_zxio_code!(out_code))
+            .and_then(SocketAddress::from_bytes)
     }
 
     fn setsockopt(

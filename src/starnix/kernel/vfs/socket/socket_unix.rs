@@ -660,21 +660,21 @@ impl SocketOps for UnixSocket {
     ///
     /// The name is derived from the address and domain. A socket
     /// will always have a name, even if it is not bound to an address.
-    fn getsockname(&self, socket: &Socket) -> Vec<u8> {
+    fn getsockname(&self, socket: &Socket) -> Result<SocketAddress, Errno> {
         let inner = self.lock();
         if let Some(address) = &inner.address {
-            address.to_bytes()
+            Ok(address.clone())
         } else {
-            SocketAddress::default_for_domain(socket.domain).to_bytes()
+            Ok(SocketAddress::default_for_domain(socket.domain))
         }
     }
 
     /// Returns the name of the peer of this socket, if such a peer exists.
     ///
     /// Returns an error if the socket is not connected.
-    fn getpeername(&self, _socket: &Socket) -> Result<Vec<u8>, Errno> {
+    fn getpeername(&self, _socket: &Socket) -> Result<SocketAddress, Errno> {
         let peer = self.lock().peer().ok_or_else(|| errno!(ENOTCONN))?.clone();
-        Ok(peer.getsockname())
+        peer.getsockname()
     }
 
     fn setsockopt(

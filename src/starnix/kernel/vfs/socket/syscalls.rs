@@ -247,7 +247,7 @@ pub fn sys_accept4(
         })?;
 
     if !user_socket_address.is_null() {
-        let address_bytes = accepted_socket.getpeername()?;
+        let address_bytes = accepted_socket.getpeername()?.to_bytes();
         write_socket_address(
             current_task,
             user_socket_address,
@@ -353,7 +353,7 @@ pub fn sys_getsockname(
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
     let socket = Socket::get_from_file(&file)?;
-    let address_bytes = socket.getsockname();
+    let address_bytes = socket.getsockname()?.to_bytes();
 
     write_socket_address(current_task, user_socket_address, user_address_length, &address_bytes)?;
 
@@ -369,7 +369,7 @@ pub fn sys_getpeername(
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
     let socket = Socket::get_from_file(&file)?;
-    let address_bytes = socket.getpeername()?;
+    let address_bytes = socket.getpeername()?.to_bytes();
 
     write_socket_address(current_task, user_socket_address, user_address_length, &address_bytes)?;
 

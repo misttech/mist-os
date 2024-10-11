@@ -174,12 +174,12 @@ pub trait SocketOps: Send + Sync + AsAny {
     ///
     /// The name is derived from the address and domain. A socket
     /// will always have a name, even if it is not bound to an address.
-    fn getsockname(&self, socket: &Socket) -> Vec<u8>;
+    fn getsockname(&self, socket: &Socket) -> Result<SocketAddress, Errno>;
 
     /// Returns the name of the peer of this socket, if such a peer exists.
     ///
     /// Returns an error if the socket is not connected.
-    fn getpeername(&self, socket: &Socket) -> Result<Vec<u8>, Errno>;
+    fn getpeername(&self, socket: &Socket) -> Result<SocketAddress, Errno>;
 
     /// Sets socket-specific options.
     fn setsockopt(
@@ -371,11 +371,11 @@ impl Socket {
         ops.as_any().downcast_ref::<T>()
     }
 
-    pub fn getsockname(&self) -> Vec<u8> {
+    pub fn getsockname(&self) -> Result<SocketAddress, Errno> {
         self.ops.getsockname(self)
     }
 
-    pub fn getpeername(&self) -> Result<Vec<u8>, Errno> {
+    pub fn getpeername(&self) -> Result<SocketAddress, Errno> {
         self.ops.getpeername(self)
     }
 
