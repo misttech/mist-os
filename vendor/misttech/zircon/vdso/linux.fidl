@@ -298,7 +298,8 @@ closed protocol Linux {
         @in
         stat_addr experimental_pointer<int32>;
         options int32;
-        @in
+        @voidptr
+        @out
         ru experimental_pointer<rusage>;
     }) -> () error int64;
 
