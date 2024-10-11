@@ -102,6 +102,48 @@ fit::result<Errno, pid_t> do_clone(const CurrentTask& current_task, struct clone
   return fit::ok(tid);
 }
 
+fit::result<Errno, ktl::pair<fbl::Vector<FsString>, size_t>> read_c_string_vector(
+    const CurrentTask& mm, starnix_uapi::UserRef<starnix_uapi::UserCString> user_vector,
+    size_t elem_limit, size_t vec_limit) {
+  auto user_current = user_vector;
+  fbl::AllocChecker ac;
+  fbl::Vector<FsString> vector;
+  size_t vec_size = 0;
+
+  do {
+    auto user_string = mm.read_object(user_current) _EP(user_string);
+    if (user_string->is_null()) {
+      break;
+    }
+    auto string = mm.read_c_string_to_vec(user_string.value(), elem_limit);
+    if (string.is_error()) {
+      auto e = string.error_value();
+      if (e == errno(ENAMETOOLONG)) {
+        return fit::error(errno(E2BIG));
+      } else {
+        return fit::error(e);
+      }
+    }
+    // Plus one to consider the null terminated
+    auto add_value = mtl::checked_add(vec_size, string->size() + 1);
+    if (add_value.has_value()) {
+      vec_size = add_value.value();
+      if (vec_size > vec_limit) {
+        return fit::error(errno(E2BIG));
+      }
+    } else {
+      return fit::error(errno(E2BIG));
+    }
+    vector.push_back(ktl::move(string.value()), &ac);
+    if (!ac.check()) {
+      return fit::error(errno(ENOMEM));
+    }
+    user_current = user_current.next();
+  } while (true);
+
+  return fit::ok(ktl::pair(ktl::move(vector), vec_size));
+}
+
 fit::result<Errno, pid_t> sys_getpid(const CurrentTask& current_task) {
   return fit::ok(current_task->get_pid());
 }

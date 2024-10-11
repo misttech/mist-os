@@ -9,6 +9,10 @@
 #include <lib/mistos/linux_uapi/typedefs.h>
 #include <lib/mistos/starnix_syscalls/syscall_result.h>
 #include <lib/mistos/starnix_uapi/errors.h>
+#include <lib/mistos/starnix_uapi/user_address.h>
+
+#include <fbl/vector.h>
+#include <ktl/pair.h>
 
 #include <linux/sched.h>
 
@@ -17,6 +21,10 @@ namespace starnix {
 class CurrentTask;
 
 fit::result<Errno, pid_t> do_clone(const CurrentTask& current_task, struct clone_args);
+
+fit::result<Errno, ktl::pair<fbl::Vector<FsString>, size_t>> read_c_string_vector(
+    const CurrentTask& current_task, starnix_uapi::UserRef<starnix_uapi::UserCString> user_vector,
+    size_t elem_limit, size_t vec_limit);
 
 fit::result<Errno, pid_t> sys_getpid(const CurrentTask& current_task);
 fit::result<Errno, pid_t> sys_gettid(const CurrentTask& current_task);
