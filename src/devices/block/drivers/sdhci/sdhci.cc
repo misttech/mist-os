@@ -14,6 +14,7 @@
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fidl/fuchsia.hardware.sdmmc/cpp/wire.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
+#include <inttypes.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
@@ -444,7 +445,7 @@ zx_status_t Sdhci::SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]
 
   PendingRequest pending_request = *std::move(pending_request_);
   pending_request_.reset();
-  return FinishRequest(*req, out_response, pending_request);
+  return FinishRequest(*req, out_response, std::move(pending_request));
 }
 
 zx::result<Sdhci::PendingRequest> Sdhci::StartRequest(const sdmmc_req_t& request,
@@ -544,7 +545,7 @@ zx_status_t Sdhci::SetUpDma(const sdmmc_req_t& request,
   const cpp20::span buffers{request.buffers_list, request.buffers_count};
   zx_status_t status;
   for (const auto& buffer : buffers) {
-    if (status = builder.ProcessBuffer(buffer); status != ZX_OK) {
+    if ((status = builder.ProcessBuffer(buffer)) != ZX_OK) {
       return status;
     }
   }
@@ -836,7 +837,7 @@ zx_status_t Sdhci::SdmmcSetBusFreq(uint32_t bus_freq) {
       .set_internal_clock_enable(1)
       .WriteTo(&regs_mmio_buffer_);
 
-  if (st = WaitForInternalClockStable(); st != ZX_OK) {
+  if ((st = WaitForInternalClockStable()) != ZX_OK) {
     return st;
   }
 
@@ -1002,13 +1003,13 @@ zx_status_t Sdhci::Init() {
   const SoftwareReset target_mask =
       SoftwareReset::Get().FromValue(0).set_reset_all(1).set_reset_cmd(1).set_reset_dat(1);
   zx_status_t status = ZX_OK;
-  if (status = WaitForReset(target_mask); status != ZX_OK) {
+  if ((status = WaitForReset(target_mask)) != ZX_OK) {
     return status;
   }
 
   // The core has been reset, which should have stopped any DMAs that were happening when the driver
   // started. It is now safe to release quarantined pages.
-  if (status = bti_.release_quarantine(); status != ZX_OK) {
+  if ((status = bti_.release_quarantine()) != ZX_OK) {
     zxlogf(ERROR, "Failed to release quarantined pages: %d", status);
     return status;
   }
@@ -1087,7 +1088,7 @@ zx_status_t Sdhci::Init() {
       zxlogf(ERROR, "sdhci: error allocating DMA descriptors");
       return status;
     }
-    info_.max_transfer_size = static_cast<uint64_t>(kDmaDescCount) * zx_system_get_page_size();
+    info_.max_transfer_size = kDmaDescCount * zx_system_get_page_size();
 
     host_control1.WriteTo(&regs_mmio_buffer_);
   } else {
