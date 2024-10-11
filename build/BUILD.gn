@@ -17,6 +17,7 @@ group("tests") {
     "fidl:tests",
     "go:tests",
     "licenses:tests",
+    "profile:tests",
     "python:tests",
     "rbe:tests",
     "rust:tests",
