@@ -53,6 +53,8 @@ zx_paddr_t PageMask() {
   return page_size - 1;
 }
 
+inline uint32_t AbsDifference(uint32_t a, uint32_t b) { return a > b ? a - b : b - a; }
+
 }  // namespace
 
 namespace aml_sdmmc {
@@ -723,8 +725,8 @@ void AmlSdmmc::SetBusWidth(SetBusWidthRequestView request, fdf::Arena& arena,
 
   if (power_suspended_) {
     // Delay this request until power has been resumed.
-    delayed_requests_.emplace_back(
-        SdmmcTaskInfo{std::move(task), std::move(arena), completer.ToAsync()});
+    delayed_requests_.emplace_back(SdmmcTaskInfo{
+        .task = std::move(task), .arena = std::move(arena), .completer = completer.ToAsync()});
     return;
   }
 
@@ -770,8 +772,8 @@ void AmlSdmmc::SetBusFreq(SetBusFreqRequestView request, fdf::Arena& arena,
 
   if (power_suspended_) {
     // Delay this request until power has been resumed.
-    delayed_requests_.emplace_back(
-        SdmmcTaskInfo{std::move(task), std::move(arena), completer.ToAsync()});
+    delayed_requests_.emplace_back(SdmmcTaskInfo{
+        .task = std::move(task), .arena = std::move(arena), .completer = completer.ToAsync()});
     return;
   }
 
@@ -801,7 +803,7 @@ zx_status_t AmlSdmmc::SetBusFreqImpl(uint32_t freq) {
 }
 
 zx_status_t AmlSdmmc::SuspendPower() {
-  if (power_suspended_ == true) {
+  if (power_suspended_) {
     return ZX_OK;
   }
 
@@ -834,7 +836,7 @@ zx_status_t AmlSdmmc::SuspendPower() {
 }
 
 zx_status_t AmlSdmmc::ResumePower() {
-  if (power_suspended_ == false) {
+  if (!power_suspended_) {
     return ZX_OK;
   }
 
@@ -908,8 +910,8 @@ void AmlSdmmc::HwReset(fdf::Arena& arena, HwResetCompleter::Sync& completer) {
 
   if (power_suspended_) {
     // Delay this request until power has been resumed.
-    delayed_requests_.emplace_back(
-        SdmmcTaskInfo{std::move(task), std::move(arena), completer.ToAsync()});
+    delayed_requests_.emplace_back(SdmmcTaskInfo{
+        .task = std::move(task), .arena = std::move(arena), .completer = completer.ToAsync()});
     return;
   }
 
@@ -970,8 +972,8 @@ void AmlSdmmc::SetTiming(SetTimingRequestView request, fdf::Arena& arena,
 
   if (power_suspended_) {
     // Delay this request until power has been resumed.
-    delayed_requests_.emplace_back(
-        SdmmcTaskInfo{std::move(task), std::move(arena), completer.ToAsync()});
+    delayed_requests_.emplace_back(SdmmcTaskInfo{
+        .task = std::move(task), .arena = std::move(arena), .completer = completer.ToAsync()});
     return;
   }
 
@@ -1354,7 +1356,7 @@ bool AmlSdmmc::TuningTestSettings(const TuneContext& context) {
     }
 
     uint8_t tuning_res[512] = {0};
-    if ((status = context.vmo->read(tuning_res, 0, context.expected_block.size())) != ZX_OK) {
+    if (status = context.vmo->read(tuning_res, 0, context.expected_block.size()); status != ZX_OK) {
       FDF_LOGL(ERROR, logger(), "Failed to read VMO: %s", zx_status_get_string(status));
       break;
     }
@@ -1436,8 +1438,6 @@ AmlSdmmc::TuneSettings AmlSdmmc::GetTuneSettings() {
   return settings;
 }
 
-inline uint32_t AbsDifference(uint32_t a, uint32_t b) { return a > b ? a - b : b - a; }
-
 uint32_t AmlSdmmc::DistanceToFailingPoint(TuneSettings point,
                                           cpp20::span<const TuneResults> adj_delay_results) {
   uint64_t results = adj_delay_results[point.adj_delay].results;
@@ -1445,9 +1445,7 @@ uint32_t AmlSdmmc::DistanceToFailingPoint(TuneSettings point,
   for (uint32_t i = 0; i <= AmlSdmmcClock::kMaxDelay; i++, results >>= 1) {
     if ((results & 1) == 0) {
       const uint32_t distance = AbsDifference(i, point.delay);
-      if (distance < min_distance) {
-        min_distance = distance;
-      }
+      min_distance = std::min(distance, min_distance);
     }
   }
 
@@ -1467,8 +1465,8 @@ void AmlSdmmc::PerformTuning(PerformTuningRequestView request, fdf::Arena& arena
     std::lock_guard<std::mutex> lock(lock_);
     if (power_suspended_) {
       // Delay this request until power has been resumed.
-      delayed_requests_.emplace_back(
-          SdmmcTaskInfo{std::move(task), std::move(arena), completer.ToAsync()});
+      delayed_requests_.emplace_back(SdmmcTaskInfo{
+          .task = std::move(task), .arena = std::move(arena), .completer = completer.ToAsync()});
       return;
     }
   }
@@ -1583,7 +1581,7 @@ zx::result<AmlSdmmc::TuneSettings> AmlSdmmc::PerformTuning(
 
   if (largest_failing_window.size == 0) {
     FDF_LOGL(INFO, logger(), "No transfers failed, using default settings");
-    return zx::ok(TuneSettings{0, 0});
+    return zx::ok(TuneSettings{.adj_delay = 0, .delay = 0});
   }
 
   const uint32_t best_adj_delay = (failing_adj_delay + (clk_div / 2)) % clk_div;
@@ -1698,8 +1696,8 @@ void AmlSdmmc::Request(RequestRequestView request, fdf::Arena& arena,
     }
 
     // Delay this request until power has been resumed.
-    delayed_requests_.emplace_back(
-        SdmmcRequestInfo{std::move(reqs), std::move(arena), completer.ToAsync()});
+    delayed_requests_.emplace_back(SdmmcRequestInfo{
+        .reqs = std::move(reqs), .arena = std::move(arena), .completer = completer.ToAsync()});
     return;
   }
 

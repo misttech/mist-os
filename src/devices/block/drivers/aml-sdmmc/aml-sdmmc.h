@@ -229,6 +229,13 @@ class AmlSdmmc : public fdf::DriverBase,
 
   using SdmmcVmoStore = vmo_store::VmoStore<vmo_store::HashTableStorage<uint32_t, OwnedVmoInfo>>;
 
+  // Sweeps from zero to the max delay and creates a TuneWindow representing the largest span of
+  // delay values that failed.
+  static TuneWindow GetFailingWindow(TuneResults results);
+
+  static uint32_t DistanceToFailingPoint(TuneSettings point,
+                                         cpp20::span<const TuneResults> adj_delay_results);
+
   zx::result<> InitResources(fidl::ClientEnd<fuchsia_hardware_platform_device::Device> pdev_client);
   // TODO(b/309152899): Once fuchsia.power.SuspendEnabled config cap is available, have this method
   // return failure if power management could not be configured. Use fuchsia.power.SuspendEnabled to
@@ -250,15 +257,9 @@ class AmlSdmmc : public fdf::DriverBase,
   template <typename T>
   void DoRequestAndComplete(fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcReq> reqs,
                             fdf::Arena& arena, T& completer) TA_REQ(lock_);
-
-  uint32_t DistanceToFailingPoint(TuneSettings point,
-                                  cpp20::span<const TuneResults> adj_delay_results);
   zx::result<TuneSettings> PerformTuning(cpp20::span<const TuneResults> adj_delay_results);
   zx_status_t TuningDoTransfer(const TuneContext& context) TA_REQ(tuning_lock_);
   bool TuningTestSettings(const TuneContext& context) TA_REQ(tuning_lock_);
-  // Sweeps from zero to the max delay and creates a TuneWindow representing the largest span of
-  // delay values that failed.
-  TuneWindow GetFailingWindow(TuneResults results);
   TuneResults TuneDelayLines(const TuneContext& context) TA_REQ(tuning_lock_);
 
   void SetTuneSettings(const TuneSettings& settings) TA_REQ(lock_);
