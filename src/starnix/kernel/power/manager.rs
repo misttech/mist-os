@@ -696,9 +696,13 @@ pub trait OnWakeOps: Send + Sync {
 }
 
 /// The signal that the runner raises when handing over an event to the kernel.
+/// While this signal is high the kernel will be kept awake.
+/// The kernel will clear this signal when it should no longer be kept awake.
 pub const RUNNER_PROXY_EVENT_SIGNAL: zx::Signals = zx::Signals::USER_0;
 
 /// The signal that the kernel raises to indicate that a message has been handled.
+/// While this signal is low, no new messages will be sent to the kernel.
+/// The kernel will raise this signal when it is alright to receive new messages.
 pub const KERNEL_PROXY_EVENT_SIGNAL: zx::Signals = zx::Signals::USER_1;
 
 /// Tells the runner that we have handled the message and are ready to accept more messages.
