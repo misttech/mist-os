@@ -13,14 +13,20 @@
 #include <lib/mistos/starnix/kernel/task/session.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
+#include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/kernel/vfs/path.h>
 #include <lib/mistos/starnix_syscalls/syscall_result.h>
+#include <lib/mistos/starnix_uapi/open_flags.h>
+#include <lib/mistos/starnix_uapi/resource_limits.h>
 #include <lib/mistos/starnix_uapi/signals.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
+#include <lib/mistos/util/num.h>
 #include <lib/mistos/util/weak_wrapper.h>
 #include <trace.h>
 #include <zircon/compiler.h>
 
+#include <fbl/alloc_checker.h>
+#include <fbl/vector.h>
 #include <ktl/algorithm.h>
 #include <ktl/optional.h>
 #include <object/process_dispatcher.h>
@@ -28,10 +34,13 @@
 #include <linux/errno.h>
 #include <linux/prctl.h>
 
-using namespace starnix_uapi;
 using namespace starnix_syscalls;
 
 namespace {
+
+using starnix_uapi::UserAddress;
+using starnix_uapi::UserCString;
+using starnix_uapi::UserRef;
 
 util::WeakPtr<starnix::Task> get_task_or_current(const starnix::CurrentTask& current_task,
                                                  pid_t pid) {
@@ -142,6 +151,154 @@ fit::result<Errno, ktl::pair<fbl::Vector<FsString>, size_t>> read_c_string_vecto
   } while (true);
 
   return fit::ok(ktl::pair(ktl::move(vector), vec_size));
+}
+
+fit::result<Errno, pid_t> sys_clone3(const CurrentTask& current_task,
+                                     starnix_uapi::UserRef<struct clone_args> user_clone_args,
+                                     size_t user_clone_args_size) {
+  // Only these specific sized versions are supported.
+  if (user_clone_args_size != CLONE_ARGS_SIZE_VER0 &&
+      user_clone_args_size != CLONE_ARGS_SIZE_VER1 &&
+      user_clone_args_size != CLONE_ARGS_SIZE_VER2) {
+    return fit::error(errno(EINVAL));
+  }
+
+  // The most recent version of the struct size should match our definition.
+  static_assert(sizeof(struct clone_args) == CLONE_ARGS_SIZE_VER2);
+
+  auto clone_args =
+      current_task.read_object_partial(user_clone_args, user_clone_args_size) _EP(clone_args);
+  return do_clone(current_task, clone_args.value());
+}
+
+fit::result<Errno> sys_execve(CurrentTask& current_task, UserCString user_path,
+                              UserRef<starnix_uapi::UserCString> user_argv,
+                              UserRef<starnix_uapi::UserCString> user_environ) {
+  return sys_execveat(current_task, FdNumber::AT_FDCWD_, user_path, user_argv, user_environ, 0);
+}
+
+fit::result<Errno> sys_execveat(CurrentTask& current_task, FdNumber dir_fd, UserCString user_path,
+                                UserRef<starnix_uapi::UserCString> user_argv,
+                                UserRef<starnix_uapi::UserCString> user_environ, uint32_t flags) {
+  if (flags & ~(AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW)) {
+    return fit::error(errno(EINVAL));
+  }
+
+  // Calculate the limit for argv and environ size as 1/4 of the stack size, floored at 32 pages.
+  // See the Limits sections in https://man7.org/linux/man-pages/man2/execve.2.html
+  const size_t PAGE_LIMIT = 32;
+  size_t page_limit_size = PAGE_LIMIT * static_cast<size_t>(PAGE_SIZE);
+  auto rlimit =
+      current_task->thread_group->get_rlimit(starnix_uapi::Resource{.value = ResourceEnum::STACK});
+  auto stack_limit = rlimit / 4;
+  auto argv_env_limit = ktl::max(page_limit_size, static_cast<size_t>(stack_limit));
+
+  // The limit per argument or environment variable is 32 pages.
+  // See the Limits sections in https://man7.org/linux/man-pages/man2/execve.2.html
+
+  fit::result<Errno, ktl::pair<fbl::Vector<FsString>, size_t>> result_argv =
+      user_argv->is_null() ? fit::ok(ktl::pair(ktl::move(fbl::Vector<FsString>()), 0))
+                           : [&]() -> fit::result<Errno, ktl::pair<fbl::Vector<FsString>, size_t>> {
+    auto result =
+        read_c_string_vector(current_task, user_argv, page_limit_size, argv_env_limit) _EP(result);
+    return result.take_value();
+  }() _EP(result_argv);
+
+  auto& [argv, argv_size] = result_argv.value();
+
+  fit::result<Errno, ktl::pair<fbl::Vector<FsString>, size_t>> result_enpv =
+      user_environ->is_null()
+          ? fit::ok(ktl::pair(ktl::move(fbl::Vector<FsString>()), 0))
+          : [&]() -> fit::result<Errno, ktl::pair<fbl::Vector<FsString>, size_t>> {
+    auto result = read_c_string_vector(current_task, user_environ, page_limit_size,
+                                       argv_env_limit - argv_size) _EP(result);
+    return result.take_value();
+  }() _EP(result_enpv);
+
+  auto& [environ, _] = result_enpv.value();
+
+  auto path =
+      current_task->read_c_string_to_vec(user_path, static_cast<size_t>(PATH_MAX)) _EP(path);
+
+  TRACEF("execveat(%d, %.*s)", dir_fd.raw(), static_cast<int>(path->size()), path->data());
+
+  starnix_uapi::OpenFlags open_flags = starnix_uapi::OpenFlags(starnix_uapi::OpenFlagsEnum::RDONLY);
+  if ((flags & AT_SYMLINK_NOFOLLOW) != 0) {
+    open_flags |= starnix_uapi::OpenFlagsEnum::NOFOLLOW;
+  }
+
+  auto executable = [&]() -> fit::result<Errno, FileHandle> {
+    if (path->empty()) {
+      if ((flags & AT_EMPTY_PATH) == 0) {
+        // If AT_EMPTY_PATH is not set, this is an error.
+        return fit::error(errno(ENOENT));
+      }
+
+      // O_PATH allowed for:
+      //
+      //   Passing the file descriptor as the dirfd argument of
+      //   openat() and the other "*at()" system calls.  This
+      //   includes linkat(2) with AT_EMPTY_PATH (or via procfs
+      //   using AT_SYMLINK_FOLLOW) even if the file is not a
+      //   directory.
+      //
+      // See https://man7.org/linux/man-pages/man2/open.2.html
+      auto file = current_task->files.get_allowing_opath(dir_fd) _EP(file);
+
+      // We are forced to reopen the file with O_RDONLY to get access to the underlying VMO.
+      // Note that skip the access check in the arguments in case the file mode does
+      // not actually have the read permission bit.
+      //
+      // This can happen because a file could have --x--x--x mode permissions and then
+      // be opened with O_PATH. Internally, the file operations would all be stubbed out
+      // for that file, which is undesirable here.
+      //
+      // See https://man7.org/linux/man-pages/man3/fexecve.3.html#DESCRIPTION
+      // file->name()
+      return file->name.open(current_task,
+                             starnix_uapi::OpenFlags(starnix_uapi::OpenFlagsEnum::RDONLY),
+                             /* AccessCheck::check_for(Access::EXEC)*/ true);
+    } else {
+      return current_task.open_file_at(
+          dir_fd, *path, open_flags, FileMode(),
+          ResolveFlags::empty() /*, AccessCheck::check_for(Access::EXEC)*/);
+    }
+  }() _EP(executable);
+
+  // This path can affect script resolution (the path is appended to the script args)
+  // and the auxiliary value `AT_EXECFN` from the syscall `getauxval()`
+  auto npath = [&]() {
+    if (dir_fd == FdNumber::AT_FDCWD_) {
+      // The file descriptor is CWD, so the path is exactly
+      // what the user specified.
+      return path.value();
+    } else {
+      // The path is `/dev/fd/N/P` where N is the file descriptor
+      // number and P is the user-provided path (if relative and non-empty).
+      //
+      // See https://man7.org/linux/man-pages/man2/execveat.2.html#NOTES
+      if (path->empty()) {
+        // User-provided path is empty
+        // None => format!("/dev/fd/{}", dir_fd.raw()).into_bytes(),
+      }
+      switch (path.value()[0]) {
+        case '/': {
+          // The user-provided path is absolute, so dir_fd is ignored.
+          return path.value();
+        }
+        default: {
+          // User-provided path is relative, append it.
+          // let mut new_path = format!("/dev/fd/{}/", dir_fd.raw()).into_bytes();
+          // new_path.append(&mut path.to_vec());
+          // new_path
+        }
+      }
+      return BString();
+    }
+  }();
+
+  _EP(current_task.exec(*executable, npath, argv, environ));
+  return fit::ok();
 }
 
 fit::result<Errno, pid_t> sys_getpid(const CurrentTask& current_task) {
