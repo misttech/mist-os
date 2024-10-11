@@ -22,13 +22,11 @@ class SyslogFile : public FileOps {
   fileops_impl_nonseekable();
   fileops_impl_noop_sync();
 
-  fit::result<Errno, size_t> write(/*Locked<WriteOps>& locked,*/ const FileObject& file,
-                                   const CurrentTask& current_task, size_t offset,
-                                   InputBuffer* data) final;
+  fit::result<Errno, size_t> write(const FileObject& file, const CurrentTask& current_task,
+                                   size_t offset, InputBuffer* data) final;
 
-  fit::result<Errno, size_t> read(/*Locked<FileOpsCore>& locked,*/ const FileObject& file,
-                                  const CurrentTask& current_task, size_t offset,
-                                  OutputBuffer* data) final {
+  fit::result<Errno, size_t> read(const FileObject& file, const CurrentTask& current_task,
+                                  size_t offset, OutputBuffer* data) final {
     DEBUG_ASSERT(offset == 0);
     return fit::ok(0);
   }
