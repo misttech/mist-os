@@ -52,7 +52,7 @@ func MergeSameVersionProfiles(ctx context.Context, tempDir string, profiles []st
 	// Use debuginfod during profile merging if it is enabled.
 	if len(debuginfodServers) > 0 && version == llvmProfdataDebuginfodSupportedVersion {
 		useDebugInfod = true
-		// TODO(https://fxbug.dev/359885449): Switch to --failure-mode=any by default when missing build id issue is resolved.
+		// TODO(https://fxbug.dev/368375861): Switch to --failure-mode=any by default when missing build id issue is resolved.
 		args = append(args, "--debuginfod", "--correlate=binary", "--failure-mode=all")
 	} else {
 		args = append(args, "--failure-mode=any")

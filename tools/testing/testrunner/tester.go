@@ -1080,7 +1080,8 @@ func (t *FFXTester) moveProfileToOutputDir(ctx context.Context, sinkDir, sinkFil
 		logger.Debugf(ctx, "merging profile %s to %s", profile, destProfile)
 		if err := covargs.MergeSameVersionProfiles(ctx, sinkDir, []string{destProfile, profile}, destProfile, t.llvmProfdata, t.llvmVersion, 0, t.debuginfodServers, t.debuginfodCache); err != nil {
 			logger.Debugf(ctx, "failed to merge profiles: %s", err)
-			return err
+			// TODO(https://fxbug.dev/368375861): Return err once missing build id issue is resolved.
+			return nil
 		}
 		// Remove old profile.
 		if err := os.Remove(profile); err != nil {
