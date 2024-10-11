@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <set>
+#include <thread>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -57,6 +58,38 @@ TEST(TargetsTest, OwnJob) {
   }
 
   EXPECT_TRUE(found_self);
+}
+
+// Ensure that if a sub job exits, we are able to get the remaining jobs that still exist
+TEST(TargetsTest, JobsDone) {
+  std::atomic<bool> keep_going = true;
+  // In the background, create and destroy some siblings
+  std::thread sibling_maker{[&keep_going]() {
+    while (keep_going.load(std::memory_order::relaxed)) {
+      zx::job sibling;
+      zx_status_t result = zx::job::create(*zx::job::default_job(), 0, &sibling);
+      ASSERT_EQ(result, ZX_OK);
+    }
+  }};
+
+  // Run a bunch of times to give the race condition a chance to occur.
+  // Experimentally, the thread above is enough to trigger the race condition about 20% of the time.
+  for (size_t i = 0; i < 100; i++) {
+    zx::job parent;
+    ASSERT_EQ(ZX_OK, zx::job::default_job()->duplicate(ZX_RIGHT_SAME_RIGHTS, &parent));
+
+    zx::result<profiler::JobTarget> target = profiler::MakeJobTarget(std::move(parent));
+    // This should succeed regardless of if a job disappeared from under us or not. In the log for
+    // the test, we'll likely see some warnings about jobs not being found.
+    ASSERT_TRUE(target.is_ok());
+
+    // We should have 1 or zero sub jobs.
+    size_t num_subjobs = target->child_jobs.size();
+    EXPECT_TRUE(num_subjobs == 0 || num_subjobs == 1);
+  }
+
+  keep_going.store(false, std::memory_order_relaxed);
+  sibling_maker.join();
 }
 
 TEST(TargetsTest, TargetTreeAddProcessTopLevel) {
