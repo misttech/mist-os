@@ -92,12 +92,12 @@ fuchsia_hardware_power::PowerElementConfiguration GetSystemWakeOnRequestPowerCon
 
   fuchsia_hardware_power::LevelTuple on_to_active = {{
       .child_level = Ufs::kPowerLevelOn,
-      .parent_level = static_cast<uint8_t>(fuchsia_power_system::WakeHandlingLevel::kActive),
+      .parent_level = static_cast<uint8_t>(fuchsia_power_system::ExecutionStateLevel::kSuspending),
   }};
   fuchsia_hardware_power::PowerDependency assertive_on_wake_handling_active = {{
       .child = Ufs::kSystemWakeOnRequestPowerElementName,
       .parent = fuchsia_hardware_power::ParentElement::WithSag(
-          fuchsia_hardware_power::SagElement::kWakeHandling),
+          fuchsia_hardware_power::SagElement::kExecutionState),
       .level_deps = {{on_to_active}},
       .strength = fuchsia_hardware_power::RequirementType::kAssertive,
   }};
