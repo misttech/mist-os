@@ -4,7 +4,6 @@
 
 use crate::attribution_client::AttributionState;
 use std::collections::{HashMap, HashSet};
-use zx_types::{zx_rights_t, ZX_RIGHT_SAME_RIGHTS};
 use {
     fidl_fuchsia_memory_attribution as fattribution,
     fidl_fuchsia_memory_attribution_plugin as fplugin, zx,
@@ -61,13 +60,13 @@ pub trait Job {
     fn get_child_job(
         &self,
         koid: &zx::Koid,
-        rights: zx_rights_t,
+        rights: zx::Rights,
     ) -> Result<Box<dyn Job>, zx::Status>;
     /// Returns a child Process from its Koid.
     fn get_child_process(
         &self,
         koid: &zx::Koid,
-        rights: zx_rights_t,
+        rights: zx::Rights,
     ) -> Result<Box<dyn Process>, zx::Status>;
 }
 
@@ -91,7 +90,7 @@ impl Job for zx::Job {
     fn get_child_job(
         &self,
         koid: &zx::Koid,
-        rights: zx_rights_t,
+        rights: zx::Rights,
     ) -> Result<Box<dyn Job>, zx::Status> {
         zx::Job::get_child(&self, koid, rights)
             .map(|handle| Box::<zx::Job>::new(handle.into()) as Box<dyn Job>)
@@ -100,7 +99,7 @@ impl Job for zx::Job {
     fn get_child_process(
         &self,
         koid: &zx::Koid,
-        rights: zx_rights_t,
+        rights: zx::Rights,
     ) -> Result<Box<dyn Process>, zx::Status> {
         zx::Job::get_child(&self, koid, rights)
             .map(|handle| Box::<zx::Process>::new(handle.into()) as Box<dyn Process>)
@@ -182,7 +181,7 @@ impl KernelResources {
             // Here and below: jobs and processes can disappear while we explore the job
             // and process hierarchy. Therefore, we don't stop the exploration if we don't
             // find a previously mentioned job or process, but we just ignore it silently.
-            let child_job = match job.get_child_job(child_job_koid, ZX_RIGHT_SAME_RIGHTS) {
+            let child_job = match job.get_child_job(child_job_koid, zx::Rights::SAME_RIGHTS) {
                 Err(s) => {
                     if s == zx::Status::NOT_FOUND {
                         continue;
@@ -196,7 +195,7 @@ impl KernelResources {
         }
 
         for process_koid in &processes {
-            let child_process = match job.get_child_process(process_koid, ZX_RIGHT_SAME_RIGHTS) {
+            let child_process = match job.get_child_process(process_koid, zx::Rights::SAME_RIGHTS) {
                 Err(s) => {
                     if s == zx::Status::NOT_FOUND {
                         continue;
@@ -391,7 +390,7 @@ mod tests {
         fn get_child_job(
             &self,
             koid: &zx::Koid,
-            _rights: zx_rights_t,
+            _rights: zx::Rights,
         ) -> Result<Box<dyn Job>, zx::Status> {
             Ok(Box::new(self.children.get(koid).ok_or(Err(zx::Status::NOT_FOUND))?.clone()))
         }
@@ -399,7 +398,7 @@ mod tests {
         fn get_child_process(
             &self,
             koid: &zx::Koid,
-            _rights: zx_rights_t,
+            _rights: zx::Rights,
         ) -> Result<Box<dyn Process>, zx::Status> {
             Ok(Box::new(self.processes.get(koid).ok_or(Err(zx::Status::NOT_FOUND))?.clone()))
         }

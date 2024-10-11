@@ -293,7 +293,7 @@ async fn get_process_handle_by_name(realm: &RealmInstance, name: &str) -> zx::Pr
     // Find the process named with the given name in the job.
     let process_koids = starnix_kernel_job.processes().unwrap();
     for koid in process_koids {
-        let process = starnix_kernel_job.get_child(&koid, zx::Rights::SAME_RIGHTS.bits()).unwrap();
+        let process = starnix_kernel_job.get_child(&koid, zx::Rights::SAME_RIGHTS).unwrap();
         if &process.get_name().unwrap() == name {
             let process: zx::Process = process.into();
             return process;

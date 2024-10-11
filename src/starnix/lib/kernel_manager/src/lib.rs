@@ -501,8 +501,7 @@ async fn suspend_kernel(kernel_job: &zx::Job) -> Result<Vec<zx::Handle>, Error> 
 
             found_new_process = true;
 
-            if let Ok(process_handle) =
-                kernel_job.get_child(&process_koid, zx::Rights::SAME_RIGHTS.bits())
+            if let Ok(process_handle) = kernel_job.get_child(&process_koid, zx::Rights::SAME_RIGHTS)
             {
                 let process = zx::Process::from_handle(process_handle);
                 match process.suspend() {
@@ -525,8 +524,7 @@ async fn suspend_kernel(kernel_job: &zx::Job) -> Result<Vec<zx::Handle>, Error> 
         for process in processes {
             let threads = process.threads().expect("failed to get threads");
             for thread_koid in &threads {
-                if let Ok(thread_handle) =
-                    process.get_child(&thread_koid, zx::Rights::SAME_RIGHTS.bits())
+                if let Ok(thread_handle) = process.get_child(&thread_koid, zx::Rights::SAME_RIGHTS)
                 {
                     let thread = zx::Thread::from_handle(thread_handle);
                     match thread.wait_handle(

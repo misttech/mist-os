@@ -4,11 +4,11 @@
 
 //! Type-safe bindings for Zircon processes.
 
-use crate::sys::{self as sys, zx_handle_t, zx_rights_t, zx_time_t, ZX_OBJ_TYPE_UPPER_BOUND};
+use crate::sys::{self as sys, zx_handle_t, zx_time_t, ZX_OBJ_TYPE_UPPER_BOUND};
 use crate::{
     object_get_info_single, object_get_info_vec, object_get_property, object_set_property, ok,
     AsHandleRef, Handle, HandleBased, HandleRef, Koid, MapInfo, ObjectQuery, Property,
-    PropertyQuery, Status, Task, Thread, Topic, VmoInfo,
+    PropertyQuery, Rights, Status, Task, Thread, Topic, VmoInfo,
 };
 use bitflags::bitflags;
 use std::mem::MaybeUninit;
@@ -305,10 +305,10 @@ impl Process {
     /// Wraps the
     /// [zx_object_get_child](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_child.md)
     /// syscall.
-    pub fn get_child(&self, koid: &Koid, rights: zx_rights_t) -> Result<Handle, Status> {
+    pub fn get_child(&self, koid: &Koid, rights: Rights) -> Result<Handle, Status> {
         let mut handle: zx_handle_t = Default::default();
         let status = unsafe {
-            sys::zx_object_get_child(self.raw_handle(), koid.raw_koid(), rights, &mut handle)
+            sys::zx_object_get_child(self.raw_handle(), koid.raw_koid(), rights.bits(), &mut handle)
         };
         ok(status)?;
         Ok(unsafe { Handle::from_raw(handle) })
@@ -332,7 +332,6 @@ mod tests {
     // "real" zx::Process that we need to use.
     use assert_matches::assert_matches;
     use std::ffi::CString;
-    use zx::sys::ZX_RIGHT_NONE;
     use zx::{
         sys, system_get_page_size, AsHandleRef, Handle, Instant, MapDetails, ProcessInfo,
         ProcessInfoFlags, ProcessOptions, Signals, Task, TaskStatsInfo, VmarFlags, Vmo,
@@ -555,8 +554,9 @@ mod tests {
         let current_thread_koid = fuchsia_runtime::thread_self().get_koid().unwrap();
         let threads_koids = fuchsia_runtime::process_self().threads().unwrap();
         assert!(threads_koids.contains(&current_thread_koid));
-        let thread_handle =
-            fuchsia_runtime::process_self().get_child(&current_thread_koid, ZX_RIGHT_NONE).unwrap();
+        let thread_handle = fuchsia_runtime::process_self()
+            .get_child(&current_thread_koid, zx::Rights::NONE)
+            .unwrap();
         assert_eq!(thread_handle.get_koid().unwrap(), current_thread_koid);
     }
 
@@ -578,7 +578,7 @@ mod tests {
         let thread_koid = thread.get_koid().unwrap();
 
         assert!(process.threads().unwrap().is_empty());
-        assert!(process.get_child(&thread_koid, ZX_RIGHT_NONE).is_err());
+        assert!(process.get_child(&thread_koid, zx::Rights::NONE).is_err());
     }
 
     #[test]
@@ -600,7 +600,7 @@ mod tests {
         assert_eq!(threads_koids.len(), 1);
         assert_eq!(threads_koids[0], thread1.get_koid().unwrap());
         assert_eq!(
-            process.get_child(&threads_koids[0], ZX_RIGHT_NONE).unwrap().get_koid().unwrap(),
+            process.get_child(&threads_koids[0], zx::Rights::NONE).unwrap().get_koid().unwrap(),
             threads_koids[0]
         );
 
@@ -613,11 +613,11 @@ mod tests {
         assert!(threads_koids.contains(&thread1.get_koid().unwrap()));
         assert!(threads_koids.contains(&thread2.get_koid().unwrap()));
         assert_eq!(
-            process.get_child(&threads_koids[0], ZX_RIGHT_NONE).unwrap().get_koid().unwrap(),
+            process.get_child(&threads_koids[0], zx::Rights::NONE).unwrap().get_koid().unwrap(),
             threads_koids[0]
         );
         assert_eq!(
-            process.get_child(&threads_koids[1], ZX_RIGHT_NONE).unwrap().get_koid().unwrap(),
+            process.get_child(&threads_koids[1], zx::Rights::NONE).unwrap().get_koid().unwrap(),
             threads_koids[1]
         );
 
