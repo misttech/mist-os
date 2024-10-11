@@ -25,10 +25,14 @@ macro_rules! impl_integer {
 }
 
 macro_rules! impl_signed_integer_traits {
-    ($name:ident: $endian:ident $prim:ty) => {
+    ($name:ident: $endian:ident $prim:ident) => {
         // SAFETY: An impl of `CheckBytes` with a `check_bytes` function that is
         // a no-op is sound for signed integers.
         unsafe_impl_check_bytes_noop!(for $name);
+        // SAFETY: Signed integers are inhabited and allow all bit patterns,
+        // fulfilling the requirements of `Zeroable` and `Pod`.
+        unsafe_impl_zeroable!(for $name);
+        unsafe_impl_pod!(for $name);
 
         impl_binop!(Add::add for $name: $prim);
         impl_binassign!(AddAssign::add_assign for $name: $prim);
@@ -46,6 +50,7 @@ macro_rules! impl_signed_integer_traits {
         impl_binop!(Div::div for $name: $prim);
         impl_binassign!(DivAssign::div_assign for $name: $prim);
         impl_from!(for $name: $prim);
+        impl_try_from_ptr_size!(isize for $name: $prim);
         impl_hash!(for $name);
         impl_fmt!(LowerExp for $name);
         impl_fmt!(LowerHex for $name);
@@ -71,10 +76,14 @@ macro_rules! impl_signed_integer_traits {
 }
 
 macro_rules! impl_unsigned_integer_traits {
-    ($name:ident: $endian:ident $prim:ty) => {
+    ($name:ident: $endian:ident $prim:ident) => {
         // SAFETY: An impl of `CheckBytes` with a `check_bytes` function that is
         // a no-op is sound for unsigned integers.
         unsafe_impl_check_bytes_noop!(for $name);
+        // SAFETY: Unsigned integers are inhabited and allow all bit patterns,
+        // fulfilling the requirements of `Zeroable` and `Pod`.
+        unsafe_impl_zeroable!(for $name);
+        unsafe_impl_pod!(for $name);
 
         impl_binop!(Add::add for $name: $prim);
         impl_binassign!(AddAssign::add_assign for $name: $prim);
@@ -92,6 +101,7 @@ macro_rules! impl_unsigned_integer_traits {
         impl_binop!(Div::div for $name: $prim);
         impl_binassign!(DivAssign::div_assign for $name: $prim);
         impl_from!(for $name: $prim);
+        impl_try_from_ptr_size!(usize for $name: $prim);
         impl_hash!(for $name);
         impl_fmt!(LowerExp for $name);
         impl_fmt!(LowerHex for $name);
@@ -128,12 +138,14 @@ macro_rules! impl_float {
                 use core::mem::transmute;
 
                 // `transmute` is used here because `from_bits` and `to_bits`
-                // are not stably const as of 1.72.0.
+                // are not stably const as of 1.81.0.
 
+                #[allow(clippy::transmute_float_to_int)]
                 // SAFETY: `$prim` and `$prim_int` have the same size and all
                 // bit patterns are valid for both.
                 let value = unsafe { transmute::<$prim, $prim_int>(value) };
                 let value = swap_endian!($endian value);
+                #[allow(clippy::transmute_int_to_float)]
                 // SAFETY: `$prim` and `$prim_int` have the same size and all
                 // bit patterns are valid for both.
                 let value = unsafe { transmute::<$prim_int, $prim>(value) };
@@ -150,12 +162,14 @@ macro_rules! impl_float {
                 use core::mem::transmute;
 
                 // `transmute` is used here because `from_bits` and `to_bits`
-                // are not stably const as of 1.72.0.
+                // are not stably const as of 1.81.0.
 
+                #[allow(clippy::transmute_float_to_int)]
                 // SAFETY: `$prim` and `$prim_int` have the same size and all
                 // bit patterns are valid for both.
                 let value = unsafe { transmute::<$prim, $prim_int>(self.0) };
                 let value = swap_endian!($endian value);
+                #[allow(clippy::transmute_int_to_float)]
                 // SAFETY: `$prim` and `$prim_int` have the same size and all
                 // bit patterns are valid for both.
                 unsafe { transmute::<$prim_int, $prim>(value) }
@@ -165,6 +179,10 @@ macro_rules! impl_float {
         // SAFETY: An impl of `CheckBytes` with a `check_bytes` function that is
         // a no-op is sound for floats.
         unsafe_impl_check_bytes_noop!(for $name);
+        // SAFETY: `Pod` is implemented for `f32` and `f64` - as such, flipped
+        // representations must also be `Pod`.
+        unsafe_impl_zeroable!(for $name);
+        unsafe_impl_pod!(for $name);
 
         impl_binop!(Add::add for $name: $prim);
         impl_binassign!(AddAssign::add_assign for $name: $prim);
@@ -221,6 +239,12 @@ macro_rules! impl_char {
                 unsafe { transmute::<u32, char>(swap_endian!($endian self.0)) }
             }
         }
+
+        // SAFETY: An all-zero bits `char` is just the null char, whether you
+        // read it forwards or backwards.
+        unsafe_impl_zeroable!(for $name);
+        // SAFETY: `char`s do not contain any uninit bytes.
+        unsafe_impl_no_uninit!(for $name);
 
         impl_clone_and_copy!(for $name);
         impl_fmt!(Debug for $name);
@@ -324,6 +348,9 @@ macro_rules! impl_nonzero {
             }
         }
 
+        // SAFETY: Non-zero integers do not contain any uninit bytes.
+        unsafe_impl_no_uninit!(for $name);
+
         impl_clone_and_copy!(for $name);
         impl_fmt!(Binary for $name);
         impl_binop_nonzero!(BitOr::bitor for $name: $prim);
@@ -337,35 +364,5 @@ macro_rules! impl_nonzero {
         impl_partial_eq_and_eq!(for $name: $prim);
         impl_partial_ord_and_ord!(for $name: $prim);
         impl_fmt!(UpperHex for $name);
-
-        #[cfg(feature = "bytecheck")]
-        // SAFETY: `check_bytes` only returns `Ok` if `value` points to a valid
-        // non-zero value, which is the only requirement for `NonZero` integers.
-        unsafe impl<C> bytecheck::CheckBytes<C> for $name
-        where
-            C: bytecheck::rancor::Fallible + ?Sized,
-            C::Error: bytecheck::rancor::Trace,
-            $prim: bytecheck::CheckBytes<C>,
-        {
-            #[inline]
-            unsafe fn check_bytes(
-                value: *const Self,
-                context: &mut C,
-            ) -> Result<(), C::Error> {
-                use bytecheck::rancor::ResultExt as _;
-
-                // SAFETY: `value` points to a `Self`, which has the same size
-                // as a `$prim` and is at least as aligned as one. Note that the
-                // bit pattern for 0 is always the same regardless of
-                // endianness.
-                unsafe {
-                    <$prim>::check_bytes(value.cast(), context)
-                        .with_trace(|| $crate::context::ValueCheckContext {
-                            inner_name: core::stringify!($prim),
-                            outer_name: core::stringify!($name),
-                        })
-                }
-            }
-        }
     };
 }

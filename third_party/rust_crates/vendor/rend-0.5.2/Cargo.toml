@@ -12,11 +12,16 @@
 [package]
 edition = "2021"
 name = "rend"
-version = "0.5.0-pre6"
+version = "0.5.2"
 authors = ["David Koloski <djkoloski@gmail.com>"]
-description = "Endian-aware primitives for Rust"
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+description = "Cross-platform, endian-aware primitives for Rust"
 documentation = "https://docs.rs/rend"
-readme = "crates-io.md"
+readme = "README.md"
 keywords = [
     "endian",
     "no_std",
@@ -28,10 +33,34 @@ categories = [
 license = "MIT"
 repository = "https://github.com/djkoloski/rend"
 
+[lib]
+name = "rend"
+path = "src/lib.rs"
+
 [dependencies.bytecheck]
-version = "0.8.0-pre6"
+version = "0.8"
+optional = true
+default-features = false
+
+[dependencies.bytemuck-1]
+version = "1"
+optional = true
+default-features = false
+package = "bytemuck"
+
+[dependencies.zerocopy]
+version = "0.8"
+optional = true
+default-features = false
+
+[dependencies.zerocopy-derive]
+version = "0.8"
 optional = true
 default-features = false
 
 [features]
 default = []
+zerocopy-0_8 = [
+    "dep:zerocopy",
+    "dep:zerocopy-derive",
+]
