@@ -72,7 +72,7 @@ def vbmeta_info_no_hash(python_path, avbtool_path, image_path):
 
 
 def normalize(
-    config,
+    images,
     root_dir,
     exclude_packages,
     exclude_images,
@@ -81,7 +81,7 @@ def normalize(
     avbtool_path,
 ):
     """Clean up the input for diffing."""
-    for image in config:
+    for image in images:
         if not image["path"]:
             raise ValueError(
                 "Paths should not be missing from images.json entries",
@@ -121,9 +121,9 @@ def normalize(
                     if pkg["name"] not in exclude_packages
                 ]
 
-    config.sort(key=image_key)
+    images.sort(key=image_key)
 
-    return config
+    return images
 
 
 def json_format(x):
@@ -221,8 +221,8 @@ def main():
 
     args = parser.parse_args()
 
-    images_manifest_gn = json.load(args.images_manifest_gn)
-    images_manifest_bzl = json.load(args.images_manifest_bzl)
+    images_manifest_gn = json.load(args.images_manifest_gn)["images"]
+    images_manifest_bzl = json.load(args.images_manifest_bzl)["images"]
 
     extra_files_read = []
     exclude_packages = []
@@ -241,7 +241,7 @@ def main():
         if gn_path.endswith("_create_system") or gn_path.endswith(
             "_create_recovery_system"
         ):
-            bazel_images_manifest_dir = bazel_path
+            bazel_images_manifest_dir = bazel_path.strip()
             break
 
     normalize(

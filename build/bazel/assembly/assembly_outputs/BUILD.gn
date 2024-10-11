@@ -34,6 +34,21 @@ if (use_bazel_images_only) {
         "bringup.zbi",
       ]
     }
+  } else {
+    verify_images_manifest("verify_fuchsia") {
+      testonly = true
+      gn_assembled_system_target =
+          "//build/images/fuchsia:fuchsia($default_toolchain)"
+      bazel_product_bundle_target = bazel_product_bundle_target
+
+      exclude_images = [
+        # Fxfs does not guarantee binary determinism in image generation.
+        # The package manifests produced by assembly ensure that the contents
+        # are logically identical.
+        "fxfs.blk",
+        "fxfs.sparse.blk",
+      ]
+    }
   }
 
   group("verifications") {
@@ -41,6 +56,8 @@ if (use_bazel_images_only) {
     deps = []
     if (use_bringup_assembly) {
       deps += [ ":verify_bringup" ]
+    } else if (build_info_product == "core") {
+      deps += [ ":verify_fuchsia" ]
     }
   }
 }
