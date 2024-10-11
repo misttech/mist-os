@@ -164,7 +164,8 @@ TEST(TimeTest, CurrentUtcTime) {
 class InvalidClock : public timekeeper::Clock {
  private:
   zx_status_t GetUtcTime(zx_time_t* time) const override { return ZX_ERR_BAD_HANDLE; }
-  zx_time_t GetMonotonicTime() const override { return 0; }
+  zx_instant_mono_t GetMonotonicTime() const override { return 0; }
+  zx_instant_boot_t GetBootTime() const override { return 0; }
 };
 
 TEST(TimeTest, CurrentUtcTimeRaw_InvalidStatus) {
