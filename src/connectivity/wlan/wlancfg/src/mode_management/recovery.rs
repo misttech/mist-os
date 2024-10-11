@@ -116,6 +116,18 @@ impl RecoveryAction {
             RecoveryAction::IfaceRecovery(IfaceRecoveryOperation::StopAp { .. }) => None,
         }
     }
+
+    fn as_timeout_recovery_mechanism(self) -> Option<telemetry::TimeoutRecoveryMechanism> {
+        match self {
+            RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy { .. }) => {
+                Some(telemetry::TimeoutRecoveryMechanism::PhyReset)
+            }
+            RecoveryAction::PhyRecovery(PhyRecoveryOperation::DestroyIface { .. }) => {
+                Some(telemetry::TimeoutRecoveryMechanism::DestroyIface)
+            }
+            RecoveryAction::IfaceRecovery(..) => None,
+        }
+    }
 }
 
 impl WriteInspect for RecoveryAction {
@@ -161,6 +173,9 @@ impl RecoverySummary {
                     self.action.as_phy_recovery_mechanism()?,
                 ))
             }
+            Defect::Iface(IfaceFailure::Timeout { .. }) => Some(
+                telemetry::RecoveryReason::Timeout(self.action.as_timeout_recovery_mechanism()?),
+            ),
             Defect::Iface(IfaceFailure::ApStartFailure { .. }) => Some(
                 telemetry::RecoveryReason::StartApFailure(self.action.as_ap_recovery_mechanism()?),
             ),
@@ -284,6 +299,10 @@ fn thresholded_recovery(
                 recovery_history,
                 latest_defect,
             )
+        }
+        Defect::Iface(IfaceFailure::Timeout { .. }) => {
+            // TODO(b/42066276): Determine thresholds and recovery options.
+            None
         }
     }
 }
@@ -931,6 +950,9 @@ mod tests {
             }
             Defect::Iface(IfaceFailure::CanceledScan { .. }) => {
                 test_thresholded_destroy_iface(&exec, profile, defect, threshold)
+            }
+            Defect::Iface(IfaceFailure::Timeout { .. }) => {
+                // TODO(b/42066276): Determine thresholds and recovery options.
             }
         }
     }

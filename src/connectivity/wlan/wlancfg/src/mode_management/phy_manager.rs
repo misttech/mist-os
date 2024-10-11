@@ -764,6 +764,27 @@ impl PhyManagerApi for PhyManager {
                     }
                 }
             }
+            Defect::Iface(IfaceFailure::Timeout { iface_id, source }) => {
+                self.telemetry_sender.send(TelemetryEvent::SmeTimeout { source });
+
+                for (phy_id, phy_info) in self.phys.iter_mut() {
+                    if phy_info.ap_ifaces.contains(&iface_id)
+                        || phy_info.client_ifaces.contains_key(&iface_id)
+                        || phy_info.destroyed_ifaces.contains(&iface_id)
+                    {
+                        phy_info.defects.add_event(defect);
+
+                        recovery_action = (self.recovery_profile)(
+                            *phy_id,
+                            &mut phy_info.defects,
+                            &mut phy_info.recoveries,
+                            defect,
+                        );
+
+                        break;
+                    }
+                }
+            }
         }
 
         if let Some(recovery_action) = recovery_action.take() {
@@ -4871,5 +4892,35 @@ mod tests {
 
         // The future should complete now.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+    }
+
+    #[fuchsia::test]
+    fn test_log_timeout_defect() {
+        let _exec = TestExecutor::new();
+        let mut test_values = test_setup();
+        let mut phy_manager = phy_manager_for_recovery_test(
+            test_values.monitor_proxy,
+            test_values.node,
+            test_values.telemetry_sender,
+            test_values.recovery_sender,
+        );
+
+        // Verify that there are no defects to begin with.
+        assert_eq!(phy_manager.phys[&0].defects.events.len(), 0);
+
+        // Log a timeout.
+        phy_manager.record_defect(Defect::Iface(IfaceFailure::Timeout {
+            iface_id: 1,
+            source: telemetry::TimeoutSource::Scan,
+        }));
+
+        // Verify that the defect was recorded.
+        assert_eq!(phy_manager.phys[&0].defects.events.len(), 1);
+
+        // Verify that the defect was reported to telemetry.
+        assert_variant!(
+            test_values.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::SmeTimeout { source: telemetry::TimeoutSource::Scan }))
+        )
     }
 }

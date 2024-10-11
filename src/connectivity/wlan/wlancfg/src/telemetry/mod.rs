@@ -416,6 +416,8 @@ impl ScanIssue {
 
 pub type ClientRecoveryMechanism = metrics::ConnectivityWlanMetricDimensionClientRecoveryMechanism;
 pub type ApRecoveryMechanism = metrics::ConnectivityWlanMetricDimensionApRecoveryMechanism;
+pub type TimeoutRecoveryMechanism =
+    metrics::ConnectivityWlanMetricDimensionTimeoutRecoveryMechanism;
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum PhyRecoveryMechanism {
@@ -426,6 +428,7 @@ pub enum PhyRecoveryMechanism {
 pub enum RecoveryReason {
     CreateIfaceFailure(PhyRecoveryMechanism),
     DestroyIfaceFailure(PhyRecoveryMechanism),
+    Timeout(TimeoutRecoveryMechanism),
     ConnectFailure(ClientRecoveryMechanism),
     StartApFailure(ApRecoveryMechanism),
     ScanFailure(ClientRecoveryMechanism),
@@ -441,6 +444,7 @@ struct RecoveryRecord {
     start_ap_failure: Option<RecoveryReason>,
     create_iface_failure: Option<RecoveryReason>,
     destroy_iface_failure: Option<RecoveryReason>,
+    timeout: Option<RecoveryReason>,
 }
 
 impl RecoveryRecord {
@@ -453,6 +457,7 @@ impl RecoveryRecord {
             start_ap_failure: None,
             create_iface_failure: None,
             destroy_iface_failure: None,
+            timeout: None,
         }
     }
 
@@ -465,6 +470,7 @@ impl RecoveryRecord {
             RecoveryReason::StartApFailure(_) => self.start_ap_failure = Some(reason),
             RecoveryReason::CreateIfaceFailure(_) => self.create_iface_failure = Some(reason),
             RecoveryReason::DestroyIfaceFailure(_) => self.destroy_iface_failure = Some(reason),
+            RecoveryReason::Timeout(_) => self.timeout = Some(reason),
         }
     }
 }
@@ -1265,6 +1271,9 @@ impl Telemetry {
                             .await
                     }
                 }
+
+                // Any completed SME operation tells us the SME is operational.
+                self.report_sme_timeout_resolved().await;
             }
             TelemetryEvent::RoamResult { iface_id, result, ap_state } => {
                 match &self.connection_state {
@@ -1307,6 +1316,9 @@ impl Telemetry {
                 }
             }
             TelemetryEvent::Disconnected { track_subsequent_downtime, info } => {
+                // Any completed SME operation tells us the SME is operational.
+                self.report_sme_timeout_resolved().await;
+
                 self.log_disconnect_event_inspect(&info);
                 self.stats_logger
                     .log_stat(StatOp::AddDisconnectCount(info.disconnect_source))
@@ -1452,7 +1464,10 @@ impl Telemetry {
                 self.last_enabled_client_connections = None;
             }
             TelemetryEvent::StopAp { enabled_duration } => {
-                self.stats_logger.log_stop_ap_cobalt_metrics(enabled_duration).await
+                self.stats_logger.log_stop_ap_cobalt_metrics(enabled_duration).await;
+
+                // Any completed SME operation tells us the SME is operational.
+                self.report_sme_timeout_resolved().await;
             }
             TelemetryEvent::UpdateExperiment { experiment } => {
                 self.experiments.update_experiment(experiment);
@@ -1475,6 +1490,9 @@ impl Telemetry {
             }
             TelemetryEvent::StartApResult(result) => {
                 self.stats_logger.log_ap_start_result(result).await;
+
+                // Any completed SME operation tells us the SME is operational.
+                self.report_sme_timeout_resolved().await;
             }
             TelemetryEvent::ScanRequestFulfillmentTime { duration, reason } => {
                 self.stats_logger.log_scan_request_fulfillment_time(duration, reason).await;
@@ -1508,6 +1526,9 @@ impl Telemetry {
             TelemetryEvent::ScanEvent { inspect_data, scan_defects } => {
                 self.log_scan_event_inspect(inspect_data);
                 self.stats_logger.log_scan_issues(scan_defects).await;
+
+                // Any completed SME operation tells us the SME is operational.
+                self.report_sme_timeout_resolved().await;
             }
             TelemetryEvent::LongDurationSignals { signals } => {
                 self.stats_logger
@@ -1530,7 +1551,15 @@ impl Telemetry {
                 let _result = sender.send(Arc::clone(&self.stats_logger.time_series_stats));
             }
             TelemetryEvent::SmeTimeout { source } => {
-                self.stats_logger.log_sme_timeout(source).await
+                self.stats_logger.log_sme_timeout(source).await;
+
+                // If timeouts have been a consistent issue to the point that recovery has been
+                // requested and operations are still timing out, record a recovery failure.
+                if let Some(recovery_reason) = self.stats_logger.recovery_record.timeout.take() {
+                    self.stats_logger
+                        .log_post_recovery_result(recovery_reason, RecoveryOutcome::Failure)
+                        .await
+                }
             }
         }
     }
@@ -1614,6 +1643,15 @@ impl Telemetry {
 
     pub async fn persist_client_stats_counters(&mut self) {
         let _auto_persist_guard = self.auto_persist_client_stats_counters.get_mut();
+    }
+
+    // Any return from an SME request is considered a successful outcome of a recovery intervention.
+    pub async fn report_sme_timeout_resolved(&mut self) {
+        if let Some(recovery_reason) = self.stats_logger.recovery_record.timeout.take() {
+            self.stats_logger
+                .log_post_recovery_result(recovery_reason, RecoveryOutcome::Success)
+                .await
+        }
     }
 }
 
@@ -3873,6 +3911,7 @@ impl StatsLogger {
             RecoveryReason::DestroyIfaceFailure(_) => {
                 metrics::RecoveryOccurrenceMetricDimensionReason::InterfaceDestructionFailure
             }
+            RecoveryReason::Timeout(_) => metrics::RecoveryOccurrenceMetricDimensionReason::Timeout,
             RecoveryReason::ConnectFailure(_) => {
                 metrics::RecoveryOccurrenceMetricDimensionReason::ClientConnectionFailure
             }
@@ -3936,6 +3975,15 @@ impl StatsLogger {
                     &mut self.cobalt_1dot1_proxy,
                     metrics::INTERFACE_DESTRUCTION_RECOVERY_OUTCOME_METRIC_ID,
                     &[outcome.as_event_code()],
+                )
+                .await;
+            }
+            RecoveryReason::Timeout(mechanism) => {
+                log_post_recovery_metric(
+                    &mut self.throttled_error_logger,
+                    &mut self.cobalt_1dot1_proxy,
+                    metrics::TIMEOUT_RECOVERY_OUTCOME_METRIC_ID,
+                    &[outcome.as_event_code(), mechanism.as_event_code()],
                 )
                 .await;
             }
@@ -8736,6 +8784,113 @@ mod tests {
     )]
     #[fuchsia::test(add_test_attr = false)]
     fn test_post_recovery_destroy_iface(
+        recovery_event: TelemetryEvent,
+        post_recovery_event: TelemetryEvent,
+        duplicate_check_event: TelemetryEvent,
+        expected_metric_id: u32,
+        dimensions: Vec<u32>,
+    ) {
+        test_generic_post_recovery_event(
+            recovery_event,
+            post_recovery_event,
+            duplicate_check_event,
+            expected_metric_id,
+            dimensions,
+        );
+    }
+
+    #[test_case(
+        TelemetryEvent::RecoveryEvent {
+            reason: RecoveryReason::Timeout(TimeoutRecoveryMechanism::PhyReset)
+        },
+        TelemetryEvent::ConnectResult {
+            iface_id: IFACE_ID,
+            policy_connect_reason: Some(
+                client::types::ConnectReason::RetryAfterFailedConnectAttempt,
+            ),
+            result: fake_connect_result(fidl_ieee80211::StatusCode::Success),
+            multiple_bss_candidates: true,
+            ap_state: random_bss_description!(Wpa2).into(),
+            network_is_likely_hidden: true,
+        },
+        TelemetryEvent::ConnectResult {
+            iface_id: IFACE_ID,
+            policy_connect_reason: Some(
+                client::types::ConnectReason::RetryAfterFailedConnectAttempt,
+            ),
+            result: fake_connect_result(fidl_ieee80211::StatusCode::Success),
+            multiple_bss_candidates: true,
+            ap_state: random_bss_description!(Wpa2).into(),
+            network_is_likely_hidden: true,
+        },
+        metrics::TIMEOUT_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, TimeoutRecoveryMechanism::PhyReset as u32] ;
+        "Connect works after recovery"
+    )]
+    #[test_case(
+        TelemetryEvent::RecoveryEvent {
+            reason: RecoveryReason::Timeout(TimeoutRecoveryMechanism::PhyReset)
+        },
+        TelemetryEvent::Disconnected {
+            track_subsequent_downtime: false,
+            info: fake_disconnect_info(),
+        },
+        TelemetryEvent::Disconnected {
+            track_subsequent_downtime: false,
+            info: fake_disconnect_info(),
+        },
+        metrics::TIMEOUT_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, TimeoutRecoveryMechanism::PhyReset as u32] ;
+        "Disconnect works after recovery"
+    )]
+    #[test_case(
+        TelemetryEvent::RecoveryEvent {
+            reason: RecoveryReason::Timeout(TimeoutRecoveryMechanism::PhyReset)
+        },
+        TelemetryEvent::StopAp { enabled_duration: zx::Duration::from_seconds(0) },
+        TelemetryEvent::StopAp { enabled_duration: zx::Duration::from_seconds(0) },
+        metrics::TIMEOUT_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, TimeoutRecoveryMechanism::PhyReset as u32] ;
+        "Stop AP works after recovery"
+    )]
+    #[test_case(
+        TelemetryEvent::RecoveryEvent {
+            reason: RecoveryReason::Timeout(TimeoutRecoveryMechanism::PhyReset)
+        },
+        TelemetryEvent::StartApResult(Ok(())),
+        TelemetryEvent::StartApResult(Ok(())),
+        metrics::TIMEOUT_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, TimeoutRecoveryMechanism::PhyReset as u32] ;
+        "Start AP works after recovery"
+    )]
+    #[test_case(
+        TelemetryEvent::RecoveryEvent {
+            reason: RecoveryReason::Timeout(TimeoutRecoveryMechanism::DestroyIface)
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData::default(),
+            scan_defects: vec![]
+        },
+        TelemetryEvent::ScanEvent {
+            inspect_data: ScanEventInspectData::default(),
+            scan_defects: vec![]
+        },
+        metrics::TIMEOUT_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32, TimeoutRecoveryMechanism::DestroyIface as u32] ;
+        "Scan works after timeout recovery"
+    )]
+    #[test_case(
+        TelemetryEvent::RecoveryEvent {
+            reason: RecoveryReason::Timeout(TimeoutRecoveryMechanism::PhyReset)
+        },
+        TelemetryEvent::SmeTimeout { source: TimeoutSource::Scan },
+        TelemetryEvent::SmeTimeout { source: TimeoutSource::Scan },
+        metrics::TIMEOUT_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Failure as u32, TimeoutRecoveryMechanism::PhyReset as u32] ;
+        "SME timeout after recovery"
+    )]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_post_recovery_timeout(
         recovery_event: TelemetryEvent,
         post_recovery_event: TelemetryEvent,
         duplicate_check_event: TelemetryEvent,

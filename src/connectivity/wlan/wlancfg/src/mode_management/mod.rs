@@ -5,7 +5,7 @@
 use crate::client::connection_selection::ConnectionSelectionRequester;
 use crate::client::roaming::local_roam_manager::RoamManager;
 use crate::config_management::SavedNetworksManagerApi;
-use crate::telemetry::TelemetrySender;
+use crate::telemetry::{TelemetrySender, TimeoutSource};
 use crate::util::listener;
 use anyhow::Error;
 use fuchsia_async as fasync;
@@ -76,6 +76,7 @@ pub enum IfaceFailure {
     EmptyScanResults { iface_id: u16 },
     ApStartFailure { iface_id: u16 },
     ConnectionFailure { iface_id: u16 },
+    Timeout { iface_id: u16, source: TimeoutSource },
 }
 
 // Interfaces will come and go and each one will receive a different ID.  The failures are
@@ -93,6 +94,7 @@ impl PartialEq for IfaceFailure {
             (IfaceFailure::ConnectionFailure { .. }, IfaceFailure::ConnectionFailure { .. }) => {
                 true
             }
+            (IfaceFailure::Timeout { .. }, IfaceFailure::Timeout { .. }) => true,
             _ => false,
         }
     }
@@ -127,6 +129,9 @@ impl WriteInspect for Defect {
             }
             Defect::Iface(IfaceFailure::ConnectionFailure { iface_id }) => {
                 inspect_insert!(writer, var key: {ConnectionFailure: {iface_id: iface_id}})
+            }
+            Defect::Iface(IfaceFailure::Timeout { iface_id, .. }) => {
+                inspect_insert!(writer, var key: {Timeout: {iface_id: iface_id}})
             }
         }
     }
@@ -410,6 +415,10 @@ mod tests {
         assert_eq!(
             IfaceFailure::ConnectionFailure { iface_id: rng.gen::<u16>() },
             IfaceFailure::ConnectionFailure { iface_id: rng.gen::<u16>() }
+        );
+        assert_eq!(
+            IfaceFailure::Timeout { iface_id: rng.gen::<u16>(), source: TimeoutSource::Scan },
+            IfaceFailure::Timeout { iface_id: rng.gen::<u16>(), source: TimeoutSource::ApStart }
         );
     }
 }
