@@ -16,7 +16,7 @@ typedef struct {
 // TRB status fields
 #define TRB_BUFSIZ_START 0  // Buffer Size
 #define TRB_BUFSIZ_BITS 24
-#define TRB_BUFSIZ(n) (((n)&0xffffff) << 0)
+#define TRB_BUFSIZ(n) (((n) & 0xffffff) << 0)
 #define TRB_PCM1_START 24  // Packet Count M1
 #define TRB_PCM1_BITS 2
 #define TRB_SPR (1 << 26)    // Short Packet Received
@@ -117,7 +117,7 @@ typedef struct {
 #define DEVT_LDM_RESPONSE 15
 
 // for DEVT_LINK_STATE_CHANGE
-#define DEVT_LINK_STATE_CHANGE_SS (1 << 4)         // Set if link is super speed
-#define DEVT_LINK_STATE_CHANGE_STATE(s) ((s)&0xf)  // Same as DSTS state
+#define DEVT_LINK_STATE_CHANGE_SS (1 << 4)           // Set if link is super speed
+#define DEVT_LINK_STATE_CHANGE_STATE(s) ((s) & 0xf)  // Same as DSTS state
 
 #endif  // SRC_DEVICES_USB_DRIVERS_DWC3_DWC3_TYPES_H_
