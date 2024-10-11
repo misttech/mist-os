@@ -755,4 +755,58 @@ pub mod tests {
         };
         assert_eq!(capability, Data::String("hello".to_string()));
     }
+
+    #[fuchsia::test]
+    async fn get_router_or_not_found() {
+        let source = Router::new(Capability::Data(Data::String("hello".to_string())));
+        let dict1 = Dict::new();
+        dict1.insert("source".parse().unwrap(), source.into()).expect("dict entry already exists");
+
+        let router = dict1.get_router_or_not_found(
+            &RelativePath::new("source").unwrap(),
+            RoutingError::BedrockMemberAccessUnsupported { moniker: Moniker::root().into() },
+        );
+
+        let metadata = Dict::new();
+        metadata.set_availability(Availability::Optional);
+        let capability = router.route(None, false).await.unwrap();
+        let capability = match capability {
+            Capability::Data(d) => d,
+            c => panic!("Bad enum {:#?}", c),
+        };
+        assert_eq!(capability, Data::String("hello".to_string()));
+    }
+
+    #[fuchsia::test]
+    async fn get_router_or_not_found_deep() {
+        let source = Capability::Data(Data::String("hello".to_string()));
+        let dict1 = Dict::new();
+        dict1.insert("source".parse().unwrap(), source.into()).expect("dict entry already exists");
+        let dict2 = Dict::new();
+        dict2
+            .insert("dict1".parse().unwrap(), Capability::Dictionary(dict1))
+            .expect("dict entry already exists");
+        let dict3 = Dict::new();
+        dict3
+            .insert("dict2".parse().unwrap(), Capability::Dictionary(dict2))
+            .expect("dict entry already exists");
+        let dict4 = Dict::new();
+        dict4
+            .insert("dict3".parse().unwrap(), Router::new(dict3).into())
+            .expect("dict entry already exists");
+
+        let router = dict4.get_router_or_not_found(
+            &RelativePath::new("dict3/dict2/dict1/source").unwrap(),
+            RoutingError::BedrockMemberAccessUnsupported { moniker: Moniker::root().into() },
+        );
+
+        let metadata = Dict::new();
+        metadata.set_availability(Availability::Optional);
+        let capability = router.route(None, false).await.unwrap();
+        let capability = match capability {
+            Capability::Data(d) => d,
+            c => panic!("Bad enum {:#?}", c),
+        };
+        assert_eq!(capability, Data::String("hello".to_string()));
+    }
 }

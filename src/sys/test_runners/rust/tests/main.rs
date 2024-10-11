@@ -65,6 +65,14 @@ async fn launch_and_run_sample_test_internal(parallel: u16) {
         RunEvent::case_stdout("my_tests::passing_test", "My only job is not to panic!()"),
         RunEvent::case_stopped("my_tests::passing_test", CaseStatus::Passed),
         RunEvent::case_finished("my_tests::passing_test"),
+        RunEvent::case_found("my_tests::passing_test_with_zero_exit"),
+        RunEvent::case_started("my_tests::passing_test_with_zero_exit"),
+        RunEvent::case_stdout(
+            "my_tests::passing_test_with_zero_exit",
+            "My only job is not to panic!()",
+        ),
+        RunEvent::case_stopped("my_tests::passing_test_with_zero_exit", CaseStatus::Passed),
+        RunEvent::case_finished("my_tests::passing_test_with_zero_exit"),
         RunEvent::case_found("my_tests::ignored_failing_test"),
         RunEvent::case_started("my_tests::ignored_failing_test"),
         RunEvent::case_stopped("my_tests::ignored_failing_test", CaseStatus::Skipped),
@@ -118,7 +126,7 @@ async fn launch_and_run_sample_test_internal(parallel: u16) {
     };
     assert!(contains("I'm supposed to panic!()"));
     assert!(contains(
-        "../../src/sys/test_runners/rust/test_data/sample-rust-tests/src/lib.rs:20:9"
+        "../../src/sys/test_runners/rust/test_data/sample-rust-tests/src/lib.rs:26:9"
     ));
     assert_eq!(
         failing_test_logs.last().unwrap(),

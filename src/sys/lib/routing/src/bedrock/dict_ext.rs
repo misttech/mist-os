@@ -2,18 +2,33 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::bedrock::lazy_get::LazyGet;
 use crate::error::RoutingError;
 use async_trait::async_trait;
-use cm_types::IterablePath;
+use cm_types::{IterablePath, RelativePath};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use moniker::ExtendedMoniker;
 use router_error::RouterError;
-use sandbox::{Capability, Dict, Request, Routable};
+use sandbox::{Capability, Dict, Request, Routable, Router};
 
 #[async_trait]
 pub trait DictExt {
     /// Returns the capability at the path, if it exists. Returns `None` if path is empty.
     fn get_capability(&self, path: &impl IterablePath) -> Option<Capability>;
+
+    /// Looks up a top-level [Router] in this [Dict]. If it's not found (or it's not a [Router])
+    /// returns a [Router] that always returns `not_found_error`. If `path` has one segment
+    /// and a [Router] was found, returns that [Router].
+    ///
+    /// If `path` is a multi-segment path, the returned [Router] performs a [Dict] lookup with the
+    /// remaining path relative to the top-level [Router] (see [LazyGet::lazy_get]).
+    ///
+    /// REQUIRES: `path` is not empty.
+    fn get_router_or_not_found(
+        &self,
+        path: &impl IterablePath,
+        not_found_error: RoutingError,
+    ) -> Router;
 
     /// Inserts the capability at the path. Intermediary dictionaries are created as needed.
     fn insert_capability(
@@ -59,6 +74,42 @@ impl DictExt for Dict {
                 None => return current_dict.get(current_name).ok().flatten(),
             }
         }
+    }
+
+    fn get_router_or_not_found(
+        &self,
+        path: &impl IterablePath,
+        not_found_error: RoutingError,
+    ) -> Router {
+        let mut segments = path.iter_segments();
+        let root = segments.next().expect("path must be nonempty");
+
+        #[derive(Debug)]
+        struct ErrorRouter {
+            not_found_error: RouterError,
+        }
+        #[async_trait]
+        impl Routable for ErrorRouter {
+            async fn route(
+                &self,
+                _request: Option<Request>,
+                _debug: bool,
+            ) -> Result<Capability, RouterError> {
+                Err(self.not_found_error.clone())
+            }
+        }
+
+        let Ok(Some(Capability::Router(router))) = self.get(root) else {
+            return Router::new(ErrorRouter { not_found_error: not_found_error.into() });
+        };
+        if segments.next().is_none() {
+            // No nested lookup necessary.
+            return router;
+        }
+        let mut segments = path.iter_segments();
+        let _ = segments.next().unwrap();
+        let path = RelativePath::from(segments.map(|s| s.clone()).collect::<Vec<_>>());
+        router.lazy_get(path, not_found_error)
     }
 
     fn insert_capability(

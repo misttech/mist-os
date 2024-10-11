@@ -980,39 +980,13 @@ impl ComponentInstance {
         Ok(self.lock_resolved_state().await?.sandbox.program_output_dict.clone())
     }
 
-    /// Returns a router that delegates to the program output dict.
-    ///
-    /// This is helpful in breaking up reference cycles. For example, you can insert an item into
-    /// the program output dict that references another item in the same dict, by indirecting
-    /// through this router.
-    pub fn program_output(self: &Arc<Self>) -> Router {
-        #[derive(Debug)]
-        struct ProgramOutput {
-            component: WeakComponentInstance,
-        }
-
-        #[async_trait]
-        impl Routable for ProgramOutput {
-            async fn route(
-                &self,
-                request: Option<Request>,
-                debug: bool,
-            ) -> Result<Capability, RouterError> {
-                let component = self.component.upgrade().map_err(RoutingError::from)?;
-                component.get_program_output_dict().await?.route(request, debug).await
-            }
-        }
-
-        Router::new(ProgramOutput { component: self.as_weak() })
-    }
-
     /// Obtains the component output dict.
     pub async fn get_component_output_dict(self: &Arc<Self>) -> Result<Dict, RouterError> {
         Ok(self.lock_resolved_state().await?.sandbox.component_output_dict.clone())
     }
 
     /// Returns a router that delegates to the component output dict.
-    pub fn component_output(self: &Arc<Self>) -> Router {
+    pub(super) fn component_output(self: &Arc<Self>) -> Router {
         #[derive(Debug)]
         struct ComponentOutput {
             component: WeakComponentInstance,
