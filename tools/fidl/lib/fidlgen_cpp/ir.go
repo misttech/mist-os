@@ -533,13 +533,34 @@ func (c *compiler) compileCodingTableType(eci fidlgen.EncodedCompoundIdentifier)
 	return fmt.Sprintf("%s_%sTable", c.symbolPrefix, eci.Parse().Name)
 }
 
-func (c *compiler) compileType(val fidlgen.Type) Type {
+func (c *compiler) compileType(val fidlgen.Type, maybeAlias *fidlgen.PartialTypeConstructor) Type {
+	if maybeAlias != nil {
+		ci := maybeAlias.Name.Parse()
+		name, ok := zirconTime(ci)
+		if ok {
+			return Type{
+				nameVariants: nameVariants{
+					HLCPP:   name,
+					Unified: name,
+					Wire:    name,
+				},
+				WireFamily:             FamilyKinds.TrivialCopy,
+				NeedsDtor:              true,
+				Kind:                   TypeKinds.Primitive,
+				Nullable:               val.Nullable,
+				InlineInEnvelope:       val.TypeShapeV2.InlineSize <= 4,
+				IsResource:             false,
+				WireFieldConstraint:    "fidl::internal::WireCodingConstraintEmpty",
+				NaturalFieldConstraint: "fidl::internal::NaturalCodingConstraintEmpty",
+			}
+		}
+	}
 	r := Type{}
 	r.Nullable = val.Nullable
 	r.InlineInEnvelope = val.TypeShapeV2.InlineSize <= 4
 	switch val.Kind {
 	case fidlgen.ArrayType:
-		t := c.compileType(*val.ElementType)
+		t := c.compileType(*val.ElementType, val.MaybeAlias)
 		// Because the unified bindings alias types from the natural domain objects,
 		// the name _transformation_ would be identical between natural and unified,
 		// here and below. We reserve the flexibility to specify different names
@@ -558,7 +579,7 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 		r.NaturalFieldConstraint = t.NaturalFieldConstraint
 		r.WireFieldConstraint = t.WireFieldConstraint
 	case fidlgen.VectorType:
-		t := c.compileType(*val.ElementType)
+		t := c.compileType(*val.ElementType, val.MaybeAlias)
 		r.nameVariants.Unified = makeName("std::vector").template(t.Unified)
 		r.nameVariants.Wire = makeName("fidl::VectorView").template(t.Wire)
 		if val.Nullable {

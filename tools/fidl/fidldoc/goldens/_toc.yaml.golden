@@ -128,6 +128,9 @@ toc:
   - title: test.table
     path: /test.table
     version_added: ""
+  - title: test.time
+    path: /test.time
+    version_added: ""
   - title: test.transitivedependencies
     path: /test.transitivedependencies
     version_added: ""

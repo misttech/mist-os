@@ -115,7 +115,7 @@ func (c *compiler) compileUnion(val fidlgen.Union) *Union {
 	for _, mem := range val.Members {
 		name := unionMemberContext.transform(mem.Name)
 		tag := unionMemberTagContext.transform(mem.Name)
-		t := c.compileType(mem.Type)
+		t := c.compileType(mem.Type, mem.MaybeAlias)
 		u.Members = append(u.Members, UnionMember{
 			Attributes:        Attributes{mem.Attributes},
 			Ordinal:           uint64(mem.Ordinal),
@@ -136,7 +136,7 @@ func (c *compiler) compileUnion(val fidlgen.Union) *Union {
 }
 
 func (c *compiler) compileResult(p Payloader, m *fidlgen.Method) *Result {
-	valueType := c.compileType(*m.ValueType)
+	valueType := c.compileType(*m.ValueType, nil)
 	result := Result{
 		ResultDecl:        c.compileNameVariants(m.ResponsePayload.Identifier),
 		ValueTypeDecl:     valueType.nameVariants,
@@ -146,7 +146,7 @@ func (c *compiler) compileResult(p Payloader, m *fidlgen.Method) *Result {
 		valueTypeIsStruct: false,
 	}
 	if m.HasError {
-		errType := c.compileType(*m.ErrorType)
+		errType := c.compileType(*m.ErrorType, nil)
 		result.ErrorDecl = errType.nameVariants
 		result.Error = errType
 	}

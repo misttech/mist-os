@@ -459,6 +459,15 @@ fidl_testdata_info = [
     target = "//tools/fidl/fidlc/testdata:test.table"
   },
   {
+    name = "time"
+    target = "//tools/fidl/fidlc/testdata:test.time"
+    denylist = [
+      # TODO(https://fxbug.dev/362963403): fidlgen_rust_next needs to pass this test.
+      "fidlgen_rust_next",
+      "fidlgen_libfuzzer",
+    ]
+  },
+  {
     name = "transitive_dependencies"
     target = "//tools/fidl/fidlc/testdata/transitive_dependencies:test.transitivedependencies"
     denylist = [

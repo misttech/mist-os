@@ -1241,7 +1241,7 @@ func (c *compiler) compileProtocol(p fidlgen.Protocol) *Protocol {
 // compileParameterSingleton compiles parameters for unflattened layouts.
 func (c *compiler) compileParameterSingleton(name fidlgen.EncodedCompoundIdentifier, typ fidlgen.Type) []Parameter {
 	return []Parameter{{
-		Type:              c.compileType(typ),
+		Type:              c.compileType(typ, typ.MaybeAlias),
 		nameVariants:      c.compileNameVariants(name),
 		OffsetV2:          0,
 		HandleInformation: c.fieldHandleInformation(typ),
@@ -1253,7 +1253,7 @@ func (c *compiler) compileParameterArray(val fidlgen.Struct) []Parameter {
 	var params []Parameter = []Parameter{}
 	for _, v := range val.Members {
 		params = append(params, Parameter{
-			Type:              c.compileType(v.Type),
+			Type:              c.compileType(v.Type, v.MaybeAlias),
 			nameVariants:      structMemberContext.transform(v.Name),
 			OffsetV2:          v.FieldShapeV2.Offset,
 			HandleInformation: c.fieldHandleInformation(v.Type),

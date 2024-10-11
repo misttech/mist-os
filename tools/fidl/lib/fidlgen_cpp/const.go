@@ -100,7 +100,7 @@ func (c *compiler) compileConst(val fidlgen.Const) *Const {
 		}
 		v.Value = c.compileConstant(val.Value, nil, val.Type)
 	} else {
-		t := c.compileType(val.Type)
+		t := c.compileType(val.Type, nil)
 		v.Extern = false
 		v.Decorator = "constexpr"
 		v.Type = t

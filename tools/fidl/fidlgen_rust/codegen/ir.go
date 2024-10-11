@@ -583,6 +583,11 @@ func isZirconIdentifier(ci fidlgen.CompoundIdentifier) bool {
 	return len(ci.Library) == 1 && ci.Library[0] == fidlgen.Identifier("zx")
 }
 
+var zirconAlias = map[fidlgen.EncodedCompoundIdentifier]string{
+	"zx/InstantMono": "fidl::MonotonicInstant",
+	"zx/InstantBoot": "fidl::BootInstant",
+}
+
 // We special case references to declarations from //zircon/vdso/zx:zx, since we
 // don't generate Rust bindings for that library.
 var zirconNames = map[fidlgen.EncodedCompoundIdentifier]string{
@@ -749,7 +754,7 @@ func (c *compiler) compileConst(val fidlgen.Const) Const {
 	if val.Type.Kind == fidlgen.StringType {
 		r.Type = "&str"
 	} else {
-		r.Type = c.compileType(val.Type).Owned
+		r.Type = c.compileType(val.Type, nil).Owned
 	}
 	return r
 }
@@ -775,7 +780,23 @@ func compileObjectTypeConst(val fidlgen.HandleSubtype) string {
 	panic(fmt.Sprintf("unknown handle type: %v", val))
 }
 
-func (c *compiler) compileType(val fidlgen.Type) Type {
+func (c *compiler) compileType(val fidlgen.Type, maybeAlias *fidlgen.PartialTypeConstructor) Type {
+	if maybeAlias != nil {
+		name, ok := zirconAlias[maybeAlias.Name]
+		if ok {
+			return Type{
+				Resourceness:     c.decls.LookupResourceness(val),
+				Kind:             val.Kind,
+				Nullable:         val.Nullable,
+				PrimitiveSubtype: val.PrimitiveSubtype,
+				Identifier:       fidlgen.EncodedCompoundIdentifier(name),
+				FidlTemplate:     name,
+				Owned:            name,
+				Param:            name,
+			}
+		}
+	}
+
 	t := Type{
 		Resourceness:     c.decls.LookupResourceness(val),
 		Kind:             val.Kind,
@@ -791,7 +812,7 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 		t.Owned = s
 		t.Param = s
 	case fidlgen.ArrayType:
-		el := c.compileType(*val.ElementType)
+		el := c.compileType(*val.ElementType, val.MaybeAlias)
 		t.ElementType = &el
 		t.FidlTemplate = fmt.Sprintf("fidl::encoding::Array<%s, %d>", el.FidlTemplate, *val.ElementCount)
 		t.Owned = fmt.Sprintf("[%s; %d]", el.Owned, *val.ElementCount)
@@ -801,7 +822,7 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 			t.Param = "&" + t.Owned
 		}
 	case fidlgen.VectorType:
-		el := c.compileType(*val.ElementType)
+		el := c.compileType(*val.ElementType, val.MaybeAlias)
 		t.ElementType = &el
 		if val.ElementCount == nil {
 			t.FidlTemplate = fmt.Sprintf("fidl::encoding::UnboundedVector<%s>", el.FidlTemplate)
@@ -1084,7 +1105,7 @@ func (c *compiler) compileAlias(val fidlgen.Alias) Alias {
 	return Alias{
 		Alias: val,
 		Name:  c.compileDeclIdentifier(val.Name),
-		Type:  c.compileType(val.Type),
+		Type:  c.compileType(val.Type, val.MaybeAlias),
 	}
 }
 
@@ -1092,7 +1113,7 @@ func (c *compiler) compileBits(val fidlgen.Bits) Bits {
 	e := Bits{
 		Bits:           val,
 		Name:           c.compileDeclIdentifier(val.Name),
-		UnderlyingType: c.compileType(val.Type).Owned,
+		UnderlyingType: c.compileType(val.Type, nil).Owned,
 		Members:        []BitsMember{},
 	}
 	for _, v := range val.Members {
@@ -1216,7 +1237,7 @@ func (c *compiler) payloadForType(payloadType Type) Payload {
 	var ownedTypes, encodeExprs []string
 	for _, v := range st.Members {
 		paramName := compileSnakeIdentifier(v.Name)
-		typ := c.compileType(v.Type)
+		typ := c.compileType(v.Type, v.MaybeAlias)
 		parameters = append(parameters, Parameter{
 			Name:             paramName,
 			Type:             typ.Param,
@@ -1259,7 +1280,7 @@ func (c *compiler) compileRequest(m fidlgen.Method) Payload {
 		return emptyPayload("fidl::encoding::EmptyPayload")
 	}
 	// Struct, table, or union request payload.
-	return c.payloadForType(c.compileType(*m.RequestPayload))
+	return c.payloadForType(c.compileType(*m.RequestPayload, nil))
 }
 
 func (c *compiler) compileResponse(m fidlgen.Method) Payload {
@@ -1273,14 +1294,14 @@ func (c *compiler) compileResponse(m fidlgen.Method) Payload {
 	}
 	if !m.HasResultUnion() {
 		// Plain payload with no flexible/error result union.
-		return c.payloadForType(c.compileType(*m.ResponsePayload))
+		return c.payloadForType(c.compileType(*m.ResponsePayload, nil))
 	}
 
-	innerType := c.compileType(*m.ValueType)
+	innerType := c.compileType(*m.ValueType, nil)
 	inner := c.payloadForType(innerType)
 	var errType Type
 	if m.HasError {
-		errType = c.compileType(*m.ErrorType)
+		errType = c.compileType(*m.ErrorType, nil)
 	}
 
 	var p Payload
@@ -1412,7 +1433,7 @@ func (c *compiler) compileService(val fidlgen.Service) Service {
 func (c *compiler) compileStructMember(val fidlgen.StructMember) StructMember {
 	return StructMember{
 		StructMember: val,
-		Type:         c.compileType(val.Type),
+		Type:         c.compileType(val.Type, val.MaybeAlias),
 		Name:         compileSnakeIdentifier(val.Name),
 		OffsetV2:     val.FieldShapeV2.Offset,
 	}
@@ -1521,7 +1542,7 @@ func (c *compiler) compileUnion(val fidlgen.Union) Union {
 	for _, v := range val.Members {
 		r.Members = append(r.Members, UnionMember{
 			UnionMember: v,
-			Type:        c.compileType(v.Type),
+			Type:        c.compileType(v.Type, v.MaybeAlias),
 			Name:        compileCamelIdentifier(v.Name),
 			Ordinal:     v.Ordinal,
 		})
@@ -1538,7 +1559,7 @@ func (c *compiler) compileTable(table fidlgen.Table) Table {
 	for _, member := range table.Members {
 		r.Members = append(r.Members, TableMember{
 			TableMember: member,
-			Type:        c.compileType(member.Type),
+			Type:        c.compileType(member.Type, member.MaybeAlias),
 			Name:        compileSnakeIdentifier(member.Name),
 			Ordinal:     member.Ordinal,
 		})
@@ -1849,7 +1870,6 @@ func Compile(r fidlgen.Root, includeDrivers bool) Root {
 		externCrates: map[string]struct{}{},
 		structs:      map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct{},
 	}
-
 	for _, s := range r.Structs {
 		c.structs[s.Name] = s
 	}
