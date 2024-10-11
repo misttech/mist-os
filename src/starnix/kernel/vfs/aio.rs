@@ -4,9 +4,9 @@
 
 use crate::mm::{
     DesiredAddress, MappingName, MappingOptions, MemoryAccessorExt, ProtectionFlags,
-    TaskMemoryAccessor,
+    RemoteMemoryManager, TaskMemoryAccessor,
 };
-use crate::task::{CurrentTask, KernelThreads, SimpleWaiter, Task, WaitQueue};
+use crate::task::{CurrentTask, KernelThreads, SimpleWaiter, WaitQueue};
 use crate::vfs::eventfd::EventFdFileObject;
 use crate::vfs::{
     checked_add_offset_and_length, FdNumber, FileHandle, InputBuffer, OutputBuffer,
@@ -18,7 +18,6 @@ use starnix_logging::track_stub;
 use starnix_sync::{InterruptibleEvent, Locked, Mutex, Unlocked};
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::errors::{Errno, EINTR, ETIMEDOUT};
-use starnix_uapi::ownership::{OwnedRef, WeakRef};
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::user_buffer::{UserBuffer, UserBuffers};
 use starnix_uapi::{
@@ -219,8 +218,8 @@ impl TryFrom<u32> for OpType {
 }
 struct IoOperation {
     op_type: OpType,
-    weak_task: WeakRef<Task>,
     file: WeakFileHandle,
+    mm: RemoteMemoryManager,
     buffers: UserBuffers,
     offset: usize,
     id: u64,
@@ -239,7 +238,7 @@ impl IoOperation {
         }
         let file = current_task.files.get(FdNumber::from_raw(control_block.aio_fildes as i32))?;
         let op_type = (control_block.aio_lio_opcode as u32).try_into()?;
-        let offset = control_block.aio_offset as usize;
+        let offset = control_block.aio_offset.try_into().map_err(|_| errno!(EINVAL))?;
         let flags = control_block.aio_flags;
 
         match op_type {
@@ -285,8 +284,8 @@ impl IoOperation {
 
         Ok(IoOperation {
             op_type,
-            weak_task: OwnedRef::downgrade(&current_task.task),
             file: Arc::downgrade(&file),
+            mm: current_task.mm().as_remote(),
             buffers,
             offset,
             id: control_block.aio_data,
@@ -334,19 +333,13 @@ impl IoOperation {
     ) -> Result<usize, Errno> {
         let buffers = self.buffers.clone();
         let mut output_buffer = {
-            let Some(task) = self.weak_task.upgrade() else {
-                return error!(EINVAL);
-            };
-            let sink = UserBuffersOutputBuffer::syscall_new(&task, buffers.clone())?;
+            let sink = UserBuffersOutputBuffer::remote_new(&self.mm, buffers.clone())?;
             VecOutputBuffer::new(sink.available())
         };
 
         file.read_at(locked, current_task, self.offset, &mut output_buffer)?;
 
-        let Some(task) = self.weak_task.upgrade() else {
-            return error!(EINVAL);
-        };
-        let mut sink = UserBuffersOutputBuffer::syscall_new(&task, buffers)?;
+        let mut sink = UserBuffersOutputBuffer::remote_new(&self.mm, buffers)?;
         sink.write(&output_buffer.data())
     }
 
@@ -357,10 +350,7 @@ impl IoOperation {
         file: FileHandle,
     ) -> Result<usize, Errno> {
         let mut input_buffer = {
-            let Some(task) = self.weak_task.upgrade() else {
-                return error!(EINVAL);
-            };
-            let mut source = UserBuffersInputBuffer::syscall_new(&task, self.buffers.clone())?;
+            let mut source = UserBuffersInputBuffer::remote_new(&self.mm, self.buffers.clone())?;
             VecInputBuffer::new(&source.read_all()?)
         };
 

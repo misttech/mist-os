@@ -990,9 +990,6 @@
                 // test calls GetEvents.
                 "AIOTest.BadWrite",
 
-                // Used to fail consistently. Now is flaky. Needs investigation.
-                "AIOTest.CloneVm",
-
                 // https://fxbug.dev/42085936
                 "AllSocketPairTest.RecvTimeoutRecvmsgOneSecondSucceeds/*",
                 "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutUsecNeg/*",

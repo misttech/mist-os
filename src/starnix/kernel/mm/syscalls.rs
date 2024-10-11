@@ -288,8 +288,7 @@ pub fn sys_process_vm_readv(
         let mut input = UserBuffersInputBuffer::unified_new(current_task, remote_iov)?;
         output.write_buffer(&mut input)
     } else {
-        let mut input =
-            UserBuffersInputBuffer::<Task>::syscall_new(remote_task.deref(), remote_iov)?;
+        let mut input = UserBuffersInputBuffer::syscall_new(remote_task.deref(), remote_iov)?;
         output.write_buffer(&mut input)
     }
 }
@@ -340,8 +339,7 @@ pub fn sys_process_vm_writev(
         let mut output = UserBuffersOutputBuffer::unified_new(current_task, remote_iov)?;
         output.write_buffer(&mut input)
     } else {
-        let mut output =
-            UserBuffersOutputBuffer::<Task>::syscall_new(remote_task.deref(), remote_iov)?;
+        let mut output = UserBuffersOutputBuffer::syscall_new(remote_task.deref(), remote_iov)?;
         output.write_buffer(&mut input)
     }
 }

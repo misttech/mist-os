@@ -2167,6 +2167,66 @@ pub trait TaskMemoryAccessor: MemoryAccessor {
     fn maximum_valid_address(&self) -> UserAddress;
 }
 
+/// A memory manager for another thread.
+///
+/// When accessing memory through this object, we use less efficient codepaths that work across
+/// address spaces.
+pub struct RemoteMemoryManager {
+    mm: Arc<MemoryManager>,
+}
+
+impl RemoteMemoryManager {
+    fn new(mm: Arc<MemoryManager>) -> Self {
+        Self { mm }
+    }
+}
+
+// If we just have a MemoryManager, we cannot assume that its address space is current, which means
+// we need to use the slower "syscall" mechanism to access its memory.
+impl MemoryAccessor for RemoteMemoryManager {
+    fn read_memory<'a>(
+        &self,
+        addr: UserAddress,
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
+        self.mm.syscall_read_memory(addr, bytes)
+    }
+
+    fn read_memory_partial_until_null_byte<'a>(
+        &self,
+        addr: UserAddress,
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
+        self.mm.syscall_read_memory_partial_until_null_byte(addr, bytes)
+    }
+
+    fn read_memory_partial<'a>(
+        &self,
+        addr: UserAddress,
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
+        self.mm.syscall_read_memory_partial(addr, bytes)
+    }
+
+    fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        self.mm.syscall_write_memory(addr, bytes)
+    }
+
+    fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        self.mm.syscall_write_memory_partial(addr, bytes)
+    }
+
+    fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
+        self.mm.syscall_zero(addr, length)
+    }
+}
+
+impl TaskMemoryAccessor for RemoteMemoryManager {
+    fn maximum_valid_address(&self) -> UserAddress {
+        self.mm.maximum_valid_user_address
+    }
+}
+
 // TODO(https://fxbug.dev/42079727): replace this with MaybeUninit::as_bytes_mut.
 #[inline]
 fn object_as_mut_bytes<T: FromBytes + Sized>(
@@ -2783,6 +2843,11 @@ impl MemoryManager {
 
     pub fn syscall_zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
         self.state.read().zero(addr, length)
+    }
+
+    /// Obtain a reference to this memory manager that can be used from another thread.
+    pub fn as_remote(self: &Arc<Self>) -> RemoteMemoryManager {
+        RemoteMemoryManager::new(self.clone())
     }
 }
 
