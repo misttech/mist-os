@@ -20,7 +20,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:anyhow",
   ]
 
-  test_deps = []
+  test_deps = [ "//src/lib/fuchsia" ]
 }
 
 group("tests") {

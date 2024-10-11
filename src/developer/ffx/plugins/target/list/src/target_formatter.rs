@@ -1262,6 +1262,6 @@ mod test {
 
         let formatter = TabularTargetFormatter::try_from(vec![target]).unwrap();
         let out = formatter.lines(None)[1].clone();
-        assert!(out.contains("fe80::1:101:101:101%42:1234"));
+        assert!(out.contains("[fe80::1:101:101:101%42]:1234"));
     }
 }
