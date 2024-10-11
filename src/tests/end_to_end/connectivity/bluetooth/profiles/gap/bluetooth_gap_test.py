@@ -127,7 +127,8 @@ class BluetoothGapTest(fuchsia_base_test.FuchsiaBaseTest):
         """
 
         _LOGGER.info("Removing all paired devices and " "turning off Bluetooth")
-        bluetooth_utils.forget_all_bt_devices(self.initiator)
+        # TODO: b/372749232: Debug bluetooth.sys.access FIDL
+        # bluetooth_utils.forget_all_bt_devices(self.initiator)
         self.initiator.bluetooth_gap.set_discoverable(False)
         self.receiver.bluetooth_gap.set_discoverable(False)
         self.initiator.bluetooth_gap.reset_state()

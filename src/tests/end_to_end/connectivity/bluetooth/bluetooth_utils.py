@@ -43,8 +43,12 @@ def retrieve_device_id(
 def forget_all_bt_devices(device: fuchsia_device.FuchsiaDevice) -> None:
     """Unpairs and deletes any BT peer pairing data from the device."""
     data = device.bluetooth_gap.get_known_remote_devices()
-    for device_id in data.keys():
-        device.bluetooth_gap.forget_device(identifier=data[device_id]["id"])
+    _LOGGER.info(data)
+    for identifier in data.keys():
+        if data[str(identifier)]["connected"]:
+            device.bluetooth_gap.forget_device(
+                identifier=data[identifier]["id"]
+            )
 
 
 def verify_bt_connection(
