@@ -70,8 +70,7 @@ void NavListener::OnNavigationStateChanged(OnNavigationStateChangedRequest& req,
   completer.Reply();
 }
 
-WebAppBase::WebAppBase()
-    : loop_(&kAsyncLoopConfigAttachToCurrentThread), outgoing_directory_(loop_.dispatcher()) {}
+WebAppBase::WebAppBase() : outgoing_directory_(dispatcher()) {}
 
 void WebAppBase::Setup(const std::string& web_app_name, const std::string& js_code,
                        fuchsia_web::ContextFeatureFlags context_feature_flags) {
@@ -119,9 +118,8 @@ void WebAppBase::SetupWebPage(const std::string& js_code) {
   FX_LOGS(INFO) << "Loading web app.";
   auto [navigation_event_listener_client_end, navigation_event_listener_server_end] =
       fidl::Endpoints<fuchsia_web::NavigationEventListener>::Create();
-  nav_listener_bindings_.AddBinding(loop_.dispatcher(),
-                                    std::move(navigation_event_listener_server_end), &nav_listener_,
-                                    fidl::kIgnoreBindingClosure);
+  nav_listener_bindings_.AddBinding(dispatcher(), std::move(navigation_event_listener_server_end),
+                                    &nav_listener_, fidl::kIgnoreBindingClosure);
   ZX_ASSERT_OK(
       web_frame_->SetNavigationEventListener({std::move(navigation_event_listener_client_end)}));
 
@@ -146,7 +144,7 @@ void WebAppBase::SetupWebPage(const std::string& js_code) {
   bool window_resized = false;
   SendMessageToWebPage(std::move(message_port_server_end), "REGISTER_PORT");
 
-  out_message_port_ = fidl::Client(std::move(message_port_client_end), loop_.dispatcher());
+  out_message_port_ = fidl::Client(std::move(message_port_client_end), dispatcher());
   out_message_port_->ReceiveMessage().Then([&is_port_registered, &window_resized](auto& res) {
     ZX_ASSERT_OK(res);
     auto message = StringFromBuffer(res->message().data().value());
@@ -184,7 +182,7 @@ void WebAppBase::SendMessageToWebPage(fidl::ServerEnd<fuchsia_web::MessagePort> 
 void WebAppBase::PresentView() {
   auto presenter_connect = component::Connect<fuchsia_element::GraphicalPresenter>();
   ZX_ASSERT_OK(presenter_connect);
-  presenter_ = fidl::Client(std::move(presenter_connect.value()), loop_.dispatcher());
+  presenter_ = fidl::Client(std::move(presenter_connect.value()), dispatcher());
 
   fuchsia_ui_views::ViewCreationToken child_token;
   fuchsia_ui_views::ViewportCreationToken parent_token;

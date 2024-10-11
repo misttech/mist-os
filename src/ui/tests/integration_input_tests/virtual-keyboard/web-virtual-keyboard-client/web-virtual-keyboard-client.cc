@@ -39,7 +39,7 @@ class WebApp : public integration_tests::WebAppBase {
     FX_LOGS(INFO) << "Waiting for input position";
     std::optional<rapidjson::Document> input_position;
     auto input_position_port =
-        fidl::Client(std::move(input_position_port_client_end), loop_.dispatcher());
+        fidl::Client(std::move(input_position_port_client_end), dispatcher());
 
     input_position_port->ReceiveMessage().Then([&input_position](auto& res) {
       ZX_ASSERT_OK(res);
@@ -77,7 +77,7 @@ class WebApp : public integration_tests::WebAppBase {
     ZX_ASSERT_OK(test_app_status_listener->ReportStatus(
         {fuchsia_ui_test_input::TestAppStatus::kHandlersRegistered}));
 
-    loop_.Run();
+    RunLoop();
   }
 
  private:
