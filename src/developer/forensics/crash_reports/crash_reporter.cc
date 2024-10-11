@@ -255,7 +255,7 @@ void CrashReporter::ScheduleHourlySnapshot(const zx::duration delay) {
 
         fuchsia::feedback::CrashReport report;
         report.set_program_name(kHourlySnapshotProgramName)
-            .set_program_uptime(clock_->Now().get())
+            .set_program_uptime(clock_->MonotonicNow().get())
             .set_is_fatal(false)
             .set_crash_signature(kHourlySnapshotSignature);
 

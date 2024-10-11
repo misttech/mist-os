@@ -18,7 +18,7 @@ namespace forensics::feedback {
 namespace {
 
 ErrorOrString GetUptime(timekeeper::Clock* clock) {
-  const auto uptime = FormatDuration(zx::duration(clock->Now().to_timespec()));
+  const auto uptime = FormatDuration(zx::duration(clock->MonotonicNow().to_timespec()));
   if (!uptime) {
     FX_LOGS(ERROR) << "Got negative uptime from timekeeper::Clock::Now()";
     return ErrorOrString(Error::kBadValue);

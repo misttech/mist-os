@@ -33,7 +33,7 @@ class Clock {
   }
 
   // Returns the current monotonic time. See |zx_clock_get_monotonic|.
-  zx::basic_time<ZX_CLOCK_MONOTONIC> Now() const { return zx::time(GetMonotonicTime()); }
+  zx::basic_time<ZX_CLOCK_MONOTONIC> MonotonicNow() const { return zx::time(GetMonotonicTime()); }
 
   // Returns the current boot time. See |zx_clock_get_boot|.
   zx::basic_time<ZX_CLOCK_BOOT> BootNow() const {

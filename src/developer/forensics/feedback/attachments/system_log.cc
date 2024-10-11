@@ -256,7 +256,7 @@ auto CompletesAndConsume() {
 
   auto self = ptr_factory_.GetWeakPtr();
 
-  buffer_.ExecuteAfter(zx::nsec(clock_->Now().get()), std::move(complete_ok));
+  buffer_.ExecuteAfter(zx::nsec(clock_->MonotonicNow().get()), std::move(complete_ok));
 
   return consume.then([self, ticket](const ::fpromise::result<void, Error>& result)
                           -> ::fpromise::result<AttachmentValue> {

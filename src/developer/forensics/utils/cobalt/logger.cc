@@ -26,7 +26,7 @@ using fxl::StringPrintf;
 constexpr uint32_t kMaxPendingEvents = 500u;
 
 uint64_t CurrentTimeUSecs(const timekeeper::Clock* clock) {
-  return zx::nsec(clock->Now().get()).to_usecs();
+  return zx::nsec(clock->MonotonicNow().get()).to_usecs();
 }
 
 }  // namespace

@@ -16,7 +16,7 @@ TEST(TestClockTest, Assignment) {
 
   clock.Set(t1);
 
-  auto t2 = clock.Now();
+  auto t2 = clock.MonotonicNow();
 
   EXPECT_EQ(t1, t2);
 

@@ -52,7 +52,7 @@
           break;                                                                                   \
         }                                                                                          \
       }                                                                                            \
-      EXPECT_TRUE(has_annotation&& name);                                                          \
+      EXPECT_TRUE(has_annotation && name);                                                         \
     }                                                                                              \
   }
 
@@ -458,7 +458,7 @@ TEST_F(MetadataTest, Check_UtcMonotonicDifference) {
 
   const zx::duration utc_monotonic_difference(utc.get() - monotonic.get());
 
-  monotonic = clock_.Now();
+  monotonic = clock_.MonotonicNow();
   ASSERT_EQ(clock_.UtcNow(&utc), ZX_OK);
 
   const auto metadata_json = MakeJsonReport(std::move(annotations), std::move(attachments));
@@ -534,7 +534,7 @@ TEST_F(MetadataTest, Check_NoUtcMonotonicDifferenceMissingFile) {
 
   const zx::duration utc_monotonic_difference(utc.get() - monotonic.get());
 
-  monotonic = clock_.Now();
+  monotonic = clock_.MonotonicNow();
   ASSERT_EQ(clock_.UtcNow(&utc), ZX_OK);
 
   const auto metadata_json = MakeJsonReport(std::move(annotations), std::move(attachments));

@@ -128,7 +128,7 @@ void CrashServer::MakeRequest(const Report& report, const Snapshot& snapshot,
 
   // Append the product and version parameters to the URL.
   const std::map<std::string, std::string> annotations =
-      PrepareAnnotations(report, snapshot, annotation_manager_, clock_->Now());
+      PrepareAnnotations(report, snapshot, annotation_manager_, clock_->MonotonicNow());
   FX_CHECK(annotations.count("product") != 0);
   FX_CHECK(annotations.count("version") != 0);
   const std::string url = fxl::Substitute("$0?product=$1&version=$2", url_,
