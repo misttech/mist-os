@@ -2,21 +2,28 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::system_activity_governor::SystemActivityGovernor;
+use crate::system_activity_governor::{CpuManager, SystemActivityGovernor};
 use anyhow::Result;
 use async_lock::OnceCell;
+use fuchsia_inspect::Node as INode;
+use futures::channel::mpsc::{self, Receiver, Sender};
 use futures::future::LocalBoxFuture;
-use futures::StreamExt;
-use power_broker_client::PowerElementContext;
+use futures::{FutureExt, StreamExt};
+use power_broker_client::{run_power_element, LeaseDependency, LeaseHelper, PowerElementContext};
 use std::rc::Rc;
-use {fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_system as fsystem};
+use zx::{HandleBased, Rights};
+use {
+    fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_power_broker as fbroker,
+    fidl_fuchsia_power_observability as fobs, fidl_fuchsia_power_system as fsystem,
+    fuchsia_async as fasync,
+};
 
 /// SystemActivityGovernorFactory is a function trait used to construct a new
 /// SystemActivityGovernor instance. The parameters are provided by an instance
 /// of CpuElementManager.
 pub trait SystemActivityGovernorFactory:
     Fn(
-        /*cpu_power_element:*/ Rc<PowerElementContext>,
+        /*cpu_manager:*/ Rc<CpuManager>,
         /*execution_state_level_dependencies:*/ Vec<fbroker::LevelDependency>,
     ) -> LocalBoxFuture<'static, Result<Rc<SystemActivityGovernor>>>
     + 'static
@@ -27,7 +34,7 @@ pub trait SystemActivityGovernorFactory:
 // a matching signature.
 impl<T> SystemActivityGovernorFactory for T where
     T: Fn(
-            /*cpu_power_element:*/ Rc<PowerElementContext>,
+            /*cpu_manager:*/ Rc<CpuManager>,
             /*execution_state_level_dependencies:*/ Vec<fbroker::LevelDependency>,
         ) -> LocalBoxFuture<'static, Result<Rc<SystemActivityGovernor>>>
         + 'static
@@ -38,8 +45,9 @@ pub struct CpuElementManager<F>
 where
     F: SystemActivityGovernorFactory,
 {
-    cpu: Rc<PowerElementContext>,
-    sag: OnceCell<Rc<SystemActivityGovernor>>,
+    cpu_assertive_dependency_token: fbroker::DependencyToken,
+    cpu_manager: Rc<CpuManager>,
+    sag: Rc<OnceCell<Rc<SystemActivityGovernor>>>,
     sag_factory: F,
 }
 
@@ -49,8 +57,11 @@ where
 {
     pub async fn new_wait_for_suspending_token(
         topology: &fbroker::TopologyProxy,
+        inspect_root: INode,
+        suspender: Option<fhsuspend::SuspenderProxy>,
         sag_factory: F,
     ) -> Rc<Self> {
+        tracing::info!("Creating CPU power element");
         let cpu = Rc::new(
             PowerElementContext::builder(
                 topology,
@@ -65,16 +76,80 @@ where
             .expect("PowerElementContext encountered error while building cpu"),
         );
 
-        Rc::new(Self { cpu, sag: OnceCell::new(), sag_factory })
+        let power_elements_node = inspect_root.create_child("power_elements");
+        let power_elements_node2 = power_elements_node.clone_weak();
+        inspect_root.record(power_elements_node);
+
+        let cpu_manager = Rc::new(CpuManager::new(
+            cpu.clone(),
+            suspender,
+            inspect_root.create_child("suspend_events"),
+        ));
+
+        let (suspend_tx, suspend_rx) = mpsc::channel(1);
+        run_suspend_task(cpu_manager.clone(), inspect_root, suspend_rx);
+        run_cpu(cpu_manager.clone(), &power_elements_node2, suspend_tx);
+
+        tracing::info!("Leasing CPU power element");
+        let cpu_lease = LeaseHelper::new(
+            &topology,
+            "cpu_boot_control",
+            vec![LeaseDependency {
+                dependency_type: fbroker::DependencyType::Assertive,
+                requires_token: cpu.assertive_dependency_token().expect("token not available"),
+                requires_level_by_preference: vec![fsystem::CpuLevel::Active.into_primitive()],
+            }],
+        )
+        .await
+        .expect("failed to create lease helper CPU element during startup")
+        .lease()
+        .await
+        .expect("failed to lease CPU element during startup");
+        tracing::info!("Leased CPU power element at 'Active'.");
+
+        let sag = Rc::new(OnceCell::<Rc<SystemActivityGovernor>>::new());
+        let sag2 = sag.clone();
+        let cpu_manager2 = cpu_manager.clone();
+
+        fasync::Task::local(async move {
+            let sag = sag2.wait().await.clone();
+
+            tracing::info!("Starting activity governor server...");
+            cpu_manager2.set_suspend_resume_listener(sag.clone());
+            sag.run(&power_elements_node2).await.expect("failed to run activity governor server");
+
+            tracing::info!("Running activity governor server, dropping CPU lease");
+            drop(cpu_lease);
+        })
+        .detach();
+
+        Rc::new(Self {
+            cpu_assertive_dependency_token: cpu
+                .assertive_dependency_token()
+                .expect("token not available"),
+            cpu_manager,
+            sag,
+            sag_factory,
+        })
     }
 
-    pub async fn new(topology: &fbroker::TopologyProxy, sag_factory: F) -> Rc<Self> {
-        let manager = Self::new_wait_for_suspending_token(topology, sag_factory).await;
+    pub async fn new(
+        topology: &fbroker::TopologyProxy,
+        inspect_root: INode,
+        suspender: Option<fhsuspend::SuspenderProxy>,
+        sag_factory: F,
+    ) -> Rc<Self> {
+        let manager =
+            Self::new_wait_for_suspending_token(topology, inspect_root, suspender, sag_factory)
+                .await;
 
         // No dependencies will be provided, so construct SystemActivityGovernor now.
-        let sag = (manager.sag_factory)(manager.cpu.clone(), Vec::new())
-            .await
-            .expect("create sag failed");
+        let sag = (manager.sag_factory)(
+            manager.cpu_manager.clone(),
+            manager.create_execution_state_level_dependencies(Vec::new()),
+        )
+        .await
+        .expect("create sag failed");
         let _ = manager.sag.set(sag).await;
 
         manager
@@ -82,6 +157,25 @@ where
 
     pub async fn sag(&self) -> Rc<SystemActivityGovernor> {
         self.sag.wait().await.clone()
+    }
+
+    fn cpu_assertive_dependency_token(&self) -> fbroker::DependencyToken {
+        self.cpu_assertive_dependency_token
+            .duplicate_handle(Rights::SAME_RIGHTS)
+            .expect("failed to duplicate token")
+    }
+
+    fn create_execution_state_level_dependencies(
+        &self,
+        mut extra_dependencies: Vec<fbroker::LevelDependency>,
+    ) -> Vec<fbroker::LevelDependency> {
+        extra_dependencies.push(fbroker::LevelDependency {
+            dependency_type: fbroker::DependencyType::Assertive,
+            dependent_level: fsystem::ExecutionStateLevel::Suspending.into_primitive(),
+            requires_token: self.cpu_assertive_dependency_token(),
+            requires_level_by_preference: vec![fsystem::CpuLevel::Active.into_primitive()],
+        });
+        extra_dependencies
     }
 
     pub async fn handle_cpu_element_manager_stream(
@@ -92,9 +186,7 @@ where
             match request {
                 Ok(fsystem::CpuElementManagerRequest::GetCpuDependencyToken { responder }) => {
                     if let Err(error) = responder.send(fsystem::Cpu {
-                        assertive_dependency_token: Some(
-                            self.cpu.assertive_dependency_token().expect("token not available"),
-                        ),
+                        assertive_dependency_token: Some(self.cpu_assertive_dependency_token()),
                         ..Default::default()
                     }) {
                         tracing::warn!(
@@ -127,14 +219,17 @@ where
                                 tracing::info!("Adding execution state dependency");
 
                                 let sag = (self.sag_factory)(
-                                    self.cpu.clone(),
-                                    vec![fbroker::LevelDependency {
-                                        dependency_type: fbroker::DependencyType::Assertive,
-                                        dependent_level: fsystem::ExecutionStateLevel::Suspending
-                                            .into_primitive(),
-                                        requires_token: dependency_token,
-                                        requires_level_by_preference: vec![power_level],
-                                    }],
+                                    self.cpu_manager.clone(),
+                                    self.create_execution_state_level_dependencies(vec![
+                                        fbroker::LevelDependency {
+                                            dependency_type: fbroker::DependencyType::Assertive,
+                                            dependent_level:
+                                                fsystem::ExecutionStateLevel::Suspending
+                                                    .into_primitive(),
+                                            requires_token: dependency_token,
+                                            requires_level_by_preference: vec![power_level],
+                                        },
+                                    ]),
                                 )
                                 .await
                                 .expect("create sag failed");
@@ -180,4 +275,56 @@ where
             }
         }
     }
+}
+
+fn run_suspend_task(
+    cpu_manager: Rc<CpuManager>,
+    inspect_node: INode,
+    mut suspend_signal: Receiver<()>,
+) {
+    fasync::Task::local(async move {
+        let _unhandled_suspend_failures_node =
+            inspect_node.create_uint(fobs::UNHANDLED_SUSPEND_FAILURES_COUNT, 0);
+        loop {
+            tracing::debug!("awaiting suspend signals");
+            suspend_signal.next().await;
+            tracing::debug!("attempting to suspend");
+            tracing::info!("trigger_suspend result: {:?}", cpu_manager.trigger_suspend().await);
+        }
+    })
+    .detach();
+}
+
+fn run_cpu(
+    cpu_manager: Rc<CpuManager>,
+    power_elements_node: &INode,
+    suspend_signaller: Sender<()>,
+) {
+    let cpu_node = power_elements_node.create_child("cpu");
+
+    fasync::Task::local(async move {
+        let element_name = cpu_manager.name().await;
+        let required_level = cpu_manager.required_level_proxy().await;
+
+        run_power_element(
+            &element_name,
+            &required_level,
+            fsystem::CpuLevel::Inactive.into_primitive(),
+            Some(cpu_node),
+            Box::new(move |new_power_level: fbroker::PowerLevel| {
+                let cpu_manager = cpu_manager.clone();
+                let mut suspend_signaller = suspend_signaller.clone();
+
+                async move {
+                    let update_res = cpu_manager.update_current_level(new_power_level).await;
+                    if let Ok(true) = update_res {
+                        let _ = suspend_signaller.start_send(());
+                    }
+                }
+                .boxed_local()
+            }),
+        )
+        .await;
+    })
+    .detach();
 }

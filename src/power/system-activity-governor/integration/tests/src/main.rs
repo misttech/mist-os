@@ -2766,8 +2766,8 @@ async fn create_cpu_driver_topology(
                 let cpu_driver_power_level = cpu_driver_power_level.clone();
 
                 async move {
-                    update_fn(new_power_level).await;
                     cpu_driver_power_level.set(new_power_level);
+                    update_fn(new_power_level).await;
                 }
                 .boxed_local()
             }),
@@ -2960,5 +2960,36 @@ async fn test_activity_governor_cpu_element_returns_bad_state() -> Result<()> {
             .unwrap_err()
     );
 
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_activity_governor_cpu_element_allows_leases_during_boot() -> Result<()> {
+    let (realm, activity_governor_moniker) = create_realm_ext(ftest::RealmOptions {
+        wait_for_suspending_token: Some(true),
+        ..Default::default()
+    })
+    .await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let (cpu_driver_controller, cpu_driver_power_level) =
+        create_cpu_driver_topology(&realm).await.unwrap();
+
+    // The CPU power element should be powered up on boot.
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            power_elements: {
+                cpu: {
+                    power_level: 1u64,
+                },
+            },
+        }
+    );
+
+    assert_eq!(0u8, cpu_driver_power_level.get());
+    let _cpu_lease = lease(&cpu_driver_controller, 1).await.unwrap();
+    assert_eq!(1u8, cpu_driver_power_level.get());
     Ok(())
 }

@@ -13,7 +13,6 @@ use fuchsia_component::client::{connect_to_protocol, connect_to_service_instance
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::health::Reporter;
 use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
-use power_broker_client::PowerElementContext;
 use sag_config::Config;
 use std::rc::Rc;
 use zx::Duration;
@@ -157,16 +156,14 @@ async fn main() -> Result<()> {
     let topology = connect_to_protocol::<fbroker::TopologyMarker>()?;
     let topology2 = topology.clone();
 
-    let sag_factory_fn = move |cpu: Rc<PowerElementContext>, execution_state_dependencies| {
+    let sag_factory_fn = move |cpu_manager, execution_state_dependencies| {
         let topology = topology2.clone();
-        let suspender = suspender.clone();
         async move {
             tracing::info!("Starting activity governor server...");
             SystemActivityGovernor::new(
                 &topology,
                 inspector.root().clone_weak(),
-                suspender,
-                cpu,
+                cpu_manager,
                 execution_state_dependencies,
             )
             .await
@@ -175,9 +172,16 @@ async fn main() -> Result<()> {
     };
 
     let cpu_service = if config.wait_for_suspending_token {
-        CpuElementManager::new_wait_for_suspending_token(&topology, sag_factory_fn).await
+        CpuElementManager::new_wait_for_suspending_token(
+            &topology,
+            inspector.root().clone_weak(),
+            suspender,
+            sag_factory_fn,
+        )
+        .await
     } else {
-        CpuElementManager::new(&topology, sag_factory_fn).await
+        CpuElementManager::new(&topology, inspector.root().clone_weak(), suspender, sag_factory_fn)
+            .await
     };
 
     fuchsia_inspect::component::health().set_ok();

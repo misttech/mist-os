@@ -17,7 +17,6 @@ use fuchsia_inspect::{
     ArrayProperty, IntProperty as IInt, Node as INode, Property, UintProperty as IUint,
 };
 use fuchsia_inspect_contrib::nodes::{BoundedListNode as IRingBuffer, NodeExt};
-use futures::channel::mpsc::{self, Receiver, Sender};
 use futures::future::FutureExt;
 use futures::lock::Mutex;
 use futures::prelude::*;
@@ -43,8 +42,8 @@ enum BootControlLevel {
 }
 
 /// The result of a suspend request.
-#[derive(PartialEq)]
-enum SuspendResult {
+#[derive(Debug, PartialEq)]
+pub enum SuspendResult {
     /// Suspend request succeeded.
     Success,
     /// Suspend request was not allowed at the time it was triggered.
@@ -63,7 +62,7 @@ impl From<BootControlLevel> for fbroker::PowerLevel {
 }
 
 #[async_trait(?Send)]
-trait SuspendResumeListener {
+pub trait SuspendResumeListener {
     /// Gets the manager of suspend stats.
     fn suspend_stats(&self) -> &SuspendStatsManager;
     /// Leases (Execution State, Suspending). Called after system suspension ends.
@@ -77,6 +76,9 @@ trait SuspendResumeListener {
     /// Notify the listeners of a suspend success.
     async fn notify_on_resume(&self);
 }
+
+// TODO(https://fxbug.dev/372779207): Move CpuManager-related types out of this file for better
+// organization and encapsulation. This will require refactoring/removing ExecutionResumeLatency.
 
 /// Controls access to CPU power element and suspend management.
 struct CpuManagerInner {
@@ -94,7 +96,7 @@ struct CpuManagerInner {
 }
 
 /// Manager of the CPU power element and suspend logic.
-struct CpuManager {
+pub struct CpuManager {
     /// State of the CPU power element and suspend controls.
     inner: Mutex<CpuManagerInner>,
     /// SuspendResumeListener object to notify of suspend/resume.
@@ -104,7 +106,7 @@ struct CpuManager {
 
 impl CpuManager {
     /// Creates a new CpuManager.
-    fn new(
+    pub fn new(
         cpu: Rc<PowerElementContext>,
         suspender: Option<fhsuspend::SuspenderProxy>,
         inspect: INode,
@@ -123,7 +125,10 @@ impl CpuManager {
 
     /// Sets the suspend resume listener.
     /// The listener can only be set once. Subsequent calls will result in a panic.
-    fn set_suspend_resume_listener(&self, suspend_resume_listener: Rc<dyn SuspendResumeListener>) {
+    pub fn set_suspend_resume_listener(
+        &self,
+        suspend_resume_listener: Rc<dyn SuspendResumeListener>,
+    ) {
         self.suspend_resume_listener
             .set(suspend_resume_listener)
             .map_err(|_| anyhow::anyhow!("suspend_resume_listener is already set"))
@@ -140,7 +145,7 @@ impl CpuManager {
     ///
     /// Returns a Result that indicates whether the system should suspend or not.
     /// If an error occurs while updating the power level, the error is forwarded to the caller.
-    async fn update_current_level(&self, required_level: fbroker::PowerLevel) -> Result<bool> {
+    pub async fn update_current_level(&self, required_level: fbroker::PowerLevel) -> Result<bool> {
         tracing::debug!(?required_level, "update_current_level: acquiring inner lock");
         let mut inner = self.inner.lock().await;
 
@@ -164,19 +169,19 @@ impl CpuManager {
     }
 
     /// Gets a copy of the name of the CPU power element.
-    async fn name(&self) -> String {
+    pub async fn name(&self) -> String {
         self.inner.lock().await.cpu.name().to_string()
     }
 
     /// Gets a copy of the RequiredLevelProxy of the CPU power element.
-    async fn required_level_proxy(&self) -> fbroker::RequiredLevelProxy {
+    pub async fn required_level_proxy(&self) -> fbroker::RequiredLevelProxy {
         self.inner.lock().await.cpu.required_level.clone()
     }
 
     /// Attempts to suspend the system.
     ///
     /// Returns an enum representing the result of the suspend attempt.
-    async fn trigger_suspend(&self) -> SuspendResult {
+    pub async fn trigger_suspend(&self) -> SuspendResult {
         let listener = self.suspend_resume_listener.get().unwrap();
         let mut suspend_failed = false;
         {
@@ -273,7 +278,7 @@ impl CpuManager {
     }
 }
 
-struct SuspendStatsManager {
+pub struct SuspendStatsManager {
     /// The hanging get handler used to notify subscribers of changes to suspend stats.
     hanging_get: RefCell<StatsHangingGet>,
     /// The publisher used to push changes to suspend stats.
@@ -544,9 +549,8 @@ impl SystemActivityGovernor {
     pub async fn new(
         topology: &fbroker::TopologyProxy,
         inspect_root: INode,
-        suspender: Option<fhsuspend::SuspenderProxy>,
-        cpu: Rc<PowerElementContext>,
-        mut execution_state_dependencies: Vec<fbroker::LevelDependency>,
+        cpu_manager: Rc<CpuManager>,
+        execution_state_dependencies: Vec<fbroker::LevelDependency>,
     ) -> Result<Rc<Self>> {
         let mut element_power_level_names: Vec<fbroker::ElementPowerLevelNames> = Vec::new();
 
@@ -557,13 +561,6 @@ impl SystemActivityGovernor {
                 (CpuLevel::Active.into_primitive(), "Active".to_string()),
             ],
         ));
-
-        execution_state_dependencies.push(fbroker::LevelDependency {
-            dependency_type: fbroker::DependencyType::Assertive,
-            dependent_level: ExecutionStateLevel::Suspending.into_primitive(),
-            requires_token: cpu.assertive_dependency_token().expect("token not registered"),
-            requires_level_by_preference: vec![CpuLevel::Active.into_primitive()],
-        });
 
         let execution_state = PowerElementContext::builder(
             topology,
@@ -718,28 +715,27 @@ impl SystemActivityGovernor {
             ],
         ));
 
-        let resume_latency_ctx = if let Some(suspender) = &suspender {
-            let resume_latency_ctx = ResumeLatencyContext::new(suspender, topology).await?;
-            element_power_level_names.push(generate_element_power_level_names(
-                "execution_resume_latency",
-                resume_latency_ctx
-                    .resume_latencies
-                    .iter()
-                    .enumerate()
-                    .map(|(i, val)| (i as u8, format!("{val} ns")))
-                    .collect(),
-            ));
-            Some(Rc::new(resume_latency_ctx))
-        } else {
-            None
-        };
+        let resume_latency_ctx =
+            if let Some(suspender) = &cpu_manager.inner.lock().await.suspender.clone() {
+                let resume_latency_ctx = ResumeLatencyContext::new(suspender, topology).await?;
+                element_power_level_names.push(generate_element_power_level_names(
+                    "execution_resume_latency",
+                    resume_latency_ctx
+                        .resume_latencies
+                        .iter()
+                        .enumerate()
+                        .map(|(i, val)| (i as u8, format!("{val} ns")))
+                        .collect(),
+                ));
+                Some(Rc::new(resume_latency_ctx))
+            } else {
+                None
+            };
 
         let suspend_stats =
             SuspendStatsManager::new(inspect_root.create_child(fobs::SUSPEND_STATS_NODE));
-        let cpu_manager =
-            Rc::new(CpuManager::new(cpu, suspender, inspect_root.create_child("suspend_events")));
 
-        let sag = Rc::new(Self {
+        Ok(Rc::new(Self {
             inspect_root,
             execution_state,
             application_activity,
@@ -756,29 +752,13 @@ impl SystemActivityGovernor {
             waiting_for_es_activation_after_resume: Cell::new(false),
             resume_control_lease: RefCell::new(None),
             is_running_signal: async_lock::OnceCell::new(),
-        });
-
-        let sag2 = sag.clone();
-        fasync::Task::local(async move {
-            tracing::info!("Starting activity governor server...");
-            sag2.run().await.expect("failed to run activity governor server");
-            let _ = sag2.is_running_signal.set(()).await;
-            tracing::info!("Running activity governor server");
-        })
-        .detach();
-
-        Ok(sag)
+        }))
     }
 
     /// Runs a FIDL server to handle fuchsia.power.suspend and fuchsia.power.system API requests.
-    async fn run(self: &Rc<Self>) -> Result<()> {
+    pub async fn run(self: &Rc<Self>, elements_node: &INode) -> Result<()> {
         tracing::info!("Handling power elements");
-        self.cpu_manager.set_suspend_resume_listener(self.clone());
 
-        let elements_node = self.inspect_root.create_child("power_elements");
-        let (suspend_tx, suspend_rx) = mpsc::channel(1);
-        self.run_suspend_task(suspend_rx);
-        self.run_cpu(&elements_node, suspend_tx);
         self.run_execution_state(&elements_node);
         self.run_full_wake_handling(&elements_node);
         self.run_wake_handling(&elements_node);
@@ -812,61 +792,8 @@ impl SystemActivityGovernor {
             tracing::warn!(?error, "failed to update boot_control level to Active");
         }
 
-        self.inspect_root.record(elements_node);
+        let _ = self.is_running_signal.set(()).await;
         Ok(())
-    }
-
-    fn run_suspend_task(self: &Rc<Self>, mut suspend_signal: Receiver<()>) {
-        let this = self.clone();
-
-        fasync::Task::local(async move {
-            let _unhandled_suspend_failures_node =
-                this.inspect_root.create_uint(fobs::UNHANDLED_SUSPEND_FAILURES_COUNT, 0);
-            let mut _suspend_result = SuspendResult::Success;
-            loop {
-                tracing::debug!("awaiting suspend signals");
-                suspend_signal.next().await;
-
-                // Check that the conditions to suspend are still satisfied.
-                tracing::debug!("attempting to suspend");
-
-                _suspend_result = this.cpu_manager.trigger_suspend().await;
-            }
-        })
-        .detach();
-    }
-
-    fn run_cpu(self: &Rc<Self>, inspect_node: &INode, suspend_signaller: Sender<()>) {
-        let cpu_node = inspect_node.create_child("cpu");
-        let sag = self.clone();
-
-        fasync::Task::local(async move {
-            let sag = sag.clone();
-            let element_name = sag.cpu_manager.name().await;
-            let required_level = sag.cpu_manager.required_level_proxy().await;
-
-            run_power_element(
-                &element_name,
-                &required_level,
-                CpuLevel::Inactive.into_primitive(),
-                Some(cpu_node),
-                Box::new(move |new_power_level: fbroker::PowerLevel| {
-                    let sag = sag.clone();
-                    let mut suspend_signaller = suspend_signaller.clone();
-
-                    async move {
-                        let update_res =
-                            sag.cpu_manager.update_current_level(new_power_level).await;
-                        if let Ok(true) = update_res {
-                            let _ = suspend_signaller.start_send(());
-                        }
-                    }
-                    .boxed_local()
-                }),
-            )
-            .await;
-        })
-        .detach();
     }
 
     fn run_application_activity(
