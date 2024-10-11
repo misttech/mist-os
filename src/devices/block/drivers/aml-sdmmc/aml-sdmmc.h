@@ -291,9 +291,7 @@ class AmlSdmmc : public fdf::DriverBase,
   // lease control client end in |lease_control_client_end|. That is unless
   // |lease_control_client_end| is valid to begin with (i.e., a lease had already been acquired), in
   // which case ZX_ERR_ALREADY_BOUND is returned instead.
-  // This should only be used during driver initialization until a higher level component can
-  // manage our power state
-  zx_status_t AcquireInitLease(
+  zx_status_t AcquireLease(
       const fidl::WireSyncClient<fuchsia_power_broker::Lessor>& lessor_client,
       fidl::ClientEnd<fuchsia_power_broker::LeaseControl>& lease_control_client_end);
 

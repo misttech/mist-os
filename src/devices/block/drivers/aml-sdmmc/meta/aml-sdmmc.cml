@@ -28,15 +28,10 @@
         { protocol: "fuchsia.power.broker.Topology" },
 
         // Used by //sdk/lib/driver/power/cpp
-        {
-            protocol: [
-                "fuchsia.power.system.ActivityGovernor",
-                "fuchsia.power.system.CpuElementManager",
-            ],
-        },
-        { service: "fuchsia.hardware.clock.Service" },
-        { service: "fuchsia.hardware.gpio.Service" },
+        { protocol: "fuchsia.power.system.ActivityGovernor" },
         { service: "fuchsia.hardware.platform.device.Service" },
+        { service: "fuchsia.hardware.gpio.Service" },
+        { service: "fuchsia.hardware.clock.Service" },
     ],
     expose: [
         {

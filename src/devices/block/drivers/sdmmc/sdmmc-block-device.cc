@@ -66,7 +66,7 @@ zx::result<fuchsia_hardware_power::ComponentPowerConfiguration> GetAllPowerConfi
 
 }  // namespace
 
-zx::result<fidl::ClientEnd<fuchsia_power_broker::LeaseControl>> SdmmcBlockDevice::AcquireInitLease(
+zx::result<fidl::ClientEnd<fuchsia_power_broker::LeaseControl>> SdmmcBlockDevice::AcquireLease(
     const fidl::WireSyncClient<fuchsia_power_broker::Lessor>& lessor_client) {
   const fidl::WireResult result = lessor_client->Lease(SdmmcBlockDevice::kPowerLevelOn);
   if (!result.ok()) {
@@ -379,6 +379,16 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
                result.error_value().FormatDescription().c_str());
     }
   }
+
+  // The lease request on the hardware power element remains persistent throughout the lifetime
+  // of this driver.
+  zx::result lease_control_client_end = AcquireLease(hardware_power_lessor_client_);
+  if (!lease_control_client_end.is_ok()) {
+    FDF_LOGL(ERROR, logger(), "Failed to acquire lease on hardware power: %s",
+             zx_status_get_string(lease_control_client_end.status_value()));
+    return lease_control_client_end.take_error();
+  }
+  hardware_power_lease_control_client_end_ = std::move(lease_control_client_end.value());
 
   // Start continuous monitoring of the required level and adjusting of the hardware's power level.
   WatchHardwareRequiredLevel();

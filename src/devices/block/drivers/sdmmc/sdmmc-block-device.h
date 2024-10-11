@@ -211,8 +211,7 @@ class SdmmcBlockDevice : public block_server::Interface {
 
   // Acquires a lease on a power element via the supplied |lessor_client|, returning the resulting
   // lease control client end.
-  // This method is planned for use in a future change.
-  zx::result<fidl::ClientEnd<fuchsia_power_broker::LeaseControl>> AcquireInitLease(
+  zx::result<fidl::ClientEnd<fuchsia_power_broker::LeaseControl>> AcquireLease(
       const fidl::WireSyncClient<fuchsia_power_broker::Lessor>& lessor_client);
 
   // Informs Power Broker of the updated |power_level| via the supplied |current_level_client|.
