@@ -29,6 +29,7 @@ ScopedGlobalLogger::ScopedGlobalLogger(FuchsiaLogSeverity min_severity)
   std::unique_ptr<fdf::Logger> logger =
       fdf::Logger::Create2(std::move(ns_result).value(), loop_.dispatcher(),
                            "fdf-testing-scoped-global-logger", min_severity);
+  logger_ = std::move(logger);
 #else
   zx::result<std::unique_ptr<fdf::Logger>> logger =
       fdf::Logger::Create(std::move(ns_result).value(), loop_.dispatcher(),
@@ -37,7 +38,6 @@ ScopedGlobalLogger::ScopedGlobalLogger(FuchsiaLogSeverity min_severity)
   logger_ = std::move(logger).value();
 #endif
 
-  logger_ = std::move(logger);
   fdf::Logger::SetGlobalInstance(logger_.get());
 }
 

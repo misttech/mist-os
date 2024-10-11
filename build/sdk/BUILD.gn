@@ -58,6 +58,7 @@ _partner_idk_source_sets_list = [
   "//sdk/lib/driver/runtime/testing/cpp",
   "//sdk/lib/driver/symbols",
   "//sdk/lib/driver/testing/cpp",
+  "//sdk/lib/driver/testing/cpp:scoped_global_logger",
   "//sdk/lib/fidl_base",
   "//sdk/lib/fidl_driver:fidl_driver_natural",
   "//sdk/lib/fidl_driver:fidl_driver_transport",

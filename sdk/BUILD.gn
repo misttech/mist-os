@@ -809,6 +809,7 @@ sdk_molecule("core_cc_source_libraries") {
     "//sdk/lib/driver/platform-device/cpp:cpp_sdk",
     "//sdk/lib/driver/power/cpp:cpp_sdk",
     "//sdk/lib/driver/testing/cpp:cpp_sdk",
+    "//sdk/lib/driver/testing/cpp:scoped_global_logger_sdk",
     "//sdk/lib/fidl/cpp:cpp_sdk",
     "//sdk/lib/fidl/cpp:hlcpp_conversion_sdk",
     "//sdk/lib/fidl/cpp:natural_ostream_sdk",

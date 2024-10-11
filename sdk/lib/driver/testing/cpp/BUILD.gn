@@ -65,8 +65,13 @@ sdk_source_set("cpp") {
   ]
 }
 
-source_set("scoped_global_logger") {
-  testonly = true
+sdk_source_set("scoped_global_logger") {
+  category = "partner"
+  sdk_name = "driver_testing_scoped_global_logger_cpp"
+  include_base = "//sdk"
+  stable = true
+  public_configs = [ "//sdk/config" ]
+
   sources = [
     "scoped_global_logger.cc",
     "scoped_global_logger.h",
