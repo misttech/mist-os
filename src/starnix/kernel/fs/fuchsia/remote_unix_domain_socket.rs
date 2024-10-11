@@ -240,11 +240,11 @@ impl SocketOps for RemoteUnixDomainSocket {
     }
 
     fn getsockname(&self, _socket: &Socket) -> Vec<u8> {
-        vec![]
+        SocketAddress::default_for_domain(SocketDomain::Unix).to_bytes()
     }
 
-    fn getpeername(&self, _socket: &Socket) -> Result<Vec<u8>, Errno> {
-        Ok(vec![])
+    fn getpeername(&self, socket: &Socket) -> Result<Vec<u8>, Errno> {
+        Ok(self.getsockname(socket))
     }
 
     fn setsockopt(
