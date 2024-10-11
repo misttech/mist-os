@@ -80,8 +80,8 @@ fit::result<Errno, Container> create_container(const Config& config) {
   // startup_file_path to be created. The task struct is still used
   // to initialize the system up until this point, regardless of whether
   // or not there is an actual init to be run.
-  auto argv = [&]() -> fbl::Vector<ktl::string_view> {
-    fbl::Vector<ktl::string_view> argv;
+  auto argv = [&]() -> fbl::Vector<BString> {
+    fbl::Vector<BString> argv;
     if (config.init.is_empty()) {
       fbl::AllocChecker ac;
       argv.push_back(DEFAULT_INIT, &ac);
@@ -124,7 +124,7 @@ fit::result<Errno, Container> create_container(const Config& config) {
     }
 
     fbl::AllocChecker ac;
-    fbl::Vector<ktl::string_view> envp;
+    fbl::Vector<BString> envp;
     // envp.push_back("LD_DEBUG=all", &ac);
     // ZX_ASSERT(ac.check());
     // envp.push_back("LD_SHOW_AUXV=1", &ac);

@@ -15,6 +15,7 @@
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/testing/testing.h>
+#include <lib/mistos/util/bstring.h>
 #include <lib/unittest/unittest.h>
 #include <zircon/assert.h>
 
@@ -89,8 +90,8 @@ bool test_trivial_initial_stack() {
   auto original_stack_start_addr = TEST_STACK_ADDR + 0x1000ul;
 
   ktl::string_view path("");
-  fbl::Vector<ktl::string_view> argv;
-  fbl::Vector<ktl::string_view> environ;
+  fbl::Vector<BString> argv;
+  fbl::Vector<BString> environ;
   fbl::Vector<ktl::pair<uint32_t, uint64_t>> auxv;
 
   auto stack_start_addr =
@@ -117,7 +118,7 @@ bool test_trivial_initial_stack() {
 }
 
 fit::result<Errno> exec_hello_starnix(starnix::CurrentTask& current_task) {
-  fbl::Vector<ktl::string_view> argv;
+  fbl::Vector<BString> argv;
   fbl::AllocChecker ac;
   argv.push_back("bin/hello_starnix", &ac);
   ZX_ASSERT(ac.check());
@@ -126,7 +127,7 @@ fit::result<Errno> exec_hello_starnix(starnix::CurrentTask& current_task) {
   if (executable.is_error()) {
     return executable.take_error();
   }
-  return current_task.exec(executable.value(), argv[0], argv, fbl::Vector<ktl::string_view>());
+  return current_task.exec(executable.value(), argv[0], argv, fbl::Vector<BString>());
 }
 
 bool test_load_hello_starnix() {
