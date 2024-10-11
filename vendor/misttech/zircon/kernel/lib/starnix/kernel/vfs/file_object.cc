@@ -6,7 +6,7 @@
 #include "lib/mistos/starnix/kernel/vfs/file_object.h"
 
 #include <lib/mistos/starnix/kernel/mm/flags.h>
-#include <lib/mistos/starnix/kernel/task/module.h>
+#include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/vfs/buffers/io_buffers.h>
 #include <lib/mistos/starnix/kernel/vfs/dir_entry.h>
 #include <lib/mistos/starnix/kernel/vfs/file_ops.h>

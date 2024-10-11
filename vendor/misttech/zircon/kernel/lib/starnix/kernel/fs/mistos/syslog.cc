@@ -5,7 +5,6 @@
 
 #include "lib/mistos/starnix/kernel/fs/mistos/syslog.h"
 
-#include <lib/mistos/starnix/kernel/task/module.h>
 #include <lib/mistos/starnix/kernel/vfs/anon_node.h>
 #include <lib/mistos/starnix/kernel/vfs/buffers/io_buffers.h>
 #include <lib/mistos/starnix/kernel/vfs/module.h>
@@ -22,7 +21,7 @@ FileHandle SyslogFile::new_file(const CurrentTask& current_task) {
   return Anon::new_file(current_task, ktl::move(file), OpenFlags(OpenFlagsEnum::RDWR));
 }
 
-fit::result<Errno, size_t> SyslogFile::write(/*Locked<WriteOps>& locked,*/ const FileObject& file,
+fit::result<Errno, size_t> SyslogFile::write(const FileObject& file,
                                              const CurrentTask& current_task, size_t offset,
                                              InputBuffer* data) {
   DEBUG_ASSERT(offset == 0);
