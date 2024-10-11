@@ -5,16 +5,14 @@
 """Defines a devicetree to be built into a devicetree blob."""
 
 load(":providers.bzl", "FuchsiaDeviceTreeSegmentInfo")
-load(":utils.bzl", "preprocesss_file")
+load(":utils.bzl", "PREPROCESS_FILE_ATTRS", "preprocesss_file")
+load(":fuchsia_transition.bzl", "fuchsia_transition")
 
 FUCHSIA_DEVICETREE_ATTR = {
     "dtcflags": attr.string_list(
         doc = "Flags to be passed to dtc compiler",
     ),
-    "_cc_toolchain": attr.label(
-        default = Label("@bazel_tools//tools/cpp:current_cc_toolchain"),
-    ),
-}
+} | PREPROCESS_FILE_ATTRS
 
 def _fuchsia_devicetree_impl(ctx):
     source = ctx.file.source
@@ -82,6 +80,11 @@ fuchsia_devicetree = rule(
         "deps": attr.label_list(
             doc = "Other Devicetree fragment targets referenced by this fragment",
             providers = [[FuchsiaDeviceTreeSegmentInfo], [CcInfo]],
+            # The dependencies can be cc_library() targets, which need a C++ toolchain
+            # definition, even if only their headers are actually used here. A
+            # transition to a Fuchsia-compatible build configuration is injected
+            # here to ensure that a C++ toolchain is always defined for them.
+            cfg = fuchsia_transition,
         ),
         "source": attr.label(
             doc = """Device tree source file (.dts/.dts.S). Source file that
@@ -89,6 +92,9 @@ fuchsia_devicetree = rule(
             will be preprocessed by C compiler before invoking the devicetree
             compiler.""",
             allow_single_file = [".dts", ".dts.S"],
+        ),
+        "_allowlist_function_transition": attr.label(
+            default = "@bazel_tools//tools/allowlists/function_transition_allowlist",
         ),
     } | FUCHSIA_DEVICETREE_ATTR,
 )
