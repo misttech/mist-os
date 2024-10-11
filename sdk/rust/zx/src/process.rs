@@ -305,13 +305,13 @@ impl Process {
     /// Wraps the
     /// [zx_object_get_child](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_child.md)
     /// syscall.
-    pub fn get_child(&self, koid: &Koid, rights: Rights) -> Result<Handle, Status> {
+    pub fn get_child(&self, koid: &Koid, rights: Rights) -> Result<Thread, Status> {
         let mut handle: zx_handle_t = Default::default();
         let status = unsafe {
             sys::zx_object_get_child(self.raw_handle(), koid.raw_koid(), rights.bits(), &mut handle)
         };
         ok(status)?;
-        Ok(unsafe { Handle::from_raw(handle) })
+        Ok(Thread::from(unsafe { Handle::from_raw(handle) }))
     }
 
     /// Wraps the

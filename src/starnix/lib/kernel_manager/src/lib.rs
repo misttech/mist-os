@@ -524,9 +524,7 @@ async fn suspend_kernel(kernel_job: &zx::Job) -> Result<Vec<zx::Handle>, Error> 
         for process in processes {
             let threads = process.threads().expect("failed to get threads");
             for thread_koid in &threads {
-                if let Ok(thread_handle) = process.get_child(&thread_koid, zx::Rights::SAME_RIGHTS)
-                {
-                    let thread = zx::Thread::from_handle(thread_handle);
+                if let Ok(thread) = process.get_child(&thread_koid, zx::Rights::SAME_RIGHTS) {
                     match thread.wait_handle(
                         zx::Signals::THREAD_SUSPENDED,
                         zx::MonotonicInstant::after(zx::Duration::INFINITE),
