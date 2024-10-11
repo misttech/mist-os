@@ -172,19 +172,6 @@ closed protocol AudioRenderer {
     /// dropped. Clients should wait until `min_lead_time_nsec > 0` before
     /// calling `Play`.
     ///
-    // TODO(mpuryear): What should the units be here?  Options include...
-    //
-    // 1. Normalized to nanoseconds (this is the current API)
-    // 2. Reference clock units (what happens if the reference clock changes?)
-    // 3. PTS units (what happens when the user changes the PTS units?)
-    //
-    // TODO(mpuryear): Should `EnableMinLeadTimeEvents` have an optional -> ()
-    // return value for synchronization purposes?  Probably not; users should be
-    // able to send a disable request and clear their event handler if they no
-    // longer want notifications. Their in-process dispatcher framework can
-    // handle draining and dropping any lead time changed events that were
-    // already in flight when the disable message was sent.
-    //
     strict EnableMinLeadTimeEvents(struct {
         enabled bool;
     });
@@ -192,9 +179,6 @@ closed protocol AudioRenderer {
         min_lead_time_nsec int64;
     });
 
-    // TODO(mpuryear): Eliminate this method when possible. Right now, it is
-    // used by code requiring synchronous FIDL interfaces to talk to
-    // AudioRenderers.
     ///
     /// While it is possible to call `GetMinLeadTime` before `SetPcmStreamType`,
     /// there's little reason to do so. This is because lead time is a function
@@ -310,13 +294,6 @@ closed protocol AudioRenderer {
     /// clock) 'reference_time'. Here the user would call
     /// `Play(reference_time, media_time)`.
     ///
-    // TODO(mpuryear): Define behavior in the case that a user calls `Play()`
-    // while the system is already playing. We should probably do nothing but
-    // return a valid correspondence pair in response -- unless both reference
-    // and media times are provided (and do not equate to the current timeline
-    // relationship), in which case we should introduce a discontinuity.
-    //
-    // TODO(mpuryear): Collapse these if we ever have optional retvals in FIDL
     strict Play(struct {
         reference_time int64;
         media_time int64;
@@ -335,22 +312,9 @@ closed protocol AudioRenderer {
     ///
     /// If the AudioRenderer is already in the paused state when this called,
     /// the previously-established timeline values are returned (if requested).
-    //
-    // TODO(mpuryear): Remove NoReply variants if FIDL gets optional retvals.
     strict Pause() -> (struct {
         reference_time int64;
         media_time int64;
     });
     strict PauseNoReply();
-
-    // TODO(mpuryear): Spec methods/events which can be used for unintentional
-    // discontinuity/underflow detection.
-    //
-    // TODO(mpuryear): Spec methods/events which can be used to report routing
-    // changes. (Presuming that they belong at this level at all; they may
-    // belong on some sort of policy object).
-    //
-    // TODO(mpuryear): Spec methods/events which can be used to report policy
-    // induced gain/ducking changes. (Presuming that they belong at this level
-    // at all; they may belong on some sort of policy object).
 };

@@ -105,68 +105,15 @@ closed protocol AudioCore {
     /// Creates an AudioCapturer which either captures from the current default
     /// audio input device, or loops-back from the current default audio output
     /// device based on value passed for the loopback flag.
-    //
-    // TODO(https://fxbug.dev/42110275): Get rid of the loopback flag ASAP. Routing decisions (and
-    // security surrounding routing decisions) should be more sophisticated.
-    // This is a placeholder until we have a design in place. Eventually, this
-    // should move up to an audio policy layer, where application clients obtain
-    // and control AudioCapturers.
     strict CreateAudioCapturer(resource struct {
         loopback bool;
         audio_in_request server_end:AudioCapturer;
     });
 
-    // TODO(https://fxbug.dev/42110311): remove these systemwide settings, once device-centric
-    // settings are plumbed into the system UI. Also, device-centric and
-    // systemwide settings should be moved out of this accessible-to-all public
-    // audio interface and relocated to a more restrictive interface that is
-    // only accessible by clients with the appropriate privileges (such as
-    // system configuration API, or the governor of audio policy).
-
-    /// System Gain and Mute
-    ///
-    /// Fuchsia clients control the volume of individual audio streams via the
-    /// fuchsia.media.audio.GainControl protocol. System Gain and Mute affect
-    /// all audio output, and are controlled with methods that use the same
-    /// concepts as GainControl, namely: independent gain and mute, with change
-    /// notifications. Setting System Mute to true leads to the same outcome as
-    /// setting System Gain to MUTED_GAIN_DB: all audio output across the system
-    /// is silenced.
-    ///
-    /// Sets the systemwide gain in decibels. `gain_db` values are clamped to
-    /// the range -160 db to 0 db, inclusive. This setting is applied to all
-    /// audio output devices. Audio input devices are unaffected.
-    /// Does not affect System Mute.
-    @available(removed=15)
-    strict SetSystemGain(struct {
-        gain_db float32;
-    });
-
-    /// Sets/clears the systemwide 'Mute' state for audio output devices.
-    /// Audio input devices are unaffected. Changes to the System Mute state do
-    /// not affect the value of System Gain.
-    @available(removed=15)
-    strict SetSystemMute(struct {
-        muted bool;
-    });
-
-    /// Provides current values for systemwide Gain and Mute. When a client
-    /// connects to AudioCore, the system immediately sends that client a
-    /// SystemGainMuteChanged event with the current system Gain|Mute settings.
-    /// Subsequent events will be sent when these Gain|Mute values change.
-    @available(removed=15)
-    strict -> SystemGainMuteChanged(struct {
-        gain_db float32;
-        muted bool;
-    });
-
     // By default, reading and writing device settings files is enabled. This
     // method (which has impact across the entire audio subsystem) allows a test
     // client to temporarily disable, then later enable, that reading/writing.
-    // TODO(https://fxbug.dev/42085388): Move this to the hub, instead of FIDL API. Alternately,
-    // simply remove; going forward, HermeticTestEnvironment accepts a
-    // parameter that disables device settings writeback during testing.
-    @deprecated
+    @available(deprecated=15)
     strict EnableDeviceSettings(struct {
         enabled bool;
     });
@@ -229,7 +176,6 @@ closed protocol AudioCore {
 };
 
 // Placeholder for routing policies.
-// TODO(https://fxbug.dev/42110283): Replace, when routing is handled by a central policy manager.
 type AudioOutputRoutingPolicy = strict enum {
     // AudioRenderers are always connected to all audio outputs which currently
     // in the plugged state (eg; have a connector attached to them)
