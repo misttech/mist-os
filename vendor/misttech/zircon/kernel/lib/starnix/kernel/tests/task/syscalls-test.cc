@@ -152,6 +152,46 @@ bool test_sys_getsid() {
   END_TEST;
 }
 
+bool test_read_c_string_vector() {
+  BEGIN_TEST;
+
+  auto [kernel, current_task] = create_kernel_task_and_unlocked();
+
+  auto arg_addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE);
+  ktl::string_view arg = "test-arg\0"sv;
+  ASSERT_TRUE(current_task
+                  ->write_memory(arg_addr,
+                                 ktl::span<const uint8_t>{
+                                     reinterpret_cast<const uint8_t*>(arg.data()), arg.size()})
+                  .is_ok(),
+              "failed to write test arg");
+
+  auto arg_usercstr = UserCString::New(arg_addr);
+  auto null_usercstr = mtl::DefaultConstruct<UserCString>();
+
+  auto argv_addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE);
+  ASSERT_TRUE(
+      current_task->write_object(UserRef<UserCString>::From(argv_addr), arg_usercstr).is_ok(),
+      "failed to write UserCString");
+  ASSERT_TRUE(
+      current_task
+          ->write_object(UserRef<UserCString>::From(argv_addr + sizeof(UserCString)), null_usercstr)
+          .is_ok(),
+      "failed to write UserCString");
+  auto argv_userref = UserRef<UserCString>::New(argv_addr);
+
+  // The arguments size limit should include the null terminator.
+  auto result = read_c_string_vector(*current_task, argv_userref, 100, arg.size());
+  ASSERT_TRUE(result.is_ok());
+  ASSERT_EQ(arg.size(), result->second);
+  ASSERT_STREQ("test-arg", result->first[0]);
+
+  ASSERT_EQ(errno(E2BIG).error_code(),
+            read_c_string_vector(*current_task, argv_userref, 100, strlen(arg.data()))
+                .error_value()
+                .error_code());
+
+  END_TEST;
 }
 
 }  // namespace unit_testing
@@ -162,4 +202,5 @@ UNITTEST("test set vma name special chars", unit_testing::test_set_vma_name_spec
 UNITTEST("test set vma name long", unit_testing::test_set_vma_name_long)
 UNITTEST("test set vma name misaligned", unit_testing::test_set_vma_name_misaligned)
 UNITTEST("test sys getsid", unit_testing::test_sys_getsid)
+UNITTEST("test read c string vector", unit_testing::test_read_c_string_vector)
 UNITTEST_END_TESTCASE(starnix_task_syscalls, "starnix_task_syscalls", "Tests for Tasks Syscalls")
