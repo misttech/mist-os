@@ -15,7 +15,10 @@ use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::file_mode::FileMode;
 use std::sync::Arc;
 
-/// Creates a new file named "file" under the root of the filesystem.
+// The default name used files used in testing.
+pub const TEST_FILE_NAME: &str = "file";
+
+/// Creates a new file named [`TEST_FILE_NAME`] under the root of the filesystem.
 /// As currently implemented this will exercise the file-labeling scheme
 /// specified for the root filesystem by the current policy and then
 /// clear both the file's cached `SecurityId` and its extended attribute.
@@ -35,7 +38,7 @@ pub fn create_unlabeled_test_file(
     namespace_node
 }
 
-/// Creates a new file named "file" under the root of the filesystem.
+/// Creates a new file named [`TEST_FILE_NAME`] under the root of the filesystem.
 /// Note that this will exercise the file-labeling scheme specified for the root
 /// filesystem by the current policy.
 pub fn create_test_file(
@@ -45,7 +48,13 @@ pub fn create_test_file(
     current_task
         .fs()
         .root()
-        .create_node(locked, &current_task, "file".into(), FileMode::IFREG, DeviceType::NONE)
+        .create_node(
+            locked,
+            &current_task,
+            TEST_FILE_NAME.into(),
+            FileMode::IFREG,
+            DeviceType::NONE,
+        )
         .expect("create_node(file)")
 }
 

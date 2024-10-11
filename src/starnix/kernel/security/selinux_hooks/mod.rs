@@ -677,6 +677,7 @@ mod tests {
     use crate::testing::{create_kernel_task_and_unlocked_with_selinux, spawn_kernel_and_run};
     use crate::vfs::XattrOp;
     use starnix_uapi::errno;
+    use testing::TEST_FILE_NAME;
 
     const VALID_SECURITY_CONTEXT: &[u8] = b"u:object_r:test_valid_t:s0";
 
@@ -851,11 +852,12 @@ mod tests {
 
     #[fuchsia::test]
     async fn get_fs_relative_path_simple_file() {
-        // Verify the full path for a file directly under the root: "/file".
+        // Verify the full path for a file directly under the root: "/" + [`TEST_FILE_NAME`].
         spawn_kernel_and_run(|locked, current_task| {
             let dir_entry = &testing::create_test_file(locked, &current_task).entry;
 
-            assert_eq!(BStr::new(b"/file"), get_fs_relative_path(&dir_entry));
+            let expected = format!("/{}", TEST_FILE_NAME);
+            assert_eq!(BStr::new(&expected), get_fs_relative_path(&dir_entry));
         });
     }
 
