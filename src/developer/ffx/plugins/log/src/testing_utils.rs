@@ -34,6 +34,7 @@ pub struct TestEnvironmentConfig {
     pub boot_id: Option<u64>,
     pub instances: Vec<Moniker>,
     pub send_connected_event: bool,
+    pub show_initial_timestamp: bool,
 }
 
 pub fn test_log_with_severity(timestamp: i64, severity: Severity) -> LogsData {
@@ -104,6 +105,7 @@ impl Default for TestEnvironmentConfig {
             instances: Vec::new(),
             send_connected_event: false,
             boot_id: Some(1),
+            show_initial_timestamp: false,
         }
     }
 }

@@ -9,7 +9,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use diagnostics_data::{
     Data, LogTextColor, LogTextDisplayOptions, LogTextPresenter, LogTimeDisplayFormat, Logs,
-    LogsData, Timezone,
+    LogsData, LogsDataBuilder, Severity, Timezone,
 };
 use ffx_writer::ToolIO;
 use futures_util::future::Either;
@@ -98,11 +98,28 @@ where
     symbolizer.symbolize(entry).await
 }
 
+fn generate_timestamp_message() -> LogEntry {
+    LogEntry {
+        data: LogData::TargetLog(
+            LogsDataBuilder::new(diagnostics_data::BuilderArgs {
+                moniker: "ffx".try_into().unwrap(),
+                timestamp: Timestamp::from_nanos(0),
+                component_url: Some("ffx".into()),
+                severity: Severity::Info,
+            })
+            .set_message(format!("UTC time now: {}", chrono::Utc::now().to_rfc3339()))
+            .build(),
+        ),
+        timestamp: Timestamp::from_nanos(0),
+    }
+}
+
 /// Reads logs from a socket and formats them using the given formatter and symbolizer.
 pub async fn dump_logs_from_socket<F, S>(
     socket: fuchsia_async::Socket,
     formatter: &mut F,
     symbolizer: &S,
+    include_timestamp: bool,
 ) -> Result<LogProcessingResult, JsonDeserializeError>
 where
     F: LogFormatter + BootTimeAccessor,
@@ -111,6 +128,9 @@ where
     let boot_ts = formatter.get_boot_timestamp();
     let mut decoder = Box::pin(LogsDataStream::new(socket).fuse());
     let mut symbolize_pending = FuturesUnordered::new();
+    if include_timestamp {
+        formatter.push_log(generate_timestamp_message()).await?;
+    }
     while let Some(value) = select! {
         res = decoder.next() => Some(Either::Left(res)),
         res = symbolize_pending.next() => Some(Either::Right(res)),
@@ -467,6 +487,18 @@ mod test {
         }
     }
 
+    async fn dump_logs_from_socket<F, S>(
+        socket: fuchsia_async::Socket,
+        formatter: &mut F,
+        symbolizer: &S,
+    ) -> Result<LogProcessingResult, JsonDeserializeError>
+    where
+        F: LogFormatter + BootTimeAccessor,
+        S: Symbolize + ?Sized,
+    {
+        super::dump_logs_from_socket(socket, formatter, symbolizer, false).await
+    }
+
     #[async_trait(?Send)]
     impl Symbolize for FakeSymbolizerCallback {
         async fn symbolize(&self, mut input: LogEntry) -> Option<LogEntry> {
@@ -536,6 +568,24 @@ mod test {
                 timestamp: Timestamp::from_nanos(0)
             }]
         );
+    }
+
+    #[fuchsia::test]
+    async fn test_format_utc_timestamp() {
+        let start_text = "UTC time now: ";
+        let symbolizer = NoOpSymbolizer {};
+        let mut formatter = FakeFormatter::new();
+        let (_, receiver) = zx::Socket::create_stream();
+        super::dump_logs_from_socket(
+            fuchsia_async::Socket::from_socket(receiver),
+            &mut formatter,
+            &symbolizer,
+            true,
+        )
+        .await
+        .unwrap();
+        let output = formatter.logs[0].data.as_target_log().unwrap().msg().unwrap().to_string();
+        chrono::DateTime::parse_from_rfc3339(&output[start_text.len()..]).unwrap();
     }
 
     #[fuchsia::test]

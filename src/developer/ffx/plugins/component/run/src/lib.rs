@@ -79,7 +79,7 @@ async fn cmd_impl(
     if args.follow_logs {
         let log_filter = args.moniker.to_string();
         let log_cmd = LogCommand { filter: vec![log_filter], ..LogCommand::default() };
-        log_impl(writer, log_cmd, connector).await?;
+        log_impl(writer, log_cmd, connector, true).await?;
     }
     Ok(())
 }
