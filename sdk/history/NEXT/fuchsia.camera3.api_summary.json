@@ -456,6 +456,14 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.camera3/Stream.SetBufferCollection2",
+        "strictness": "strict",
+        "ordinal": "7390920386660649190",
+        "direction": "one_way",
+        "request": "fuchsia.camera3/StreamSetBufferCollection2Request"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.camera3/Stream.SetCropRegion",
         "strictness": "strict",
         "ordinal": "8277025934920991490",
@@ -477,6 +485,14 @@
         "ordinal": "3879945243421435350",
         "direction": "two_way",
         "response": "fuchsia.camera3/StreamWatchBufferCollectionResponse"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.camera3/Stream.WatchBufferCollection2",
+        "strictness": "strict",
+        "ordinal": "6974345893373619441",
+        "direction": "two_way",
+        "response": "fuchsia.camera3/StreamWatchBufferCollection2Response"
     },
     {
         "kind": "protocol/member",
@@ -613,6 +629,17 @@
     },
     {
         "kind": "struct/member",
+        "name": "fuchsia.camera3/StreamSetBufferCollection2Request.token",
+        "ordinal": "1",
+        "type": "fuchsia.sysmem2/BufferCollectionToken:optional"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera3/StreamSetBufferCollection2Request",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
         "name": "fuchsia.camera3/StreamSetBufferCollectionRequest.token",
         "ordinal": "1",
         "type": "fuchsia.sysmem/BufferCollectionToken:optional"
@@ -641,6 +668,17 @@
     {
         "kind": "struct",
         "name": "fuchsia.camera3/StreamSetResolutionRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera3/StreamWatchBufferCollection2Response.token",
+        "ordinal": "1",
+        "type": "fuchsia.sysmem2/BufferCollectionToken"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera3/StreamWatchBufferCollection2Response",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",

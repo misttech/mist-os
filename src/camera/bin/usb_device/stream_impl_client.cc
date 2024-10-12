@@ -126,9 +126,19 @@ void StreamImpl::Client::WatchResolution(WatchResolutionCallback callback) {
   FX_LOGS(ERROR) << log_prefix_ << "FIDL call not supported";
 }
 
+void StreamImpl::Client::SetBufferCollection2(
+    fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token) {
+  SetBufferCollectionCommon(std::move(token));
+}
+
 void StreamImpl::Client::SetBufferCollection(
-    fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_param) {
-  fuchsia::sysmem2::BufferCollectionTokenHandle token(token_param.TakeChannel());
+    fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token) {
+  SetBufferCollectionCommon(
+      fuchsia::sysmem2::BufferCollectionTokenHandle(std::move(token).TakeChannel()));
+}
+
+void StreamImpl::Client::SetBufferCollectionCommon(
+    fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token) {
   auto nonce = TRACE_NONCE();
   TRACE_ASYNC_BEGIN("camera", "StreamImpl::Client::SetBufferCollection", nonce);
   FX_LOGS(INFO) << log_prefix_ << "called SetBufferCollection(koid = " << GetRelatedKoid(token)
@@ -137,7 +147,7 @@ void StreamImpl::Client::SetBufferCollection(
       stream_.SetClientParticipation(id_, std::move(token))
           .then([this,
                  nonce](fpromise::result<std::optional<BufferCollectionTokenPtr>>& result) mutable
-                -> fpromise::promise<void> {
+                    -> fpromise::promise<void> {
             // If the result of SetClientParticipation was nullopt, we're done.
             if (!result.value())
               return make_ok_promise();
@@ -159,13 +169,28 @@ void StreamImpl::Client::SetBufferCollection(
   stream_.Schedule(std::move(promise));
 }
 
+void StreamImpl::Client::WatchBufferCollection2(WatchBufferCollection2Callback callback) {
+  WatchBufferCollectionCommon(
+      [callback = std::move(callback)](
+          fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token) {
+        std::move(callback)(std::move(token));
+      });
+}
+
 void StreamImpl::Client::WatchBufferCollection(WatchBufferCollectionCallback callback) {
+  WatchBufferCollectionCommon(
+      [callback = std::move(callback)](
+          fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token) {
+        std::move(callback)(fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
+            std::move(token).TakeChannel()));
+      });
+}
+
+void StreamImpl::Client::WatchBufferCollectionCommon(
+    fit::function<void(fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>)> callback) {
   TRACE_DURATION("camera", "StreamImpl::Client::WatchBufferCollection");
   FX_LOGS(INFO) << log_prefix_ << "called WatchBufferCollection()";
-  if (buffers_.Get(
-          [callback = std::move(callback)](fuchsia::sysmem2::BufferCollectionTokenHandle token) {
-            callback(fuchsia::sysmem::BufferCollectionTokenHandle(token.TakeChannel()));
-          })) {
+  if (buffers_.Get(std::move(callback))) {
     CloseConnection(ZX_ERR_BAD_STATE);
     stream_.Schedule(stream_.RemoveClient(id_));
   }

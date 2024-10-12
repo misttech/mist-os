@@ -113,10 +113,19 @@ void FakeStreamImpl::WatchResolution(WatchResolutionCallback callback) {
   bindings_.CloseAll(ZX_ERR_NOT_SUPPORTED);
 }
 
-void FakeStreamImpl::SetBufferCollection(
-    fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_param) {
-  fuchsia::sysmem2::BufferCollectionTokenHandle token(token_param.TakeChannel());
+void FakeStreamImpl::SetBufferCollection2(
+    fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token) {
+  SetBufferCollectionCommon(std::move(token));
+}
 
+void FakeStreamImpl::SetBufferCollection(
+    fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token) {
+  SetBufferCollectionCommon(
+      fuchsia::sysmem2::BufferCollectionTokenHandle(std::move(token).TakeChannel()));
+}
+
+void FakeStreamImpl::SetBufferCollectionCommon(
+    fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token) {
   if (!token) {
     on_set_buffer_collection_(nullptr);
     return;
@@ -132,7 +141,7 @@ void FakeStreamImpl::SetBufferCollection(
   token_protocol->Sync(&sync_result);
 
   if (token_request_) {
-    token_request_(fuchsia::sysmem::BufferCollectionTokenHandle(client_token.TakeChannel()));
+    std::move(token_request_)(std::move(client_token));
     token_request_ = nullptr;
   } else {
     token_ = std::move(client_token);
@@ -141,13 +150,28 @@ void FakeStreamImpl::SetBufferCollection(
   on_set_buffer_collection_(std::move(token_protocol));
 }
 
+void FakeStreamImpl::WatchBufferCollection2(WatchBufferCollection2Callback callback) {
+  WatchBufferCollectionCommon(
+      [callback = std::move(callback)](fuchsia::sysmem2::BufferCollectionTokenHandle token) {
+        std::move(callback)(std::move(token));
+      });
+}
+
 void FakeStreamImpl::WatchBufferCollection(WatchBufferCollectionCallback callback) {
+  WatchBufferCollectionCommon(
+      [callback = std::move(callback)](fuchsia::sysmem2::BufferCollectionTokenHandle token) {
+        std::move(callback)(fuchsia::sysmem::BufferCollectionTokenHandle(token.TakeChannel()));
+      });
+}
+
+void FakeStreamImpl::WatchBufferCollectionCommon(
+    fit::function<void(fuchsia::sysmem2::BufferCollectionTokenHandle)> callback) {
   if (token_request_) {
     bindings_.CloseAll(ZX_ERR_BAD_STATE);
   }
 
   if (token_) {
-    callback(fuchsia::sysmem::BufferCollectionTokenHandle(std::move(token_).TakeChannel()));
+    callback(std::move(token_));
     token_ = nullptr;
     return;
   }
