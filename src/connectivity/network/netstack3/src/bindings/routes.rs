@@ -23,7 +23,9 @@ use std::sync::Arc;
 use assert_matches::assert_matches;
 use derivative::Derivative;
 use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
-use fidl_fuchsia_net_routes_ext::rules::{InstalledRule, RuleSetPriority};
+use fidl_fuchsia_net_routes_ext::rules::{
+    InstalledRule, RuleAction, RuleIndex, RuleSetPriority, DEFAULT_RULE_SET_PRIORITY,
+};
 use futures::channel::{mpsc, oneshot};
 use futures::{stream, Future, FutureExt as _, StreamExt as _};
 use log::{debug, error, info, warn};
@@ -1116,6 +1118,26 @@ impl ChangeSink {
 
     pub(crate) fn main_table_token<I: Ip>(&self) -> &Arc<zx::Event> {
         &self.changes::<I>().main_table_token
+    }
+
+    pub(crate) async fn add_default_rule<I: Ip>(&self) {
+        let (rule_work_sink, receiver) = mpsc::unbounded();
+        self.new_rule_set::<I>(DEFAULT_RULE_SET_PRIORITY, receiver)
+            .await
+            .expect("failed to add a new rule set");
+        let (responder, receiver) = oneshot::channel();
+        rule_work_sink
+            .unbounded_send(RuleWorkItem::RuleOp {
+                op: RuleOp::Add {
+                    priority: DEFAULT_RULE_SET_PRIORITY,
+                    index: RuleIndex::new(0),
+                    matcher: Default::default(),
+                    action: RuleAction::Lookup(main_table_id::<I>().into()),
+                },
+                responder,
+            })
+            .expect("failed to send work item");
+        receiver.await.expect("responder dropped").expect("failed to add the default rule");
     }
 
     fn changes<I: Ip>(&self) -> &Changes<I> {

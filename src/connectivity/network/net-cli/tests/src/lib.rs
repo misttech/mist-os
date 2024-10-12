@@ -17,6 +17,7 @@ use anyhow::Result;
 use argh::FromArgs as _;
 use net_declare::{fidl_ip_v6, fidl_mac};
 use net_types::ip::{IpVersion, Ipv4, Ipv6};
+use netemul::TestRealm;
 use netstack_testing_common::realms::KnownServiceProvider;
 use test_case::test_case;
 use {
@@ -309,6 +310,30 @@ async fn rule_list() {
     )
     .await;
 
+    async fn default_rule<
+        I: fnet_routes_ext::admin::FidlRouteAdminIpExt + fnet_routes_ext::FidlRouteIpExt,
+    >(
+        realm: &TestRealm<'_>,
+    ) -> serde_json::Value {
+        let main_table =
+            connect_to_hermetic_network_realm_protocol::<I::RouteTableMarker>(&realm).await;
+        let main_table_id = fnet_routes_ext::admin::get_table_id::<I>(&main_table)
+            .await
+            .expect("get main table id");
+        serde_json::json!({
+            "action": format!("lookup {main_table_id}"),
+            "bound_device": null,
+            "from": null,
+            "index": 0,
+            "locally_generated": null,
+            "mark_1": null,
+            "mark_2": null,
+            "rule_set_priority": u32::from(fnet_routes_ext::rules::DEFAULT_RULE_SET_PRIORITY),
+        })
+    }
+    let v4_default_rule = default_rule::<Ipv4>(&realm).await;
+    let v6_default_rule = default_rule::<Ipv6>(&realm).await;
+
     let connector = NetworkTestRealmConnector { realm: &realm };
     let list_rules = || async {
         let buffers = ffx_writer::TestBuffers::default();
@@ -327,8 +352,8 @@ async fn rule_list() {
 
     let initial_rules = list_rules().await;
 
-    // Initially, there are no rules installed.
-    assert!(initial_rules.is_empty());
+    // Initially, only the default rules are installed.
+    assert_eq!(&initial_rules[..], &[v4_default_rule.clone(), v6_default_rule.clone()]);
 
     let rule_table_v6 =
         connect_to_hermetic_network_realm_protocol::<fnet_routes_admin::RuleTableV6Marker>(&realm)
@@ -380,7 +405,10 @@ async fn rule_list() {
     });
 
     let rules = list_rules().await;
-    assert_eq!(&rules[..], &[v6_rule.clone()][..]);
+    assert_eq!(
+        &rules[..],
+        &[v4_default_rule.clone(), v6_rule.clone(), v6_default_rule.clone()][..]
+    );
 
     let rule_table_v4 =
         connect_to_hermetic_network_realm_protocol::<fnet_routes_admin::RuleTableV4Marker>(&realm)
@@ -430,5 +458,5 @@ async fn rule_list() {
     });
 
     let rules = list_rules().await;
-    assert_eq!(&rules[..], &[v4_rule, v6_rule][..]);
+    assert_eq!(&rules[..], &[v4_rule, v4_default_rule, v6_rule, v6_default_rule][..]);
 }

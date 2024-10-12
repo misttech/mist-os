@@ -1060,8 +1060,11 @@ async fn do_rule_list<C: NetCliDepsConnector>(
         froutes_ext::rules::collect_rules_until_idle::<Ipv6, Vec<_>>(ipv6_rule_event_stream),
     )
     .await;
-    let v4_rules = v4_rules.context("failed to collect all existing IPv4 rules")?;
-    let v6_rules = v6_rules.context("failed to collect all existing IPv6 rules")?;
+    let mut v4_rules = v4_rules.context("failed to collect all existing IPv4 rules")?;
+    let mut v6_rules = v6_rules.context("failed to collect all existing IPv6 rules")?;
+
+    v4_rules.sort_by_key(|r| (r.priority, r.index));
+    v6_rules.sort_by_key(|r| (r.priority, r.index));
 
     fn format_matcher(matcher: froutes_ext::rules::MarkMatcher) -> Cow<'static, str> {
         match matcher {
