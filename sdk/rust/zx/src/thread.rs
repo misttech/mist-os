@@ -123,16 +123,9 @@ impl Thread {
         ok(status)
     }
 
-    pub fn raise_exception(
-        options: RaiseExceptionOptions,
-        exception_type: sys::zx_excp_type_t,
-        context: sys::zx_exception_context_t,
-    ) -> Result<(), Status> {
-        let status =
-            unsafe { sys::zx_thread_raise_exception(options.bits(), exception_type, &context) };
-        ok(status)
-    }
-
+    /// Wraps the `zx_thread_raise_exception` syscall.
+    ///
+    /// See https://fuchsia.dev/reference/syscalls/thread_raise_exception?hl=en for details.
     pub fn raise_user_exception(
         options: RaiseExceptionOptions,
         synth_code: u32,
@@ -140,7 +133,9 @@ impl Thread {
     ) -> Result<(), Status> {
         let arch = unsafe { std::mem::zeroed::<sys::zx_exception_header_arch_t>() };
         let context = sys::zx_exception_context_t { arch, synth_code, synth_data };
-        Self::raise_exception(options, sys::ZX_EXCP_USER, context)
+
+        // SAFETY: basic FFI call. `&context` is a valid pointer.
+        ok(unsafe { sys::zx_thread_raise_exception(options.bits(), sys::ZX_EXCP_USER, &context) })
     }
 }
 
