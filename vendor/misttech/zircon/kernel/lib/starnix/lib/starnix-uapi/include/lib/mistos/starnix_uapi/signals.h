@@ -41,11 +41,13 @@ struct Signal {
 
   static const uint32_t NUM_SIGNALS = 64;
 
+  bool operator==(const Signal& other) const { return number_ == other.number_; }
+  bool operator!=(const Signal& other) const { return !(*this == other); }
+
  public:
   // impl TryFrom<UncheckedSignal>
   static fit::result<Errno, Signal> try_from(UncheckedSignal value);
 
- public:
   explicit Signal(uint32_t number) : number_(number) {}
 };
 
@@ -114,10 +116,12 @@ struct SigSet {
   static SigSet From(sigset_t value) { return SigSet(value); }
   static SigSet From(Signal value) { return SigSet(value.mask()); }
 
+  SigSet() = default;
+
  private:
   explicit SigSet(unsigned long value) : value_(value) {}
 
-  unsigned long value_;
+  unsigned long value_ = 0;
 };
 
 static_assert(sizeof(SigSet) == sizeof(sigset_t));
