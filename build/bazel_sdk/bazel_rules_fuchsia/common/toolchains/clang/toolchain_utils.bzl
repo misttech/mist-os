@@ -568,3 +568,47 @@ def generate_clang_cc_toolchain(
         toolchain = ":" + name,
         toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
     )
+
+def _empty_cc_toolchain_config_impl(ctx):
+    # See CppConfiguration.java class in Bazel sources for the list of
+    # all tool_path() names that must be defined and relative to the
+    # clang repository directory.
+    tool_paths = [
+        tool_path(name = "ar", path = "/usr/bin/false"),
+        tool_path(name = "cpp", path = "/usr/bin/false"),
+        tool_path(name = "gcc", path = "/usr/bin/false"),
+        tool_path(name = "gcov", path = "/usr/bin/false"),
+        tool_path(name = "gcov-tool", path = "/usr/bin/false"),
+        tool_path(name = "ld", path = "/usr/bin/false"),
+        tool_path(name = "llvm-cov", path = "/usr/bin/false"),
+        tool_path(name = "nm", path = "/usr/bin/false"),
+        tool_path("objcopy", path = "/usr/bin/false"),
+        tool_path("objdump", path = "/usr/bin/false"),
+        tool_path("strip", path = "/usr/bin/false"),
+        tool_path(name = "dwp", path = "/usr/bin/false"),
+        tool_path(name = "llvm-profdata", path = "/usr/bin/false"),
+    ]
+
+    features = []
+
+    return cc_common.create_cc_toolchain_config_info(
+        ctx = ctx,
+        toolchain_identifier = "empty_cpp",
+        tool_paths = tool_paths,
+        target_cpu = "x86_64",
+        # Required by constructor, but otherwise ignored by Bazel.
+        # These string values are arbitrary, but are easy to grep
+        # in our source tree if they ever happen to appear in
+        # build error messages.
+        host_system_name = "__bazel_host_system_name__",
+        target_system_name = "__bazel_target_system_name__",
+        target_libc = "__bazel_target_libc__",
+        abi_version = "__bazel_abi_version__",
+        abi_libc_version = "__bazel_abi_libc_version__",
+        compiler = "__bazel_compiler__",
+    )
+
+empty_cc_toolchain_config = rule(
+    implementation = _empty_cc_toolchain_config_impl,
+    doc = "Define a cc_toolchain_config target for an empty C++ toolchain.",
+)

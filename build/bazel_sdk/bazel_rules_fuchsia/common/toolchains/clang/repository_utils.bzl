@@ -223,3 +223,68 @@ def setup_clang_repository(constants):
         name = "clang_strip_binaries",
         srcs = ["bin/llvm-strip"],
     )
+
+def _empty_host_cpp_toolchain_repository_impl(repo_ctx):
+    _BUILD_BAZEL_CONTENT = """
+load("@host_platform//:constraints.bzl", "HOST_CONSTRAINTS")
+load("//common:toolchains/clang/toolchain_utils.bzl", "empty_cc_toolchain_config")
+
+package(default_visibility = ["//visibility:public"])
+
+# An empty filegroup.
+filegroup(
+  name = "empty",
+  srcs = [],
+)
+
+empty_cc_toolchain_config(
+  name = "empty_cc_toolchain_config",
+)
+
+cc_toolchain(
+  name = "empty_cc_toolchain",
+  all_files = ":empty",
+  ar_files = ":empty",
+  as_files = ":empty",
+  compiler_files = ":empty",
+  dwp_files = ":empty",
+  linker_files = ":empty",
+  objcopy_files = ":empty",
+  strip_files = ":empty",
+  supports_param_files = 0,
+  toolchain_config = ":empty_cc_toolchain_config",
+  toolchain_identifier = "empty_cc_toolchain",
+)
+
+toolchain(
+  name = "empty_cpp_toolchain",
+  exec_compatible_with = HOST_CONSTRAINTS,
+  target_compatible_with = HOST_CONSTRAINTS,
+  toolchain = ":empty_cc_toolchain",
+  toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
+)
+"""
+    repo_ctx.file("WORKSPACE.bazel", "")
+    repo_ctx.symlink(repo_ctx.path(Label("@fuchsia_sdk_common//common:BUILD.bazel")).dirname, "common")
+    repo_ctx.file("BUILD.bazel", _BUILD_BAZEL_CONTENT)
+
+empty_host_cpp_toolchain_repository = repository_rule(
+    implementation = _empty_host_cpp_toolchain_repository_impl,
+    doc = """Generate a repository that contains an empty C++ toolchain definition.
+
+Useful when running on machines without an installed GCC or Clang.
+Usage example, from a WORKSPACE.bazel file:
+
+  load(
+      "@fuchsia_sdk_common//common:toolchains/clang/repository_utils.bzl",
+      "empty_host_cpp_toolchain_repository",
+  )
+
+  empty_host_cpp_toolchain_repository(
+    name = "no_host_cpp",
+  )
+
+  register_toolchain("@no_host_cpp:empty_cpp_toolchain")
+
+""",
+)

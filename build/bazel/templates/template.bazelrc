@@ -4,10 +4,6 @@
 
 # AUTO-GENERATED - DO NOT EDIT!
 
-# Ensure that platform-based C++ toolchain selection is performed, instead
-# of relying on --crosstool_top / --cpu / --compiler/
-build --incompatible_enable_cc_toolchain_resolution
-
 # Ensure that the same build configuration and output directory will be used
 # when there are two different transition paths to the same configured
 # target. For example, let's assume the following:

@@ -94,6 +94,19 @@ compact_python_runtime_repository(
 
 register_toolchains("@prebuilt_python//:py_toolchain")
 
+# Register an empty C++ host toolchain, because thiss test suite
+# needs to run on CI bots without GCC or Clang installed.
+load(
+    "@fuchsia_sdk_common//common:toolchains/clang/repository_utils.bzl",
+    "empty_host_cpp_toolchain_repository",
+)
+
+empty_host_cpp_toolchain_repository(
+    name = "host_no_cpp",
+)
+
+register_toolchains("@host_no_cpp//:empty_cpp_toolchain")
+
 fuchsia_sdk_repository(
     name = "fuchsia_sdk_x64_only",
     local_paths = [
