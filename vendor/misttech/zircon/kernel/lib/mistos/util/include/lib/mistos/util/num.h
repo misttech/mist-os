@@ -10,9 +10,23 @@
 namespace mtl {
 
 template <typename T>
-auto checked_add(const T& a, const T& b) -> std::optional<T> {
+auto overflowing_add(const T& a, const T& b) -> std::pair<T, bool> {
   T result;
-  if (add_overflow(a, b, &result)) {
+  bool overflow = add_overflow(a, b, &result);
+  return std::make_pair(result, overflow);
+}
+
+template <typename T>
+auto overflowing_sub(const T& a, const T& b) -> std::pair<T, bool> {
+  T result;
+  bool overflow = sub_overflow(a, b, &result);
+  return std::make_pair(result, overflow);
+}
+
+template <typename T>
+auto checked_add(const T& a, const T& b) -> std::optional<T> {
+  auto [result, overflow] = overflowing_add(a, b);
+  if (unlikely(overflow)) {
     return std::nullopt;
   }
   return result;
@@ -20,8 +34,8 @@ auto checked_add(const T& a, const T& b) -> std::optional<T> {
 
 template <typename T>
 auto checked_sub(const T& a, const T& b) -> std::optional<T> {
-  T result;
-  if (sub_overflow(a, b, &result)) {
+  auto [result, overflow] = overflowing_sub(a, b);
+  if (unlikely(overflow)) {
     return std::nullopt;
   }
   return result;
