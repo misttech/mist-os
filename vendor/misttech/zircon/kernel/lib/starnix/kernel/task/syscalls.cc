@@ -25,6 +25,7 @@
 #include <trace.h>
 #include <zircon/compiler.h>
 
+#include <arch/mistos.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/vector.h>
 #include <ktl/algorithm.h>
@@ -71,8 +72,10 @@ fit::result<Errno, pid_t> do_clone(const CurrentTask& current_task, struct clone
     child_exit_signal = signal_or_error.value();
   }
 
-  ///
-  // READ TASK Registers
+  // Store the register state in the current task.
+  ::zx_thread_state_general_regs_t regs;
+  arch_get_general_regs_mistos(Thread::Current().Get(), &regs);
+  current_task.thread_state.registers = RegisterState::From(regs);
 
   ///
 

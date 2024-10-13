@@ -8,8 +8,8 @@
 
 namespace starnix {
 
-zx_thread_state_general_regs_t zx_thread_state_general_regs_t::From(const ThreadStartInfo& val) {
-  zx_thread_state_general_regs_t result;
+::zx_thread_state_general_regs_t zx_thread_state_general_regs_t_from(const ThreadStartInfo& val) {
+  ::zx_thread_state_general_regs_t result;
   result.rip = reinterpret_cast<uint64_t>(val.entry.ptr());
   result.rsp = reinterpret_cast<uint64_t>(val.stack.ptr());
   // You can initialize other fields here if necessary

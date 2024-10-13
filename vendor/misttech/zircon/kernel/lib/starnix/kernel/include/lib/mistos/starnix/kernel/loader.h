@@ -35,6 +35,8 @@ struct ThreadStartInfo {
   UserAddress stack;
 };
 
+::zx_thread_state_general_regs_t zx_thread_state_general_regs_t_from(const ThreadStartInfo& val);
+
 // Holds a resolved ELF interpreter VMO.
 struct ResolvedInterpElf {
   /// A file handle to the resolved ELF interpreter.
