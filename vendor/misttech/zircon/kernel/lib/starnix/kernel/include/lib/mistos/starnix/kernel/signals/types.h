@@ -67,6 +67,62 @@ struct SignalInfo {
   int32_t _pad;
   SignalDetail detail;
   bool force;
+
+  static SignalInfo Default(starnix_uapi::Signal signal) {
+    return New(signal, SI_KERNEL, std::monostate{});
+  }
+
+  static SignalInfo New(starnix_uapi::Signal signal, int32_t code, SignalDetail detail) {
+    return SignalInfo{
+        .signal = signal, .errno = 0, .code = code, ._pad = 0, .detail = detail, .force = false};
+  }
+
+  static SignalInfo new_kill(starnix_uapi::Signal signal, pid_t pid, uid_t uid) {
+    return SignalInfo{.signal = signal,
+                      .errno = 0,
+                      .code = SI_USER,
+                      ._pad = 0,
+                      .detail = KillDetail{.pid = pid, .uid = uid},
+                      .force = false};
+  }
+
+  static SignalInfo new_sigchld(pid_t pid, uid_t uid, int32_t status, int32_t code) {
+    return SignalInfo{.signal = starnix_uapi::kSIGCHLD,
+                      .errno = 0,
+                      .code = code,
+                      ._pad = 0,
+                      .detail = SIGCHLDDetail{.pid = pid, .uid = uid, .status = status},
+                      .force = false};
+  }
+
+  static SignalInfo new_sigfault(starnix_uapi::Signal signal, uint64_t addr, int32_t errno) {
+    return SignalInfo{.signal = signal,
+                      .errno = errno,
+                      .code = SI_KERNEL,
+                      ._pad = 0,
+                      .detail = SigFaultDetail{.addr = addr},
+                      .force = false};
+  }
+
+  static SignalInfo new_sigsys(starnix_uapi::UserAddress call_addr, int32_t syscall,
+                               uint32_t arch) {
+    return SignalInfo{
+        .signal = starnix_uapi::kSIGSYS,
+        .errno = 0,
+        .code = SYS_SECCOMP,
+        ._pad = 0,
+        .detail = SIGSYSDetail{.call_addr = call_addr, .syscall = syscall, .arch = arch},
+        .force = false};
+  }
+
+  static SignalInfo new_timer(starnix_uapi::Signal signal) {
+    return SignalInfo{.signal = signal,
+                      .errno = 0,
+                      .code = SI_TIMER,
+                      ._pad = 0,
+                      .detail = TimerDetail{},
+                      .force = false};
+  }
 };
 
 class SignalState {};
