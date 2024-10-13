@@ -43,28 +43,21 @@ fit::result<Errno, TaskInfo> create_zircon_process(
     ktl::optional<RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent, pid_t pid,
     fbl::RefPtr<ProcessGroup> process_group, const ktl::string_view& name) {
   LTRACE;
-  auto process_or_error =
+  auto process_dispatcher =
       create_process(GetRootJobDispatcher(), 0, name).map_error([](auto status) {
         return errno(from_status_like_fdio(status));
-      });
-  if (process_or_error.is_error()) {
-    return process_or_error.take_error();
-  }
+      }) _EP(process_dispatcher);
 
-  auto [process, root_vmar] = ktl::move(process_or_error.value());
+  auto& [process, root_vmar] = *process_dispatcher;
 
-  auto mm_or_error = MemoryManager::New(ktl::move(root_vmar)).map_error([](auto status) {
+  auto mm = MemoryManager::New(ktl::move(root_vmar)).map_error([](auto status) {
     return errno(from_status_like_fdio(status));
-  });
-
-  if (mm_or_error.is_error()) {
-    return mm_or_error.take_error();
-  }
+  }) _EP(mm);
 
   auto thread_group =
       ThreadGroup::New(kernel, ktl::move(process), ktl::move(parent), pid, process_group);
   return fit::ok(
-      TaskInfo{.thread = {}, .thread_group = thread_group, .memory_manager = *mm_or_error});
+      TaskInfo{.thread = {}, .thread_group = thread_group, .memory_manager = mm.value()});
 }
 
 fit::result<zx_status_t, ktl::pair<KernelHandle<ProcessDispatcher>, Vmar>> create_process(
