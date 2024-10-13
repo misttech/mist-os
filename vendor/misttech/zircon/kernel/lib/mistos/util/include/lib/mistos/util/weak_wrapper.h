@@ -24,7 +24,8 @@ class WeakPtr final {
 
   // Assignment
   WeakPtr& operator=(const WeakPtr& r) {
-    fbl::AutoLock lock(&lock_);
+    fbl::AutoLock lock1(&lock_);
+    fbl::AutoLock lock2(&r.lock_);
     ptr_ = r.ptr_;
     return *this;
   }
