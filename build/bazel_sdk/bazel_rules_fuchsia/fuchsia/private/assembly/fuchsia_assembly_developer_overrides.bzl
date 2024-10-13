@@ -4,7 +4,6 @@
 
 """Rules related to assembly developer overrides."""
 
-load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 load(
     ":providers.bzl",
     "FuchsiaAssemblyDeveloperOverridesInfo",

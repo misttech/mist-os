@@ -33,6 +33,7 @@ _all_actions = [
     ACTION_NAMES.clif_match,
 ]
 
+# buildifier: disable=unused-variable
 _all_compile_actions = [
     ACTION_NAMES.assemble,
     ACTION_NAMES.preprocess_assemble,
@@ -46,6 +47,7 @@ _all_compile_actions = [
     ACTION_NAMES.clif_match,
 ]
 
+# buildifier: disable=unused-variable
 _all_cpp_compile_actions = [
     ACTION_NAMES.linkstamp_compile,
     ACTION_NAMES.cpp_compile,
@@ -62,6 +64,7 @@ _all_link_actions = [
     ACTION_NAMES.cpp_link_nodeps_dynamic_library,
 ]
 
+# buildifier: disable=unused-variable
 def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
     """Compute list of C++ toolchain features required by Clang.
 
@@ -284,7 +287,7 @@ def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
         name = "no_dotd_file",
         enabled = True,
     )
-    features += [no_dotd_file_feature]
+    features.append(no_dotd_file_feature)
 
     return features
 
@@ -487,7 +490,7 @@ def generate_clang_cc_toolchain(
            value. Default to //:clang_info.
            See setup_clang_repository() in repository_utils.bzl.
 
-       sysroot_headers_files: (optional) A label list for the sysroot
+       sysroot_header_files: (optional) A label list for the sysroot
            header files. These will be exposed to the sandbox for C++
            compilation actions.
 

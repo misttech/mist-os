@@ -4,6 +4,7 @@
 
 """file-making utilities."""
 
+# buildifier: disable=bzl-visibility
 load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaComponentManifestInfo")
 
 def _make_file_impl(ctx):

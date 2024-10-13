@@ -220,6 +220,8 @@ def format_labels_list_to_target_tag_native_glob_select(labels, target_tags = No
            target tags will be used.
         extra_dict: An optional dictionary containing additional arguments
            for the string expansion.
+        common_package_prefix: Package prefix for the repository that contains
+            this .bzl file and the BUILD.bazel next to it.
 
     Example:
 

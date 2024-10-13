@@ -4,9 +4,9 @@
 
 """Defines a devicetree source file that can be included by other devicetree files."""
 
+load(":fuchsia_transition.bzl", "fuchsia_transition")
 load(":providers.bzl", "FuchsiaDeviceTreeSegmentInfo")
 load(":utils.bzl", "PREPROCESS_FILE_ATTRS", "preprocesss_file")
-load(":fuchsia_transition.bzl", "fuchsia_transition")
 
 def _fuchsia_devicetree_fragment_impl(ctx):
     source = ctx.file.source

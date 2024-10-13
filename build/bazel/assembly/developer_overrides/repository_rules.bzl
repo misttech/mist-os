@@ -14,8 +14,6 @@ def _make_overrides_target(label):
     return target_lines
 
 def _generate_developer_overrides_repository_impl(repo_ctx):
-    workspace_dir = str(repo_ctx.workspace_root)
-
     overrides_map_file = repo_ctx.path(Label("@//:" + repo_ctx.attr.overrides_map_from_gn))
     overrides_map_data = repo_ctx.read(overrides_map_file)
     overrides_map_gn = json.decode(overrides_map_data)

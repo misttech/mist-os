@@ -4,9 +4,9 @@
 
 """Defines a devicetree to be built into a devicetree blob."""
 
+load(":fuchsia_transition.bzl", "fuchsia_transition")
 load(":providers.bzl", "FuchsiaDeviceTreeSegmentInfo")
 load(":utils.bzl", "PREPROCESS_FILE_ATTRS", "preprocesss_file")
-load(":fuchsia_transition.bzl", "fuchsia_transition")
 
 FUCHSIA_DEVICETREE_ATTR = {
     "dtcflags": attr.string_list(

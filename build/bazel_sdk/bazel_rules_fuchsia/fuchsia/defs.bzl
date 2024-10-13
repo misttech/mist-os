@@ -143,8 +143,8 @@ load(
 )
 load(
     "//fuchsia/private:legacy_fuchsia_fidl_cc_library.bzl",
-    _fuchsia_fidl_hlcpp_library = "fuchsia_fidl_hlcpp_library",
-    _fuchsia_fidl_llcpp_library = "fuchsia_fidl_llcpp_library",
+    _fuchsia_fidl_hlcpp_library = "fuchsia_fidl_hlcpp_library",  # buildifier: disable=deprecated-function
+    _fuchsia_fidl_llcpp_library = "fuchsia_fidl_llcpp_library",  # buildifier: disable=deprecated-function
 )
 load(
     "//fuchsia/workspace:fuchsia_devicetree_toolchain_info.bzl",

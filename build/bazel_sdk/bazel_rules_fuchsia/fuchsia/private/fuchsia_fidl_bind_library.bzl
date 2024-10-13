@@ -4,10 +4,10 @@
 
 """A fuchsia_bind_library backed by a FIDL library."""
 
+load("@bazel_skylib//lib:paths.bzl", "paths")
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load(":fuchsia_bind_library.bzl", "fuchsia_bind_library")
 load(":providers.bzl", "FuchsiaFidlLibraryInfo")
-load("@bazel_skylib//lib:paths.bzl", "paths")
 
 def _bindlibgen_impl(ctx):
     sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]

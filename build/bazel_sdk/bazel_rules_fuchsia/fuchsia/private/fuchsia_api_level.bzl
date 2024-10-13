@@ -4,7 +4,7 @@
 
 """ Defines utilities for working with fuchsia api levels. """
 
-load("//:api_version.bzl", "DEFAULT_TARGET_API", "INTERNAL_ONLY_VALID_TARGET_APIS")
+load("//:api_version.bzl", "INTERNAL_ONLY_VALID_TARGET_APIS")
 
 # We define the provider in this file because it is a private implementation
 # detail in this file. It is only made public so that it can be used in tests.

@@ -13,6 +13,7 @@ load(
     "with_feature_set",
 )
 
+# buildifier: disable=unused-variable
 _all_actions = [
     ACTION_NAMES.assemble,
     ACTION_NAMES.preprocess_assemble,

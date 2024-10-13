@@ -30,8 +30,8 @@ load(
     "process_clang_builtins_output",
     "to_clang_target_tuple",
 )
-load("//common/platforms:utils_test.bzl", "platforms_utils_test")
 load("//common:transition_utils_test.bzl", "transition_utils_test")
+load("//common/platforms:utils_test.bzl", "platforms_utils_test")
 
 def _process_clang_builtins_output_test(ctx):
     response = """Fuchsia clang version 16.0.0 (https://llvm.googlesource.com/llvm-project 039b969b32b64b64123dce30dd28ec4e343d893f)

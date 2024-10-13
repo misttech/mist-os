@@ -6,11 +6,11 @@
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_tools//tools/build_defs/repo:utils.bzl", "maybe")
+load("@platforms//host:extension.bzl", "host_platform_repo")
 load(
     "//fuchsia/workspace:check_bazel_version.bzl",
     "assert_bazel_version",
 )
-load("@platforms//host:extension.bzl", "host_platform_repo")
 
 # buildifier: disable=function-docstring
 def rules_fuchsia_deps():

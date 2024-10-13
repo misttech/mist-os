@@ -2,6 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_devicetree_toolchain_info",
+)
+
 test_suite(
     name = "tests",
     tags = ["all"],
@@ -71,11 +76,6 @@ filegroup(
         "//examples/hello_world_cpp:pkg",
         "//examples/hello_world_cpp:test_pkg",
     ],
-)
-
-load(
-    "@fuchsia_sdk//fuchsia:defs.bzl",
-    "fuchsia_devicetree_toolchain_info",
 )
 
 fuchsia_devicetree_toolchain_info(

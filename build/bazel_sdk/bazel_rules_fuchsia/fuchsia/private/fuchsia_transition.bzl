@@ -4,8 +4,8 @@
 
 """Utilities for changing the build configuration to fuchsia."""
 
-load("//fuchsia/constraints/platforms:supported_platforms.bzl", "ALL_SUPPORTED_PLATFORMS", "fuchsia_platforms")
 load("//common:transition_utils.bzl", "set_command_line_option_value")
+load("//fuchsia/constraints/platforms:supported_platforms.bzl", "ALL_SUPPORTED_PLATFORMS", "fuchsia_platforms")
 load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_TARGET_NAME", "fail_missing_api_level", "get_fuchsia_api_levels")
 
 NATIVE_CPU_ALIASES = {

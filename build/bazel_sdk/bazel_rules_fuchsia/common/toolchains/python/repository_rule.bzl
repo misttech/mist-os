@@ -101,7 +101,7 @@ def _compact_python_runtime_impl(repo_ctx):
         # Use the versioned python3 file name, but takes care of ignoring
         # suffixes such as the one in `python3.XX-config`.
         if filename.startswith("python3."):
-            python_version, _, suffix = filename[6:].partition("-")
+            python_version, _, __ = filename[6:].partition("-")
             break
 
     if not python_version:

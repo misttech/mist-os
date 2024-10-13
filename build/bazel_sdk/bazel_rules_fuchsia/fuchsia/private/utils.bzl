@@ -256,7 +256,7 @@ def rule_variants(implementation, variants = [], attrs = {}, **rule_kwargs):
            be augmented with a private '_variant' attribute corresponding to
            the 'variants' item value used to create it.
 
-        rule_kwargs: Extra arguments are passed directly to each result rule()
+        **rule_kwargs: Extra arguments are passed directly to each result rule()
            constructor.
 
     Returns:

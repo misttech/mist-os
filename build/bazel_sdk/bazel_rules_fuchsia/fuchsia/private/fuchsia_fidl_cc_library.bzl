@@ -5,8 +5,8 @@
 """A cc_library backed by a FIDL library."""
 
 load("@bazel_skylib//lib:paths.bzl", "paths")
-load(":providers.bzl", "FuchsiaFidlLibraryInfo")
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
+load(":providers.bzl", "FuchsiaFidlLibraryInfo")
 
 _CodegenInfo = provider("Carries generated information across FIDL bindings code generation ", fields = ["files"])
 

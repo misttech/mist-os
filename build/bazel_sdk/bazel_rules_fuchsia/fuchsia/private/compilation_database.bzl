@@ -9,10 +9,10 @@ load(
     "CPP_COMPILE_ACTION_NAME",
     "C_COMPILE_ACTION_NAME",
 )
-load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 
 # buildifier: disable=module-docstring
 load("@bazel_tools//tools/cpp:toolchain_utils.bzl", "find_cpp_toolchain")
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 
 _CC_RULES = [
     "cc_library",

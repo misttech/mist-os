@@ -9,10 +9,6 @@ load(
     _fuchsia_prebuilt_package = "fuchsia_prebuilt_package",
 )
 load(
-    "//fuchsia/private/assembly:fuchsia_package_with_configs.bzl",
-    _fuchsia_package_with_configs = "fuchsia_package_with_configs",
-)
-load(
     "//fuchsia/private/assembly:fuchsia_assembly_developer_overrides.bzl",
     _fuchsia_assembly_developer_overrides_list = "fuchsia_assembly_developer_overrides_list",
     _fuchsia_prebuilt_assembly_developer_overrides = "fuchsia_prebuilt_assembly_developer_overrides",
@@ -53,6 +49,10 @@ load(
     _fuchsia_package_size_check = "fuchsia_package_size_check",
 )
 load(
+    "//fuchsia/private/assembly:fuchsia_package_with_configs.bzl",
+    _fuchsia_package_with_configs = "fuchsia_package_with_configs",
+)
+load(
     "//fuchsia/private/assembly:fuchsia_partition.bzl",
     _PARTITION_TYPE = "PARTITION_TYPE",
     _SLOT = "SLOT",
@@ -66,6 +66,10 @@ load(
 load(
     "//fuchsia/private/assembly:fuchsia_platform_artifacts.bzl",
     _fuchsia_platform_artifacts = "fuchsia_platform_artifacts",
+)
+load(
+    "//fuchsia/private/assembly:fuchsia_post_processing_script.bzl",
+    _fuchsia_post_processing_script = "fuchsia_post_processing_script",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_product.bzl",
@@ -93,10 +97,6 @@ load(
 load(
     "//fuchsia/private/assembly:fuchsia_product_size_check.bzl",
     _fuchsia_product_size_check = "fuchsia_product_size_check",
-)
-load(
-    "//fuchsia/private/assembly:fuchsia_post_processing_script.bzl",
-    _fuchsia_post_processing_script = "fuchsia_post_processing_script",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_repository_keys.bzl",

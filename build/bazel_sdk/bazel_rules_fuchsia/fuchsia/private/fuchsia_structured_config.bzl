@@ -219,7 +219,7 @@ def fuchsia_structured_config_values(
 
     # FIXME(https://fxbug.dev/364917537): `_value_file_deps` is not used meaningfully here.
     # It should either be plumbed or deleted.
-    _value_file_deps = []
+    _value_file_deps = []  # buildifier: disable=unused-variable
 
     _value_file = values_source
     if values:
@@ -233,6 +233,7 @@ def fuchsia_structured_config_values(
             cmd = "echo \"%s\" > $@" % _json_string,
         )
 
+    # buildifier: disable=unused-variable
     _cvf_output_name = component_name
     if cvf_output_name:
         _cvf_output_name = cvf_output_name
