@@ -33,13 +33,13 @@ fit::result<Errno> sys_chown(const CurrentTask& current_task, starnix_uapi::User
                              uid_t owner, gid_t group);
 
 /// The parameter order for `clone` varies by architecture.
-fit::result<Errno, pid_t> sys_clone(const CurrentTask& current_task, uint64_t flags,
+fit::result<Errno, pid_t> sys_clone(CurrentTask& current_task, uint64_t flags,
                                     starnix_uapi::UserAddress user_stack,
                                     starnix_uapi::UserRef<pid_t> user_parent_tid,
                                     starnix_uapi::UserRef<pid_t> user_child_tid,
                                     starnix_uapi::UserAddress user_tls);
 
-fit::result<Errno, pid_t> sys_fork(const CurrentTask& current_task);
+fit::result<Errno, pid_t> sys_fork(CurrentTask& current_task);
 
 // https://pubs.opengroup.org/onlinepubs/9699919799/functions/creat.html
 fit::result<Errno, FdNumber> sys_creat(const CurrentTask& current_task,
@@ -59,7 +59,7 @@ fit::result<Errno, size_t> sys_readlink(const CurrentTask& current_task,
 fit::result<Errno> sys_stat(const CurrentTask& current_task, starnix_uapi::UserCString user_path,
                             starnix_uapi::UserRef<struct ::stat> buffer);
 
-fit::result<Errno, pid_t> sys_vfork(const CurrentTask& current_task);
+fit::result<Errno, pid_t> sys_vfork(CurrentTask& current_task);
 
 }  // namespace starnix
 

@@ -21,13 +21,13 @@ namespace starnix {
 
 class CurrentTask;
 
-fit::result<Errno, pid_t> do_clone(const CurrentTask& current_task, struct clone_args);
+fit::result<Errno, pid_t> do_clone(CurrentTask& current_task, struct clone_args);
 
 fit::result<Errno, ktl::pair<fbl::Vector<FsString>, size_t>> read_c_string_vector(
     const CurrentTask& current_task, starnix_uapi::UserRef<starnix_uapi::UserCString> user_vector,
     size_t elem_limit, size_t vec_limit);
 
-fit::result<Errno, pid_t> sys_clone3(const CurrentTask& current_task,
+fit::result<Errno, pid_t> sys_clone3(CurrentTask& current_task,
                                      starnix_uapi::UserRef<struct clone_args> user_clone_args,
                                      size_t user_clone_args_size);
 

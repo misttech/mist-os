@@ -36,7 +36,7 @@ fit::result<Errno> sys_arch_prctl(const CurrentTask& current_task, uint32_t code
 }
 
 /// The parameter order for `clone` varies by architecture.
-fit::result<Errno, pid_t> sys_clone(const CurrentTask& current_task, uint64_t flags,
+fit::result<Errno, pid_t> sys_clone(CurrentTask& current_task, uint64_t flags,
                                     starnix_uapi::UserAddress user_stack,
                                     starnix_uapi::UserRef<pid_t> user_parent_tid,
                                     starnix_uapi::UserRef<pid_t> user_child_tid,
@@ -51,7 +51,7 @@ fit::result<Errno, pid_t> sys_clone(const CurrentTask& current_task, uint64_t fl
                                  .tls = user_tls.ptr()});
 }
 
-fit::result<Errno, pid_t> sys_fork(const CurrentTask& current_task) {
+fit::result<Errno, pid_t> sys_fork(CurrentTask& current_task) {
   return do_clone(current_task, {
                                     .exit_signal = kSIGCHLD.number(),
                                 });
@@ -91,7 +91,7 @@ fit::result<Errno> sys_stat(const CurrentTask& current_task, starnix_uapi::UserC
   return sys_newfstatat(current_task, FdNumber::AT_FDCWD_, user_path, buffer, 0);
 }
 
-fit::result<Errno, pid_t> sys_vfork(const CurrentTask& current_task) {
+fit::result<Errno, pid_t> sys_vfork(CurrentTask& current_task) {
   return do_clone(current_task, {
                                     .flags = (CLONE_VFORK | CLONE_VM),
                                     .exit_signal = kSIGCHLD.number(),

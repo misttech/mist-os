@@ -59,17 +59,15 @@ void __NO_RETURN do_exit(long code) { ProcessDispatcher::ExitCurrent(code); }
 
 namespace starnix {
 
-fit::result<Errno, pid_t> do_clone(const CurrentTask& current_task, struct clone_args args) {
+fit::result<Errno, pid_t> do_clone(CurrentTask& current_task, struct clone_args args) {
   // security::check_task_create_access(current_task)?;
 
   ktl::optional<Signal> child_exit_signal;
   if (args.exit_signal == 0) {
     child_exit_signal = {};
   } else {
-    auto signal_or_error = Signal::try_from(UncheckedSignal::New(args.exit_signal));
-    if (signal_or_error.is_error())
-      return signal_or_error.take_error();
-    child_exit_signal = signal_or_error.value();
+    auto signal = Signal::try_from(UncheckedSignal::New(args.exit_signal)) _EP(signal);
+    child_exit_signal = signal.value();
   }
 
   // Store the register state in the current task.
@@ -77,17 +75,12 @@ fit::result<Errno, pid_t> do_clone(const CurrentTask& current_task, struct clone
   arch_get_general_regs_mistos(Thread::Current().Get(), &regs);
   current_task.thread_state.registers = RegisterState::From(regs);
 
-  ///
-
-  auto new_task_or_error = current_task.clone_task(
+  auto task_builder = current_task.clone_task(
       args.flags, child_exit_signal, UserRef<pid_t>::New(UserAddress::from((args.parent_tid))),
-      UserRef<pid_t>::New(UserAddress::from((args.child_tid))));
-  if (new_task_or_error.is_error()) {
-    return new_task_or_error.take_error();
-  }
-  auto new_task = new_task_or_error.value();
+      UserRef<pid_t>::New(UserAddress::from((args.child_tid)))) _EP(task_builder);
   // Set the result register to 0 for the return value from clone in the
   // cloned process.
+  auto new_task = task_builder.value();
   new_task.thread_state.registers.set_return_register(0);
   // let (trace_kind, ptrace_state) = current_task.get_ptrace_core_state_for_clone(args);
 
@@ -96,7 +89,7 @@ fit::result<Errno, pid_t> do_clone(const CurrentTask& current_task, struct clone
     // `stack` points to the bottom of the stack. Therefore, in clone3() we need to add
     // `stack_size` to calculate the stack pointer. Note that in clone() `stack_size` is 0.
     new_task.thread_state.registers.set_stack_pointer_register(args.stack + args.stack_size);
-  }
+   }
 
   if ((args.flags & static_cast<uint64_t>(CLONE_SETTLS)) != 0) {
     new_task.thread_state.registers.set_thread_pointer_register(args.tls);
@@ -156,7 +149,7 @@ fit::result<Errno, ktl::pair<fbl::Vector<FsString>, size_t>> read_c_string_vecto
   return fit::ok(ktl::pair(ktl::move(vector), vec_size));
 }
 
-fit::result<Errno, pid_t> sys_clone3(const CurrentTask& current_task,
+fit::result<Errno, pid_t> sys_clone3(CurrentTask& current_task,
                                      starnix_uapi::UserRef<struct clone_args> user_clone_args,
                                      size_t user_clone_args_size) {
   // Only these specific sized versions are supported.
