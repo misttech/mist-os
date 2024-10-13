@@ -17,6 +17,7 @@ bool pid_table_allocate_pid() {
 
   END_TEST;
 }
+
 }  // namespace unit_testing
 
 UNITTEST_START_TESTCASE(starnix_pid_table)
