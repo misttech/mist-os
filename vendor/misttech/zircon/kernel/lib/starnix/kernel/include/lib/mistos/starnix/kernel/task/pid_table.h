@@ -26,8 +26,25 @@ class ThreadGroup;
 class Task;
 class ZombieProcess;
 
-using ProcessEntry =
-    ktl::variant<std::monostate, util::WeakPtr<ThreadGroup>, util::WeakPtr<ZombieProcess>>;
+class ProcessEntry {
+ public:
+  using Variant =
+      ktl::variant<ktl::monostate, util::WeakPtr<ThreadGroup>, util::WeakPtr<ZombieProcess>>;
+
+  ProcessEntry();
+  ~ProcessEntry();
+  static ProcessEntry ThreadGroupCtor(util::WeakPtr<ThreadGroup> thread_group);
+  static ProcessEntry ZombieProcessCtor(util::WeakPtr<ZombieProcess> thread_group);
+
+  bool is_none() const;
+
+  ktl::optional<std::reference_wrapper<const util::WeakPtr<ThreadGroup>>> thread_group() const;
+
+ private:
+  explicit ProcessEntry(Variant variant);
+
+  ktl::variant<ktl::monostate, util::WeakPtr<ThreadGroup>, util::WeakPtr<ZombieProcess>> process_;
+};
 
 struct PidEntry : public fbl::SinglyLinkedListable<ktl::unique_ptr<PidEntry>> {
  private:
@@ -56,18 +73,30 @@ struct PidEntry : public fbl::SinglyLinkedListable<ktl::unique_ptr<PidEntry>> {
 };
 
 class PidTable {
- public:
+ private:
   /// The most-recently allocated pid in this table.
   pid_t last_pid_ = 0;
 
   /// The tasks in this table, organized by pid_t.
-  PidEntry::HashTable table;
+  PidEntry::HashTable table_;
+
+  /// Used to notify thread group changes.
+  // thread_group_notifier: Option<memory_attribution::sync::Notifier>,
 
  private:
   /// impl PidTable
   ktl::optional<const PidEntry*> get_entry(pid_t pid) const;
 
   PidEntry& get_entry_mut(pid_t pid);
+
+  template <typename F>
+  void remove_item(pid_t pid, F&& do_remove) {
+    auto& entry = get_entry_mut(pid);
+    do_remove(entry);
+    if (!entry.task_.has_value() && entry.process_.is_none() && !entry.process_group_.has_value()) {
+      table_.erase(pid);
+    }
+  }
 
  public:
   pid_t allocate_pid();
@@ -85,6 +114,10 @@ class PidTable {
   void add_thread_group(const fbl::RefPtr<ThreadGroup>& thread_group);
 
   void add_process_group(const fbl::RefPtr<ProcessGroup>& process_group);
+
+  ktl::optional<fbl::RefPtr<ProcessGroup>> get_process_group(pid_t pid) const;
+
+  void remove_process_group(pid_t pid);
 };
 
 }  // namespace starnix
