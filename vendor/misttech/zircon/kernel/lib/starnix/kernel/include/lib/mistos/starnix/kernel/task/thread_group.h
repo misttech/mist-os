@@ -7,11 +7,13 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
+#include <lib/mistos/starnix/kernel/mm/flags.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/exit_status.h>
 #include <lib/mistos/starnix/kernel/task/zombie_process.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/resource_limits.h>
+#include <lib/mistos/starnix_uapi/stats.h>
 #include <lib/mistos/util/weak_wrapper.h>
 #include <lib/starnix_sync/locks.h>
 
@@ -30,6 +32,99 @@ class Kernel;
 class ProcessGroup;
 class ThreadGroup;
 class Task;
+class WaitingOptions;
+
+// Represents the exit information of a process
+struct ProcessExitInfo {
+  ExitStatus status;
+  ktl::optional<Signal> exit_signal;
+
+  ProcessExitInfo() = default;
+  ProcessExitInfo(ExitStatus status, ktl::optional<Signal> exit_signal)
+      : status(status), exit_signal(exit_signal) {}
+};
+
+// Represents the result of a wait operation
+struct WaitResult {
+  pid_t pid;
+  uid_t uid;
+  ProcessExitInfo exit_info;
+  TaskTimeStats time_stats;
+
+  WaitResult() = default;
+  WaitResult(pid_t pid, uid_t uid, ProcessExitInfo exit_info, TaskTimeStats time_stats)
+      : pid(pid), uid(uid), exit_info(exit_info), time_stats(time_stats) {}
+
+  // Converts the wait result to a signal info
+  /*SignalInfo AsSignalInfo() const {
+    return SignalInfo::new_sigchld(pid, uid, exit_info.status.SignalInfoStatus(),
+                                   exit_info.status.SignalInfoCode());
+  }*/
+};
+
+// Represents the result of checking for a waitable child
+class WaitableChildResult {
+ public:
+  enum class Type { ReadyNow, ShouldWait, NoneFound };
+
+  static WaitableChildResult ReadyNow(WaitResult result) {
+    return WaitableChildResult(Type::ReadyNow, ktl::move(result));
+  }
+
+  static WaitableChildResult ShouldWait() { return WaitableChildResult(Type::ShouldWait); }
+
+  static WaitableChildResult NoneFound() { return WaitableChildResult(Type::NoneFound); }
+
+  Type GetType() const { return type_; }
+
+  WaitResult GetResult() const {
+    ZX_ASSERT(type_ == Type::ReadyNow);
+    return result_.value();
+  }
+
+ private:
+  WaitableChildResult(Type type) : type_(type) {}
+  WaitableChildResult(Type type, WaitResult result) : type_(type), result_(ktl::move(result)) {}
+
+  Type type_;
+  ktl::optional<WaitResult> result_;
+};
+
+// A selector that can match a process. Works as a representation of the pid argument to syscalls
+// like wait and kill.
+class ProcessSelector {
+ public:
+  struct Any {};
+  struct Pid {
+    pid_t value;
+  };
+  struct Pgid {
+    pid_t value;
+  };
+
+  using Variant = ktl::variant<Any, Pid, Pgid>;
+
+  static ProcessSelector AnyProcess() { return ProcessSelector(Any{}); }
+  static ProcessSelector SpecificPid(pid_t pid) { return ProcessSelector(Pid{pid}); }
+  static ProcessSelector ProcessGroup(pid_t pgid) { return ProcessSelector(Pgid{pgid}); }
+
+  bool DoMatch(pid_t pid, const PidTable& pid_table) const;
+
+ private:
+  // Helpers from the reference documentation for ktl::visit<>, to allow
+  // visit-by-overload of the ktl::variant<> returned by GetLastReference():
+  template <class... Ts>
+  struct overloaded : Ts... {
+    using Ts::operator()...;
+  };
+  // explicit deduction guide (not needed as of C++20)
+  template <class... Ts>
+  overloaded(Ts...) -> overloaded<Ts...>;
+
+  explicit ProcessSelector(Variant selector) : selector_(ktl::move(selector)) {}
+
+  Variant selector_;
+};
 
 /// The mutable state of the ThreadGroup.
 class ThreadGroupMutableState {
@@ -119,9 +214,31 @@ class ThreadGroupMutableState {
 
   fbl::Vector<fbl::RefPtr<Task>> tasks() const;
 
-  pid_t get_ppid() const;
+  fbl::Vector<pid_t> task_ids() const;
+
+  bool contains_task(pid_t tid) const;
+
+  fbl::RefPtr<Task> get_task(pid_t tid) const;
 
   size_t tasks_count() const { return tasks_.size(); }
+
+  pid_t get_ppid() const;
+
+  // Indicates whether the thread group is waitable via waitid and waitpid for
+  /// either WSTOPPED or WCONTINUED.
+  bool is_waitable() const;
+
+  WaitableChildResult get_waitable_running_children(ProcessSelector selector,
+                                                    const WaitingOptions& options,
+                                                    const PidTable& pids) const;
+
+  /// Returns any waitable child matching the given `selector` and `options`. Returns None if no
+  /// child matching the selector is waitable. Returns ECHILD if no child matches the selector at
+  /// all.
+  ///
+  /// Will remove the waitable status from the child depending on `options`.
+  WaitableChildResult get_waitable_child(ProcessSelector selector, const WaitingOptions& options,
+                                         PidTable& pids);
 
   ThreadGroupMutableState();
 
