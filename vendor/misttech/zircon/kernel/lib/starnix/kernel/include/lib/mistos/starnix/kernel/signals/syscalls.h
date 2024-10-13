@@ -11,10 +11,63 @@
 #include <lib/mistos/starnix_uapi/user_address.h>
 
 #include <linux/resource.h>
+#include <linux/wait.h>
 
 namespace starnix {
 
 class CurrentTask;
+
+class WaitingOptions {
+ public:
+  WaitingOptions(uint32_t options)
+      : wait_for_exited_(options & WEXITED),
+        wait_for_stopped_(options & WSTOPPED),
+        wait_for_continued_(options & WCONTINUED),
+        block_((options & WNOHANG) == 0),
+        keep_waitable_state_(options & WNOWAIT),
+        wait_for_all_(options & __WALL),
+        wait_for_clone_(options & __WCLONE),
+        waiter_(ktl::nullopt) {}
+
+  /// Build a `WaitingOptions` from the waiting flags of waitid.
+  static fit::result<Errno, WaitingOptions> new_for_waitid(uint32_t options) {
+    if (options & ~(__WCLONE | __WALL | WNOHANG | WNOWAIT | WSTOPPED | WEXITED | WCONTINUED)) {
+      return fit::error(errno(EINVAL));
+    }
+    if ((options & (WEXITED | WSTOPPED | WCONTINUED)) == 0) {
+      return fit::error(errno(EINVAL));
+    }
+    return fit::ok(WaitingOptions(options));
+  }
+
+  /// Build a `WaitingOptions` from the waiting flags of wait4.
+  static fit::result<Errno, WaitingOptions> new_for_wait4(uint32_t options, pid_t waiter_pid) {
+    if (options & ~(__WCLONE | __WALL | WNOHANG | WUNTRACED | WCONTINUED)) {
+      return fit::error(errno(EINVAL));
+    }
+    WaitingOptions result(options | WEXITED);
+    result.waiter_ = waiter_pid;
+    return fit::ok(result);
+  }
+
+  bool wait_for_exited() const { return wait_for_exited_; }
+  bool wait_for_stopped() const { return wait_for_stopped_; }
+  bool wait_for_continued() const { return wait_for_continued_; }
+  bool block() const { return block_; }
+  bool keep_waitable_state() const { return keep_waitable_state_; }
+  bool wait_for_all() const { return wait_for_all_; }
+  bool wait_for_clone() const { return wait_for_clone_; }
+
+ private:
+  bool wait_for_exited_;
+  bool wait_for_stopped_;
+  bool wait_for_continued_;
+  bool block_;
+  bool keep_waitable_state_;
+  bool wait_for_all_;
+  bool wait_for_clone_;
+  ktl::optional<pid_t> waiter_;
+};
 
 fit::result<Errno, pid_t> sys_wait4(const CurrentTask& current_task, pid_t raw_selector,
                                     starnix_uapi::UserRef<int32_t> user_wstatus, uint32_t options,
