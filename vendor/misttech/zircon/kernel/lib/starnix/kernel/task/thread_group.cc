@@ -6,6 +6,7 @@
 #include "lib/mistos/starnix/kernel/task/thread_group.h"
 
 #include <lib/fit/result.h>
+#include <lib/mistos/starnix/kernel/signals/syscalls.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
@@ -59,11 +60,57 @@ fbl::Vector<fbl::RefPtr<Task>> ThreadGroupMutableState::tasks() const {
   return ktl::move(tasks_vec);
 }
 
+fbl::Vector<pid_t> ThreadGroupMutableState::task_ids() const {
+  fbl::Vector<pid_t> ids;
+  fbl::AllocChecker ac;
+  for (auto& tc : tasks_) {
+    ids.push_back(tc.GetKey(), &ac);
+    ZX_ASSERT(ac.check());
+  }
+  return ids;
+}
+
+bool ThreadGroupMutableState::contains_task(pid_t tid) const {
+  return tasks_.find(tid) != tasks_.end();
+}
+
+fbl::RefPtr<Task> ThreadGroupMutableState::get_task(pid_t tid) const {
+  auto it = tasks_.find(tid);
+  if (it != tasks_.end()) {
+    auto task = it->upgrade();
+    if (task.has_value()) {
+      return task.value();
+    }
+  }
+  return nullptr;
+}
+
 pid_t ThreadGroupMutableState::get_ppid() const {
   if (parent.has_value()) {
     return parent.value()->leader;
   }
   return leader();
+}
+
+bool ThreadGroupMutableState::is_waitable() const {
+  //return last_signal.has_value() && base_->load_stopped() != StopState::InProgress;
+  return false;
+}
+
+WaitableChildResult ThreadGroupMutableState::get_waitable_running_children(
+    ProcessSelector selector,
+    const WaitingOptions& options,
+    const PidTable& pids) const {
+  // Implementation details omitted for brevity
+  // This would contain the logic to find and return waitable running children
+  // based on the given selector and options
+  return WaitableChildResult::ShouldWait();
+}
+
+WaitableChildResult ThreadGroupMutableState::get_waitable_child(ProcessSelector selector,
+                                                     const WaitingOptions& options,
+                                                     PidTable& pids) {
+  return get_waitable_running_children(selector, options, pids);
 }
 
 fbl::RefPtr<ThreadGroup> ThreadGroup::New(
@@ -147,6 +194,23 @@ fit::result<Errno> ThreadGroup::add(fbl::RefPtr<Task> task) {
 
   state->tasks_.insert(TaskContainer::From(ktl::move(task)));
   return fit::ok();
+}
+
+bool ProcessSelector::DoMatch(pid_t pid, const PidTable& pid_table) const {
+  return ktl::visit(ProcessSelector::overloaded{
+                        [](Any) { return true; }, [pid](Pid p) { return p.value == pid; },
+                        [pid, &pid_table](Pgid pg) {
+                          auto task_ref = pid_table.get_task(pid).Lock();
+                          if (task_ref) {
+                            if (auto group = pid_table.get_process_group(pg.value)) {
+                              if (group.has_value()) {
+                                return group == task_ref->thread_group->read()->process_group;
+                              }
+                            }
+                          }
+                          return false;
+                        }},
+                    selector_);
 }
 
 }  // namespace starnix
