@@ -522,11 +522,8 @@ fit::result<Errno> CurrentTask::finish_exec(const ktl::string_view& path,
   selinux_hooks::update_state_on_exec(self, &resolved_elf.selinux_state);
   */
 
-  auto start_info = load_executable(*this, resolved_elf, path);
-  if (start_info.is_error()) {
-    return start_info.take_error();
-  }
-  auto regs = zx_thread_state_general_regs_t::From(start_info.value());
+  auto start_info = load_executable(*this, resolved_elf, path) _EP(start_info);
+  auto regs = zx_thread_state_general_regs_t_from(start_info.value());
   thread_state.registers = RegisterState::From(regs);
 
   {
