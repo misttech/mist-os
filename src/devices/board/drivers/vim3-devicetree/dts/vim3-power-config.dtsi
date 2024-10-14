@@ -52,6 +52,20 @@
 			};
 		};
 	};
+	cpu {
+		power-elements {
+			cpu-element {
+				power-levels {
+					off-level {
+						level = <0>;
+					};
+					cpu_on_level: on-level {
+						level = <1>;
+					};
+				};
+			};
+		};
+	};
 };
 
 &bt_uart {
@@ -130,6 +144,7 @@
 				};
 				on-level {
 					level = <1>;
+					level-dependencies = <&cpu_on_level 1>;
 					level-transition-table {
 						transition-to-off {
 							target-level = <0>;

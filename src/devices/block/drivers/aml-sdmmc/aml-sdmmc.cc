@@ -57,7 +57,7 @@ zx_paddr_t PageMask() {
 
 namespace aml_sdmmc {
 
-zx_status_t AmlSdmmc::AcquireLease(
+zx_status_t AmlSdmmc::AcquireInitLease(
     const fidl::WireSyncClient<fuchsia_power_broker::Lessor>& lessor_client,
     fidl::ClientEnd<fuchsia_power_broker::LeaseControl>& lease_control_client_end) {
   if (lease_control_client_end.is_valid()) {
@@ -392,7 +392,7 @@ zx::result<> AmlSdmmc::ConfigurePowerManagement(
   // Maintain a lease on the hardware power element until a child driver obtains a power dependency
   // token to it via the GetToken() call.
   zx_status_t status =
-      AcquireLease(hardware_power_lessor_client_, hardware_power_lease_control_client_end_);
+      AcquireInitLease(hardware_power_lessor_client_, hardware_power_lease_control_client_end_);
   if (status != ZX_OK) {
     FDF_LOGL(ERROR, logger(), "Failed to acquire lease on hardware power: %s",
              zx_status_get_string(status));
