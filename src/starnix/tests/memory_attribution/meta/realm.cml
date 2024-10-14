@@ -17,22 +17,6 @@
             url: "debian#meta/debian_container.cm",
             environment: "#starnix_runner_env",
         },
-        {
-            name: "power-broker",
-            url: "power-broker#meta/power-broker.cm",
-        },
-        {
-            name: "fake-hrtimer",
-            url: "fake-hrtimer#meta/fake-hrtimer.cm",
-        },
-        {
-            name: "system-activity-governor",
-            url: "fake-system-activity-governor#meta/fake-system-activity-governor.cm",
-        },
-        {
-            name: "fake-suspend",
-            url: "fake-suspend-pkg#meta/fake-suspend.cm",
-        },
     ],
     collections: [
         {
@@ -66,49 +50,6 @@
             config: "fuchsia.starnix.runner.EnableDataCollection",
             from: "self",
             to: "#starnix_runner",
-        },
-        {
-            protocol: [ "fuchsia.power.broker.Topology" ],
-            from: "#power-broker",
-            to: [
-                "#fake-hrtimer",
-                "#starnix_runner",
-            ],
-        },
-        {
-            protocol: [
-                "fuchsia.power.suspend.Stats",
-                "fuchsia.power.system.ActivityGovernor",
-            ],
-            from: "#system-activity-governor",
-            to: [ "#starnix_runner" ],
-        },
-        {
-            directory: "dev-hrtimer",
-            from: "#fake-hrtimer",
-            to: [ "#starnix_runner" ],
-        },
-        {
-            config: [
-                "fuchsia.power.UseSuspender",
-                "fuchsia.power.WaitForSuspendingToken",
-            ],
-            from: "void",
-            to: "#system-activity-governor",
-            availability: "optional",
-        },
-        {
-            protocol: [
-                "fuchsia.hardware.suspend.SuspendSerivce",
-                "test.suspendcontrol.Device",
-            ],
-            from: "#fake-suspend",
-            to: "#system-activity-governor",
-        },
-        {
-            protocol: [ "fuchsia.power.broker.Topology" ],
-            from: "#power-broker",
-            to: "#system-activity-governor",
         },
     ],
     expose: [
