@@ -1185,7 +1185,7 @@ mod tests {
         ];
         "replace upstream with no guests"
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn bridge(steps: impl IntoIterator<Item = (Action, Vec<BridgeEvent>)>) {
         // At most 2 events will need to be sent before the test can process them: in the case that
         // a bridge is modified, the bridge is destroyed and then built again.

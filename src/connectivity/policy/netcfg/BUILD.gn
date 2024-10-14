@@ -150,6 +150,11 @@ config_data("config-default") {
 
 fuchsia_unittest_package("netcfg-tests") {
   deps = [ ":lib_test" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
   manifest = "meta/netcfg_lib_test.cml"
 }
 

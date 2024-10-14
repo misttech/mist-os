@@ -510,7 +510,7 @@ mod tests {
         });
         "different_interface"
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn get_suitable_dhcpv6_prefix(
         current_prefix: Option<PrefixOnInterface>,
         interface_state_iter: impl IntoIterator<Item = (crate::DeviceClass, Option<Prefixes>)>,

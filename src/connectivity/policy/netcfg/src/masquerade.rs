@@ -500,7 +500,7 @@ pub mod test {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn enable_disable_masquerade() {
         let filter = MockFilter::default();
         let mut filter_enabled_state = FilterEnabledState::default();
@@ -563,7 +563,7 @@ pub mod test {
         Err(Error::InvalidArguments);
         "invalid subnet"
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn masquerade(
         config: ValidatedConfig,
         fail_generations: Option<i32>,
