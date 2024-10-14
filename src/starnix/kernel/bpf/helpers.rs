@@ -37,6 +37,7 @@ pub struct HelperFunctionContext<'a> {
     pub current_task: &'a CurrentTask,
 }
 
+#[derive(Debug)]
 pub enum HelperFunctionContextMarker {}
 impl EbpfRunContext for HelperFunctionContextMarker {
     type Context<'a> = HelperFunctionContext<'a>;
