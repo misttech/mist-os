@@ -80,18 +80,26 @@ if (allowed_device_types == []) {
       "QEMU",
       "Intel NUC Kit NUC11TNHv5",
       "GCE",
+      "crosvm",
     ]
   } else if (board_name == "arm64") {
     allowed_device_types = [
       "QEMU",
       "GCE",
+      "crosvm",
     ]
-  } else if (board_name == "riscv64" || board_name == "qemu-arm64") {
+  } else if (board_name == "riscv64") {
     allowed_device_types = [ "QEMU" ]
+  } else if (board_name == "qemu-arm64") {
+    allowed_device_types = [
+      "QEMU",
+      "crosvm",
+    ]
   } else if (board_name == "qemu-x64") {
     allowed_device_types = [
       "AEMU",
       "QEMU",
+      "crosvm",
     ]
   } else if (board_name == "astro") {
     allowed_device_types = [ "Astro" ]

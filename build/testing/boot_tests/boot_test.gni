@@ -31,6 +31,7 @@ _all_emu_envs = [
   qemu_env,
   qemu_1cpu_env,
   aemu_env,
+  crosvm_env,
 ]
 
 # Helper template defining a boot test for a particular host architecture. This

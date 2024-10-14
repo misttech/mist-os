@@ -117,7 +117,8 @@ type Environment struct {
 }
 
 func (env Environment) TargetsEmulator() bool {
-	return env.Dimensions.DeviceType() == "QEMU" || env.Dimensions.DeviceType() == "AEMU"
+	deviceType := env.Dimensions.DeviceType()
+	return deviceType == "QEMU" || deviceType == "AEMU" || deviceType == "crosvm"
 }
 
 // DimensionSet encapsulates the Swarming dimensions a test wishes to target.

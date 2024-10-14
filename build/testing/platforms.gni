@@ -60,6 +60,14 @@ test_platforms = [
     cpu = "arm64"
   },
   {
+    device_type = "crosvm"
+    cpu = "arm64"
+  },
+  {
+    device_type = "crosvm"
+    cpu = "x64"
+  },
+  {
     os = "Linux"
     cpu = "x64"
   },
