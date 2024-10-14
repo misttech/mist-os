@@ -12,6 +12,7 @@
 #include <lib/ddk/metadata.h>
 #include <lib/fit/defer.h>
 #include <lib/zx/clock.h>
+#include <zircon/syscalls.h>
 
 #include <fbl/auto_lock.h>
 #include <usb/usb.h>
@@ -24,6 +25,24 @@ namespace fdci = fuchsia_hardware_usb_dci;
 namespace fdescriptor = fuchsia_hardware_usb_descriptor;
 namespace fendpoint = fuchsia_hardware_usb_endpoint;
 namespace fio = fuchsia_io;
+
+zx_status_t CacheFlushCommon(dma_buffer::ContiguousBuffer* buffer, zx_off_t offset, size_t length,
+                             uint32_t flush_options) {
+  if (offset + length < offset || offset + length > buffer->size()) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+  auto virt{reinterpret_cast<uintptr_t>(buffer->virt()) + offset};
+  return zx_cache_flush(reinterpret_cast<void*>(virt), length, flush_options);
+}
+
+zx_status_t CacheFlush(dma_buffer::ContiguousBuffer* buffer, zx_off_t offset, size_t length) {
+  return CacheFlushCommon(buffer, offset, length, ZX_CACHE_FLUSH_DATA);
+}
+
+zx_status_t CacheFlushInvalidate(dma_buffer::ContiguousBuffer* buffer, zx_off_t offset,
+                                 size_t length) {
+  return CacheFlushCommon(buffer, offset, length, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
+}
 
 zx_status_t Dwc3::Create(void* ctx, zx_device_t* parent) {
   auto dev = std::make_unique<Dwc3>(parent, fdf::Dispatcher::GetCurrent()->async_dispatcher());
@@ -163,20 +182,20 @@ zx_status_t Dwc3::Init() {
   }
 
   // If something goes wrong after this point, make sure to release any of our
-  // allocated IoBuffers.
+  // allocated dma buffers.
   auto cleanup = fit::defer([this]() { ReleaseResources(); });
 
   // Strictly speaking, we should not need RW access to this buffer.
   // Unfortunately, attempting to writeback and invalidate the cache before
   // reading anything from the buffer produces a page fault right if this buffer
   // is mapped read only, so for now, we keep the buffer mapped RW.
-  if (zx_status_t status =
-          event_buffer_.Init(bti_.get(), kEventBufferSize, IO_BUFFER_RW | IO_BUFFER_CONTIG);
-      status != ZX_OK) {
-    zxlogf(ERROR, "event_buffer init failed: %s", zx_status_get_string(status));
+  zx_status_t status = dma_buffer::CreateBufferFactory()->CreateContiguous(bti_, kEventBufferSize,
+                                                                           12, &event_buffer_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "dma_buffer init fails: %s", zx_status_get_string(status));
     return status;
   }
-  event_buffer_.CacheFlushInvalidate(0, kEventBufferSize);
+  CacheFlushInvalidate(event_buffer_.get(), 0, kEventBufferSize);
 
   // Now that we have allocated our event buffer, we have at least one region
   // pinned.  We need to be sure to place the hardware into reset before
@@ -185,9 +204,9 @@ zx_status_t Dwc3::Init() {
 
   {
     fbl::AutoLock lock(&ep0_.lock);
-    if (zx_status_t status =
-            ep0_.buffer.Init(bti_.get(), UINT16_MAX, IO_BUFFER_RW | IO_BUFFER_CONTIG);
-        status != ZX_OK) {
+    zx_status_t status =
+        dma_buffer::CreateBufferFactory()->CreateContiguous(bti_, kEp0BufferSize, 12, &ep0_.buffer);
+    if (status != ZX_OK) {
       zxlogf(ERROR, "ep0_buffer init failed: %s", zx_status_get_string(status));
       return status;
     }
@@ -243,7 +262,7 @@ void Dwc3::ReleaseResources() {
     fbl::AutoLock lock(&ep0_.lock);
     ep0_.out.enabled = false;
     ep0_.in.enabled = false;
-    ep0_.buffer.release();
+    ep0_.buffer.reset();
     ep0_.shared_fifo.Release();
   }
 
@@ -253,7 +272,7 @@ void Dwc3::ReleaseResources() {
     uep.ep.enabled = false;
   }
 
-  event_buffer_.release();
+  event_buffer_.reset();
   has_pinned_memory_ = false;
 }
 

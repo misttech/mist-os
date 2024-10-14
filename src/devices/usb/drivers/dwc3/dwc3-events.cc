@@ -177,7 +177,7 @@ void Dwc3::HandleEvent(uint32_t event) {
 
 int Dwc3::IrqThread() {
   auto* mmio = get_mmio();
-  const uint32_t* const ring_start = static_cast<const uint32_t*>(event_buffer_.virt());
+  const uint32_t* const ring_start = static_cast<const uint32_t*>(event_buffer_->virt());
   const uint32_t* const ring_end = ring_start + (kEventBufferSize / sizeof(*ring_start));
   const uint32_t* ring_cur = ring_start;
   bool shutdown_now = false;
@@ -219,9 +219,9 @@ int Dwc3::IrqThread() {
         // invalidate cache so we can read fresh events
         const zx_off_t offset = (ring_cur - ring_start) * sizeof(*ring_cur);
         const size_t todo = std::min<size_t>(ring_end - ring_cur, event_count);
-        event_buffer_.CacheFlushInvalidate(offset, todo * sizeof(*ring_cur));
+        CacheFlushInvalidate(event_buffer_.get(), offset, todo * sizeof(*ring_cur));
         if (event_count > todo) {
-          event_buffer_.CacheFlushInvalidate(0, (event_count - todo) * sizeof(*ring_cur));
+          CacheFlushInvalidate(event_buffer_.get(), 0, (event_count - todo) * sizeof(*ring_cur));
         }
 
         for (uint32_t i = 0; i < event_count; i += sizeof(uint32_t)) {
@@ -269,7 +269,7 @@ void Dwc3::StartEvents() {
 
   // set event buffer pointer and size
   // keep interrupts masked until we are ready
-  zx_paddr_t paddr = event_buffer_.phys();
+  zx_paddr_t paddr = event_buffer_->phys();
   ZX_DEBUG_ASSERT(paddr != 0);
 
   GEVNTADR::Get(0).FromValue(0).set_EVNTADR(paddr).WriteTo(mmio);

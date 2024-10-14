@@ -43,8 +43,8 @@ void Dwc3::Ep0Start() {
 }
 
 void Dwc3::Ep0QueueSetupLocked() {
-  ep0_.buffer.CacheFlushInvalidate(0, sizeof(usb_setup_t));
-  EpStartTransfer(ep0_.out, ep0_.shared_fifo, TRB_TRBCTL_SETUP, ep0_.buffer.phys(),
+  CacheFlushInvalidate(ep0_.buffer.get(), 0, sizeof(usb_setup_t));
+  EpStartTransfer(ep0_.out, ep0_.shared_fifo, TRB_TRBCTL_SETUP, ep0_.buffer->phys(),
                   sizeof(usb_setup_t), false);
   ep0_.state = Ep0::State::Setup;
 }
@@ -79,8 +79,8 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
 
   switch (ep0_.state) {
     case Ep0::State::Setup: {
-      void* const vaddr = ep0_.buffer.virt();
-      const zx_paddr_t paddr = ep0_.buffer.phys();
+      void* const vaddr = ep0_.buffer->virt();
+      const zx_paddr_t paddr = ep0_.buffer->phys();
       usb_setup_t setup = ep0_.cur_setup;
       //
       memcpy(&setup, vaddr, sizeof(setup));
@@ -90,12 +90,12 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
 
       const bool is_out = ((setup.bm_request_type & USB_DIR_MASK) == USB_DIR_OUT);
       if (setup.w_length > 0 && is_out) {
-        ep0_.buffer.CacheFlushInvalidate(0, ep0_.buffer.size());
+        CacheFlushInvalidate(ep0_.buffer.get(), 0, ep0_.buffer->size());
         EpStartTransfer(ep0_.out, ep0_.shared_fifo, TRB_TRBCTL_CONTROL_DATA, paddr,
-                        ep0_.buffer.size(), false);
+                        ep0_.buffer->size(), false);
         ep0_.state = Ep0::State::DataOut;
       } else {
-        zx::result<size_t> status = HandleEp0Setup(setup, vaddr, ep0_.buffer.size());
+        zx::result<size_t> status = HandleEp0Setup(setup, vaddr, ep0_.buffer->size());
         if (status.is_error()) {
           zxlogf(DEBUG, "HandleSetup returned %s", zx_status_get_string(status.error_value()));
           CmdEpSetStall(ep0_.out);
@@ -107,7 +107,7 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
         zxlogf(DEBUG, "HandleSetup success: actual %zu", actual);
         if (setup.w_length > 0) {
           // queue a write for the data phase
-          ep0_.buffer.CacheFlush(0, actual);
+          CacheFlush(ep0_.buffer.get(), 0, actual);
           EpStartTransfer(ep0_.in, ep0_.shared_fifo, TRB_TRBCTL_CONTROL_DATA, paddr, actual, false);
           ep0_.state = Ep0::State::DataIn;
         } else {
@@ -122,9 +122,9 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
       dwc3_trb_t trb;
       EpReadTrb(ep0_.out, ep0_.shared_fifo, ep0_.shared_fifo.current, &trb);
       ep0_.shared_fifo.current = nullptr;
-      zx_off_t received = ep0_.buffer.size() - TRB_BUFSIZ(trb.status);
+      zx_off_t received = ep0_.buffer->size() - TRB_BUFSIZ(trb.status);
 
-      zx::result<size_t> status = HandleEp0Setup(ep0_.cur_setup, ep0_.buffer.virt(), received);
+      zx::result<size_t> status = HandleEp0Setup(ep0_.cur_setup, ep0_.buffer->virt(), received);
       if (status.is_error()) {
         CmdEpSetStall(ep0_.out);
         Ep0QueueSetupLocked();

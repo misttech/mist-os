@@ -9,13 +9,14 @@
 #include <fidl/fuchsia.hardware.usb.endpoint/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/ddk/io-buffer.h>
 #include <lib/device-protocol/pdev-fidl.h>
+#include <lib/dma-buffer/buffer.h>
 #include <lib/mmio/mmio.h>
 #include <lib/sync/cpp/completion.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <lib/zx/result.h>
 
+#include <cstdint>
 #include <deque>
 #include <memory>
 #include <variant>
@@ -34,6 +35,12 @@
 #include "src/devices/usb/drivers/dwc3/dwc3-types.h"
 
 namespace dwc3 {
+
+// A dma_buffer::ContiguousBuffer is cached, but leaves cache management to the user. These methods
+// wrap zx_cache_flush with sensible boundary checking and validation.
+zx_status_t CacheFlush(dma_buffer::ContiguousBuffer* buffer, zx_off_t offset, size_t length);
+zx_status_t CacheFlushInvalidate(dma_buffer::ContiguousBuffer* buffer, zx_off_t offset,
+                                 size_t length);
 
 class Dwc3;
 using Dwc3Type = ddk::Device<Dwc3, ddk::Initializable, ddk::Unbindable>;
@@ -102,6 +109,7 @@ class Dwc3 : public Dwc3Type,
                                  size_t* read_actual) TA_REQ(dci_lock_);
 
   static inline const uint32_t kEventBufferSize = zx_system_get_page_size();
+  static inline const uint32_t kEp0BufferSize = UINT16_MAX + 1;
 
   // physical endpoint numbers.  We use 0 and 1 for EP0, and let the device-mode
   // driver use the rest.
@@ -230,10 +238,10 @@ class Dwc3 : public Dwc3Type,
 
     zx_paddr_t GetTrbPhys(dwc3_trb_t* trb) const {
       ZX_DEBUG_ASSERT((trb >= first) && (trb <= last));
-      return buffer.phys() + ((trb - first) * sizeof(*trb));
+      return buffer->phys() + ((trb - first) * sizeof(*trb));
     }
 
-    ddk::IoBuffer buffer;
+    std::unique_ptr<dma_buffer::ContiguousBuffer> buffer;
     dwc3_trb_t* first{nullptr};    // first TRB in the fifo
     dwc3_trb_t* next{nullptr};     // next free TRB in the fifo
     dwc3_trb_t* current{nullptr};  // TRB for currently pending transaction
@@ -381,7 +389,7 @@ class Dwc3 : public Dwc3Type,
     fbl::Mutex lock;
 
     TA_GUARDED(lock) Fifo shared_fifo;
-    TA_GUARDED(lock) ddk::IoBuffer buffer;
+    TA_GUARDED(lock) std::unique_ptr<dma_buffer::ContiguousBuffer> buffer;
     TA_GUARDED(lock) State state { Ep0::State::None };
     TA_GUARDED(lock) Endpoint out;
     TA_GUARDED(lock) Endpoint in;
@@ -527,7 +535,8 @@ class Dwc3 : public Dwc3Type,
   thrd_t irq_thread_;
   std::atomic<bool> irq_thread_started_{false};
 
-  ddk::IoBuffer event_buffer_;
+  std::unique_ptr<dma_buffer::ContiguousBuffer> event_buffer_;
+
   Ep0 ep0_;
   UserEndpointCollection user_endpoints_;
 

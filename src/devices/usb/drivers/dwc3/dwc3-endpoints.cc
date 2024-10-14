@@ -10,34 +10,34 @@
 namespace dwc3 {
 
 zx_status_t Dwc3::Fifo::Init(zx::bti& bti) {
-  if (buffer.is_valid()) {
+  if (buffer) {
     return ZX_ERR_BAD_STATE;
   }
 
-  if (zx_status_t status = buffer.Init(bti.get(), Fifo::kFifoSize, IO_BUFFER_RW | IO_BUFFER_CONTIG);
-      status != ZX_OK) {
+  zx_status_t status =
+      dma_buffer::CreateBufferFactory()->CreateContiguous(bti, Fifo::kFifoSize, 12, &buffer);
+  if (status != ZX_OK) {
     return status;
   }
 
-  first = static_cast<dwc3_trb_t*>(buffer.virt());
+  first = static_cast<dwc3_trb_t*>(buffer->virt());
   next = first;
   current = nullptr;
   last = first + (Fifo::kFifoSize / sizeof(dwc3_trb_t)) - 1;
 
   // set up link TRB pointing back to the start of the fifo
   dwc3_trb_t* trb = last;
-  zx_paddr_t trb_phys = buffer.phys();
+  zx_paddr_t trb_phys = buffer->phys();
   trb->ptr_low = (uint32_t)trb_phys;
   trb->ptr_high = (uint32_t)(trb_phys >> 32);
   trb->status = 0;
   trb->control = TRB_TRBCTL_LINK | TRB_HWO;
-  buffer.CacheFlush((trb - first) * sizeof(*trb), sizeof(*trb));
+  CacheFlush(buffer.get(), (trb - first) * sizeof(*trb), sizeof(*trb));
 
   return ZX_OK;
 }
 
 void Dwc3::Fifo::Release() {
-  buffer.release();
   first = next = current = last = nullptr;
 }
 
@@ -100,7 +100,7 @@ void Dwc3::EpStartTransfer(Endpoint& ep, Fifo& fifo, uint32_t type, zx_paddr_t b
   } else {
     trb->control = type | TRB_LST | TRB_IOC | TRB_HWO;
   }
-  fifo.buffer.CacheFlush((trb - fifo.first) * sizeof(*trb), sizeof(*trb));
+  CacheFlush(fifo.buffer.get(), (trb - fifo.first) * sizeof(*trb), sizeof(*trb));
 
   if (send_zlp) {
     dwc3_trb_t* zlp_trb = fifo.next++;
@@ -111,7 +111,7 @@ void Dwc3::EpStartTransfer(Endpoint& ep, Fifo& fifo, uint32_t type, zx_paddr_t b
     zlp_trb->ptr_high = 0;
     zlp_trb->status = TRB_BUFSIZ(0);
     zlp_trb->control = type | TRB_LST | TRB_IOC | TRB_HWO;
-    fifo.buffer.CacheFlush((zlp_trb - fifo.first) * sizeof(*trb), sizeof(*trb));
+    CacheFlush(fifo.buffer.get(), (zlp_trb - fifo.first) * sizeof(*trb), sizeof(*trb));
   }
 
   CmdEpStartTransfer(ep, fifo.GetTrbPhys(trb));
@@ -153,7 +153,7 @@ void Dwc3::EpEndTransfers(Endpoint& ep, zx_status_t reason) {
 
 void Dwc3::EpReadTrb(Endpoint& ep, Fifo& fifo, const dwc3_trb_t* src, dwc3_trb_t* dst) {
   if (src >= fifo.first && src < fifo.last) {
-    fifo.buffer.CacheFlushInvalidate((src - fifo.first) * sizeof(*src), sizeof(*src));
+    CacheFlushInvalidate(fifo.buffer.get(), (src - fifo.first) * sizeof(*src), sizeof(*src));
     memcpy(dst, src, sizeof(*dst));
   } else {
     zxlogf(ERROR, "bad trb");
