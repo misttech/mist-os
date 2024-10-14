@@ -112,26 +112,28 @@ constexpr duration operator*(int64_t multiplier, duration d) ZX_AVAILABLE_SINCE(
   return d * multiplier;
 }
 
-class ticks final {
+template <zx_clock_t kClockId>
+class basic_ticks final {
  public:
-  constexpr ticks() = default;
+  constexpr basic_ticks() = default;
 
-  explicit constexpr ticks(zx_ticks_t value) : value_(value) {}
+  explicit constexpr basic_ticks(zx_ticks_t value) : value_(value) {}
 
-  // Constructs a tick object for the current tick counter in the system.
-  static ticks now() ZX_AVAILABLE_SINCE(7) { return ticks(zx_ticks_get()); }
+  static basic_ticks<kClockId> now();
 
   // Returns the number of ticks contained within one second.
-  static ticks per_second() ZX_AVAILABLE_SINCE(7) { return ticks(zx_ticks_per_second()); }
+  static basic_ticks<kClockId> per_second() ZX_AVAILABLE_SINCE(7) {
+    return basic_ticks(zx_ticks_per_second());
+  }
 
   // Acquires the number of ticks contained within this object.
   constexpr zx_ticks_t get() const { return value_; }
 
-  static constexpr ticks infinite() { return ticks(INFINITE); }
+  static constexpr basic_ticks<kClockId> infinite() { return basic_ticks(INFINITE); }
 
-  static constexpr ticks infinite_past() { return ticks(INFINITE_PAST); }
+  static constexpr basic_ticks<kClockId> infinite_past() { return basic_ticks(INFINITE_PAST); }
 
-  constexpr ticks operator+(ticks other) const {
+  constexpr basic_ticks<kClockId> operator+(basic_ticks<kClockId> other) const {
     zx_ticks_t x = 0;
 
     if (unlikely(add_overflow(value_, other.value_, &x))) {
@@ -142,10 +144,10 @@ class ticks final {
       }
     }
 
-    return ticks(x);
+    return basic_ticks(x);
   }
 
-  constexpr ticks operator-(ticks other) const {
+  constexpr basic_ticks<kClockId> operator-(basic_ticks<kClockId> other) const {
     zx_ticks_t x = 0;
 
     if (unlikely(sub_overflow(value_, other.value_, &x))) {
@@ -156,10 +158,10 @@ class ticks final {
       }
     }
 
-    return ticks(x);
+    return basic_ticks(x);
   }
 
-  constexpr ticks operator*(uint64_t multiplier) const {
+  constexpr basic_ticks<kClockId> operator*(uint64_t multiplier) const {
     zx_ticks_t x = 0;
 
     if (unlikely(mul_overflow(value_, multiplier, &x))) {
@@ -170,56 +172,56 @@ class ticks final {
       }
     }
 
-    return ticks(x);
+    return basic_ticks<kClockId>(x);
   }
 
-  constexpr ticks operator/(uint64_t divisor) const {
-    return ticks(static_cast<int64_t>(static_cast<uint64_t>(value_) / divisor));
+  constexpr basic_ticks<kClockId> operator/(uint64_t divisor) const {
+    return basic_ticks(static_cast<int64_t>(static_cast<uint64_t>(value_) / divisor));
   }
 
-  constexpr uint64_t operator/(ticks other) const {
+  constexpr uint64_t operator/(basic_ticks<kClockId> other) const {
     return static_cast<uint64_t>(value_ / other.value_);
   }
 
-  constexpr ticks operator%(uint64_t divisor) const {
-    return ticks(static_cast<int64_t>(static_cast<uint64_t>(value_) % divisor));
+  constexpr basic_ticks<kClockId> operator%(uint64_t divisor) const {
+    return basic_ticks(static_cast<int64_t>(static_cast<uint64_t>(value_) % divisor));
   }
 
-  constexpr uint64_t operator%(ticks other) const {
+  constexpr uint64_t operator%(basic_ticks<kClockId> other) const {
     return static_cast<uint64_t>(value_ % other.value_);
   }
 
-  constexpr ticks& operator+=(ticks other) {
+  constexpr basic_ticks<kClockId>& operator+=(basic_ticks<kClockId> other) {
     *this = *this + other;
     return *this;
   }
 
-  constexpr ticks& operator-=(ticks other) {
+  constexpr basic_ticks<kClockId>& operator-=(basic_ticks<kClockId> other) {
     *this = *this - other;
     return *this;
   }
 
-  constexpr ticks& operator*=(uint64_t multiplier) {
+  constexpr basic_ticks<kClockId>& operator*=(uint64_t multiplier) {
     *this = *this * multiplier;
     return *this;
   }
 
-  constexpr ticks& operator/=(uint64_t divisor) {
+  constexpr basic_ticks<kClockId>& operator/=(uint64_t divisor) {
     value_ /= divisor;
     return *this;
   }
 
-  constexpr ticks& operator%=(uint64_t divisor) {
+  constexpr basic_ticks<kClockId>& operator%=(uint64_t divisor) {
     value_ %= divisor;
     return *this;
   }
 
-  constexpr bool operator==(ticks other) const { return value_ == other.value_; }
-  constexpr bool operator!=(ticks other) const { return value_ != other.value_; }
-  constexpr bool operator<(ticks other) const { return value_ < other.value_; }
-  constexpr bool operator<=(ticks other) const { return value_ <= other.value_; }
-  constexpr bool operator>(ticks other) const { return value_ > other.value_; }
-  constexpr bool operator>=(ticks other) const { return value_ >= other.value_; }
+  constexpr bool operator==(basic_ticks<kClockId> other) const { return value_ == other.value_; }
+  constexpr bool operator!=(basic_ticks<kClockId> other) const { return value_ != other.value_; }
+  constexpr bool operator<(basic_ticks<kClockId> other) const { return value_ < other.value_; }
+  constexpr bool operator<=(basic_ticks<kClockId> other) const { return value_ <= other.value_; }
+  constexpr bool operator>(basic_ticks<kClockId> other) const { return value_ > other.value_; }
+  constexpr bool operator>=(basic_ticks<kClockId> other) const { return value_ >= other.value_; }
 
  private:
   static constexpr zx_ticks_t INFINITE = std::numeric_limits<zx_ticks_t>::max();
@@ -227,6 +229,10 @@ class ticks final {
 
   zx_ticks_t value_ = 0;
 } ZX_AVAILABLE_SINCE(7);
+
+using ticks = basic_ticks<ZX_CLOCK_MONOTONIC>;
+using ticks_boot = basic_ticks<ZX_CLOCK_BOOT>;
+using ticks_monotonic = basic_ticks<ZX_CLOCK_MONOTONIC>;
 
 template <zx_clock_t kClockId>
 class basic_time final {

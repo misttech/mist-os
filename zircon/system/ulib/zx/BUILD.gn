@@ -82,6 +82,7 @@ zx_library("zx") {
       "status_string.cc",
       "stream.cc",
       "thread.cc",
+      "time.cc",
       "timer.cc",
       "vcpu.cc",
       "vmar.cc",
