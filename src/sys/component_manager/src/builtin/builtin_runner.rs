@@ -13,7 +13,8 @@ use fidl::endpoints;
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy, RequestStream, ServerEnd};
 use fuchsia_runtime::UtcClock;
 
-use futures::future::BoxFuture;
+use cm_util::{AbortHandle, AbortableScope};
+use futures::future::{BoxFuture, Shared};
 use futures::{Future, FutureExt, TryStreamExt};
 use namespace::{Namespace, NamespaceError};
 use routing::capability_source::{BuiltinSource, CapabilitySource};
@@ -21,7 +22,7 @@ use routing::policy::ScopedPolicyChecker;
 use runner::component::{Controllable, Controller, StopInfo};
 use sandbox::{Capability, Dict, DirEntry, RemotableCapability};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use thiserror::Error;
 use tracing::{error, warn};
 use vfs::directory::entry::OpenRequest;
@@ -117,10 +118,10 @@ impl BuiltinRunner {
     /// Creates a builtin runner with its required resources.
     /// - `task_group`: The tasks associated with the builtin runner.
     pub fn new(
+        root_job: zx::Unowned<'static, zx::Job>,
         task_group: TaskGroup,
         builtin_programs: HashMap<&'static str, BuiltinProgramGen>,
     ) -> Self {
-        let root_job = fuchsia_runtime::job_default();
         Self { root_job, task_group, builtin_programs }
     }
 
@@ -265,10 +266,10 @@ impl BuiltinRunnerFactory for BuiltinRunner {
 
 /// The program state of a builtin component running in the builtin runner.
 struct BuiltinProgram {
-    job: zx::Job,
     lifecycle_client: Option<fprocess_lifecycle::LifecycleProxy>,
-    root_job_if_critical: Option<zx::Unowned<'static, zx::Job>>,
-    task: Arc<Mutex<Option<fasync::Task<()>>>>,
+    main_process_critical: bool,
+    task: Shared<BoxFuture<'static, ()>>,
+    task_abortable: AbortHandle,
 }
 
 type BuiltinProgramFn = Box<
@@ -292,17 +293,38 @@ impl BuiltinProgram {
         outgoing_dir: ServerEnd<fio::DirectoryMarker>,
         lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>,
     ) -> Self {
+        let (abort_scope, task_abort) = AbortableScope::new();
+        let main_process_critical = root_job_if_critical.is_some();
         let job2 = job.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
+        // Kill the job at the end of this task. Ensure the job is killed if this task is
+        // dropped before completion.
+        //
+        // We don't expect the runner to drop this task before it completes, but there's no
+        // cost to being defensive.
+        struct Finalize {
+            job: zx::Job,
+            root_job_if_critical: Option<zx::Unowned<'static, zx::Job>>,
+        }
+        impl Drop for Finalize {
+            fn drop(&mut self) {
+                if let Some(j) = self.root_job_if_critical.as_ref() {
+                    _ = j.kill();
+                }
+                _ = self.job.kill();
+            }
+        }
+        let f = Finalize { job, root_job_if_critical };
         let task = fasync::Task::spawn(async move {
-            let job = job2.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
-            body(job, namespace, outgoing_dir, lifecycle_server).await;
-            _ = job2.kill();
-        });
+            let _f = f;
+            _ = abort_scope.run(body(job2, namespace, outgoing_dir, lifecycle_server)).await;
+        })
+        .boxed()
+        .shared();
         Self {
-            job,
             lifecycle_client: Some(lifecycle_client),
-            root_job_if_critical,
-            task: Arc::new(Mutex::new(Some(task))),
+            main_process_critical,
+            task,
+            task_abortable: task_abort,
         }
     }
 }
@@ -310,22 +332,17 @@ impl BuiltinProgram {
 #[async_trait]
 impl Controllable for BuiltinProgram {
     async fn kill(&mut self) {
-        if let Some(j) = self.root_job_if_critical.as_ref() {
-            _ = j.kill();
-        }
-        {
-            // Cancel the program's task (drop it).
-            let mut task = self.task.lock().unwrap();
-            _ = task.take();
-        }
-        _ = self.job.kill();
+        self.task_abortable.abort();
+        self.task.clone().await;
     }
 
     fn stop<'a>(&mut self) -> BoxFuture<'a, ()> {
+        let main_process_critical = self.main_process_critical;
         let lifecycle_client = self.lifecycle_client.take();
+        let task_abortable = self.task_abortable.clone();
+        let task = self.task.clone();
         match lifecycle_client {
             Some(lifecycle) => {
-                let task = self.task.clone();
                 let _ = lifecycle.stop();
                 async move {
                     lifecycle
@@ -338,14 +355,16 @@ impl Controllable for BuiltinProgram {
                             "killing builtin component after failure waiting on lifecycle channel"
                         )
                     });
-                    let task = {
-                        let mut task = task.lock().unwrap();
-                        task.take()
-                    };
-                    if let Some(task) = task {
-                        // This will kill the component's job.
-                        task.await;
+                    if !main_process_critical {
+                        task_abortable.abort();
+                    } else {
+                        // To mimic the behavior of elf_runner, if main_process_critical is set,
+                        // wait for the program's task to exit before signaling stop completed.
+                        // The task will kill the job at the end, so we don't need to do it.
+                        // ourselves.
                     }
+                    // The task will kill the job at the end.
+                    task.await;
                 }
                 .boxed()
             }
@@ -543,7 +562,9 @@ mod tests {
     use sandbox::Directory;
     use serve_processargs::NamespaceBuilder;
     use std::pin::pin;
+    use std::sync::LazyLock;
     use std::task::Poll;
+    use test_case::test_case;
     use vfs::path::Path as VfsPath;
     use vfs::ToObjectRequest;
 
@@ -574,18 +595,20 @@ mod tests {
     }
 
     fn make_builtin_runner(
+        root_job: zx::Unowned<'static, zx::Job>,
         programs: HashMap<&'static str, BuiltinProgramGen>,
     ) -> Arc<BuiltinRunner> {
         let task_group = TaskGroup::new();
-        Arc::new(BuiltinRunner::new(task_group, programs))
+        Arc::new(BuiltinRunner::new(root_job, task_group, programs))
     }
 
     fn make_start_info(
         program_type: &str,
         svc_dir: ClientEnd<fio::DirectoryMarker>,
+        main_process_critical: bool,
     ) -> (ComponentStartInfo, DirectoryProxy) {
         let (outgoing_dir, outgoing_server_end) = fidl::endpoints::create_proxy().unwrap();
-        let start_info = ComponentStartInfo {
+        let mut start_info = ComponentStartInfo {
             resolved_url: Some("fuchsia-builtin://elf_runner.cm".to_string()),
             program: Some(Dictionary {
                 entries: Some(vec![DictionaryEntry {
@@ -606,6 +629,12 @@ mod tests {
             break_on_start: None,
             ..Default::default()
         };
+        if main_process_critical {
+            start_info.program.as_mut().unwrap().entries.as_mut().unwrap().push(DictionaryEntry {
+                key: "main_process_critical".into(),
+                value: Some(Box::new(DictionaryValue::Str("true".into()))),
+            });
+        }
         (start_info, outgoing_dir)
     }
 
@@ -617,8 +646,9 @@ mod tests {
                     _job: zx::Job,
                     _namespace: Namespace,
                     _outgoing_dir: ServerEnd<fio::DirectoryMarker>,
-                    _lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>| {
+                    lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>| {
                     async move {
+                        let _lifecycle_server = lifecycle_server;
                     }
                     .boxed()
                 }
@@ -643,12 +673,16 @@ mod tests {
                                 }
                             }
                         }
+                        drop(stream);
+                        // We'd like to test what happens when the program continues running
+                        // after it's dropped its lifecycle channel.
+                        std::future::pending::<()>().await;
                     }
                     .boxed()
                 }
             )
         });
-        out.insert("test-exit-gracefully", f);
+        out.insert("test-watch-lifecycle", f);
 
         let f: BuiltinProgramGen = Box::new(|| {
             Box::new(
@@ -656,8 +690,9 @@ mod tests {
                     _job: zx::Job,
                     _namespace: Namespace,
                     _outgoing_dir: ServerEnd<fio::DirectoryMarker>,
-                    _lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>| {
+                    lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>| {
                     async move {
+                        let _lifecycle_server = lifecycle_server;
                         std::future::pending::<()>().await;
                     }
                     .boxed()
@@ -669,10 +704,16 @@ mod tests {
         out
     }
 
+    #[test_case(false; "non-critical")]
+    #[test_case(true; "critical")]
     #[fuchsia::test]
-    async fn builtin_component_exit() {
+    async fn builtin_component_exit(main_process_critical: bool) {
+        static ROOT_JOB: LazyLock<zx::Job> =
+            LazyLock::new(|| fuchsia_runtime::job_default().create_child_job().unwrap());
+        let root_job_handle = ROOT_JOB.as_handle_ref().cast();
+
         let programs = make_test_builtin_programs();
-        let builtin_runner = make_builtin_runner(programs);
+        let builtin_runner = make_builtin_runner(root_job_handle, programs);
         let (client, server_end) =
             fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
         let scope = ExecutionScope::new();
@@ -699,7 +740,8 @@ mod tests {
             svc_server_end,
         )
         .unwrap();
-        let (start_info, _outgoing_dir) = make_start_info("test-exit-immediately", svc);
+        let (start_info, _outgoing_dir) =
+            make_start_info("test-exit-immediately", svc, main_process_critical);
         client.start(start_info, server_end).unwrap();
 
         // The test component exits immediately, so we should observe a stop event on the
@@ -718,12 +760,31 @@ mod tests {
         );
         let event = stream.try_next().await;
         assert_matches!(event, Ok(None));
+
+        if main_process_critical {
+            assert_matches!(
+                ROOT_JOB.info(),
+                Ok(zx::JobInfo {
+                    exited: true,
+                    return_code: zx::sys::ZX_TASK_RETCODE_SYSCALL_KILL,
+                    ..
+                })
+            );
+        } else {
+            assert_matches!(ROOT_JOB.info(), Ok(zx::JobInfo { exited: false, .. }));
+        }
     }
 
+    #[test_case(false; "non-critical")]
+    #[test_case(true; "critical")]
     #[fuchsia::test(allow_stalls = false)]
-    async fn builtin_component_stop_gracefully() {
+    async fn builtin_component_stop_gracefully(main_process_critical: bool) {
+        static ROOT_JOB: LazyLock<zx::Job> =
+            LazyLock::new(|| fuchsia_runtime::job_default().create_child_job().unwrap());
+        let root_job_handle = ROOT_JOB.as_handle_ref().cast();
+
         let programs = make_test_builtin_programs();
-        let builtin_runner = make_builtin_runner(programs);
+        let builtin_runner = make_builtin_runner(root_job_handle, programs);
         let (client, server_end) =
             fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
         let scope = ExecutionScope::new();
@@ -750,7 +811,8 @@ mod tests {
             svc_server_end,
         )
         .unwrap();
-        let (start_info, _outgoing_dir) = make_start_info("test-exit-gracefully", svc);
+        let (start_info, _outgoing_dir) =
+            make_start_info("test-watch-lifecycle", svc, main_process_critical);
         client.start(start_info, server_end).unwrap();
 
         let controller2 = controller.clone();
@@ -772,13 +834,39 @@ mod tests {
         });
         assert_matches!(TestExecutor::poll_until_stalled(&mut on_stop).await, Poll::Pending);
         controller.stop().unwrap();
+
+        if main_process_critical {
+            // If main_process_critical, stop waits for the task. Expect it to hang, and kill
+            // the component to terminate it.
+            assert_matches!(TestExecutor::poll_until_stalled(&mut on_stop).await, Poll::Pending);
+            controller.kill().unwrap();
+        }
         on_stop.await;
+
+        if main_process_critical {
+            assert_matches!(
+                ROOT_JOB.info(),
+                Ok(zx::JobInfo {
+                    exited: true,
+                    return_code: zx::sys::ZX_TASK_RETCODE_SYSCALL_KILL,
+                    ..
+                })
+            );
+        } else {
+            assert_matches!(ROOT_JOB.info(), Ok(zx::JobInfo { exited: false, .. }));
+        }
     }
 
+    #[test_case(false; "non-critical")]
+    #[test_case(true; "critical")]
     #[fuchsia::test(allow_stalls = false)]
-    async fn builtin_component_stop_forcefully() {
+    async fn builtin_component_kill_forcefully(main_process_critical: bool) {
+        static ROOT_JOB: LazyLock<zx::Job> =
+            LazyLock::new(|| fuchsia_runtime::job_default().create_child_job().unwrap());
+        let root_job_handle = ROOT_JOB.as_handle_ref().cast();
+
         let programs = make_test_builtin_programs();
-        let builtin_runner = make_builtin_runner(programs);
+        let builtin_runner = make_builtin_runner(root_job_handle, programs);
         let (client, server_end) =
             fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
         let scope = ExecutionScope::new();
@@ -805,7 +893,7 @@ mod tests {
             svc_server_end,
         )
         .unwrap();
-        let (start_info, _outgoing_dir) = make_start_info("test-hang", svc);
+        let (start_info, _outgoing_dir) = make_start_info("test-hang", svc, main_process_critical);
         client.start(start_info, server_end).unwrap();
 
         let controller2 = controller.clone();
@@ -834,6 +922,19 @@ mod tests {
         assert_matches!(TestExecutor::poll_until_stalled(&mut on_stop).await, Poll::Pending);
         controller.kill().unwrap();
         on_stop.await;
+
+        if main_process_critical {
+            assert_matches!(
+                ROOT_JOB.info(),
+                Ok(zx::JobInfo {
+                    exited: true,
+                    return_code: zx::sys::ZX_TASK_RETCODE_SYSCALL_KILL,
+                    ..
+                })
+            );
+        } else {
+            assert_matches!(ROOT_JOB.info(), Ok(zx::JobInfo { exited: false, .. }));
+        }
     }
 
     /// Tests that:
@@ -845,7 +946,7 @@ mod tests {
     async fn elf_runner_start_stop() {
         let elf_runner_resources = make_elf_runner_resources();
         let programs = BuiltinRunner::get_builtin_programs(elf_runner_resources.clone());
-        let builtin_runner = make_builtin_runner(programs);
+        let builtin_runner = make_builtin_runner(fuchsia_runtime::job_default(), programs);
         let (client, server_end) =
             fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
         let scope = ExecutionScope::new();
@@ -872,7 +973,7 @@ mod tests {
             svc_server_end,
         )
         .unwrap();
-        let (start_info, outgoing_dir) = make_start_info("elf_runner", svc);
+        let (start_info, outgoing_dir) = make_start_info("elf_runner", svc, false);
         client.start(start_info, server_end).unwrap();
 
         // Use the ComponentRunner FIDL in the outgoing directory of the ELF runner to run
@@ -974,7 +1075,7 @@ mod tests {
     #[fuchsia::test]
     async fn start_error_unknown_type() {
         let programs = make_test_builtin_programs();
-        let builtin_runner = make_builtin_runner(programs);
+        let builtin_runner = make_builtin_runner(fuchsia_runtime::job_default(), programs);
         let (client, server_end) =
             fidl::endpoints::create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
         let scope = ExecutionScope::new();
@@ -998,7 +1099,7 @@ mod tests {
             svc_server_end,
         )
         .unwrap();
-        let (start_info, _outgoing_dir) = make_start_info("foobar", svc);
+        let (start_info, _outgoing_dir) = make_start_info("foobar", svc, false);
         client.start(start_info, server_end).unwrap();
         let event = controller.take_event_stream().try_next().await;
         let invalid_arguments =

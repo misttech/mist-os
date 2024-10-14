@@ -217,6 +217,7 @@ impl BuiltinEnvironmentBuilder {
             instance_registry: self.instance_registry.clone(),
         };
         let runner = Arc::new(BuiltinRunner::new(
+            fuchsia_runtime::job_default(),
             top_instance.task_group(),
             BuiltinRunner::get_builtin_programs(Arc::new(elf_runner_resources)),
         ));
