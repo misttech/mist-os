@@ -384,17 +384,23 @@ capabilities: [
 
 #### Dynamic dictionaries {#dynamic}
 
-As a special case of [extension](#extension), the source dictionary can be a
-dictionary that's dynamically provided by the component's program at runtime.
-This provides a way to bridge between runtime-provisioned dictionaries and
-declarative `dictionary` capabilities. The syntax is the following:
+There is another kind of `dictionary` capability where the dictionary is
+created by the component's program itself at runtime. These dictionaries do
+not support [extension](#extension) or [aggregation](#aggregation) in CML;
+it is up to the program to populate the dictionary using the fidl
+[sandbox][fidl-sandbox-capability-store] API.
 
 ```json5
-extends: "program/<outgoing-dir-path>",
+capabilities: [
+    {
+        dictionary: "my-dynamic-dictionary",
+        path: "<outgoing-dir-path>",
+    },
+],
 ```
 
 `<outgoing-dir-path>` is a path in the component's
-[outgoing directory][glossary-outgoing-directory] to a handler that serves the
+[outgoing directory][glossary-outgoing-directory] to a
 [`fuchsia.component.sandbox/Router`][fidl-sandbox-router] protocol which is
 expected to return a [`Dictionary`][fidl-sandbox-dictionary] capability.
 
@@ -404,7 +410,7 @@ of two components.
 -   `dynamic-dictionary-provider`: Creates a runtime
     [`Dictionary`][fidl-sandbox-dictionary] with three `Echo` protocol
     instances. It exposes the `Dictionary` via a [`Router`][fidl-sandbox-router]
-    and defines a `dictionary` in its CML that extends the `Router`.
+    and defines a `dictionary` backed by this `Router`.
 -   `dynamic-dictionary`: Declares CML to [retrieve](#retrieval) the three
     `Echo` protocols from the `dictionary`, and runs code to use each of these
     protocols.
@@ -412,7 +418,8 @@ of two components.
 ##### Provider
 
 The component manifest of `dynamic-dictionary-provider` is as follows. In it we
-see the `dictionary` definition for `bundle` that extends the `Router`.
+see the `dictionary` definition for `bundle` that names a `Router` in its
+`path`.
 
 ```json5
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/dictionaries/meta/dynamic_dictionary_provider.cml" region_tag="body" adjust_indentation="auto" %}
@@ -420,7 +427,7 @@ see the `dictionary` definition for `bundle` that extends the `Router`.
 
 At initialization, `dynamic-dictionary-provider` uses the
 [`CapabilityStore`][fidl-sandbox-capability-store] sandbox API to create a new
-`Dictionary` and adding three [`Connector`][fidl-sandbox-connector] to it. Each
+`Dictionary` and adds three [`Connector`][fidl-sandbox-connector] to it. Each
 `Connector` represents one of the `Echo` protocol instances.
 
 ```json5
@@ -446,8 +453,8 @@ Finally, we need to expose the dictionary created earlier with a
 
 The [`Router`][fidl-sandbox-router] request handler exports the dictionary and
 returns it. Note that it makes a
-[`CapabilityStore/Duplicate`][fidl-sandbox-capability-store] of the dictionary
-first because the framework may call `Router/Route` multiple times. This has the
+[`CapabilityStore.Duplicate`][fidl-sandbox-capability-store] of the dictionary
+first because the framework may call `Router.Route` multiple times. This has the
 effect of duplicating the dictionary *handle*, without copying the inner
 contents.
 
@@ -498,7 +505,7 @@ The program just connects to each protocol in turn and tries to use it:
 [capability-routing]: /docs/concepts/components/v2/capabilities/README.md#routing
 [fidl-sandbox-capability-store]: https://fuchsia.dev/reference/fidl/fuchsia.component.sandbox#CapabilityStore
 [fidl-sandbox-connector]: https://fuchsia.dev/reference/fidl/fuchsia.component.sandbox#Connector
-[fidl-sandbox-dictionary]: https://fuchsia.dev/reference/fidl/fuchsia.component.sandbox#Dictionary
+[fidl-sandbox-dictionary]: https://fuchsia.dev/reference/fidl/fuchsia.component.sandbox#DictionaryRef
 [fidl-sandbox-router]: https://fuchsia.dev/reference/fidl/fuchsia.component.sandbox#Router
 [fidl-sandbox-receiver]: https://fuchsia.dev/reference/fidl/fuchsia.component.sandbox#Receiver
 [glossary-dictionary]: /docs/glossary/README.md#dictionary
