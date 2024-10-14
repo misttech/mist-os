@@ -6,7 +6,6 @@ library fuchsia.hardware.display.engine;
 using fuchsia.hardware.display.types;
 using fuchsia.hardware.i2cimpl;
 using fuchsia.images2;
-using fuchsia.sysmem;
 using fuchsia.sysmem2;
 using zx;
 
@@ -142,10 +141,10 @@ open protocol Engine {
     /// Import a sysmem buffer collection token.
     ///
     /// Returns ZX_ERR_ALREADY_EXISTS if `collection_id` is in use.
-    flexible ImportBufferCollection(resource struct {
+    flexible ImportBufferCollection2(resource struct {
         buffer_collection_id BufferCollectionId;
 
-        collection_token client_end:fuchsia.sysmem.BufferCollectionToken;
+        collection_token client_end:fuchsia.sysmem2.BufferCollectionToken;
     }) -> () error zx.Status;
 
     /// Release an imported buffer collection.
