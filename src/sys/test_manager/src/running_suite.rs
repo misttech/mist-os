@@ -50,6 +50,7 @@ use {
 
 const DEBUG_DATA_REALM_NAME: &'static str = "debug-data";
 const ARCHIVIST_REALM_NAME: &'static str = "archivist";
+const DIAGNOSTICS_DICTIONARY_NAME: &'static str = "diagnostics";
 const ARCHIVIST_FOR_EMBEDDING_URL: &'static str = "#meta/archivist-for-embedding.cm";
 const MEMFS_FOR_EMBEDDING_URL: &'static str = "#meta/memfs.cm";
 const MEMFS_REALM_NAME: &'static str = "memfs";
@@ -785,6 +786,15 @@ async fn get_realm(
         storage_id: fdecl::StorageId::StaticInstanceIdOrMoniker,
     }));
 
+    test_wrapper_decl.capabilities.push(cm_rust::CapabilityDecl::Dictionary(
+        cm_rust::DictionaryDecl {
+            name: DIAGNOSTICS_DICTIONARY_NAME.parse().unwrap(),
+            source: None,
+            source_dictionary: None,
+            source_path: None,
+        },
+    ));
+
     wrapper_realm.replace_realm_decl(test_wrapper_decl).await?;
 
     let test_root = Ref::collection(TEST_ROOT_COLLECTION);
@@ -829,6 +839,18 @@ async fn get_realm(
                 .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
                 .capability(Capability::protocol_by_name("fuchsia.inspect.InspectSink"))
                 .from(&archivist)
+                .to(test_root.clone())
+                .to(Ref::dictionary(format!("self/{DIAGNOSTICS_DICTIONARY_NAME}")))
+                .to(&resolver),
+        )
+        .await?;
+
+    // Diagnostics dictionary to resolver and test_root
+    wrapper_realm
+        .add_route(
+            Route::new()
+                .capability(Capability::dictionary(DIAGNOSTICS_DICTIONARY_NAME))
+                .from(Ref::self_())
                 .to(test_root.clone())
                 .to(&resolver),
         )
