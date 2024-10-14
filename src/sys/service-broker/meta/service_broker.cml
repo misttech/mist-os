@@ -1,0 +1,88 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "syslog/client.shard.cml" ],
+    program: {
+        runner: "elf",
+        binary: "bin/service-broker",
+    },
+    capabilities: [
+        { service: "service" },
+        { protocol: "protocol" },
+    ],
+    use: [
+        // The input service which should be operated on.
+        { service: "input" },
+
+        // Specifies the type of policy to use. Appropriate choices include:
+        //
+        // * "first_instance_to_protocol": Waits for a single instance to enumerate
+        //   and serves it as the exposed `protocol` capability. `protocol_name` must be provided.
+        //
+        // * "first_instance_to_default": Wait for a single instance to enumerate and
+        //   serves it as the "default" instance in the exposed `service` capability.
+        //
+        // * "filter_and_rename": Filters and renames incoming instances to the set described by
+        //   the `filter` and `rename` config capabilities. Only useful for service capabilities
+        //   don't have instance names obfucscated, eg the capability is not aggregated.
+        {
+            config: "policy",
+            key: "policy",
+            type: "string",
+            max_size: 30,
+            availability: "optional",
+            default: "",
+        },
+
+        // The name of the protocol to pluck out of incoming service and expose via the exposed
+        // `protocol` capability.
+        {
+            config: "protocol_name",
+            key: "protocol_name",
+            type: "string",
+            max_size: 100,
+            availability: "optional",
+            default: "",
+        },
+
+        // Specifies the set of instances that should be kept in the exposed `service` capability.
+        {
+            config: "filter",
+            key: "filter",
+            type: "vector",
+            max_count: 100,
+            availability: "optional",
+            element: {
+                type: "string",
+                max_size: 100,
+            },
+            default: [],
+        },
+
+        // Specifies the set of instances that should be renamed in exposed `service` capability.
+        // Syntax for renames should be "${new}=${old}".
+        {
+            config: "rename",
+            key: "rename",
+            type: "vector",
+            max_count: 100,
+            availability: "optional",
+            element: {
+                type: "string",
+                max_size: 100,
+            },
+            default: [],
+        },
+    ],
+    expose: [
+        {
+            service: "service",
+            from: "self",
+        },
+        {
+            protocol: "protocol",
+            from: "self",
+        },
+    ],
+}
