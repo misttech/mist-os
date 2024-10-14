@@ -12,7 +12,7 @@ use crate::endpoints::ProtocolMarker;
 use crate::handle::{
     Handle, HandleBased, HandleDisposition, HandleInfo, HandleOp, ObjectType, Rights, Status,
 };
-use crate::time::{BootInstant, MonotonicInstant};
+use crate::time::{Instant, Ticks, Timeline};
 use crate::{Error, MethodType, Result};
 use bitflags::bitflags;
 use std::cell::{RefCell, RefMut};
@@ -494,7 +494,7 @@ impl<'a, D: ResourceDialect> Encoder<'a, D> {
     }
 }
 
-unsafe impl TypeMarker for BootInstant {
+unsafe impl<T: Timeline + 'static, U: 'static> TypeMarker for Instant<T, U> {
     type Owned = Self;
 
     #[inline(always)]
@@ -508,14 +508,14 @@ unsafe impl TypeMarker for BootInstant {
     }
 }
 
-impl ValueTypeMarker for BootInstant {
+impl<T: Timeline + Copy + 'static, U: Copy + 'static> ValueTypeMarker for Instant<T, U> {
     type Borrowed<'a> = Self;
-    fn borrow(value: &<Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
+    fn borrow(value: &Self::Owned) -> Self::Borrowed<'_> {
         *value
     }
 }
 
-unsafe impl<D: ResourceDialect> Encode<BootInstant, D> for BootInstant {
+unsafe impl<T: Timeline + Copy + 'static, D: ResourceDialect> Encode<Instant<T>, D> for Instant<T> {
     #[inline]
     unsafe fn encode(
         self,
@@ -529,28 +529,7 @@ unsafe impl<D: ResourceDialect> Encode<BootInstant, D> for BootInstant {
     }
 }
 
-unsafe impl TypeMarker for MonotonicInstant {
-    type Owned = Self;
-
-    #[inline(always)]
-    fn inline_align(_context: Context) -> usize {
-        mem::align_of::<Self>()
-    }
-
-    #[inline(always)]
-    fn inline_size(_context: Context) -> usize {
-        mem::size_of::<Self>()
-    }
-}
-
-impl ValueTypeMarker for MonotonicInstant {
-    type Borrowed<'a> = Self;
-    fn borrow(value: &<Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
-        *value
-    }
-}
-
-unsafe impl<D: ResourceDialect> Encode<MonotonicInstant, D> for MonotonicInstant {
+unsafe impl<T: Timeline + 'static, D: ResourceDialect> Encode<Ticks<T>, D> for Ticks<T> {
     #[inline]
     unsafe fn encode(
         self,
@@ -559,7 +538,7 @@ unsafe impl<D: ResourceDialect> Encode<MonotonicInstant, D> for MonotonicInstant
         _depth: Depth,
     ) -> Result<()> {
         encoder.debug_check_bounds::<Self>(offset);
-        encoder.write_num(self.into_nanos(), offset);
+        encoder.write_num(self.into_raw(), offset);
         Ok(())
     }
 }
@@ -886,10 +865,10 @@ impl<'a, D: ResourceDialect> Decoder<'a, D> {
     }
 }
 
-impl<D: ResourceDialect> Decode<Self, D> for BootInstant {
+impl<T: Timeline + 'static, D: ResourceDialect> Decode<Self, D> for Instant<T> {
     #[inline(always)]
     fn new_empty() -> Self {
-        BootInstant::ZERO
+        Instant::ZERO
     }
 
     #[inline]
@@ -905,10 +884,10 @@ impl<D: ResourceDialect> Decode<Self, D> for BootInstant {
     }
 }
 
-impl<D: ResourceDialect> Decode<Self, D> for MonotonicInstant {
+impl<T: Timeline + 'static, D: ResourceDialect> Decode<Self, D> for Ticks<T> {
     #[inline(always)]
     fn new_empty() -> Self {
-        MonotonicInstant::ZERO
+        Ticks::<T>::ZERO
     }
 
     #[inline]
@@ -919,7 +898,7 @@ impl<D: ResourceDialect> Decode<Self, D> for MonotonicInstant {
         _depth: Depth,
     ) -> Result<()> {
         decoder.debug_check_bounds::<Self>(offset);
-        *self = Self::from_nanos(decoder.read_num(offset));
+        *self = Self::from_raw(decoder.read_num(offset));
         Ok(())
     }
 }
@@ -3244,6 +3223,7 @@ mod test {
 
     use super::*;
     use crate::handle::{convert_handle_dispositions_to_infos, AsHandleRef};
+    use crate::time::{BootInstant, BootTicks, MonotonicInstant, MonotonicTicks};
     use assert_matches::assert_matches;
     use std::fmt;
 
@@ -3342,9 +3322,13 @@ mod test {
     fn encode_decode_instants() {
         let monotonic = MonotonicInstant::from_nanos(987654321);
         let boot = BootInstant::from_nanos(987654321);
+        let monotonic_ticks = MonotonicTicks::from_raw(111111111);
+        let boot_ticks = BootTicks::from_raw(22222222);
         for ctx in CONTEXTS {
             assert_eq!(encode_decode::<BootInstant>(ctx, boot), boot);
             assert_eq!(encode_decode::<MonotonicInstant>(ctx, monotonic), monotonic);
+            assert_eq!(encode_decode::<BootTicks>(ctx, boot_ticks), boot_ticks);
+            assert_eq!(encode_decode::<MonotonicTicks>(ctx, monotonic_ticks), monotonic_ticks);
         }
     }
 

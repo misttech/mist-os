@@ -145,12 +145,15 @@ impl BootInstant {
     }
 }
 
+impl<T: Timeline, U: TimeUnit> Instant<T, U> {
+    pub const ZERO: Instant<T, U> = Instant(0, std::marker::PhantomData);
+}
+
 impl<T: Timeline> Instant<T> {
     pub const INFINITE: Instant<T, NsUnit> =
         Instant(sys::ZX_TIME_INFINITE, std::marker::PhantomData);
     pub const INFINITE_PAST: Instant<T, NsUnit> =
         Instant(sys::ZX_TIME_INFINITE_PAST, std::marker::PhantomData);
-    pub const ZERO: Instant<T, NsUnit> = Instant(0, std::marker::PhantomData);
 
     /// Returns the number of nanoseconds since the epoch contained by this `Time`.
     pub const fn into_nanos(self) -> i64 {
