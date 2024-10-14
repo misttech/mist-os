@@ -85,7 +85,6 @@ impl From<&bpf_attr__bindgen_ty_4> for ProgramInfo {
     }
 }
 
-#[derive(Debug)]
 pub struct Program {
     pub info: ProgramInfo,
     vm: Option<EbpfProgram<HelperFunctionContextMarker>>,

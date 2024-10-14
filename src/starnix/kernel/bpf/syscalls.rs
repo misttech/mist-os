@@ -94,7 +94,7 @@ fn install_bpf_fd(
     Ok(current_task.add_file(file, FdFlags::CLOEXEC)?.into())
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct BpfTypeFormat {
     #[allow(dead_code)]
     data: Vec<u8>,

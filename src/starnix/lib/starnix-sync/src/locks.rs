@@ -77,7 +77,7 @@ impl<T: Default, L> Default for OrderedMutex<T, L> {
     }
 }
 
-impl<T: fmt::Debug, L> fmt::Debug for OrderedMutex<T, L> {
+impl<T: Default + fmt::Debug, L> fmt::Debug for OrderedMutex<T, L> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "OrderedMutex({:?}, {})", self.mutex, any::type_name::<L>())
     }

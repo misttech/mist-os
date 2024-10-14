@@ -51,7 +51,6 @@ use std::sync::Arc;
 static MAP_IDS: AtomicU32Counter = AtomicU32Counter::new(1);
 
 /// A BPF map. This is a hashtable that can be accessed both by BPF programs and userspace.
-#[derive(Debug)]
 pub struct Map {
     pub id: u32,
     pub schema: MapSchema,
@@ -301,7 +300,6 @@ type PinnedBuffer = Pin<Box<[u8]>>;
 /// The underlying storage for a BPF map.
 ///
 /// We will eventually need to implement a wide variety of backing stores.
-#[derive(Debug)]
 enum MapStore {
     Array(PinnedBuffer),
     Hash(HashStorage),
@@ -493,7 +491,6 @@ fn compute_storage_size(schema: &MapSchema) -> Result<usize, Errno> {
         .ok_or_else(|| errno!(ENOMEM))
 }
 
-#[derive(Debug)]
 struct HashStorage {
     index_map: BTreeMap<Vec<u8>, usize>,
     data: PinnedBuffer,
@@ -576,7 +573,6 @@ impl HashStorage {
     }
 }
 
-#[derive(Debug)]
 struct RingBufferStorage {
     memory: Arc<MemoryObject>,
     /// The mask corresponding to the size of the ring buffer. This is used to map back the
