@@ -50,6 +50,11 @@
             to: [ "#fshost" ],
         },
         {
+            service: "fuchsia.hardware.block.volume.Service",
+            from: "#boot-drivers",
+            to: "#fshost",
+        },
+        {
             protocol: [
                 "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",
