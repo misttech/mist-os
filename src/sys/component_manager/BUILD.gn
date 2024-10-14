@@ -21,6 +21,12 @@ rustc_binary("bin") {
 
   configs += [ "//build/config/rust:bootfs" ]
 
+  # Statically link rust standard library
+  # TODO(https://fxbug.dev/42163719): Dynamically link once security allowlist supports globs.
+  configs += [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
+  configs -= [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
+  configs += [ "//build/config/fuchsia:static_rust_standard_library" ]
+
   deps = [
     ":measure_tape_for_events",
     ":measure_tape_for_instance",

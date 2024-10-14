@@ -31,4 +31,10 @@ rustc_binary("shared-multi-call-tool-binary") {
     # This binary is a part of the bootfs image, so attempt to minimize its size impact.
     "//build/config/rust:bootfs",
   ]
+
+  # Statically link rust standard library
+  # TODO(https://fxbug.dev/42163719): Dynamically link once this is in a bootfs_package.
+  configs += [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
+  configs -= [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
+  configs += [ "//build/config/fuchsia:static_rust_standard_library" ]
 }

@@ -10,6 +10,7 @@ import("//build/bazel/bazel_inputs.gni")
 import("//build/config/clang/clang.gni")
 import("//build/icu/icu_assembly_input_bundle.gni")
 import("//bundles/assembly/platform_aibs.gni")
+import("//bundles/assembly/rust_libstd.gni")
 import("//src/lib/icu/tzdata/icu_tzres_source.gni")
 import("//third_party/sbase/binaries.gni")
 import("//zircon/kernel/phys/qemu.gni")
@@ -2592,6 +2593,11 @@ assembly_input_bundle("fshost_common") {
           label = "//sdk/lib/svc($shlib_toolchain)"
           source = "${root_out_dir}/${target_cpu}-shared/libsvc.so"
           destination = "lib/libsvc.so"
+        },
+        {
+          label = "//build/toolchain/runtime:shared-rust-libstd-deps"
+          source = "${rust_libstd_path}"
+          destination = "lib/${rust_libstd_so_name}"
         },
       ]
       component_includes = [

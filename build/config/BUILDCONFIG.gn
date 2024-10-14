@@ -2500,13 +2500,6 @@ template("_fuchsia_binary") {
             configs + dynamic_rust_config - dynamic_rust_config != configs) {
           should_add_shared_rust_runtime = true
         }
-        bootfs_rust_config = [ "//build/config/rust:bootfs" ]
-        if (defined(configs) &&
-            configs + bootfs_rust_config - bootfs_rust_config != configs) {
-          # Never add dynamic stdlib for bootfs binaries.
-          # TODO(https://fxbug.dev/42163719): reconsider this.
-          should_add_shared_rust_runtime = false
-        }
         if (should_add_shared_rust_runtime) {
           data_deps += [ "//build/toolchain/runtime:shared-rust-libstd-deps" ]
 
