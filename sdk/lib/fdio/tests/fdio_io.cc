@@ -41,6 +41,16 @@ TEST(IOTest, WaitFD) {
   EXPECT_TRUE(pending & FDIO_EVT_PEER_CLOSED);
 }
 
+TEST(IOTest, CreateTransferrable) {
+  zx::channel channel;
+  int raw_fd = -1;
+  EXPECT_OK(fdio_transferable_fd(&raw_fd, channel.reset_and_get_address()));
+  EXPECT_LE(0, raw_fd);
+  fbl::unique_fd fd(raw_fd);
+  // The channel must be closed before the fd, otherwise the test will
+  // block when zxio tries to call the Close method.
+  channel.reset();
+}
 
 TEST(IOTest, WaitOnUnwaitableFD) {
   constexpr size_t kSize = 4096;

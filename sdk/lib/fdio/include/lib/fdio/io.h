@@ -140,6 +140,24 @@ zx_status_t fdio_get_vmo_exact(int fd, zx_handle_t* out_vmo) ZX_AVAILABLE_SINCE(
 //   * [fdio_get_vmo_exact()]
 zx_status_t fdio_get_vmo_exec(int fd, zx_handle_t* out_vmo) ZX_AVAILABLE_SINCE(1);
 
+// Creates a transferrable. The first argument returns the file descriptor
+// representing the transferrable, and the second argument returns the handle of
+// the channel used to communicate with the transferrable.
+// A transferrable represents a channel that responds to the following
+// protocols:
+// - [fuchsia.unknown.Cloneable]
+// - [fuchsia.unknown.Closeable]
+// - [fuchsia.unknown.Queryable]
+// This allows to produce a file descriptor that can be duped and transferred to
+// another process without knowing the exact nature of the file.
+//
+// # Errors
+//
+//   * `ZX_ERR_NO_MEMORY`: Failed due to a lack of memory.
+//
+//   * `ZX_ERR_NO_RESOURCES`: Failed to bind to the file descriptor.
+zx_status_t fdio_transferable_fd(int* out_fd, zx_handle_t* out_handle) ZX_AVAILABLE_SINCE(NEXT);
+
 __END_CDECLS
 
 #endif  // LIB_FDIO_IO_H_
