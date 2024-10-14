@@ -47,6 +47,12 @@ pub struct KernelThreads {
 }
 
 impl KernelThreads {
+    /// Create a KernelThreads object for the given Kernel.
+    ///
+    /// Must be called in the initial Starnix process on a thread with an async executor. This
+    /// function captures the async executor for this thread for use with spawned futures.
+    ///
+    /// Used during kernel boot.
     pub fn new(kernel: Weak<Kernel>) -> Self {
         KernelThreads {
             starnix_process: fuchsia_runtime::process_self()
@@ -59,6 +65,10 @@ impl KernelThreads {
             kernel,
         }
     }
+
+    /// Initialize this object with the system task that will be used for spawned threads.
+    ///
+    /// This function must be called before this object is used to spawn threads.
     pub fn init(&self, system_task: CurrentTask) -> Result<(), Errno> {
         self.system_task.set(SystemTask::new(system_task)).map_err(|_| errno!(EEXIST))?;
         self.spawner
@@ -67,28 +77,57 @@ impl KernelThreads {
         Ok(())
     }
 
+    /// Spawn an async task in the main async executor to await the given future.
+    ///
+    /// Use this function to run async tasks in the background. These tasks cannot block or else
+    /// they will starve the main async executor.
+    ///
+    /// Prefer this function to `spawn` for non-blocking work.
     pub fn spawn_future(&self, future: impl Future<Output = ()> + 'static) {
         self.ehandle.spawn_local_detached(WrappedFuture(self.kernel.clone(), future));
     }
 
+    /// Spawn a thread in the main starnix process to run the given function.
+    ///
+    /// Use this function to work in the background that involves blocking. Prefer `spawn_future`
+    /// for non-blocking work.
+    ///
+    /// The threads spawned by this function come from the `spawner()` thread pool, which means
+    /// they can be used either for long-lived work or for short-lived work. The thread pool keeps
+    /// a few idle threads around to reduce the overhead for spawning threads for short-lived work.
+    pub fn spawn<F>(&self, f: F)
+    where
+        F: FnOnce(&mut Locked<'_, Unlocked>, &CurrentTask) + Send + 'static,
+    {
+        self.spawner().spawn(f)
+    }
+
+    /// The dynamic thread spawner used to spawn threads.
+    ///
+    /// To spawn a thread in this thread pool, use `spawn()`.
     pub fn spawner(&self) -> &DynamicThreadSpawner {
         self.spawner.get().as_ref().unwrap()
     }
 
-    /// Access the `CurrentTask` for the kernel main thread. This can only be called from the
-    /// kernel main thread itself.
+    /// Access the `CurrentTask` for the kernel main thread.
+    ///
+    /// This function can only be called from the kernel main thread itself.
     pub fn system_task(&self) -> &CurrentTask {
         self.system_task.get().expect("KernelThreads::init must be called").system_task.get()
     }
 
-    /// Access the `Unlocked` state. This is intended for limited use in async contexts and can
-    /// only be called from the kernel main thread.
+    /// Access the `Unlocked` state.
+    ///
+    /// This function is intended for limited use in async contexts and can only be called from the
+    /// kernel main thread.
     pub fn unlocked_for_async(&self) -> RefMut<'_, Locked<'static, Unlocked>> {
         self.unlocked_for_async.unlocked.get().borrow_mut()
     }
 
-    /// Access the `ThreadGroup` for the system tasks. This can be safely called from anywhere as
-    /// soon as KernelThreads::init has been called.
+    /// Access the `ThreadGroup` for the system tasks.
+    ///
+    /// This function can be safely called from anywhere as soon as `KernelThreads::init` has been
+    /// called.
     pub fn system_thread_group(&self) -> TempRef<'_, ThreadGroup> {
         TempRef::into_static(
             self.system_task
@@ -98,13 +137,6 @@ impl KernelThreads {
                 .upgrade()
                 .expect("System task must be still alive"),
         )
-    }
-
-    pub fn spawn<F>(&self, f: F)
-    where
-        F: FnOnce(&mut Locked<'_, Unlocked>, &CurrentTask) + Send + 'static,
-    {
-        self.spawner().spawn(f)
     }
 }
 
