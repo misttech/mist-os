@@ -4,6 +4,7 @@
 
 use fidl::endpoints::SynchronousProxy;
 use fidl::Peered;
+use fidl_fuchsia_hardware_adb as fadb;
 use futures_util::StreamExt;
 use starnix_core::power::{
     create_proxy_for_wake_events, KERNEL_PROXY_EVENT_SIGNAL, RUNNER_PROXY_EVENT_SIGNAL,
@@ -30,7 +31,6 @@ use std::collections::VecDeque;
 use std::ops::Deref;
 use std::sync::mpsc;
 use zerocopy::IntoBytes;
-use {fidl_fuchsia_hardware_adb as fadb, fuchsia_async as fasync};
 
 // The node identifiers of different nodes in FunctionFS.
 const ROOT_NODE_ID: ino_t = 1;
@@ -336,17 +336,12 @@ impl FunctionFsRootDir {
         let (command_sender, command_receiver) = async_channel::unbounded();
         state.adb_channel = Some(command_sender);
 
-        // Spawn our thread that will handle all of the ADB messages on an async executor.
-        kernel.kthreads.spawn(move |_, _| {
-            let mut executor = fasync::LocalExecutor::new();
+        // Spawn our future that will handle all of the ADB messages.
+        kernel.kthreads.spawn_future(async move {
             let adb_proxy = fadb::UsbAdbImpl_Proxy::new(fidl::AsyncChannel::from_channel(
                 adb_proxy.into_channel(),
             ));
-            executor.run_singlethreaded(handle_adb(
-                adb_proxy,
-                adb_proxy_resume_event,
-                command_receiver,
-            ));
+            handle_adb(adb_proxy, adb_proxy_resume_event, command_receiver).await
         });
 
         state.has_input_output_endpoints = true;
