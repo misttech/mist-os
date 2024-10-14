@@ -2960,7 +2960,7 @@ pub fn sys_io_destroy(
     ctx_id: aio_context_t,
 ) -> Result<(), Errno> {
     let aio_context = current_task.mm().destroy_aio_context(ctx_id.into())?;
-    aio_context.destroy();
+    std::mem::drop(aio_context);
     Ok(())
 }
 

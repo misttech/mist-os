@@ -34,12 +34,7 @@ const AIO_RING_SIZE: usize = 32;
 /// Kernel state-machine-based implementation of asynchronous I/O.
 /// See https://man7.org/linux/man-pages/man7/aio.7.html#NOTES
 pub struct AioContext {
-    // We currently queue the read and write operations to separate threads.
-    // That behavior is incorrect, but it keeps our clients working well enough while we work on
-    // getting the correct parallelism.
-    read_operations: OperationQueue,
-    write_operations: OperationQueue,
-    results: ResultQueue,
+    inner: Arc<AioContextInner>,
 }
 
 impl AioContext {
@@ -47,9 +42,9 @@ impl AioContext {
         current_task: &CurrentTask,
         max_operations: usize,
     ) -> Result<aio_context_t, Errno> {
-        let context = Self::new(max_operations);
-        context.spawn_worker(&current_task.kernel().kthreads, WorkerType::Read);
-        context.spawn_worker(&current_task.kernel().kthreads, WorkerType::Write);
+        let context = Arc::new(AioContext { inner: AioContextInner::new(max_operations) });
+        context.inner.spawn_worker(&current_task.kernel().kthreads, WorkerType::Read);
+        context.inner.spawn_worker(&current_task.kernel().kthreads, WorkerType::Write);
         let context_addr = current_task.mm().map_anonymous(
             DesiredAddress::Any,
             AIO_RING_SIZE,
@@ -60,23 +55,64 @@ impl AioContext {
         Ok(context_addr.ptr() as aio_context_t)
     }
 
-    pub fn destroy(&self) {
-        self.read_operations.stop();
-        self.write_operations.stop();
+    pub fn get_events(
+        &self,
+        current_task: &CurrentTask,
+        min_results: usize,
+        max_results: usize,
+        deadline: zx::MonotonicInstant,
+    ) -> Result<Vec<io_event>, Errno> {
+        self.inner.get_events(current_task, min_results, max_results, deadline)
     }
 
+    pub fn submit(
+        self: &Arc<Self>,
+        current_task: &CurrentTask,
+        control_block: iocb,
+        iocb_addr: UserAddress,
+    ) -> Result<(), Errno> {
+        self.inner.submit(current_task, control_block, iocb_addr)
+    }
+}
+
+impl std::fmt::Debug for AioContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AioContext").finish()
+    }
+}
+
+impl std::cmp::PartialEq for AioContext {
+    fn eq(&self, other: &AioContext) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
+    }
+}
+
+impl std::cmp::Eq for AioContext {}
+
+impl Drop for AioContext {
+    fn drop(&mut self) {
+        self.inner.stop();
+    }
+}
+
+struct AioContextInner {
+    operations: OperationQueue,
+    results: ResultQueue,
+}
+
+impl AioContextInner {
     fn new(max_operations: usize) -> Arc<Self> {
         Arc::new(Self {
-            // The maximum number of operations should cover all types of operations.
-            // Counting read and write operations separately is incorrect. We should fix the
-            // accounting once we correctly schedule read and write operations.
-            read_operations: OperationQueue::new(max_operations),
-            write_operations: OperationQueue::new(max_operations),
+            operations: OperationQueue::new(max_operations),
             results: Default::default(),
         })
     }
 
-    pub fn get_events(
+    fn stop(&self) {
+        self.operations.stop();
+    }
+
+    fn get_events(
         &self,
         current_task: &CurrentTask,
         min_results: usize,
@@ -111,27 +147,20 @@ impl AioContext {
         }
     }
 
-    pub fn submit(
+    fn submit(
         self: &Arc<Self>,
         current_task: &CurrentTask,
         control_block: iocb,
         iocb_addr: UserAddress,
     ) -> Result<(), Errno> {
         let op = IoOperation::new(current_task, control_block, iocb_addr)?;
-        self.operations_for(op.op_type.worker_type()).enqueue(op)
-    }
-
-    fn operations_for(&self, worker_type: WorkerType) -> &OperationQueue {
-        match worker_type {
-            WorkerType::Read => &self.read_operations,
-            WorkerType::Write => &self.write_operations,
-        }
+        self.operations.enqueue(op)
     }
 
     fn spawn_worker(self: &Arc<Self>, kthreads: &KernelThreads, worker_type: WorkerType) {
-        let ctx: Arc<AioContext> = self.clone();
+        let inner = self.clone();
         kthreads.spawn(move |locked, current_task| {
-            ctx.perform_next_action(locked, current_task, worker_type)
+            inner.perform_next_action(locked, current_task, worker_type)
         });
     }
 
@@ -142,7 +171,7 @@ impl AioContext {
         worker_type: WorkerType,
     ) {
         while let Ok(IoAction::Op(op)) =
-            self.operations_for(worker_type).block_until_dequeue(current_task)
+            self.operations.block_until_dequeue(current_task, worker_type)
         {
             let Some(result) = op.execute(locked, current_task) else {
                 return;
@@ -158,20 +187,6 @@ impl AioContext {
         }
     }
 }
-
-impl std::fmt::Debug for AioContext {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("AioContext").finish()
-    }
-}
-
-impl std::cmp::PartialEq for AioContext {
-    fn eq(&self, _other: &AioContext) -> bool {
-        false
-    }
-}
-
-impl std::cmp::Eq for AioContext {}
 
 #[derive(Debug, Clone, Copy)]
 enum WorkerType {
@@ -366,58 +381,96 @@ enum IoAction {
 #[derive(Default)]
 struct PendingOperations {
     is_stopped: bool,
-    ops: VecDeque<IoOperation>,
+    // We currently queue the read and write operations to separate threads.
+    // That behavior is incorrect, but it keeps our clients working well enough while we work on
+    // getting the correct parallelism.
+    read_ops: VecDeque<IoOperation>,
+    write_ops: VecDeque<IoOperation>,
+}
+
+impl PendingOperations {
+    fn ops_for(&mut self, worker_type: WorkerType) -> &mut VecDeque<IoOperation> {
+        match worker_type {
+            WorkerType::Read => &mut self.read_ops,
+            WorkerType::Write => &mut self.write_ops,
+        }
+    }
+
+    fn ops_len(&self) -> usize {
+        self.read_ops.len() + self.write_ops.len()
+    }
 }
 
 struct OperationQueue {
     max_operations: usize,
     pending: Mutex<PendingOperations>,
-    waiters: WaitQueue,
+    read_waiters: WaitQueue,
+    write_waiters: WaitQueue,
 }
 
 impl OperationQueue {
     fn new(max_operations: usize) -> Self {
-        Self { max_operations, pending: Default::default(), waiters: Default::default() }
+        Self {
+            max_operations,
+            pending: Default::default(),
+            read_waiters: Default::default(),
+            write_waiters: Default::default(),
+        }
+    }
+
+    fn waiters_for(&self, worker_type: WorkerType) -> &WaitQueue {
+        match worker_type {
+            WorkerType::Read => &self.read_waiters,
+            WorkerType::Write => &self.write_waiters,
+        }
     }
 
     fn enqueue(&self, op: IoOperation) -> Result<(), Errno> {
+        let worker_type = op.op_type.worker_type();
         {
             let mut pending = self.pending.lock();
             if pending.is_stopped {
                 return error!(EINVAL);
             }
-            if pending.ops.len() >= self.max_operations {
+            if pending.ops_len() >= self.max_operations {
                 return error!(EAGAIN);
             }
-            pending.ops.push_back(op);
+            pending.ops_for(worker_type).push_back(op);
         }
-        self.waiters.notify_unordered_count(1);
+        self.waiters_for(worker_type).notify_unordered_count(1);
         Ok(())
     }
 
     fn stop(&self) {
         let mut pending = self.pending.lock();
         pending.is_stopped = true;
-        pending.ops.clear();
+        pending.read_ops.clear();
+        pending.write_ops.clear();
+        self.read_waiters.notify_all();
+        self.write_waiters.notify_all();
     }
 
-    fn dequeue(&self) -> Option<IoAction> {
+    fn dequeue(&self, worker_type: WorkerType) -> Option<IoAction> {
         let mut pending = self.pending.lock();
         if pending.is_stopped {
             return Some(IoAction::Stop);
         }
-        pending.ops.pop_front().map(IoAction::Op)
+        pending.ops_for(worker_type).pop_front().map(IoAction::Op)
     }
 
-    fn block_until_dequeue(&self, current_task: &CurrentTask) -> Result<IoAction, Errno> {
-        if let Some(action) = self.dequeue() {
+    fn block_until_dequeue(
+        &self,
+        current_task: &CurrentTask,
+        worker_type: WorkerType,
+    ) -> Result<IoAction, Errno> {
+        if let Some(action) = self.dequeue(worker_type) {
             return Ok(action);
         }
         loop {
             let event = InterruptibleEvent::new();
             let (mut waiter, guard) = SimpleWaiter::new(&event);
-            self.waiters.wait_async_simple(&mut waiter);
-            if let Some(action) = self.dequeue() {
+            self.waiters_for(worker_type).wait_async_simple(&mut waiter);
+            if let Some(action) = self.dequeue(worker_type) {
                 return Ok(action);
             }
             current_task.block_until(guard, zx::MonotonicInstant::INFINITE)?;
