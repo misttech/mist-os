@@ -9,9 +9,7 @@ use assembly_config_capabilities::{Config, ConfigNestedValueType, ConfigValueTyp
 use assembly_config_schema::platform_config::diagnostics_config::{
     ArchivistConfig, ArchivistPipeline, DiagnosticsConfig, LogSeverity, PipelineType,
 };
-use assembly_util::{
-    read_config, write_json_file, BootfsPackageDestination, FileEntry, PackageSetDestination,
-};
+use assembly_util::{read_config, BootfsPackageDestination, FileEntry, PackageSetDestination};
 use sampler_config::ComponentIdInfoList;
 use std::collections::BTreeSet;
 
@@ -239,29 +237,6 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
                 })
                 .context(format!("Adding fire config to sampler: {}", &fire_config))?;
         }
-
-        // Read the platform buckets.
-        let platform_buckets_path = context.get_resource("buckets.json");
-        let mut buckets: Vec<serde_json::Value> = read_config(platform_buckets_path)?;
-
-        // Optionally, add the product buckets.
-        if let Some(buckets_path) = &memory_monitor.buckets {
-            let mut product_buckets: Vec<serde_json::Value> =
-                read_config(buckets_path).context("reading product memory buckets config")?;
-            buckets.append(&mut product_buckets);
-        }
-
-        // Write the result back to a file and add as config_data.
-        let gendir = context.get_gendir().context("Getting gendir for diagnostics")?;
-        let buckets_path = gendir.join("buckets.json");
-        write_json_file(&buckets_path, &buckets)?;
-        let memory_monitor_package = builder.package("memory_monitor");
-        memory_monitor_package
-            .config_data(FileEntry {
-                source: buckets_path.clone(),
-                destination: "buckets.json".into(),
-            })
-            .context(format!("Adding buckets config to memory_monitor: {}", &buckets_path))?;
 
         builder.set_config_capability(
             "fuchsia.memory.CaptureOnPressureChange",

@@ -271,7 +271,8 @@ raw_assembly_input_bundle_json = """{
       "includes": [],
       "bootfs_package": false
     }
-  ]
+  ],
+  "memory_buckets": []
 }"""
 
 

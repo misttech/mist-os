@@ -182,6 +182,8 @@ class AssemblyInputBundle:
                     name.shard.cml
                 files/
                     path/to/file/in/package
+        memory_buckets/
+            path/to/bucket.json
         kernel/
             kernel.zbi
             multiboot.bin
@@ -274,7 +276,10 @@ class AssemblyInputBundle:
                        ]
                   }
                }
-             ]
+           ],
+           "memory_buckets": [
+               "memory_buckets/path/to/bucket.json",
+           ],
         }
 
     All items are optional.  Files for `config_data` should be in the config_data section,
@@ -300,6 +305,7 @@ class AssemblyInputBundle:
         default_factory=list
     )
     bootfs_files_package: Optional[FilePath] = None
+    memory_buckets: Set[FilePath] = field(default_factory=set)
 
     def __repr__(self) -> str:
         """Serialize to a JSON string"""
@@ -326,6 +332,8 @@ class AssemblyInputBundle:
             file_paths.extend([entry.source for entry in entries])
         if self.blobs is not None:
             file_paths.extend(self.blobs)
+        if self.memory_buckets:
+            file_paths.extend(self.memory_buckets)
 
         for package in self.packages_to_compile:
             file_paths.extend(package.includes)
@@ -436,6 +444,9 @@ class AIBCreator:
         # scope, or directly set by the legacy AIB creator.
         self.compiled_packages: List[CompiledPackageDefinitionFromGN] = list()
 
+        # Memory buckets to add to memory monitor.
+        self.memory_buckets: Set[FilePath] = set()
+
         # The package copying mechanism.
         self.package_copier: PackageCopier = PackageCopier(outdir)
 
@@ -499,6 +510,17 @@ class AIBCreator:
                 _,
             ) = self.package_copier.add_package(self.bootfs_files_package)
             result.bootfs_files_package = bootfs_pkg_manifest_path
+
+        # Copy the memory bucket entries
+        _memory_buckets_entries = [
+            FileEntry(src, os.path.basename(src)) for src in self.memory_buckets
+        ]
+        (memory_buckets, memory_buckets_deps) = self._copy_file_entries(
+            _memory_buckets_entries, "memory_buckets"
+        )
+        memory_buckets = [entry.source for entry in memory_buckets]
+        deps.update(memory_buckets_deps)
+        result.memory_buckets.update(memory_buckets)
 
         # Add shell_commands field to assembly_config.json field in AIBCreator
         result.shell_commands = self.shell_commands

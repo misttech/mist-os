@@ -271,6 +271,11 @@ Resulting product is not supported and may misbehave!
     // Add product-specified packages and configuration
     builder.add_product_packages(product.packages).context("Adding product-provided packages")?;
 
+    // Add product-specified memory buckets.
+    if let Some(buckets) = platform.diagnostics.memory_monitor.buckets {
+        builder.add_memory_buckets(&vec![buckets])?;
+    }
+
     // Add any packages compiled by the assembly process itself
     for package in configuration.compiled_packages.values() {
         builder

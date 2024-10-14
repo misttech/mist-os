@@ -102,6 +102,9 @@ def create_bundle(args: argparse.Namespace) -> None:
     if args.qemu_kernel:
         aib_creator.qemu_kernel = args.qemu_kernel
 
+    if args.memory_buckets:
+        add_memory_buckets(aib_creator, args.memory_buckets)
+
     # Create the AIB itself.
     (assembly_input_bundle, assembly_config, deps) = aib_creator.build()
 
@@ -137,6 +140,15 @@ def add_kernel_cmdline_from_file(
         if cmd in aib_creator.kernel.args:
             raise ValueError(f"duplicate kernel cmdline arg found: {cmd}")
         aib_creator.kernel.args.add(cmd)
+
+
+def add_memory_buckets(
+    aib_creator: AIBCreator, memory_buckets: list[str]
+) -> None:
+    for memory_bucket in memory_buckets:
+        if memory_bucket in aib_creator.memory_buckets:
+            raise ValueError(f"duplicate memory bucket found: {memory_bucket}")
+        aib_creator.memory_buckets.add(memory_bucket)
 
 
 def add_driver_list_from_file(
@@ -534,6 +546,11 @@ def main() -> int:
         "--compiled-packages",
         type=argparse.FileType("r"),
         help="Path to a json file of compiled package configuration",
+    )
+    bundle_creation_parser.add_argument(
+        "--memory-buckets",
+        action="append",
+        help="Path to a json file of memory buckets",
     )
 
     bundle_creation_parser.set_defaults(handler=create_bundle)

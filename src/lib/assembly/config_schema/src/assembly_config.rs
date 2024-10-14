@@ -114,6 +114,11 @@ pub struct AssemblyInputBundle {
     /// A package that includes files to include in bootfs.
     #[serde(default)]
     pub bootfs_files_package: Option<Utf8PathBuf>,
+
+    /// A list of memory buckets to pass to memory monitor.
+    #[file_relative_paths]
+    #[serde(default)]
+    pub memory_buckets: Vec<FileRelativePathBuf>,
 }
 
 /// Contents of a compiled package. The contents provided by all
@@ -518,7 +523,10 @@ mod tests {
                     ],
                     includes: [ "src/path/to/include.cml" ]
                 },
-               ]
+              ],
+              memory_buckets: [
+                "path/to/buckets.json",
+              ],
             }
         "#;
         let bundle =
@@ -572,6 +580,10 @@ mod tests {
                 PackageInternalPathBuf::from("path/to/binary1"),
                 PackageInternalPathBuf::from("path/to/binary2"),
             ])
+        );
+        assert_eq!(
+            bundle.memory_buckets,
+            vec![FileRelativePathBuf::FileRelative("path/to/buckets.json".into())]
         );
     }
 

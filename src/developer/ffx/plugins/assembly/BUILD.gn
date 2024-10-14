@@ -77,6 +77,7 @@ ffx_plugin("ffx_assembly") {
     "//src/lib/assembly/fvm",
     "//src/lib/assembly/fxfs",
     "//src/lib/assembly/images_config",
+    "//src/lib/assembly/memory_buckets",
     "//src/lib/assembly/named_file_map",
     "//src/lib/assembly/package_copy",
     "//src/lib/assembly/package_list",
