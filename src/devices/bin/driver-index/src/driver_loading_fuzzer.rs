@@ -11,7 +11,7 @@ use {fuchsia_async as fasync, zx};
 
 pub struct Session {
     sender: futures::channel::mpsc::UnboundedSender<Vec<ResolvedDriver>>,
-    max_delay: zx::Duration,
+    max_delay: zx::MonotonicDuration,
     shuffled_boot_drivers: Vec<ResolvedDriver>,
     rng: SmallRng,
 }
@@ -20,7 +20,7 @@ impl Session {
     pub fn new(
         sender: futures::channel::mpsc::UnboundedSender<Vec<ResolvedDriver>>,
         mut boot_drivers: Vec<ResolvedDriver>,
-        max_delay: zx::Duration,
+        max_delay: zx::MonotonicDuration,
         seed: Option<u64>,
     ) -> Session {
         let seed_val = seed.unwrap_or(rand::random::<u64>());
@@ -56,7 +56,7 @@ impl Session {
                 let delay = if max_load_delay.into_millis() == 0 {
                     max_load_delay
                 } else {
-                    zx::Duration::from_millis(
+                    zx::MonotonicDuration::from_millis(
                         (self.rng.next_u32() as i64) % max_load_delay.into_millis(),
                     )
                 };
@@ -127,7 +127,7 @@ mod tests {
         let session = Session::new(
             sender,
             test_boot_repo.clone(),
-            zx::Duration::from_millis(10),
+            zx::MonotonicDuration::from_millis(10),
             Some(test_seed),
         );
         session.run().await;

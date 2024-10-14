@@ -56,7 +56,7 @@ const METADATA_KEY: Aes256Key = Aes256Key::create([
     0x8e, 0xea, 0xd8, 0x05, 0xc4, 0xc9, 0x0b, 0xa8, 0xd8, 0x85, 0x87, 0x50, 0x75, 0x40, 0x1c, 0x4c,
 ]);
 
-const INSPECT_POLL_INTERVAL: zx::Duration = zx::Duration::from_seconds(1);
+const INSPECT_POLL_INTERVAL: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(1);
 
 fn print_inspect_data(data: &DiagnosticsHierarchy) {
     match serde_json::to_string_pretty(&data) {

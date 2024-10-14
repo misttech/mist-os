@@ -19,7 +19,7 @@ use futures::StreamExt;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
-use zx::Duration;
+use zx::MonotonicDuration;
 
 const PROGRESS_GRANULARITY: f32 = 1000.0;
 
@@ -33,7 +33,10 @@ pub enum ProgressBarConfig {
 // Progress is [0.0..1.0[
 pub enum ProgressBarMessages {
     SetProgress(/* progress*/ f32),
-    SetProgressSmooth(/* progress */ f32, /* time to get to progress */ Duration),
+    SetProgressSmooth(
+        /* progress */ f32,
+        /* time to get to progress */ MonotonicDuration,
+    ),
     SetInternalProgress(f32),
     SetProgressBarText(String),
 }
@@ -121,7 +124,11 @@ impl ProgressBar {
     }
 
     pub fn set_percent_smooth(&mut self, view_key: ViewKey, percent_complete: f32) {
-        self.set_progress_smooth(view_key, percent_complete / 100.0, Duration::from_seconds(1));
+        self.set_progress_smooth(
+            view_key,
+            percent_complete / 100.0,
+            MonotonicDuration::from_seconds(1),
+        );
     }
 
     /// Set progress from 0.0 to 1.0
@@ -129,7 +136,7 @@ impl ProgressBar {
         &mut self,
         view_key: ViewKey,
         progress: f32,
-        elapsed_time: Duration,
+        elapsed_time: MonotonicDuration,
     ) {
         let progress = (progress * PROGRESS_GRANULARITY) as u32;
         let current_progress = self.current_progress.load(Ordering::Acquire);
@@ -145,7 +152,7 @@ impl ProgressBar {
             let (tx, mut rx) = pipe::<(u32, i64)>(1);
             self.task_sender = Some(tx);
             let f = async move {
-                let mut sleep_time = Duration::from_millis(step_time_ms);
+                let mut sleep_time = MonotonicDuration::from_millis(step_time_ms);
                 loop {
                     let current = current_progress.load(Ordering::Acquire);
 
@@ -153,13 +160,13 @@ impl ProgressBar {
                     let difference = end as i64 - current as i64;
                     if difference == 0 {
                         let (progress, step_time_ms) = rx.next().await.unwrap();
-                        sleep_time = Duration::from_millis(step_time_ms);
+                        sleep_time = MonotonicDuration::from_millis(step_time_ms);
                         final_progress.store(progress as u32, Ordering::Release);
                     } else {
                         match rx.try_next() {
                             Ok(value) => {
                                 if let Some((progress, step_time_ms)) = value {
-                                    sleep_time = Duration::from_millis(step_time_ms);
+                                    sleep_time = MonotonicDuration::from_millis(step_time_ms);
                                     final_progress.store(progress as u32, Ordering::Release);
                                 }
                             }

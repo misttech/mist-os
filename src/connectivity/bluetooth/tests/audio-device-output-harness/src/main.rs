@@ -26,8 +26,8 @@ async fn main() -> Result<(), anyhow::Error> {
         "AudioOutHarness",
         LOCAL_MONOTONIC_CLOCK_DOMAIN,
         pcm_format,
-        zx::Duration::from_millis(10),
-        zx::Duration::from_millis(0),
+        zx::MonotonicDuration::from_millis(10),
+        zx::MonotonicDuration::from_millis(0),
     )?;
 
     // Spawn a task to read all the frames from the audio.

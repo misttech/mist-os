@@ -188,7 +188,7 @@ mod tests {
         SendExecutor::new(2).run(async {
             // The timer will only fire on one thread, so use one so we can get to a point where
             // only one thread is running.
-            Timer::new(zx::Duration::from_millis(10)).await;
+            Timer::new(zx::MonotonicDuration::from_millis(10)).await;
 
             let (tx, rx) = oneshot::channel();
             let pair = Arc::new((Mutex::new(false), Condvar::new()));

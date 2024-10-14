@@ -840,7 +840,9 @@ pub async fn get_dynamic_linker<'a>(
     const LDSO_LOAD_TIMEOUT_SEC: i64 = 30;
     let load_fut =
         ldsvc.load_object(interp_str).map_err(ProcessBuilderError::LoadDynamicLinker).on_timeout(
-            fasync::MonotonicInstant::after(zx::Duration::from_seconds(LDSO_LOAD_TIMEOUT_SEC)),
+            fasync::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(
+                LDSO_LOAD_TIMEOUT_SEC,
+            )),
             || Err(ProcessBuilderError::LoadDynamicLinkerTimeout()),
         );
     let (status, ld_vmo) = load_fut.await?;

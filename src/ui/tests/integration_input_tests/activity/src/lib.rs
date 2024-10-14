@@ -24,13 +24,13 @@ use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstan
 use futures::{future, StreamExt};
 use std::pin::pin;
 use test_case::test_case;
-use zx::Duration;
+use zx::MonotonicDuration;
 
 const TEST_UI_STACK: &str = "ui";
 const TEST_UI_STACK_URL: &str = "#meta/test-ui-stack.cm";
 
 // Set a maximum bound test timeout.
-const TEST_TIMEOUT: Duration = Duration::from_seconds(30);
+const TEST_TIMEOUT: MonotonicDuration = MonotonicDuration::from_seconds(30);
 
 async fn assemble_realm(suspend_enabled: bool) -> RealmInstance {
     let builder = RealmBuilder::new().await.expect("Failed to create RealmBuilder.");

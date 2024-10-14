@@ -36,9 +36,10 @@ pub mod scoring_functions;
 pub const CONNECTION_SELECTION_REQUEST_BUFFER_SIZE: usize = 100;
 const INSPECT_EVENT_LIMIT_FOR_CONNECTION_SELECTIONS: usize = 10;
 
-const RECENT_DISCONNECT_WINDOW: zx::Duration = zx::Duration::from_seconds(60 * 15);
-const RECENT_FAILURE_WINDOW: zx::Duration = zx::Duration::from_seconds(60 * 5);
-const SHORT_CONNECT_DURATION: zx::Duration = zx::Duration::from_seconds(7 * 60);
+const RECENT_DISCONNECT_WINDOW: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_seconds(60 * 15);
+const RECENT_FAILURE_WINDOW: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(60 * 5);
+const SHORT_CONNECT_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(7 * 60);
 
 #[derive(Clone)]
 pub struct ConnectionSelectionRequester {

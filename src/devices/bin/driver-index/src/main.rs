@@ -79,7 +79,7 @@ fn create_and_setup_index(boot_drivers: Vec<ResolvedDriver>, config: &Config) ->
         Session::new(
             sender,
             boot_drivers,
-            zx::Duration::from_millis(config.driver_load_fuzzer_max_delay_ms),
+            zx::MonotonicDuration::from_millis(config.driver_load_fuzzer_max_delay_ms),
             None,
         ),
     );
@@ -756,7 +756,8 @@ mod tests {
         indexer: Rc<Indexer>,
         stream: DriverIndexRequestStream,
     ) -> Result<()> {
-        return run_index_server_with_timeout(indexer, stream, zx::Duration::INFINITE).await;
+        return run_index_server_with_timeout(indexer, stream, zx::MonotonicDuration::INFINITE)
+            .await;
     }
 
     async fn execute_driver_index_test(
@@ -795,9 +796,13 @@ mod tests {
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
         let index = Rc::new(Indexer::new(vec![], BaseRepo::Resolved(std::vec![]), false));
-        run_index_server_with_timeout(index.clone(), stream, zx::Duration::from_millis(10))
-            .await
-            .unwrap();
+        run_index_server_with_timeout(
+            index.clone(),
+            stream,
+            zx::MonotonicDuration::from_millis(10),
+        )
+        .await
+        .unwrap();
 
         let result =
             proxy.add_composite_node_spec(&fdf::CompositeNodeSpec { ..Default::default() }).await;

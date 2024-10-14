@@ -12,21 +12,26 @@ use fidl_fuchsia_bluetooth_gatt2::{
     RemoteServiceProxy, RemoteServiceRequest, RemoteServiceRequestStream, ServiceHandle,
 };
 use fuchsia_bluetooth::types::Uuid;
-use zx::Duration;
+use zx::MonotonicDuration;
 
 /// Provides a simple mock implementation of `fuchsia.bluetooth.gatt2.RemoteService`.
 pub struct RemoteServiceMock {
     stream: RemoteServiceRequestStream,
-    timeout: Duration,
+    timeout: MonotonicDuration,
 }
 
 impl RemoteServiceMock {
-    pub fn new(timeout: Duration) -> Result<(RemoteServiceProxy, RemoteServiceMock), Error> {
+    pub fn new(
+        timeout: MonotonicDuration,
+    ) -> Result<(RemoteServiceProxy, RemoteServiceMock), Error> {
         let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<RemoteServiceMarker>()?;
         Ok((proxy, RemoteServiceMock { stream, timeout }))
     }
 
-    pub fn from_stream(stream: RemoteServiceRequestStream, timeout: Duration) -> RemoteServiceMock {
+    pub fn from_stream(
+        stream: RemoteServiceRequestStream,
+        timeout: MonotonicDuration,
+    ) -> RemoteServiceMock {
         RemoteServiceMock { stream, timeout }
     }
 
@@ -99,11 +104,11 @@ impl RemoteServiceMock {
 /// to connect to GATT services.
 pub struct ClientMock {
     stream: ClientRequestStream,
-    timeout: Duration,
+    timeout: MonotonicDuration,
 }
 
 impl ClientMock {
-    pub fn new(timeout: Duration) -> Result<(ClientProxy, ClientMock), Error> {
+    pub fn new(timeout: MonotonicDuration) -> Result<(ClientProxy, ClientMock), Error> {
         let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ClientMarker>()?;
         Ok((proxy, ClientMock { stream, timeout }))
     }

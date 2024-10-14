@@ -626,13 +626,13 @@ impl ComponentInstance {
                 let started_timestamp_monotonic = started.timestamp_monotonic;
                 let stop_timer = Box::pin(async move {
                     let timer = fasync::Timer::new(fasync::MonotonicInstant::after(
-                        zx::Duration::from(self.environment.stop_timeout()),
+                        zx::MonotonicDuration::from(self.environment.stop_timeout()),
                     ));
                     timer.await;
                 });
                 let kill_timer = Box::pin(async move {
                     let timer = fasync::Timer::new(fasync::MonotonicInstant::after(
-                        zx::Duration::from(DEFAULT_KILL_TIMEOUT),
+                        zx::MonotonicDuration::from(DEFAULT_KILL_TIMEOUT),
                     ));
                     timer.await;
                 });
@@ -2704,7 +2704,7 @@ pub mod tests {
         test_topology.runner.add_host_fn("test:///root_resolved", root_out_dir.host_fn());
 
         // Configure the component runner to take 3 seconds to stop the component.
-        let response_delay = zx::Duration::from_seconds(3);
+        let response_delay = zx::MonotonicDuration::from_seconds(3);
         test_topology.runner.add_controller_response(
             "test:///root_resolved",
             Box::new(move || ControllerActionResponse {

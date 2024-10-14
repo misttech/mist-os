@@ -24,7 +24,7 @@ use fuchsia_runtime::UtcInstant;
 
 /// A special `Duration` that will match any value during an `eq_with_any` operation.
 #[cfg(test)]
-pub const ANY_DURATION: zx::Duration = zx::Duration::from_nanos(i64::MIN);
+pub const ANY_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_nanos(i64::MIN);
 
 /// A special instant that will match any value during an `eq_with_any` operation.
 #[cfg(test)]
@@ -54,7 +54,7 @@ pub enum Event {
         /// The estimated UTC corresponding to monotonic.
         utc: UtcInstant,
         /// Square root of element [0,0] of the covariance matrix.
-        sqrt_covariance: zx::Duration,
+        sqrt_covariance: zx::MonotonicDuration,
     },
     /// A partially completed frequency window was discarded without being used.
     FrequencyWindowDiscarded { track: Track, reason: FrequencyDiscardReason },
@@ -72,7 +72,11 @@ pub enum Event {
     },
     /// A strategy has been determined to align the userspace clock with the estimated UTC.
     /// This will be followed by zero or more `UpdateClock` events to implement the strategy.
-    ClockCorrection { track: Track, correction: zx::Duration, strategy: ClockCorrectionStrategy },
+    ClockCorrection {
+        track: Track,
+        correction: zx::MonotonicDuration,
+        strategy: ClockCorrectionStrategy,
+    },
     /// An attempt was made to write to the real time clock.
     WriteRtc { outcome: WriteRtcOutcome },
     /// The userspace clock has been started for the first time.

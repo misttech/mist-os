@@ -138,8 +138,9 @@ impl<'a, S: Write> SerialWriter<'a, S> {
         write!(
             &mut this,
             "[{:05}.{:03}] {:05}:{:05}> [",
-            zx::Duration::from_nanos(log.metadata.timestamp.into_nanos()).into_seconds(),
-            zx::Duration::from_nanos(log.metadata.timestamp.into_nanos()).into_millis() % 1000,
+            zx::MonotonicDuration::from_nanos(log.metadata.timestamp.into_nanos()).into_seconds(),
+            zx::MonotonicDuration::from_nanos(log.metadata.timestamp.into_nanos()).into_millis()
+                % 1000,
             log.pid().unwrap_or(0),
             log.tid().unwrap_or(0)
         )?;

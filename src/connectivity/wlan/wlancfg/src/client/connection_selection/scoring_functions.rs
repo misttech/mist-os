@@ -191,7 +191,7 @@ mod test {
 
     fn past_connection_with_bssid_uptime(
         bssid: types::Bssid,
-        uptime: zx::Duration,
+        uptime: zx::MonotonicDuration,
     ) -> PastConnectionData {
         PastConnectionData {
             bssid,
@@ -219,8 +219,8 @@ mod test {
             ..generate_random_bss()
         };
         let mut internal_data = generate_random_saved_network_data();
-        let short_uptime = zx::Duration::from_seconds(30);
-        let okay_uptime = zx::Duration::from_minutes(100);
+        let short_uptime = zx::MonotonicDuration::from_seconds(30);
+        let okay_uptime = zx::MonotonicDuration::from_minutes(100);
         // Record a short uptime for the worse network and a long enough uptime for the better one.
         let short_uptime_data = past_connection_with_bssid_uptime(bss_worse.bssid, short_uptime);
         let okay_uptime_data = past_connection_with_bssid_uptime(bss_better.bssid, okay_uptime);
@@ -346,7 +346,7 @@ mod test {
                 reason: FailureReason::CredentialRejected,
             });
         }
-        let short_uptime = zx::Duration::from_seconds(30);
+        let short_uptime = zx::MonotonicDuration::from_seconds(30);
         let data = past_connection_with_bssid_uptime(bss.bssid, short_uptime);
         for _ in 0..10 {
             internal_data.past_connections.add(bss.bssid, data);

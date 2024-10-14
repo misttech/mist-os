@@ -136,7 +136,7 @@ pub struct PastConnectionData {
     /// Time at which the connection was ended
     pub disconnect_time: fasync::MonotonicInstant,
     /// The time that the connection was up - from established to disconnected.
-    pub connection_uptime: zx::Duration,
+    pub connection_uptime: zx::MonotonicDuration,
     /// Cause of disconnect or failure to connect
     pub disconnect_reason: client_types::DisconnectReason,
     /// Final signal strength measure before disconnect
@@ -149,7 +149,7 @@ impl PastConnectionData {
     pub fn new(
         bssid: client_types::Bssid,
         disconnect_time: fasync::MonotonicInstant,
-        connection_uptime: zx::Duration,
+        connection_uptime: zx::MonotonicDuration,
         disconnect_reason: client_types::DisconnectReason,
         signal_at_disconnect: client_types::Signal,
         average_tx_rate: u32,
@@ -1100,14 +1100,14 @@ mod tests {
         // Add two failures for BSSID_1
         let bssid_1 = client_types::Bssid::from([1; 6]);
         let failure_1_bssid_1 = ConnectFailure {
-            time: curr_time - zx::Duration::from_seconds(10),
+            time: curr_time - zx::MonotonicDuration::from_seconds(10),
             bssid: bssid_1,
             reason: FailureReason::GeneralFailure,
         };
         connect_failures.add(bssid_1, failure_1_bssid_1);
 
         let failure_2_bssid_1 = ConnectFailure {
-            time: curr_time - zx::Duration::from_seconds(5),
+            time: curr_time - zx::MonotonicDuration::from_seconds(5),
             bssid: bssid_1,
             reason: FailureReason::CredentialRejected,
         };
@@ -1115,14 +1115,15 @@ mod tests {
 
         // Verify get_recent_for_network(curr_time - 10) retrieves both entries
         assert_eq!(
-            connect_failures.get_recent_for_network(curr_time - zx::Duration::from_seconds(10)),
+            connect_failures
+                .get_recent_for_network(curr_time - zx::MonotonicDuration::from_seconds(10)),
             vec![failure_1_bssid_1, failure_2_bssid_1]
         );
 
         // Add one failure for BSSID_2
         let bssid_2 = client_types::Bssid::from([2; 6]);
         let failure_1_bssid_2 = ConnectFailure {
-            time: curr_time - zx::Duration::from_seconds(3),
+            time: curr_time - zx::MonotonicDuration::from_seconds(3),
             bssid: bssid_2,
             reason: FailureReason::GeneralFailure,
         };
@@ -1130,13 +1131,15 @@ mod tests {
 
         // Verify get_recent_for_network(curr_time - 10) includes entries from both BSSIDs
         assert_eq!(
-            connect_failures.get_recent_for_network(curr_time - zx::Duration::from_seconds(10)),
+            connect_failures
+                .get_recent_for_network(curr_time - zx::MonotonicDuration::from_seconds(10)),
             vec![failure_1_bssid_1, failure_2_bssid_1, failure_1_bssid_2]
         );
 
         // Verify get_recent_for_network(curr_time - 9) excludes older entries
         assert_eq!(
-            connect_failures.get_recent_for_network(curr_time - zx::Duration::from_seconds(9)),
+            connect_failures
+                .get_recent_for_network(curr_time - zx::MonotonicDuration::from_seconds(9)),
             vec![failure_2_bssid_1, failure_1_bssid_2]
         );
 
@@ -1184,7 +1187,7 @@ mod tests {
         // Add to list, exceeding the capacity by one entry
         for i in 0..connect_failures.0.capacity() + 1 {
             connect_failures.add(ConnectFailure {
-                time: curr_time + zx::Duration::from_seconds(i as i64),
+                time: curr_time + zx::MonotonicDuration::from_seconds(i as i64),
                 reason: FailureReason::GeneralFailure,
                 bssid: client_types::Bssid::from([1; 6]),
             })
@@ -1192,7 +1195,7 @@ mod tests {
 
         // Validate entry with time = curr_time was evicted.
         for (i, e) in connect_failures.0.iter().enumerate() {
-            assert_eq!(e.time, curr_time + zx::Duration::from_seconds(i as i64 + 1));
+            assert_eq!(e.time, curr_time + zx::MonotonicDuration::from_seconds(i as i64 + 1));
         }
     }
 
@@ -1204,38 +1207,39 @@ mod tests {
         // Add two past_connections for BSSID_1
         let mut data_1_bssid_1 = random_connection_data();
         let bssid_1 = data_1_bssid_1.bssid;
-        data_1_bssid_1.disconnect_time = curr_time - zx::Duration::from_seconds(10);
+        data_1_bssid_1.disconnect_time = curr_time - zx::MonotonicDuration::from_seconds(10);
 
         past_connections_list.add(bssid_1, data_1_bssid_1);
 
         let mut data_2_bssid_1 = random_connection_data();
         data_2_bssid_1.bssid = bssid_1;
-        data_2_bssid_1.disconnect_time = curr_time - zx::Duration::from_seconds(5);
+        data_2_bssid_1.disconnect_time = curr_time - zx::MonotonicDuration::from_seconds(5);
         past_connections_list.add(bssid_1, data_2_bssid_1);
 
         // Verify get_recent_for_network(curr_time - 10) retrieves both entries
         assert_eq!(
             past_connections_list
-                .get_recent_for_network(curr_time - zx::Duration::from_seconds(10)),
+                .get_recent_for_network(curr_time - zx::MonotonicDuration::from_seconds(10)),
             vec![data_1_bssid_1, data_2_bssid_1]
         );
 
         // Add one past_connection for BSSID_2
         let mut data_1_bssid_2 = random_connection_data();
         let bssid_2 = data_1_bssid_2.bssid;
-        data_1_bssid_2.disconnect_time = curr_time - zx::Duration::from_seconds(3);
+        data_1_bssid_2.disconnect_time = curr_time - zx::MonotonicDuration::from_seconds(3);
         past_connections_list.add(bssid_2, data_1_bssid_2);
 
         // Verify get_recent_for_network(curr_time - 10) includes entries from both BSSIDs
         assert_eq!(
             past_connections_list
-                .get_recent_for_network(curr_time - zx::Duration::from_seconds(10)),
+                .get_recent_for_network(curr_time - zx::MonotonicDuration::from_seconds(10)),
             vec![data_1_bssid_1, data_2_bssid_1, data_1_bssid_2]
         );
 
         // Verify get_recent_for_network(curr_time - 9) excludes older entries
         assert_eq!(
-            past_connections_list.get_recent_for_network(curr_time - zx::Duration::from_seconds(9)),
+            past_connections_list
+                .get_recent_for_network(curr_time - zx::MonotonicDuration::from_seconds(9)),
             vec![data_2_bssid_1, data_1_bssid_2]
         );
 
@@ -1263,13 +1267,16 @@ mod tests {
         for i in 0..past_connections_list.0.capacity() + 1 {
             let mut data = random_connection_data();
             data.bssid = client_types::Bssid::from([1; 6]);
-            data.disconnect_time = curr_time + zx::Duration::from_seconds(i as i64);
+            data.disconnect_time = curr_time + zx::MonotonicDuration::from_seconds(i as i64);
             past_connections_list.add(data);
         }
 
         // Validate entry with time = curr_time was evicted.
         for (i, e) in past_connections_list.0.iter().enumerate() {
-            assert_eq!(e.disconnect_time, curr_time + zx::Duration::from_seconds(i as i64 + 1));
+            assert_eq!(
+                e.disconnect_time,
+                curr_time + zx::MonotonicDuration::from_seconds(i as i64 + 1)
+            );
         }
     }
 
@@ -1289,13 +1296,13 @@ mod tests {
         assert_variant!(past_connections_list.get_recent(curr_time).as_slice(), [data] => {
             assert_eq!(data, &past_connection_data.clone());
         });
-        let earlier_time = curr_time - zx::Duration::from_seconds(1);
+        let earlier_time = curr_time - zx::MonotonicDuration::from_seconds(1);
         assert_variant!(past_connections_list.get_recent(earlier_time).as_slice(), [data] => {
             assert_eq!(data, &data.clone());
         });
         // The results should be empty if the requested time is after the latest past connection's
         // time.
-        let later_time = curr_time + zx::Duration::from_seconds(1);
+        let later_time = curr_time + zx::MonotonicDuration::from_seconds(1);
         assert!(past_connections_list.get_recent(later_time).is_empty());
     }
 

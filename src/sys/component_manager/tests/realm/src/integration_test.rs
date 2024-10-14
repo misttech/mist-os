@@ -310,7 +310,7 @@ pub async fn echo_server() {
             assert_eq!(entries, expected_entries);
             break;
         }
-        fasync::Timer::new(zx::Duration::from_millis(100).after_now()).await;
+        fasync::Timer::new(zx::MonotonicDuration::from_millis(100).after_now()).await;
     }
 }
 

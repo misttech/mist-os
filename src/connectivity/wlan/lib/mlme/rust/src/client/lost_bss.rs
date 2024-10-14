@@ -6,15 +6,15 @@
 /// when trigger auto deauth.
 #[derive(Debug)]
 pub struct LostBssCounter {
-    /// beacon_period in zx::Duration as obtained from the AP, used to convert beacon_count to time.
-    beacon_period: zx::Duration,
+    /// beacon_period in zx::MonotonicDuration as obtained from the AP, used to convert beacon_count to time.
+    beacon_period: zx::MonotonicDuration,
 
     /// The number of beacon periods where client doesn't receive a single beacon frame
     /// before it declares BSS as lost.
-    full_timeout: zx::Duration,
+    full_timeout: zx::MonotonicDuration,
 
     /// Number of intervals since we last saw a beacon. Reset to 0 as soon as we see a beacon.
-    time_since_last_beacon: zx::Duration,
+    time_since_last_beacon: zx::MonotonicDuration,
 }
 
 /// In a typical use case, a full association status check interval is added every time the timeout
@@ -22,16 +22,16 @@ pub struct LostBssCounter {
 /// during this period. To counter this effect, call should_deauthenticate() before calling
 /// add_beacon_interval().
 impl LostBssCounter {
-    pub fn start(beacon_period: zx::Duration, full_timeout_beacon_count: u32) -> Self {
+    pub fn start(beacon_period: zx::MonotonicDuration, full_timeout_beacon_count: u32) -> Self {
         Self {
             beacon_period: beacon_period.clone(),
             full_timeout: beacon_period * full_timeout_beacon_count as i64,
-            time_since_last_beacon: zx::Duration::from_nanos(0),
+            time_since_last_beacon: zx::MonotonicDuration::from_nanos(0),
         }
     }
 
     pub fn reset(&mut self) {
-        self.time_since_last_beacon = zx::Duration::from_nanos(0);
+        self.time_since_last_beacon = zx::MonotonicDuration::from_nanos(0);
     }
 
     /// In the most typical use case, a full association status check interval is added when
@@ -48,7 +48,7 @@ impl LostBssCounter {
 
     /// add_time() is used to record any time that is shorter than a full status check interval.
     /// (typically when the client goes off-channel to scan while associated).
-    pub fn add_time(&mut self, time: zx::Duration) {
+    pub fn add_time(&mut self, time: zx::MonotonicDuration) {
         self.time_since_last_beacon += time;
     }
 }
@@ -58,7 +58,8 @@ mod tests {
     use super::*;
     use wlan_common::time::TimeUnit;
 
-    const TEST_BEACON_PERIOD: zx::Duration = zx::Duration::from_micros(TimeUnit(42).into_micros());
+    const TEST_BEACON_PERIOD: zx::MonotonicDuration =
+        zx::MonotonicDuration::from_micros(TimeUnit(42).into_micros());
     const TEST_TIMEOUT_BCN_COUNT: u32 = 1000;
 
     #[test]
@@ -94,10 +95,12 @@ mod tests {
     fn test_add_time_uninterrupted() {
         let mut counter = LostBssCounter::start(TEST_BEACON_PERIOD, TEST_TIMEOUT_BCN_COUNT);
         // about to timeout but not yet.
-        counter.add_time(TEST_BEACON_PERIOD * TEST_TIMEOUT_BCN_COUNT - zx::Duration::from_nanos(1));
+        counter.add_time(
+            TEST_BEACON_PERIOD * TEST_TIMEOUT_BCN_COUNT - zx::MonotonicDuration::from_nanos(1),
+        );
         assert!(!counter.should_deauthenticate());
         // any more time will trigger auto deauth
-        counter.add_time(zx::Duration::from_nanos(1));
+        counter.add_time(zx::MonotonicDuration::from_nanos(1));
         assert!(counter.should_deauthenticate());
     }
 

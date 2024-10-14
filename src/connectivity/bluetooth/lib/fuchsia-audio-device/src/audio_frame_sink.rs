@@ -144,7 +144,7 @@ mod tests {
             "UnitTest",
             TEST_CLOCK_DOMAIN,
             format,
-            zx::Duration::from_millis(100),
+            zx::MonotonicDuration::from_millis(100),
         )
         .expect("should always build");
         test(exec, client.into_proxy().expect("channel should be available"), frame_sink)
@@ -272,7 +272,7 @@ mod tests {
         exec.run_until_stalled(&mut write_fut).expect_pending("buffer is full");
 
         // Run the ring buffer for a bit over half a second.
-        exec.set_fake_time(fasync::MonotonicInstant::after(zx::Duration::from_millis(500)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(zx::MonotonicDuration::from_millis(500)));
         let _ = exec.wake_expired_timers();
 
         // Should be able to write again now.

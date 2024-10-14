@@ -78,7 +78,8 @@ async fn escrow_inspect_data() {
         if data.is_empty() {
             break;
         }
-        fasync::Timer::new(zx::MonotonicInstant::after(zx::Duration::from_millis(100))).await;
+        fasync::Timer::new(zx::MonotonicInstant::after(zx::MonotonicDuration::from_millis(100)))
+            .await;
     }
 }
 

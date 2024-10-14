@@ -1084,7 +1084,8 @@ async fn destroying_instance_blocks_on_routing() {
     // Give the destroy action some time to complete. Sleeping is not an ideal testing strategy,
     // but it helps add confidence to the test because it makes it more likely the test would
     // fail if the destroy action is not correctly blocking on the routing task.
-    fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_seconds(5))).await;
+    fasync::Timer::new(fasync::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(5)))
+        .await;
 
     // Wait until routing reaches resolution. It should get here because `Destroy` should not
     // cancel the routing task.
@@ -3237,7 +3238,7 @@ async fn source_component_stopping_when_routing() {
     test_topology.runner.add_host_fn("test:///root_resolved", root_out_dir.host_fn());
 
     // Configure the component runner to take 3 seconds to stop the component.
-    let response_delay = zx::Duration::from_seconds(3);
+    let response_delay = zx::MonotonicDuration::from_seconds(3);
     test_topology.runner.add_controller_response(
         "test:///root_resolved",
         Box::new(move || ControllerActionResponse {

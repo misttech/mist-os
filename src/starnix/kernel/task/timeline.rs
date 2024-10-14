@@ -68,7 +68,7 @@ impl TargetTime {
         }
     }
 
-    pub fn itimerspec(&self, interval: zx::Duration) -> itimerspec {
+    pub fn itimerspec(&self, interval: zx::MonotonicDuration) -> itimerspec {
         match self {
             TargetTime::Monotonic(t) | TargetTime::BootInstant(t) => {
                 itimerspec_from_deadline_interval(*t, interval)
@@ -87,7 +87,7 @@ impl TargetTime {
 
     /// Find the difference between this time and `rhs`. Returns `None` if the timelines don't
     /// match.
-    pub fn delta(&self, rhs: &Self) -> Option<zx::Duration> {
+    pub fn delta(&self, rhs: &Self) -> Option<zx::MonotonicDuration> {
         match (*self, *rhs) {
             (TargetTime::Monotonic(lhs), TargetTime::Monotonic(rhs)) => Some(lhs - rhs),
             (TargetTime::BootInstant(lhs), TargetTime::BootInstant(rhs)) => Some(lhs - rhs),
@@ -97,9 +97,9 @@ impl TargetTime {
     }
 }
 
-impl std::ops::Add<zx::Duration> for TargetTime {
+impl std::ops::Add<zx::MonotonicDuration> for TargetTime {
     type Output = Self;
-    fn add(self, rhs: zx::Duration) -> Self {
+    fn add(self, rhs: zx::MonotonicDuration) -> Self {
         match self {
             Self::RealTime(t) => Self::RealTime(t + rhs),
             Self::Monotonic(t) => Self::Monotonic(t + rhs),
@@ -108,13 +108,13 @@ impl std::ops::Add<zx::Duration> for TargetTime {
     }
 }
 
-impl std::ops::Sub<zx::Duration> for TargetTime {
-    type Output = zx::Duration;
-    fn sub(self, rhs: zx::Duration) -> Self::Output {
+impl std::ops::Sub<zx::MonotonicDuration> for TargetTime {
+    type Output = zx::MonotonicDuration;
+    fn sub(self, rhs: zx::MonotonicDuration) -> Self::Output {
         match self {
-            TargetTime::Monotonic(t) => zx::Duration::from_nanos((t - rhs).into_nanos()),
-            TargetTime::RealTime(t) => zx::Duration::from_nanos((t - rhs).into_nanos()),
-            TargetTime::BootInstant(t) => zx::Duration::from_nanos((t - rhs).into_nanos()),
+            TargetTime::Monotonic(t) => zx::MonotonicDuration::from_nanos((t - rhs).into_nanos()),
+            TargetTime::RealTime(t) => zx::MonotonicDuration::from_nanos((t - rhs).into_nanos()),
+            TargetTime::BootInstant(t) => zx::MonotonicDuration::from_nanos((t - rhs).into_nanos()),
         }
     }
 }

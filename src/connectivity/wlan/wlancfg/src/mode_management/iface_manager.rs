@@ -1018,7 +1018,7 @@ async fn handle_automatic_connection_selection_results(
     }
 
     *connectivity_monitor_timer =
-        fasync::Interval::new(zx::Duration::from_seconds(*reconnect_monitor_interval));
+        fasync::Interval::new(zx::MonotonicDuration::from_seconds(*reconnect_monitor_interval));
 }
 
 /// Handles results of a connect request connection selection, including attempting to connect and
@@ -1480,7 +1480,7 @@ pub(crate) async fn serve_iface_manager_requests(
     // Create a timer to periodically check to ensure that all client interfaces are connected.
     let mut reconnect_monitor_interval: i64 = 1;
     let mut connectivity_monitor_timer =
-        fasync::Interval::new(zx::Duration::from_seconds(reconnect_monitor_interval));
+        fasync::Interval::new(zx::MonotonicDuration::from_seconds(reconnect_monitor_interval));
 
     // Any recovery process needs to be allowed to run to completion before further IfaceManager
     // requests or new recovery requests are processed.
@@ -2185,7 +2185,7 @@ mod tests {
         // disconnect call.
         async fn blocking_fn() -> Result<ConnectionSelectionResponse, anyhow::Error> {
             loop {
-                fasync::Timer::new(zx::Duration::from_millis(1).after_now()).await
+                fasync::Timer::new(zx::MonotonicDuration::from_millis(1).after_now()).await
             }
         }
         iface_manager.connection_selection_futures.push(blocking_fn().boxed());
@@ -5271,7 +5271,7 @@ mod tests {
         // Create a timer to periodically check to ensure that all client interfaces are connected.
         let mut reconnect_monitor_interval: i64 = 1;
         let mut connectivity_monitor_timer =
-            fasync::Interval::new(zx::Duration::from_seconds(reconnect_monitor_interval));
+            fasync::Interval::new(zx::MonotonicDuration::from_seconds(reconnect_monitor_interval));
 
         // Simulate multiple failed scan attempts and ensure that the timer interval backs off as
         // expected.
@@ -5310,7 +5310,7 @@ mod tests {
         // Setup for a reconnection attempt.
         let mut reconnect_monitor_interval = 1;
         let mut connectivity_monitor_timer =
-            fasync::Interval::new(zx::Duration::from_seconds(reconnect_monitor_interval));
+            fasync::Interval::new(zx::MonotonicDuration::from_seconds(reconnect_monitor_interval));
 
         // Create a candidate network.
         let ssid = TEST_SSID.clone();
@@ -5375,7 +5375,7 @@ mod tests {
         // Setup for a reconnection attempt.
         let mut reconnect_monitor_interval = 1;
         let mut connectivity_monitor_timer =
-            fasync::Interval::new(zx::Duration::from_seconds(reconnect_monitor_interval));
+            fasync::Interval::new(zx::MonotonicDuration::from_seconds(reconnect_monitor_interval));
 
         // Create a candidate network.
         let ssid = TEST_SSID.clone();

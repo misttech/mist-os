@@ -32,7 +32,7 @@ impl GetNeighborTableCommand {
             let age = format!(
                 "{:^8}",
                 item.age
-                    .map(|x| format!("{}s", zx::Duration::from_nanos(x).into_seconds()))
+                    .map(|x| format!("{}s", zx::MonotonicDuration::from_nanos(x).into_seconds()))
                     .unwrap_or("".to_string())
             );
             let is_child =

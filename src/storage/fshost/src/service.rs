@@ -37,7 +37,7 @@ use std::sync::Arc;
 use uuid::Uuid;
 use vfs::service;
 use zx::sys::{zx_handle_t, zx_status_t};
-use zx::{self as zx, AsHandleRef, Duration};
+use zx::{self as zx, AsHandleRef, MonotonicDuration};
 use {fidl_fuchsia_fshost as fshost, fuchsia_async as fasync};
 
 pub enum FshostShutdownResponder {
@@ -56,7 +56,7 @@ impl FshostShutdownResponder {
     }
 }
 
-const FIND_PARTITION_DURATION: Duration = Duration::from_seconds(20);
+const FIND_PARTITION_DURATION: MonotonicDuration = MonotonicDuration::from_seconds(20);
 
 fn data_partition_names() -> Vec<String> {
     vec![DATA_PARTITION_LABEL.to_string(), LEGACY_DATA_PARTITION_LABEL.to_string()]

@@ -203,7 +203,7 @@ impl LinkState {
         }
     }
 
-    pub fn disconnect(self) -> (Protection, Option<zx::Duration>) {
+    pub fn disconnect(self) -> (Protection, Option<zx::MonotonicDuration>) {
         match self {
             Self::EstablishingRsna(state) => {
                 let (_, state) = state.release_data();

@@ -53,7 +53,7 @@ async fn connecting_to_aps_with_wrong_credential_types() {
         security_type: fidl_policy::SecurityType::None,
         password: None,
     };
-    let timeout: zx::Duration = zx::Duration::from_seconds(30);
+    let timeout: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(30);
 
     // Test a client fails to connect to a network protected by WPA2-PSK if no
     // password is provided. The DisconnectStatus::CredentialsFailed status should be

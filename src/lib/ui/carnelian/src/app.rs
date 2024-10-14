@@ -642,7 +642,8 @@ impl App {
             let mut frame_count = 0;
             app.app_init_common().await?;
             loop {
-                let timeout = pin!(Timer::new(zx::Duration::from_millis(500_i64).after_now()));
+                let timeout =
+                    pin!(Timer::new(zx::MonotonicDuration::from_millis(500_i64).after_now()));
                 let either = futures::future::select(timeout, internal_receiver.next());
                 let resolved = either.await;
                 match resolved {

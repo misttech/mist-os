@@ -40,7 +40,7 @@ static PKG_PATH: &'static str = "/pkg";
 // Maximum time that the runner will wait for break_on_start eventpair to signal.
 // This is set to prevent debuggers from blocking us for too long, either intentionally
 // or unintentionally.
-const MAX_WAIT_BREAK_ON_START: zx::Duration = zx::Duration::from_millis(300);
+const MAX_WAIT_BREAK_ON_START: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(300);
 
 /// Error encountered running test component
 #[derive(Debug, Error)]

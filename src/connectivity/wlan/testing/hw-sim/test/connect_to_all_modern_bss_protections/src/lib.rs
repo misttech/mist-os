@@ -62,7 +62,7 @@ async fn connect_to_modern_wpa_network() {
 
         let () = connect_or_timeout(
             &mut helper,
-            zx::Duration::from_seconds(30),
+            zx::MonotonicDuration::from_seconds(30),
             &ssid,
             &bss,
             &bss_protection,

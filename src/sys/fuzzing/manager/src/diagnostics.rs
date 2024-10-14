@@ -100,7 +100,7 @@ struct Message {
 impl Message {
     fn new(data: Vec<u8>) -> Self {
         let mut expiration = zx::MonotonicInstant::get();
-        expiration += zx::Duration::from_seconds(DEFAULT_TIMEOUT_IN_SECONDS);
+        expiration += zx::MonotonicDuration::from_seconds(DEFAULT_TIMEOUT_IN_SECONDS);
         Self { data, expiration }
     }
 }

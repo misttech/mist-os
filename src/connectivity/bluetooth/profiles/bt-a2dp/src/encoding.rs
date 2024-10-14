@@ -179,13 +179,13 @@ impl futures::Stream for SilenceStream {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let now = zx::MonotonicInstant::get();
         if self.last_frame_time.is_none() {
-            self.last_frame_time = Some(now - zx::Duration::from_seconds(1));
+            self.last_frame_time = Some(now - zx::MonotonicDuration::from_seconds(1));
         }
         let last_time = self.last_frame_time.as_ref().unwrap().clone();
         let repeats = (now - last_time).into_seconds();
         if repeats == 0 {
             self.next_frame_timer =
-                Box::pin(fasync::Timer::new(last_time + zx::Duration::from_seconds(1)));
+                Box::pin(fasync::Timer::new(last_time + zx::MonotonicDuration::from_seconds(1)));
             let poll = self.next_frame_timer.poll_unpin(cx);
             assert_eq!(Poll::Pending, poll);
             return Poll::Pending;
@@ -193,7 +193,7 @@ impl futures::Stream for SilenceStream {
         // Generate one second of silence.
         let pcm_frame_size = self.pcm_format.channel_map.len() * PCM_SAMPLE_SIZE;
         let buffer = vec![0; self.pcm_format.frames_per_second as usize * pcm_frame_size];
-        self.last_frame_time = Some(last_time + zx::Duration::from_seconds(1));
+        self.last_frame_time = Some(last_time + zx::MonotonicDuration::from_seconds(1));
         Poll::Ready(Some(Ok(buffer)))
     }
 }

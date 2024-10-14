@@ -13,7 +13,7 @@ use std::future::Future as _;
 use std::pin::Pin;
 use std::sync::{Arc, Weak};
 use std::task::{Context, Poll};
-use zx::Duration;
+use zx::MonotonicDuration;
 use {fuchsia_async as fasync, zx};
 
 /// [`until_stalled`] wraps a FIDL request stream of type [`RS`] into another
@@ -30,7 +30,7 @@ use {fuchsia_async as fasync, zx};
 /// on its own without stalling.
 pub fn until_stalled<RS: RequestStream>(
     request_stream: RS,
-    debounce_interval: Duration,
+    debounce_interval: MonotonicDuration,
 ) -> (impl StreamAndControlHandle<RS, <RS as Stream>::Item>, Receiver<Option<zx::Channel>>) {
     let (sender, receiver) = oneshot::channel();
     let stream = StallableRequestStream::new(request_stream, debounce_interval, move |channel| {
@@ -53,7 +53,7 @@ pin_project! {
     /// The stream returned from [`until_stalled`].
     pub struct StallableRequestStream<RS, F> {
         stream: Arc<Mutex<Option<RS>>>,
-        debounce_interval: Duration,
+        debounce_interval: MonotonicDuration,
         unbind_callback: Option<F>,
         #[pin]
         timer: Option<fasync::Timer>,
@@ -63,7 +63,7 @@ pin_project! {
 impl<RS, F> StallableRequestStream<RS, F> {
     /// Creates a new stallable request stream that will send the channel via `unbind_callback` when
     /// stream is stalled.
-    pub fn new(stream: RS, debounce_interval: Duration, unbind_callback: F) -> Self {
+    pub fn new(stream: RS, debounce_interval: MonotonicDuration, unbind_callback: F) -> Self {
         Self {
             stream: Arc::new(Mutex::new(Some(stream))),
             debounce_interval,
@@ -181,7 +181,7 @@ mod tests {
         let initial = fasync::MonotonicInstant::from_nanos(0);
         TestExecutor::advance_to(initial).await;
         const DURATION_NANOS: i64 = 1_000_000;
-        let idle_duration = Duration::from_nanos(DURATION_NANOS);
+        let idle_duration = MonotonicDuration::from_nanos(DURATION_NANOS);
 
         let (_proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
@@ -202,7 +202,7 @@ mod tests {
         let initial = fasync::MonotonicInstant::from_nanos(0);
         TestExecutor::advance_to(initial).await;
         const DURATION_NANOS: i64 = 1_000_000;
-        let idle_duration = Duration::from_nanos(DURATION_NANOS);
+        let idle_duration = MonotonicDuration::from_nanos(DURATION_NANOS);
 
         let (_proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
@@ -236,7 +236,7 @@ mod tests {
         let initial = fasync::MonotonicInstant::from_nanos(0);
         TestExecutor::advance_to(initial).await;
         const DURATION_NANOS: i64 = 1_000_000;
-        let idle_duration = Duration::from_nanos(DURATION_NANOS);
+        let idle_duration = MonotonicDuration::from_nanos(DURATION_NANOS);
 
         let (_proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
@@ -262,7 +262,7 @@ mod tests {
         let initial = fasync::MonotonicInstant::from_nanos(0);
         TestExecutor::advance_to(initial).await;
         const DURATION_NANOS: i64 = 1_000_000;
-        let idle_duration = Duration::from_nanos(DURATION_NANOS);
+        let idle_duration = MonotonicDuration::from_nanos(DURATION_NANOS);
 
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
@@ -303,7 +303,7 @@ mod tests {
         let initial = fasync::MonotonicInstant::from_nanos(0);
         TestExecutor::advance_to(initial).await;
         const DURATION_NANOS: i64 = 1_000_000;
-        let idle_duration = Duration::from_nanos(DURATION_NANOS);
+        let idle_duration = MonotonicDuration::from_nanos(DURATION_NANOS);
 
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
@@ -346,7 +346,7 @@ mod tests {
         let initial = fasync::MonotonicInstant::from_nanos(0);
         TestExecutor::advance_to(initial).await;
         const DURATION_NANOS: i64 = 1_000_000;
-        let idle_duration = Duration::from_nanos(DURATION_NANOS);
+        let idle_duration = MonotonicDuration::from_nanos(DURATION_NANOS);
 
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
@@ -384,7 +384,7 @@ mod tests {
         use fidl_fuchsia_component_client_test::{ServiceAMarker, ServiceARequest};
 
         const DURATION_NANOS: i64 = 40_000_000;
-        let idle_duration = Duration::from_nanos(DURATION_NANOS);
+        let idle_duration = MonotonicDuration::from_nanos(DURATION_NANOS);
         let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<ServiceAMarker>().unwrap();
         let (stream, stalled) = until_stalled(stream, idle_duration);
 
@@ -403,7 +403,7 @@ mod tests {
         let stalled = fasync::Task::spawn(stalled).map(Arc::new).shared();
 
         // Make some requests at intervals half the idle duration. Stall should not happen.
-        let request_duration = Duration::from_nanos(DURATION_NANOS / 2);
+        let request_duration = MonotonicDuration::from_nanos(DURATION_NANOS / 2);
         const NUM_REQUESTS: usize = 5;
         let mut deadline = initial;
         for _ in 0..NUM_REQUESTS {

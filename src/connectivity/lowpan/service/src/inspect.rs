@@ -1300,7 +1300,7 @@ mod tests {
         dummy_driver.connect_to_binder().unwrap();
 
         let _res = watch_device_changes(inspect_tree.clone(), look_up.clone())
-            .on_timeout(MonotonicInstant::after(zx::Duration::from_seconds(5)), || {
+            .on_timeout(MonotonicInstant::after(zx::MonotonicDuration::from_seconds(5)), || {
                 info!("test_watch_device_changes: watch_device_changes timed out");
             })
             .await;

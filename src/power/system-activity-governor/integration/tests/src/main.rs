@@ -278,7 +278,7 @@ const DELAY_NOTIFICATION: usize = 10;
 // Spend no more than this many loop turns before giving up for the inspect to match.
 const MAX_LOOPS_COUNT: usize = 20;
 
-const RESTART_DELAY: zx::Duration = zx::Duration::from_seconds(1);
+const RESTART_DELAY: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(1);
 
 macro_rules! block_until_inspect_matches {
     ($sag_moniker:expr, $($tree:tt)+) => {{

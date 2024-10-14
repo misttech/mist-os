@@ -17,15 +17,16 @@ use {fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, zx};
 
 /// The minimum amount of time for a device counter to be stuck in the same
 /// value for the device to be considered unhealthy.
-const DEVICE_COUNTERS_UNHEALTHY_TIME: zx::Duration = zx::Duration::from_minutes(2);
+const DEVICE_COUNTERS_UNHEALTHY_TIME: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_minutes(2);
 
 /// The minimum amount of time to wait before generating a new request for debug
 /// information.
-const DEBUG_INFO_COOLDOWN: zx::Duration = zx::Duration::from_minutes(15);
+const DEBUG_INFO_COOLDOWN: zx::MonotonicDuration = zx::MonotonicDuration::from_minutes(15);
 
 /// The minimum amount of time for a neighbor in unhealthy state to trigger
 /// actions.
-const NEIGHBOR_UNHEALTHY_TIME: zx::Duration = zx::Duration::from_minutes(1);
+const NEIGHBOR_UNHEALTHY_TIME: zx::MonotonicDuration = zx::MonotonicDuration::from_minutes(1);
 
 #[derive(Debug, thiserror::Error)]
 #[cfg_attr(test, derive(Clone))]
@@ -480,7 +481,7 @@ mod tests {
         assert_eq!(status, HealthStatus::Unhealthy { last_action: now });
 
         status = HealthStatus::Healthy { last_action: Some(now) };
-        let later = now + zx::Duration::from_seconds(1);
+        let later = now + zx::MonotonicDuration::from_seconds(1);
         assert!(!status.set_unhealthy_and_check_for_debug_info_cooldown(later));
         assert_eq!(status, HealthStatus::Unhealthy { last_action: now });
 
@@ -494,7 +495,7 @@ mod tests {
     fn health_status_unhealthy() {
         let now = SOME_TIME;
         let mut status = HealthStatus::Unhealthy { last_action: now };
-        let later = now + zx::Duration::from_seconds(1);
+        let later = now + zx::MonotonicDuration::from_seconds(1);
         assert!(!status.set_unhealthy_and_check_for_debug_info_cooldown(later));
         assert_eq!(status, HealthStatus::Unhealthy { last_action: now });
 
@@ -508,7 +509,7 @@ mod tests {
         let now = SOME_TIME;
         let mut counter = TimestampedCounter { value: 1, at: now };
 
-        let later = now + zx::Duration::from_seconds(1);
+        let later = now + zx::MonotonicDuration::from_seconds(1);
         assert!(!counter.update(1, later));
         assert_eq!(counter, TimestampedCounter { value: 1, at: now });
 
@@ -692,13 +693,13 @@ mod tests {
         );
         sys.increment_counters(IFACE1, DeviceCounters { rx_frames: 10, tx_frames: 0 });
 
-        let now = now + DEBUG_INFO_COOLDOWN - zx::Duration::from_seconds(1);
+        let now = now + DEBUG_INFO_COOLDOWN - zx::MonotonicDuration::from_seconds(1);
         // Don't trigger again because of cooldown.
         assert_eq!(Watchdog::evaluate_interface_state(now, &mut state, view.view()).await, None);
 
         // Now detect a tx stall.
         sys.increment_counters(IFACE1, DeviceCounters { rx_frames: 10, tx_frames: 0 });
-        let now = now + zx::Duration::from_seconds(1);
+        let now = now + zx::MonotonicDuration::from_seconds(1);
         assert_eq!(
             Watchdog::evaluate_interface_state(now, &mut state, view.view()).await,
             Some(Action {
@@ -709,7 +710,7 @@ mod tests {
         );
         assert_eq!(state.health, HealthStatus::Unhealthy { last_action: now });
 
-        let later = now + zx::Duration::from_seconds(1);
+        let later = now + zx::MonotonicDuration::from_seconds(1);
 
         // If the gateway disappears, no action is taken but we maintain the
         // unhealthy state.
@@ -719,7 +720,7 @@ mod tests {
 
         // Finally, if the gateway becomes healthy, the system should go back to
         // healthy state.
-        let later = later + zx::Duration::from_seconds(1);
+        let later = later + zx::MonotonicDuration::from_seconds(1);
         let view = MockInterfaceView::new(
             IFACE1,
             [Route {
@@ -785,7 +786,7 @@ mod tests {
         assert_eq!(
             GatewayHealth::from_neighbor_health(
                 &NeighborHealth::Healthy { last_observed: now },
-                now + zx::Duration::from_minutes(60),
+                now + zx::MonotonicDuration::from_minutes(60),
             ),
             GatewayHealth::Healthy
         );

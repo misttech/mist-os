@@ -67,7 +67,7 @@ async fn find_cr50() -> Result<TpmDeviceProxy, Error> {
 
     while let Some(entry) = stream
         .try_next()
-        .on_timeout(zx::Duration::from_seconds(300), || Ok(None))
+        .on_timeout(zx::MonotonicDuration::from_seconds(300), || Ok(None))
         .await
         .context("Watching for TPM devices")?
     {

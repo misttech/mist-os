@@ -40,7 +40,8 @@ use {
 const DEFAULT_PERSISTENT_ELEMENTS_PATH: &str = "/data/persistent_elements";
 
 // Timeout duration for a ViewControllerProxy to close, in seconds.
-static VIEW_CONTROLLER_DISMISS_TIMEOUT: zx::Duration = zx::Duration::from_seconds(3_i64);
+static VIEW_CONTROLLER_DISMISS_TIMEOUT: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_seconds(3_i64);
 
 /// Errors returned by calls to [`ElementManager`].
 #[derive(Debug, thiserror::Error, Clone, PartialEq)]

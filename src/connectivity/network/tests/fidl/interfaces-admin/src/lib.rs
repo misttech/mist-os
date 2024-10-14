@@ -1261,7 +1261,10 @@ async fn add_address_and_detach<N: Netstack>(
         },
     )
     .map_ok(|()| panic!("address deleted after detaching and closing channel"))
-    .on_timeout(fuchsia_async::MonotonicInstant::after(zx::Duration::from_millis(100)), || Ok(()))
+    .on_timeout(
+        fuchsia_async::MonotonicInstant::after(zx::MonotonicDuration::from_millis(100)),
+        || Ok(()),
+    )
     .await
     .expect("wait for address to not be removed");
 
@@ -3557,7 +3560,8 @@ async fn nud_base_reachable_time<N: Netstack, I: Ip>(name: &str) {
     );
 
     // Set a lower value than the default.
-    const DEFAULT_BASE_REACHABLE_TIME: zx::Duration = zx::Duration::from_seconds(30);
+    const DEFAULT_BASE_REACHABLE_TIME: zx::MonotonicDuration =
+        zx::MonotonicDuration::from_seconds(30);
     let want_base_reachable_time = DEFAULT_BASE_REACHABLE_TIME / 2;
     let config = iface
         .control()

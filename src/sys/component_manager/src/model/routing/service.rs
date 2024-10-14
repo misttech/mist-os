@@ -46,7 +46,7 @@ use vfs::ToObjectRequest;
 use {fidl_fuchsia_io as fio, zx};
 
 /// Timeout for opening a service capability when aggregating.
-const OPEN_SERVICE_TIMEOUT: zx::Duration = zx::Duration::from_seconds(5);
+const OPEN_SERVICE_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(5);
 
 /// Serves a Service directory that allows clients to list instances resulting from an aggregation of service offers
 /// and to open instances.

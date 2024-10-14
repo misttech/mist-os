@@ -339,7 +339,7 @@ async fn record_lazy_values(
                     let properties = properties.clone();
                     async move {
                         if options.hang.unwrap_or_default() {
-                            Timer::new(zx::Duration::from_minutes(60)).await;
+                            Timer::new(zx::MonotonicDuration::from_minutes(60)).await;
                         }
                         let inspector = Inspector::default();
                         let node = inspector.root();

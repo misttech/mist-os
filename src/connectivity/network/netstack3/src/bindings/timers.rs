@@ -921,7 +921,7 @@ mod tests {
 
         let mut reschedule = || {
             let prev: fasync::MonotonicInstant = timer.cancel().unwrap().into();
-            assert_eq!(timer.schedule(prev + zx::Duration::from_seconds(1)), None);
+            assert_eq!(timer.schedule(prev + zx::MonotonicDuration::from_seconds(1)), None);
         };
 
         // Canceling and rescheduling creates a new heap entry.

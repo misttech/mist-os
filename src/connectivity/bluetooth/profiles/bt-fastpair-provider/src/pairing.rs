@@ -149,7 +149,8 @@ impl Procedure {
     /// Default timeout duration for a pairing procedure. Per the GFPS specification, if progress
     /// is not made within this amount of time, the procedure should be terminated.
     /// See https://developers.google.com/nearby/fast-pair/specifications/service/gatt#procedure
-    const DEFAULT_PROCEDURE_TIMEOUT_DURATION: zx::Duration = zx::Duration::from_seconds(10);
+    const DEFAULT_PROCEDURE_TIMEOUT_DURATION: zx::MonotonicDuration =
+        zx::MonotonicDuration::from_seconds(10);
 
     fn new(id: PeerId, key: SharedSecret) -> Self {
         let timer =

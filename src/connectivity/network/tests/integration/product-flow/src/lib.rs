@@ -93,8 +93,8 @@ async fn interface_disruption<N: Netstack>(name: &str, ip_supported: IpSupported
         .expect("wait for link-local address in server realm");
 
     let send_ra_and_wait_for_addr = || async {
-        let mut send_ra_fut =
-            pin!(fasync::Interval::new(zx::Duration::from_seconds(4)).for_each(|()| async {
+        let mut send_ra_fut = pin!(fasync::Interval::new(zx::MonotonicDuration::from_seconds(4))
+            .for_each(|()| async {
                 let options = [NdpOptionBuilder::PrefixInformation(PrefixInformation::new(
                     ipv6_consts::GLOBAL_PREFIX.prefix(),  /* prefix_length */
                     false,                                /* on_link_flag */

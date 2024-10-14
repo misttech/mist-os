@@ -1362,7 +1362,7 @@ mod tests {
 
         let cursor_location = mouse_binding::MouseLocation::Absolute(Position { x: 0.0, y: 0.0 });
         let event_time1 = zx::MonotonicInstant::get();
-        let event_time2 = event_time1.add(zx::Duration::from_micros(1));
+        let event_time2 = event_time1.add(zx::MonotonicDuration::from_micros(1));
 
         let event1 = create_mouse_event(
             cursor_location,
@@ -1509,9 +1509,9 @@ mod tests {
 
         let cursor_location = mouse_binding::MouseLocation::Absolute(Position { x: 0.0, y: 0.0 });
         let event_time1 = zx::MonotonicInstant::get();
-        let event_time2 = event_time1.add(zx::Duration::from_micros(1));
-        let event_time3 = event_time2.add(zx::Duration::from_micros(1));
-        let event_time4 = event_time3.add(zx::Duration::from_micros(1));
+        let event_time2 = event_time1.add(zx::MonotonicDuration::from_micros(1));
+        let event_time3 = event_time2.add(zx::MonotonicDuration::from_micros(1));
+        let event_time4 = event_time3.add(zx::MonotonicDuration::from_micros(1));
 
         let event1 = create_mouse_event(
             cursor_location,
@@ -1729,8 +1729,8 @@ mod tests {
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
 
         let event_time1 = zx::MonotonicInstant::get();
-        let event_time2 = event_time1.add(zx::Duration::from_micros(1));
-        let event_time3 = event_time2.add(zx::Duration::from_micros(1));
+        let event_time2 = event_time1.add(zx::MonotonicDuration::from_micros(1));
+        let event_time3 = event_time2.add(zx::MonotonicDuration::from_micros(1));
         let zero_position = Position { x: 0.0, y: 0.0 };
         let expected_position = Position {
             x: 10.0 * MOUSE_DISTANCE_IN_MM_TO_DISPLAY_LOGICAL_PIXEL,
@@ -2231,9 +2231,9 @@ mod tests {
         );
 
         let event_time1 = zx::MonotonicInstant::get();
-        let event_time2 = event_time1.add(zx::Duration::from_micros(1));
-        let event_time3 = event_time2.add(zx::Duration::from_micros(1));
-        let event_time4 = event_time3.add(zx::Duration::from_micros(1));
+        let event_time2 = event_time1.add(zx::MonotonicDuration::from_micros(1));
+        let event_time3 = event_time2.add(zx::MonotonicDuration::from_micros(1));
+        let event_time4 = event_time3.add(zx::MonotonicDuration::from_micros(1));
 
         let aggregator_fut = handle_aggregator_request_stream(
             aggregator_request_stream,
@@ -2452,8 +2452,8 @@ mod tests {
 
         let cursor_location = mouse_binding::MouseLocation::Absolute(Position { x: 0.0, y: 0.0 });
         let event_time1 = zx::MonotonicInstant::get();
-        let event_time2 = event_time1.add(zx::Duration::from_micros(1));
-        let event_time3 = event_time2.add(zx::Duration::from_micros(1));
+        let event_time2 = event_time1.add(zx::MonotonicDuration::from_micros(1));
+        let event_time3 = event_time2.add(zx::MonotonicDuration::from_micros(1));
 
         let aggregator_fut = handle_aggregator_request_stream(
             aggregator_request_stream,

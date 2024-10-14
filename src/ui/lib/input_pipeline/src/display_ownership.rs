@@ -16,7 +16,7 @@ use keymaps::KeyState;
 use lazy_static::lazy_static;
 use std::cell::RefCell;
 use std::rc::Rc;
-use zx::{AsHandleRef, Duration, MonotonicInstant, Signals, Status};
+use zx::{AsHandleRef, MonotonicDuration, MonotonicInstant, Signals, Status};
 
 lazy_static! {
     // The signal value corresponding to the `DISPLAY_OWNED_SIGNAL`.  Same as zircon's signal
@@ -216,7 +216,7 @@ impl DisplayOwnership {
                         let key_event = KeyboardEvent::new(key, event_type);
                         output.unbounded_send(into_input_event(key_event, event_time))
                             .context("unable to send display updates")?;
-                        event_time = event_time + Duration::from_nanos(1);
+                        event_time = event_time + MonotonicDuration::from_nanos(1);
                     }
                     *(self.ownership.borrow_mut()) = new_ownership;
                 },

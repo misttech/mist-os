@@ -52,7 +52,7 @@ impl Bound {
     }
 
     /// Returns the size of the possible range.
-    pub fn size(&self) -> zx::Duration {
+    pub fn size(&self) -> zx::MonotonicDuration {
         self.utc_max - self.utc_min
     }
 
@@ -67,11 +67,11 @@ mod test {
     use super::*;
     use lazy_static::lazy_static;
 
-    const DURATION_MICROS_500: zx::Duration = zx::Duration::from_micros(500);
+    const DURATION_MICROS_500: zx::MonotonicDuration = zx::MonotonicDuration::from_micros(500);
     const MONOTONIC_TIME: zx::MonotonicInstant =
         zx::MonotonicInstant::from_nanos(1_000_000_000_000);
     lazy_static! {
-        static ref DRIFT_IN_500_MICROS: zx::Duration =
+        static ref DRIFT_IN_500_MICROS: zx::MonotonicDuration =
             DURATION_MICROS_500 * MAX_DRIFT_PPM / ONE_MILLION;
     }
 

@@ -574,9 +574,9 @@ mod tests {
                     previous_task_count = current;
                     break;
                 }
-                fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_millis(
-                    100i64,
-                )))
+                fasync::Timer::new(fasync::MonotonicInstant::after(
+                    zx::MonotonicDuration::from_millis(100i64),
+                ))
                 .await;
             }
         }
@@ -819,9 +819,9 @@ mod tests {
                     previous_task_count = current;
                     break;
                 }
-                fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_millis(
-                    100i64,
-                )))
+                fasync::Timer::new(fasync::MonotonicInstant::after(
+                    zx::MonotonicDuration::from_millis(100i64),
+                ))
                 .await;
             }
 
@@ -1230,8 +1230,10 @@ mod tests {
             if stats.tree.lock().await.len() == 2 {
                 break;
             }
-            fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_millis(100i64)))
-                .await;
+            fasync::Timer::new(fasync::MonotonicInstant::after(
+                zx::MonotonicDuration::from_millis(100i64),
+            ))
+            .await;
         }
 
         assert_data_tree!(inspector, root: {
@@ -1309,8 +1311,10 @@ mod tests {
             if stats.tree.lock().await.len() == 2 {
                 break;
             }
-            fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_millis(100i64)))
-                .await;
+            fasync::Timer::new(fasync::MonotonicInstant::after(
+                zx::MonotonicDuration::from_millis(100i64),
+            ))
+            .await;
         }
 
         assert_eq!(stats.tree.lock().await.len(), 2);

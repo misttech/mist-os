@@ -39,7 +39,7 @@ const SCAN_RETRY_DELAY_MS: i64 = 100;
 const SCAN_CONSUMER_MAX_SECONDS_ALLOWED: i64 = 5;
 // A long amount of time that a scan should be able to finish within. If a scan takes longer than
 // this is indicates something is wrong.
-const SCAN_TIMEOUT: zx::Duration = zx::Duration::from_seconds(60);
+const SCAN_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(60);
 /// Capacity of "first come, first serve" slots available to scan requesters
 pub const SCAN_REQUEST_BUFFER_SIZE: usize = 100;
 
@@ -147,7 +147,7 @@ pub async fn serve_scanning_loop(
                     if !results.is_empty() {
                         location_sensor_updates.push(location_sensor_updater
                             .update_scan_results(results.clone())
-                            .on_timeout(zx::Duration::from_seconds(SCAN_CONSUMER_MAX_SECONDS_ALLOWED), || {
+                            .on_timeout(zx::MonotonicDuration::from_seconds(SCAN_CONSUMER_MAX_SECONDS_ALLOWED), || {
                                 error!("Timed out waiting for location sensor to get results");
 
                             })
@@ -291,8 +291,10 @@ async fn perform_scan(
                         return (scan_request, Err(scan_err));
                     }
                     info!("Driver requested a delay before retrying scan");
-                    fasync::Timer::new(zx::Duration::from_millis(SCAN_RETRY_DELAY_MS).after_now())
-                        .await;
+                    fasync::Timer::new(
+                        zx::MonotonicDuration::from_millis(SCAN_RETRY_DELAY_MS).after_now(),
+                    )
+                    .await;
                 }
             },
         }

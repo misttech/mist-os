@@ -60,6 +60,6 @@ async fn main() -> Result<(), Error> {
     info!("Done reversing! Please use `ffx component stop`");
 
     loop {
-        zx::Duration::from_seconds(1).sleep();
+        zx::MonotonicDuration::from_seconds(1).sleep();
     }
 }

@@ -318,7 +318,7 @@ impl ConnectedPeers {
         &self,
         id: PeerId,
         channel: Channel,
-        initiator_delay: Option<zx::Duration>,
+        initiator_delay: Option<zx::MonotonicDuration>,
     ) -> Result<DetachableWeak<PeerId, Peer>, Error> {
         if let Some(weak) = self.get_weak(&id) {
             let peer = weak.upgrade().ok_or(format_err!("Disconnected connecting transport"))?;
@@ -726,7 +726,7 @@ mod tests {
         let (remote, channel) = Channel::create();
         let remote = avdtp::Peer::new(remote);
 
-        let delay = zx::Duration::from_seconds(1);
+        let delay = zx::MonotonicDuration::from_seconds(1);
 
         let mut remote_requests = remote.take_request_stream();
 
@@ -749,7 +749,9 @@ mod tests {
         // The remote peer doesn't need to actually open, Set Configuration is enough of a signal.
         // wait for the delay to expire now.
 
-        exec.set_fake_time(fasync::MonotonicInstant::after(delay) + zx::Duration::from_micros(1));
+        exec.set_fake_time(
+            fasync::MonotonicInstant::after(delay) + zx::MonotonicDuration::from_micros(1),
+        );
         let _ = exec.wake_expired_timers();
 
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
@@ -813,7 +815,7 @@ mod tests {
         let (remote, channel) = Channel::create();
         let remote = avdtp::Peer::new(remote);
 
-        let delay = zx::Duration::from_seconds(1);
+        let delay = zx::MonotonicDuration::from_seconds(1);
 
         let mut remote_requests = remote.take_request_stream();
 
@@ -823,7 +825,9 @@ mod tests {
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
 
         // The delay expires, and the discovery is start!
-        exec.set_fake_time(fasync::MonotonicInstant::after(delay) + zx::Duration::from_micros(1));
+        exec.set_fake_time(
+            fasync::MonotonicInstant::after(delay) + zx::MonotonicDuration::from_micros(1),
+        );
         let _ = exec.wake_expired_timers();
         expect_peer_discovery(
             &mut exec,
@@ -875,7 +879,7 @@ mod tests {
             ..Default::default()
         };
         let preferred_direction = vec![avdtp::EndpointType::Sink];
-        let delay = zx::Duration::from_seconds(1);
+        let delay = zx::MonotonicDuration::from_seconds(1);
         peers.found(id, desc, HashSet::from_iter(preferred_direction.into_iter()));
 
         let connected_fut = peers.connected(id, channel, Some(delay));
@@ -892,7 +896,9 @@ mod tests {
         // Should wait for the specified amount of time.
         assert!(exec.run_until_stalled(&mut remote_requests.next()).is_pending());
 
-        exec.set_fake_time(fasync::MonotonicInstant::after(delay + zx::Duration::from_micros(1)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            delay + zx::MonotonicDuration::from_micros(1),
+        ));
         let _ = exec.wake_expired_timers();
 
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
@@ -968,7 +974,7 @@ mod tests {
         );
         peers.found(id, desc, HashSet::from_iter(vec![avdtp::EndpointType::Sink].into_iter()));
 
-        let delay = zx::Duration::from_seconds(1);
+        let delay = zx::MonotonicDuration::from_seconds(1);
         let connect_fut = peers.connected(id, channel, Some(delay));
         let mut connect_fut = std::pin::pin!(connect_fut);
         let _ = exec
@@ -980,7 +986,9 @@ mod tests {
         let mut remote_requests = remote.take_request_stream();
         // Should wait for the specified amount of time.
         assert!(exec.run_until_stalled(&mut remote_requests.next()).is_pending());
-        exec.set_fake_time(fasync::MonotonicInstant::after(delay + zx::Duration::from_micros(1)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            delay + zx::MonotonicDuration::from_micros(1),
+        ));
         let _ = exec.wake_expired_timers();
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
 
@@ -1035,7 +1043,7 @@ mod tests {
         let (remote, channel) = Channel::create();
         let remote = avdtp::Peer::new(remote);
 
-        let delay = zx::Duration::from_seconds(1);
+        let delay = zx::MonotonicDuration::from_seconds(1);
 
         let mut connect_fut = std::pin::pin!(peers.connected(id, channel, Some(delay)));
         let _ = exec
@@ -1051,7 +1059,9 @@ mod tests {
         // Should wait for the specified amount of time.
         assert!(exec.run_until_stalled(&mut remote_requests.next()).is_pending());
 
-        exec.set_fake_time(fasync::MonotonicInstant::after(delay + zx::Duration::from_micros(1)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            delay + zx::MonotonicDuration::from_micros(1),
+        ));
         let _ = exec.wake_expired_timers();
 
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());

@@ -245,12 +245,12 @@ impl StateRef {
 pub struct Interval {
     timer: Pin<Box<Timer>>,
     next: MonotonicInstant,
-    duration: zx::Duration,
+    duration: zx::MonotonicDuration,
 }
 
 impl Interval {
     /// Create a new `Interval` which yields every `duration`.
-    pub fn new(duration: zx::Duration) -> Self {
+    pub fn new(duration: zx::MonotonicDuration) -> Self {
         let next = MonotonicInstant::after(duration);
         Interval { timer: Box::pin(Timer::new(next)), next, duration }
     }
@@ -664,13 +664,14 @@ mod test {
     use rand::seq::SliceRandom;
     use rand::{thread_rng, Rng};
     use std::pin::pin;
-    use zx::Duration;
+    use zx::MonotonicDuration;
 
     #[test]
     fn shorter_fires_first() {
         let mut exec = LocalExecutor::new();
-        let shorter = pin!(Timer::new(MonotonicInstant::after(Duration::from_millis(100))));
-        let longer = pin!(Timer::new(MonotonicInstant::after(Duration::from_seconds(1))));
+        let shorter =
+            pin!(Timer::new(MonotonicInstant::after(MonotonicDuration::from_millis(100))));
+        let longer = pin!(Timer::new(MonotonicInstant::after(MonotonicDuration::from_seconds(1))));
         match exec.run_singlethreaded(future::select(shorter, longer)) {
             Either::Left(_) => {}
             Either::Right(_) => panic!("wrong timer fired"),
@@ -680,8 +681,10 @@ mod test {
     #[test]
     fn shorter_fires_first_multithreaded() {
         SendExecutor::new(4).run(async {
-            let shorter = pin!(Timer::new(MonotonicInstant::after(Duration::from_millis(100))));
-            let longer = pin!(Timer::new(MonotonicInstant::after(Duration::from_seconds(1))));
+            let shorter =
+                pin!(Timer::new(MonotonicInstant::after(MonotonicDuration::from_millis(100))));
+            let longer =
+                pin!(Timer::new(MonotonicInstant::after(MonotonicDuration::from_seconds(1))));
             match future::select(shorter, longer).await {
                 Either::Left(_) => {}
                 Either::Right(_) => panic!("wrong timer fired"),
@@ -693,7 +696,7 @@ mod test {
     fn fires_after_timeout() {
         let mut exec = TestExecutor::new_with_fake_time();
         exec.set_fake_time(MonotonicInstant::from_nanos(0));
-        let deadline = MonotonicInstant::after(Duration::from_seconds(5));
+        let deadline = MonotonicInstant::after(MonotonicDuration::from_seconds(5));
         let mut future = pin!(Timer::new(deadline));
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut future));
         exec.set_fake_time(deadline);
@@ -704,8 +707,8 @@ mod test {
     fn timer_before_now_fires_immediately() {
         let mut exec = TestExecutor::new();
         let now = MonotonicInstant::now();
-        let before = pin!(Timer::new(now - Duration::from_nanos(1)));
-        let after = pin!(Timer::new(now + Duration::from_nanos(1)));
+        let before = pin!(Timer::new(now - MonotonicDuration::from_nanos(1)));
+        let after = pin!(Timer::new(now + MonotonicDuration::from_nanos(1)));
         assert_matches!(
             exec.run_singlethreaded(futures::future::select(before, after)),
             Either::Left(_),
@@ -722,7 +725,7 @@ mod test {
         let counter = Arc::new(::std::sync::atomic::AtomicUsize::new(0));
         let mut future = pin!({
             let counter = counter.clone();
-            Interval::new(Duration::from_seconds(5))
+            Interval::new(MonotonicDuration::from_seconds(5))
                 .map(move |()| {
                     counter.fetch_add(1, Ordering::SeqCst);
                 })
@@ -735,7 +738,7 @@ mod test {
 
         // Pretend to wait until the next timer
         let first_deadline = TestExecutor::next_timer().expect("Expected a pending timeout (1)");
-        assert!(first_deadline >= Duration::from_seconds(5) + start);
+        assert!(first_deadline >= MonotonicDuration::from_seconds(5) + start);
         exec.set_fake_time(first_deadline);
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut future));
         assert_eq!(1, counter.load(Ordering::SeqCst));
@@ -750,7 +753,7 @@ mod test {
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut future));
         assert_eq!(2, counter.load(Ordering::SeqCst));
 
-        assert_eq!(second_deadline, first_deadline + Duration::from_seconds(5));
+        assert_eq!(second_deadline, first_deadline + MonotonicDuration::from_seconds(5));
     }
 
     #[test]
@@ -758,10 +761,11 @@ mod test {
         let mut exec = TestExecutor::new_with_fake_time();
         exec.set_fake_time(MonotonicInstant::from_nanos(0));
 
-        let mut timer = pin!(Timer::new(MonotonicInstant::after(Duration::from_seconds(1))));
+        let mut timer =
+            pin!(Timer::new(MonotonicInstant::after(MonotonicDuration::from_seconds(1))));
         assert_eq!(Poll::Pending, exec.run_until_stalled(&mut timer));
 
-        exec.set_fake_time(MonotonicInstant::after(Duration::from_seconds(1)));
+        exec.set_fake_time(MonotonicInstant::after(MonotonicDuration::from_seconds(1)));
         assert_eq!(Poll::Ready(()), exec.run_until_stalled(&mut timer));
     }
 

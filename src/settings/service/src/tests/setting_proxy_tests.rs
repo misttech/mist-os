@@ -14,7 +14,7 @@ use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::channel::oneshot;
 use futures::lock::Mutex;
 use futures::StreamExt;
-use zx::{Duration, MonotonicInstant};
+use zx::{MonotonicDuration, MonotonicInstant};
 
 use async_trait::async_trait;
 
@@ -35,7 +35,7 @@ use crate::message::receptor::Receptor;
 use crate::service::{self, message, TryFromWithClient};
 use crate::{clock, event, Payload};
 
-const TEARDOWN_TIMEOUT: Duration = Duration::from_seconds(5);
+const TEARDOWN_TIMEOUT: MonotonicDuration = MonotonicDuration::from_seconds(5);
 const SETTING_PROXY_MAX_ATTEMPTS: u64 = 3;
 const SETTING_PROXY_TIMEOUT_MS: i64 = 1;
 
@@ -55,7 +55,7 @@ enum HandlerAction {
     Ignore,
     Exit(ExitResult),
     Respond(SettingHandlerResult),
-    RespondAfterDelay(SettingHandlerResult, Duration),
+    RespondAfterDelay(SettingHandlerResult, MonotonicDuration),
 }
 
 impl SettingHandler {
@@ -214,7 +214,7 @@ impl SettingHandlerFactory for FakeFactory {
 struct TestEnvironmentBuilder {
     setting_type: SettingType,
     done_tx: Option<oneshot::Sender<()>>,
-    timeout: Option<(Duration, bool)>,
+    timeout: Option<(MonotonicDuration, bool)>,
 }
 
 impl TestEnvironmentBuilder {
@@ -227,7 +227,7 @@ impl TestEnvironmentBuilder {
         self
     }
 
-    fn set_timeout(mut self, duration: Duration, retry_on_timeout: bool) -> Self {
+    fn set_timeout(mut self, duration: MonotonicDuration, retry_on_timeout: bool) -> Self {
         self.timeout = Some((duration, retry_on_timeout));
         self
     }
@@ -1033,7 +1033,7 @@ fn test_timeout() {
     let mut fut = pin!(async move {
         let setting_type = SettingType::Unknown;
         let environment = TestEnvironmentBuilder::new(setting_type)
-            .set_timeout(Duration::from_millis(SETTING_PROXY_TIMEOUT_MS), true)
+            .set_timeout(MonotonicDuration::from_millis(SETTING_PROXY_TIMEOUT_MS), true)
             .build()
             .await;
 
@@ -1116,7 +1116,7 @@ fn test_timeout() {
     loop {
         let new_time = fuchsia_async::MonotonicInstant::from_nanos(
             executor.now().into_nanos()
-                + zx::Duration::from_millis(SETTING_PROXY_TIMEOUT_MS).into_nanos(),
+                + zx::MonotonicDuration::from_millis(SETTING_PROXY_TIMEOUT_MS).into_nanos(),
         );
         match executor.run_until_stalled(&mut fut) {
             Poll::Ready(x) => break x,
@@ -1133,7 +1133,7 @@ fn test_timeout_no_retry() {
     let mut fut = pin!(async move {
         let setting_type = SettingType::Unknown;
         let environment = TestEnvironmentBuilder::new(setting_type)
-            .set_timeout(Duration::from_millis(SETTING_PROXY_TIMEOUT_MS), false)
+            .set_timeout(MonotonicDuration::from_millis(SETTING_PROXY_TIMEOUT_MS), false)
             .build()
             .await;
 
@@ -1144,7 +1144,7 @@ fn test_timeout_no_retry() {
             Request::Get,
             HandlerAction::RespondAfterDelay(
                 Ok(None),
-                Duration::from_millis(SETTING_PROXY_TIMEOUT_MS * 2),
+                MonotonicDuration::from_millis(SETTING_PROXY_TIMEOUT_MS * 2),
             ),
         );
 
@@ -1184,7 +1184,7 @@ fn test_timeout_no_retry() {
     loop {
         let new_time = fuchsia_async::MonotonicInstant::from_nanos(
             executor.now().into_nanos()
-                + zx::Duration::from_millis(SETTING_PROXY_TIMEOUT_MS).into_nanos(),
+                + zx::MonotonicDuration::from_millis(SETTING_PROXY_TIMEOUT_MS).into_nanos(),
         );
         match executor.run_until_stalled(&mut fut) {
             Poll::Ready(x) => break x,

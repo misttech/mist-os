@@ -11,8 +11,10 @@ async fn main() {
     loop {
         // Why 5 minutes? It is the typical test timeout so we only expect this
         // loop to run once and pollute the logs a little.
-        fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_seconds(5 * 60)))
-            .await;
+        fasync::Timer::new(fasync::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(
+            5 * 60,
+        )))
+        .await;
         println!("Waiting longer");
     }
 }

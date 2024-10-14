@@ -44,7 +44,7 @@ extern "C" {
 
 fn create_named_deadline_rust(
     deadline: &DeadlineId<'_>,
-    duration: zx::Duration,
+    duration: zx::MonotonicDuration,
 ) -> fasync::MonotonicInstant {
     let mut time: zx_time_t = 0;
     let time_valid = unsafe {
@@ -76,7 +76,7 @@ impl NamedTimer {
     /// In an integration test, the `SET` event is reported immediately when this method is called,
     /// and `EXPIRED` is reported after `duration` elapses. Note `EXPIRED` is still reported even
     /// if the timer is dropped before `duration` elapses.
-    pub fn new(id: &DeadlineId<'_>, duration: zx::Duration) -> fasync::Timer {
+    pub fn new(id: &DeadlineId<'_>, duration: zx::MonotonicDuration) -> fasync::Timer {
         let deadline = create_named_deadline_rust(id, duration);
         fasync::Timer::new(deadline)
     }
@@ -96,7 +96,7 @@ pub trait NamedTimeoutExt: Future + Sized {
     fn on_timeout_named<OT>(
         self,
         id: &DeadlineId<'_>,
-        duration: zx::Duration,
+        duration: zx::MonotonicDuration,
         on_timeout: OT,
     ) -> fasync::OnTimeout<Self, OT>
     where
@@ -120,7 +120,7 @@ mod test {
     // fasync::TestExecutor continue to work when fake-clock is NOT linked in. Behavior with
     // fake-clock linked in is verified by integration tests in fake-clock/examples.
 
-    const ONE_HOUR: zx::Duration = zx::Duration::from_hours(1);
+    const ONE_HOUR: zx::MonotonicDuration = zx::MonotonicDuration::from_hours(1);
     const DEADLINE_ID: DeadlineId<'static> = DeadlineId::new("component", "code");
 
     #[test]

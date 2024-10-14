@@ -19,7 +19,7 @@ use crate::experimental::series::{FoldError, Interpolator, MatrixSampler};
 const TIME_MATRIX_SENDER_BUFFER_SIZE: usize = 10;
 
 /// How often to interpolate time series stats.
-const INTERPOLATE_INTERVAL: zx::Duration = zx::Duration::from_minutes(5);
+const INTERPOLATE_INTERVAL: zx::MonotonicDuration = zx::MonotonicDuration::from_minutes(5);
 
 /// Create a `TimeMatrixClient` and a `Future` server for routine management tasks of time
 /// matrices.

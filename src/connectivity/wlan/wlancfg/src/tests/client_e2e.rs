@@ -361,7 +361,7 @@ fn add_phy(exec: &mut TestExecutor, test_values: &mut TestValues) {
     );
 
     exec.run_singlethreaded(pin!(
-        add_phy_fut.expect_within(zx::Duration::from_seconds(5), "future didn't complete")
+        add_phy_fut.expect_within(zx::MonotonicDuration::from_seconds(5), "future didn't complete")
     ));
 }
 

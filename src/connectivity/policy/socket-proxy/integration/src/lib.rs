@@ -641,7 +641,7 @@ async fn watch_dns_and_use_registry() -> Result<(), Error> {
 
     let dns_history = Arc::new(Mutex::new(Vec::new()));
 
-    let pause = || fasync::Timer::new(zx::Duration::from_millis(1).after_now());
+    let pause = || fasync::Timer::new(zx::MonotonicDuration::from_millis(1).after_now());
 
     // `select_all` runs a Vec of futures with identical return values until one of them completes.
     // Once the first future resolves, it returns a tuple containing the result of the completed

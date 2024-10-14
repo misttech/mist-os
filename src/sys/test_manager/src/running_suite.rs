@@ -293,7 +293,7 @@ impl RunningSuite {
             let mut invocations_iter = invocations.into_iter();
             let counter = AtomicU32::new(0);
             let timeout_time = match options.timeout {
-                Some(t) => zx::MonotonicInstant::after(zx::Duration::from_nanos(t)),
+                Some(t) => zx::MonotonicInstant::after(zx::MonotonicDuration::from_nanos(t)),
                 None => zx::MonotonicInstant::INFINITE,
             };
             let timeout_fut = fasync::Timer::new(timeout_time).shared();
@@ -467,7 +467,7 @@ impl RunningSuite {
 
         // TODO(https://fxbug.dev/42174479) Remove timeout once component manager hangs are removed.
         // This value is set to be slightly longer than the shutdown timeout for tests (30 sec).
-        const TEARDOWN_TIMEOUT: zx::Duration = zx::Duration::from_seconds(32);
+        const TEARDOWN_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(32);
 
         // Make the call to destroy the test, before destroying the entire realm. Once this
         // completes, it guarantees that any of its service providers (archivist, storage,

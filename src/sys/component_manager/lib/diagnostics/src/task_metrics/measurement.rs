@@ -15,16 +15,16 @@ use std::sync::Arc;
 #[derive(Debug, Clone, Default, PartialOrd, Eq, Ord, PartialEq)]
 pub struct Measurement {
     timestamp: zx::BootInstant,
-    cpu_time: zx::Duration,
-    queue_time: zx::Duration,
+    cpu_time: zx::MonotonicDuration,
+    queue_time: zx::MonotonicDuration,
 }
 
 impl Measurement {
     pub fn empty(timestamp: zx::BootInstant) -> Self {
         Self {
             timestamp,
-            cpu_time: zx::Duration::from_nanos(0),
-            queue_time: zx::Duration::from_nanos(0),
+            cpu_time: zx::MonotonicDuration::from_nanos(0),
+            queue_time: zx::MonotonicDuration::from_nanos(0),
         }
     }
 
@@ -33,12 +33,12 @@ impl Measurement {
     }
 
     /// The measured cpu time.
-    pub fn cpu_time(&self) -> &zx::Duration {
+    pub fn cpu_time(&self) -> &zx::MonotonicDuration {
         &self.cpu_time
     }
 
     /// The measured queue time.
-    pub fn queue_time(&self) -> &zx::Duration {
+    pub fn queue_time(&self) -> &zx::MonotonicDuration {
         &self.queue_time
     }
 
@@ -77,8 +77,8 @@ impl Measurement {
     pub(crate) fn from_runtime_info(info: zx::TaskRuntimeInfo, timestamp: zx::BootInstant) -> Self {
         Self {
             timestamp,
-            cpu_time: zx::Duration::from_nanos(info.cpu_time),
-            queue_time: zx::Duration::from_nanos(info.queue_time),
+            cpu_time: zx::MonotonicDuration::from_nanos(info.cpu_time),
+            queue_time: zx::MonotonicDuration::from_nanos(info.queue_time),
         }
     }
 }
@@ -130,7 +130,7 @@ pub struct MeasurementsQueue {
     // outer option refers to initialization
     most_recent_measurement: MostRecentMeasurement,
     ts: Arc<dyn TimeSource + Send + Sync>,
-    max_period: zx::Duration,
+    max_period: zx::MonotonicDuration,
     max_measurements: usize,
 }
 
@@ -271,7 +271,7 @@ mod tests {
     use super::*;
     use injectable_time::FakeTime;
     use std::time::Duration;
-    use zx::{BootInstant, Duration as ZxDuration};
+    use zx::{BootInstant, MonotonicDuration};
 
     fn insert_default(q: &mut MeasurementsQueue, clock: &FakeTime) {
         q.insert(Measurement::empty(BootInstant::from_nanos(clock.now())));
@@ -384,7 +384,7 @@ mod tests {
 
         q1 += q2;
 
-        let expected: ZxDuration = Duration::from_secs(4).into();
+        let expected: MonotonicDuration = Duration::from_secs(4).into();
         for m in q1.iter_sorted() {
             assert_eq!(&expected, m.cpu_time());
         }
@@ -449,7 +449,7 @@ mod tests {
         let sorted = q1.values.into_sorted_vec();
         let actual = sorted.iter().map(|Reverse(m)| m).collect::<Vec<_>>();
 
-        let d = |secs| -> ZxDuration { Duration::from_secs(secs).into() };
+        let d = |secs| -> MonotonicDuration { Duration::from_secs(secs).into() };
         assert_eq!(&d(3), actual[0].cpu_time());
         assert_eq!(&d(3), actual[1].cpu_time());
         assert_eq!(&d(4), actual[2].cpu_time());
@@ -516,7 +516,7 @@ mod tests {
         let sorted = q1.values.into_sorted_vec();
         let actual = sorted.into_iter().map(|Reverse(m)| m).collect::<Vec<_>>();
 
-        let d = |secs| -> ZxDuration { Duration::from_secs(secs).into() };
+        let d = |secs| -> MonotonicDuration { Duration::from_secs(secs).into() };
         assert_eq!(&d(3), actual[0].cpu_time());
         assert_eq!(&d(3), actual[1].cpu_time());
         assert_eq!(&d(4), actual[2].cpu_time());

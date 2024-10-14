@@ -241,7 +241,7 @@ pub enum EventPayload {
         exit_code: Option<i64>,
         stop_time: zx::BootInstant,
         stop_time_monotonic: zx::MonotonicInstant,
-        execution_duration: zx::Duration,
+        execution_duration: zx::MonotonicDuration,
         requested_escrow: bool,
     },
     DebugStarted {

@@ -259,7 +259,7 @@ fn handle_notification(
 /// The control channel should be in `Connecting` state before spawning this task.
 /// TODO(https://fxbug.dev/42166696): Refactor logic into RemotePeer to avoid multiple lock accesses.
 async fn make_connection(peer: Arc<RwLock<RemotePeer>>, conn_type: AVCTPConnectionType) {
-    let random_delay: zx::Duration = zx::Duration::from_nanos(
+    let random_delay: zx::MonotonicDuration = zx::MonotonicDuration::from_nanos(
         rand::thread_rng()
             .gen_range(MIN_CONNECTION_EST_TIME.into_nanos()..MAX_CONNECTION_EST_TIME.into_nanos()),
     );

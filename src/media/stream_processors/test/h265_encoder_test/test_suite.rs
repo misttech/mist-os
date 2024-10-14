@@ -134,7 +134,7 @@ impl H265EncoderTestCase {
     }
 
     fn get_timebase(&self) -> u64 {
-        zx::Duration::from_seconds(1).into_nanos() as u64
+        zx::MonotonicDuration::from_seconds(1).into_nanos() as u64
     }
 
     fn create_test_stream(&self) -> Result<Rc<VideoFrameStream>> {

@@ -15,7 +15,7 @@ use std::collections::{HashMap, VecDeque};
 use std::pin::pin;
 use std::sync::Arc;
 use tracing::{trace, warn};
-use zx::Duration;
+use zx::MonotonicDuration;
 
 pub mod browse_channel;
 mod decoders;
@@ -246,8 +246,9 @@ async fn handle_passthrough_command<'a>(
     pressed: bool,
 ) -> Result<(), Error> {
     // Passthrough commands need to be handled in 100ms
-    let timer =
-        pin!(fasync::Timer::new(fasync::MonotonicInstant::after(Duration::from_millis(100))));
+    let timer = pin!(fasync::Timer::new(fasync::MonotonicInstant::after(
+        MonotonicDuration::from_millis(100)
+    )));
 
     // As per Table 9.27 in AV/C 4.0, send back the state_flag, operation_id, and operation_data.
     let buf: Vec<u8> = command.body().to_vec();
@@ -367,7 +368,7 @@ fn send_notification(
 }
 
 /// T_MTP defined by AVRCP 1.6.2 Sec 15
-const T_MTP: Duration = Duration::from_millis(1000);
+const T_MTP: MonotonicDuration = MonotonicDuration::from_millis(1000);
 
 async fn handle_notify_command(
     delegate: Arc<TargetDelegate>,
@@ -687,7 +688,8 @@ async fn handle_status_command(
     let mut status_fut = pin!(status_fut);
 
     let interim_timer =
-        fasync::Timer::new(fasync::MonotonicInstant::after(Duration::from_millis(100))).fuse();
+        fasync::Timer::new(fasync::MonotonicInstant::after(MonotonicDuration::from_millis(100)))
+            .fuse();
     let mut interim_timer = pin!(interim_timer);
 
     loop {
@@ -848,7 +850,8 @@ async fn handle_control_command(
     let mut control_fut = pin!(control_fut);
 
     let interim_timer =
-        fasync::Timer::new(fasync::MonotonicInstant::after(Duration::from_millis(100))).fuse();
+        fasync::Timer::new(fasync::MonotonicInstant::after(MonotonicDuration::from_millis(100)))
+            .fuse();
     let mut interim_timer = pin!(interim_timer);
 
     loop {
@@ -1030,9 +1033,9 @@ mod test {
         fasync::Task::spawn(async move {
             while let Some(Ok(event)) = target_stream.next().await {
                 if stall_responses {
-                    fasync::Timer::new(fasync::MonotonicInstant::after(Duration::from_millis(
-                        2000000,
-                    )))
+                    fasync::Timer::new(fasync::MonotonicInstant::after(
+                        MonotonicDuration::from_millis(2000000),
+                    ))
                     .await;
                 }
 

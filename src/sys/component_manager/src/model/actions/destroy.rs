@@ -376,8 +376,10 @@ pub mod tests {
 
             // The destroy action hasn't blocked on the mock action yet.
             // Wait for that to happen and check again.
-            fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_millis(100)))
-                .await;
+            fasync::Timer::new(fasync::MonotonicInstant::after(
+                zx::MonotonicDuration::from_millis(100),
+            ))
+            .await;
         }
 
         // Unblock the mock action, causing destroy to complete as well
@@ -468,8 +470,10 @@ pub mod tests {
 
             // The destroy action hasn't blocked on the mock action yet.
             // Wait for that to happen and check again.
-            fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_millis(100)))
-                .await;
+            fasync::Timer::new(fasync::MonotonicInstant::after(
+                zx::MonotonicDuration::from_millis(100),
+            ))
+            .await;
         }
 
         // Now that the Destroy action is waiting on the Start action, it should also

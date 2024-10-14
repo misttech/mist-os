@@ -17,15 +17,15 @@ pub fn convert_disconnect_source(
 }
 
 pub fn convert_user_wait_time(
-    duration: zx::Duration,
+    duration: zx::MonotonicDuration,
 ) -> metrics::ConnectivityWlanMetricDimensionWaitTime {
     use metrics::ConnectivityWlanMetricDimensionWaitTime::*;
     match duration {
-        x if x < zx::Duration::from_seconds(1) => LessThan1Second,
-        x if x < zx::Duration::from_seconds(3) => LessThan3Seconds,
-        x if x < zx::Duration::from_seconds(5) => LessThan5Seconds,
-        x if x < zx::Duration::from_seconds(8) => LessThan8Seconds,
-        x if x < zx::Duration::from_seconds(15) => LessThan15Seconds,
+        x if x < zx::MonotonicDuration::from_seconds(1) => LessThan1Second,
+        x if x < zx::MonotonicDuration::from_seconds(3) => LessThan3Seconds,
+        x if x < zx::MonotonicDuration::from_seconds(5) => LessThan5Seconds,
+        x if x < zx::MonotonicDuration::from_seconds(8) => LessThan8Seconds,
+        x if x < zx::MonotonicDuration::from_seconds(15) => LessThan15Seconds,
         _ => AtLeast15Seconds,
     }
 }

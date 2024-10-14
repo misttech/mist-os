@@ -758,7 +758,7 @@ impl<T> ReferenceReceiver<T> {
         debug!("{resource_name} {resource_id:?} removal is pending references: {refs:?}");
         // If we get stuck trying to remove the resource, log the remaining refs
         // at a low frequency to aid debugging.
-        let interval_logging = fasync::Interval::new(zx::Duration::from_seconds(30))
+        let interval_logging = fasync::Interval::new(zx::MonotonicDuration::from_seconds(30))
             .map(move |()| {
                 warn!("{resource_name} {resource_id:?} removal is pending references: {refs:?}")
             })

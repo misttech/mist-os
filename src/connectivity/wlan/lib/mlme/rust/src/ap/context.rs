@@ -37,7 +37,11 @@ impl<D> Context<D> {
         Self { device, timer, seq_mgr: SequenceManager::new(), bssid }
     }
 
-    pub fn schedule_after(&mut self, duration: zx::Duration, event: TimedEvent) -> EventId {
+    pub fn schedule_after(
+        &mut self,
+        duration: zx::MonotonicDuration,
+        event: TimedEvent,
+    ) -> EventId {
         self.timer.schedule_after(duration, event)
     }
 
@@ -652,7 +656,7 @@ mod test {
         let (fake_device, _) = FakeDevice::new().await;
         let (mut ctx, mut time_stream) = make_context(fake_device);
         let event_id = ctx.schedule_after(
-            zx::Duration::from_seconds(5),
+            zx::MonotonicDuration::from_seconds(5),
             TimedEvent::ClientEvent(MacAddr::from([1; 6]), ClientEvent::BssIdleTimeout),
         );
         let (_, timed_event) =

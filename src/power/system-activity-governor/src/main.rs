@@ -15,13 +15,13 @@ use fuchsia_inspect::health::Reporter;
 use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use sag_config::Config;
 use std::rc::Rc;
-use zx::Duration;
+use zx::MonotonicDuration;
 use {
     fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_power_broker as fbroker,
     fidl_fuchsia_power_suspend as fsuspend, fidl_fuchsia_power_system as fsystem,
 };
 
-const SUSPEND_DEVICE_TIMEOUT: Duration = Duration::from_seconds(10);
+const SUSPEND_DEVICE_TIMEOUT: MonotonicDuration = MonotonicDuration::from_seconds(10);
 
 async fn connect_to_suspender() -> Result<fhsuspend::SuspenderProxy> {
     let service_dir =

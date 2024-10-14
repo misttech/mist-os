@@ -33,7 +33,7 @@ use recovery_ui_config::Config as UiConfig;
 use rive_rs::{self as rive};
 use std::borrow::{Borrow, Cow};
 use std::path::Path;
-use zx::{Duration, Event};
+use zx::{Event, MonotonicDuration};
 
 #[cfg(feature = "ota_ui")]
 mod ui_v2;
@@ -775,7 +775,7 @@ impl RecoveryViewAssistant {
                         // start the countdown timer
                         let f = async move {
                             let mut interval_timer =
-                                fasync::Interval::new(Duration::from_seconds(1));
+                                fasync::Interval::new(MonotonicDuration::from_seconds(1));
                             while let Some(()) = interval_timer.next().await {
                                 counter -= 1;
                                 local_app_sender.queue_message(
@@ -924,7 +924,7 @@ impl RecoveryViewAssistant {
                                     Err(_) => {
                                         // Let the "Connecting" message stay there for a second so
                                         // the user can see that something was tried.
-                                        let sleep_time = Duration::from_seconds(1);
+                                        let sleep_time = MonotonicDuration::from_seconds(1);
                                         fuchsia_async::Timer::new(sleep_time.after_now()).await;
                                         println!(
                                             "Failed to connect: {}",

@@ -26,12 +26,12 @@ use virtio_device::chain::ReadableChain;
 // TODO(https://fxbug.dev/323262398): Remove this hardcoded profile once we've switched to
 // RoleManager, which supports output parameters.
 pub(crate) struct DeadlineProfileConfig {
-    period: zx::Duration,
+    period: zx::MonotonicDuration,
 }
 
 // Currently requesting 0.5ms of CPU every 5ms.
 pub(crate) static DEADLINE_PROFILE: Lazy<DeadlineProfileConfig> =
-    Lazy::new(|| DeadlineProfileConfig { period: zx::Duration::from_millis(5) });
+    Lazy::new(|| DeadlineProfileConfig { period: zx::MonotonicDuration::from_millis(5) });
 
 // There are no defined features. See: 5.14.3 Feature Bits
 // https://www.kraxel.org/virtio/virtio-v1.1-cs01-sound-v8.html#x1-4980003

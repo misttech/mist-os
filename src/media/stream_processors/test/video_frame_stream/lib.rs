@@ -261,7 +261,7 @@ mod test {
                 })
             }),
             /*frames_per_second=*/ 60,
-            /*timebase=*/ Some(zx::Duration::from_seconds(1).into_nanos() as u64),
+            /*timebase=*/ Some(zx::MonotonicDuration::from_seconds(1).into_nanos() as u64),
             /*mime_type=*/ "video/h264",
         )
         .expect("stream");
@@ -270,7 +270,7 @@ mod test {
         assert_eq!(chunks.next().and_then(|chunk| chunk.timestamp), Some(0));
         assert_eq!(
             chunks.next().and_then(|chunk| chunk.timestamp),
-            Some(zx::Duration::from_seconds(1).into_nanos() as u64 / 60)
+            Some(zx::MonotonicDuration::from_seconds(1).into_nanos() as u64 / 60)
         );
     }
 

@@ -477,7 +477,7 @@ async fn test_slew_clock() {
     // Constants for controlling the duration of the slew we want to induce. These constants
     // are intended to tune the test to avoid flakes and do not necessarily need to match up with
     // those in timekeeper.
-    const SLEW_DURATION: zx::Duration = zx::Duration::from_minutes(90);
+    const SLEW_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_minutes(90);
     const NOMINAL_SLEW_PPM: i64 = 20;
     let error_for_slew = SLEW_DURATION * NOMINAL_SLEW_PPM / 1_000_000;
 
@@ -538,7 +538,7 @@ async fn test_slew_clock() {
 
 #[fuchsia::test]
 async fn test_step_clock() {
-    const STEP_ERROR: zx::Duration = zx::Duration::from_hours(1);
+    const STEP_ERROR: zx::MonotonicDuration = zx::MonotonicDuration::from_hours(1);
     let clock = new_nonshareable_clock();
     timekeeper_test(clock, None, |clock, push_source_controller, _, _| async move {
         // Let the first sample be slightly in the past so later samples are not in the future.
@@ -598,7 +598,9 @@ async fn test_step_clock() {
         assert_geq!(utc_now_2, jump_utc);
         assert_leq!(
             utc_now_2,
-            jump_utc + (monotonic_after_2 - monotonic_before) + zx::Duration::from_millis(500)
+            jump_utc
+                + (monotonic_after_2 - monotonic_before)
+                + zx::MonotonicDuration::from_millis(500)
         );
     })
     .await

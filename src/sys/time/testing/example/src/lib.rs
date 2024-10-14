@@ -88,7 +88,7 @@ async fn test_example() {
     // the time source.  When we inject the time sample as shown below, Timekeeper will see
     // that as if the time source provided a time sample, and will adjust all clocks
     // accordingly.
-    const STD_DEV: zx::Duration = zx::Duration::from_millis(50);
+    const STD_DEV: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(50);
     push_source_puppet
         .set_sample(&TimeSample {
             utc: Some(VALID_TIME.into_nanos()),

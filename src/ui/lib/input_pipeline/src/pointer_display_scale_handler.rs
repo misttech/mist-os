@@ -657,8 +657,8 @@ mod tests {
         .expect("failed to make handler");
 
         let event_time1 = zx::MonotonicInstant::get();
-        let event_time2 = event_time1.add(zx::Duration::from_micros(1));
-        let event_time3 = event_time2.add(zx::Duration::from_micros(1));
+        let event_time2 = event_time1.add(zx::MonotonicDuration::from_micros(1));
+        let event_time3 = event_time2.add(zx::MonotonicDuration::from_micros(1));
 
         let input_events = vec![
             testing_utilities::create_mouse_event(

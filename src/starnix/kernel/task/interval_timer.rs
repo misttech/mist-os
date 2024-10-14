@@ -22,9 +22,9 @@ use std::sync::Arc;
 #[derive(Default)]
 pub struct TimerRemaining {
     /// Remaining time until the next expiration.
-    pub remainder: zx::Duration,
+    pub remainder: zx::MonotonicDuration,
     /// Interval for periodic timer.
-    pub interval: zx::Duration,
+    pub interval: zx::MonotonicDuration,
 }
 
 impl From<TimerRemaining> for itimerspec {
@@ -60,7 +60,7 @@ struct IntervalTimerMutableState {
     /// Time of the next expiration on the requested timeline.
     target_time: TargetTime,
     /// Interval for periodic timer.
-    interval: zx::Duration,
+    interval: zx::MonotonicDuration,
     /// Number of timer expirations that have occurred since the last time a signal was sent.
     ///
     /// Timer expiration is not counted as overrun under `SignalEventNotify::None`.
@@ -149,7 +149,7 @@ impl IntervalTimer {
                 let mut guard = self.state.lock();
                 // If the `interval` is zero, the timer expires just once, at the time
                 // specified by `target_time`.
-                if guard.interval == zx::Duration::ZERO {
+                if guard.interval == zx::MonotonicDuration::ZERO {
                     guard.overrun_cur = 1;
                 } else {
                     let exp =
@@ -199,7 +199,7 @@ impl IntervalTimer {
             // If the `interval` is zero, the timer expires just once, at the time
             // specified by `target_time`.
             let mut guard = self.state.lock();
-            if guard.interval != zx::Duration::default() {
+            if guard.interval != zx::MonotonicDuration::default() {
                 guard.target_time = self.timeline.now() + guard.interval;
             } else {
                 guard.disarm();
@@ -230,7 +230,7 @@ impl IntervalTimer {
         let interval = duration_from_timespec(new_value.it_interval)?;
 
         if let Some(hr_timer) = &self.hr_timer {
-            *hr_timer.is_interval.lock() = guard.interval != zx::Duration::default();
+            *hr_timer.is_interval.lock() = guard.interval != zx::MonotonicDuration::default();
         }
 
         // Stop the current running task;

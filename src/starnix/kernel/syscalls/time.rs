@@ -255,8 +255,10 @@ fn clock_nanosleep_monotonic_with_deadline(
                     Some(original_utc_deadline) => original_utc_deadline - utc_now(),
                     None => deadline - zx::MonotonicInstant::get(),
                 };
-                let remaining =
-                    timespec_from_duration(std::cmp::max(zx::Duration::from_nanos(0), remaining));
+                let remaining = timespec_from_duration(std::cmp::max(
+                    zx::MonotonicDuration::from_nanos(0),
+                    remaining,
+                ));
                 current_task.write_object(user_remaining, &remaining)?;
             }
             current_task.set_syscall_restart_func(move |current_task| {
@@ -565,7 +567,7 @@ mod test {
             }
         });
 
-        let duration = timespec_from_duration(zx::Duration::from_seconds(60));
+        let duration = timespec_from_duration(zx::MonotonicDuration::from_seconds(60));
         let address = map_memory(
             &mut locked,
             &current_task,
@@ -605,7 +607,7 @@ mod test {
 
         super::clock_nanosleep_relative_to_utc(&mut current_task, tv, false, remaining).unwrap();
         let elapsed = test_clock.read().unwrap() - before;
-        assert!(elapsed >= zx::Duration::from_seconds(1));
+        assert!(elapsed >= zx::MonotonicDuration::from_seconds(1));
     }
 
     #[::fuchsia::test]
@@ -632,7 +634,8 @@ mod test {
 
         // Interrupt the sleep roughly halfway through. The actual interruption might be before the
         // sleep starts, during the sleep, or after.
-        let interruption_target = zx::MonotonicInstant::get() + zx::Duration::from_seconds(1);
+        let interruption_target =
+            zx::MonotonicInstant::get() + zx::MonotonicDuration::from_seconds(1);
 
         let thread_group = OwnedRef::downgrade(&current_task.thread_group);
         let thread_join_handle = std::thread::Builder::new()
@@ -659,14 +662,14 @@ mod test {
         }
         assert_leq!(
             duration_from_timespec(remaining_written).unwrap(),
-            zx::Duration::from_seconds(2)
+            zx::MonotonicDuration::from_seconds(2)
         );
         let elapsed = test_clock.read().unwrap() - before;
         thread_join_handle.join().unwrap();
 
         assert_geq!(
             elapsed + duration_from_timespec(remaining_written).unwrap(),
-            zx::Duration::from_seconds(2)
+            zx::MonotonicDuration::from_seconds(2)
         );
     }
 }

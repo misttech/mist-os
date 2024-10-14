@@ -1994,7 +1994,7 @@ mod tests {
         // in the past.
         let (dir, _server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("could not create proxy");
-        let result = readdir_recursive(&dir, Some(zx::Duration::from_nanos(0)))
+        let result = readdir_recursive(&dir, Some(zx::MonotonicDuration::from_nanos(0)))
             .collect::<Vec<Result<DirEntry, RecursiveEnumerateError>>>()
             .await
             .into_iter()

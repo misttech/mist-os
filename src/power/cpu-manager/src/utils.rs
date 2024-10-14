@@ -9,9 +9,9 @@ use fuchsia_component::client::{self as fclient, connect_to_service_instance};
 use futures::{TryFutureExt, TryStreamExt};
 use std::cmp::Reverse;
 use std::collections::HashMap;
-use zx::Duration;
+use zx::MonotonicDuration;
 
-const CPU_DRIVER_TIMEOUT: Duration = Duration::from_seconds(5);
+const CPU_DRIVER_TIMEOUT: MonotonicDuration = MonotonicDuration::from_seconds(5);
 
 pub async fn get_cpu_ctrl_proxy(
     node_info: &str,

@@ -172,7 +172,7 @@ async fn stress_interface(
     let iterations =
         if perftest_mode { PERF_TEST_MODE_ITERATIONS } else { UNIT_TEST_MODE_ITERATIONS };
     for i in 0..iterations {
-        fuchsia_async::Timer::new(zx::Duration::from_millis(50)).await;
+        fuchsia_async::Timer::new(zx::MonotonicDuration::from_millis(50)).await;
 
         assert!(control.disable().await.expect("call disable").expect("disable interface"));
         fnet_interfaces_ext::wait_interface_with_id(stream.by_ref(), &mut state, |iface| {
@@ -181,7 +181,7 @@ async fn stress_interface(
         .await
         .expect("wait for interface offline");
 
-        fuchsia_async::Timer::new(zx::Duration::from_millis(50)).await;
+        fuchsia_async::Timer::new(zx::MonotonicDuration::from_millis(50)).await;
 
         assert!(control.enable().await.expect("call enable").expect("enable interface"));
         fnet_interfaces_ext::wait_interface_with_id(stream.by_ref(), &mut state, |iface| {

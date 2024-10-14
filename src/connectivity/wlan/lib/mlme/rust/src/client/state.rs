@@ -479,7 +479,7 @@ fn extract_ht_vht_op<B: SplitByteSlice>(
 }
 
 pub fn schedule_association_status_timeout(
-    beacon_period: zx::Duration,
+    beacon_period: zx::MonotonicDuration,
     timer: &mut Timer<TimedEvent>,
 ) -> StatusCheckTimeout {
     let last_fired = timer.now();

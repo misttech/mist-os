@@ -407,8 +407,8 @@ mod test {
         );
     }
 
-    #[test_case(true, zx::MonotonicInstant::after(zx::Duration::from_millis(100)); "blocking with object")]
-    #[test_case(false, zx::MonotonicInstant::after(zx::Duration::from_millis(100)); "blocking without object")]
+    #[test_case(true, zx::MonotonicInstant::after(zx::MonotonicDuration::from_millis(100)); "blocking with object")]
+    #[test_case(false, zx::MonotonicInstant::after(zx::MonotonicDuration::from_millis(100)); "blocking without object")]
     #[test_case(true, zx::MonotonicInstant::INFINITE_PAST; "non blocking with object")]
     #[test_case(false, zx::MonotonicInstant::INFINITE_PAST; "non blocking without object")]
     fn test_wait_timeout(with_object: bool, deadline: zx::MonotonicInstant) {

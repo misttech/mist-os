@@ -43,19 +43,19 @@ use inspect::RemotePeerInspect;
 /// This is used during connection establishment when both devices attempt to establish
 /// a connection at the same time.
 /// See AVRCP 1.6.2, Section 4.1.1 for more details.
-const MIN_CONNECTION_EST_TIME: zx::Duration = zx::Duration::from_millis(100);
+const MIN_CONNECTION_EST_TIME: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(100);
 
 /// The maximum amount of time to wait before establishing an AVCTP connection.
 /// This is used during connection establishment when both devices attempt to establish
 /// a connection at the same time.
 /// See AVRCP 1.6.2, Section 4.1.1 for more details.
-const MAX_CONNECTION_EST_TIME: zx::Duration = zx::Duration::from_millis(1000);
+const MAX_CONNECTION_EST_TIME: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(1000);
 
 /// Arbitrary threshold amount of time used to determine if two connections were
 /// established at "the same time".
 /// This was chosen in between the `MIN_CONNECTION_EST_TIME` and `MAX_CONNECTION_EST_TIME`
 /// to account for radio delay and other factors that impede connection establishment.
-const CONNECTION_THRESHOLD: zx::Duration = zx::Duration::from_millis(750);
+const CONNECTION_THRESHOLD: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(750);
 
 #[derive(Debug, PartialEq)]
 pub enum PeerChannelState<T> {
@@ -1180,7 +1180,7 @@ pub(crate) mod tests {
         expect_channel_writable(&remote);
 
         // Advance time by some arbitrary amount before peer decides to reconnect.
-        exec.set_fake_time(zx::Duration::from_seconds(5).after_now());
+        exec.set_fake_time(zx::MonotonicDuration::from_seconds(5).after_now());
         let _ = exec.wake_expired_timers();
 
         // Peer reconnects with a new l2cap connection. Keep the old one alive to validate that it's
@@ -1243,7 +1243,7 @@ pub(crate) mod tests {
 
         // Advance time by LESS than the CONNECTION_THRESHOLD amount.
         let advance_time = CONNECTION_THRESHOLD.into_nanos() - 100;
-        exec.set_fake_time(zx::Duration::from_nanos(advance_time).after_now());
+        exec.set_fake_time(zx::MonotonicDuration::from_nanos(advance_time).after_now());
         let _ = exec.wake_expired_timers();
 
         // Simulate inbound connection.
@@ -1454,7 +1454,7 @@ pub(crate) mod tests {
 
         // Advance time by LESS than the CONNECTION_THRESHOLD amount.
         let advance_time = CONNECTION_THRESHOLD.into_nanos() - 200;
-        exec.set_fake_time(zx::Duration::from_nanos(advance_time).after_now());
+        exec.set_fake_time(zx::MonotonicDuration::from_nanos(advance_time).after_now());
         let _ = exec.wake_expired_timers();
 
         // Simulate inbound browse connection.
@@ -1562,7 +1562,7 @@ pub(crate) mod tests {
         expect_channel_writable(&remote2);
 
         // Advance time by some arbitrary amount before peer decides to reconnect.
-        exec.set_fake_time(zx::Duration::from_seconds(5).after_now());
+        exec.set_fake_time(zx::MonotonicDuration::from_seconds(5).after_now());
         let _ = exec.wake_expired_timers();
 
         // After some time, remote peer sends incoming a new l2cap connection

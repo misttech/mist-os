@@ -120,7 +120,7 @@ pub async fn start_ap_and_wait_for_confirmation(
     let () = responder.send().expect("failed to send update response");
 
     // Start the AP
-    let mut retry = RetryWithBackoff::new(zx::Duration::from_seconds(120));
+    let mut retry = RetryWithBackoff::new(zx::MonotonicDuration::from_seconds(120));
     loop {
         let controller = ap_controller.clone();
 

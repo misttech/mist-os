@@ -393,8 +393,10 @@ impl Cr50 {
                 }
 
                 // Wait 10ms before checking again.
-                fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_millis(10)))
-                    .await;
+                fasync::Timer::new(fasync::MonotonicInstant::after(
+                    zx::MonotonicDuration::from_millis(10),
+                ))
+                .await;
             }
         })
         .detach();

@@ -25,7 +25,7 @@ fn connect_to_ime_service() -> Result<ui_input::ImeServiceProxy> {
         .context("Failed to connect to fuchsia.ui.input.ImeService")
 }
 
-const DELAY: zx::Duration = zx::Duration::from_seconds(5);
+const DELAY: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(5);
 
 // TODO(https://fxbug.dev/42154779) This is horrible, but inevitable. Until the linked
 // bug is fixed.  It can't work in 100% of the cases, and it can't work 100%

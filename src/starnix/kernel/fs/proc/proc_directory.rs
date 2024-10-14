@@ -779,7 +779,7 @@ impl DynamicFileSource for UptimeFile {
             .map_err(|_| errno!(EIO))?;
         let per_cpu_stats = cpu_stats.per_cpu_stats.unwrap_or(vec![]);
         let idle_time = per_cpu_stats.iter().map(|s| s.idle_time.unwrap_or(0)).sum();
-        let idle_time = zx::Duration::from_nanos(idle_time).into_seconds_f64();
+        let idle_time = zx::MonotonicDuration::from_nanos(idle_time).into_seconds_f64();
 
         writeln!(sink, "{:.2} {:.2}", uptime, idle_time)?;
 
@@ -906,7 +906,7 @@ impl DynamicFileSource for StatFile {
         const NUM_CPU_STATS: usize = 10;
 
         let get_cpu_stats_row = |cpu_stats: &fidl_fuchsia_kernel::PerCpuStats| {
-            let idle = zx::Duration::from_nanos(cpu_stats.idle_time.unwrap_or(0));
+            let idle = zx::MonotonicDuration::from_nanos(cpu_stats.idle_time.unwrap_or(0));
 
             // Assume that all non-idle time is spent in user mode.
             let user = uptime - idle;
@@ -955,7 +955,7 @@ impl DynamicFileSource for StatFile {
         let num_interrupts: u64 = per_cpu_stats.iter().map(|s| s.ints.unwrap_or(0)).sum();
         writeln!(sink, "intr {}", num_interrupts)?;
 
-        let epoch_time = zx::Duration::from(
+        let epoch_time = zx::MonotonicDuration::from(
             SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap_or_default(),
         );
         let boot_time_epoch = epoch_time - uptime;

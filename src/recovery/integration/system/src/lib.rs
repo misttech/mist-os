@@ -14,7 +14,7 @@ use fidl_fuchsia_logger::{
     LogMarker,
 };
 use fuchsia_component::client::connect_to_protocol;
-use zx::Duration;
+use zx::MonotonicDuration;
 
 use futures::channel::mpsc;
 use futures::{StreamExt, TryStreamExt};
@@ -110,7 +110,7 @@ async fn test_startup() -> Result<(), Error> {
 
     let recovery_started_msg = receiver
         .next()
-        .on_timeout(Duration::from_seconds(test_timeout_seconds), || {
+        .on_timeout(MonotonicDuration::from_seconds(test_timeout_seconds), || {
             Some("test_startup timed out".to_string())
         })
         .await

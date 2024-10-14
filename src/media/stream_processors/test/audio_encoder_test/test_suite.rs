@@ -263,7 +263,7 @@ impl AudioEncoderTestCase {
             pcm_audio,
             encoder_settings: settings.clone(),
             frames_per_packet: frames_per_packet,
-            timebase: Some(zx::Duration::from_seconds(1).into_nanos() as u64),
+            timebase: Some(zx::MonotonicDuration::from_seconds(1).into_nanos() as u64),
         })
     }
 }

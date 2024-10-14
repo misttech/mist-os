@@ -492,7 +492,7 @@ impl ProjectSampler {
     ) -> fasync::Task<Result<ProjectSamplerTaskExit, Error>> {
         fasync::Task::local(async move {
             let mut periodic_timer =
-                fasync::Interval::new(zx::Duration::from_seconds(self.poll_rate_sec));
+                fasync::Interval::new(zx::MonotonicDuration::from_seconds(self.poll_rate_sec));
             loop {
                 let done = select! {
                     opt = periodic_timer.next() => {

@@ -12,7 +12,7 @@ use futures::stream::StreamExt;
 use mock_piconet_client::{BtProfileComponent, PiconetHarness, PiconetMember};
 use profile_client::{ProfileClient, ProfileEvent};
 use std::pin::pin;
-use zx::Duration;
+use zx::MonotonicDuration;
 use {fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr};
 
 /// RFCOMM component URL.
@@ -35,7 +35,7 @@ const MOCK_PICONET_MEMBER_MONIKER: &str = "mock-peer";
 ///   b) short enough to still provide useful feedback in those cases where asynchronous operations
 ///      fail
 ///   c) short enough to fail before the overall infra-imposed test timeout (currently 5 minutes)
-const RFCOMM_CHANNEL_TIMEOUT: Duration = Duration::from_seconds(2 * 60);
+const RFCOMM_CHANNEL_TIMEOUT: MonotonicDuration = MonotonicDuration::from_seconds(2 * 60);
 
 /// The SppClient in these integration tests is just an alias for the `ProfileClient`.
 type SppClient = ProfileClient;

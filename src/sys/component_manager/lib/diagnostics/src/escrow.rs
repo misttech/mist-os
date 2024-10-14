@@ -108,7 +108,7 @@ impl DurationStats {
         self: &Arc<Self>,
         moniker: &Moniker,
         stop_time: zx::MonotonicInstant,
-        execution_duration: zx::Duration,
+        execution_duration: zx::MonotonicDuration,
         requested_escrow: bool,
     ) {
         let mut escrowing_components = self.escrowing_components.lock();

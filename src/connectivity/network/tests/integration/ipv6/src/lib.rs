@@ -66,17 +66,18 @@ const EXPECTED_DUP_ADDR_DETECT_TRANSMITS: u8 = 1;
 
 /// The expected interval between sending Neighbor Solicitation messages when
 /// performing Duplicate Address Detection.
-const EXPECTED_DAD_RETRANSMIT_TIMER: zx::Duration = zx::Duration::from_seconds(1);
+const EXPECTED_DAD_RETRANSMIT_TIMER: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(1);
 
 /// The expected interval between sending Router Solicitation messages when
 /// soliciting IPv6 routers.
-const EXPECTED_ROUTER_SOLICITATION_INTERVAL: zx::Duration = zx::Duration::from_seconds(4);
+const EXPECTED_ROUTER_SOLICITATION_INTERVAL: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_seconds(4);
 
 /// As per [RFC 7217 section 6] Hosts SHOULD introduce a random delay between 0 and
 /// `IDGEN_DELAY` before trying a new tentative address.
 ///
 /// [RFC 7217]: https://tools.ietf.org/html/rfc7217#section-6
-const DAD_IDGEN_DELAY: zx::Duration = zx::Duration::from_seconds(1);
+const DAD_IDGEN_DELAY: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(1);
 
 async fn install_and_get_ipv6_addrs_for_endpoint<N: Netstack>(
     realm: &netemul::TestRealm<'_>,
@@ -892,7 +893,7 @@ async fn slaac_regeneration_after_dad_failure<N: Netstack>(name: &str) {
     // Expects an NS message for DAD within timeout and returns the target address of the message.
     async fn expect_ns_message_in(
         fake_ep: &netemul::TestFakeEndpoint<'_>,
-        timeout: zx::Duration,
+        timeout: zx::MonotonicDuration,
     ) -> net_types_ip::Ipv6Addr {
         fake_ep
             .frame_stream()

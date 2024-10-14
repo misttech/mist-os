@@ -13,13 +13,13 @@ use futures::channel::mpsc::UnboundedSender;
 use futures::future::{AbortHandle, Abortable, TryFutureExt};
 use futures::lock::Mutex;
 use std::sync::Arc;
-use zx::Duration;
+use zx::MonotonicDuration;
 
 /// Helper for creating a beacon. The builder allows chaining additional fuses
 pub struct BeaconBuilder {
     messenger: Messenger,
     chained_fuses: Option<ActionFuseHandle>,
-    timeout: Option<Duration>,
+    timeout: Option<MonotonicDuration>,
 }
 
 impl BeaconBuilder {
@@ -32,7 +32,7 @@ impl BeaconBuilder {
         self
     }
 
-    pub(super) fn set_timeout(mut self, duration: Option<Duration>) -> Self {
+    pub(super) fn set_timeout(mut self, duration: Option<MonotonicDuration>) -> Self {
         self.timeout = duration;
         self
     }
@@ -71,7 +71,7 @@ impl Beacon {
     fn create(
         messenger: Messenger,
         fuses: Option<ActionFuseHandle>,
-        timeout: Option<Duration>,
+        timeout: Option<MonotonicDuration>,
     ) -> (Beacon, Receptor) {
         let sentinel = Arc::new(Mutex::new(Sentinel::new()));
         let (event_tx, event_rx) = futures::channel::mpsc::unbounded::<MessageEvent>();

@@ -42,8 +42,8 @@ mod test {
         static ref TEST_SAMPLE: HttpsSample = HttpsSample {
             utc: zx::MonotonicInstant::from_nanos(111_111_111),
             monotonic: zx::MonotonicInstant::from_nanos(222_222_222),
-            standard_deviation: zx::Duration::from_millis(235),
-            final_bound_size: zx::Duration::from_millis(100),
+            standard_deviation: zx::MonotonicDuration::from_millis(235),
+            final_bound_size: zx::MonotonicDuration::from_millis(100),
             polls: vec![],
         };
         static ref TEST_SUCCESS: Event<'static> = Event::Success(&*TEST_SAMPLE);

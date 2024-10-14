@@ -185,8 +185,10 @@ impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
                 Err(fnet_filter_deprecated::FilterUpdateNatRulesError::GenerationMismatch) => {
                     // We need to try again.
                     fuchsia_async::Timer::new(
-                        zx::Duration::from_millis(crate::filter::FILTER_CAS_RETRY_INTERVAL_MILLIS)
-                            .after_now(),
+                        zx::MonotonicDuration::from_millis(
+                            crate::filter::FILTER_CAS_RETRY_INTERVAL_MILLIS,
+                        )
+                        .after_now(),
                     )
                     .await;
                 }

@@ -503,7 +503,7 @@ impl ReadWrite {
                     // to be transmitted to the guest. Signal to the guest not to send any more data
                     // if not already done.
                     *self.tx_shutdown_leeway.borrow_mut() =
-                        fasync::MonotonicInstant::after(zx::Duration::from_seconds(1));
+                        fasync::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(1));
                     self.conn_flags.borrow_mut().set(VirtioVsockFlags::SHUTDOWN_SEND, true);
                     self.send_half_shutdown_packet();
                 }
@@ -707,7 +707,7 @@ impl ReadWrite {
                 }
                 Err(_) => {
                     *self.tx_shutdown_leeway.borrow_mut() =
-                        fasync::MonotonicInstant::after(zx::Duration::from_seconds(1));
+                        fasync::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(1));
                     self.conn_flags.borrow_mut().set(VirtioVsockFlags::SHUTDOWN_SEND, true);
                     self.send_half_shutdown_packet();
                     return Ok(());
@@ -833,7 +833,8 @@ impl ClientInitiatedShutdown {
                 .expect("Control packet tx end should never be closed");
 
             self.sent_full_shutdown.set(true);
-            self.timeout.set(fasync::MonotonicInstant::after(zx::Duration::from_seconds(5)));
+            self.timeout
+                .set(fasync::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(5)));
         }
 
         // Returns once the state has waited 5s from creation for a guest response.
@@ -2163,7 +2164,7 @@ mod tests {
         // After 1s the TX queue for this connection should be empty, and the guest should have
         // refrained from adding any new chains.
         executor.set_fake_time(fuchsia_async::MonotonicInstant::after(
-            zx::Duration::from_seconds(1) + zx::Duration::from_nanos(1),
+            zx::MonotonicDuration::from_seconds(1) + zx::MonotonicDuration::from_nanos(1),
         ));
 
         queue_state
@@ -2336,8 +2337,9 @@ mod tests {
         assert_eq!(flags, VirtioVsockFlags::SHUTDOWN_BOTH);
         assert_eq!(OpType::try_from(header.op.get()).unwrap(), OpType::Shutdown);
 
-        executor
-            .set_fake_time(fuchsia_async::MonotonicInstant::after(zx::Duration::from_seconds(5)));
+        executor.set_fake_time(fuchsia_async::MonotonicInstant::after(
+            zx::MonotonicDuration::from_seconds(5),
+        ));
         assert!(executor.wake_expired_timers());
 
         // 5 seconds have passed, so the connection is no longer willing to wait for a guest reply.

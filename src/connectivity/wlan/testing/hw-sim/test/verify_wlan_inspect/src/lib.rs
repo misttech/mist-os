@@ -106,7 +106,7 @@ async fn verify_wlan_inspect() {
         });
         let () = helper
             .run_until_complete_or_timeout(
-                zx::Duration::from_seconds(240),
+                zx::MonotonicDuration::from_seconds(240),
                 format!("connecting to {} ({})", AP_SSID.to_string_not_redactable(), *BSSID),
                 event::on_scan(action::send_advertisements_and_scan_completion(&phy, probes))
                     .or(event::on_transmit(action::connect_with_open_authentication(

@@ -23,7 +23,7 @@ use futures::lock::Mutex;
 use futures::{FutureExt, StreamExt};
 use std::collections::VecDeque;
 use std::sync::Arc;
-use zx::Duration;
+use zx::MonotonicDuration;
 use {fuchsia_async as fasync, fuchsia_trace as ftrace};
 
 /// Maximum number of errors tracked per setting proxy before errors are rolled over.
@@ -140,8 +140,8 @@ pub(crate) struct SettingProxy {
     /// Sender for passing messages about the active requests and controllers.
     proxy_request_sender: UnboundedSender<ProxyRequest>,
     max_attempts: u64,
-    teardown_timeout: Duration,
-    request_timeout: Option<Duration>,
+    teardown_timeout: MonotonicDuration,
+    request_timeout: Option<MonotonicDuration>,
     retry_on_timeout: bool,
     teardown_cancellation: Option<futures::channel::oneshot::Sender<()>>,
     _node: fuchsia_inspect::Node,
@@ -175,8 +175,8 @@ impl SettingProxy {
         handler_factory: Arc<Mutex<dyn SettingHandlerFactory + Send + Sync>>,
         delegate: service::message::Delegate,
         max_attempts: u64,
-        teardown_timeout: Duration,
-        request_timeout: Option<Duration>,
+        teardown_timeout: MonotonicDuration,
+        request_timeout: Option<MonotonicDuration>,
         retry_on_timeout: bool,
         node: fuchsia_inspect::Node,
         listener_logger: Arc<Mutex<ListenerInspectLogger>>,

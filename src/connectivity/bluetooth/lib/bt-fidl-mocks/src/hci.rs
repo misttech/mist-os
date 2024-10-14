@@ -8,21 +8,24 @@ use fidl_fuchsia_hardware_bluetooth::{
     HciTransportMarker, HciTransportProxy, HciTransportRequest, HciTransportRequestStream,
     SentPacket,
 };
-use zx::Duration;
+use zx::MonotonicDuration;
 
 /// Provides a simple mock implementation of `fuchsia.hardware.bluetooth/HciTransport`.
 pub struct HciTransportMock {
     stream: HciTransportRequestStream,
-    timeout: Duration,
+    timeout: MonotonicDuration,
 }
 
 impl HciTransportMock {
-    pub fn new(timeout: Duration) -> Result<(HciTransportProxy, HciTransportMock), Error> {
+    pub fn new(timeout: MonotonicDuration) -> Result<(HciTransportProxy, HciTransportMock), Error> {
         let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<HciTransportMarker>()?;
         Ok((proxy, HciTransportMock { stream, timeout }))
     }
 
-    pub fn from_stream(stream: HciTransportRequestStream, timeout: Duration) -> HciTransportMock {
+    pub fn from_stream(
+        stream: HciTransportRequestStream,
+        timeout: MonotonicDuration,
+    ) -> HciTransportMock {
         HciTransportMock { stream, timeout }
     }
 

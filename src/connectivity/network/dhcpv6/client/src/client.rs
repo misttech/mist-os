@@ -56,7 +56,7 @@ impl dhcpv6_core::Instant for MonotonicInstant {
     fn duration_since(&self, MonotonicInstant(earlier): MonotonicInstant) -> Duration {
         let Self(this) = *self;
 
-        let diff: zx::Duration = this - earlier;
+        let diff: zx::MonotonicDuration = this - earlier;
 
         Duration::from_nanos(diff.into_nanos().try_into().unwrap_or_else(|e| {
             panic!(
@@ -380,7 +380,7 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
                         let now = zx::MonotonicInstant::get();
                         let nonzero_timevalue_to_zx_time = |tv| match tv {
                             v6::NonZeroTimeValue::Finite(tv) => {
-                                now + zx::Duration::from_seconds(tv.get().into())
+                                now + zx::MonotonicDuration::from_seconds(tv.get().into())
                             }
                             v6::NonZeroTimeValue::Infinity => zx::MonotonicInstant::INFINITE,
                         };
@@ -1728,10 +1728,10 @@ mod tests {
                         let preferred_until = zx::MonotonicInstant::from_nanos(preferred_until1);
                         let valid_until = zx::MonotonicInstant::from_nanos(valid_until1);
 
-                        let preferred_for = zx::Duration::from_seconds(
+                        let preferred_for = zx::MonotonicDuration::from_seconds(
                             preferred_lifetime_secs.into(),
                         );
-                        let valid_for = zx::Duration::from_seconds(valid_lifetime_secs.into());
+                        let valid_for = zx::MonotonicDuration::from_seconds(valid_lifetime_secs.into());
 
                         assert_eq!(
                             HashSet::from([got_prefix1, got_prefix2]),

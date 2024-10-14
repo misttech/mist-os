@@ -230,7 +230,7 @@ impl BatteryManager {
                 }
 
                 // time remaining, provided by hardware as hours
-                let nanos_in_one_hour = zx::Duration::from_hours(1);
+                let nanos_in_one_hour = zx::MonotonicDuration::from_hours(1);
 
                 if bi.present_rate < 0 {
                     // discharging
@@ -518,7 +518,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn update_battery_info() {
-        let nanos_in_one_hour = zx::Duration::from_hours(1);
+        let nanos_in_one_hour = zx::MonotonicDuration::from_hours(1);
 
         let battery_manager = BatteryManager::new();
         let mut power_info = hpower::SourceInfo { type_: hpower::PowerType::Ac, state: 1 };

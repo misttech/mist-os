@@ -87,7 +87,7 @@ impl WlanPolicyFacade {
         // Sleep very briefly to introduce a yield point (with the await) so that in case the other
         // end of the channel is closed, its status is correctly propagated by the kernel and we can
         // accurately check it using `is_closed()`.
-        let sleep_duration = zx::Duration::from_millis(10);
+        let sleep_duration = zx::MonotonicDuration::from_millis(10);
         fasync::Timer::new(sleep_duration.after_now()).await;
         if controller.is_closed() {
             return Err(format_err!(

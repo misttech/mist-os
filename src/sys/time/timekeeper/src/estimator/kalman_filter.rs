@@ -19,14 +19,14 @@ const MIN_COVARIANCE: f64 = 1e12;
 /// two sigma approximately corresponds to a 95% confidence interval.
 const ERROR_BOUND_FACTOR: u32 = 2;
 
-/// Converts a zx::Duration to a floating point number of nanoseconds.
-fn duration_to_f64(duration: zx::Duration) -> f64 {
+/// Converts a zx::MonotonicDuration to a floating point number of nanoseconds.
+fn duration_to_f64(duration: zx::MonotonicDuration) -> f64 {
     duration.into_nanos() as f64
 }
 
-/// Converts a floating point number of nanoseconds to a zx::Duration.
-fn f64_to_duration(float: f64) -> zx::Duration {
-    zx::Duration::from_nanos(float as i64)
+/// Converts a floating point number of nanoseconds to a zx::MonotonicDuration.
+fn f64_to_duration(float: f64) -> zx::MonotonicDuration {
+    zx::MonotonicDuration::from_nanos(float as i64)
 }
 
 /// Maintains an estimate of the offset between true UTC time and monotonic time on this
@@ -86,7 +86,7 @@ impl KalmanFilter {
     }
 
     /// Correct the estimate by incorporating measurement data.
-    fn correct(&mut self, utc: &UtcInstant, std_dev: &zx::Duration) {
+    fn correct(&mut self, utc: &UtcInstant, std_dev: &zx::MonotonicDuration) {
         let measurement_variance = duration_to_f64(*std_dev).powf(2.0);
         let measurement_utc_offset = duration_to_f64(*utc - self.reference_utc);
         // Gain is based on the relative variance of the apriori estimate and the new measurement...
@@ -102,7 +102,7 @@ impl KalmanFilter {
     pub fn update(
         &mut self,
         Sample { utc, monotonic, std_dev }: &Sample,
-    ) -> Result<zx::Duration, Error> {
+    ) -> Result<zx::MonotonicDuration, Error> {
         // Ignore any updates that are earlier than the current filter state. Samples from a single
         // time source should arrive in order due to the validation in time_source_manager, but its
         // not impossible that a backwards step occurs during a time source switch.
@@ -157,7 +157,7 @@ impl KalmanFilter {
     }
 
     /// Returns the square root of the last updated filter covariance.
-    pub fn sqrt_covariance(&self) -> zx::Duration {
+    pub fn sqrt_covariance(&self) -> zx::MonotonicDuration {
         f64_to_duration(self.covariance_00.sqrt())
     }
 }
@@ -170,10 +170,10 @@ mod test {
 
     const TIME_1: zx::MonotonicInstant = zx::MonotonicInstant::from_nanos(10_000_000_000);
     const TIME_2: zx::MonotonicInstant = zx::MonotonicInstant::from_nanos(20_000_000_000);
-    const OFFSET_1: zx::Duration = zx::Duration::from_seconds(777);
-    const OFFSET_2: zx::Duration = zx::Duration::from_seconds(999);
-    const STD_DEV_1: zx::Duration = zx::Duration::from_millis(22);
-    const ZERO_DURATION: zx::Duration = zx::Duration::from_nanos(0);
+    const OFFSET_1: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(777);
+    const OFFSET_2: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(999);
+    const STD_DEV_1: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(22);
+    const ZERO_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_nanos(0);
     const SQRT_COV_1: u64 = STD_DEV_1.into_nanos() as u64;
 
     #[fuchsia::test]
@@ -202,10 +202,13 @@ mod test {
         assert_eq!(transform.synthetic(TIME_2).into_nanos(), (TIME_2 + OFFSET_1).into_nanos());
         assert_eq!(transform.error_bound(TIME_1), 2 * SQRT_COV_1);
         // Earlier time should return same error bound.
-        assert_eq!(transform.error_bound(TIME_1 - zx::Duration::from_seconds(1)), 2 * SQRT_COV_1);
+        assert_eq!(
+            transform.error_bound(TIME_1 - zx::MonotonicDuration::from_seconds(1)),
+            2 * SQRT_COV_1
+        );
         // Later time should have a higher bound.
         assert_eq!(
-            transform.error_bound(TIME_1 + zx::Duration::from_seconds(1)),
+            transform.error_bound(TIME_1 + zx::MonotonicDuration::from_seconds(1)),
             2 * SQRT_COV_1 + 2000 * config.get_oscillator_error_std_dev_ppm() as u64
         );
         assert_eq!(filter.monotonic(), TIME_1);
@@ -222,7 +225,7 @@ mod test {
             &Sample::new(
                 UtcInstant::from_nanos(10001_000000000),
                 zx::MonotonicInstant::from_nanos(1_000000000),
-                zx::Duration::from_millis(50),
+                zx::MonotonicDuration::from_millis(50),
             ),
             config,
         );
@@ -236,10 +239,10 @@ mod test {
                 .update(&Sample::new(
                     UtcInstant::from_nanos(10101_100000000),
                     zx::MonotonicInstant::from_nanos(101_000000000),
-                    zx::Duration::from_millis(200),
+                    zx::MonotonicDuration::from_millis(200),
                 ))
                 .unwrap(),
-            zx::Duration::from_nanos(100_005887335 - 0 - 100_000000000)
+            zx::MonotonicDuration::from_nanos(100_005887335 - 0 - 100_000000000)
         );
         assert_near!(filter.estimate_0, 100_005887335.0, 1.0);
         assert_near!(filter.estimate_1, 1f64, 1e-9);
@@ -250,10 +253,10 @@ mod test {
                 .update(&Sample::new(
                     UtcInstant::from_nanos(10300_900000000),
                     zx::MonotonicInstant::from_nanos(301_000000000),
-                    zx::Duration::from_millis(100),
+                    zx::MonotonicDuration::from_millis(100),
                 ))
                 .unwrap(),
-            zx::Duration::from_nanos(299_985642105 - 100_005887335 - 200_000000000)
+            zx::MonotonicDuration::from_nanos(299_985642105 - 100_005887335 - 200_000000000)
         );
         assert_near!(filter.estimate_0, 299_985642105.0, 1.0);
         assert_near!(filter.estimate_1, 1f64, 1e-9);
@@ -267,7 +270,7 @@ mod test {
             &Sample::new(
                 UtcInstant::from_nanos(10001_000000000),
                 zx::MonotonicInstant::from_nanos(1_000000000),
-                zx::Duration::from_millis(50),
+                zx::MonotonicDuration::from_millis(50),
             ),
             Arc::clone(&config),
         );
@@ -276,10 +279,10 @@ mod test {
                 .update(&Sample::new(
                     UtcInstant::from_nanos(10201_000000000),
                     zx::MonotonicInstant::from_nanos(201_000000000),
-                    zx::Duration::from_millis(50),
+                    zx::MonotonicDuration::from_millis(50),
                 ))
                 .unwrap(),
-            zx::Duration::from_nanos(0)
+            zx::MonotonicDuration::from_nanos(0)
         );
         assert_eq!(filter.reference_utc, UtcInstant::from_nanos(10001_000000000));
         assert_near!(filter.estimate_0, 200_000000000.0, 1.0);
@@ -322,10 +325,10 @@ mod test {
                 .update(&Sample::new(
                     UtcInstant::from_nanos(10301_000000000),
                     zx::MonotonicInstant::from_nanos(301_000000000),
-                    zx::Duration::from_millis(50),
+                    zx::MonotonicDuration::from_millis(50),
                 ))
                 .unwrap(),
-            zx::Duration::from_nanos(3341316)
+            zx::MonotonicDuration::from_nanos(3341316)
         );
         assert_near!(filter.estimate_0, 99993341316.6, 1.0);
         assert_near!(filter.estimate_1, 0.9999, 1e-9);

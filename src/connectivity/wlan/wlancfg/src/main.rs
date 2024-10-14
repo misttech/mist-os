@@ -67,8 +67,9 @@ async fn serve_fidl(
     telemetry_sender: TelemetrySender,
 ) -> Result<Infallible, Error> {
     // Wait a bit for the country code to be set before serving the policy APIs.
-    let regulatory_listener_timeout =
-        fasync::Timer::new(zx::Duration::from_seconds(REGULATORY_LISTENER_TIMEOUT_SEC).after_now());
+    let regulatory_listener_timeout = fasync::Timer::new(
+        zx::MonotonicDuration::from_seconds(REGULATORY_LISTENER_TIMEOUT_SEC).after_now(),
+    );
     select! {
         _ = regulatory_listener_timeout.fuse() => {
             // Log at info level because we expect RegulatoryManager may in some
@@ -179,7 +180,7 @@ async fn serve_fidl(
 async fn saved_networks_manager_metrics_loop(saved_networks: Arc<dyn SavedNetworksManagerApi>) {
     loop {
         saved_networks.record_periodic_metrics().await;
-        fasync::Timer::new(zx::Duration::from_hours(24).after_now()).await;
+        fasync::Timer::new(zx::MonotonicDuration::from_hours(24).after_now()).await;
     }
 }
 

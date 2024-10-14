@@ -21,7 +21,7 @@ use {
 };
 
 static MAX_REDIRECTS: u8 = 10;
-static DEFAULT_DEADLINE_DURATION: zx::Duration = zx::Duration::from_seconds(15);
+static DEFAULT_DEADLINE_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(15);
 
 fn to_status_line(version: hyper::Version, status: hyper::StatusCode) -> Vec<u8> {
     match status.canonical_reason() {

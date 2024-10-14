@@ -25,7 +25,7 @@ pub fn timeval_from_time<T: zx::Timeline>(time: zx::Instant<T>) -> timeval {
     timeval { tv_sec: nanos / NANOS_PER_SECOND, tv_usec: (nanos % NANOS_PER_SECOND) / 1000 }
 }
 
-pub fn timeval_from_duration(duration: zx::Duration) -> timeval {
+pub fn timeval_from_duration(duration: zx::MonotonicDuration) -> timeval {
     let nanos = duration.into_nanos();
     timeval { tv_sec: nanos / NANOS_PER_SECOND, tv_usec: (nanos % NANOS_PER_SECOND) / 1000 }
 }
@@ -35,38 +35,40 @@ pub fn timespec_from_time<T: zx::Timeline>(time: zx::Instant<T>) -> timespec {
     timespec { tv_sec: nanos / NANOS_PER_SECOND, tv_nsec: nanos % NANOS_PER_SECOND }
 }
 
-pub fn timespec_from_duration(duration: zx::Duration) -> timespec {
+pub fn timespec_from_duration(duration: zx::MonotonicDuration) -> timespec {
     let nanos = duration.into_nanos();
     timespec { tv_sec: nanos / NANOS_PER_SECOND, tv_nsec: nanos % NANOS_PER_SECOND }
 }
 
-pub fn duration_from_timespec(ts: timespec) -> Result<zx::Duration, Errno> {
+pub fn duration_from_timespec(ts: timespec) -> Result<zx::MonotonicDuration, Errno> {
     if ts.tv_nsec >= NANOS_PER_SECOND {
         return error!(EINVAL);
     }
     if ts.tv_sec < 0 || ts.tv_nsec < 0 {
         return error!(EINVAL);
     }
-    Ok(zx::Duration::from_seconds(ts.tv_sec) + zx::Duration::from_nanos(ts.tv_nsec))
+    Ok(zx::MonotonicDuration::from_seconds(ts.tv_sec)
+        + zx::MonotonicDuration::from_nanos(ts.tv_nsec))
 }
 
-pub fn duration_from_timeval(tv: timeval) -> Result<zx::Duration, Errno> {
+pub fn duration_from_timeval(tv: timeval) -> Result<zx::MonotonicDuration, Errno> {
     if tv.tv_usec < 0 || tv.tv_usec >= MICROS_PER_SECOND {
         return error!(EDOM);
     }
-    Ok(zx::Duration::from_seconds(tv.tv_sec) + zx::Duration::from_micros(tv.tv_usec))
+    Ok(zx::MonotonicDuration::from_seconds(tv.tv_sec)
+        + zx::MonotonicDuration::from_micros(tv.tv_usec))
 }
 
-pub fn duration_from_poll_timeout(timeout_ms: i32) -> Result<zx::Duration, Errno> {
+pub fn duration_from_poll_timeout(timeout_ms: i32) -> Result<zx::MonotonicDuration, Errno> {
     if timeout_ms == -1 {
-        return Ok(zx::Duration::INFINITE);
+        return Ok(zx::MonotonicDuration::INFINITE);
     }
 
     if timeout_ms < 0 {
         return error!(EINVAL);
     }
 
-    Ok(zx::Duration::from_millis(timeout_ms.into()))
+    Ok(zx::MonotonicDuration::from_millis(timeout_ms.into()))
 }
 
 pub fn itimerspec_from_itimerval(tv: itimerval) -> itimerspec {
@@ -103,7 +105,7 @@ pub fn timespec_is_zero(ts: timespec) -> bool {
 /// Returns an `itimerspec` with `it_value` set to `deadline` and `it_interval` set to `interval`.
 pub fn itimerspec_from_deadline_interval<T: zx::Timeline>(
     deadline: zx::Instant<T>,
-    interval: zx::Duration,
+    interval: zx::MonotonicDuration,
 ) -> itimerspec {
     itimerspec {
         it_interval: timespec_from_duration(interval),
@@ -111,7 +113,7 @@ pub fn itimerspec_from_deadline_interval<T: zx::Timeline>(
     }
 }
 
-pub fn duration_to_scheduler_clock(duration: zx::Duration) -> i64 {
+pub fn duration_to_scheduler_clock(duration: zx::MonotonicDuration) -> i64 {
     duration.into_nanos() / NANOS_PER_SCHEDULER_TICK
 }
 
@@ -124,7 +126,7 @@ mod test {
     #[::fuchsia::test]
     fn test_itimerspec() {
         let deadline = zx::MonotonicInstant::from_nanos(2 * NANOS_PER_SECOND + 50);
-        let interval = zx::Duration::from_nanos(1000);
+        let interval = zx::MonotonicDuration::from_nanos(1000);
         let time_spec = itimerspec_from_deadline_interval(deadline, interval);
         assert_eq!(time_spec.it_value.tv_sec, 2);
         assert_eq!(time_spec.it_value.tv_nsec, 50);

@@ -242,7 +242,7 @@ async fn assert_interface_assigned_addr(
         // loses the race here and only starts after the first request from the DHCP
         // client, which results in a 3 second toll. This test typically takes ~4.5
         // seconds; we apply a large multiple to be safe.
-        fuchsia_async::MonotonicInstant::after(zx::Duration::from_seconds(30)),
+        fuchsia_async::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(30)),
         || Err(anyhow::anyhow!("timed out")),
     )
     .await
@@ -331,8 +331,9 @@ async fn removing_acquired_address_stops_dhcp<SERVER: Netstack, CLIENT: Netstack
                                 // test timeout.
                                 default: {
                                     assert!(
-                                        zx::Duration::from_seconds(SHORT_LEASE_LENGTH_SECS.into())
-                                            < ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT
+                                        zx::MonotonicDuration::from_seconds(
+                                            SHORT_LEASE_LENGTH_SECS.into()
+                                        ) < ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT
                                     );
                                     Some(SHORT_LEASE_LENGTH_SECS)
                                 },

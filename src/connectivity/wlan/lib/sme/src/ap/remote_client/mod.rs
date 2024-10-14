@@ -472,7 +472,7 @@ mod tests {
         let (mut ctx, _, mut time_stream) = make_env();
         let timeout_event_id = r_sta.schedule_at(
             &mut ctx,
-            zx::MonotonicInstant::after(zx::Duration::from_seconds(2)),
+            zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(2)),
             ClientEvent::AssociationTimeout,
         );
         let (_, timed_event) = time_stream.try_next().unwrap().expect("expected timed event");

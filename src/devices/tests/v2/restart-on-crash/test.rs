@@ -61,7 +61,7 @@ async fn wait_for_instance(realm: &fuchsia_component_test::RealmInstance) -> Res
             instance = entry.name.clone();
             break;
         }
-        Timer::new(zx::Duration::from_millis(100).after_now()).await;
+        Timer::new(zx::MonotonicDuration::from_millis(100).after_now()).await;
     }
 
     return Ok(instance);
@@ -118,7 +118,7 @@ async fn test_restart_on_crash() -> Result<()> {
         if driver_host_koid_2.is_some() && driver_host_koid_2 != driver_host_koid_1 {
             break;
         }
-        Timer::new(zx::Duration::from_millis(100).after_now()).await;
+        Timer::new(zx::MonotonicDuration::from_millis(100).after_now()).await;
     }
 
     assert_ne!(driver_host_koid_1, driver_host_koid_2);

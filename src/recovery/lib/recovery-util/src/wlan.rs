@@ -10,9 +10,9 @@ use fidl_fuchsia_wlan_policy::{self as wlan_policy, NetworkConfig, SecurityType}
 use fuchsia_async::{MonotonicInstant, TimeoutExt as _};
 use fuchsia_component::client::connect_to_protocol;
 use futures::TryStreamExt as _;
-use zx::Duration;
+use zx::MonotonicDuration;
 
-const CONNECT_TIMEOUT: Duration = Duration::from_seconds(60);
+const CONNECT_TIMEOUT: MonotonicDuration = MonotonicDuration::from_seconds(60);
 
 type GetClientController = dyn Fn() -> Result<
     (wlan_policy::ClientControllerProxy, wlan_policy::ClientStateUpdatesRequestStream),

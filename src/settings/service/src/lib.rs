@@ -29,7 +29,7 @@ use settings_storage::fidl_storage::FidlStorage;
 use settings_storage::storage_factory::{FidlStorageFactory, StorageFactory};
 #[cfg(test)]
 use tracing as _;
-use zx::Duration; // Make it easier to debug tests by always building with tracing
+use zx::MonotonicDuration; // Make it easier to debug tests by always building with tracing
 
 pub use display::display_configuration::DisplayConfiguration;
 pub use handler::setting_proxy_inspect_info::SettingProxyInspectInfo;
@@ -102,7 +102,7 @@ pub mod trace;
 /// before the timeout triggers, then the timeout will be canceled.
 // The value of 5 seconds was chosen arbitrarily to allow some time between manual
 // button presses that occurs for some settings.
-pub(crate) const DEFAULT_TEARDOWN_TIMEOUT: Duration = Duration::from_seconds(5);
+pub(crate) const DEFAULT_TEARDOWN_TIMEOUT: MonotonicDuration = MonotonicDuration::from_seconds(5);
 const DEFAULT_SETTING_PROXY_MAX_ATTEMPTS: u64 = 3;
 const DEFAULT_SETTING_PROXY_RESPONSE_TIMEOUT_MS: i64 = 10_000;
 
@@ -797,7 +797,7 @@ where
             delegate.clone(),
             DEFAULT_SETTING_PROXY_MAX_ATTEMPTS,
             DEFAULT_TEARDOWN_TIMEOUT,
-            Some(Duration::from_millis(DEFAULT_SETTING_PROXY_RESPONSE_TIMEOUT_MS)),
+            Some(MonotonicDuration::from_millis(DEFAULT_SETTING_PROXY_RESPONSE_TIMEOUT_MS)),
             true,
             setting_proxies_node.create_child(format!("{setting_type:?}")),
             Arc::clone(&listener_logger),

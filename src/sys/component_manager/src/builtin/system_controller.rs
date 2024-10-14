@@ -15,7 +15,7 @@ use std::sync::{Arc, Weak};
 use std::time::Duration;
 use tracing::*;
 
-const SHUTDOWN_WATCHDOG_INTERVAL: zx::Duration = zx::Duration::from_seconds(15);
+const SHUTDOWN_WATCHDOG_INTERVAL: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(15);
 
 pub struct SystemController {
     top_instance: Weak<ComponentManagerInstance>,
@@ -43,7 +43,7 @@ impl SystemController {
                 // Shutting down the root component causes component_manager to
                 // exit. main.rs waits on the model to observe the root disappear.
                 SystemControllerRequest::Shutdown { responder } => {
-                    let timeout = zx::Duration::from(self.request_timeout);
+                    let timeout = zx::MonotonicDuration::from(self.request_timeout);
                     fasync::Task::spawn(async move {
                         fasync::Timer::new(fasync::MonotonicInstant::after(timeout)).await;
                         panic!("Component manager did not complete shutdown in allowed time.");
@@ -205,9 +205,9 @@ mod tests {
         #[async_trait]
         impl Hook for StopHook {
             async fn on(self: Arc<Self>, _event: &Event) -> Result<(), ModelError> {
-                fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_seconds(
-                    EVENT_PAUSE_SECONDS.into(),
-                )))
+                fasync::Timer::new(fasync::MonotonicInstant::after(
+                    zx::MonotonicDuration::from_seconds(EVENT_PAUSE_SECONDS.into()),
+                ))
                 .await;
                 Ok(())
             }
@@ -269,7 +269,8 @@ mod tests {
         assert_eq!(std::task::Poll::Pending, exec.run_until_stalled(&mut test_logic));
 
         let new_time = fasync::MonotonicInstant::from_nanos(
-            exec.now().into_nanos() + zx::Duration::from_seconds(TIMEOUT_SECONDS).into_nanos(),
+            exec.now().into_nanos()
+                + zx::MonotonicDuration::from_seconds(TIMEOUT_SECONDS).into_nanos(),
         );
 
         exec.set_fake_time(new_time);

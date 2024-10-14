@@ -10,7 +10,7 @@ use futures::stream::{FusedStream, Stream};
 use futures::FutureExt;
 
 /// Default frequency used for rings.
-const DEFAULT_FREQUENCY: zx::Duration = zx::Duration::from_seconds(5);
+const DEFAULT_FREQUENCY: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(5);
 
 /// A Ringer is a Stream that will output an Item at a fixed frequency.
 ///
@@ -19,7 +19,7 @@ const DEFAULT_FREQUENCY: zx::Duration = zx::Duration::from_seconds(5);
 pub struct Ringer {
     /// Determines how frequently an item will be emitted from the Ringer stream when a call is
     /// incoming.
-    frequency: zx::Duration,
+    frequency: zx::MonotonicDuration,
     /// Internal timer used to trigger the next ring.
     timer: Option<Pin<Box<fasync::Timer>>>,
     /// Stream should produce a ring.

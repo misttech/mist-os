@@ -50,14 +50,14 @@ use {
 // Maximum time that the runner will wait for break_on_start eventpair to signal.
 // This is set to prevent debuggers from blocking us for too long, either intentionally
 // or unintentionally.
-const MAX_WAIT_BREAK_ON_START: zx::Duration = zx::Duration::from_millis(300);
+const MAX_WAIT_BREAK_ON_START: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(300);
 
 // Minimum timer slack amount and default mode. The amount should be large enough to allow for some
 // coalescing of timers, but small enough to ensure applications don't miss deadlines.
 //
 // TODO(https://fxbug.dev/42120293): For now, set the value to 50us to avoid delaying performance-critical
 // timers in Scenic and other system services.
-const TIMER_SLACK_DURATION: zx::Duration = zx::Duration::from_micros(50);
+const TIMER_SLACK_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_micros(50);
 
 // Rights used when duplicating the UTC clock handle.
 //
@@ -456,7 +456,7 @@ impl ElfRunner {
 
         // Add UTC estimate of the process start time to the runtime dir.
         let utc_clock_started = fasync::OnSignals::new(&utc_clock_dup, zx::Signals::CLOCK_STARTED)
-            .on_timeout(zx::MonotonicInstant::after(zx::Duration::default()), || {
+            .on_timeout(zx::MonotonicInstant::after(zx::MonotonicDuration::default()), || {
                 Err(zx::Status::TIMED_OUT)
             })
             .await

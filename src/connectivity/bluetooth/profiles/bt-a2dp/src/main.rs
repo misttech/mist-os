@@ -143,7 +143,7 @@ async fn connect_after_timeout(
     peer_id: PeerId,
     peers: Arc<ConnectedPeers>,
     channel_parameters: fidl_bt::ChannelParameters,
-    initiator_delay: zx::Duration,
+    initiator_delay: zx::MonotonicDuration,
 ) {
     trace!("waiting {}ms before connecting to peer {}.", initiator_delay.into_millis(), peer_id);
     fuchsia_async::Timer::new(initiator_delay.after_now()).await;
@@ -157,7 +157,9 @@ async fn connect_after_timeout(
     };
 
     info!(%peer_id, mode = %channel.channel_mode(), max_tx = %channel.max_tx_size(), "Connected");
-    if let Err(e) = peers.connected(peer_id, channel, Some(zx::Duration::from_nanos(0))).await {
+    if let Err(e) =
+        peers.connected(peer_id, channel, Some(zx::MonotonicDuration::from_nanos(0))).await
+    {
         warn!("Problem delivering connection to peer: {}", e);
     }
 }
@@ -187,7 +189,7 @@ fn handle_services_found(
     attributes: &[bredr::Attribute],
     peers: Arc<ConnectedPeers>,
     channel_parameters: fidl_bt::ChannelParameters,
-    initiator_delay: Option<zx::Duration>,
+    initiator_delay: Option<zx::MonotonicDuration>,
 ) {
     let service_classes = find_service_classes(attributes);
     let service_names: Vec<&str> = service_classes.iter().map(|an| an.name).collect();
@@ -405,7 +407,7 @@ async fn handle_profile_events(
     mut profile: impl Stream<Item = profile_client::Result<ProfileEvent>> + Unpin,
     peers: Arc<ConnectedPeers>,
     channel_parameters: fidl_bt::ChannelParameters,
-    initiator_delay: Option<zx::Duration>,
+    initiator_delay: Option<zx::MonotonicDuration>,
 ) -> Result<(), Error> {
     while let Some(item) = profile.next().await {
         let Ok(evt) = item else {
@@ -574,7 +576,10 @@ mod tests {
 
         // Fast forward time by 5 seconds. In this time, the remote peer has not
         // connected.
-        forward_time_to(&mut exec, fasync::MonotonicInstant::after(zx::Duration::from_seconds(5)));
+        forward_time_to(
+            &mut exec,
+            fasync::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(5)),
+        );
 
         // After fast forwarding time, expect and handle the `connect` request
         // because A2DP-sink should be initiating.
@@ -644,7 +649,10 @@ mod tests {
 
         // Fast forward time by .5 seconds. The threshold is 1 second, so the timer
         // to initiate connections has not been triggered.
-        forward_time_to(&mut exec, fasync::MonotonicInstant::after(zx::Duration::from_millis(500)));
+        forward_time_to(
+            &mut exec,
+            fasync::MonotonicInstant::after(zx::MonotonicDuration::from_millis(500)),
+        );
 
         // A peer connects before the timeout.
         let (_remote, signaling) = Channel::create();
@@ -660,7 +668,7 @@ mod tests {
         // by us, since the remote peer has assumed the INT role.
         forward_time_to(
             &mut exec,
-            fasync::MonotonicInstant::after(zx::Duration::from_millis(4500)),
+            fasync::MonotonicInstant::after(zx::MonotonicDuration::from_millis(4500)),
         );
 
         let request = exec.run_until_stalled(&mut prof_stream.next());

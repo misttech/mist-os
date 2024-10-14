@@ -34,7 +34,7 @@ async fn connect_and_wait_for_failure(
 
 async fn fail_to_connect_or_timeout(
     helper: &mut test_utils::TestHelper,
-    timeout: zx::Duration,
+    timeout: zx::MonotonicDuration,
     ssid: &Ssid,
     bssid: &Bssid,
     protection: &Protection,
@@ -80,7 +80,7 @@ async fn connect_with_bad_password() {
     // is provided. The DisconnectStatus::CredentialsFailed status should be returned by policy.
     fail_to_connect_or_timeout(
         &mut helper,
-        zx::Duration::from_seconds(60),
+        zx::MonotonicDuration::from_seconds(60),
         &Ssid::try_from("wpa3network").unwrap(),
         &BSSID,
         &Protection::Wpa3Personal,
@@ -95,7 +95,7 @@ async fn connect_with_bad_password() {
     // provided. The DisconnectStatus::CredentialsFailed status should be returned by policy.
     fail_to_connect_or_timeout(
         &mut helper,
-        zx::Duration::from_seconds(30),
+        zx::MonotonicDuration::from_seconds(30),
         &Ssid::try_from("wpa2network").unwrap(),
         &BSSID,
         &Protection::Wpa2Personal,
@@ -110,7 +110,7 @@ async fn connect_with_bad_password() {
     // provided. The DisconnectStatus::CredentialsFailed status should be returned by policy.
     fail_to_connect_or_timeout(
         &mut helper,
-        zx::Duration::from_seconds(30),
+        zx::MonotonicDuration::from_seconds(30),
         &Ssid::try_from("wpa1network").unwrap(),
         &BSSID,
         &Protection::Wpa1,

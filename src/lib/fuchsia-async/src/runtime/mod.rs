@@ -52,7 +52,7 @@ use pin_project_lite::pin_project;
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 
-/// An extension trait to provide `after_now` on `zx::Duration`.
+/// An extension trait to provide `after_now` on `zx::MonotonicDuration`.
 pub trait DurationExt {
     /// Return a `MonotonicInstant` which is a `Duration` after the current time.
     /// `duration.after_now()` is equivalent to `MonotonicInstant::after(duration)`.

@@ -400,7 +400,7 @@ mod tests {
         });
 
         // Wait for the thread to become blocked on the read.
-        zx::Duration::from_seconds(2).sleep();
+        zx::MonotonicDuration::from_seconds(2).sleep();
 
         socket_file
             .write(&mut locked, &current_task, &mut VecInputBuffer::new(&[0; XFER_SIZE]))

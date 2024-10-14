@@ -39,24 +39,26 @@ impl SocketConnector for RealSocketConnector {
 /// version 2 §5p3.
 ///
 /// [RFC8305]: https://tools.ietf.org/html/rfc8305#section-5
-pub(crate) const RECOMMENDED_MIN_CONN_ATT_DELAY: zx::Duration = zx::Duration::from_millis(100);
+pub(crate) const RECOMMENDED_MIN_CONN_ATT_DELAY: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_millis(100);
 
 /// Recommended time between connection attempts according to [RFC8305] Happy Eyeballs
 /// version 2 §5p2.
 ///
 /// [RFC8305]: https://tools.ietf.org/html/rfc8305#section-5
-pub(crate) const RECOMMENDED_CONN_ATT_DELAY: zx::Duration = zx::Duration::from_millis(250);
+pub(crate) const RECOMMENDED_CONN_ATT_DELAY: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_millis(250);
 
 /// Minimum time between connection attempts according to [RFC8305] Happy Eyeballs version 2 §5p3.
 ///
 /// [RFC8305]: https://tools.ietf.org/html/rfc8305#section-5
-const ABS_MIN_CONN_ATT_DELAY: zx::Duration = zx::Duration::from_millis(10);
+const ABS_MIN_CONN_ATT_DELAY: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(10);
 
 /// Recommended maximum time between connection attempts according to [RFC8305] Happy Eyeballs
 /// version 2 §5p3.
 ///
 /// [RFC8305]: https://tools.ietf.org/html/rfc8305#section-5
-const ABS_MAX_CONN_ATT_DELAY: zx::Duration = zx::Duration::from_seconds(2);
+const ABS_MAX_CONN_ATT_DELAY: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(2);
 
 /// happy_eyeballs supplies a partial implementation of [RFC8305] Happy Eyeballs version 2,
 /// including §4p4 and the "simple implementation" described in §5p2.
@@ -74,8 +76,8 @@ const ABS_MAX_CONN_ATT_DELAY: zx::Duration = zx::Duration::from_seconds(2);
 pub(crate) fn happy_eyeballs<A, C>(
     addrs: A,
     connector: C,
-    min_conn_att_delay: zx::Duration,
-    conn_att_delay: zx::Duration,
+    min_conn_att_delay: zx::MonotonicDuration,
+    conn_att_delay: zx::MonotonicDuration,
     bind_device: Option<&str>,
 ) -> HappyEyeballs<C>
 where
@@ -145,8 +147,8 @@ where
     connection_futs: FuturesUnordered<C::Fut>,
     #[pin]
     timer: Timer,
-    min_conn_att_delay: zx::Duration,
-    conn_att_delay: zx::Duration,
+    min_conn_att_delay: zx::MonotonicDuration,
+    conn_att_delay: zx::MonotonicDuration,
     last_wake: MonotonicInstant,
     next_wake: MonotonicInstant,
 }
@@ -155,8 +157,8 @@ impl<C: SocketConnector> Inner<C> {
     fn new(
         addrs: Peekable<Interleave<IntoIter<SocketAddr>, IntoIter<SocketAddr>>>,
         connector: C,
-        min_conn_att_delay: zx::Duration,
-        conn_att_delay: zx::Duration,
+        min_conn_att_delay: zx::MonotonicDuration,
+        conn_att_delay: zx::MonotonicDuration,
         bind_device: Option<&str>,
     ) -> Self {
         let last_wake = MonotonicInstant::now();
@@ -372,7 +374,7 @@ mod test {
     #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
     enum Class {
         Connectable,
-        DelayedConnectable { delay: zx::Duration },
+        DelayedConnectable { delay: zx::MonotonicDuration },
         NotListening,
         Blackholed,
     }
@@ -483,23 +485,23 @@ mod test {
     fn next_event<F>(
         executor: &mut fasync::TestExecutor,
         fut: &mut F,
-        duration: zx::Duration,
+        duration: zx::MonotonicDuration,
     ) -> Poll<F::Output>
     where
         F: Future + Unpin,
         <F as Future>::Output: Debug,
     {
-        if duration == zx::Duration::from_millis(0) {
+        if duration == zx::MonotonicDuration::from_millis(0) {
             assert!(!executor.wake_expired_timers());
         } else {
             // Advance time right before the timer is supposed to fire, and make sure it does not.
-            let () =
-                executor.set_fake_time(executor.now() + duration - zx::Duration::from_millis(1));
+            let () = executor
+                .set_fake_time(executor.now() + duration - zx::MonotonicDuration::from_millis(1));
             assert!(!executor.wake_expired_timers());
             assert_matches!(executor.run_until_stalled(fut), Poll::Pending);
 
             // Advance time to when the timer should fire and make sure it does.
-            let () = executor.set_fake_time(executor.now() + zx::Duration::from_millis(1));
+            let () = executor.set_fake_time(executor.now() + zx::MonotonicDuration::from_millis(1));
             assert!(executor.wake_expired_timers());
         }
 
@@ -565,8 +567,11 @@ mod test {
 
         // Trigger all the failing polls.
         for (delay, expected_event) in fail_addrs.enumerate().map(|(i, addr)| {
-            let delay =
-                if i == 0 { zx::Duration::from_millis(0) } else { RECOMMENDED_MIN_CONN_ATT_DELAY };
+            let delay = if i == 0 {
+                zx::MonotonicDuration::from_millis(0)
+            } else {
+                RECOMMENDED_MIN_CONN_ATT_DELAY
+            };
             (
                 delay,
                 Event::Connecting {
@@ -632,8 +637,11 @@ mod test {
 
         // Trigger all the failing polls.
         for (delay, expected_event) in fail_addrs.iter().enumerate().map(|(i, addr)| {
-            let delay =
-                if i == 0 { zx::Duration::from_millis(0) } else { RECOMMENDED_CONN_ATT_DELAY };
+            let delay = if i == 0 {
+                zx::MonotonicDuration::from_millis(0)
+            } else {
+                RECOMMENDED_CONN_ATT_DELAY
+            };
             (
                 delay,
                 Event::Connecting {
@@ -780,7 +788,7 @@ mod test {
         server_addr: SA,
         fail_class: Class,
         fail_addrs: Vec<FA>,
-        delay: zx::Duration,
+        delay: zx::MonotonicDuration,
     ) where
         SA: Into<SocketAddr>,
         FA: Into<SocketAddr>,
@@ -804,7 +812,7 @@ mod test {
 
         // Trigger all the failing polls.
         for (delay, expected_event) in fail_addrs.iter().enumerate().map(|(i, addr)| {
-            let delay = if i == 0 { zx::Duration::from_millis(0) } else { delay };
+            let delay = if i == 0 { zx::MonotonicDuration::from_millis(0) } else { delay };
             (
                 delay,
                 Event::Connecting {
@@ -874,8 +882,11 @@ mod test {
 
         // Trigger all the failing polls.
         for (delay, expected_event) in fail_addrs.iter().enumerate().map(|(i, addr)| {
-            let delay =
-                if i == 0 { zx::Duration::from_millis(0) } else { RECOMMENDED_CONN_ATT_DELAY };
+            let delay = if i == 0 {
+                zx::MonotonicDuration::from_millis(0)
+            } else {
+                RECOMMENDED_CONN_ATT_DELAY
+            };
             (
                 delay,
                 Event::Connecting {
@@ -936,7 +947,7 @@ mod test {
         // Trigger all the failing polls.
         for (delay, expected_event) in vec![
             (
-                zx::Duration::from_millis(0),
+                zx::MonotonicDuration::from_millis(0),
                 Event::Connecting {
                     addr: nl_v4,
                     class: Class::NotListening,
@@ -1008,7 +1019,7 @@ mod test {
             conn_addrs = vec![nl_v4, bh_v4, bh_v6, nl_v6];
             expected_events = vec![
                 (
-                    zx::Duration::from_millis(0),
+                    zx::MonotonicDuration::from_millis(0),
                     Event::Connecting {
                         addr: nl_v4,
                         class: Class::NotListening,
@@ -1044,7 +1055,7 @@ mod test {
             conn_addrs = vec![nl_v6, bh_v6, bh_v4, nl_v4];
             expected_events = vec![
                 (
-                    zx::Duration::from_millis(0),
+                    zx::MonotonicDuration::from_millis(0),
                     Event::Connecting {
                         addr: nl_v6,
                         class: Class::NotListening,
@@ -1128,7 +1139,7 @@ mod test {
         let mut executor = fasync::TestExecutor::new_with_fake_time();
         let () = executor.set_fake_time(MonotonicInstant::from_nanos(0));
 
-        let delay = RECOMMENDED_CONN_ATT_DELAY + zx::Duration::from_millis(5);
+        let delay = RECOMMENDED_CONN_ATT_DELAY + zx::MonotonicDuration::from_millis(5);
 
         let mut connector = TestEnvConnector::new(Some(server_addr))
             .add_classified_addrs(Class::DelayedConnectable { delay }, vec![server_addr])
@@ -1145,7 +1156,7 @@ mod test {
         // Trigger all the failing polls.
         for (delay, expected_event) in vec![
             (
-                zx::Duration::from_millis(0),
+                zx::MonotonicDuration::from_millis(0),
                 Event::Connecting {
                     addr: server_addr,
                     class: Class::DelayedConnectable { delay },
@@ -1170,7 +1181,7 @@ mod test {
 
         // Sleep to when the server should eventually respond.
         assert_matches::assert_matches!(
-            next_event(&mut executor, &mut fut, zx::Duration::from_millis(5)),
+            next_event(&mut executor, &mut fut, zx::MonotonicDuration::from_millis(5)),
             Poll::Ready(Ok(a)) if a == server_addr
         );
         assert_eq!(connector.take_events(), vec![Event::DelayFinished { addr: server_addr }]);
@@ -1204,15 +1215,15 @@ mod test {
         let mut fut = pin!(happy_eyeballs(
             vec![nl_addr, bh_addr, server_addr],
             connector.clone(),
-            zx::Duration::from_millis(1),
-            zx::Duration::from_seconds(5),
+            zx::MonotonicDuration::from_millis(1),
+            zx::MonotonicDuration::from_seconds(5),
             Some("timer_behavior"),
         ));
 
         // Walk through all the events that should occur in this setup.
         for (abstime, woke, done, optional_event) in vec![
             (
-                zx::Duration::from_millis(0),
+                zx::MonotonicDuration::from_millis(0),
                 false,
                 false,
                 Some(Event::Connecting {
@@ -1222,7 +1233,7 @@ mod test {
                 }),
             ),
             (
-                zx::Duration::from_millis(10),
+                zx::MonotonicDuration::from_millis(10),
                 true,
                 false,
                 Some(Event::Connecting {
@@ -1231,11 +1242,11 @@ mod test {
                     bind_device: Some("timer_behavior".into()),
                 }),
             ),
-            (zx::Duration::from_millis(250), false, false, None),
+            (zx::MonotonicDuration::from_millis(250), false, false, None),
             (
                 // N.B. 2010ms is the absolute time for the successful connection because it was
                 // scheduled 2s out from the 10ms clamp where the blackholed connection was queued.
-                zx::Duration::from_millis(2010),
+                zx::MonotonicDuration::from_millis(2010),
                 true,
                 true,
                 Some(Event::Connecting {

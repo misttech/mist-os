@@ -435,7 +435,7 @@ impl VirtualConsoleViewAssistant {
                         let admin = AdminSynchronousProxy::new(client_end);
                         match admin.reboot(
                             RebootReason::UserRequest,
-                            zx::MonotonicInstant::after(zx::Duration::from_seconds(5)),
+                            zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(5)),
                         )? {
                             Ok(()) => {
                                 // Wait for the world to end.

@@ -655,7 +655,7 @@ async fn ping_once<Ip: ping::FuchsiaIpExt>(
     address: Ip::SockAddr,
     payload_length: usize,
     interface_name: Option<String>,
-    timeout: zx::Duration,
+    timeout: zx::MonotonicDuration,
     connector: &HermeticNetworkConnector,
 ) -> Result<(), fntr::Error> {
     let socket = create_icmp_socket(Ip::DOMAIN_FIDL, connector).await?;
@@ -856,7 +856,7 @@ impl Controller {
                     .poll_udp(
                         target,
                         &payload,
-                        zx::Duration::from_nanos(timeout),
+                        zx::MonotonicDuration::from_nanos(timeout),
                         num_retries,
                         &mut rx_buffer,
                     )
@@ -872,7 +872,12 @@ impl Controller {
                 responder,
             } => {
                 let result = self
-                    .ping(target, payload_length, interface_name, zx::Duration::from_nanos(timeout))
+                    .ping(
+                        target,
+                        payload_length,
+                        interface_name,
+                        zx::MonotonicDuration::from_nanos(timeout),
+                    )
                     .await;
                 responder.send(result)?;
             }
@@ -1186,7 +1191,7 @@ impl Controller {
         &self,
         target: std::net::SocketAddr,
         payload: &[u8],
-        timeout: zx::Duration,
+        timeout: zx::MonotonicDuration,
         num_retries: u16,
         rx_buffer: &mut [u8],
     ) -> Result<usize, fntr::Error> {
@@ -1283,7 +1288,7 @@ impl Controller {
         target: fnet::IpAddress,
         payload_length: u16,
         interface_name: Option<String>,
-        timeout: zx::Duration,
+        timeout: zx::MonotonicDuration,
     ) -> Result<(), fntr::Error> {
         let hermetic_network_connector = self
             .hermetic_network_connector

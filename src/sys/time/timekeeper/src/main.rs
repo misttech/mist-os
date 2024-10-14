@@ -103,12 +103,14 @@ impl Config {
         self.source_config.monitor_uses_pull
     }
 
-    fn get_back_off_time_between_pull_samples(&self) -> zx::Duration {
-        zx::Duration::from_seconds(self.source_config.back_off_time_between_pull_samples_sec)
+    fn get_back_off_time_between_pull_samples(&self) -> zx::MonotonicDuration {
+        zx::MonotonicDuration::from_seconds(
+            self.source_config.back_off_time_between_pull_samples_sec,
+        )
     }
 
-    fn get_first_sampling_delay(&self) -> zx::Duration {
-        zx::Duration::from_seconds(self.source_config.first_sampling_delay_sec)
+    fn get_first_sampling_delay(&self) -> zx::MonotonicDuration {
+        zx::MonotonicDuration::from_seconds(self.source_config.first_sampling_delay_sec)
     }
 
     fn get_primary_uses_pull(&self) -> bool {
@@ -461,7 +463,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
         // we start the clock from backstop and hope for the best.
         let backstop = &clock_details.backstop;
         // Not possible to start at backstop, so we start just a bit after.
-        let b1 = *backstop + zx::Duration::from_nanos(1);
+        let b1 = *backstop + zx::MonotonicDuration::from_nanos(1);
         let mono = zx::MonotonicInstant::get();
         info!("starting the UTC clock from backstop time, to handle legacy programs");
         debug!("`- synthetic (backstop+1): {:?}, reference (monotonic): {:?}", &b1, &mono);
@@ -561,9 +563,9 @@ mod tests {
     use {fidl_fuchsia_time_external as ftexternal, zx};
 
     const NANOS_PER_SECOND: i64 = 1_000_000_000;
-    const OFFSET: zx::Duration = zx::Duration::from_seconds(1111_000);
-    const OFFSET_2: zx::Duration = zx::Duration::from_seconds(1111_333);
-    const STD_DEV: zx::Duration = zx::Duration::from_millis(44);
+    const OFFSET: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(1111_000);
+    const OFFSET_2: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(1111_333);
+    const STD_DEV: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(44);
     const INVALID_RTC_TIME: UtcInstant = UtcInstant::from_nanos(111111 * NANOS_PER_SECOND);
     const BACKSTOP_TIME: UtcInstant = UtcInstant::from_nanos(222222 * NANOS_PER_SECOND);
     const VALID_RTC_TIME: UtcInstant = UtcInstant::from_nanos(333333 * NANOS_PER_SECOND);
@@ -1003,7 +1005,7 @@ mod tests {
         clock
             .update(
                 UtcClockUpdate::builder()
-                    .approximate_value(BACKSTOP_TIME + zx::Duration::from_millis(1)),
+                    .approximate_value(BACKSTOP_TIME + zx::MonotonicDuration::from_millis(1)),
             )
             .unwrap();
         let initial_update_ticks = clock.get_details().unwrap().last_value_update_ticks;

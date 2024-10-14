@@ -491,7 +491,7 @@ async fn drive_automated_install(app_sender: AppSender, view_key: ViewKey) {
             MessageTarget::View(view_key),
             make_message(InstallerMessages::MenuEnter),
         );
-        fasync::Timer::new(zx::Duration::from_seconds(1).after_now()).await
+        fasync::Timer::new(zx::MonotonicDuration::from_seconds(1).after_now()).await
     }
 }
 

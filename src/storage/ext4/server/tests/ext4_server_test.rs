@@ -145,7 +145,7 @@ async fn ext4_server_mounts_block_device_and_dies_on_close() -> Result<(), Error
     std::mem::drop(dir_proxy);
     process.wait_handle(
         zx::Signals::TASK_TERMINATED,
-        zx::MonotonicInstant::after(zx::Duration::from_seconds(5)),
+        zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(5)),
     )?;
     Ok(())
 }

@@ -123,7 +123,7 @@ pub trait ExpectableStateExt: ExpectableState + Sized {
     fn when_satisfied(
         &self,
         expectation: Predicate<Self::State>,
-        timeout: zx::Duration,
+        timeout: zx::MonotonicDuration,
     ) -> BoxFuture<'_, Result<Self::State, Error>>;
 }
 
@@ -135,7 +135,7 @@ where
     fn when_satisfied(
         &self,
         expectation: Predicate<T::State>,
-        timeout: zx::Duration,
+        timeout: zx::MonotonicDuration,
     ) -> BoxFuture<'_, Result<Self::State, Error>> {
         let state = self.clone();
         let exp = expectation.clone();

@@ -25,7 +25,7 @@ pub fn create_reference_clock(clock_type: fac::ClockType) -> Result<Option<zx::C
             let offset = info.offset;
             let now = zx::MonotonicInstant::get();
             let delta_time = now.into_nanos()
-                + zx::Duration::from_nanos(offset.unwrap_or(0).into()).into_nanos();
+                + zx::MonotonicDuration::from_nanos(offset.unwrap_or(0).into()).into_nanos();
 
             let update_builder = zx::ClockUpdate::builder()
                 .rate_adjust(rate.unwrap_or(0))

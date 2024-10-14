@@ -230,15 +230,17 @@ async fn send_eth_beacons<'a>(
     };
     let buf = ethernet_header.as_bytes();
 
-    let mut timer_stream = Interval::new(zx::Duration::from_nanos(DATA_FRAME_INTERVAL_NANOS));
+    let mut timer_stream =
+        Interval::new(zx::MonotonicDuration::from_nanos(DATA_FRAME_INTERVAL_NANOS));
     let mut intervals_since_last_beacon: i64 = i64::max_value() / DATA_FRAME_INTERVAL_NANOS;
     loop {
         timer_stream.next().await;
 
         // The auto-deauthentication timeout is 10.24 seconds. Send a beacon before then to stay
         // connected.
-        if zx::Duration::from_nanos(intervals_since_last_beacon * DATA_FRAME_INTERVAL_NANOS)
-            >= zx::Duration::from_millis(8765)
+        if zx::MonotonicDuration::from_nanos(
+            intervals_since_last_beacon * DATA_FRAME_INTERVAL_NANOS,
+        ) >= zx::MonotonicDuration::from_millis(8765)
         {
             intervals_since_last_beacon = 0;
             Beacon {
@@ -274,7 +276,7 @@ async fn rate_selection() {
 
     let () = connect_or_timeout(
         &mut helper,
-        zx::Duration::from_seconds(30),
+        zx::MonotonicDuration::from_seconds(30),
         &AP_SSID,
         &BSS_MINSTL,
         &Protection::Open,
@@ -292,7 +294,7 @@ async fn rate_selection() {
     let mut tx_vec_counts = HashMap::new();
     let snapshot = helper
         .run_until_complete_or_timeout(
-            zx::Duration::from_seconds(30),
+            zx::MonotonicDuration::from_seconds(30),
             "verify rate selection converges to 130",
             send_tx_result_and_minstrel_convergence(
                 &phy,

@@ -11,7 +11,7 @@ use futures::lock::Mutex;
 use futures::StreamExt;
 use std::sync::Arc;
 use vfs::service;
-use zx::{self as zx, Duration};
+use zx::{self as zx, MonotonicDuration};
 
 /// Make a new vfs service node that implements fuchsia.update.verify.BlobfsVerifier
 pub fn blobfs_verifier_service() -> Arc<service::Service> {
@@ -38,7 +38,7 @@ pub fn blobfs_verifier_service() -> Arc<service::Service> {
     )
 }
 
-const FIND_PARTITION_DURATION: Duration = Duration::from_seconds(10);
+const FIND_PARTITION_DURATION: MonotonicDuration = MonotonicDuration::from_seconds(10);
 
 /// Mounts (or formats) the data volume in Fxblob.  Assumes the partition is already formatted.
 pub async fn mount_or_format_data(

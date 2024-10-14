@@ -5,7 +5,7 @@
 pub(super) const SPURIOUS_TO_INTENTIONAL_MOTION_THRESHOLD_MM: f32 = 6.0 / 12.0;
 pub(super) const MAX_SPURIOUS_TO_INTENTIONAL_SCROLL_THRESHOLD_MM: f32 =
     5.0 * SPURIOUS_TO_INTENTIONAL_MOTION_THRESHOLD_MM;
-pub(super) const TAP_TIMEOUT: zx::Duration = zx::Duration::from_millis(1200);
+pub(super) const TAP_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(1200);
 pub(super) const MAX_SCROLL_DIRECTION_SKEW_DEGREES: f32 = 40.0;
 
 /// Based on palm / thumb size data collected from adults.
@@ -17,4 +17,5 @@ pub(super) const MIN_PALM_SIZE_MM: f32 = 5.8;
 
 pub(super) const SPURIOUS_TO_INTENTIONAL_MOTION_THRESHOLD_BUTTON_CHANGE_MM: f32 =
     3.0 * SPURIOUS_TO_INTENTIONAL_MOTION_THRESHOLD_MM;
-pub(super) const BUTTON_CHANGE_STATE_TIMEOUT: zx::Duration = zx::Duration::from_millis(100);
+pub(super) const BUTTON_CHANGE_STATE_TIMEOUT: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_millis(100);

@@ -71,7 +71,7 @@ type InteractionHangingGet = HangingGet<State, NotifierWatchStateResponder, Noti
 type StatePublisher = Publisher<State, NotifierWatchStateResponder, NotifyFn>;
 
 struct StateTransitioner {
-    idle_threshold_ms: zx::Duration,
+    idle_threshold_ms: zx::MonotonicDuration,
     idle_transition_task: Cell<Option<Task<()>>>,
     last_event_time: RefCell<zx::MonotonicInstant>,
 
@@ -85,7 +85,7 @@ struct StateTransitioner {
 impl StateTransitioner {
     pub fn new(
         initial_timestamp: zx::MonotonicInstant,
-        idle_threshold_ms: zx::Duration,
+        idle_threshold_ms: zx::MonotonicDuration,
         state_publisher: StatePublisher,
         lease_holder: Option<Rc<RefCell<LeaseHolder>>>,
     ) -> Self {
@@ -176,7 +176,7 @@ pub struct ActivityManager {
 impl ActivityManager {
     /// Creates a new [`ActivityManager`] that listens for user input
     /// input interactions and notifies clients of activity state changes.
-    pub async fn new(idle_threshold_ms: zx::Duration, suspend_enabled: bool) -> Rc<Self> {
+    pub async fn new(idle_threshold_ms: zx::MonotonicDuration, suspend_enabled: bool) -> Rc<Self> {
         let lease_holder = match suspend_enabled {
             true => {
                 let activity_governor = connect_to_protocol::<ActivityGovernorMarker>()
@@ -204,7 +204,7 @@ impl ActivityManager {
     #[cfg(test)]
     /// Sets the initial idleness timer relative to fake time at 0 for tests.
     async fn new_for_test(
-        idle_threshold_ms: zx::Duration,
+        idle_threshold_ms: zx::MonotonicDuration,
         suspend_enabled: bool,
         lease_holder: Option<Rc<RefCell<LeaseHolder>>>,
     ) -> Rc<Self> {
@@ -219,7 +219,7 @@ impl ActivityManager {
     }
 
     async fn new_internal(
-        idle_threshold_ms: zx::Duration,
+        idle_threshold_ms: zx::MonotonicDuration,
         initial_timestamp: zx::MonotonicInstant,
         suspend_enabled: bool,
         lease_holder: Option<Rc<RefCell<LeaseHolder>>>,
@@ -345,7 +345,7 @@ mod tests {
     use std::task::Poll;
     use test_case::test_case;
 
-    const ACTIVITY_TIMEOUT: zx::Duration = zx::Duration::from_millis(5000);
+    const ACTIVITY_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(5000);
 
     async fn create_activity_manager(suspend_enabled: bool) -> Rc<ActivityManager> {
         let lease_holder = match suspend_enabled {

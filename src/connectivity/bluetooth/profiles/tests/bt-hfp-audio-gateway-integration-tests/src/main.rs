@@ -21,7 +21,7 @@ use futures::TryFutureExt;
 use mock_piconet_client::{BtProfileComponent, PiconetHarness, PiconetMember};
 use realmbuilder_mock_helpers::{mock_component, mock_dev};
 use test_call_manager::TestCallManager;
-use zx::Duration;
+use zx::MonotonicDuration;
 use {fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_io as fio};
 
 /// HFP-AG component URL.
@@ -52,7 +52,7 @@ const MOCK_A2DP_CONTROLLER_MONIKER: &str = "mock-a2dp-controller";
 ///   b) short enough to still provide useful feedback in those cases where asynchronous operations
 ///      fail
 ///   c) short enough to fail before the overall infra-imposed test timeout (currently 5 minutes)
-const CHANNEL_TIMEOUT: Duration = Duration::from_seconds(2 * 60);
+const CHANNEL_TIMEOUT: MonotonicDuration = MonotonicDuration::from_seconds(2 * 60);
 
 /// SDP Attribute ID for the Supported Features of HFP.
 /// Defined in Assigned Numbers for SDP

@@ -223,7 +223,7 @@ impl ShutdownWatcher {
         // take this approach so that watchers that timed out have their channel dropped
         // (https://fxbug.dev/42131208).
         let watcher_futures = watchers.into_iter().map(|(key, watcher_proxy)| async move {
-            let deadline = zx::Duration::from_seconds(timeout.0 as i64).after_now();
+            let deadline = zx::MonotonicDuration::from_seconds(timeout.0 as i64).after_now();
             match watcher_proxy
                 .on_reboot(reason)
                 .map_err(|_| ())

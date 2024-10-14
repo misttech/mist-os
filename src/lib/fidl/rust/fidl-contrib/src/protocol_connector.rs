@@ -172,20 +172,21 @@ impl<Msg> ProtocolSender<Msg> {
 }
 
 struct ExponentialBackoff {
-    initial: zx::Duration,
-    current: zx::Duration,
+    initial: zx::MonotonicDuration,
+    current: zx::MonotonicDuration,
     factor: f64,
 }
 
 impl ExponentialBackoff {
-    fn new(initial: zx::Duration, factor: f64) -> Self {
+    fn new(initial: zx::MonotonicDuration, factor: f64) -> Self {
         Self { initial, current: initial, factor }
     }
 
     fn next_timer(&mut self) -> fasync::Timer {
         let timer = fasync::Timer::new(self.current.after_now());
-        self.current =
-            zx::Duration::from_nanos((self.current.into_nanos() as f64 * self.factor) as i64);
+        self.current = zx::MonotonicDuration::from_nanos(
+            (self.current.into_nanos() as f64 * self.factor) as i64,
+        );
         timer
     }
 
@@ -262,7 +263,7 @@ impl<CP: ConnectedProtocol> ProtocolConnector<CP> {
         mut receiver: mpsc::Receiver<<CP as ConnectedProtocol>::Message>,
         mut h: ErrHandler,
     ) {
-        let mut backoff = ExponentialBackoff::new(zx::Duration::from_millis(100), 2.0);
+        let mut backoff = ExponentialBackoff::new(zx::MonotonicDuration::from_millis(100), 2.0);
         loop {
             let protocol = match self.protocol.get_protocol().await {
                 Ok(protocol) => protocol,

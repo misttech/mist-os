@@ -34,7 +34,7 @@ use euclid::{size2, Size2D};
 use recovery_util::ota::state_machine::Event as StateMachineEvent;
 use std::collections::VecDeque;
 use std::hash::{Hash, Hasher};
-use zx::{Duration, Event, MonotonicInstant};
+use zx::{Event, MonotonicDuration, MonotonicInstant};
 
 type FieldName = String;
 type InputText = String;
@@ -436,7 +436,7 @@ impl KeyboardViewAssistant {
                         self.state_alt = false;
                     } else {
                         // Is this a quick double press?
-                        if *time - self.shift_time < Duration::from_seconds(1) {
+                        if *time - self.shift_time < MonotonicDuration::from_seconds(1) {
                             self.sticky_shift = true;
                         } else {
                             self.sticky_shift = false;

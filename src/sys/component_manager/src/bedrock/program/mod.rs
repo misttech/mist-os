@@ -389,8 +389,8 @@ pub mod tests {
         // Create a mock program which simulates immediately shutting down
         // the component.
         let (program, server) = mocks::mock_program();
-        let stop_timeout = zx::Duration::from_millis(200);
-        let kill_timeout = zx::Duration::from_millis(40);
+        let stop_timeout = zx::MonotonicDuration::from_millis(200);
+        let kill_timeout = zx::MonotonicDuration::from_millis(40);
 
         // Create a request map which the MockController will fill with
         // requests it received related to mocked component.
@@ -438,8 +438,8 @@ pub mod tests {
     /// the component.
     async fn stop_component_successful_component_already_gone() {
         let (program, server) = mocks::mock_program();
-        let stop_timeout = zx::Duration::from_millis(100);
-        let kill_timeout = zx::Duration::from_millis(1);
+        let stop_timeout = zx::MonotonicDuration::from_millis(100);
+        let kill_timeout = zx::MonotonicDuration::from_millis(1);
 
         let stop_timer = Box::pin(async move {
             let timer = fasync::Timer::new(fasync::MonotonicInstant::after(stop_timeout));
@@ -480,14 +480,15 @@ pub mod tests {
         // after a delay. The delay is much shorter than the period allotted
         // for the component to stop.
         let (program, server) = mocks::mock_program();
-        let stop_timeout = zx::Duration::from_seconds(5);
-        let kill_timeout = zx::Duration::from_millis(1);
+        let stop_timeout = zx::MonotonicDuration::from_seconds(5);
+        let kill_timeout = zx::MonotonicDuration::from_millis(1);
 
         // Create a request map which the MockController will fill with
         // requests it received related to mocked component.
         let requests: Arc<Mutex<HashMap<Koid, Vec<ControlMessage>>>> =
             Arc::new(Mutex::new(HashMap::new()));
-        let component_stop_delay = zx::Duration::from_millis(stop_timeout.into_millis() / 1_000);
+        let component_stop_delay =
+            zx::MonotonicDuration::from_millis(stop_timeout.into_millis() / 1_000);
         let controller = MockController::new_with_responses(
             server,
             requests.clone(),
@@ -568,17 +569,17 @@ pub mod tests {
         // Create a controller which takes far longer than allowed to stop the
         // component.
         let (program, server) = mocks::mock_program();
-        let stop_timeout = zx::Duration::from_seconds(5);
-        let kill_timeout = zx::Duration::from_millis(200);
+        let stop_timeout = zx::MonotonicDuration::from_seconds(5);
+        let kill_timeout = zx::MonotonicDuration::from_millis(200);
 
         // Create a request map which the MockController will fill with
         // requests it received related to mocked component.
         let requests: Arc<Mutex<HashMap<Koid, Vec<ControlMessage>>>> =
             Arc::new(Mutex::new(HashMap::new()));
-        let stop_resp_delay = zx::Duration::from_millis(stop_timeout.into_millis() / 10);
+        let stop_resp_delay = zx::MonotonicDuration::from_millis(stop_timeout.into_millis() / 10);
         // since we want the mock controller to close the controller channel
         // before the kill timeout, set the response delay to less than the timeout
-        let kill_resp_delay = zx::Duration::from_millis(kill_timeout.into_millis() * 2);
+        let kill_resp_delay = zx::MonotonicDuration::from_millis(kill_timeout.into_millis() * 2);
         let controller = MockController::new_with_responses(
             server,
             requests.clone(),
@@ -670,14 +671,14 @@ pub mod tests {
         // Create a controller which takes far longer than allowed to stop the
         // component.
         let (program, server) = mocks::mock_program();
-        let stop_timeout = zx::Duration::from_seconds(5);
-        let kill_timeout = zx::Duration::from_millis(200);
+        let stop_timeout = zx::MonotonicDuration::from_seconds(5);
+        let kill_timeout = zx::MonotonicDuration::from_millis(200);
 
         // Create a request map which the MockController will fill with
         // requests it received related to mocked component.
         let requests: Arc<Mutex<HashMap<Koid, Vec<ControlMessage>>>> =
             Arc::new(Mutex::new(HashMap::new()));
-        let kill_resp_delay = zx::Duration::from_millis(kill_timeout.into_millis() / 2);
+        let kill_resp_delay = zx::MonotonicDuration::from_millis(kill_timeout.into_millis() / 2);
         let controller = MockController::new_with_responses(
             server,
             requests.clone(),
@@ -744,16 +745,17 @@ pub mod tests {
         // Create a program which takes far longer than allowed to stop the
         // component.
         let (program, server) = mocks::mock_program();
-        let stop_timeout = zx::Duration::from_seconds(5);
-        let kill_timeout = zx::Duration::from_millis(1);
+        let stop_timeout = zx::MonotonicDuration::from_seconds(5);
+        let kill_timeout = zx::MonotonicDuration::from_millis(1);
 
         // Create a request map which the MockController will fill with
         // requests it received related to mocked component.
         let requests: Arc<Mutex<HashMap<Koid, Vec<ControlMessage>>>> =
             Arc::new(Mutex::new(HashMap::new()));
-        let close_delta = zx::Duration::from_millis(10);
-        let resp_delay =
-            zx::Duration::from_millis(stop_timeout.into_millis() + close_delta.into_millis());
+        let close_delta = zx::MonotonicDuration::from_millis(10);
+        let resp_delay = zx::MonotonicDuration::from_millis(
+            stop_timeout.into_millis() + close_delta.into_millis(),
+        );
         let controller = MockController::new_with_responses(
             server,
             requests.clone(),

@@ -63,7 +63,10 @@ pub fn open_fuse_device(
     Ok(Box::new(DevFuse { connection }))
 }
 
-fn attr_valid_to_duration(attr_valid: u64, attr_valid_nsec: u32) -> Result<zx::Duration, Errno> {
+fn attr_valid_to_duration(
+    attr_valid: u64,
+    attr_valid_nsec: u32,
+) -> Result<zx::MonotonicDuration, Errno> {
     duration_from_timespec(uapi::timespec {
         tv_sec: i64::try_from(attr_valid).unwrap_or(std::i64::MAX),
         tv_nsec: attr_valid_nsec.into(),
@@ -594,7 +597,7 @@ impl FuseNode {
     fn set_node_info(
         info: &mut FsNodeInfo,
         attributes: uapi::fuse_attr,
-        attr_valid_duration: zx::Duration,
+        attr_valid_duration: zx::MonotonicDuration,
         node_attributes_valid_until: &AtomicMonotonicInstant,
     ) -> Result<(), Errno> {
         info.ino = attributes.ino as uapi::ino_t;

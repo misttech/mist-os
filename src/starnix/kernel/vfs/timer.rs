@@ -59,11 +59,11 @@ pub struct TimerFile {
     timeline: Timeline,
 
     /// The deadline (`TargetTime`) for the next timer trigger, and the associated interval
-    /// (`zx::Duration`).
+    /// (`zx::MonotonicDuration`).
     ///
     /// When the file is read, the deadline is recomputed based on the current time and the set
     /// interval. If the interval is 0, `self.timer` is cancelled after the file is read.
-    deadline_interval: Mutex<(TargetTime, zx::Duration)>,
+    deadline_interval: Mutex<(TargetTime, zx::MonotonicDuration)>,
 }
 
 impl TimerFile {
@@ -86,7 +86,10 @@ impl TimerFile {
             Box::new(TimerFile {
                 timer,
                 timeline,
-                deadline_interval: Mutex::new((timeline.zero_time(), zx::Duration::default())),
+                deadline_interval: Mutex::new((
+                    timeline.zero_time(),
+                    zx::MonotonicDuration::default(),
+                )),
             }),
             flags,
         ))
@@ -100,8 +103,8 @@ impl TimerFile {
         let (deadline, interval) = *self.deadline_interval.lock();
 
         let now = self.timeline.now();
-        let remaining_time = if interval == zx::Duration::default() && deadline <= now {
-            timespec_from_duration(zx::Duration::default())
+        let remaining_time = if interval == zx::MonotonicDuration::default() && deadline <= now {
+            timespec_from_duration(zx::MonotonicDuration::default())
         } else {
             timespec_from_duration(
                 deadline.delta(&now).expect("deadline and now come from same timeline"),
@@ -129,7 +132,7 @@ impl TimerFile {
         if timespec_is_zero(timer_spec.it_value) {
             // Sayeth timerfd_settime(2):
             // Setting both fields of new_value.it_value to zero disarms the timer.
-            *deadline_interval = (self.timeline.zero_time(), zx::Duration::ZERO);
+            *deadline_interval = (self.timeline.zero_time(), zx::MonotonicDuration::ZERO);
             self.timer.stop(current_task)?;
         } else {
             let new_deadline = if flags & TFD_TIMER_ABSTIME != 0 {
@@ -221,7 +224,7 @@ impl FileOps for TimerFile {
                 return error!(EAGAIN);
             }
 
-            let count: i64 = if interval > zx::Duration::default() {
+            let count: i64 = if interval > zx::MonotonicDuration::default() {
                 let elapsed_nanos =
                     now.delta(&deadline).expect("timelines must match").into_nanos();
                 // The number of times the timer has triggered is written to `data`.
@@ -239,7 +242,7 @@ impl FileOps for TimerFile {
             } else {
                 // The timer is non-repeating, so cancel the timer to clear the `ZX_TIMER_SIGNALED`
                 // signal.
-                *deadline_interval = (self.timeline.zero_time(), zx::Duration::ZERO);
+                *deadline_interval = (self.timeline.zero_time(), zx::MonotonicDuration::ZERO);
                 self.timer.stop(current_task)?;
                 1
             };

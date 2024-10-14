@@ -16,7 +16,7 @@ const FIRST_EPHEMERAL_PORT: HostPort = 49152;
 const LAST_EPHEMERAL_PORT: HostPort = 65535;
 
 // This is an arbitrarily chosen length of time which can be adjusted up or down as needed.
-const QUARANTINE_TIME: zx::Duration = zx::Duration::from_seconds(10);
+const QUARANTINE_TIME: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(10);
 
 struct HostPortInfo {
     has_listener: bool,
@@ -363,7 +363,7 @@ mod tests {
 
         // One nano after quarantine ends.
         executor.set_fake_time(fuchsia_async::MonotonicInstant::after(
-            QUARANTINE_TIME + zx::Duration::from_nanos(1),
+            QUARANTINE_TIME + zx::MonotonicDuration::from_nanos(1),
         ));
 
         // Port is still in use due to the listener (need to check quarantined connections
@@ -391,7 +391,7 @@ mod tests {
 
         // One nano after quarantine ends.
         executor.set_fake_time(fuchsia_async::MonotonicInstant::after(
-            QUARANTINE_TIME + zx::Duration::from_nanos(1),
+            QUARANTINE_TIME + zx::MonotonicDuration::from_nanos(1),
         ));
 
         // Can re-use the now unquarantined connection.

@@ -262,7 +262,8 @@ mod tests {
 
         root.record_lazy_values("lazy-node-always-hangs", || {
             async move {
-                fuchsia_async::Timer::new(zx::Duration::from_minutes(30).after_now()).await;
+                fuchsia_async::Timer::new(zx::MonotonicDuration::from_minutes(30).after_now())
+                    .await;
                 Ok(Inspector::default())
             }
             .boxed()

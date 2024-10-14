@@ -1603,7 +1603,8 @@ async fn watch_routing_events_hanging<I: Ip + FidlMulticastAdminIpExt, N: Netsta
     };
 
     let send_packet_fut = async {
-        const WAIT_BEFORE_SEND_DURATION: zx::Duration = zx::Duration::from_seconds(5);
+        const WAIT_BEFORE_SEND_DURATION: zx::MonotonicDuration =
+            zx::MonotonicDuration::from_seconds(5);
         // Before sending a packet, sleep for a few seconds to ensure that the
         // call to watch_routing_events hangs.
         netstack_testing_common::sleep(WAIT_BEFORE_SEND_DURATION.into_seconds()).await;
@@ -1694,7 +1695,7 @@ async fn watch_multiple_routing_events<I: Ip + FidlMulticastAdminIpExt, N: Netst
     // After sending the packet, sleep for a few seconds to allow the netstack
     // time to receive the packets and publish events. This helps reduce the
     // rate of falsely passing.
-    const WAIT_AFTER_SEND_DURATION: zx::Duration = zx::Duration::from_seconds(1);
+    const WAIT_AFTER_SEND_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(1);
     netstack_testing_common::sleep(WAIT_AFTER_SEND_DURATION.into_seconds()).await;
 
     // Verify both "Missing Route" events are observed in the correct order.
@@ -1760,7 +1761,8 @@ async fn watch_routing_events_dropped_events<I: Ip + FidlMulticastAdminIpExt, N:
         test_network: &MulticastForwardingNetwork<'_, I>,
         num: u16,
     ) {
-        const WAIT_AFTER_SEND_DURATION: zx::Duration = zx::Duration::from_seconds(5);
+        const WAIT_AFTER_SEND_DURATION: zx::MonotonicDuration =
+            zx::MonotonicDuration::from_seconds(5);
         futures::stream::iter(0..num)
             .for_each_concurrent(None, |_| async {
                 test_network.send_multicast_packet().await;

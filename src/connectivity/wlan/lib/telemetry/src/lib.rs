@@ -95,7 +95,7 @@ pub fn setup_disconnected_persistence_req_sender() -> auto_persist::PersistenceR
 }
 
 /// How often to refresh time series stats. Also how often to request packet counters.
-const TELEMETRY_QUERY_INTERVAL: zx::Duration = zx::Duration::from_seconds(10);
+const TELEMETRY_QUERY_INTERVAL: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(10);
 
 pub fn serve_telemetry(
     cobalt_1dot1_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,

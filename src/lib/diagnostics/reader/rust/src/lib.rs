@@ -23,7 +23,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use thiserror::Error;
-use zx::{self as zx, Duration};
+use zx::{self as zx, MonotonicDuration};
 
 pub use diagnostics_data::{Data, Inspect, Logs, Severity};
 pub use diagnostics_hierarchy::{hierarchy, DiagnosticsHierarchy, Property};
@@ -210,7 +210,7 @@ pub struct ArchiveReader {
     archive: Arc<Mutex<Option<ArchiveAccessorProxy>>>,
     selectors: Vec<SelectorArgument>,
     retry_config: RetryConfig,
-    timeout: Option<Duration>,
+    timeout: Option<MonotonicDuration>,
     batch_retrieval_timeout_seconds: Option<i64>,
     max_aggregated_content_size_bytes: Option<u64>,
 }
@@ -269,7 +269,7 @@ impl ArchiveReader {
 
     /// Sets the maximum time to wait for a response from the Archive.
     /// Do not use in tests unless timeout is the expected behavior.
-    pub fn with_timeout(&mut self, duration: Duration) -> &mut Self {
+    pub fn with_timeout(&mut self, duration: MonotonicDuration) -> &mut Self {
         self.timeout = Some(duration);
         self
     }
@@ -358,9 +358,9 @@ impl ArchiveReader {
                 .await;
 
             if self.retry_config.should_retry(result.len()) {
-                fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_millis(
-                    RETRY_DELAY_MS,
-                )))
+                fasync::Timer::new(fasync::MonotonicInstant::after(
+                    zx::MonotonicDuration::from_millis(RETRY_DELAY_MS),
+                ))
                 .await;
             } else {
                 return Ok(result);
@@ -691,7 +691,7 @@ mod tests {
                 "realm_builder\\:{}/test_component:root",
                 instance.root.child_name()
             ))
-            .with_timeout(zx::Duration::from_nanos(0));
+            .with_timeout(zx::MonotonicDuration::from_nanos(0));
         let result = reader.snapshot::<Inspect>().await;
         assert!(result.unwrap().is_empty());
         Ok(())

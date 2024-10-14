@@ -527,7 +527,7 @@ async fn suspend_kernel(kernel_job: &zx::Job) -> Result<Vec<zx::Handle>, Error> 
                 if let Ok(thread) = process.get_child(&thread_koid, zx::Rights::SAME_RIGHTS) {
                     match thread.wait_handle(
                         zx::Signals::THREAD_SUSPENDED,
-                        zx::MonotonicInstant::after(zx::Duration::INFINITE),
+                        zx::MonotonicInstant::after(zx::MonotonicDuration::INFINITE),
                     ) {
                         Err(e) => {
                             tracing::warn!("Error waiting for task suspension: {:?}", e);

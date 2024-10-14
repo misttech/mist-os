@@ -447,7 +447,7 @@ async fn starting_state(
             // may succeed.
             if remaining_retries > 0 {
                 let mut retry_timer = pin!(fasync::Timer::new(
-                    zx::Duration::from_seconds(AP_START_RETRY_INTERVAL).after_now(),
+                    zx::MonotonicDuration::from_seconds(AP_START_RETRY_INTERVAL).after_now(),
                 ));
 
                 // To ensure that the state machine remains responsive, process any incoming
@@ -568,7 +568,7 @@ async fn started_state(
     pending_status_req.push(deps.proxy.status());
 
     let mut status_timer =
-        fasync::Interval::new(zx::Duration::from_seconds(AP_STATUS_INTERVAL_SEC));
+        fasync::Interval::new(zx::MonotonicDuration::from_seconds(AP_STATUS_INTERVAL_SEC));
 
     // Channel bandwidth is required for frequency computation when reporting state updates.
     let cbw = req.radio_config.channel.cbw;

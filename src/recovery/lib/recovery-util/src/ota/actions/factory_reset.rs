@@ -54,7 +54,7 @@ mod test {
     use futures::channel::mpsc;
     use futures::{StreamExt, TryStreamExt};
     use mockall::predicate::{self, eq};
-    use zx::Duration;
+    use zx::MonotonicDuration;
 
     const RESET_CALLED: i32 = 123456;
 
@@ -91,7 +91,8 @@ mod test {
 
         let (proxy, mut receiver) = create_mock_factory_reset_server(ZX_OK).unwrap();
         FactoryResetAction::run_with_proxy(event_sender, proxy).await;
-        let status = receiver.next().on_timeout(Duration::from_seconds(5), || None).await.unwrap();
+        let status =
+            receiver.next().on_timeout(MonotonicDuration::from_seconds(5), || None).await.unwrap();
         assert_eq!(status, RESET_CALLED);
     }
 
@@ -106,7 +107,8 @@ mod test {
         let (proxy, mut receiver) =
             create_mock_factory_reset_server(zx_status::Status::ACCESS_DENIED.into_raw()).unwrap();
         FactoryResetAction::run_with_proxy(event_sender, proxy).await;
-        let status = receiver.next().on_timeout(Duration::from_seconds(5), || None).await.unwrap();
+        let status =
+            receiver.next().on_timeout(MonotonicDuration::from_seconds(5), || None).await.unwrap();
         assert_eq!(status, RESET_CALLED);
     }
 }

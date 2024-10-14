@@ -47,7 +47,7 @@ const GENERATE_204: &'static str = "/generate_204";
 // Gstatic has a TTL of 300 seconds, therefore, we will perform a lookup every
 // 300 seconds since we won't get any better indication of DNS function.
 // TODO(https://fxbug.dev/42072067): Dynamically query TTL based on the domain's DNS record
-const DNS_PROBE_PERIOD: zx::Duration = zx::Duration::from_seconds(300);
+const DNS_PROBE_PERIOD: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(300);
 
 // Timeout ID for the fake clock component that restrains the integration tests from reaching the
 // FIDL timeout and subsequently failing. Shared by the eventloop and integration library.
@@ -1456,7 +1456,7 @@ mod tests {
     }
 
     struct FakeTime {
-        increment: zx::Duration,
+        increment: zx::MonotonicDuration,
         time: zx::MonotonicInstant,
     }
 
@@ -1682,7 +1682,7 @@ mod tests {
         mocks: Vec<(P, D, F)>,
         neighbors: Option<&InterfaceNeighborCache>,
         internet_ping_address: std::net::IpAddr,
-        sleep_between: Option<zx::Duration>,
+        sleep_between: Option<zx::MonotonicDuration>,
     ) -> Vec<State> {
         let properties = &fnet_interfaces_ext::Properties {
             id: interface_id.try_into().expect("should be nonzero"),
@@ -1754,13 +1754,13 @@ mod tests {
         routes: &RouteTable,
         neighbors: Option<&InterfaceNeighborCache>,
         mocks: Vec<(P, D, F)>,
-        sleep_between: Option<zx::Duration>,
+        sleep_between: Option<zx::MonotonicDuration>,
     ) -> Result<Option<Vec<IpVersions<StateEvent>>>, anyhow::Error> {
         let (sender, receiver) = mpsc::unbounded::<(NetworkCheckAction, NetworkCheckCookie)>();
         let mut monitor = Monitor::new_with_time_provider(
             sender,
             FakeTime {
-                increment: sleep_between.unwrap_or(zx::Duration::from_nanos(10)),
+                increment: sleep_between.unwrap_or(zx::MonotonicDuration::from_nanos(10)),
                 time: zx::MonotonicInstant::get(),
             },
         )

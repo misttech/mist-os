@@ -15,7 +15,7 @@ use {
     fidl_fuchsia_ui_views as ui_views, fuchsia_scenic as scenic,
 };
 
-const DEFAULT_LISTENER_TIMEOUT: zx::Duration = zx::Duration::from_seconds(2);
+const DEFAULT_LISTENER_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(2);
 
 /// Abstraction wrapper for fidl_fuchsia_ui_views::ViewRef.
 /// See https://fuchsia.dev/fuchsia-src/concepts/graphics/scenic/view_ref

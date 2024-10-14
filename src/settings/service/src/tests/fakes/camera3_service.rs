@@ -15,7 +15,7 @@ use fuchsia_async::{self as fasync, DurationExt};
 use futures::TryStreamExt;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use zx::{self as zx, Duration};
+use zx::{self as zx, MonotonicDuration};
 
 pub(crate) struct Camera3Service {
     camera_sw_muted: Arc<AtomicBool>,
@@ -86,7 +86,8 @@ impl Service for Camera3Service {
                                 empty_devices
                             } else {
                                 let timer = fasync::Timer::new(
-                                    Duration::from_millis(CAMERA_WATCHER_TIMEOUT / 2).after_now(),
+                                    MonotonicDuration::from_millis(CAMERA_WATCHER_TIMEOUT / 2)
+                                        .after_now(),
                                 );
                                 timer.await;
                                 camera_devices

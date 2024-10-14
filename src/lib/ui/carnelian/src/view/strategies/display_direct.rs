@@ -29,7 +29,8 @@ use futures::channel::mpsc::UnboundedSender;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use zx::{
-    self as zx, AsHandleRef, Duration, Event, HandleBased, MonotonicInstant, Signals, Status,
+    self as zx, AsHandleRef, Event, HandleBased, MonotonicDuration, MonotonicInstant, Signals,
+    Status,
 };
 
 type WaitEvents = BTreeMap<ImageId, (Event, EventId)>;
@@ -164,7 +165,7 @@ pub(crate) struct DisplayDirectViewStrategy {
     drop_display_resources_task: Option<fasync::Task<()>>,
     display_resource_release_delay: std::time::Duration,
     vsync_phase: MonotonicInstant,
-    vsync_interval: Duration,
+    vsync_interval: MonotonicDuration,
     mouse_cursor_position: Option<IntPoint>,
     pub collection_id: BufferCollectionId,
     render_frame_count: usize,
@@ -221,7 +222,7 @@ impl DisplayDirectViewStrategy {
             drop_display_resources_task: None,
             display_resource_release_delay: app_config.display_resource_release_delay,
             vsync_phase: MonotonicInstant::get(),
-            vsync_interval: Duration::from_millis(16),
+            vsync_interval: MonotonicDuration::from_millis(16),
             mouse_cursor_position: None,
             collection_id,
             render_frame_count,
@@ -237,13 +238,13 @@ impl DisplayDirectViewStrategy {
         let time_now = MonotonicInstant::get();
         // |interval_offset| is the offset from |time_now| to the next multiple
         // of vsync interval after vsync phase, possibly negative if in the past.
-        let mut interval_offset = Duration::from_nanos(
+        let mut interval_offset = MonotonicDuration::from_nanos(
             (self.vsync_phase.into_nanos() - time_now.into_nanos())
                 % self.vsync_interval.into_nanos(),
         );
         // Unless |time_now| is exactly on the interval, adjust forward to the next
         // vsync after |time_now|.
-        if interval_offset != Duration::from_nanos(0) && self.vsync_phase < time_now {
+        if interval_offset != MonotonicDuration::from_nanos(0) && self.vsync_phase < time_now {
             interval_offset += self.vsync_interval;
         }
 
@@ -476,7 +477,11 @@ impl DisplayDirectViewStrategy {
         Ok(local_event)
     }
 
-    fn handle_vsync_parameters_changed(&mut self, phase: MonotonicInstant, interval: Duration) {
+    fn handle_vsync_parameters_changed(
+        &mut self,
+        phase: MonotonicInstant,
+        interval: MonotonicDuration,
+    ) {
         self.vsync_phase = phase;
         self.vsync_interval = interval;
     }
@@ -694,7 +699,7 @@ impl ViewStrategy for DisplayDirectViewStrategy {
         match event {
             CoordinatorListenerRequest::OnVsync { timestamp, cookie, .. } => {
                 duration!(c"gfx", c"DisplayDirectViewStrategy::OnVsync");
-                let vsync_interval = Duration::from_nanos(
+                let vsync_interval = MonotonicDuration::from_nanos(
                     100_000_000_000 / self.display.info.modes[0].refresh_rate_e2 as i64,
                 );
                 self.handle_vsync_parameters_changed(

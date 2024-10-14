@@ -21,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use splines::{Interpolation, Key, Spline};
 use watch_handler::{Sender, WatchHandler};
 use zx::sys::ZX_ERR_NOT_SUPPORTED;
-use zx::Duration;
+use zx::MonotonicDuration;
 
 use crate::sender_channel::SenderChannel;
 use lib::backlight::BacklightControl;
@@ -40,7 +40,7 @@ const BRIGHTNESS_USER_MULTIPLIER_MAX: f32 = 8.0;
 const BRIGHTNESS_USER_MULTIPLIER_MIN: f32 = 0.25;
 const BRIGHTNESS_TABLE_FILE_PATH: &str = "/data/brightness_table";
 const BRIGHTNESS_MINIMUM_CHANGE: f32 = 0.00001;
-const MANUAL_BRIGHTNESS_DEFAULT: Duration = Duration::from_millis(250);
+const MANUAL_BRIGHTNESS_DEFAULT: MonotonicDuration = MonotonicDuration::from_millis(250);
 
 // Minimum time between brightness steps. 50 ms is the configured ramp time of the backlight.
 // It'll do its smoothing within this, so there is no need to send events more frequently.
@@ -103,8 +103,8 @@ lazy_static! {
     static ref AUTO_BRIGHTNESS_ADJUSTMENT: Arc<Mutex<f32>> = Arc::new(Mutex::new(1.0));
     static ref GET_BRIGHTNESS_FAILED_FIRST: Arc<Mutex<bool>> = Arc::new(Mutex::new(true));
     static ref LAST_SET_BRIGHTNESS: Arc<Mutex<f32>> = Arc::new(Mutex::new(1.0));
-    static ref BRIGHTNESS_CHANGE_DURATION: Arc<Mutex<Duration>> =
-        Arc::new(Mutex::new(Duration::from_millis(BRIGHTNESS_CHANGE_DURATION_MS)));
+    static ref BRIGHTNESS_CHANGE_DURATION: Arc<Mutex<MonotonicDuration>> =
+        Arc::new(Mutex::new(MonotonicDuration::from_millis(BRIGHTNESS_CHANGE_DURATION_MS)));
 }
 
 pub struct WatcherCurrentResponder {
@@ -224,7 +224,11 @@ impl Control {
                 duration: duration_ns,
                 control_handle: _,
             } => {
-                self.set_manual_brightness_smooth(value, Duration::from_nanos(duration_ns)).await;
+                self.set_manual_brightness_smooth(
+                    value,
+                    MonotonicDuration::from_nanos(duration_ns),
+                )
+                .await;
             }
             BrightnessControlRequest::WatchCurrentBrightness { responder } => {
                 let watch_current_result =
@@ -361,8 +365,10 @@ impl Control {
                         last_value = value as i32;
                         let delay_timeout =
                             if large_change { QUICK_SCAN_TIMEOUT_MS } else { SLOW_SCAN_TIMEOUT_MS };
-                        fuchsia_async::Timer::new(Duration::from_millis(delay_timeout).after_now())
-                            .await;
+                        fuchsia_async::Timer::new(
+                            MonotonicDuration::from_millis(delay_timeout).after_now(),
+                        )
+                        .await;
                     }
                 },
                 abort_registration,
@@ -377,7 +383,7 @@ impl Control {
         self.set_manual_brightness_smooth(value, MANUAL_BRIGHTNESS_DEFAULT).await;
     }
 
-    async fn set_manual_brightness_smooth(&mut self, value: f32, duration: Duration) {
+    async fn set_manual_brightness_smooth(&mut self, value: f32, duration: MonotonicDuration) {
         if let Some(handle) = self.auto_brightness_abort_handle.take() {
             tracing::info!("Auto-brightness off, brightness set to {}", value);
             handle.abort();
@@ -686,7 +692,7 @@ async fn set_brightness_slowly(
     current_value: f32,
     to_value: f32,
     backlight: Arc<dyn BacklightControl>,
-    duration: Duration,
+    duration: MonotonicDuration,
     current_sender_channel: Arc<Mutex<SenderChannel<f32>>>,
 ) {
     let mut current_value = current_value as f64;
@@ -712,7 +718,7 @@ async fn set_brightness_slowly(
         // Too frequent, let's slow it down. It will still look smooth.
         time_per_step = BRIGHTNESS_MIN_STEP_TIME_MS;
     }
-    let sleep_time = Duration::from_millis(time_per_step as i64);
+    let sleep_time = MonotonicDuration::from_millis(time_per_step as i64);
     let steps = (duration.into_millis() as f64 / time_per_step) as i64;
     if steps > 0 {
         let step_size = difference / steps as f64;
@@ -1090,7 +1096,7 @@ mod tests {
             0.4,
             0.42,
             control.backlight,
-            zx::Duration::from_millis(500),
+            zx::MonotonicDuration::from_millis(500),
             control.current_sender_channel,
         );
         pin_mut!(future);
@@ -1098,7 +1104,7 @@ mod tests {
         for _i in 1..10 {
             assert!(exec.run_until_stalled(&mut future).is_pending());
             if let Some(deadline) = exec.wake_next_timer() {
-                let deadline = zx::Duration::from_nanos(deadline.into_nanos());
+                let deadline = zx::MonotonicDuration::from_nanos(deadline.into_nanos());
                 assert_eq!(50, deadline.into_millis());
             } else {
                 panic!("Timer has no value");
@@ -1138,7 +1144,7 @@ mod tests {
             0.0006,
             0.0001,
             control.backlight,
-            zx::Duration::from_seconds(10),
+            zx::MonotonicDuration::from_seconds(10),
             control.current_sender_channel,
         );
         pin_mut!(future);
@@ -1146,9 +1152,9 @@ mod tests {
         for _i in 1..2 {
             assert!(exec.run_until_stalled(&mut future).is_pending());
             if let Some(deadline) = exec.wake_next_timer() {
-                let deadline = zx::Duration::from_nanos(deadline.into_nanos());
-                assert!(deadline > zx::Duration::from_millis(4500));
-                assert!(deadline < zx::Duration::from_millis(5000));
+                let deadline = zx::MonotonicDuration::from_nanos(deadline.into_nanos());
+                assert!(deadline > zx::MonotonicDuration::from_millis(4500));
+                assert!(deadline < zx::MonotonicDuration::from_millis(5000));
             } else {
                 panic!("Timer has no value");
             }
@@ -1277,7 +1283,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_set_manual_brightness_smooth_with_duration_got_set() {
         let mut control = generate_control_struct(400.0, 0.5).await;
-        control.set_manual_brightness_smooth(0.6, Duration::from_nanos(4000000000)).await;
+        control.set_manual_brightness_smooth(0.6, MonotonicDuration::from_nanos(4000000000)).await;
         let duration = *BRIGHTNESS_CHANGE_DURATION.lock().await;
         assert_eq!(4000, duration.into_millis());
     }
@@ -1298,7 +1304,8 @@ mod tests {
         futures::pin_mut!(func_fut1);
         let mut control = exec.run_singlethreaded(&mut func_fut1);
         {
-            let func_fut2 = control.set_manual_brightness_smooth(0.6, Duration::from_nanos(4000));
+            let func_fut2 =
+                control.set_manual_brightness_smooth(0.6, MonotonicDuration::from_nanos(4000));
             futures::pin_mut!(func_fut2);
             exec.run_singlethreaded(&mut func_fut2);
         }
@@ -1322,7 +1329,7 @@ mod tests {
         let mut control = exec.run_singlethreaded(&mut func_fut1);
         {
             let func_fut2 =
-                control.set_manual_brightness_smooth(0.0006, Duration::from_nanos(4000));
+                control.set_manual_brightness_smooth(0.0006, MonotonicDuration::from_nanos(4000));
             futures::pin_mut!(func_fut2);
             exec.run_singlethreaded(&mut func_fut2);
         }

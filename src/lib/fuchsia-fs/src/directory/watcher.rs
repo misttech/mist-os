@@ -260,7 +260,7 @@ mod tests {
         ERR: Debug,
     {
         let f = s.next();
-        let f = f.on_timeout(zx::Duration::from_millis(500).after_now(), || {
+        let f = f.on_timeout(zx::MonotonicDuration::from_millis(500).after_now(), || {
             panic!("timeout waiting for watcher")
         });
         f.map(|next| {

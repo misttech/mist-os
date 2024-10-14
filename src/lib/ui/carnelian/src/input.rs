@@ -16,7 +16,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
-use zx::{self as zx, Duration};
+use zx::{self as zx, MonotonicDuration};
 
 #[derive(Debug)]
 pub(crate) enum UserInputMessage {
@@ -406,7 +406,7 @@ async fn listen_to_path(device_path: &Path, internal_sender: &InternalSender) ->
     let descriptor = device
         .get_descriptor()
         .map_err(|err| format_err!("FIDL error on get_descriptor: {:?}", err))
-        .on_timeout(MonotonicInstant::after(Duration::from_millis(200)), || {
+        .on_timeout(MonotonicInstant::after(MonotonicDuration::from_millis(200)), || {
             Err(format_err!("FIDL timeout on get_descriptor"))
         })
         .await?;

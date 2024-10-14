@@ -1247,7 +1247,7 @@ pub(crate) mod tests {
             receiver
                 .next()
                 .map(Some)
-                .on_timeout(zx::Duration::from_millis(100).after_now(), || None)
+                .on_timeout(zx::MonotonicDuration::from_millis(100).after_now(), || None)
                 .await,
             None
         );

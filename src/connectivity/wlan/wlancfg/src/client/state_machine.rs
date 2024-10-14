@@ -37,7 +37,7 @@ use {
 };
 
 const MAX_CONNECTION_ATTEMPTS: u8 = 4; // arbitrarily chosen until we have some data
-const CONNECT_TIMEOUT: zx::Duration = zx::Duration::from_seconds(30);
+const CONNECT_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(30);
 const NUM_PAST_SCORES: usize = 91; // number of past periodic connection scores to store for metrics
 
 type State = state_machine::State<ExitReason>;
@@ -389,7 +389,7 @@ async fn handle_connecting_error_and_retry(
         // Limit not exceeded, retry after backing off.
         let backoff_time = 400_i64 * i64::from(new_attempt_count);
         info!("Will attempt to reconnect after {}ms backoff", backoff_time);
-        fasync::Timer::new(zx::Duration::from_millis(backoff_time).after_now()).await;
+        fasync::Timer::new(zx::MonotonicDuration::from_millis(backoff_time).after_now()).await;
 
         let next_connecting_options = ConnectingOptions {
             connect_selection: types::ConnectSelection {
@@ -1494,7 +1494,7 @@ mod tests {
         // Ensure a connect request is sent to the SME
         let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
-        let time_to_connect = zx::Duration::from_seconds(30);
+        let time_to_connect = zx::MonotonicDuration::from_seconds(30);
         let connect_txn_handle = assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
@@ -1604,7 +1604,7 @@ mod tests {
             data: PastConnectionData {
                 bssid: types::Bssid::from(bss_description.bssid),
                 disconnect_time: fasync::MonotonicInstant::now(),
-                connection_uptime: zx::Duration::from_minutes(0),
+                connection_uptime: zx::MonotonicDuration::from_minutes(0),
                 disconnect_reason: types::DisconnectReason::DisconnectDetectedFromSme,
                 signal_at_disconnect: types::Signal {
                     rssi_dbm: bss_description.rssi_dbm,
@@ -2104,7 +2104,8 @@ mod tests {
         let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
 
-        let disconnect_time = fasync::MonotonicInstant::after(zx::Duration::from_hours(12));
+        let disconnect_time =
+            fasync::MonotonicInstant::after(zx::MonotonicDuration::from_hours(12));
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2119,7 +2120,7 @@ mod tests {
 
         // Run forward to get post connection signals metrics
         exec.set_fake_time(fasync::MonotonicInstant::after(
-            AVERAGE_SCORE_DELTA_MINIMUM_DURATION + zx::Duration::from_seconds(1),
+            AVERAGE_SCORE_DELTA_MINIMUM_DURATION + zx::MonotonicDuration::from_seconds(1),
         ));
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
@@ -2128,7 +2129,7 @@ mod tests {
 
         // Run forward to get long duration signals metrics
         exec.set_fake_time(fasync::MonotonicInstant::after(
-            METRICS_SHORT_CONNECT_DURATION + zx::Duration::from_seconds(1),
+            METRICS_SHORT_CONNECT_DURATION + zx::MonotonicDuration::from_seconds(1),
         ));
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
@@ -2181,7 +2182,7 @@ mod tests {
             assert_variant!(event, TelemetryEvent::Disconnected { track_subsequent_downtime, info } => {
                 assert!(!track_subsequent_downtime);
                 assert_variant!(info, DisconnectInfo {connected_duration, is_sme_reconnecting, disconnect_source, previous_connect_reason, ap_state, ..} => {
-                    assert_eq!(connected_duration, zx::Duration::from_hours(12));
+                    assert_eq!(connected_duration, zx::MonotonicDuration::from_hours(12));
                     assert!(!is_sme_reconnecting);
                     assert_eq!(disconnect_source, fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::FidlStopClientConnectionsRequest));
                     assert_eq!(previous_connect_reason, connect_selection.reason);
@@ -2197,7 +2198,7 @@ mod tests {
             data: PastConnectionData {
                 bssid: init_ap_state.original().bssid,
                 disconnect_time,
-                connection_uptime: zx::Duration::from_hours(12),
+                connection_uptime: zx::MonotonicDuration::from_hours(12),
                 disconnect_reason: types::DisconnectReason::FidlStopClientConnectionsRequest,
                 signal_at_disconnect: types::Signal {
                     rssi_dbm: bss_description.rssi_dbm,
@@ -2263,7 +2264,8 @@ mod tests {
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
-        let disconnect_time = fasync::MonotonicInstant::after(zx::Duration::from_hours(12));
+        let disconnect_time =
+            fasync::MonotonicInstant::after(zx::MonotonicDuration::from_hours(12));
         exec.set_fake_time(disconnect_time);
 
         // SME notifies Policy of disconnection
@@ -2280,7 +2282,7 @@ mod tests {
             data: PastConnectionData {
                 bssid: init_ap_state.original().bssid,
                 disconnect_time,
-                connection_uptime: zx::Duration::from_hours(12),
+                connection_uptime: zx::MonotonicDuration::from_hours(12),
                 disconnect_reason: types::DisconnectReason::DisconnectDetectedFromSme,
                 signal_at_disconnect: types::Signal {
                     rssi_dbm: bss_description.rssi_dbm,
@@ -2299,7 +2301,7 @@ mod tests {
             assert_variant!(event, TelemetryEvent::Disconnected { track_subsequent_downtime, info } => {
                 assert!(track_subsequent_downtime);
                 assert_variant!(info, DisconnectInfo {connected_duration, is_sme_reconnecting, disconnect_source, previous_connect_reason, ap_state, ..} => {
-                    assert_eq!(connected_duration, zx::Duration::from_hours(12));
+                    assert_eq!(connected_duration, zx::MonotonicDuration::from_hours(12));
                     assert!(!is_sme_reconnecting);
                     assert_eq!(disconnect_source, fidl_disconnect_info.disconnect_source);
                     assert_eq!(previous_connect_reason, connect_selection.reason);
@@ -2341,7 +2343,8 @@ mod tests {
         let fut = run_state_machine(initial_state);
         let mut fut = pin!(fut);
 
-        let disconnect_time = fasync::MonotonicInstant::after(zx::Duration::from_hours(12));
+        let disconnect_time =
+            fasync::MonotonicInstant::after(zx::MonotonicDuration::from_hours(12));
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2356,7 +2359,7 @@ mod tests {
 
         // Run forward to get post connection score metrics
         exec.set_fake_time(fasync::MonotonicInstant::after(
-            AVERAGE_SCORE_DELTA_MINIMUM_DURATION + zx::Duration::from_seconds(1),
+            AVERAGE_SCORE_DELTA_MINIMUM_DURATION + zx::MonotonicDuration::from_seconds(1),
         ));
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
@@ -2365,7 +2368,7 @@ mod tests {
 
         // Run forward to get long duration signals metrics
         exec.set_fake_time(fasync::MonotonicInstant::after(
-            METRICS_SHORT_CONNECT_DURATION + zx::Duration::from_seconds(1),
+            METRICS_SHORT_CONNECT_DURATION + zx::MonotonicDuration::from_seconds(1),
         ));
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
@@ -2387,12 +2390,12 @@ mod tests {
         // Disconnect telemetry event sent
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
             assert_variant!(event, TelemetryEvent::Disconnected { info, .. } => {
-                assert_eq!(info.connected_duration, zx::Duration::from_hours(12));
+                assert_eq!(info.connected_duration, zx::MonotonicDuration::from_hours(12));
             });
         });
 
         // SME notifies Policy of reconnection successful
-        exec.set_fake_time(fasync::MonotonicInstant::after(zx::Duration::from_seconds(1)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(1)));
         let connect_result =
             fidl_sme::ConnectResult { is_reconnect: true, ..fake_successful_connect_result() };
         connect_txn_handle
@@ -2406,7 +2409,7 @@ mod tests {
         );
 
         // SME notifies Policy of another disconnection
-        exec.set_fake_time(fasync::MonotonicInstant::after(zx::Duration::from_hours(2)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(zx::MonotonicDuration::from_hours(2)));
         let is_sme_reconnecting = false;
         let fidl_disconnect_info = generate_disconnect_info(is_sme_reconnecting);
         connect_txn_handle
@@ -2417,7 +2420,7 @@ mod tests {
         // Another disconnect telemetry event sent
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
             assert_variant!(event, TelemetryEvent::Disconnected { info, .. } => {
-                assert_eq!(info.connected_duration, zx::Duration::from_hours(2));
+                assert_eq!(info.connected_duration, zx::MonotonicDuration::from_hours(2));
             });
         });
     }
@@ -2456,7 +2459,7 @@ mod tests {
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut state_fut), Poll::Pending);
 
-        let time_to_connect = zx::Duration::from_seconds(10);
+        let time_to_connect = zx::MonotonicDuration::from_seconds(10);
         exec.set_fake_time(fasync::MonotonicInstant::after(time_to_connect));
 
         // Process connect request sent to SME
@@ -2475,7 +2478,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut state_fut), Poll::Pending);
 
         // SME notifies Policy of disconnection.
-        let disconnect_time = fasync::MonotonicInstant::after(zx::Duration::from_hours(5));
+        let disconnect_time = fasync::MonotonicInstant::after(zx::MonotonicDuration::from_hours(5));
         exec.set_fake_time(disconnect_time);
         let is_sme_reconnecting = false;
         connect_txn_handle
@@ -2496,7 +2499,7 @@ mod tests {
             data: PastConnectionData {
                 bssid: types::Bssid::from(bss_description.bssid),
                 disconnect_time,
-                connection_uptime: zx::Duration::from_hours(5),
+                connection_uptime: zx::MonotonicDuration::from_hours(5),
                 disconnect_reason: types::DisconnectReason::DisconnectDetectedFromSme,
                 signal_at_disconnect: types::Signal {
                     rssi_dbm: bss_description.rssi_dbm,
@@ -2593,7 +2596,8 @@ mod tests {
         let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
 
-        let disconnect_time = fasync::MonotonicInstant::after(zx::Duration::from_hours(12));
+        let disconnect_time =
+            fasync::MonotonicInstant::after(zx::MonotonicDuration::from_hours(12));
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2608,7 +2612,7 @@ mod tests {
 
         // Run forward to get post connection signals metrics
         exec.set_fake_time(fasync::MonotonicInstant::after(
-            AVERAGE_SCORE_DELTA_MINIMUM_DURATION + zx::Duration::from_seconds(1),
+            AVERAGE_SCORE_DELTA_MINIMUM_DURATION + zx::MonotonicDuration::from_seconds(1),
         ));
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
@@ -2617,7 +2621,7 @@ mod tests {
 
         // Run forward to get long duration signals metrics
         exec.set_fake_time(fasync::MonotonicInstant::after(
-            METRICS_SHORT_CONNECT_DURATION + zx::Duration::from_seconds(1),
+            METRICS_SHORT_CONNECT_DURATION + zx::MonotonicDuration::from_seconds(1),
         ));
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
@@ -2683,7 +2687,7 @@ mod tests {
             assert_variant!(event, TelemetryEvent::Disconnected { track_subsequent_downtime, info } => {
                 assert!(!track_subsequent_downtime);
                 assert_variant!(info, DisconnectInfo {connected_duration, is_sme_reconnecting, disconnect_source, previous_connect_reason, ap_state, ..} => {
-                    assert_eq!(connected_duration, zx::Duration::from_hours(12));
+                    assert_eq!(connected_duration, zx::MonotonicDuration::from_hours(12));
                     assert!(!is_sme_reconnecting);
                     assert_eq!(disconnect_source, fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::ProactiveNetworkSwitch));
                     assert_eq!(previous_connect_reason, first_connect_selection.reason);
@@ -2743,7 +2747,7 @@ mod tests {
             data: PastConnectionData {
                 bssid: types::Bssid::from(first_bss_desc.bssid),
                 disconnect_time,
-                connection_uptime: zx::Duration::from_hours(12),
+                connection_uptime: zx::MonotonicDuration::from_hours(12),
                 disconnect_reason: types::DisconnectReason::ProactiveNetworkSwitch,
                 signal_at_disconnect: types::Signal {
                     rssi_dbm: first_bss_desc.rssi_dbm,

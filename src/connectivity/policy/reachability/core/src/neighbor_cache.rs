@@ -199,7 +199,7 @@ mod tests {
         }
 
         fn advance_secs(&mut self, secs: u64) {
-            self.now += zx::Duration::from_seconds(secs.try_into().unwrap());
+            self.now += zx::MonotonicDuration::from_seconds(secs.try_into().unwrap());
         }
 
         fn entry(

@@ -94,7 +94,7 @@ pub struct Channel {
     socket: fasync::Socket,
     mode: ChannelMode,
     max_tx_size: usize,
-    flush_timeout: Arc<Mutex<Option<zx::Duration>>>,
+    flush_timeout: Arc<Mutex<Option<zx::MonotonicDuration>>>,
     audio_direction_ext: Option<bredr::AudioDirectionExtProxy>,
     l2cap_parameters_ext: Option<bredr::L2capParametersExtProxy>,
     terminated: bool,
@@ -150,7 +150,7 @@ impl Channel {
         &self.mode
     }
 
-    pub fn flush_timeout(&self) -> Option<zx::Duration> {
+    pub fn flush_timeout(&self) -> Option<zx::MonotonicDuration> {
         self.flush_timeout.lock().unwrap().clone()
     }
 
@@ -180,8 +180,8 @@ impl Channel {
     /// or return an error setting the parameter is not supported.
     pub fn set_flush_timeout(
         &self,
-        duration: Option<zx::Duration>,
-    ) -> impl Future<Output = Result<Option<zx::Duration>, Error>> {
+        duration: Option<zx::MonotonicDuration>,
+    ) -> impl Future<Output = Result<Option<zx::MonotonicDuration>, Error>> {
         let flush_timeout = self.flush_timeout.clone();
         let current = self.flush_timeout.lock().unwrap().clone();
         let proxy = self.l2cap_parameters_ext.clone();
@@ -195,11 +195,11 @@ impl Channel {
             };
             let proxy = proxy.ok_or(Error::profile("l2cap parameter changing not supported"))?;
             let parameters = fidl_bt::ChannelParameters {
-                flush_timeout: duration.clone().map(zx::Duration::into_nanos),
+                flush_timeout: duration.clone().map(zx::MonotonicDuration::into_nanos),
                 ..Default::default()
             };
             let new_params = proxy.request_parameters(&parameters).await?;
-            let new_timeout = new_params.flush_timeout.map(zx::Duration::from_nanos);
+            let new_timeout = new_params.flush_timeout.map(zx::MonotonicDuration::from_nanos);
             *(flush_timeout.lock().unwrap()) = new_timeout.clone();
             Ok(new_timeout)
         }
@@ -264,7 +264,9 @@ impl TryFrom<fidl_fuchsia_bluetooth_bredr::Channel> for Channel {
             socket: fasync::Socket::from_socket(fidl.socket.ok_or(zx::Status::INVALID_ARGS)?),
             mode: channel,
             max_tx_size: fidl.max_tx_sdu_size.ok_or(zx::Status::INVALID_ARGS)? as usize,
-            flush_timeout: Arc::new(Mutex::new(fidl.flush_timeout.map(zx::Duration::from_nanos))),
+            flush_timeout: Arc::new(Mutex::new(
+                fidl.flush_timeout.map(zx::MonotonicDuration::from_nanos),
+            )),
             audio_direction_ext: fidl.ext_direction.and_then(|e| e.into_proxy().ok()),
             l2cap_parameters_ext: fidl.ext_l2cap.and_then(|e| e.into_proxy().ok()),
             terminated: false,
@@ -297,7 +299,8 @@ impl TryFrom<Channel> for bredr::Channel {
             .map_err(|_: bredr::L2capParametersExtProxy| {
                 Error::profile("l2cap parameters proxy in use")
             })?;
-        let flush_timeout = channel.flush_timeout.lock().unwrap().map(zx::Duration::into_nanos);
+        let flush_timeout =
+            channel.flush_timeout.lock().unwrap().map(zx::MonotonicDuration::into_nanos);
         Ok(bredr::Channel {
             socket: Some(socket),
             channel_mode: Some(channel.mode.into()),
@@ -524,18 +527,22 @@ mod tests {
         };
         let channel = Channel::try_from(no_ext).unwrap();
 
-        assert_eq!(Some(zx::Duration::from_millis(50)), channel.flush_timeout());
+        assert_eq!(Some(zx::MonotonicDuration::from_millis(50)), channel.flush_timeout());
 
         // Within 2 milliseconds, doesn't change.
-        let res =
-            exec.run_singlethreaded(channel.set_flush_timeout(Some(zx::Duration::from_millis(49))));
-        assert_eq!(Some(zx::Duration::from_millis(50)), res.expect("shouldn't error"));
-        let res =
-            exec.run_singlethreaded(channel.set_flush_timeout(Some(zx::Duration::from_millis(51))));
-        assert_eq!(Some(zx::Duration::from_millis(50)), res.expect("shouldn't error"));
+        let res = exec.run_singlethreaded(
+            channel.set_flush_timeout(Some(zx::MonotonicDuration::from_millis(49))),
+        );
+        assert_eq!(Some(zx::MonotonicDuration::from_millis(50)), res.expect("shouldn't error"));
+        let res = exec.run_singlethreaded(
+            channel.set_flush_timeout(Some(zx::MonotonicDuration::from_millis(51))),
+        );
+        assert_eq!(Some(zx::MonotonicDuration::from_millis(50)), res.expect("shouldn't error"));
 
         assert!(exec
-            .run_singlethreaded(channel.set_flush_timeout(Some(zx::Duration::from_millis(200))))
+            .run_singlethreaded(
+                channel.set_flush_timeout(Some(zx::MonotonicDuration::from_millis(200)))
+            )
             .is_err());
         assert!(exec.run_singlethreaded(channel.set_flush_timeout(None)).is_err());
 
@@ -564,7 +571,7 @@ mod tests {
             }
         }
 
-        let req_duration = zx::Duration::from_millis(42);
+        let req_duration = zx::MonotonicDuration::from_millis(42);
 
         {
             let flush_timeout_fut = channel.set_flush_timeout(Some(req_duration));
@@ -590,13 +597,13 @@ mod tests {
 
             match exec.run_until_stalled(&mut flush_timeout_fut) {
                 Poll::Ready(Ok(Some(duration))) => {
-                    assert_eq!(zx::Duration::from_millis(50), duration)
+                    assert_eq!(zx::MonotonicDuration::from_millis(50), duration)
                 }
                 x => panic!("Expected ready result from params response, got {:?}", x),
             };
         }
 
         // Channel should have recorded the new flush timeout.
-        assert_eq!(Some(zx::Duration::from_millis(50)), channel.flush_timeout());
+        assert_eq!(Some(zx::MonotonicDuration::from_millis(50)), channel.flush_timeout());
     }
 }

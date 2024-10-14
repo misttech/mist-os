@@ -237,7 +237,7 @@ macro_rules! log_trace_statistics {
 
 struct StatisticsTracker {
     /// Interval for summarizing statistics.
-    statistics_interval: zx::Duration,
+    statistics_interval: zx::MonotonicDuration,
 
     /// List of samples polled from all the sensors during `statistics_interval` starting from
     /// `statistics_start_time`. Data is cleared at the end of each `statistics_interval`.
@@ -286,7 +286,7 @@ pub struct SensorLogger<T> {
     activity_listener: ActivityListener,
 
     /// Polling interval from the sensors.
-    sampling_interval: zx::Duration,
+    sampling_interval: zx::MonotonicDuration,
 
     /// Start time for the logger; used to calculate elapsed time.
     /// This is an exclusive start.
@@ -348,12 +348,12 @@ impl<T: Sensor<T>> SensorLogger<T> {
 
         let start_time = fasync::MonotonicInstant::now();
         let end_time = duration_ms.map_or(fasync::MonotonicInstant::INFINITE, |d| {
-            start_time + zx::Duration::from_millis(d as i64)
+            start_time + zx::MonotonicDuration::from_millis(d as i64)
         });
-        let sampling_interval = zx::Duration::from_millis(sampling_interval_ms as i64);
+        let sampling_interval = zx::MonotonicDuration::from_millis(sampling_interval_ms as i64);
 
         let statistics_tracker = statistics_interval_ms.map(|i| StatisticsTracker {
-            statistics_interval: zx::Duration::from_millis(i as i64),
+            statistics_interval: zx::MonotonicDuration::from_millis(i as i64),
             statistics_start_time: fasync::MonotonicInstant::now(),
             samples: vec![Vec::new(); drivers.len()],
         });

@@ -17,7 +17,10 @@ fn black_box<T>(placeholder: T) -> T {
 
 fn work_func(sag: &fsystem::ActivityGovernorSynchronousProxy) -> Result<()> {
     let _event_pair = sag
-        .take_wake_lease("benchmark", zx::MonotonicInstant::after(zx::Duration::from_seconds(5)))
+        .take_wake_lease(
+            "benchmark",
+            zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(5)),
+        )
         .unwrap();
 
     Ok(())

@@ -329,7 +329,7 @@ async fn partition_max_size_set() {
 
     let dev = fixture.dir("dev-topological/class/block", fio::OpenFlags::empty());
     let data_partition_controller =
-        find_partition_in(&dev, data_matcher, zx::Duration::from_seconds(10))
+        find_partition_in(&dev, data_matcher, zx::MonotonicDuration::from_seconds(10))
             .await
             .expect("failed to find data partition");
 

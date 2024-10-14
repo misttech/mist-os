@@ -12,7 +12,7 @@ use anyhow::Error;
 use fuchsia_async::{DurationExt, Task};
 use recovery_metrics_registry::cobalt_registry as metrics;
 use std::rc::Rc;
-use zx::Duration;
+use zx::MonotonicDuration;
 
 /// Connects to a Wifi network.
 /// Asynchronously ends event Connected or Error as appropriate.
@@ -55,7 +55,7 @@ impl WifiConnectAction {
                     // Let the "Connecting" message stay there for a second so the
                     // user can see that something was tried.
                     // TODO(b/258576788): Confirm sleep details etc. with UX
-                    let sleep_time = Duration::from_seconds(1);
+                    let sleep_time = MonotonicDuration::from_seconds(1);
                     fuchsia_async::Timer::new(sleep_time.after_now()).await;
                     println!("Failed to connect: {}", error);
                     event_sender.send(Event::Error(error.to_string()));
@@ -96,7 +96,7 @@ mod tests {
     use futures::future;
     use mockall::predicate::eq;
     use recovery_metrics_registry::cobalt_registry as metrics;
-    use zx::Duration;
+    use zx::MonotonicDuration;
 
     struct FakeWifiConnectImpl {
         connected: bool,
@@ -162,7 +162,9 @@ mod tests {
         );
         // Make sure the task under test runs to its delay
         let _ = exec.run_until_stalled(&mut future::pending::<()>());
-        exec.set_fake_time(fasync::MonotonicInstant::after(Duration::from_seconds(3).into()));
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            MonotonicDuration::from_seconds(3).into(),
+        ));
         exec.wake_expired_timers();
         // Make sure the task under test runs to its finish
         let _ = exec.run_until_stalled(&mut future::pending::<()>());

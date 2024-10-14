@@ -650,7 +650,7 @@ mod tests {
             assert_matches!(
                 watcher
                     .next()
-                    .on_timeout(zx::Duration::from_millis(500).after_now(), || None)
+                    .on_timeout(zx::MonotonicDuration::from_millis(500).after_now(), || None)
                     .await,
                 None
             );

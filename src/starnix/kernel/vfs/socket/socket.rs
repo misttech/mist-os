@@ -248,10 +248,10 @@ pub struct Socket {
 #[derive(Default)]
 struct SocketState {
     /// The value of SO_RCVTIMEO.
-    receive_timeout: Option<zx::Duration>,
+    receive_timeout: Option<zx::MonotonicDuration>,
 
     /// The value for SO_SNDTIMEO.
-    send_timeout: Option<zx::Duration>,
+    send_timeout: Option<zx::MonotonicDuration>,
 
     /// The socket's mark. Can get and set with SO_MARK.
     mark: u32,
@@ -389,7 +389,7 @@ impl Socket {
         let read_timeval = || {
             let timeval_ref = user_opt.try_into()?;
             let duration = duration_from_timeval(task.read_object(timeval_ref)?)?;
-            Ok(if duration == zx::Duration::default() { None } else { Some(duration) })
+            Ok(if duration == zx::MonotonicDuration::default() { None } else { Some(duration) })
         };
 
         match level {
@@ -433,11 +433,11 @@ impl Socket {
         Ok(value)
     }
 
-    pub fn receive_timeout(&self) -> Option<zx::Duration> {
+    pub fn receive_timeout(&self) -> Option<zx::MonotonicDuration> {
         self.state.lock().receive_timeout
     }
 
-    pub fn send_timeout(&self) -> Option<zx::Duration> {
+    pub fn send_timeout(&self) -> Option<zx::MonotonicDuration> {
         self.state.lock().send_timeout
     }
 

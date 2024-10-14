@@ -44,7 +44,7 @@ async fn test_services() -> Result<()> {
             instance = entry.name.clone();
             break;
         }
-        Timer::new(zx::Duration::from_millis(100).after_now()).await;
+        Timer::new(zx::MonotonicDuration::from_millis(100).after_now()).await;
     }
 
     // Connect to the `Device` service.

@@ -185,7 +185,7 @@ impl UnhandledInputHandler for PointerSensorScaleHandler {
 // * Is set to accommodate up to 10 kHZ event reporting.
 //
 // TODO(https://fxbug.dev/42181307): Use the polling rate instead of event timestamps.
-const MIN_PLAUSIBLE_EVENT_DELAY: zx::Duration = zx::Duration::from_micros(100);
+const MIN_PLAUSIBLE_EVENT_DELAY: zx::MonotonicDuration = zx::MonotonicDuration::from_micros(100);
 
 // The maximum reasonable delay between intentional mouse movements.
 // This value is used to compute speed for the first mouse motion after
@@ -198,7 +198,7 @@ const MIN_PLAUSIBLE_EVENT_DELAY: zx::Duration = zx::Duration::from_micros(100);
 //    reports at 125 HZ, which would mean an 8 msec delay.
 //
 // TODO(https://fxbug.dev/42181307): Use the polling rate instead of event timestamps.
-const MAX_PLAUSIBLE_EVENT_DELAY: zx::Duration = zx::Duration::from_millis(50);
+const MAX_PLAUSIBLE_EVENT_DELAY: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(50);
 
 const MAX_SENSOR_COUNTS_PER_INCH: f32 = 20_000.0; // From https://sensor.fyi/sensors
 const MAX_SENSOR_COUNTS_PER_MM: f32 = MAX_SENSOR_COUNTS_PER_INCH / 12.7;
@@ -524,8 +524,8 @@ mod tests {
             PointerSensorScaleHandler::new(&fake_handlers_node, metrics::MetricsLogger::default());
 
         let event_time1 = zx::MonotonicInstant::get();
-        let event_time2 = event_time1.add(zx::Duration::from_micros(1));
-        let event_time3 = event_time2.add(zx::Duration::from_micros(1));
+        let event_time2 = event_time1.add(zx::MonotonicDuration::from_micros(1));
+        let event_time3 = event_time2.add(zx::MonotonicDuration::from_micros(1));
 
         let input_events = vec![
             testing_utilities::create_mouse_event(
@@ -630,7 +630,7 @@ mod tests {
         #[ignore]
         #[fuchsia::test(allow_stalls = false)]
         async fn plot_example_curve() {
-            let duration = zx::Duration::from_millis(8);
+            let duration = zx::MonotonicDuration::from_millis(8);
             for count in 1..1000 {
                 let scaled_count = get_scaled_motion_mm(
                     Position { x: count as f32 / COUNTS_PER_MM, y: 0.0 },
@@ -641,7 +641,10 @@ mod tests {
             }
         }
 
-        async fn get_scaled_motion_mm(movement_mm: Position, duration: zx::Duration) -> Position {
+        async fn get_scaled_motion_mm(
+            movement_mm: Position,
+            duration: zx::MonotonicDuration,
+        ) -> Position {
             let inspector = fuchsia_inspect::Inspector::default();
             let test_node = inspector.root().create_child("test_node");
             let handler =
@@ -720,13 +723,13 @@ mod tests {
             }
         }
 
-        fn velocity_to_mm(velocity_mm_per_sec: f32, duration: zx::Duration) -> f32 {
+        fn velocity_to_mm(velocity_mm_per_sec: f32, duration: zx::MonotonicDuration) -> f32 {
             velocity_mm_per_sec * (duration.into_nanos() as f32 / 1E9)
         }
 
         #[fuchsia::test(allow_stalls = false)]
         async fn low_speed_horizontal_motion_scales_linearly() {
-            const TICK_DURATION: zx::Duration = zx::Duration::from_millis(8);
+            const TICK_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(8);
             const MOTION_A_MM: f32 = 1.0 / COUNTS_PER_MM;
             const MOTION_B_MM: f32 = 2.0 / COUNTS_PER_MM;
             assert_lt!(
@@ -743,7 +746,7 @@ mod tests {
 
         #[fuchsia::test(allow_stalls = false)]
         async fn low_speed_vertical_motion_scales_linearly() {
-            const TICK_DURATION: zx::Duration = zx::Duration::from_millis(8);
+            const TICK_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(8);
             const MOTION_A_MM: f32 = 1.0 / COUNTS_PER_MM;
             const MOTION_B_MM: f32 = 2.0 / COUNTS_PER_MM;
             assert_lt!(
@@ -760,7 +763,7 @@ mod tests {
 
         #[fuchsia::test(allow_stalls = false)]
         async fn low_speed_45degree_motion_scales_dimensions_equally() {
-            const TICK_DURATION: zx::Duration = zx::Duration::from_millis(8);
+            const TICK_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(8);
             const MOTION_MM: f32 = 1.0 / COUNTS_PER_MM;
             assert_lt!(
                 MOTION_MM,
@@ -774,7 +777,7 @@ mod tests {
 
         #[fuchsia::test(allow_stalls = false)]
         async fn medium_speed_motion_scales_quadratically() {
-            const TICK_DURATION: zx::Duration = zx::Duration::from_millis(8);
+            const TICK_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(8);
             const MOTION_A_MM: f32 = 7.0 / COUNTS_PER_MM;
             const MOTION_B_MM: f32 = 14.0 / COUNTS_PER_MM;
             assert_gt!(
@@ -800,7 +803,7 @@ mod tests {
         // Thus, this tests verifies a weaker property.
         #[fuchsia::test(allow_stalls = false)]
         async fn high_speed_motion_scaling_is_increasing() {
-            const TICK_DURATION: zx::Duration = zx::Duration::from_millis(8);
+            const TICK_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(8);
             const MOTION_A_MM: f32 = 16.0 / COUNTS_PER_MM;
             const MOTION_B_MM: f32 = 20.0 / COUNTS_PER_MM;
             assert_gt!(
@@ -817,7 +820,7 @@ mod tests {
 
         #[fuchsia::test(allow_stalls = false)]
         async fn zero_motion_maps_to_zero_motion() {
-            const TICK_DURATION: zx::Duration = zx::Duration::from_millis(8);
+            const TICK_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(8);
             let scaled = get_scaled_motion_mm(Position { x: 0.0, y: 0.0 }, TICK_DURATION).await;
             assert_eq!(scaled, Position::zero())
         }
@@ -826,7 +829,7 @@ mod tests {
         async fn zero_duration_does_not_crash() {
             get_scaled_motion_mm(
                 Position { x: 1.0 / COUNTS_PER_MM, y: 0.0 },
-                zx::Duration::from_millis(0),
+                zx::MonotonicDuration::from_millis(0),
             )
             .await;
         }
@@ -913,7 +916,7 @@ mod tests {
         async fn get_scaled_scroll_mm(
             wheel_delta_v_mm: Option<f32>,
             wheel_delta_h_mm: Option<f32>,
-            duration: zx::Duration,
+            duration: zx::MonotonicDuration,
         ) -> (Option<mouse_binding::WheelDelta>, Option<mouse_binding::WheelDelta>) {
             let inspector = fuchsia_inspect::Inspector::default();
             let test_node = inspector.root().create_child("test_node");
@@ -988,13 +991,13 @@ mod tests {
             }
         }
 
-        fn velocity_to_mm(velocity_mm_per_sec: f32, duration: zx::Duration) -> f32 {
+        fn velocity_to_mm(velocity_mm_per_sec: f32, duration: zx::MonotonicDuration) -> f32 {
             velocity_mm_per_sec * (duration.into_nanos() as f32 / 1E9)
         }
 
         #[fuchsia::test(allow_stalls = false)]
         async fn low_speed_horizontal_scroll_scales_linearly() {
-            const TICK_DURATION: zx::Duration = zx::Duration::from_millis(8);
+            const TICK_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(8);
             const MOTION_A_MM: f32 = 1.0 / COUNTS_PER_MM;
             const MOTION_B_MM: f32 = 2.0 / COUNTS_PER_MM;
             assert_lt!(
@@ -1028,7 +1031,7 @@ mod tests {
 
         #[fuchsia::test(allow_stalls = false)]
         async fn low_speed_vertical_scroll_scales_linearly() {
-            const TICK_DURATION: zx::Duration = zx::Duration::from_millis(8);
+            const TICK_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(8);
             const MOTION_A_MM: f32 = 1.0 / COUNTS_PER_MM;
             const MOTION_B_MM: f32 = 2.0 / COUNTS_PER_MM;
             assert_lt!(
@@ -1060,7 +1063,7 @@ mod tests {
 
         #[fuchsia::test(allow_stalls = false)]
         async fn medium_speed_horizontal_scroll_scales_quadratically() {
-            const TICK_DURATION: zx::Duration = zx::Duration::from_millis(8);
+            const TICK_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(8);
             const MOTION_A_MM: f32 = 7.0 / COUNTS_PER_MM;
             const MOTION_B_MM: f32 = 14.0 / COUNTS_PER_MM;
             assert_gt!(
@@ -1098,7 +1101,7 @@ mod tests {
 
         #[fuchsia::test(allow_stalls = false)]
         async fn medium_speed_vertical_scroll_scales_quadratically() {
-            const TICK_DURATION: zx::Duration = zx::Duration::from_millis(8);
+            const TICK_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(8);
             const MOTION_A_MM: f32 = 7.0 / COUNTS_PER_MM;
             const MOTION_B_MM: f32 = 14.0 / COUNTS_PER_MM;
             assert_gt!(
@@ -1134,7 +1137,7 @@ mod tests {
 
         #[fuchsia::test(allow_stalls = false)]
         async fn high_speed_horizontal_scroll_scaling_is_inreasing() {
-            const TICK_DURATION: zx::Duration = zx::Duration::from_millis(8);
+            const TICK_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(8);
             const MOTION_A_MM: f32 = 16.0 / COUNTS_PER_MM;
             const MOTION_B_MM: f32 = 20.0 / COUNTS_PER_MM;
             assert_gt!(
@@ -1164,7 +1167,7 @@ mod tests {
 
         #[fuchsia::test(allow_stalls = false)]
         async fn high_speed_vertical_scroll_scaling_is_inreasing() {
-            const TICK_DURATION: zx::Duration = zx::Duration::from_millis(8);
+            const TICK_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(8);
             const MOTION_A_MM: f32 = 16.0 / COUNTS_PER_MM;
             const MOTION_B_MM: f32 = 20.0 / COUNTS_PER_MM;
             assert_gt!(

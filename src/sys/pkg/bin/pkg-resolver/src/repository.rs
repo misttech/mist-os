@@ -673,7 +673,7 @@ mod tests {
         // Advance time right before the timeout, and make sure we don't access the server.
         clock::mock::set(
             zx::MonotonicInstant::from_nanos(0) + METADATA_CACHE_STALE_TIMEOUT
-                - zx::Duration::from_seconds(1),
+                - zx::MonotonicDuration::from_seconds(1),
         );
         assert_matches!(repo.get_merkle_at_path(&target_path).await, Ok(_));
 
@@ -684,7 +684,7 @@ mod tests {
         clock::mock::set(
             zx::MonotonicInstant::from_nanos(0)
                 + METADATA_CACHE_STALE_TIMEOUT
-                + zx::Duration::from_seconds(1),
+                + zx::MonotonicDuration::from_seconds(1),
         );
         assert_matches!(repo.get_merkle_at_path(&target_path).await, Ok(_));
 

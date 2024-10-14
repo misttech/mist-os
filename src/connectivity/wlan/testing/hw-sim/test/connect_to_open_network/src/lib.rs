@@ -23,7 +23,7 @@ async fn connect_to_open_network() {
 
     let () = connect_or_timeout(
         &mut helper,
-        zx::Duration::from_seconds(30),
+        zx::MonotonicDuration::from_seconds(30),
         &AP_SSID,
         &bss,
         &Protection::Open,

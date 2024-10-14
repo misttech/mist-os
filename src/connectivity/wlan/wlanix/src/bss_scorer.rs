@@ -11,7 +11,8 @@ use {fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_async as fasync, zx};
 
 /// Only connect failures that were RECENT_CONNECT_FAILURE_WINDOW from now would
 /// contribute to score penalty.
-const RECENT_CONNECT_FAILURE_WINDOW: zx::Duration = zx::Duration::from_seconds(60 * 5);
+const RECENT_CONNECT_FAILURE_WINDOW: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_seconds(60 * 5);
 
 /// The amount to decrease the score by for each failed connection attempt.
 const SCORE_PENALTY_FOR_RECENT_CONNECT_FAILURE: i16 = 5;
@@ -176,13 +177,15 @@ mod tests {
         // Two connect failures at the 0th second mark.
         bss_scorer.report_connect_failure(Bssid::from(BSSID), &connect_failure());
         bss_scorer.report_connect_failure(Bssid::from(BSSID), &connect_failure());
-        exec.set_fake_time(fasync::MonotonicInstant::after(zx::Duration::from_seconds(300)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(
+            300,
+        )));
         assert_eq!(bss_scorer.score_bss(&fake_bss(-50)), -60);
         bss_scorer.report_connect_failure(Bssid::from(BSSID), &connect_failure());
         // At 300th second mark, three connect failures are considered as recent.
         assert_eq!(bss_scorer.score_bss(&fake_bss(-50)), -65);
 
-        exec.set_fake_time(fasync::MonotonicInstant::after(zx::Duration::from_seconds(1)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(1)));
         // At 301th second mark, the two connect failures from the 0th second mark are
         // evicted, leaving one recent connect failure.
         assert_eq!(bss_scorer.score_bss(&fake_bss(-50)), -55);

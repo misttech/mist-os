@@ -40,11 +40,11 @@ pub mod fidl {
         // Note: This choice of time is somewhat arbitrary and may need tuning in the future. Its
         // intended to be large enough that a healthy system does not timeout and small enough that
         // waiting for FIDL doesn't interfere with the timeouts we set on the security key.
-        static ref FIDL_TIMEOUT: zx::Duration = zx::Duration::from_millis(50);
+        static ref FIDL_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(50);
 
         /// Time to wait before declaring a read failure. Set slightly higher than the 100ms
         /// KEEPALIVE requirement in the CTAPHID specification.
-        static ref READ_MESSAGE_TIMEOUT: zx::Duration = zx::Duration::from_millis(110);
+        static ref READ_MESSAGE_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(110);
     }
 
     /// A connection to a CTAPHID device over the FIDL `Device` protocol.

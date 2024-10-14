@@ -14,7 +14,7 @@ use windowed_stats::experimental::series::{SamplingProfile, TimeMatrix};
 use windowed_stats::experimental::serve::{InspectedTimeMatrix, TimeMatrixClient};
 
 // Include a timeout on stats calls so that if the driver deadlocks, telemtry doesn't get stuck.
-const GET_IFACE_STATS_TIMEOUT: zx::Duration = zx::Duration::from_seconds(5);
+const GET_IFACE_STATS_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(5);
 
 enum IfaceState {
     NotAvailable,

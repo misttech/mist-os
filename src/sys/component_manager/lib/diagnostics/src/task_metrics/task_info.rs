@@ -58,7 +58,7 @@ pub struct TaskInfo<T: RuntimeStatsSource + Debug> {
     pub(crate) measurements: MeasurementsQueue,
     exited_cpu: Option<Measurement>,
     histogram: Option<UintLinearHistogramProperty>,
-    previous_cpu: zx::Duration,
+    previous_cpu: zx::MonotonicDuration,
     previous_histogram_timestamp: i64,
     cpu_cores: i64,
     sample_period: std::time::Duration,
@@ -127,7 +127,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> TaskInfo<T> {
             cpu_cores,
             sample_period,
             histogram,
-            previous_cpu: zx::Duration::from_nanos(0),
+            previous_cpu: zx::MonotonicDuration::from_nanos(0),
             previous_histogram_timestamp: time_source.now(),
             time_source,
             _terminated_task,
@@ -238,7 +238,11 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> TaskInfo<T> {
     }
 
     // Add a measurement to this task's histogram.
-    fn add_to_histogram(&mut self, cpu_time_delta: zx::Duration, timestamp: zx::BootInstant) {
+    fn add_to_histogram(
+        &mut self,
+        cpu_time_delta: zx::MonotonicDuration,
+        timestamp: zx::BootInstant,
+    ) {
         if let Some(histogram) = &self.histogram {
             let time_value: i64 = timestamp.into_nanos();
             let elapsed_time = time_value - self.previous_histogram_timestamp;

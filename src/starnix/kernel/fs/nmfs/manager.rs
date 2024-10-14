@@ -26,7 +26,7 @@ use {fidl_fuchsia_netpol_socketproxy as fnp_socketproxy, zx};
 pub(crate) struct NetworkManager {
     starnix_networks: Mutex<Option<fnp_socketproxy::StarnixNetworksSynchronousProxy>>,
     // Timeout for thread-blocking calls to the socketproxy.
-    proxy_timeout: zx::Duration,
+    proxy_timeout: zx::MonotonicDuration,
     // Sender for requests to initiate a socketproxy reconnect.
     initiate_reconnect_sender: OnceCell<mpsc::Sender<()>>,
     #[inspect(forward)]
@@ -68,9 +68,12 @@ impl NetworkManagerHandle {
     /// Create a NetworkManagerHandle with a `nmfs` inspect node.
     pub fn new_with_inspect(node: &fuchsia_inspect::Node) -> Self {
         Self(Arc::new(
-            NetworkManager { proxy_timeout: zx::Duration::from_seconds(1), ..Default::default() }
-                .with_inspect(node, "nmfs")
-                .expect("Failed to attach 'nmfs' node"),
+            NetworkManager {
+                proxy_timeout: zx::MonotonicDuration::from_seconds(1),
+                ..Default::default()
+            }
+            .with_inspect(node, "nmfs")
+            .expect("Failed to attach 'nmfs' node"),
         ))
     }
 
@@ -477,7 +480,7 @@ async fn reconnect_to_proxy_loop(
 ) {
     // The amount of time the thread should wait until it attempts to reconnect
     // to the socketproxy protocol and replay the network events.
-    let mut reconnect_delay = zx::Duration::from_seconds(0);
+    let mut reconnect_delay = zx::MonotonicDuration::from_seconds(0);
     // Each time this stream yields, attempt to reconnect to the proxy and replay events.
     let mut reconnect_futures = futures::stream::FuturesUnordered::new();
     loop {
@@ -500,7 +503,7 @@ async fn reconnect_to_proxy_loop(
                 let (reconnect_sender, reconnect_receiver) = oneshot::channel::<bool>();
                 if let Err(e) = sender.try_send(reconnect_sender) {
                     log_error!("Failed to send message to initiate proxy reconnect: {e:?}");
-                        reconnect_delay += zx::Duration::from_seconds(1);
+                        reconnect_delay += zx::MonotonicDuration::from_seconds(1);
                         reconnect_futures.push(fuchsia_async::Interval::new(reconnect_delay).into_future());
                         continue;
                 }
@@ -512,7 +515,7 @@ async fn reconnect_to_proxy_loop(
                     Ok(false) | Err(_) => {
                         log_error!("Unsucessfully re-connected proxy. Re-attempting \
                             in {reconnect_delay:?}...");
-                        reconnect_delay += zx::Duration::from_seconds(1);
+                        reconnect_delay += zx::MonotonicDuration::from_seconds(1);
                         reconnect_futures.push(fuchsia_async::Interval::new(reconnect_delay).into_future());
                         continue;
                     }
@@ -522,7 +525,7 @@ async fn reconnect_to_proxy_loop(
                     Ok(()) => {
                         log_info!("Successfully reconnected to socketproxy and replayed events");
                         // On success, reset `reconnect_delay` to the initial delay period.
-                        reconnect_delay = zx::Duration::from_seconds(0);
+                        reconnect_delay = zx::MonotonicDuration::from_seconds(0);
                         {
                             let mut inner_guard = handle.0.lock();
                             let mut inner = inner_guard.as_mut();
@@ -548,7 +551,7 @@ async fn reconnect_to_proxy_loop(
                                 unreachable!("responses not possible from `replay_network_events`");
                             }
                         }
-                        reconnect_delay += zx::Duration::from_seconds(1);
+                        reconnect_delay += zx::MonotonicDuration::from_seconds(1);
                         reconnect_futures.push(
                             fuchsia_async::Interval::new(reconnect_delay).into_future()
                         );
@@ -922,7 +925,7 @@ mod tests {
     // a response for every request.
     fn create_test_network_manager_handle(node: &fuchsia_inspect::Node) -> NetworkManagerHandle {
         NetworkManagerHandle(Arc::new(
-            NetworkManager { proxy_timeout: zx::Duration::INFINITE, ..Default::default() }
+            NetworkManager { proxy_timeout: zx::MonotonicDuration::INFINITE, ..Default::default() }
                 .with_inspect(node, "nmfs")
                 .expect("Failed to attach 'nmfs' node"),
         ))

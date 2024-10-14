@@ -18,7 +18,7 @@ pub enum Event {
 }
 
 impl TimeoutDuration for Event {
-    fn timeout_duration(&self) -> zx::Duration {
+    fn timeout_duration(&self) -> zx::MonotonicDuration {
         match self {
             Event::Sme { event } => event.timeout_duration(),
             Event::Client { event, .. } => event.timeout_duration(),
@@ -33,10 +33,10 @@ pub enum SmeEvent {
 }
 
 impl SmeEvent {
-    pub fn timeout_duration(&self) -> zx::Duration {
+    pub fn timeout_duration(&self) -> zx::MonotonicDuration {
         match self {
-            SmeEvent::StartTimeout => zx::Duration::from_seconds(START_TIMEOUT_SECONDS),
-            SmeEvent::StopTimeout => zx::Duration::from_seconds(STOP_TIMEOUT_SECONDS),
+            SmeEvent::StartTimeout => zx::MonotonicDuration::from_seconds(START_TIMEOUT_SECONDS),
+            SmeEvent::StopTimeout => zx::MonotonicDuration::from_seconds(STOP_TIMEOUT_SECONDS),
         }
     }
 }
@@ -54,12 +54,12 @@ pub enum ClientEvent {
 }
 
 impl ClientEvent {
-    pub fn timeout_duration(&self) -> zx::Duration {
+    pub fn timeout_duration(&self) -> zx::MonotonicDuration {
         match self {
             // We only use schedule_at, so we ignore these timeout durations here.
             // TODO(tonyy): Switch everything to use schedule_at, maybe?
-            ClientEvent::AssociationTimeout => zx::Duration::from_seconds(0),
-            ClientEvent::RsnaTimeout { .. } => zx::Duration::from_seconds(0),
+            ClientEvent::AssociationTimeout => zx::MonotonicDuration::from_seconds(0),
+            ClientEvent::RsnaTimeout { .. } => zx::MonotonicDuration::from_seconds(0),
         }
     }
 }

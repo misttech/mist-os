@@ -173,7 +173,7 @@ struct AudioStreamConn<T> {
     fidl_proxy: T,
     params: AudioStreamParams,
     payload_buffer: PayloadBuffer,
-    lead_time: tokio::sync::watch::Receiver<zx::Duration>,
+    lead_time: tokio::sync::watch::Receiver<zx::MonotonicDuration>,
     buffers_received: u32,
     packets_pending: HashMap<u32, Notification>, // signalled when we're done with the packet
     closing: Notification,                       // signalled when we've started disconnecting
@@ -246,7 +246,7 @@ struct AudioOutput<'a> {
 
 struct AudioOutputBgJob {
     event_stream: fidl_fuchsia_media::AudioRendererEventStream,
-    lead_time: tokio::sync::watch::Sender<zx::Duration>,
+    lead_time: tokio::sync::watch::Sender<zx::MonotonicDuration>,
 }
 
 #[async_trait(?Send)]
@@ -269,7 +269,7 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
 
         // Start a bg job to watch for lead time changes.
         let (lead_time_send, mut lead_time_recv) =
-            tokio::sync::watch::channel(zx::Duration::from_nanos(0));
+            tokio::sync::watch::channel(zx::MonotonicDuration::from_nanos(0));
         if let Err(_) = self
             .bg_jobs_send
             .borrow_mut()
@@ -284,11 +284,11 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
 
         // Wait until the renderer is configured. This is signalled by a non-zero lead time.
         loop {
-            let deadline = zx::Duration::from_seconds(5).after_now();
+            let deadline = zx::MonotonicDuration::from_seconds(5).after_now();
             if lead_time_recv.changed().map(|res| res.is_ok()).on_timeout(deadline, || false).await
             {
                 let t = lead_time_recv.borrow_and_update();
-                if *t > zx::Duration::from_nanos(0) {
+                if *t > zx::MonotonicDuration::from_nanos(0) {
                     // TODO(https://fxbug.dev/42052022): temporary for debugging
                     throttled_log::info!(
                         "AudioOutput received non-zero lead_time {} ns",
@@ -553,7 +553,7 @@ impl<'a> AudioStream<'a> for AudioOutput<'a> {
                                     Some(OnMinLeadTimeChanged { min_lead_time_nsec }) => {
                                         // Include our deadline in the lead time.
                                         // This is an upper-bound: see discussion in https://fxbug.dev/42172030.
-                                        let lead_time = zx::Duration::from_nanos(min_lead_time_nsec)
+                                        let lead_time = zx::MonotonicDuration::from_nanos(min_lead_time_nsec)
                                             + super::DEADLINE_PROFILE.period;
                                         // TODO(https://fxbug.dev/42052022): temporary for debugging
                                         throttled_log::info!("AudioRenderer lead_time {} ns", lead_time.into_nanos());
@@ -603,7 +603,7 @@ struct AudioInput<'a> {
 
 struct AudioInputInner {
     conn: AudioInputConn,
-    lead_time: tokio::sync::watch::Sender<zx::Duration>,
+    lead_time: tokio::sync::watch::Sender<zx::MonotonicDuration>,
 }
 
 #[async_trait(?Send)]
@@ -625,7 +625,7 @@ impl<'a> AudioStream<'a> for AudioInput<'a> {
         fidl_proxy.add_payload_buffer(0, payload_vmo)?;
 
         let (lead_time_send, lead_time_recv) =
-            tokio::sync::watch::channel(zx::Duration::from_nanos(0));
+            tokio::sync::watch::channel(zx::MonotonicDuration::from_nanos(0));
 
         *self.inner.borrow_mut() = Some(AudioInputInner {
             conn: AudioInputConn {

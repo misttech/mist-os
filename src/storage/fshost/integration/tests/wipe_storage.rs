@@ -258,7 +258,9 @@ async fn data_unformatted() {
     let orig_instance_guid;
     {
         let data_controller =
-            find_partition_in(&dev_class, matcher.clone(), zx::Duration::INFINITE).await.unwrap();
+            find_partition_in(&dev_class, matcher.clone(), zx::MonotonicDuration::INFINITE)
+                .await
+                .unwrap();
         let (data_partition, partition_server_end) =
             fidl::endpoints::create_proxy::<PartitionMarker>().unwrap();
         data_controller.connect_to_device_fidl(partition_server_end.into_channel()).unwrap();
@@ -290,7 +292,7 @@ async fn data_unformatted() {
 
     // Ensure the data partition was assigned a new instance GUID.
     let data_controller =
-        find_partition_in(&dev_class, matcher, zx::Duration::INFINITE).await.unwrap();
+        find_partition_in(&dev_class, matcher, zx::MonotonicDuration::INFINITE).await.unwrap();
     let (data_partition, partition_server_end) =
         fidl::endpoints::create_proxy::<PartitionMarker>().unwrap();
     data_controller.connect_to_device_fidl(partition_server_end.into_channel()).unwrap();

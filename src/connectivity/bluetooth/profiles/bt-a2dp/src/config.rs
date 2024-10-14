@@ -11,7 +11,8 @@ use {fidl_fuchsia_bluetooth as fidl_bt, zx};
 use crate::media::sources::AudioSourceType;
 
 pub(crate) const DEFAULT_DOMAIN: &str = "Bluetooth";
-pub(crate) const DEFAULT_INITIATOR_DELAY: zx::Duration = zx::Duration::from_millis(500);
+pub(crate) const DEFAULT_INITIATOR_DELAY: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_millis(500);
 
 /// The MAX receive SDU size to ask the Profile Server when connecting or accepting a L2CAP
 /// connection.
@@ -53,7 +54,7 @@ pub struct A2dpConfiguration {
     /// If a signaling channel has not been established by this time, A2DP will
     /// create the signaling channel, configure, open and start the stream. Defaults
     /// to 500 milliseconds. Set to 0 to disable initiation.
-    pub initiator_delay: zx::Duration,
+    pub initiator_delay: zx::MonotonicDuration,
 }
 
 impl Default for A2dpConfiguration {
@@ -111,7 +112,7 @@ impl A2dpConfiguration {
         } = str_config;
         let source = if source_type == "none" { None } else { Some(source_type.parse()?) };
         let channel_mode = channel_mode_from_str(channel_mode)?;
-        let initiator_delay = zx::Duration::from_millis(initiator_delay.into());
+        let initiator_delay = zx::MonotonicDuration::from_millis(initiator_delay.into());
         Ok(Self {
             domain,
             source,

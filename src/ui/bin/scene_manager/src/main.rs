@@ -268,9 +268,11 @@ async fn inner_main() -> Result<(), Error> {
 
     // Create Activity Manager.
     #[cfg(fuchsia_api_level_at_least = "HEAD")]
-    let activity_manager =
-        ActivityManager::new(zx::Duration::from_millis(idle_threshold_ms as i64), suspend_enabled)
-            .await;
+    let activity_manager = ActivityManager::new(
+        zx::MonotonicDuration::from_millis(idle_threshold_ms as i64),
+        suspend_enabled,
+    )
+    .await;
 
     // Create and register a ColorTransformManager.
     let color_converter = connect_to_protocol::<color::ConverterMarker>()?;

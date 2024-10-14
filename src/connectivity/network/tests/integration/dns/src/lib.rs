@@ -111,7 +111,7 @@ async fn poll_lookup_admin<
     lookup_admin: &net_name::LookupAdminProxy,
     expect: &[fnet::SocketAddress],
     mut wait_for_netmgr_fut: &mut F,
-    poll_wait: zx::Duration,
+    poll_wait: zx::MonotonicDuration,
     retry_count: u64,
 ) {
     for i in 0..retry_count {
@@ -147,7 +147,7 @@ async fn poll_dns_server_watcher<
     dns_server_watcher_proxy: &net_name::DnsServerWatcherProxy,
     expect: &[fnet::SocketAddress],
     mut wait_for_netmgr_fut: &mut F,
-    wait_duration: zx::Duration,
+    wait_duration: zx::MonotonicDuration,
 ) {
     loop {
         let () = futures::select! {
@@ -181,7 +181,7 @@ async fn poll_dns_server_watcher<
 enum DnsCheckType {
     LookupAdmin {
         /// Duration to sleep between polls.
-        poll_wait: zx::Duration,
+        poll_wait: zx::MonotonicDuration,
         /// Maximum number of times to poll `LookupAdmin` to check
         // whether the DNS configuration succeeded.
         retry_count: u64,
@@ -190,13 +190,13 @@ enum DnsCheckType {
         /// The maximum Duration to wait for a response from the
         /// `DnsServerWatcher` hanging get to determine whether the
         /// DNS configuration succeeded.
-        wait_duration: zx::Duration,
+        wait_duration: zx::MonotonicDuration,
     },
 }
 
 impl DnsCheckType {
     fn lookup_admin() -> Self {
-        Self::LookupAdmin { poll_wait: zx::Duration::from_seconds(1), retry_count: 60 }
+        Self::LookupAdmin { poll_wait: zx::MonotonicDuration::from_seconds(1), retry_count: 60 }
     }
 
     fn dns_server_watcher() -> Self {
@@ -800,7 +800,7 @@ async fn successfully_retrieves_ipv6_record_despite_ipv4_timeout<N: Netstack>(na
     futures::stream::once(futures::future::ready(()))
         .chain(fuchsia_async::Interval::new(
             // Wait an arbitrary short duration to avoid busy-looping.
-            zx::Duration::from_millis(100),
+            zx::MonotonicDuration::from_millis(100),
         ))
         .take_until(lookup_fut)
         .for_each(|()| async {
@@ -808,7 +808,7 @@ async fn successfully_retrieves_ipv6_record_despite_ipv4_timeout<N: Netstack>(na
                 .advance(&ftesting::Increment::Determined(
                     // Advance the fake clock by a larger amount than the real time we are waiting
                     // in order to speed up the test run-time.
-                    zx::Duration::from_seconds(1).into_nanos(),
+                    zx::MonotonicDuration::from_seconds(1).into_nanos(),
                 ))
                 .await
                 .expect("fake clock FIDL error")
@@ -1250,7 +1250,7 @@ async fn query_preferred_name_servers_first<N: Netstack>(name: &str) {
     // in the DNS resolver, to ensure that the test is deterministic and doesn't
     // rely on external factors to avoid flakiness.
     const CONCURRENT_NAME_SERVER_QUERIES: usize = 10;
-    const QUERY_TIMEOUT: zx::Duration = zx::Duration::from_minutes(1);
+    const QUERY_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_minutes(1);
 
     let preferred_servers: Vec<_> =
         futures::future::join_all((0..CONCURRENT_NAME_SERVER_QUERIES).map(|i| {

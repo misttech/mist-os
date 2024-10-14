@@ -43,7 +43,7 @@ async fn verify_main_process_critical_default_denied() -> Result<(), Error> {
     // component_manager should still be running. Observe this by not seeing component_manager exit
     // within COMPONENT_MANAGER_DEATH_TIMEOUT seconds.
     let timer = pin!(fasync::Timer::new(fasync::MonotonicInstant::after(
-        zx::Duration::from_seconds(COMPONENT_MANAGER_DEATH_TIMEOUT,)
+        zx::MonotonicDuration::from_seconds(COMPONENT_MANAGER_DEATH_TIMEOUT,)
     )));
 
     let moniker = format!("./realm_builder:{}/component_manager", test.root.child_name());
@@ -85,7 +85,7 @@ async fn verify_main_process_critical_nonzero_flag_used() -> Result<(), Error> {
     // code. Observe this by not seeing component_manager exit within
     // COMPONENT_MANAGER_DEATH_TIMEOUT seconds.
     let timer = pin!(fasync::Timer::new(fasync::MonotonicInstant::after(
-        zx::Duration::from_seconds(COMPONENT_MANAGER_DEATH_TIMEOUT,)
+        zx::MonotonicDuration::from_seconds(COMPONENT_MANAGER_DEATH_TIMEOUT,)
     )));
 
     let moniker = format!("./realm_builder:{}/component_manager", test.root.child_name());

@@ -2707,7 +2707,7 @@ mod tests {
             .set_start_updates(vec![SecAssocUpdate::Status(SecAssocStatus::PmkSaEstablished)]);
         let assoc_conf = create_connect_conf(bss.bssid, fidl_ieee80211::StatusCode::Success);
         let rsna_response_deadline =
-            zx::Duration::from_millis(event::RSNA_RESPONSE_TIMEOUT_MILLIS).after_now();
+            zx::MonotonicDuration::from_millis(event::RSNA_RESPONSE_TIMEOUT_MILLIS).after_now();
         let state = state.on_mlme_event(assoc_conf, &mut h.context);
         assert!(suppl_mock.is_supplicant_started());
 
@@ -2813,7 +2813,8 @@ mod tests {
             expect_stream_empty(&mut h.mlme_stream, "unexpected event in mlme stream");
 
             let rsna_retransmission_deadline =
-                zx::Duration::from_millis(event::RSNA_RETRANSMISSION_TIMEOUT_MILLIS).after_now();
+                zx::MonotonicDuration::from_millis(event::RSNA_RETRANSMISSION_TIMEOUT_MILLIS)
+                    .after_now();
             let timed_event = expect_next_event_at_deadline(
                 &mut h.executor,
                 &mut timed_event_stream,
@@ -2922,20 +2923,21 @@ mod tests {
         // Progress time to avoid scheduling two concurrent rsna response timeouts.
         // TODO(https://fxbug.dev/371613444): Remove when our timer implementation supports better cancel behavior.
         let first_rsna_response_deadline =
-            zx::Duration::from_millis(event::RSNA_RESPONSE_TIMEOUT_MILLIS).after_now();
-        h.executor.set_fake_time(zx::Duration::from_millis(1).after_now());
+            zx::MonotonicDuration::from_millis(event::RSNA_RESPONSE_TIMEOUT_MILLIS).after_now();
+        h.executor.set_fake_time(zx::MonotonicDuration::from_millis(1).after_now());
         let mut state = state.on_mlme_event(eapol_ind, &mut h.context);
 
         // Cycle through the RSNA retransmission timeouts
         let mock_number_of_retransmissions = 5;
         let second_rsna_response_deadline =
-            zx::Duration::from_millis(event::RSNA_RESPONSE_TIMEOUT_MILLIS).after_now();
+            zx::MonotonicDuration::from_millis(event::RSNA_RESPONSE_TIMEOUT_MILLIS).after_now();
         for i in 0..=mock_number_of_retransmissions {
             expect_eapol_req(&mut h.mlme_stream, bss.bssid);
             expect_stream_empty(&mut h.mlme_stream, "unexpected event in mlme stream");
 
             let rsna_retransmission_deadline =
-                zx::Duration::from_millis(event::RSNA_RETRANSMISSION_TIMEOUT_MILLIS).after_now();
+                zx::MonotonicDuration::from_millis(event::RSNA_RETRANSMISSION_TIMEOUT_MILLIS)
+                    .after_now();
             let timed_event = expect_next_event_at_deadline(
                 &mut h.executor,
                 &mut timed_event_stream,
@@ -3069,9 +3071,10 @@ mod tests {
         let state = state.on_mlme_event(assoc_conf, &mut h.context);
         assert!(suppl_mock.is_supplicant_started());
         let rsna_completion_deadline =
-            zx::Duration::from_millis(event::RSNA_COMPLETION_TIMEOUT_MILLIS).after_now();
-        let mut initial_rsna_response_deadline_in_effect =
-            Some(zx::Duration::from_millis(event::RSNA_RESPONSE_TIMEOUT_MILLIS).after_now());
+            zx::MonotonicDuration::from_millis(event::RSNA_COMPLETION_TIMEOUT_MILLIS).after_now();
+        let mut initial_rsna_response_deadline_in_effect = Some(
+            zx::MonotonicDuration::from_millis(event::RSNA_RESPONSE_TIMEOUT_MILLIS).after_now(),
+        );
 
         let mut timed_event_stream = timer::make_async_timed_event_stream(h.time_stream);
 
@@ -3096,12 +3099,13 @@ mod tests {
         expect_stream_empty(&mut h.mlme_stream, "unexpected event in mlme stream");
 
         let mut rsna_retransmission_deadline =
-            zx::Duration::from_millis(event::RSNA_RETRANSMISSION_TIMEOUT_MILLIS).after_now();
+            zx::MonotonicDuration::from_millis(event::RSNA_RETRANSMISSION_TIMEOUT_MILLIS)
+                .after_now();
         let mut rsna_response_deadline =
-            zx::Duration::from_millis(event::RSNA_RESPONSE_TIMEOUT_MILLIS).after_now();
+            zx::MonotonicDuration::from_millis(event::RSNA_RESPONSE_TIMEOUT_MILLIS).after_now();
 
         let mock_just_before_progress_frames = 2;
-        let just_before_duration = zx::Duration::from_nanos(1);
+        let just_before_duration = zx::MonotonicDuration::from_nanos(1);
         for _ in 0..mock_just_before_progress_frames {
             // Expire the restransmission timeout
             let timed_event = expect_next_event_at_deadline(
@@ -3127,10 +3131,11 @@ mod tests {
             expect_eapol_req(&mut h.mlme_stream, bss.bssid);
             expect_stream_empty(&mut h.mlme_stream, "unexpected event in mlme stream");
             rsna_retransmission_deadline =
-                zx::Duration::from_millis(event::RSNA_RETRANSMISSION_TIMEOUT_MILLIS).after_now();
+                zx::MonotonicDuration::from_millis(event::RSNA_RETRANSMISSION_TIMEOUT_MILLIS)
+                    .after_now();
             let prev_rsna_response_deadline = rsna_response_deadline;
             rsna_response_deadline =
-                zx::Duration::from_millis(event::RSNA_RESPONSE_TIMEOUT_MILLIS).after_now();
+                zx::MonotonicDuration::from_millis(event::RSNA_RESPONSE_TIMEOUT_MILLIS).after_now();
 
             // Expire the initial response timeout
             if let Some(initial_rsna_response_deadline) =

@@ -1469,9 +1469,9 @@ impl Task {
         };
 
         TaskTimeStats {
-            user_time: zx::Duration::from_nanos(info.cpu_time),
+            user_time: zx::MonotonicDuration::from_nanos(info.cpu_time),
             // TODO(https://fxbug.dev/42078242): How can we calculate system time?
-            system_time: zx::Duration::default(),
+            system_time: zx::MonotonicDuration::default(),
         }
     }
 

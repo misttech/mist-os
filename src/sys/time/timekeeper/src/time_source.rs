@@ -30,7 +30,7 @@ pub struct Sample {
     /// The monotonic time at which the UTC was most valid.
     pub monotonic: zx::MonotonicInstant,
     /// The standard deviation of the UTC error.
-    pub std_dev: zx::Duration,
+    pub std_dev: zx::MonotonicDuration,
 }
 
 impl TryFrom<TimeSample> for Sample {
@@ -45,7 +45,7 @@ impl TryFrom<TimeSample> for Sample {
             (Some(utc), Some(monotonic), Some(std_dev)) => Ok(Sample {
                 utc: UtcInstant::from_nanos(utc),
                 monotonic: zx::MonotonicInstant::from_nanos(monotonic),
-                std_dev: zx::Duration::from_nanos(std_dev),
+                std_dev: zx::MonotonicDuration::from_nanos(std_dev),
             }),
         }
     }
@@ -54,7 +54,11 @@ impl TryFrom<TimeSample> for Sample {
 #[cfg(test)]
 impl Sample {
     /// Constructs a new `Sample`.
-    pub fn new(utc: UtcInstant, monotonic: zx::MonotonicInstant, std_dev: zx::Duration) -> Sample {
+    pub fn new(
+        utc: UtcInstant,
+        monotonic: zx::MonotonicInstant,
+        std_dev: zx::MonotonicDuration,
+    ) -> Sample {
         Sample { utc, monotonic, std_dev }
     }
 }
@@ -500,13 +504,13 @@ mod test {
         static ref SAMPLE_1: Sample = Sample {
             utc: UtcInstant::from_nanos(SAMPLE_1_UTC_NANOS),
             monotonic: zx::MonotonicInstant::from_nanos(SAMPLE_1_MONO_NANOS),
-            std_dev: zx::Duration::from_nanos(SAMPLE_1_STD_DEV_NANOS),
+            std_dev: zx::MonotonicDuration::from_nanos(SAMPLE_1_STD_DEV_NANOS),
         };
         static ref SAMPLE_EVENT_1: Event = Event::from(*SAMPLE_1);
         static ref SAMPLE_2: Sample = Sample {
             utc: UtcInstant::from_nanos(12345678),
             monotonic: zx::MonotonicInstant::from_nanos(333),
-            std_dev: zx::Duration::from_nanos(9999),
+            std_dev: zx::MonotonicDuration::from_nanos(9999),
         };
         static ref SAMPLE_EVENT_2: Event = Event::from(*SAMPLE_2);
     }

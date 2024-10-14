@@ -99,7 +99,7 @@ pub fn bytes_per_frame(stream_type: fidl_fuchsia_media::AudioStreamType) -> usiz
 /// Computes the number of bytes needed to represent the given duration, for the given audio format.
 /// Returns None if the duration is negative.
 pub fn bytes_for_duration(
-    duration: zx::Duration,
+    duration: zx::MonotonicDuration,
     stream_type: fidl_fuchsia_media::AudioStreamType,
 ) -> Option<usize> {
     let nsec = cast::<i64, usize>(duration.into_nanos())?;
@@ -217,7 +217,7 @@ mod tests {
         assert_eq!(
             None,
             bytes_for_duration(
-                zx::Duration::from_millis(-10),
+                zx::MonotonicDuration::from_millis(-10),
                 AudioStreamType {
                     sample_format: ASF::Unsigned8,
                     channels: 2,
@@ -229,7 +229,7 @@ mod tests {
         assert_eq!(
             Some(480 * 2),
             bytes_for_duration(
-                zx::Duration::from_millis(10),
+                zx::MonotonicDuration::from_millis(10),
                 AudioStreamType {
                     sample_format: ASF::Unsigned8,
                     channels: 2,
@@ -240,7 +240,7 @@ mod tests {
         assert_eq!(
             Some(480 * 4),
             bytes_for_duration(
-                zx::Duration::from_millis(10),
+                zx::MonotonicDuration::from_millis(10),
                 AudioStreamType {
                     sample_format: ASF::Signed16,
                     channels: 2,
@@ -251,7 +251,7 @@ mod tests {
         assert_eq!(
             Some(480 * 8),
             bytes_for_duration(
-                zx::Duration::from_millis(10),
+                zx::MonotonicDuration::from_millis(10),
                 AudioStreamType {
                     sample_format: ASF::Signed24In32,
                     channels: 2,
@@ -262,7 +262,7 @@ mod tests {
         assert_eq!(
             Some(480 * 8),
             bytes_for_duration(
-                zx::Duration::from_millis(10),
+                zx::MonotonicDuration::from_millis(10),
                 AudioStreamType {
                     sample_format: ASF::Float,
                     channels: 2,

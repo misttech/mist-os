@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use fuchsia_component::client::connect_to_protocol;
 #[cfg(test)]
 use mockall::automock;
-use zx::{Duration, Status as zx_status};
+use zx::{MonotonicDuration, Status as zx_status};
 use {fidl_fuchsia_hardware_power_statecontrol as powercontrol, fuchsia_async as fasync};
 
 #[cfg_attr(test, automock)]
@@ -30,7 +30,7 @@ impl RebootImpl {
         println!("Rebooting after {:?} seconds...", delay_seconds.unwrap_or(0));
 
         if let Some(delay) = delay_seconds {
-            fasync::Timer::new(fasync::MonotonicInstant::after(Duration::from_seconds(
+            fasync::Timer::new(fasync::MonotonicInstant::after(MonotonicDuration::from_seconds(
                 delay.try_into()?,
             )))
             .await;
@@ -97,7 +97,7 @@ mod test {
         reboot.request_reboot_with_proxy(None, proxy).await.unwrap();
 
         let reboot_reason =
-            receiver.next().on_timeout(Duration::from_seconds(5), || None).await.unwrap();
+            receiver.next().on_timeout(MonotonicDuration::from_seconds(5), || None).await.unwrap();
 
         assert_eq!(reboot_reason, powercontrol::RebootReason::FactoryDataReset);
     }
@@ -112,7 +112,7 @@ mod test {
         reboot.request_reboot_with_proxy(Some(delay_seconds), proxy).await.unwrap();
 
         let reboot_reason =
-            receiver.next().on_timeout(Duration::from_seconds(5), || None).await.unwrap();
+            receiver.next().on_timeout(MonotonicDuration::from_seconds(5), || None).await.unwrap();
 
         let end_time = fasync::MonotonicInstant::now();
 

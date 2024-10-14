@@ -52,7 +52,7 @@ async fn set_country() {
 
     helper
         .run_until_complete_or_timeout(
-            zx::Duration::INFINITE, // Unlimited timeout. Await `set_country` in the event handler.
+            zx::MonotonicDuration::INFINITE, // Unlimited timeout. Await `set_country` in the event handler.
             "wlanstack_dev_svc set_country",
             event::on_set_country(
                 event::extract(|alpha2: [u8; 2]| assert_eq!(alpha2, *ALPHA2))

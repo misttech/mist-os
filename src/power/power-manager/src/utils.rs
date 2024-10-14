@@ -6,7 +6,7 @@ use anyhow::Error;
 use fuchsia_async::{DurationExt, TimeoutExt};
 use futures::stream::FuturesUnordered;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
-use zx::Duration;
+use zx::MonotonicDuration;
 use {fidl_fuchsia_hardware_temperature as ftemperature, fidl_fuchsia_io as fio};
 
 /// Logs an error message if the provided `cond` evaluates to false. Also passes the same expression
@@ -113,7 +113,7 @@ impl CobaltIntHistogram {
     }
 }
 
-const TEMPERATURE_DRIVER_TIMEOUT: Duration = Duration::from_seconds(5);
+const TEMPERATURE_DRIVER_TIMEOUT: MonotonicDuration = MonotonicDuration::from_seconds(5);
 
 pub async fn get_temperature_driver_proxy(
     sensor_name: &str,

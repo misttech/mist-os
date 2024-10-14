@@ -48,9 +48,9 @@ const DEFAULT_IPV6_LINK_LOCAL_SOURCE_SUBNET: fnet::Subnet = fnet::Subnet {
     prefix_len: 64,
 };
 
-const DURATION_FIVE_MINUTES: zx::Duration = zx::Duration::from_minutes(5);
-const MINIMUM_TIMEOUT: zx::Duration = zx::Duration::from_nanos(1);
-const NO_WAIT_TIMEOUT: zx::Duration = zx::Duration::from_nanos(0);
+const DURATION_FIVE_MINUTES: zx::MonotonicDuration = zx::MonotonicDuration::from_minutes(5);
+const MINIMUM_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_nanos(1);
+const NO_WAIT_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_nanos(0);
 const DEFAULT_PAYLOAD_LENGTH: u16 = 100;
 const NON_EXISTENT_INTERFACE_NAME: &'static str = "non_existent";
 
@@ -735,7 +735,7 @@ async fn poll_udp(
     })
     .into();
     let response = network_test_realm
-        .poll_udp(&poll_addr, payload, zx::Duration::from_millis(10).into_nanos(), 6000)
+        .poll_udp(&poll_addr, payload, zx::MonotonicDuration::from_millis(10).into_nanos(), 6000)
         .await
         .expect("poll_udp FIDL error")
         .expect("poll_udp error");
@@ -746,7 +746,7 @@ async fn poll_udp(
     assert!(!has_stub(&realm).await, "expected has_stub(&realm) to be false");
 
     let response = network_test_realm
-        .poll_udp(&poll_addr, payload, zx::Duration::from_millis(10).into_nanos(), 100)
+        .poll_udp(&poll_addr, payload, zx::MonotonicDuration::from_millis(10).into_nanos(), 100)
         .await
         .expect("poll_udp FIDL error");
     assert_eq!(response, Err(fntr::Error::TimeoutExceeded));
@@ -778,7 +778,7 @@ async fn poll_udp_unreachable(name: &str, sub_name: &str, netstack: fntr::Netsta
         .poll_udp(
             &poll_addr,
             "test payload".as_bytes(),
-            zx::Duration::from_millis(10).into_nanos(),
+            zx::MonotonicDuration::from_millis(10).into_nanos(),
             100,
         )
         .await
@@ -1027,7 +1027,7 @@ struct PingOptions {
     #[derivative(Default(value = "DEFAULT_PAYLOAD_LENGTH"))]
     payload_length: u16,
     #[derivative(Default(value = "DURATION_FIVE_MINUTES"))]
-    timeout: zx::Duration,
+    timeout: zx::MonotonicDuration,
     disable_target_interface: bool,
 }
 
@@ -1222,7 +1222,7 @@ const IPV6_LINK_LOCAL_ADDRESS_CONFIG: PingAddressConfig = PingAddressConfig {
         PingOptions {
             interface_name:  Some(INTERFACE1_NAME.to_string()),
             // TODO(https://fxbug.dev/42083514): Fix and use the default timeout.
-            timeout: zx::Duration::from_seconds(5),
+            timeout: zx::MonotonicDuration::from_seconds(5),
             ..PingOptions::default()
         },
         fntr::Netstack::V3,

@@ -142,7 +142,7 @@ impl From<&fidl_sme::DisconnectSource> for InspectDisconnectSource {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct DisconnectInfo {
-    pub connected_duration: zx::Duration,
+    pub connected_duration: zx::MonotonicDuration,
     pub is_sme_reconnecting: bool,
     pub disconnect_source: fidl_sme::DisconnectSource,
     pub original_bss_desc: Box<BssDescription>,
@@ -555,7 +555,7 @@ mod tests {
         let bss_description = fake_bss_description!(Open);
         let channel = bss_description.channel;
         let disconnect_info = DisconnectInfo {
-            connected_duration: zx::Duration::from_seconds(30),
+            connected_duration: zx::MonotonicDuration::from_seconds(30),
             is_sme_reconnecting: false,
             disconnect_source: fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
                 mlme_event_name: fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
@@ -610,7 +610,7 @@ mod tests {
                 disconnect_events: {
                     "0": {
                         "@time": AnyNumericProperty,
-                        connected_duration: zx::Duration::from_seconds(30).into_nanos(),
+                        connected_duration: zx::MonotonicDuration::from_seconds(30).into_nanos(),
                         disconnect_source_id: 0u64,
                         network_id: 0u64,
                         rssi_dbm: -30i64,

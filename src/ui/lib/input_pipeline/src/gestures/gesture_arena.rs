@@ -845,7 +845,7 @@ impl GestureArena {
                                 recognized_gesture,
                                 Reason::Basic("discrete-recognizer"),
                                 0,
-                                zx::Duration::from_nanos(0),
+                                zx::MonotonicDuration::from_nanos(0),
                             );
                         });
                         if has_finger_contact {
@@ -1235,7 +1235,7 @@ fn log_gesture_start(
     log_entry_node: &InspectNode,
     recognized_gesture: RecognizedGesture,
     num_previous_events: usize,
-    elapsed_from_first_event: zx::Duration,
+    elapsed_from_first_event: zx::MonotonicDuration,
 ) {
     tracing::debug!("touchpad: recognized start {:?}", recognized_gesture);
     log_entry_node.record_child("gesture_start", |gesture_start_node| {
@@ -1258,7 +1258,7 @@ fn log_gesture_end(
     current_gesture: RecognizedGesture,
     reason: Reason,
     num_events: usize,
-    elapsed_from_gesture_start: zx::Duration,
+    elapsed_from_gesture_start: zx::MonotonicDuration,
 ) {
     tracing::debug!("touchpad: recognized end {:?}", current_gesture);
     log_entry_node.record_child("gesture_end", |gesture_end_node| {

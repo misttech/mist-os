@@ -117,7 +117,7 @@ impl CobaltDiagnostics {
     }
 
     /// Records an update to the Kalman filter state, including an event and a covariance report.
-    fn record_kalman_filter_update(&self, track: Track, sqrt_covariance: zx::Duration) {
+    fn record_kalman_filter_update(&self, track: Track, sqrt_covariance: zx::MonotonicDuration) {
         let mut locked_sender = self.sender.lock();
         let cobalt_track = Into::<CobaltTrack>::into(track);
         locked_sender.send(
@@ -162,7 +162,7 @@ impl CobaltDiagnostics {
     fn record_clock_correction(
         &self,
         track: Track,
-        correction: zx::Duration,
+        correction: zx::MonotonicDuration,
         strategy: ClockCorrectionStrategy,
     ) {
         let mut locked_sender = self.sender.lock();
@@ -327,12 +327,12 @@ mod test {
     use test_util::{assert_geq, assert_leq};
 
     const TEST_EXPERIMENT: Experiment = Experiment::B;
-    const MONITOR_OFFSET: zx::Duration = zx::Duration::from_seconds(444);
+    const MONITOR_OFFSET: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(444);
     // The allowed half-interval of the offset error. Due to the non-determinism
     // in timing, this interval may sometimes be too small and cause flaky
     // tests. The flake rate for 10ms was 0.15 flakes/day, this should be
     // somewhat better.
-    const MONITOR_OFFSET_ERROR: zx::Duration = zx::Duration::from_millis(40);
+    const MONITOR_OFFSET_ERROR: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(40);
 
     fn create_clock(time: UtcInstant) -> Arc<UtcClock> {
         let clk = UtcClock::create(zx::ClockOpts::empty(), None).unwrap();
@@ -481,7 +481,7 @@ mod test {
             track: Track::Primary,
             monotonic: zx::MonotonicInstant::from_nanos(333_000_000_000),
             utc: UtcInstant::from_nanos(4455445544_000_000_000),
-            sqrt_covariance: zx::Duration::from_micros(55555),
+            sqrt_covariance: zx::MonotonicDuration::from_micros(55555),
         });
         assert_eq!(
             mpsc_receiver.next().await,
@@ -526,7 +526,7 @@ mod test {
 
         diagnostics.record(Event::ClockCorrection {
             track: Track::Monitor,
-            correction: zx::Duration::from_micros(-777),
+            correction: zx::MonotonicDuration::from_micros(-777),
             strategy: ClockCorrectionStrategy::NominalRateSlew,
         });
         assert_eq!(

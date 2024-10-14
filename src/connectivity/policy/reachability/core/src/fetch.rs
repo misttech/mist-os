@@ -11,7 +11,7 @@ use futures::{AsyncReadExt, AsyncWriteExt, TryFutureExt};
 use std::net;
 use tracing::warn;
 
-const FETCH_TIMEOUT: zx::Duration = zx::Duration::from_seconds(10);
+const FETCH_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(10);
 
 fn http_request(path: &str, host: &str) -> String {
     [

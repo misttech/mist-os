@@ -27,7 +27,7 @@ struct State {
 }
 
 struct TagState {
-    backoff: zx::Duration,
+    backoff: zx::MonotonicDuration,
     state: FetchState,
     last_fetched: zx::MonotonicInstant,
 }
@@ -39,7 +39,7 @@ impl Scheduler {
             let mut tag_states = HashMap::new();
             for (tag, tag_config) in tags {
                 let TagConfig { min_seconds_between_fetch, .. } = tag_config;
-                let backoff = zx::Duration::from_seconds(*min_seconds_between_fetch);
+                let backoff = zx::MonotonicDuration::from_seconds(*min_seconds_between_fetch);
                 let tag_state = TagState {
                     backoff,
                     state: FetchState::Idle,

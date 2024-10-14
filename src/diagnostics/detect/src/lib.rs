@@ -102,8 +102,11 @@ fn load_configuration_files() -> Result<HashMap<String, String>, Error> {
 ///
 /// If the command line can't be evaluated to an integer, an error is returned.
 /// If the integer is below minimum and mode isn't IntegrationTest, an error is returned.
-/// If a valid integer is determined, it is returned as a zx::Duration.
-fn appropriate_check_interval(expression: &str, mode: Mode) -> Result<zx::Duration, Error> {
+/// If a valid integer is determined, it is returned as a zx::MonotonicDuration.
+fn appropriate_check_interval(
+    expression: &str,
+    mode: Mode,
+) -> Result<zx::MonotonicDuration, Error> {
     let check_every = triage_shim::evaluate_int_math(&expression)
         .or_else(|e| bail!("Check_every argument must be Minutes(n), Hours(n), etc. but: {}", e))?;
     if check_every < MINIMUM_CHECK_TIME_NANOS && mode != Mode::IntegrationTest {
@@ -118,7 +121,7 @@ fn appropriate_check_interval(expression: &str, mode: Mode) -> Result<zx::Durati
         check_every / 1_000_000_000,
         expression
     );
-    Ok(zx::Duration::from_nanos(check_every))
+    Ok(zx::MonotonicDuration::from_nanos(check_every))
 }
 
 fn build_signature(snapshot: SnapshotTrigger, mode: Mode) -> String {
@@ -242,7 +245,10 @@ pub async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-async fn main_loop(detection_runner: Arc<Mutex<impl RunsDetection>>, check_every: zx::Duration) {
+async fn main_loop(
+    detection_runner: Arc<Mutex<impl RunsDetection>>,
+    check_every: zx::MonotonicDuration,
+) {
     // Start the first scan as soon as the program starts, via the "missed deadline" logic below.
     let mut next_check_time = fasync::MonotonicInstant::INFINITE_PAST;
     loop {
@@ -368,13 +374,13 @@ mod test {
         let error_a = "a".to_string();
         let error_empty = "".to_string();
         let raw_1 = "1".to_string();
-        let raw_1_result = zx::Duration::from_nanos(1);
+        let raw_1_result = zx::MonotonicDuration::from_nanos(1);
         let short_time = format!("Nanos({})", MINIMUM_CHECK_TIME_NANOS - 1);
-        let short_time_result = zx::Duration::from_nanos(MINIMUM_CHECK_TIME_NANOS - 1);
+        let short_time_result = zx::MonotonicDuration::from_nanos(MINIMUM_CHECK_TIME_NANOS - 1);
         let minimum_time = format!("Nanos({})", MINIMUM_CHECK_TIME_NANOS);
-        let minimum_time_result = zx::Duration::from_nanos(MINIMUM_CHECK_TIME_NANOS);
+        let minimum_time_result = zx::MonotonicDuration::from_nanos(MINIMUM_CHECK_TIME_NANOS);
         let long_time = format!("Nanos({})", MINIMUM_CHECK_TIME_NANOS + 1);
-        let long_time_result = zx::Duration::from_nanos(MINIMUM_CHECK_TIME_NANOS + 1);
+        let long_time_result = zx::MonotonicDuration::from_nanos(MINIMUM_CHECK_TIME_NANOS + 1);
 
         assert!(appropriate_check_interval(&error_a, Mode::IntegrationTest).is_err());
         assert!(appropriate_check_interval(&error_empty, Mode::IntegrationTest).is_err());

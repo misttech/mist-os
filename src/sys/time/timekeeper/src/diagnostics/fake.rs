@@ -68,7 +68,7 @@ trait EqWithAny {
     fn eq_with_any(&self, other: &Self) -> bool;
 }
 
-impl EqWithAny for zx::Duration {
+impl EqWithAny for zx::MonotonicDuration {
     fn eq_with_any(&self, other: &Self) -> bool {
         *self == ANY_DURATION || self == other
     }
@@ -178,7 +178,7 @@ mod test {
             track: Track::Monitor,
             monotonic: zx::MonotonicInstant::from_nanos(1234_000_000_000),
             utc: UtcInstant::from_nanos(2345_000_000_000),
-            sqrt_covariance: zx::Duration::from_millis(321),
+            sqrt_covariance: zx::MonotonicDuration::from_millis(321),
         };
 
         diagnostics.record(test_event.clone());
@@ -188,14 +188,14 @@ mod test {
             track: Track::Monitor,
             monotonic: any_time(),
             utc: UtcInstant::from_nanos(2345_000_000_000),
-            sqrt_covariance: zx::Duration::from_millis(321),
+            sqrt_covariance: zx::MonotonicDuration::from_millis(321),
         }]);
 
         diagnostics.assert_events(&[Event::KalmanFilterUpdated {
             track: Track::Monitor,
             monotonic: zx::MonotonicInstant::from_nanos(1234_000_000_000),
             utc: any_time(),
-            sqrt_covariance: zx::Duration::from_millis(321),
+            sqrt_covariance: zx::MonotonicDuration::from_millis(321),
         }]);
 
         diagnostics.assert_events(&[Event::KalmanFilterUpdated {

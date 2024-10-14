@@ -343,7 +343,7 @@ mod test {
             let flush = update_monitor.try_flush();
             pin_mut!(flush);
             prop_assert_eq!(executor.run_until_stalled(&mut flush), Poll::Pending);
-            let expected_deadline = executor.now() + zx::Duration::from_seconds(5);
+            let expected_deadline = executor.now() + zx::MonotonicDuration::from_seconds(5);
             prop_assert_eq!(executor.wake_next_timer(), Some(expected_deadline));
             prop_assert_eq!(executor.run_until_stalled(&mut flush), Poll::Ready(()));
         }

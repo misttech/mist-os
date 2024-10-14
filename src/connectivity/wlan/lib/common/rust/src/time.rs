@@ -29,9 +29,9 @@ pub struct TimeUnit(pub u16);
 
 #[cfg(target_os = "fuchsia")]
 #[cfg(target_os = "fuchsia")]
-impl From<TimeUnit> for zx::Duration {
-    fn from(tu: TimeUnit) -> zx::Duration {
-        zx::Duration::from_micros(tu.into_micros())
+impl From<TimeUnit> for zx::MonotonicDuration {
+    fn from(tu: TimeUnit) -> zx::MonotonicDuration {
+        zx::MonotonicDuration::from_micros(tu.into_micros())
     }
 }
 
@@ -79,14 +79,23 @@ mod tests {
 
     #[fuchsia::test]
     fn one_time_unit_conversion_to_duration() {
-        assert_eq!(zx::Duration::from(TimeUnit(1)), zx::Duration::from_micros(1024));
+        assert_eq!(
+            zx::MonotonicDuration::from(TimeUnit(1)),
+            zx::MonotonicDuration::from_micros(1024)
+        );
     }
 
     #[fuchsia::test]
     fn time_unit_conversion_to_duration_is_linear() {
-        assert_eq!(zx::Duration::from(TimeUnit(0)), zx::Duration::from_micros(0));
-        assert_eq!(zx::Duration::from(TimeUnit(1)), zx::Duration::from_micros(1024));
-        assert_eq!(zx::Duration::from(TimeUnit(200)), zx::Duration::from_micros(204800));
+        assert_eq!(zx::MonotonicDuration::from(TimeUnit(0)), zx::MonotonicDuration::from_micros(0));
+        assert_eq!(
+            zx::MonotonicDuration::from(TimeUnit(1)),
+            zx::MonotonicDuration::from_micros(1024)
+        );
+        assert_eq!(
+            zx::MonotonicDuration::from(TimeUnit(200)),
+            zx::MonotonicDuration::from_micros(204800)
+        );
     }
 
     #[fuchsia::test]

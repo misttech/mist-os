@@ -45,14 +45,16 @@ use {
 };
 
 // Include a timeout on stats calls so that if the driver deadlocks, telemtry doesn't get stuck.
-const GET_IFACE_STATS_TIMEOUT: zx::Duration = zx::Duration::from_seconds(5);
+const GET_IFACE_STATS_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(5);
 // If there are commands to turn off then turn on client connections within this amount of time
 // through the policy API, it is likely that a user intended to restart WLAN connections.
-const USER_RESTART_TIME_THRESHOLD: zx::Duration = zx::Duration::from_seconds(5);
+const USER_RESTART_TIME_THRESHOLD: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(5);
 // Short duration connection for metrics purposes.
-pub const METRICS_SHORT_CONNECT_DURATION: zx::Duration = zx::Duration::from_seconds(90);
+pub const METRICS_SHORT_CONNECT_DURATION: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_seconds(90);
 // Minimum connection duration for logging average connection score deltas.
-pub const AVERAGE_SCORE_DELTA_MINIMUM_DURATION: zx::Duration = zx::Duration::from_seconds(30);
+pub const AVERAGE_SCORE_DELTA_MINIMUM_DURATION: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_seconds(30);
 // Maximum value of reason code accepted by cobalt metrics (set by max_event_code)
 pub const COBALT_REASON_CODE_MAX: u16 = 1000;
 // Time between cobalt error reports to prevent cluttering up the syslog.
@@ -122,7 +124,7 @@ impl TelemetrySender {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct DisconnectInfo {
-    pub connected_duration: zx::Duration,
+    pub connected_duration: zx::MonotonicDuration,
     pub is_sme_reconnecting: bool,
     pub disconnect_source: fidl_sme::DisconnectSource,
     pub previous_connect_reason: client::types::ConnectReason,
@@ -302,7 +304,7 @@ pub enum TelemetryEvent {
     },
     /// Record the time since the last network selection scan
     NetworkSelectionScanInterval {
-        time_since_last_scan: zx::Duration,
+        time_since_last_scan: zx::MonotonicDuration,
     },
     /// Statistics about networks observed in scan results for Connection Selection
     ConnectionSelectionScanResults {
@@ -321,7 +323,7 @@ pub enum TelemetryEvent {
     StopClientConnectionsRequest,
     /// Notify telemetry of when AP is stopped, and how long it was started.
     StopAp {
-        enabled_duration: zx::Duration,
+        enabled_duration: zx::MonotonicDuration,
     },
     /// Notify telemetry that its experiment group has changed and that a new metrics logger must
     /// be created.
@@ -336,7 +338,7 @@ pub enum TelemetryEvent {
     StartApResult(Result<(), ()>),
     /// Record scan fulfillment time
     ScanRequestFulfillmentTime {
-        duration: zx::Duration,
+        duration: zx::MonotonicDuration,
         reason: client::scan::ScanReason,
     },
     /// Record scan queue length upon scan completion
@@ -504,7 +506,7 @@ pub type CreateMetricsLoggerFn = Box<
 /// the mpsc::Sender<TelemetryEvent>.
 const TELEMETRY_EVENT_BUFFER_SIZE: usize = 100;
 /// How often to request RSSI stats and dispatcher packet counts from MLME.
-const TELEMETRY_QUERY_INTERVAL: zx::Duration = zx::Duration::from_seconds(15);
+const TELEMETRY_QUERY_INTERVAL: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(15);
 
 /// Create a struct for sending TelemetryEvent, and a future representing the telemetry loop.
 ///
@@ -524,7 +526,7 @@ pub fn serve_telemetry(
     let cloned_sender = sender.clone();
     let fut = async move {
         let mut report_interval_stream = fasync::Interval::new(TELEMETRY_QUERY_INTERVAL);
-        const ONE_MINUTE: zx::Duration = zx::Duration::from_minutes(1);
+        const ONE_MINUTE: zx::MonotonicDuration = zx::MonotonicDuration::from_minutes(1);
         const_assert_eq!(ONE_MINUTE.into_nanos() % TELEMETRY_QUERY_INTERVAL.into_nanos(), 0);
         const INTERVAL_TICKS_PER_MINUTE: u64 =
             (ONE_MINUTE.into_nanos() / TELEMETRY_QUERY_INTERVAL.into_nanos()) as u64;
@@ -616,7 +618,7 @@ pub struct DisconnectedState {
     /// If this has a value, then conceptually we say that "no saved neighbor" flag
     /// is set.
     latest_no_saved_neighbor_time: Option<fasync::MonotonicInstant>,
-    accounted_no_saved_neighbor_duration: zx::Duration,
+    accounted_no_saved_neighbor_duration: zx::MonotonicDuration,
 }
 
 fn inspect_create_counters(
@@ -909,7 +911,8 @@ impl ExternalInspectNode {
 }
 
 /// Duration without signal before we determine driver as unresponsive
-const UNRESPONSIVE_FLAG_MIN_DURATION: zx::Duration = zx::Duration::from_seconds(60);
+const UNRESPONSIVE_FLAG_MIN_DURATION: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_seconds(60);
 
 pub struct Telemetry {
     monitor_svc_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
@@ -1192,7 +1195,7 @@ impl Telemetry {
                         }
                         let adjusted_downtime = max(
                             total_downtime - state.accounted_no_saved_neighbor_duration,
-                            zx::Duration::from_seconds(0),
+                            zx::MonotonicDuration::from_seconds(0),
                         );
                         self.stats_logger
                             .log_downtime_cobalt_metrics(adjusted_downtime, &state.disconnect_info)
@@ -1383,7 +1386,9 @@ impl Telemetry {
                         // We assume that there's a saved neighbor in vicinity until proven
                         // otherwise from scan result.
                         latest_no_saved_neighbor_time: None,
-                        accounted_no_saved_neighbor_duration: zx::Duration::from_seconds(0),
+                        accounted_no_saved_neighbor_duration: zx::MonotonicDuration::from_seconds(
+                            0,
+                        ),
                     })
                 } else {
                     ConnectionState::Idle(IdleState { connect_start_time })
@@ -1661,7 +1666,7 @@ fn float_to_ten_thousandth(value: f64) -> i64 {
     (value * 10000f64) as i64
 }
 
-fn round_to_nearest_second(duration: zx::Duration) -> i64 {
+fn round_to_nearest_second(duration: zx::MonotonicDuration) -> i64 {
     const MILLIS_PER_SEC: i64 = 1000;
     let millis = duration.into_millis();
     let rounded_portion = if millis % MILLIS_PER_SEC >= 500 { 1 } else { 0 };
@@ -1722,7 +1727,7 @@ async fn diff_and_log_counters(
     stats_logger: &mut StatsLogger,
     prev: &fidl_fuchsia_wlan_stats::IfaceCounterStats,
     current: &fidl_fuchsia_wlan_stats::IfaceCounterStats,
-    duration: zx::Duration,
+    duration: zx::MonotonicDuration,
 ) {
     let tx_total = current.tx_total - prev.tx_total;
     let tx_drop = current.tx_drop - prev.tx_drop;
@@ -2423,11 +2428,11 @@ impl StatsLogger {
         let device_uptime_dim = {
             use metrics::DisconnectBreakdownByDeviceUptimeMetricDimensionDeviceUptime::*;
             match fasync::MonotonicInstant::now() - fasync::MonotonicInstant::from_nanos(0) {
-                x if x < zx::Duration::from_hours(1) => LessThan1Hour,
-                x if x < zx::Duration::from_hours(3) => LessThan3Hours,
-                x if x < zx::Duration::from_hours(12) => LessThan12Hours,
-                x if x < zx::Duration::from_hours(24) => LessThan1Day,
-                x if x < zx::Duration::from_hours(48) => LessThan2Days,
+                x if x < zx::MonotonicDuration::from_hours(1) => LessThan1Hour,
+                x if x < zx::MonotonicDuration::from_hours(3) => LessThan3Hours,
+                x if x < zx::MonotonicDuration::from_hours(12) => LessThan12Hours,
+                x if x < zx::MonotonicDuration::from_hours(24) => LessThan1Day,
+                x if x < zx::MonotonicDuration::from_hours(48) => LessThan2Days,
                 _ => AtLeast2Days,
             }
         };
@@ -2440,11 +2445,11 @@ impl StatsLogger {
         let connected_duration_dim = {
             use metrics::DisconnectBreakdownByConnectedDurationMetricDimensionConnectedDuration::*;
             match disconnect_info.connected_duration {
-                x if x < zx::Duration::from_seconds(30) => LessThan30Seconds,
-                x if x < zx::Duration::from_minutes(5) => LessThan5Minutes,
-                x if x < zx::Duration::from_hours(1) => LessThan1Hour,
-                x if x < zx::Duration::from_hours(6) => LessThan6Hours,
-                x if x < zx::Duration::from_hours(24) => LessThan24Hours,
+                x if x < zx::MonotonicDuration::from_seconds(30) => LessThan30Seconds,
+                x if x < zx::MonotonicDuration::from_minutes(5) => LessThan5Minutes,
+                x if x < zx::MonotonicDuration::from_hours(1) => LessThan1Hour,
+                x if x < zx::MonotonicDuration::from_hours(6) => LessThan6Hours,
+                x if x < zx::MonotonicDuration::from_hours(24) => LessThan24Hours,
                 _ => AtLeast24Hours,
             }
         };
@@ -2644,7 +2649,10 @@ impl StatsLogger {
         ));
     }
 
-    async fn log_network_selection_scan_interval(&mut self, time_since_last_scan: zx::Duration) {
+    async fn log_network_selection_scan_interval(
+        &mut self,
+        time_since_last_scan: zx::MonotonicDuration,
+    ) {
         self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
             self.cobalt_1dot1_proxy,
             log_integer,
@@ -2839,7 +2847,7 @@ impl StatsLogger {
 
     async fn log_downtime_cobalt_metrics(
         &mut self,
-        downtime: zx::Duration,
+        downtime: zx::MonotonicDuration,
         disconnect_info: &DisconnectInfo,
     ) {
         let disconnect_source_dim =
@@ -2858,17 +2866,17 @@ impl StatsLogger {
 
     async fn log_reconnect_cobalt_metrics(
         &mut self,
-        reconnect_duration: zx::Duration,
+        reconnect_duration: zx::MonotonicDuration,
         disconnect_reason: fidl_sme::DisconnectSource,
     ) {
         let mut metric_events = vec![];
         let reconnect_duration_dim = {
             use metrics::ConnectivityWlanMetricDimensionReconnectDuration::*;
             match reconnect_duration {
-                x if x < zx::Duration::from_millis(100) => LessThan100Milliseconds,
-                x if x < zx::Duration::from_seconds(1) => LessThan1Second,
-                x if x < zx::Duration::from_seconds(5) => LessThan5Seconds,
-                x if x < zx::Duration::from_seconds(30) => LessThan30Seconds,
+                x if x < zx::MonotonicDuration::from_millis(100) => LessThan100Milliseconds,
+                x if x < zx::MonotonicDuration::from_seconds(1) => LessThan1Second,
+                x if x < zx::MonotonicDuration::from_seconds(5) => LessThan5Seconds,
+                x if x < zx::MonotonicDuration::from_seconds(30) => LessThan30Seconds,
                 _ => AtLeast30Seconds,
             }
         };
@@ -3040,7 +3048,10 @@ impl StatsLogger {
         ));
     }
 
-    async fn log_start_client_connections_request(&mut self, disabled_duration: zx::Duration) {
+    async fn log_start_client_connections_request(
+        &mut self,
+        disabled_duration: zx::MonotonicDuration,
+    ) {
         if disabled_duration < USER_RESTART_TIME_THRESHOLD {
             self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
                 self.cobalt_1dot1_proxy,
@@ -3052,7 +3063,10 @@ impl StatsLogger {
         }
     }
 
-    async fn log_stop_client_connections_request(&mut self, enabled_duration: zx::Duration) {
+    async fn log_stop_client_connections_request(
+        &mut self,
+        enabled_duration: zx::MonotonicDuration,
+    ) {
         self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
             self.cobalt_1dot1_proxy,
             log_integer,
@@ -3062,7 +3076,7 @@ impl StatsLogger {
         ));
     }
 
-    async fn log_stop_ap_cobalt_metrics(&mut self, enabled_duration: zx::Duration) {
+    async fn log_stop_ap_cobalt_metrics(&mut self, enabled_duration: zx::MonotonicDuration) {
         self.throttled_error_logger.throttle_error(log_cobalt_1dot1!(
             self.cobalt_1dot1_proxy,
             log_integer,
@@ -3210,7 +3224,7 @@ impl StatsLogger {
 
     async fn log_scan_request_fulfillment_time(
         &mut self,
-        duration: zx::Duration,
+        duration: zx::MonotonicDuration,
         reason: client::scan::ScanReason,
     ) {
         let fulfillment_time_dim = {
@@ -3436,7 +3450,8 @@ impl StatsLogger {
 
         self.log_average_delta_metric_by_signal(
             metrics::AVERAGE_SCORE_DELTA_AFTER_CONNECTION_BY_INITIAL_SCORE_METRIC_ID,
-            signals.get_between(connect_time, connect_time + zx::Duration::from_millis(1100)),
+            signals
+                .get_between(connect_time, connect_time + zx::MonotonicDuration::from_millis(1100)),
             signal_at_connect,
             DurationDimension::OneSecond as u32,
         )
@@ -3444,7 +3459,8 @@ impl StatsLogger {
 
         self.log_average_delta_metric_by_signal(
             metrics::AVERAGE_SCORE_DELTA_AFTER_CONNECTION_BY_INITIAL_SCORE_METRIC_ID,
-            signals.get_between(connect_time, connect_time + zx::Duration::from_millis(5100)),
+            signals
+                .get_between(connect_time, connect_time + zx::MonotonicDuration::from_millis(5100)),
             signal_at_connect,
             DurationDimension::FiveSeconds as u32,
         )
@@ -3452,7 +3468,10 @@ impl StatsLogger {
 
         self.log_average_delta_metric_by_signal(
             metrics::AVERAGE_SCORE_DELTA_AFTER_CONNECTION_BY_INITIAL_SCORE_METRIC_ID,
-            signals.get_between(connect_time, connect_time + zx::Duration::from_millis(10100)),
+            signals.get_between(
+                connect_time,
+                connect_time + zx::MonotonicDuration::from_millis(10100),
+            ),
             signal_at_connect,
             DurationDimension::TenSeconds as u32,
         )
@@ -3460,7 +3479,10 @@ impl StatsLogger {
 
         self.log_average_delta_metric_by_signal(
             metrics::AVERAGE_SCORE_DELTA_AFTER_CONNECTION_BY_INITIAL_SCORE_METRIC_ID,
-            signals.get_between(connect_time, connect_time + zx::Duration::from_millis(30100)),
+            signals.get_between(
+                connect_time,
+                connect_time + zx::MonotonicDuration::from_millis(30100),
+            ),
             signal_at_connect,
             DurationDimension::ThirtySeconds as u32,
         )
@@ -3469,7 +3491,7 @@ impl StatsLogger {
 
     async fn log_pre_disconnect_score_deltas_by_signal(
         &mut self,
-        connect_duration: zx::Duration,
+        connect_duration: zx::MonotonicDuration,
         mut signals: HistoricalList<client::types::TimestampedSignal>,
     ) {
         // The following time ranges are 100ms longer than the corresponding duration dimensions.
@@ -3485,28 +3507,32 @@ impl StatsLogger {
             {
                 self.log_average_delta_metric_by_signal(
                     metrics::AVERAGE_SCORE_DELTA_BEFORE_DISCONNECT_BY_FINAL_SCORE_METRIC_ID,
-                    signals.get_recent(final_signal_time - zx::Duration::from_millis(1100)),
+                    signals
+                        .get_recent(final_signal_time - zx::MonotonicDuration::from_millis(1100)),
                     final_signal,
                     DurationDimension::OneSecond as u32,
                 )
                 .await;
                 self.log_average_delta_metric_by_signal(
                     metrics::AVERAGE_SCORE_DELTA_BEFORE_DISCONNECT_BY_FINAL_SCORE_METRIC_ID,
-                    signals.get_recent(final_signal_time - zx::Duration::from_millis(5100)),
+                    signals
+                        .get_recent(final_signal_time - zx::MonotonicDuration::from_millis(5100)),
                     final_signal,
                     DurationDimension::FiveSeconds as u32,
                 )
                 .await;
                 self.log_average_delta_metric_by_signal(
                     metrics::AVERAGE_SCORE_DELTA_BEFORE_DISCONNECT_BY_FINAL_SCORE_METRIC_ID,
-                    signals.get_recent(final_signal_time - zx::Duration::from_millis(10100)),
+                    signals
+                        .get_recent(final_signal_time - zx::MonotonicDuration::from_millis(10100)),
                     final_signal,
                     DurationDimension::TenSeconds as u32,
                 )
                 .await;
                 self.log_average_delta_metric_by_signal(
                     metrics::AVERAGE_SCORE_DELTA_BEFORE_DISCONNECT_BY_FINAL_SCORE_METRIC_ID,
-                    signals.get_recent(final_signal_time - zx::Duration::from_millis(30100)),
+                    signals
+                        .get_recent(final_signal_time - zx::MonotonicDuration::from_millis(30100)),
                     final_signal,
                     DurationDimension::ThirtySeconds as u32,
                 )
@@ -3530,7 +3556,8 @@ impl StatsLogger {
 
         self.log_average_rssi_delta_metric(
             metrics::AVERAGE_RSSI_DELTA_AFTER_CONNECTION_BY_INITIAL_RSSI_METRIC_ID,
-            signals.get_between(connect_time, connect_time + zx::Duration::from_millis(1100)),
+            signals
+                .get_between(connect_time, connect_time + zx::MonotonicDuration::from_millis(1100)),
             signal_at_connect,
             DurationDimension::OneSecond as u32,
         )
@@ -3538,7 +3565,8 @@ impl StatsLogger {
 
         self.log_average_rssi_delta_metric(
             metrics::AVERAGE_RSSI_DELTA_AFTER_CONNECTION_BY_INITIAL_RSSI_METRIC_ID,
-            signals.get_between(connect_time, connect_time + zx::Duration::from_millis(5100)),
+            signals
+                .get_between(connect_time, connect_time + zx::MonotonicDuration::from_millis(5100)),
             signal_at_connect,
             DurationDimension::FiveSeconds as u32,
         )
@@ -3546,7 +3574,10 @@ impl StatsLogger {
 
         self.log_average_rssi_delta_metric(
             metrics::AVERAGE_RSSI_DELTA_AFTER_CONNECTION_BY_INITIAL_RSSI_METRIC_ID,
-            signals.get_between(connect_time, connect_time + zx::Duration::from_millis(10100)),
+            signals.get_between(
+                connect_time,
+                connect_time + zx::MonotonicDuration::from_millis(10100),
+            ),
             signal_at_connect,
             DurationDimension::TenSeconds as u32,
         )
@@ -3554,7 +3585,10 @@ impl StatsLogger {
 
         self.log_average_rssi_delta_metric(
             metrics::AVERAGE_RSSI_DELTA_AFTER_CONNECTION_BY_INITIAL_RSSI_METRIC_ID,
-            signals.get_between(connect_time, connect_time + zx::Duration::from_millis(30100)),
+            signals.get_between(
+                connect_time,
+                connect_time + zx::MonotonicDuration::from_millis(30100),
+            ),
             signal_at_connect,
             DurationDimension::ThirtySeconds as u32,
         )
@@ -3563,7 +3597,7 @@ impl StatsLogger {
 
     async fn log_pre_disconnect_rssi_deltas(
         &mut self,
-        connect_duration: zx::Duration,
+        connect_duration: zx::MonotonicDuration,
         mut signals: HistoricalList<client::types::TimestampedSignal>,
     ) {
         // The following time ranges are 100ms longer than the corresponding duration dimensions.
@@ -3581,7 +3615,7 @@ impl StatsLogger {
                 self.log_average_rssi_delta_metric(
                     metrics::AVERAGE_RSSI_DELTA_BEFORE_DISCONNECT_BY_FINAL_RSSI_METRIC_ID,
                     signals.get_between(
-                        final_signal_time - zx::Duration::from_millis(1100),
+                        final_signal_time - zx::MonotonicDuration::from_millis(1100),
                         final_signal_time,
                     ),
                     final_signal,
@@ -3592,7 +3626,7 @@ impl StatsLogger {
                 self.log_average_rssi_delta_metric(
                     metrics::AVERAGE_RSSI_DELTA_BEFORE_DISCONNECT_BY_FINAL_RSSI_METRIC_ID,
                     signals.get_between(
-                        final_signal_time - zx::Duration::from_millis(5100),
+                        final_signal_time - zx::MonotonicDuration::from_millis(5100),
                         final_signal_time,
                     ),
                     final_signal,
@@ -3603,7 +3637,7 @@ impl StatsLogger {
                 self.log_average_rssi_delta_metric(
                     metrics::AVERAGE_RSSI_DELTA_BEFORE_DISCONNECT_BY_FINAL_RSSI_METRIC_ID,
                     signals.get_between(
-                        final_signal_time - zx::Duration::from_millis(10100),
+                        final_signal_time - zx::MonotonicDuration::from_millis(10100),
                         final_signal_time,
                     ),
                     final_signal,
@@ -3614,7 +3648,7 @@ impl StatsLogger {
                 self.log_average_rssi_delta_metric(
                     metrics::AVERAGE_RSSI_DELTA_BEFORE_DISCONNECT_BY_FINAL_RSSI_METRIC_ID,
                     signals.get_between(
-                        final_signal_time - zx::Duration::from_millis(30100),
+                        final_signal_time - zx::MonotonicDuration::from_millis(30100),
                         final_signal_time,
                     ),
                     final_signal,
@@ -4166,19 +4200,19 @@ fn is_roam_disconnect(reason: fidl_sme::UserDisconnectReason) -> bool {
 }
 
 enum StatOp {
-    AddTotalDuration(zx::Duration),
-    AddConnectedDuration(zx::Duration),
-    AddDowntimeDuration(zx::Duration),
+    AddTotalDuration(zx::MonotonicDuration),
+    AddConnectedDuration(zx::MonotonicDuration),
+    AddDowntimeDuration(zx::MonotonicDuration),
     // Downtime with no saved network in vicinity
-    AddDowntimeNoSavedNeighborDuration(zx::Duration),
+    AddDowntimeNoSavedNeighborDuration(zx::MonotonicDuration),
     AddConnectAttemptsCount,
     AddConnectSuccessfulCount,
     AddDisconnectCount(fidl_sme::DisconnectSource),
-    AddTxHighPacketDropDuration(zx::Duration),
-    AddRxHighPacketDropDuration(zx::Duration),
-    AddTxVeryHighPacketDropDuration(zx::Duration),
-    AddRxVeryHighPacketDropDuration(zx::Duration),
-    AddNoRxDuration(zx::Duration),
+    AddTxHighPacketDropDuration(zx::MonotonicDuration),
+    AddRxHighPacketDropDuration(zx::MonotonicDuration),
+    AddTxVeryHighPacketDropDuration(zx::MonotonicDuration),
+    AddRxVeryHighPacketDropDuration(zx::MonotonicDuration),
+    AddNoRxDuration(zx::MonotonicDuration),
     AddRxTxPacketCounters {
         rx_unicast_total: u64,
         rx_unicast_drop: u64,
@@ -4189,26 +4223,26 @@ enum StatOp {
 
 #[derive(Clone, Default, PartialEq)]
 struct StatCounters {
-    total_duration: zx::Duration,
-    connected_duration: zx::Duration,
-    downtime_duration: zx::Duration,
-    downtime_no_saved_neighbor_duration: zx::Duration,
+    total_duration: zx::MonotonicDuration,
+    connected_duration: zx::MonotonicDuration,
+    downtime_duration: zx::MonotonicDuration,
+    downtime_no_saved_neighbor_duration: zx::MonotonicDuration,
     connect_attempts_count: u64,
     connect_successful_count: u64,
     disconnect_count: u64,
     roaming_disconnect_count: u64,
     non_roaming_disconnect_count: u64,
-    tx_high_packet_drop_duration: zx::Duration,
-    rx_high_packet_drop_duration: zx::Duration,
-    tx_very_high_packet_drop_duration: zx::Duration,
-    rx_very_high_packet_drop_duration: zx::Duration,
-    no_rx_duration: zx::Duration,
+    tx_high_packet_drop_duration: zx::MonotonicDuration,
+    rx_high_packet_drop_duration: zx::MonotonicDuration,
+    tx_very_high_packet_drop_duration: zx::MonotonicDuration,
+    rx_very_high_packet_drop_duration: zx::MonotonicDuration,
+    no_rx_duration: zx::MonotonicDuration,
 }
 
 impl StatCounters {
-    fn adjusted_downtime(&self) -> zx::Duration {
+    fn adjusted_downtime(&self) -> zx::MonotonicDuration {
         max(
-            zx::Duration::from_seconds(0),
+            zx::MonotonicDuration::from_seconds(0),
             self.downtime_duration - self.downtime_no_saved_neighbor_duration,
         )
     }
@@ -4253,20 +4287,20 @@ impl Add for StatCounters {
 impl SaturatingAdd for StatCounters {
     fn saturating_add(&self, v: &Self) -> Self {
         Self {
-            total_duration: zx::Duration::from_nanos(
+            total_duration: zx::MonotonicDuration::from_nanos(
                 self.total_duration.into_nanos().saturating_add(v.total_duration.into_nanos()),
             ),
-            connected_duration: zx::Duration::from_nanos(
+            connected_duration: zx::MonotonicDuration::from_nanos(
                 self.connected_duration
                     .into_nanos()
                     .saturating_add(v.connected_duration.into_nanos()),
             ),
-            downtime_duration: zx::Duration::from_nanos(
+            downtime_duration: zx::MonotonicDuration::from_nanos(
                 self.downtime_duration
                     .into_nanos()
                     .saturating_add(v.downtime_duration.into_nanos()),
             ),
-            downtime_no_saved_neighbor_duration: zx::Duration::from_nanos(
+            downtime_no_saved_neighbor_duration: zx::MonotonicDuration::from_nanos(
                 self.downtime_no_saved_neighbor_duration
                     .into_nanos()
                     .saturating_add(v.downtime_no_saved_neighbor_duration.into_nanos()),
@@ -4284,27 +4318,27 @@ impl SaturatingAdd for StatCounters {
             non_roaming_disconnect_count: self
                 .non_roaming_disconnect_count
                 .saturating_add(v.non_roaming_disconnect_count),
-            tx_high_packet_drop_duration: zx::Duration::from_nanos(
+            tx_high_packet_drop_duration: zx::MonotonicDuration::from_nanos(
                 self.tx_high_packet_drop_duration
                     .into_nanos()
                     .saturating_add(v.tx_high_packet_drop_duration.into_nanos()),
             ),
-            rx_high_packet_drop_duration: zx::Duration::from_nanos(
+            rx_high_packet_drop_duration: zx::MonotonicDuration::from_nanos(
                 self.rx_high_packet_drop_duration
                     .into_nanos()
                     .saturating_add(v.rx_high_packet_drop_duration.into_nanos()),
             ),
-            tx_very_high_packet_drop_duration: zx::Duration::from_nanos(
+            tx_very_high_packet_drop_duration: zx::MonotonicDuration::from_nanos(
                 self.tx_very_high_packet_drop_duration
                     .into_nanos()
                     .saturating_add(v.tx_very_high_packet_drop_duration.into_nanos()),
             ),
-            rx_very_high_packet_drop_duration: zx::Duration::from_nanos(
+            rx_very_high_packet_drop_duration: zx::MonotonicDuration::from_nanos(
                 self.rx_very_high_packet_drop_duration
                     .into_nanos()
                     .saturating_add(v.rx_very_high_packet_drop_duration.into_nanos()),
             ),
-            no_rx_duration: zx::Duration::from_nanos(
+            no_rx_duration: zx::MonotonicDuration::from_nanos(
                 self.no_rx_duration.into_nanos().saturating_add(v.no_rx_duration.into_nanos()),
             ),
         }
@@ -4391,7 +4425,7 @@ mod tests {
     use wlan_common::test_utils::fake_stas::IesOverrides;
     use wlan_common::{assert_variant, random_bss_description};
 
-    const STEP_INCREMENT: zx::Duration = zx::Duration::from_seconds(1);
+    const STEP_INCREMENT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(1);
     const IFACE_ID: u16 = 1;
 
     // Macro rule for testing Inspect data tree. When we query for Inspect data, the LazyNode
@@ -4608,17 +4642,19 @@ mod tests {
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper
-            .advance_by(zx::Duration::from_hours(24) - TELEMETRY_QUERY_INTERVAL, test_fut.as_mut());
+        test_helper.advance_by(
+            zx::MonotonicDuration::from_hours(24) - TELEMETRY_QUERY_INTERVAL,
+            test_fut.as_mut(),
+        );
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
             stats: contains {
                 "1d_counters": contains {
-                    total_duration: (zx::Duration::from_hours(24) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
-                    connected_duration: (zx::Duration::from_hours(24) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
+                    total_duration: (zx::MonotonicDuration::from_hours(24) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
+                    connected_duration: (zx::MonotonicDuration::from_hours(24) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
                 },
                 "7d_counters": contains {
-                    total_duration: (zx::Duration::from_hours(24) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
-                    connected_duration: (zx::Duration::from_hours(24) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
+                    total_duration: (zx::MonotonicDuration::from_hours(24) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
+                    connected_duration: (zx::MonotonicDuration::from_hours(24) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
                 },
             }
         });
@@ -4629,26 +4665,26 @@ mod tests {
                 "1d_counters": contains {
                     // The first hour window is now discarded, so it only shows 23 hours
                     // of total and connected duration.
-                    total_duration: zx::Duration::from_hours(23).into_nanos(),
-                    connected_duration: zx::Duration::from_hours(23).into_nanos(),
+                    total_duration: zx::MonotonicDuration::from_hours(23).into_nanos(),
+                    connected_duration: zx::MonotonicDuration::from_hours(23).into_nanos(),
                 },
                 "7d_counters": contains {
-                    total_duration: zx::Duration::from_hours(24).into_nanos(),
-                    connected_duration: zx::Duration::from_hours(24).into_nanos(),
+                    total_duration: zx::MonotonicDuration::from_hours(24).into_nanos(),
+                    connected_duration: zx::MonotonicDuration::from_hours(24).into_nanos(),
                 },
             }
         });
 
-        test_helper.advance_by(zx::Duration::from_hours(2), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(2), test_fut.as_mut());
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
             stats: contains {
                 "1d_counters": contains {
-                    total_duration: zx::Duration::from_hours(23).into_nanos(),
-                    connected_duration: zx::Duration::from_hours(23).into_nanos(),
+                    total_duration: zx::MonotonicDuration::from_hours(23).into_nanos(),
+                    connected_duration: zx::MonotonicDuration::from_hours(23).into_nanos(),
                 },
                 "7d_counters": contains {
-                    total_duration: zx::Duration::from_hours(26).into_nanos(),
-                    connected_duration: zx::Duration::from_hours(26).into_nanos(),
+                    total_duration: zx::MonotonicDuration::from_hours(26).into_nanos(),
+                    connected_duration: zx::MonotonicDuration::from_hours(26).into_nanos(),
                 },
             }
         });
@@ -4660,36 +4696,36 @@ mod tests {
             .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_hours(8), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(8), test_fut.as_mut());
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
             stats: contains {
                 "1d_counters": contains {
-                    total_duration: zx::Duration::from_hours(23).into_nanos(),
+                    total_duration: zx::MonotonicDuration::from_hours(23).into_nanos(),
                     // Now the 1d connected counter should decrease
-                    connected_duration: zx::Duration::from_hours(15).into_nanos(),
+                    connected_duration: zx::MonotonicDuration::from_hours(15).into_nanos(),
                 },
                 "7d_counters": contains {
-                    total_duration: zx::Duration::from_hours(34).into_nanos(),
-                    connected_duration: zx::Duration::from_hours(26).into_nanos(),
+                    total_duration: zx::MonotonicDuration::from_hours(34).into_nanos(),
+                    connected_duration: zx::MonotonicDuration::from_hours(26).into_nanos(),
                 },
             }
         });
 
         // The 7d counters do not decrease before the 7th day
-        test_helper.advance_by(zx::Duration::from_hours(14), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(14), test_fut.as_mut());
         test_helper.advance_by(
-            zx::Duration::from_hours(5 * 24) - TELEMETRY_QUERY_INTERVAL,
+            zx::MonotonicDuration::from_hours(5 * 24) - TELEMETRY_QUERY_INTERVAL,
             test_fut.as_mut(),
         );
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
             stats: contains {
                 "1d_counters": contains {
-                    total_duration: (zx::Duration::from_hours(24) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
+                    total_duration: (zx::MonotonicDuration::from_hours(24) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
                     connected_duration: 0i64,
                 },
                 "7d_counters": contains {
-                    total_duration: (zx::Duration::from_hours(7 * 24) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
-                    connected_duration: zx::Duration::from_hours(26).into_nanos(),
+                    total_duration: (zx::MonotonicDuration::from_hours(7 * 24) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
+                    connected_duration: zx::MonotonicDuration::from_hours(26).into_nanos(),
                 },
             }
         });
@@ -4699,12 +4735,12 @@ mod tests {
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
             stats: contains {
                 "1d_counters": contains {
-                    total_duration: zx::Duration::from_hours(23).into_nanos(),
+                    total_duration: zx::MonotonicDuration::from_hours(23).into_nanos(),
                     connected_duration: 0i64,
                 },
                 "7d_counters": contains {
-                    total_duration: zx::Duration::from_hours(6 * 24).into_nanos(),
-                    connected_duration: zx::Duration::from_hours(2).into_nanos(),
+                    total_duration: zx::MonotonicDuration::from_hours(6 * 24).into_nanos(),
+                    connected_duration: zx::MonotonicDuration::from_hours(2).into_nanos(),
                 },
             }
         });
@@ -4716,7 +4752,7 @@ mod tests {
         for _ in 0..10 {
             test_helper.send_connected_event(random_bss_description!(Wpa2));
         }
-        test_helper.advance_by(zx::Duration::from_hours(24), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(24), test_fut.as_mut());
 
         // On 1st day, 10 successful connects, so verify metric is logged with count of 10.
         let status_codes = test_helper.get_logged_metrics(
@@ -4729,7 +4765,7 @@ mod tests {
         test_helper.cobalt_events.clear();
 
         test_helper.send_connected_event(random_bss_description!(Wpa2));
-        test_helper.advance_by(zx::Duration::from_hours(24), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(24), test_fut.as_mut());
 
         // On 2nd day, 1 successful connect, so verify metric is logged with count of 1.
         let status_codes = test_helper.get_logged_metrics(
@@ -4744,26 +4780,26 @@ mod tests {
     fn test_total_duration_counters() {
         let (mut test_helper, mut test_fut) = setup_test();
 
-        test_helper.advance_by(zx::Duration::from_minutes(30), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_minutes(30), test_fut.as_mut());
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
             stats: contains {
                 "1d_counters": contains {
-                    total_duration: zx::Duration::from_minutes(30).into_nanos(),
+                    total_duration: zx::MonotonicDuration::from_minutes(30).into_nanos(),
                 },
                 "7d_counters": contains {
-                    total_duration: zx::Duration::from_minutes(30).into_nanos(),
+                    total_duration: zx::MonotonicDuration::from_minutes(30).into_nanos(),
                 },
             }
         });
 
-        test_helper.advance_by(zx::Duration::from_minutes(30), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_minutes(30), test_fut.as_mut());
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
             stats: contains {
                 "1d_counters": contains {
-                    total_duration: zx::Duration::from_hours(1).into_nanos(),
+                    total_duration: zx::MonotonicDuration::from_hours(1).into_nanos(),
                 },
                 "7d_counters": contains {
-                    total_duration: zx::Duration::from_hours(1).into_nanos(),
+                    total_duration: zx::MonotonicDuration::from_hours(1).into_nanos(),
                 },
             }
         });
@@ -4773,7 +4809,7 @@ mod tests {
     fn test_total_duration_time_series() {
         let (mut test_helper, mut test_fut) = setup_test();
 
-        test_helper.advance_by(zx::Duration::from_seconds(25), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(25), test_fut.as_mut());
         let time_series = test_helper.get_time_series(&mut test_fut);
         let total_duration_sec: Vec<_> =
             time_series.lock().total_duration_sec.minutely_iter().copied().collect();
@@ -4799,14 +4835,14 @@ mod tests {
         });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_minutes(1), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_minutes(1), test_fut.as_mut());
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
             stats: contains {
                 "1d_counters": contains {
-                    total_duration: zx::Duration::from_minutes(1).into_nanos(),
+                    total_duration: zx::MonotonicDuration::from_minutes(1).into_nanos(),
                 },
                 "7d_counters": contains {
-                    total_duration: zx::Duration::from_minutes(1).into_nanos(),
+                    total_duration: zx::MonotonicDuration::from_minutes(1).into_nanos(),
                 },
             }
         });
@@ -4816,7 +4852,7 @@ mod tests {
     fn test_counters_when_idle() {
         let (mut test_helper, mut test_fut) = setup_test();
 
-        test_helper.advance_by(zx::Duration::from_minutes(30), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_minutes(30), test_fut.as_mut());
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
             stats: contains {
                 "1d_counters": contains {
@@ -4832,7 +4868,7 @@ mod tests {
             }
         });
 
-        test_helper.advance_by(zx::Duration::from_minutes(30), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_minutes(30), test_fut.as_mut());
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
             stats: contains {
                 "1d_counters": contains {
@@ -4855,32 +4891,32 @@ mod tests {
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_minutes(30), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_minutes(30), test_fut.as_mut());
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
             stats: contains {
                 "1d_counters": contains {
-                    connected_duration: zx::Duration::from_minutes(30).into_nanos(),
+                    connected_duration: zx::MonotonicDuration::from_minutes(30).into_nanos(),
                     downtime_duration: 0i64,
                     downtime_no_saved_neighbor_duration: 0i64,
                 },
                 "7d_counters": contains {
-                    connected_duration: zx::Duration::from_minutes(30).into_nanos(),
+                    connected_duration: zx::MonotonicDuration::from_minutes(30).into_nanos(),
                     downtime_duration: 0i64,
                     downtime_no_saved_neighbor_duration: 0i64,
                 },
             }
         });
 
-        test_helper.advance_by(zx::Duration::from_minutes(30), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_minutes(30), test_fut.as_mut());
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
             stats: contains {
                 "1d_counters": contains {
-                    connected_duration: zx::Duration::from_hours(1).into_nanos(),
+                    connected_duration: zx::MonotonicDuration::from_hours(1).into_nanos(),
                     downtime_duration: 0i64,
                     downtime_no_saved_neighbor_duration: 0i64,
                 },
                 "7d_counters": contains {
-                    connected_duration: zx::Duration::from_hours(1).into_nanos(),
+                    connected_duration: zx::MonotonicDuration::from_hours(1).into_nanos(),
                     downtime_duration: 0i64,
                     downtime_no_saved_neighbor_duration: 0i64,
                 },
@@ -4899,7 +4935,7 @@ mod tests {
             .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_minutes(10), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_minutes(10), test_fut.as_mut());
 
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
             stats: contains {
@@ -4923,18 +4959,18 @@ mod tests {
             .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_minutes(15), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_minutes(15), test_fut.as_mut());
 
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
             stats: contains {
                 "1d_counters": contains {
                     connected_duration: 0i64,
-                    downtime_duration: zx::Duration::from_minutes(15).into_nanos(),
+                    downtime_duration: zx::MonotonicDuration::from_minutes(15).into_nanos(),
                     downtime_no_saved_neighbor_duration: 0i64,
                 },
                 "7d_counters": contains {
                     connected_duration: 0i64,
-                    downtime_duration: zx::Duration::from_minutes(15).into_nanos(),
+                    downtime_duration: zx::MonotonicDuration::from_minutes(15).into_nanos(),
                     downtime_no_saved_neighbor_duration: 0i64,
                 },
             }
@@ -4947,7 +4983,7 @@ mod tests {
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_seconds(5), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(5), test_fut.as_mut());
 
         // Disconnect but not track downtime. Downtime counter should not increase.
         let info = fake_disconnect_info();
@@ -4978,12 +5014,12 @@ mod tests {
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
             stats: contains {
                 "1d_counters": contains {
-                    connected_duration: zx::Duration::from_seconds(5).into_nanos(),
+                    connected_duration: zx::MonotonicDuration::from_seconds(5).into_nanos(),
                     downtime_duration: (fasync::MonotonicInstant::now() - downtime_start).into_nanos(),
                     downtime_no_saved_neighbor_duration: 0i64,
                 },
                 "7d_counters": contains {
-                    connected_duration: zx::Duration::from_seconds(5).into_nanos(),
+                    connected_duration: zx::MonotonicDuration::from_seconds(5).into_nanos(),
                     downtime_duration: (fasync::MonotonicInstant::now() - downtime_start).into_nanos(),
                     downtime_no_saved_neighbor_duration: 0i64,
                 },
@@ -5004,7 +5040,7 @@ mod tests {
             .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_seconds(5), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(5), test_fut.as_mut());
         // Indicate that there's no saved neighbor in vicinity
         test_helper.telemetry_sender.send(TelemetryEvent::NetworkSelectionDecision {
             network_selection_type: NetworkSelectionType::Undirected,
@@ -5019,12 +5055,12 @@ mod tests {
                 "1d_counters": contains {
                     connected_duration: 0i64,
                     downtime_duration: TELEMETRY_QUERY_INTERVAL.into_nanos(),
-                    downtime_no_saved_neighbor_duration: (TELEMETRY_QUERY_INTERVAL - zx::Duration::from_seconds(5)).into_nanos(),
+                    downtime_no_saved_neighbor_duration: (TELEMETRY_QUERY_INTERVAL - zx::MonotonicDuration::from_seconds(5)).into_nanos(),
                 },
                 "7d_counters": contains {
                     connected_duration: 0i64,
                     downtime_duration: TELEMETRY_QUERY_INTERVAL.into_nanos(),
-                    downtime_no_saved_neighbor_duration: (TELEMETRY_QUERY_INTERVAL - zx::Duration::from_seconds(5)).into_nanos(),
+                    downtime_no_saved_neighbor_duration: (TELEMETRY_QUERY_INTERVAL - zx::MonotonicDuration::from_seconds(5)).into_nanos(),
                 },
             }
         });
@@ -5035,17 +5071,17 @@ mod tests {
                 "1d_counters": contains {
                     connected_duration: 0i64,
                     downtime_duration: (TELEMETRY_QUERY_INTERVAL * 2).into_nanos(),
-                    downtime_no_saved_neighbor_duration: (TELEMETRY_QUERY_INTERVAL*2 - zx::Duration::from_seconds(5)).into_nanos(),
+                    downtime_no_saved_neighbor_duration: (TELEMETRY_QUERY_INTERVAL*2 - zx::MonotonicDuration::from_seconds(5)).into_nanos(),
                 },
                 "7d_counters": contains {
                     connected_duration: 0i64,
                     downtime_duration: (TELEMETRY_QUERY_INTERVAL * 2).into_nanos(),
-                    downtime_no_saved_neighbor_duration: (TELEMETRY_QUERY_INTERVAL*2 - zx::Duration::from_seconds(5)).into_nanos(),
+                    downtime_no_saved_neighbor_duration: (TELEMETRY_QUERY_INTERVAL*2 - zx::MonotonicDuration::from_seconds(5)).into_nanos(),
                 },
             }
         });
 
-        test_helper.advance_by(zx::Duration::from_seconds(5), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(5), test_fut.as_mut());
         // Indicate that saved neighbor has been found
         test_helper.telemetry_sender.send(TelemetryEvent::NetworkSelectionDecision {
             network_selection_type: NetworkSelectionType::Undirected,
@@ -5060,12 +5096,12 @@ mod tests {
                 "1d_counters": contains {
                     connected_duration: 0i64,
                     downtime_duration: (TELEMETRY_QUERY_INTERVAL * 2).into_nanos(),
-                    downtime_no_saved_neighbor_duration: (TELEMETRY_QUERY_INTERVAL*2 - zx::Duration::from_seconds(5)).into_nanos(),
+                    downtime_no_saved_neighbor_duration: (TELEMETRY_QUERY_INTERVAL*2 - zx::MonotonicDuration::from_seconds(5)).into_nanos(),
                 },
                 "7d_counters": contains {
                     connected_duration: 0i64,
                     downtime_duration: (TELEMETRY_QUERY_INTERVAL * 2).into_nanos(),
-                    downtime_no_saved_neighbor_duration: (TELEMETRY_QUERY_INTERVAL*2 - zx::Duration::from_seconds(5)).into_nanos(),
+                    downtime_no_saved_neighbor_duration: (TELEMETRY_QUERY_INTERVAL*2 - zx::MonotonicDuration::from_seconds(5)).into_nanos(),
                 },
             }
         });
@@ -5330,7 +5366,7 @@ mod tests {
         let (mut test_helper, mut test_fut) = setup_test();
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
-        test_helper.advance_by(zx::Duration::from_seconds(90), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(90), test_fut.as_mut());
 
         let time_series = test_helper.get_time_series(&mut test_fut);
         let connected_duration_sec: Vec<_> =
@@ -5344,7 +5380,7 @@ mod tests {
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_hours(1), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(1), test_fut.as_mut());
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
             stats: contains {
                 get_iface_stats_fail_count: 0u64,
@@ -5381,23 +5417,23 @@ mod tests {
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_hours(1), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(1), test_fut.as_mut());
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
             stats: contains {
                 get_iface_stats_fail_count: 0u64,
                 "1d_counters": contains {
                     // Deduct 15 seconds beecause there isn't packet counter to diff against in
                     // the first interval of telemetry
-                    tx_high_packet_drop_duration: (zx::Duration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
+                    tx_high_packet_drop_duration: (zx::MonotonicDuration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
                     rx_high_packet_drop_duration: 0i64,
-                    tx_very_high_packet_drop_duration: (zx::Duration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
+                    tx_very_high_packet_drop_duration: (zx::MonotonicDuration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
                     rx_very_high_packet_drop_duration: 0i64,
                     no_rx_duration: 0i64,
                 },
                 "7d_counters": contains {
-                    tx_high_packet_drop_duration: (zx::Duration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
+                    tx_high_packet_drop_duration: (zx::MonotonicDuration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
                     rx_high_packet_drop_duration: 0i64,
-                    tx_very_high_packet_drop_duration: (zx::Duration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
+                    tx_very_high_packet_drop_duration: (zx::MonotonicDuration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
                     rx_very_high_packet_drop_duration: 0i64,
                     no_rx_duration: 0i64,
                 },
@@ -5420,23 +5456,23 @@ mod tests {
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_hours(1), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(1), test_fut.as_mut());
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
             stats: contains {
                 get_iface_stats_fail_count: 0u64,
                 "1d_counters": contains {
                     // Deduct 15 seconds beecause there isn't packet counter to diff against in
                     // the first interval of telemetry
-                    rx_high_packet_drop_duration: (zx::Duration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
+                    rx_high_packet_drop_duration: (zx::MonotonicDuration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
                     tx_high_packet_drop_duration: 0i64,
-                    rx_very_high_packet_drop_duration: (zx::Duration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
+                    rx_very_high_packet_drop_duration: (zx::MonotonicDuration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
                     tx_very_high_packet_drop_duration: 0i64,
                     no_rx_duration: 0i64,
                 },
                 "7d_counters": contains {
-                    rx_high_packet_drop_duration: (zx::Duration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
+                    rx_high_packet_drop_duration: (zx::MonotonicDuration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
                     tx_high_packet_drop_duration: 0i64,
-                    rx_very_high_packet_drop_duration: (zx::Duration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
+                    rx_very_high_packet_drop_duration: (zx::MonotonicDuration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
                     tx_very_high_packet_drop_duration: 0i64,
                     no_rx_duration: 0i64,
                 },
@@ -5462,23 +5498,23 @@ mod tests {
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_hours(1), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(1), test_fut.as_mut());
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
             stats: contains {
                 get_iface_stats_fail_count: 0u64,
                 "1d_counters": contains {
                     // Deduct 15 seconds beecause there isn't packet counter to diff against in
                     // the first interval of telemetry
-                    rx_high_packet_drop_duration: (zx::Duration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
-                    tx_high_packet_drop_duration: (zx::Duration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
+                    rx_high_packet_drop_duration: (zx::MonotonicDuration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
+                    tx_high_packet_drop_duration: (zx::MonotonicDuration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
                     // Very high drop rate counters should still be 0
                     rx_very_high_packet_drop_duration: 0i64,
                     tx_very_high_packet_drop_duration: 0i64,
                     no_rx_duration: 0i64,
                 },
                 "7d_counters": contains {
-                    rx_high_packet_drop_duration: (zx::Duration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
-                    tx_high_packet_drop_duration: (zx::Duration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
+                    rx_high_packet_drop_duration: (zx::MonotonicDuration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
+                    tx_high_packet_drop_duration: (zx::MonotonicDuration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
                     rx_very_high_packet_drop_duration: 0i64,
                     tx_very_high_packet_drop_duration: 0i64,
                     no_rx_duration: 0i64,
@@ -5506,7 +5542,7 @@ mod tests {
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_minutes(2), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_minutes(2), test_fut.as_mut());
 
         let time_series = test_helper.get_time_series(&mut test_fut);
         let rx_unicast_drop_count: Vec<_> =
@@ -5543,21 +5579,21 @@ mod tests {
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_hours(1), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(1), test_fut.as_mut());
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
             stats: contains {
                 get_iface_stats_fail_count: 0u64,
                 "1d_counters": contains {
                     // Deduct 15 seconds beecause there isn't packet counter to diff against in
                     // the first interval of telemetry
-                    no_rx_duration: (zx::Duration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
+                    no_rx_duration: (zx::MonotonicDuration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
                     rx_high_packet_drop_duration: 0i64,
                     tx_high_packet_drop_duration: 0i64,
                     rx_very_high_packet_drop_duration: 0i64,
                     tx_very_high_packet_drop_duration: 0i64,
                 },
                 "7d_counters": contains {
-                    no_rx_duration: (zx::Duration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
+                    no_rx_duration: (zx::MonotonicDuration::from_hours(1) - TELEMETRY_QUERY_INTERVAL).into_nanos(),
                     rx_high_packet_drop_duration: 0i64,
                     tx_high_packet_drop_duration: 0i64,
                     rx_very_high_packet_drop_duration: 0i64,
@@ -5581,7 +5617,7 @@ mod tests {
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_seconds(150), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(150), test_fut.as_mut());
         let time_series = test_helper.get_time_series(&mut test_fut);
         let no_rx_duration_sec: Vec<_> =
             time_series.lock().no_rx_duration_sec.minutely_iter().copied().collect();
@@ -5596,7 +5632,7 @@ mod tests {
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_hours(1), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(1), test_fut.as_mut());
         assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
             stats: contains {
                 get_iface_stats_fail_count: NonZeroUintProperty,
@@ -5659,7 +5695,7 @@ mod tests {
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_hours(12), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(12), test_fut.as_mut());
 
         let info = fake_disconnect_info();
         test_helper
@@ -5667,7 +5703,7 @@ mod tests {
             .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_hours(6), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(6), test_fut.as_mut());
 
         // Indicate that there's no saved neighbor in vicinity
         test_helper.telemetry_sender.send(TelemetryEvent::NetworkSelectionDecision {
@@ -5676,7 +5712,7 @@ mod tests {
             selected_count: 0,
         });
 
-        test_helper.advance_by(zx::Duration::from_hours(6), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(6), test_fut.as_mut());
 
         let uptime_ratios =
             test_helper.get_logged_metrics(metrics::CONNECTED_UPTIME_RATIO_METRIC_ID);
@@ -5695,7 +5731,7 @@ mod tests {
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_hours(4), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(4), test_fut.as_mut());
 
         let info = DisconnectInfo { disconnect_source, ..fake_disconnect_info() };
         test_helper
@@ -5728,7 +5764,7 @@ mod tests {
         );
         connect_and_disconnect_with_source(&mut test_helper, test_fut.as_mut(), user_source);
 
-        test_helper.advance_by(zx::Duration::from_hours(12), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(12), test_fut.as_mut());
 
         let dpdc_ratios =
             test_helper.get_logged_metrics(metrics::DISCONNECT_PER_DAY_CONNECTED_METRIC_ID);
@@ -5759,7 +5795,7 @@ mod tests {
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_hours(24), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(24), test_fut.as_mut());
 
         // No disconnect in the last day, so the 1d ratio would be 0.
         let dpdc_ratios =
@@ -5791,7 +5827,7 @@ mod tests {
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_hours(12), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(12), test_fut.as_mut());
 
         let info = DisconnectInfo {
             disconnect_source: fidl_sme::DisconnectSource::User(
@@ -5804,7 +5840,7 @@ mod tests {
             .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_hours(12), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(12), test_fut.as_mut());
 
         let dpdc_ratios =
             test_helper.get_logged_metrics(metrics::DISCONNECT_PER_DAY_CONNECTED_METRIC_ID);
@@ -5830,14 +5866,14 @@ mod tests {
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_hours(1), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(1), test_fut.as_mut());
         let info = fake_disconnect_info();
         test_helper
             .telemetry_sender
             .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_hours(23), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(23), test_fut.as_mut());
     }
 
     #[fuchsia::test]
@@ -5852,15 +5888,17 @@ mod tests {
                 // computing counters, this leads to 3 hour of high TX drop rate.
                 tx_drop: 3 * min(
                     seed,
-                    (zx::Duration::from_hours(3) + TELEMETRY_QUERY_INTERVAL).into_seconds() as u64,
+                    (zx::MonotonicDuration::from_hours(3) + TELEMETRY_QUERY_INTERVAL).into_seconds()
+                        as u64,
                 ),
                 // RX total stops increasing at 23 hour mark
                 rx_unicast_total: 10
-                    * min(seed, zx::Duration::from_hours(23).into_seconds() as u64),
+                    * min(seed, zx::MonotonicDuration::from_hours(23).into_seconds() as u64),
                 // RX drop rate stops increasing at 4 hour + TELEMETRY_QUERY_INTERVAL mark.
                 rx_unicast_drop: 3 * min(
                     seed,
-                    (zx::Duration::from_hours(4) + TELEMETRY_QUERY_INTERVAL).into_seconds() as u64,
+                    (zx::MonotonicDuration::from_hours(4) + TELEMETRY_QUERY_INTERVAL).into_seconds()
+                        as u64,
                 ),
                 ..fake_iface_counter_stats(seed)
             })
@@ -5869,7 +5907,7 @@ mod tests {
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_hours(24), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(24), test_fut.as_mut());
 
         let high_rx_drop_time_ratios =
             test_helper.get_logged_metrics(metrics::TIME_RATIO_WITH_HIGH_RX_PACKET_DROP_METRIC_ID);
@@ -5915,7 +5953,7 @@ mod tests {
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_hours(24), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(24), test_fut.as_mut());
 
         let high_rx_drop_time_ratios =
             test_helper.get_logged_metrics(metrics::TIME_RATIO_WITH_HIGH_RX_PACKET_DROP_METRIC_ID);
@@ -5963,7 +6001,7 @@ mod tests {
         }
         test_helper.send_connected_event(random_bss_description!(Wpa2));
 
-        test_helper.advance_by(zx::Duration::from_hours(24), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(24), test_fut.as_mut());
 
         let connection_success_rate =
             test_helper.get_logged_metrics(metrics::CONNECTION_SUCCESS_RATE_METRIC_ID);
@@ -5979,14 +6017,14 @@ mod tests {
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_hours(1), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(1), test_fut.as_mut());
 
         let total_wlan_uptime_durs =
             test_helper.get_logged_metrics(metrics::TOTAL_WLAN_UPTIME_NEAR_SAVED_NETWORK_METRIC_ID);
         assert_eq!(total_wlan_uptime_durs.len(), 1);
         assert_eq!(
             total_wlan_uptime_durs[0].payload,
-            MetricEventPayload::IntegerValue(zx::Duration::from_hours(1).into_micros())
+            MetricEventPayload::IntegerValue(zx::MonotonicDuration::from_hours(1).into_micros())
         );
 
         let connected_durs =
@@ -5994,13 +6032,13 @@ mod tests {
         assert_eq!(connected_durs.len(), 1);
         assert_eq!(
             connected_durs[0].payload,
-            MetricEventPayload::IntegerValue(zx::Duration::from_hours(1).into_micros())
+            MetricEventPayload::IntegerValue(zx::MonotonicDuration::from_hours(1).into_micros())
         );
 
         // Clear record of logged Cobalt events
         test_helper.cobalt_events.clear();
 
-        test_helper.advance_by(zx::Duration::from_minutes(30), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_minutes(30), test_fut.as_mut());
 
         let info = fake_disconnect_info();
         test_helper
@@ -6008,7 +6046,7 @@ mod tests {
             .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_minutes(15), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_minutes(15), test_fut.as_mut());
 
         // Indicate that there's no saved neighbor in vicinity
         test_helper.telemetry_sender.send(TelemetryEvent::NetworkSelectionDecision {
@@ -6018,7 +6056,7 @@ mod tests {
         });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_minutes(15), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_minutes(15), test_fut.as_mut());
 
         let total_wlan_uptime_durs =
             test_helper.get_logged_metrics(metrics::TOTAL_WLAN_UPTIME_NEAR_SAVED_NETWORK_METRIC_ID);
@@ -6026,7 +6064,7 @@ mod tests {
         // 30 minutes connected uptime + 15 minutes downtime near saved network
         assert_eq!(
             total_wlan_uptime_durs[0].payload,
-            MetricEventPayload::IntegerValue(zx::Duration::from_minutes(45).into_micros())
+            MetricEventPayload::IntegerValue(zx::MonotonicDuration::from_minutes(45).into_micros())
         );
 
         let connected_durs =
@@ -6034,7 +6072,7 @@ mod tests {
         assert_eq!(connected_durs.len(), 1);
         assert_eq!(
             connected_durs[0].payload,
-            MetricEventPayload::IntegerValue(zx::Duration::from_minutes(30).into_micros())
+            MetricEventPayload::IntegerValue(zx::MonotonicDuration::from_minutes(30).into_micros())
         );
     }
 
@@ -6050,17 +6088,17 @@ mod tests {
                 // computing counters, this leads to 10 min of high TX drop rate.
                 tx_drop: 3 * min(
                     seed,
-                    (zx::Duration::from_minutes(10) + TELEMETRY_QUERY_INTERVAL).into_seconds()
-                        as u64,
+                    (zx::MonotonicDuration::from_minutes(10) + TELEMETRY_QUERY_INTERVAL)
+                        .into_seconds() as u64,
                 ),
                 // RX total stops increasing at 45 min mark
                 rx_unicast_total: 10
-                    * min(seed, zx::Duration::from_minutes(45).into_seconds() as u64),
+                    * min(seed, zx::MonotonicDuration::from_minutes(45).into_seconds() as u64),
                 // RX drop rate stops increasing at 20 min + TELEMETRY_QUERY_INTERVAL mark.
                 rx_unicast_drop: 3 * min(
                     seed,
-                    (zx::Duration::from_minutes(20) + TELEMETRY_QUERY_INTERVAL).into_seconds()
-                        as u64,
+                    (zx::MonotonicDuration::from_minutes(20) + TELEMETRY_QUERY_INTERVAL)
+                        .into_seconds() as u64,
                 ),
                 ..fake_iface_counter_stats(seed)
             })
@@ -6069,14 +6107,14 @@ mod tests {
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_hours(1), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(1), test_fut.as_mut());
 
         let rx_high_drop_durs =
             test_helper.get_logged_metrics(metrics::TOTAL_TIME_WITH_HIGH_RX_PACKET_DROP_METRIC_ID);
         assert_eq!(rx_high_drop_durs.len(), 1);
         assert_eq!(
             rx_high_drop_durs[0].payload,
-            MetricEventPayload::IntegerValue(zx::Duration::from_minutes(20).into_micros())
+            MetricEventPayload::IntegerValue(zx::MonotonicDuration::from_minutes(20).into_micros())
         );
 
         let tx_high_drop_durs =
@@ -6084,7 +6122,7 @@ mod tests {
         assert_eq!(tx_high_drop_durs.len(), 1);
         assert_eq!(
             tx_high_drop_durs[0].payload,
-            MetricEventPayload::IntegerValue(zx::Duration::from_minutes(10).into_micros())
+            MetricEventPayload::IntegerValue(zx::MonotonicDuration::from_minutes(10).into_micros())
         );
 
         let rx_very_high_drop_durs = test_helper
@@ -6092,7 +6130,7 @@ mod tests {
         assert_eq!(rx_very_high_drop_durs.len(), 1);
         assert_eq!(
             rx_very_high_drop_durs[0].payload,
-            MetricEventPayload::IntegerValue(zx::Duration::from_minutes(20).into_micros())
+            MetricEventPayload::IntegerValue(zx::MonotonicDuration::from_minutes(20).into_micros())
         );
 
         let tx_very_high_drop_durs = test_helper
@@ -6100,14 +6138,14 @@ mod tests {
         assert_eq!(tx_very_high_drop_durs.len(), 1);
         assert_eq!(
             tx_very_high_drop_durs[0].payload,
-            MetricEventPayload::IntegerValue(zx::Duration::from_minutes(10).into_micros())
+            MetricEventPayload::IntegerValue(zx::MonotonicDuration::from_minutes(10).into_micros())
         );
 
         let no_rx_durs = test_helper.get_logged_metrics(metrics::TOTAL_TIME_WITH_NO_RX_METRIC_ID);
         assert_eq!(no_rx_durs.len(), 1);
         assert_eq!(
             no_rx_durs[0].payload,
-            MetricEventPayload::IntegerValue(zx::Duration::from_minutes(15).into_micros())
+            MetricEventPayload::IntegerValue(zx::MonotonicDuration::from_minutes(15).into_micros())
         );
     }
 
@@ -6126,7 +6164,7 @@ mod tests {
         test_helper.telemetry_sender.send(TelemetryEvent::OnSignalReport { ind: ind_2 });
 
         // After an hour has passed, the RSSI should be logged to cobalt
-        test_helper.advance_by(zx::Duration::from_hours(1), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(1), test_fut.as_mut());
         test_helper.drain_cobalt_events(&mut test_fut);
 
         let metrics = test_helper.get_logged_metrics(metrics::CONNECTION_RSSI_METRIC_ID);
@@ -6141,7 +6179,7 @@ mod tests {
         // Send another different RSSI
         let ind_3 = fidl_internal::SignalReportIndication { rssi_dbm: -75, snr_db: 30 };
         test_helper.telemetry_sender.send(TelemetryEvent::OnSignalReport { ind: ind_3 });
-        test_helper.advance_by(zx::Duration::from_hours(1), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(1), test_fut.as_mut());
 
         // Check that the previously logged values are not logged again, and the new value is
         // logged.
@@ -6176,7 +6214,7 @@ mod tests {
             .send(TelemetryEvent::OnSignalVelocityUpdate { rssi_velocity: rssi_velocity_2 });
 
         // After an hour has passed, the RSSI velocity should be logged to cobalt
-        test_helper.advance_by(zx::Duration::from_hours(1), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(1), test_fut.as_mut());
         test_helper.drain_cobalt_events(&mut test_fut);
 
         let metrics = test_helper.get_logged_metrics(metrics::RSSI_VELOCITY_METRIC_ID);
@@ -6194,7 +6232,7 @@ mod tests {
         test_helper
             .telemetry_sender
             .send(TelemetryEvent::OnSignalVelocityUpdate { rssi_velocity: rssi_velocity_3 });
-        test_helper.advance_by(zx::Duration::from_hours(1), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(1), test_fut.as_mut());
 
         // Check that the previously logged values are not logged again, and the new value is
         // logged.
@@ -6230,7 +6268,7 @@ mod tests {
         test_helper.telemetry_sender.send(TelemetryEvent::OnSignalReport { ind: ind_max });
         test_helper.telemetry_sender.send(TelemetryEvent::OnSignalReport { ind: ind_overflow_1 });
         test_helper.telemetry_sender.send(TelemetryEvent::OnSignalReport { ind: ind_overflow_2 });
-        test_helper.advance_by(zx::Duration::from_hours(1), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(1), test_fut.as_mut());
 
         // Check that the min, max, underflow, and overflow buckets are used correctly.
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -6270,7 +6308,7 @@ mod tests {
         test_helper
             .telemetry_sender
             .send(TelemetryEvent::OnSignalVelocityUpdate { rssi_velocity: 10.0 });
-        test_helper.advance_by(zx::Duration::from_hours(1), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(1), test_fut.as_mut());
 
         // Check that the min, max, underflow, and overflow buckets are used correctly.
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -6307,7 +6345,8 @@ mod tests {
         });
         // Log disconnect with reason FidlConnectRequest during short duration
         let info = DisconnectInfo {
-            connected_duration: METRICS_SHORT_CONNECT_DURATION - zx::Duration::from_seconds(1),
+            connected_duration: METRICS_SHORT_CONNECT_DURATION
+                - zx::MonotonicDuration::from_seconds(1),
             disconnect_source: fidl_sme::DisconnectSource::User(
                 fidl_sme::UserDisconnectReason::FidlConnectRequest,
             ),
@@ -6340,7 +6379,8 @@ mod tests {
 
         // Log disconnect with reason NetworkUnsaved during longer duration connection
         let info = DisconnectInfo {
-            connected_duration: METRICS_SHORT_CONNECT_DURATION + zx::Duration::from_seconds(1),
+            connected_duration: METRICS_SHORT_CONNECT_DURATION
+                + zx::MonotonicDuration::from_seconds(1),
             ..info
         };
         test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
@@ -6374,17 +6414,17 @@ mod tests {
     #[fuchsia::test]
     fn test_log_disconnect_cobalt_metrics() {
         let (mut test_helper, mut test_fut) = setup_test();
-        test_helper.advance_by(zx::Duration::from_hours(3), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(3), test_fut.as_mut());
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_hours(5), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(5), test_fut.as_mut());
 
         let primary_channel = 8;
         let channel = Channel::new(primary_channel, Cbw::Cbw20);
         let ap_state = random_bss_description!(Wpa2, channel: channel).into();
         let info = DisconnectInfo {
-            connected_duration: zx::Duration::from_hours(5),
+            connected_duration: zx::MonotonicDuration::from_hours(5),
             disconnect_source: fidl_sme::DisconnectSource::Mlme(fidl_sme::DisconnectCause {
                 reason_code: fidl_ieee80211::ReasonCode::LeavingNetworkDeauth,
                 mlme_event_name: fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
@@ -6513,16 +6553,16 @@ mod tests {
     #[fuchsia::test]
     fn test_log_roam_disconnect_cobalt_metrics() {
         let (mut test_helper, mut test_fut) = setup_test();
-        test_helper.advance_by(zx::Duration::from_hours(3), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(3), test_fut.as_mut());
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         const DUR_MIN: i64 = 125;
-        test_helper.advance_by(zx::Duration::from_minutes(DUR_MIN), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_minutes(DUR_MIN), test_fut.as_mut());
 
         // Send a disconnect event.
         let info = DisconnectInfo {
-            connected_duration: zx::Duration::from_minutes(DUR_MIN),
+            connected_duration: zx::MonotonicDuration::from_minutes(DUR_MIN),
             disconnect_source: fidl_sme::DisconnectSource::User(
                 fidl_sme::UserDisconnectReason::ProactiveNetworkSwitch,
             ),
@@ -6574,16 +6614,16 @@ mod tests {
     #[fuchsia::test]
     fn test_log_user_disconnect_cobalt_metrics() {
         let (mut test_helper, mut test_fut) = setup_test();
-        test_helper.advance_by(zx::Duration::from_hours(3), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(3), test_fut.as_mut());
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         const DUR_MIN: i64 = 250;
-        test_helper.advance_by(zx::Duration::from_minutes(DUR_MIN), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_minutes(DUR_MIN), test_fut.as_mut());
 
         // Send a disconnect event.
         let info = DisconnectInfo {
-            connected_duration: zx::Duration::from_minutes(DUR_MIN),
+            connected_duration: zx::MonotonicDuration::from_minutes(DUR_MIN),
             disconnect_source: fidl_sme::DisconnectSource::User(
                 fidl_sme::UserDisconnectReason::FidlConnectRequest,
             ),
@@ -6666,7 +6706,7 @@ mod tests {
     fn test_log_network_selection_scan_interval() {
         let (mut test_helper, mut test_fut) = setup_test();
 
-        let duration = zx::Duration::from_seconds(rand::thread_rng().gen_range(0..100));
+        let duration = zx::MonotonicDuration::from_seconds(rand::thread_rng().gen_range(0..100));
 
         let event = TelemetryEvent::NetworkSelectionScanInterval { time_since_last_scan: duration };
         test_helper.telemetry_sender.send(event);
@@ -6872,7 +6912,7 @@ mod tests {
             test_helper.telemetry_sender.send(event);
         }
         test_helper.send_connected_event(random_bss_description!(Wpa2));
-        test_helper.advance_by(zx::Duration::from_hours(24), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(24), test_fut.as_mut());
 
         let status_codes = test_helper.get_logged_metrics(
             metrics::CONNECT_ATTEMPT_ON_NORMAL_DEVICE_BREAKDOWN_BY_STATUS_CODE_METRIC_ID,
@@ -6914,7 +6954,7 @@ mod tests {
             test_helper.telemetry_sender.send(event);
         }
         test_helper.send_connected_event(random_bss_description!(Wpa2));
-        test_helper.advance_by(zx::Duration::from_hours(24), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(24), test_fut.as_mut());
 
         let status_codes = test_helper.get_logged_metrics(
             metrics::CONNECT_ATTEMPT_ON_BAD_DEVICE_BREAKDOWN_BY_STATUS_CODE_METRIC_ID,
@@ -6946,11 +6986,11 @@ mod tests {
         test_helper
             .telemetry_sender
             .send(TelemetryEvent::StartEstablishConnection { reset_start_time: false });
-        test_helper.advance_by(zx::Duration::from_seconds(2), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(2), test_fut.as_mut());
         test_helper
             .telemetry_sender
             .send(TelemetryEvent::StartEstablishConnection { reset_start_time: false });
-        test_helper.advance_by(zx::Duration::from_seconds(4), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(4), test_fut.as_mut());
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         test_helper.drain_cobalt_events(&mut test_fut);
 
@@ -6972,11 +7012,11 @@ mod tests {
         test_helper
             .telemetry_sender
             .send(TelemetryEvent::StartEstablishConnection { reset_start_time: false });
-        test_helper.advance_by(zx::Duration::from_seconds(2), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(2), test_fut.as_mut());
         test_helper
             .telemetry_sender
             .send(TelemetryEvent::StartEstablishConnection { reset_start_time: true });
-        test_helper.advance_by(zx::Duration::from_seconds(4), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(4), test_fut.as_mut());
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         test_helper.drain_cobalt_events(&mut test_fut);
 
@@ -6997,15 +7037,15 @@ mod tests {
         test_helper
             .telemetry_sender
             .send(TelemetryEvent::StartEstablishConnection { reset_start_time: false });
-        test_helper.advance_by(zx::Duration::from_seconds(10), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(10), test_fut.as_mut());
         test_helper.telemetry_sender.send(TelemetryEvent::ClearEstablishConnectionStartTime);
 
-        test_helper.advance_by(zx::Duration::from_seconds(30), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(30), test_fut.as_mut());
 
         test_helper
             .telemetry_sender
             .send(TelemetryEvent::StartEstablishConnection { reset_start_time: false });
-        test_helper.advance_by(zx::Duration::from_seconds(2), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(2), test_fut.as_mut());
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         test_helper.drain_cobalt_events(&mut test_fut);
 
@@ -7114,7 +7154,7 @@ mod tests {
             test_helper.telemetry_sender.send(event);
         }
 
-        test_helper.advance_by(zx::Duration::from_hours(24), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(24), test_fut.as_mut());
 
         let metrics = test_helper.get_logged_metrics(metric_id);
         assert_eq!(metrics.len(), 2);
@@ -7145,12 +7185,12 @@ mod tests {
         test_helper
             .telemetry_sender
             .send(TelemetryEvent::StartEstablishConnection { reset_start_time: true });
-        test_helper.advance_by(zx::Duration::from_seconds(2), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(2), test_fut.as_mut());
         let info = fake_disconnect_info();
         test_helper
             .telemetry_sender
             .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
-        test_helper.advance_by(zx::Duration::from_seconds(4), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(4), test_fut.as_mut());
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         test_helper.drain_cobalt_events(&mut test_fut);
 
@@ -7181,11 +7221,11 @@ mod tests {
         test_helper
             .telemetry_sender
             .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
-        test_helper.advance_by(zx::Duration::from_seconds(2), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(2), test_fut.as_mut());
         test_helper
             .telemetry_sender
             .send(TelemetryEvent::StartEstablishConnection { reset_start_time: false });
-        test_helper.advance_by(zx::Duration::from_seconds(4), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(4), test_fut.as_mut());
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         test_helper.drain_cobalt_events(&mut test_fut);
 
@@ -7210,7 +7250,7 @@ mod tests {
         test_helper
             .telemetry_sender
             .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
-        test_helper.advance_by(zx::Duration::from_seconds(2), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(2), test_fut.as_mut());
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         test_helper.drain_cobalt_events(&mut test_fut);
 
@@ -7241,7 +7281,7 @@ mod tests {
             .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_minutes(42), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_minutes(42), test_fut.as_mut());
         // Indicate that there's no saved neighbor in vicinity
         test_helper.telemetry_sender.send(TelemetryEvent::NetworkSelectionDecision {
             network_selection_type: NetworkSelectionType::Undirected,
@@ -7250,7 +7290,7 @@ mod tests {
         });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_minutes(5), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_minutes(5), test_fut.as_mut());
         // Indicate that there's some saved neighbor in vicinity
         test_helper.telemetry_sender.send(TelemetryEvent::NetworkSelectionDecision {
             network_selection_type: NetworkSelectionType::Undirected,
@@ -7259,7 +7299,7 @@ mod tests {
         });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_minutes(7), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_minutes(7), test_fut.as_mut());
         // Reconnect
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -7273,7 +7313,7 @@ mod tests {
         );
         assert_eq!(
             breakdowns_by_reason[0].payload,
-            MetricEventPayload::IntegerValue(zx::Duration::from_minutes(49).into_micros())
+            MetricEventPayload::IntegerValue(zx::MonotonicDuration::from_minutes(49).into_micros())
         );
     }
 
@@ -7295,7 +7335,7 @@ mod tests {
             .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        test_helper.advance_by(zx::Duration::from_seconds(3), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(3), test_fut.as_mut());
         // Reconnect
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -7335,7 +7375,7 @@ mod tests {
             .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
         let downtime = 5_000_000;
-        test_helper.advance_by(zx::Duration::from_micros(downtime), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_micros(downtime), test_fut.as_mut());
 
         // Reconnect and verify that a roam reconnect time is logged and a non-roam reconnect time
         // is not logged.
@@ -7538,7 +7578,7 @@ mod tests {
         test_helper.drain_cobalt_events(&mut test_fut);
         test_helper.cobalt_events.clear();
 
-        test_helper.advance_by(zx::Duration::from_hours(24), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(24), test_fut.as_mut());
 
         // Verify that after 24 hours has passed, metric is logged at least once because
         // device is still connected
@@ -7660,7 +7700,7 @@ mod tests {
 
         test_helper.telemetry_sender.send(TelemetryEvent::StartClientConnectionsRequest);
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
-        test_helper.advance_by(zx::Duration::from_seconds(10), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(10), test_fut.as_mut());
         test_helper.telemetry_sender.send(TelemetryEvent::StopClientConnectionsRequest);
 
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -7669,7 +7709,7 @@ mod tests {
         assert_eq!(metrics.len(), 1);
         assert_eq!(
             metrics[0].payload,
-            MetricEventPayload::IntegerValue(zx::Duration::from_seconds(10).into_micros())
+            MetricEventPayload::IntegerValue(zx::MonotonicDuration::from_seconds(10).into_micros())
         );
     }
 
@@ -7680,9 +7720,9 @@ mod tests {
         // Send a start client connections event and then a stop and start corresponding to a
         // restart. The first start client connections should not count for the metric.
         test_helper.telemetry_sender.send(TelemetryEvent::StartClientConnectionsRequest);
-        test_helper.advance_by(zx::Duration::from_seconds(2), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(2), test_fut.as_mut());
         test_helper.telemetry_sender.send(TelemetryEvent::StopClientConnectionsRequest);
-        test_helper.advance_by(zx::Duration::from_seconds(1), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(1), test_fut.as_mut());
         test_helper.telemetry_sender.send(TelemetryEvent::StartClientConnectionsRequest);
 
         // Check that exactly 1 restart client connections event was logged to cobalt.
@@ -7699,7 +7739,7 @@ mod tests {
 
         // Send stop and start events corresponding to restarting client connections.
         test_helper.telemetry_sender.send(TelemetryEvent::StopClientConnectionsRequest);
-        test_helper.advance_by(zx::Duration::from_seconds(3), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(3), test_fut.as_mut());
         test_helper.telemetry_sender.send(TelemetryEvent::StartClientConnectionsRequest);
         // Check that 1 restart client connection event has been logged to cobalt.
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -7709,9 +7749,9 @@ mod tests {
         assert_eq!(metrics[0].payload, MetricEventPayload::Count(1));
 
         // Stop and start client connections quickly again.
-        test_helper.advance_by(zx::Duration::from_seconds(20), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(20), test_fut.as_mut());
         test_helper.telemetry_sender.send(TelemetryEvent::StopClientConnectionsRequest);
-        test_helper.advance_by(zx::Duration::from_seconds(1), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(1), test_fut.as_mut());
         test_helper.telemetry_sender.send(TelemetryEvent::StartClientConnectionsRequest);
         // Check that 1 more event has been logged.
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -7727,9 +7767,9 @@ mod tests {
 
         // Send a stop and start with some time in between, then a quick stop and start.
         test_helper.telemetry_sender.send(TelemetryEvent::StopClientConnectionsRequest);
-        test_helper.advance_by(zx::Duration::from_seconds(30), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(30), test_fut.as_mut());
         test_helper.telemetry_sender.send(TelemetryEvent::StartClientConnectionsRequest);
-        test_helper.advance_by(zx::Duration::from_seconds(2), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(2), test_fut.as_mut());
         // Check that a restart was not logged since some time passed between requests.
         test_helper.drain_cobalt_events(&mut test_fut);
         let metrics =
@@ -7738,7 +7778,7 @@ mod tests {
 
         // Send another stop and start that do correspond to a restart.
         test_helper.telemetry_sender.send(TelemetryEvent::StopClientConnectionsRequest);
-        test_helper.advance_by(zx::Duration::from_seconds(1), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(1), test_fut.as_mut());
         test_helper.telemetry_sender.send(TelemetryEvent::StartClientConnectionsRequest);
         // Check that exactly 1 restart client connections event was logged to cobalt.
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -7754,12 +7794,12 @@ mod tests {
 
         // Stop client connections well before starting it again.
         test_helper.telemetry_sender.send(TelemetryEvent::StopClientConnectionsRequest);
-        test_helper.advance_by(zx::Duration::from_seconds(10), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(10), test_fut.as_mut());
 
         // Send another stop client connections shortly before a start request. The second request
         // should should not cause a metric to be logged, since connections were already off.
         test_helper.telemetry_sender.send(TelemetryEvent::StopClientConnectionsRequest);
-        test_helper.advance_by(zx::Duration::from_seconds(1), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(1), test_fut.as_mut());
         test_helper.telemetry_sender.send(TelemetryEvent::StartClientConnectionsRequest);
 
         test_helper.drain_cobalt_events(&mut test_fut);
@@ -7772,9 +7812,9 @@ mod tests {
     fn test_stop_ap_metric() {
         let (mut test_helper, mut test_fut) = setup_test();
 
-        test_helper
-            .telemetry_sender
-            .send(TelemetryEvent::StopAp { enabled_duration: zx::Duration::from_seconds(50) });
+        test_helper.telemetry_sender.send(TelemetryEvent::StopAp {
+            enabled_duration: zx::MonotonicDuration::from_seconds(50),
+        });
 
         test_helper.drain_cobalt_events(&mut test_fut);
         let metrics = test_helper
@@ -7782,20 +7822,20 @@ mod tests {
         assert_eq!(metrics.len(), 1);
         assert_eq!(
             metrics[0].payload,
-            MetricEventPayload::IntegerValue(zx::Duration::from_seconds(50).into_micros())
+            MetricEventPayload::IntegerValue(zx::MonotonicDuration::from_seconds(50).into_micros())
         );
     }
 
     #[fuchsia::test]
     fn test_data_persistence_called_every_five_minutes() {
         let (mut test_helper, mut test_fut) = setup_test();
-        test_helper.advance_by(zx::Duration::from_minutes(5), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_minutes(5), test_fut.as_mut());
 
         let tags = test_helper.get_persistence_reqs();
         assert!(tags.contains(&"wlancfg-client-stats-counters".to_string()), "tags: {:?}", tags);
 
         test_helper.send_connected_event(random_bss_description!(Wpa2));
-        test_helper.advance_by(zx::Duration::from_minutes(5), test_fut.as_mut());
+        test_helper.advance_by(zx::MonotonicDuration::from_minutes(5), test_fut.as_mut());
         let tags = test_helper.get_persistence_reqs();
         assert!(tags.contains(&"wlancfg-client-stats-counters".to_string()), "tags: {:?}", tags);
     }
@@ -8847,8 +8887,8 @@ mod tests {
         TelemetryEvent::RecoveryEvent {
             reason: RecoveryReason::Timeout(TimeoutRecoveryMechanism::PhyReset)
         },
-        TelemetryEvent::StopAp { enabled_duration: zx::Duration::from_seconds(0) },
-        TelemetryEvent::StopAp { enabled_duration: zx::Duration::from_seconds(0) },
+        TelemetryEvent::StopAp { enabled_duration: zx::MonotonicDuration::from_seconds(0) },
+        TelemetryEvent::StopAp { enabled_duration: zx::MonotonicDuration::from_seconds(0) },
         metrics::TIMEOUT_RECOVERY_OUTCOME_METRIC_ID,
         vec![RecoveryOutcome::Success as u32, TimeoutRecoveryMechanism::PhyReset as u32] ;
         "Stop AP works after recovery"
@@ -8911,7 +8951,7 @@ mod tests {
         let (mut test_helper, mut test_fut) = setup_test();
 
         // Send a scan fulfillment duration
-        let duration = zx::Duration::from_seconds(15);
+        let duration = zx::MonotonicDuration::from_seconds(15);
         test_helper.telemetry_sender.send(TelemetryEvent::ScanRequestFulfillmentTime {
             duration,
             reason: client::scan::ScanReason::ClientRequest,
@@ -8969,19 +9009,19 @@ mod tests {
         let signals_deque: VecDeque<client::types::TimestampedSignal> = VecDeque::from_iter([
             client::types::TimestampedSignal {
                 signal: client::types::Signal { rssi_dbm: -70, snr_db: 10 },
-                time: connect_time + zx::Duration::from_millis(500),
+                time: connect_time + zx::MonotonicDuration::from_millis(500),
             },
             client::types::TimestampedSignal {
                 signal: client::types::Signal { rssi_dbm: -50, snr_db: 30 },
-                time: connect_time + zx::Duration::from_seconds(4),
+                time: connect_time + zx::MonotonicDuration::from_seconds(4),
             },
             client::types::TimestampedSignal {
                 signal: client::types::Signal { rssi_dbm: -30, snr_db: 60 },
-                time: connect_time + zx::Duration::from_seconds(9),
+                time: connect_time + zx::MonotonicDuration::from_seconds(9),
             },
             client::types::TimestampedSignal {
                 signal: client::types::Signal { rssi_dbm: -10, snr_db: 80 },
-                time: connect_time + zx::Duration::from_seconds(20),
+                time: connect_time + zx::MonotonicDuration::from_seconds(20),
             },
         ]);
         let signals = HistoricalList(signals_deque);
@@ -9070,19 +9110,19 @@ mod tests {
         let signals_deque: VecDeque<client::types::TimestampedSignal> = VecDeque::from_iter([
             client::types::TimestampedSignal {
                 signal: client::types::Signal { rssi_dbm: -10, snr_db: 80 },
-                time: final_score_time - zx::Duration::from_seconds(20),
+                time: final_score_time - zx::MonotonicDuration::from_seconds(20),
             },
             client::types::TimestampedSignal {
                 signal: client::types::Signal { rssi_dbm: -30, snr_db: 60 },
-                time: final_score_time - zx::Duration::from_seconds(9),
+                time: final_score_time - zx::MonotonicDuration::from_seconds(9),
             },
             client::types::TimestampedSignal {
                 signal: client::types::Signal { rssi_dbm: -50, snr_db: 30 },
-                time: final_score_time - zx::Duration::from_seconds(4),
+                time: final_score_time - zx::MonotonicDuration::from_seconds(4),
             },
             client::types::TimestampedSignal {
                 signal: client::types::Signal { rssi_dbm: -70, snr_db: 10 },
-                time: final_score_time - zx::Duration::from_millis(500),
+                time: final_score_time - zx::MonotonicDuration::from_millis(500),
             },
             client::types::TimestampedSignal {
                 signal: client::types::Signal { rssi_dbm: -90, snr_db: 0 },
@@ -9171,7 +9211,7 @@ mod tests {
         // Record a disconnect shorter than the minimum required duration
         let disconnect_info = DisconnectInfo {
             connected_duration: AVERAGE_SCORE_DELTA_MINIMUM_DURATION
-                - zx::Duration::from_seconds(1),
+                - zx::MonotonicDuration::from_seconds(1),
             ..fake_disconnect_info()
         };
         test_helper.telemetry_sender.send(TelemetryEvent::Disconnected {
@@ -9637,7 +9677,7 @@ mod tests {
         /// any expired timers and running the test_fut, until `duration` is reached.
         fn advance_by(
             &mut self,
-            duration: zx::Duration,
+            duration: zx::MonotonicDuration,
             mut test_fut: Pin<&mut impl Future<Output = ()>>,
         ) {
             assert_eq!(
@@ -9695,7 +9735,7 @@ mod tests {
             let now = fasync::MonotonicInstant::now();
             let remaining_interval = TELEMETRY_QUERY_INTERVAL.into_nanos()
                 - (now.into_nanos() % TELEMETRY_QUERY_INTERVAL.into_nanos());
-            self.advance_by(zx::Duration::from_nanos(remaining_interval), test_fut)
+            self.advance_by(zx::MonotonicDuration::from_nanos(remaining_interval), test_fut)
         }
 
         /// Continually execute the future and respond to any incoming Cobalt request with Ok.
@@ -10055,7 +10095,7 @@ mod tests {
         let is_sme_reconnecting = false;
         let fidl_disconnect_info = generate_disconnect_info(is_sme_reconnecting);
         DisconnectInfo {
-            connected_duration: zx::Duration::from_hours(6),
+            connected_duration: zx::MonotonicDuration::from_hours(6),
             is_sme_reconnecting: fidl_disconnect_info.is_sme_reconnecting,
             disconnect_source: fidl_disconnect_info.disconnect_source,
             previous_connect_reason: client::types::ConnectReason::IdleInterfaceAutoconnect,
