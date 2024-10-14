@@ -68,4 +68,9 @@ debug::Status LinuxExceptionHandle::SetStrategy(debug_ipc::ExceptionStrategy str
   return debug::Status("Linux does not support exception strategies.");
 }
 
+debug_ipc::ExceptionRecord LinuxExceptionHandle::GetRecord() const {
+  // TODO(brettw) implement this.
+  return debug_ipc::ExceptionRecord();
+}
+
 }  // namespace debug_agent

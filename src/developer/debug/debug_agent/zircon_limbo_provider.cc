@@ -162,11 +162,22 @@ ZirconLimboProvider::RetrieveException(zx_koid_t process_koid) {
   info.tid = source_info->thread_koid();
   info.type = static_cast<zx_excp_type_t>(source_info->type());
 
+  // Get the exception report from the thread.
+  std::optional<zx_exception_report_t> report;
+  if (exception.thread()) {
+    zx_exception_report_t stack_report;
+    if (exception.thread()->get_info(ZX_INFO_THREAD_EXCEPTION_REPORT, &stack_report,
+                                     sizeof(stack_report), nullptr, nullptr) == ZX_OK) {
+      report = stack_report;
+    }
+  }
+
   RetrievedException retrieved;
   retrieved.process = std::make_unique<ZirconProcessHandle>(std::move(*exception.process()));
   retrieved.thread = std::make_unique<ZirconThreadHandle>(std::move(*exception.thread()));
+
   retrieved.exception =
-      std::make_unique<ZirconExceptionHandle>(std::move(*exception.exception()), info);
+      std::make_unique<ZirconExceptionHandle>(std::move(*exception.exception()), info, report);
 
   return fit::ok(std::move(retrieved));
 }

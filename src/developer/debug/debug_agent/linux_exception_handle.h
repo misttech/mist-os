@@ -37,6 +37,7 @@ class LinuxExceptionHandle : public ExceptionHandle {
   debug::Status SetResolution(Resolution resolution) override;
   fit::result<debug::Status, debug_ipc::ExceptionStrategy> GetStrategy() const override;
   debug::Status SetStrategy(debug_ipc::ExceptionStrategy strategy) override;
+  debug_ipc::ExceptionRecord GetRecord() const override;
 
  private:
   // Moveable but not copyable.

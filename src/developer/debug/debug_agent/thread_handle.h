@@ -74,9 +74,6 @@ class ThreadHandle {
   // isn't known by the thread handle, it is passed in.
   virtual debug_ipc::ThreadRecord GetThreadRecord(zx_koid_t process_koid) const = 0;
 
-  // ExceptionRecord.valid will be false on failure.
-  virtual debug_ipc::ExceptionRecord GetExceptionRecord() const = 0;
-
   // Asynchronously suspends the thread. The thread will remain suspended as long as any suspend
   // handle is alive. See also WaitForSuspension().
   virtual std::unique_ptr<SuspendHandle> Suspend() = 0;

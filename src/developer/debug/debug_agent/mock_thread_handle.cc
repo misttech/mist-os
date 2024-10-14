@@ -90,11 +90,6 @@ debug_ipc::ThreadRecord MockThreadHandle::GetThreadRecord(zx_koid_t process_koid
   return record;
 }
 
-debug_ipc::ExceptionRecord MockThreadHandle::GetExceptionRecord() const {
-  // Currently not implemented by this mock.
-  return debug_ipc::ExceptionRecord();
-}
-
 std::unique_ptr<SuspendHandle> MockThreadHandle::Suspend() {
   return std::make_unique<MockSuspendHandle>(suspend_count_);
 }

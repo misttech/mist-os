@@ -75,6 +75,8 @@ class MockExceptionHandle : public ExceptionHandle {
     return debug::Status();
   }
 
+  debug_ipc::ExceptionRecord GetRecord() const override { return debug_ipc::ExceptionRecord(); }
+
  private:
   uint64_t process_koid_ = ZX_KOID_INVALID;
   uint64_t thread_koid_ = ZX_KOID_INVALID;

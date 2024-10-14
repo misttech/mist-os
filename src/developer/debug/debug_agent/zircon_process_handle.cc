@@ -415,17 +415,31 @@ void ZirconProcessHandle::OnProcessTerminated(zx_koid_t process_koid) {
 
 void ZirconProcessHandle::OnThreadStarting(zx::exception exception, zx_exception_info_t info) {
   FX_DCHECK(observer_);
-  observer_->OnThreadStarting(std::make_unique<ZirconExceptionHandle>(std::move(exception), info));
+  observer_->OnThreadStarting(
+      std::make_unique<ZirconExceptionHandle>(std::move(exception), info, std::nullopt));
 }
 
 void ZirconProcessHandle::OnThreadExiting(zx::exception exception, zx_exception_info_t info) {
   FX_DCHECK(observer_);
-  observer_->OnThreadExiting(std::make_unique<ZirconExceptionHandle>(std::move(exception), info));
+  observer_->OnThreadExiting(
+      std::make_unique<ZirconExceptionHandle>(std::move(exception), info, std::nullopt));
 }
 
 void ZirconProcessHandle::OnException(zx::exception exception, zx_exception_info_t info) {
+  // Get the exception report.
+  std::optional<zx_exception_report_t> report;
+  zx::thread thread;
+  if (exception.get_thread(&thread) == ZX_OK) {
+    zx_exception_report_t stack_report;
+    if (thread.get_info(ZX_INFO_THREAD_EXCEPTION_REPORT, &stack_report, sizeof(stack_report),
+                        nullptr, nullptr) == ZX_OK) {
+      report = stack_report;
+    }
+  }
+
   FX_DCHECK(observer_);
-  observer_->OnException(std::make_unique<ZirconExceptionHandle>(std::move(exception), info));
+  observer_->OnException(
+      std::make_unique<ZirconExceptionHandle>(std::move(exception), info, report));
 }
 
 }  // namespace debug_agent

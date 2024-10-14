@@ -57,7 +57,7 @@ void DebuggedJob::OnUnhandledException(std::unique_ptr<ExceptionHandle> exceptio
 
   debug_ipc::NotifyException notify;
   notify.thread = thread->GetThreadRecord(debug_ipc::ThreadRecord::StackAmount::kFull);
-  notify.exception = thread->thread_handle().GetExceptionRecord();
+  notify.exception = exception_handle->GetRecord();
   notify.timestamp = GetNowTimestamp();
   notify.type = exception_handle->GetType(thread->thread_handle());
   // Make sure to tell the client that we aren't actually holding onto the exception after the

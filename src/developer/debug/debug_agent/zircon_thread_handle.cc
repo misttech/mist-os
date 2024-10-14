@@ -84,14 +84,6 @@ ThreadHandle::State ZirconThreadHandle::GetState() const {
   return State(debug_ipc::ThreadRecord::State::kDead);  // Assume failures mean the thread is dead.
 }
 
-debug_ipc::ExceptionRecord ZirconThreadHandle::GetExceptionRecord() const {
-  zx_exception_report_t report = {};
-  if (thread_.get_info(ZX_INFO_THREAD_EXCEPTION_REPORT, &report, sizeof(report), nullptr,
-                       nullptr) == ZX_OK)
-    return arch::FillExceptionRecord(report);
-  return debug_ipc::ExceptionRecord();
-}
-
 std::unique_ptr<SuspendHandle> ZirconThreadHandle::Suspend() {
   zx::suspend_token token;
   thread_.suspend(&token);

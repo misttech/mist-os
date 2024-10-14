@@ -82,4 +82,10 @@ debug::Status ZirconExceptionHandle::SetStrategy(debug_ipc::ExceptionStrategy st
                                                  sizeof(raw_strategy.value())));
 }
 
+debug_ipc::ExceptionRecord ZirconExceptionHandle::GetRecord() const {
+  if (report_)
+    return arch::FillExceptionRecord(report_.value());
+  return debug_ipc::ExceptionRecord();
+}
+
 }  // namespace debug_agent

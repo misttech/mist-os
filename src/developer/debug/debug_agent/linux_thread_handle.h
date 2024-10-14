@@ -28,7 +28,6 @@ class LinuxThreadHandle final : public ThreadHandle {
   std::string GetName() const override;
   State GetState() const override;
   debug_ipc::ThreadRecord GetThreadRecord(zx_koid_t process_koid) const override;
-  debug_ipc::ExceptionRecord GetExceptionRecord() const override;
   std::unique_ptr<SuspendHandle> Suspend() override;
   bool WaitForSuspension(TickTimePoint deadline) const override;
   std::optional<GeneralRegisters> GetGeneralRegisters() const override;

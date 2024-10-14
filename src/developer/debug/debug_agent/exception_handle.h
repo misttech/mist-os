@@ -49,6 +49,13 @@ class ExceptionHandle {
 
   // Sets the handling strategy.
   virtual debug::Status SetStrategy(debug_ipc::ExceptionStrategy strategy) = 0;
+
+  // Returns this exception info for IPC.
+  //
+  // Race conditions or other errors can conspire to mean the exception records are not valid. In
+  // order to differentiate this case from "0" addresses, ExceptionRecord.valid will be set to
+  // false on failure.
+  virtual debug_ipc::ExceptionRecord GetRecord() const = 0;
 };
 
 }  // namespace debug_agent
