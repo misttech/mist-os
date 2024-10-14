@@ -36,8 +36,7 @@ pub use matchers::{
 };
 pub use packets::{
     FilterIpExt, ForwardedPacket, IcmpMessage, IpPacket, MaybeTransportPacket,
-    MaybeTransportPacketMut, NestedWithInnerIpPacket, RawIpBody, TransportPacketSerializer,
-    TxPacket,
+    MaybeTransportPacketMut, RawIpBody, TransportPacketSerializer, TxPacket,
 };
 pub use state::validation::{ValidRoutines, ValidationError};
 pub use state::{

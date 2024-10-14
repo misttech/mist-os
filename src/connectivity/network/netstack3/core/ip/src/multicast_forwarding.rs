@@ -522,7 +522,7 @@ mod testutil {
             _egress_proof: ProofOfEgressCheck,
         ) -> Result<(), netstack3_base::SendFrameError<S>>
         where
-            S: Serializer + netstack3_filter::IpPacket<I>,
+            S: Serializer,
             S::Buffer: BufferMut,
         {
             let dst = match destination {

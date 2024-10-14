@@ -33,7 +33,7 @@ use netstack3_base::{
     RemoveResourceResultWithContext, RngContext, SendFrameError, StrongDeviceIdentifier,
     TimerBindingsTypes, TimerContext, TimerHandler, WeakDeviceIdentifier,
 };
-use netstack3_filter::{IpPacket, ProofOfEgressCheck};
+use netstack3_filter::ProofOfEgressCheck;
 use packet::{BufferMut, Serializer};
 use packet_formats::icmp::mld::MldPacket;
 use packet_formats::icmp::ndp::options::NdpNonce;
@@ -1210,7 +1210,7 @@ pub trait IpDeviceSendContext<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         egress_proof: ProofOfEgressCheck,
     ) -> Result<(), SendFrameError<S>>
     where
-        S: Serializer + IpPacket<I>,
+        S: Serializer,
         S::Buffer: BufferMut;
 }
 

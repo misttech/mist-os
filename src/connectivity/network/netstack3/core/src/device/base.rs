@@ -37,7 +37,7 @@ use netstack3_device::{
     Devices, DevicesIter, IpLinkDeviceState, IpLinkDeviceStateInner, Ipv6DeviceLinkLayerAddr,
     OriginTracker, OriginTrackerContext, WeakDeviceId,
 };
-use netstack3_filter::{IpPacket, ProofOfEgressCheck};
+use netstack3_filter::ProofOfEgressCheck;
 use netstack3_ip::device::{
     AddressIdIter, AssignedAddress as _, DualStackIpDeviceState, IpDeviceAddressContext,
     IpDeviceAddressIdContext, IpDeviceConfigurationContext, IpDeviceFlags, IpDeviceIpExt,
@@ -195,7 +195,7 @@ impl<
         ProofOfEgressCheck { .. }: ProofOfEgressCheck,
     ) -> Result<(), SendFrameError<S>>
     where
-        S: Serializer + IpPacket<I>,
+        S: Serializer,
         S::Buffer: BufferMut,
     {
         send_ip_frame(self, bindings_ctx, device, destination, body)
@@ -219,7 +219,7 @@ impl<
         ProofOfEgressCheck { .. }: ProofOfEgressCheck,
     ) -> Result<(), SendFrameError<S>>
     where
-        S: Serializer + IpPacket<I>,
+        S: Serializer,
         S::Buffer: BufferMut,
     {
         let Self { config: _, core_ctx } = self;

@@ -79,7 +79,7 @@ impl<I: IpLayerIpExt, BC> IpDeviceSendContext<I, BC> for FakeCoreCtx<I> {
         _egress_proof: filter::ProofOfEgressCheck,
     ) -> Result<(), netstack3_base::SendFrameError<S>>
     where
-        S: Serializer + IpPacket<I>,
+        S: Serializer,
         S::Buffer: BufferMut,
     {
         let frame = body

@@ -39,8 +39,7 @@ use netstack3_base::{
 use netstack3_filter::{
     self as filter, ConntrackConnection, FilterBindingsContext, FilterBindingsTypes,
     FilterHandler as _, FilterIpContext, FilterIpExt, FilterIpMetadata, FilterTimerId,
-    ForwardedPacket, IngressVerdict, IpPacket, NestedWithInnerIpPacket, TransportPacketSerializer,
-    Tuple,
+    ForwardedPacket, IngressVerdict, IpPacket, TransportPacketSerializer, Tuple,
 };
 use packet::{Buf, BufferMut, GrowBuffer, ParseBufferMut, ParseMetadata, Serializer};
 use packet_formats::error::IpParseError;
@@ -2667,7 +2666,6 @@ where
     // TODO(https://fxbug.dev/42148827): Check that the serializer fits in MTU
     // and fragment if necessary instead of just applying the limit.
     let body = body.with_size_limit(mtu.into());
-    let body = NestedWithInnerIpPacket::new(body);
     core_ctx.send_ip_frame(bindings_ctx, device, destination, body, proof).map_err(
         |ErrorAndSerializer { serializer, error }| IpSendFrameError {
             serializer: serializer.into_inner(),
