@@ -13,11 +13,7 @@
         { protocol: "fuchsia.sysinfo.SysInfo" },
     ],
     use: [
-        {
-            directory: "dev-topological",
-            rights: [ "r*" ],
-            path: "/dev",
-        },
+        { service: "fuchsia.sysinfo.Service" },
         { protocol: "fuchsia.boot.WriteOnlyLog" },
     ],
     expose: [

@@ -99,14 +99,14 @@ bool AstroPartitioner::CanSafelyUpdateLayout(std::shared_ptr<Context> context) {
   return true;
 }
 
-zx::result<> AstroPartitioner::InitializeContext(const paver::BlockDevices& devices,
-                                                 AbrWearLevelingOption abr_wear_leveling_opt,
-                                                 Context* context) {
+zx::result<> AstroPartitioner::InitializeContext(
+    const paver::BlockDevices& devices, AbrWearLevelingOption abr_wear_leveling_opt,
+    fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Context* context) {
   return context->Initialize<AstroPartitionerContext>(
       [&]() -> zx::result<std::unique_ptr<AstroPartitionerContext>> {
         // TODO(https://fxbug.dev/339491886): Support sysconfig client in storage-host
         fdio_cpp::UnownedFdioCaller caller(devices.devfs_root());
-        zx::result client = sysconfig::SyncClient::Create(caller.directory());
+        zx::result client = sysconfig::SyncClient::Create(caller.directory(), svc_root);
         if (client.is_error()) {
           ERROR("Failed to create sysconfig client. %s\n", client.status_string());
           return client.take_error();
@@ -134,7 +134,7 @@ zx::result<std::unique_ptr<DevicePartitioner>> AstroPartitioner::Initialize(
     std::shared_ptr<Context> context) {
   auto boot_arg_client = OpenBootArgumentClient(svc_root);
   // TODO(https://fxbug.dev/339491886): Support IsBoard with partitions directory
-  zx::result<> status = IsBoard(devices.devfs_root(), "astro");
+  zx::result<> status = IsBoard(svc_root, "astro");
   if (status.is_error()) {
     return status.take_error();
   }
@@ -146,7 +146,8 @@ zx::result<std::unique_ptr<DevicePartitioner>> AstroPartitioner::Initialize(
           ? AbrWearLevelingOption::ON
           : AbrWearLevelingOption::OFF;
 
-  if (auto status = InitializeContext(devices, option, context.get()); status.is_error()) {
+  if (auto status = InitializeContext(devices, option, svc_root, context.get());
+      status.is_error()) {
     ERROR("Failed to initialize context. %s\n", status.status_string());
     return status.take_error();
   }

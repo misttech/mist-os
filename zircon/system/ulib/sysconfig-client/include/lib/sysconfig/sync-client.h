@@ -42,8 +42,9 @@ class __EXPORT SyncClient {
   // and writing to sub-partitions of the sysconfig device.
   static zx::result<SyncClient> Create();
 
-  // Variation on `Create` with devfs (/dev) injected.
-  static zx::result<SyncClient> Create(fidl::UnownedClientEnd<fuchsia_io::Directory> dev);
+  // Variation on `Create` with devfs (/dev) and svc dir injected.
+  static zx::result<SyncClient> Create(fidl::UnownedClientEnd<fuchsia_io::Directory> dev,
+                                       fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir);
 
   // Provides write access for the partition specified. Always writes full partition.
   //

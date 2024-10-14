@@ -17,6 +17,7 @@
     capabilities: [
         { service: "fuchsia.hardware.platform.bus.Service" },
         { service: "fuchsia.hardware.platform.device.Service" },
+        { service: "fuchsia.sysinfo.Service" },
     ],
     use: [
         {
@@ -66,6 +67,10 @@
         },
         {
             service: "fuchsia.hardware.platform.device.Service",
+            from: "self",
+        },
+        {
+            service: "fuchsia.sysinfo.Service",
             from: "self",
         },
     ],

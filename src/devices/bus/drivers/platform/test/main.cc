@@ -5,6 +5,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fidl/fuchsia.sysinfo/cpp/wire.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/devmgr-integration-test/fixture.h>
 #include <lib/fdio/cpp/caller.h>
@@ -20,12 +21,16 @@
 #include <unistd.h>
 #include <zircon/status.h>
 
+#include <format>
+
+#include <src/lib/files/directory.h>
 #include <zxtest/zxtest.h>
 
 namespace {
 
 using device_watcher::RecursiveWaitForFile;
 using devmgr_integration_test::IsolatedDevmgr;
+namespace fio = fuchsia_io;
 
 TEST(PbusTest, Enumeration) {
   // NB: this loop is never run. RealmBuilder::Build is in the call stack, and insists on a non-null
@@ -77,12 +82,27 @@ TEST(PbusTest, Enumeration) {
   //    "sys/platform/composite_node_spec/composite_node_spec/test-composite-node-spec", &st, 0),
   //    0);
 
-  zx::result channel = RecursiveWaitForFile(dirfd, "sys/platform");
-  ASSERT_OK(channel.status_value());
+  auto svc_dir = devmgr->svc_dir();
+  auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  auto flags = static_cast<uint32_t>(fio::OpenFlags::kRightReadable | fio::OpenFlags::kDirectory);
+  ASSERT_OK(fdio_open_at(svc_dir.channel().get(), "fuchsia.sysinfo.Service", flags,
+                         server_end.TakeChannel().release()));
+  fbl::unique_fd dir_fd;
+  ASSERT_OK(fdio_fd_create(client_end.TakeChannel().release(), dir_fd.reset_and_get_address()));
+  std::vector<std::string> entries;
+  files::ReadDirContentsAt(dir_fd.get(), ".", &entries);
+  std::string instance;
+  for (const auto& entry : entries) {
+    if (entry != ".") {
+      instance = entry;
+    }
+  }
+  std::string path = std::format("fuchsia.sysinfo.Service/{}/device", instance);
+  fprintf(stderr, "path: %s", path.c_str());
 
-  fidl::ClientEnd<fuchsia_sysinfo::SysInfo> client_end(std::move(channel.value()));
-
-  const fidl::WireSyncClient client(std::move(client_end));
+  auto sysinfo_client_end = component::ConnectAt<fuchsia_sysinfo::SysInfo>(svc_dir, path);
+  ASSERT_OK(sysinfo_client_end);
+  const fidl::WireSyncClient client(*std::move(sysinfo_client_end));
 
   // Get board name.
   [&client]() {

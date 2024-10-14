@@ -55,3 +55,7 @@ closed protocol SysInfo {
         serial string:<SERIAL_NUMBER_LEN>;
     }) error zx.Status;
 };
+
+service Service {
+    device client_end:SysInfo;
+};

@@ -94,8 +94,8 @@ zx::result<fidl::WireSyncClient<skipblock::SkipBlock>> FindSysconfigPartition(
   return std::move(watch_result.value());
 }
 
-zx_status_t CheckIfAstro(fidl::UnownedClientEnd<fuchsia_io::Directory> dev) {
-  zx::result sysinfo = component::ConnectAt<fuchsia_sysinfo::SysInfo>(dev, "sys/platform");
+zx_status_t CheckIfAstro(fidl::UnownedClientEnd<fuchsia_io::Directory> svc) {
+  zx::result sysinfo = component::ConnectAt<fuchsia_sysinfo::SysInfo>(svc);
   if (sysinfo.is_error()) {
     return sysinfo.error_value();
   }
@@ -274,14 +274,19 @@ zx::result<SyncClient> SyncClient::Create() {
   if (dev.is_error()) {
     return dev.take_error();
   }
-  return Create(dev.value());
+  zx::result svc = component::OpenServiceRoot("/svc");
+  if (svc.is_error()) {
+    return dev.take_error();
+  }
+  return Create(dev.value(), svc.value());
 }
 
-zx::result<SyncClient> SyncClient::Create(fidl::UnownedClientEnd<fuchsia_io::Directory> dev) {
+zx::result<SyncClient> SyncClient::Create(fidl::UnownedClientEnd<fuchsia_io::Directory> dev,
+                                          fidl::UnownedClientEnd<fuchsia_io::Directory> svc) {
   // TODO(surajmalhotra): This is just a temporary measure to allow us to hardcode constants into
   // this library safely. For future products, the library should be updated to use some sort of
   // configuration file to determine partition layout.
-  if (zx_status_t status = CheckIfAstro(dev); status != ZX_OK) {
+  if (zx_status_t status = CheckIfAstro(svc); status != ZX_OK) {
     return zx::error(status);
   }
 

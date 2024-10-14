@@ -6,9 +6,11 @@
 
 #include <fidl/fuchsia.board.test/cpp/wire.h>
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
+#include <fidl/fuchsia.sysinfo/cpp/wire_test_base.h>
 #include <fidl/fuchsia.system.state/cpp/wire.h>
 #include <fuchsia/driver/test/cpp/fidl.h>
 #include <fuchsia/io/cpp/fidl.h>
+#include <lib/async/default.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/driver_test_realm/realm_builder/cpp/lib.h>
 #include <lib/fdio/cpp/caller.h>
@@ -16,6 +18,7 @@
 #include <lib/fdio/fd.h>
 #include <lib/fdio/fdio.h>
 #include <lib/syslog/global.h>
+#include <lib/vfs/cpp/service.h>
 
 #include <bind/fuchsia/platform/cpp/bind.h>
 
@@ -25,9 +28,38 @@ namespace driver_integration_test {
 
 using namespace component_testing;
 
+class FakeSysinfo : public LocalComponentImpl,
+                    public fidl::testing::WireTestBase<fuchsia_sysinfo::SysInfo> {
+ public:
+  explicit FakeSysinfo(std::string board_name) : board_name_(std::move(board_name)) {}
+
+  void OnStart() override {
+    auto service =
+        std::make_unique<vfs::Service>([this](zx::channel request, async_dispatcher_t* dispatcher) {
+          bindings_.AddBinding(dispatcher,
+                               fidl::ServerEnd<fuchsia_sysinfo::SysInfo>(std::move(request)), this,
+                               fidl::kIgnoreBindingClosure);
+        });
+    ZX_ASSERT(outgoing()->AddPublicService(std::move(service), "fuchsia.sysinfo.SysInfo") == ZX_OK);
+  }
+
+  void GetBoardName(GetBoardNameCompleter::Sync& completer) override {
+    completer.Reply(ZX_OK, fidl::StringView::FromExternal(board_name_));
+  }
+
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+    ZX_PANIC("Unexpected call to sysinfo: %s", name.c_str());
+  }
+
+ private:
+  fidl::ServerBindingGroup<fuchsia_sysinfo::SysInfo> bindings_;
+  std::string board_name_;
+};
+
 zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
   IsolatedDevmgr devmgr;
   devmgr.loop_ = std::make_unique<async::Loop>(&kAsyncLoopConfigNoAttachToCurrentThread);
+  devmgr.loop_->StartThread();
 
   // Create and build the realm.
   auto realm_builder = component_testing::RealmBuilder::Create();
@@ -145,6 +177,15 @@ zx_status_t IsolatedDevmgr::Create(Args* args, IsolatedDevmgr* out) {
       .capabilities = {Directory{.name = "dev-class", .rights = fuchsia::io::R_STAR_DIR}},
       .source = {ChildRef{"driver_test_realm"}},
       .targets = {ChildRef{"fshost"}},
+  });
+  realm_builder.AddLocalChild("fake-sysinfo",
+                              [board_name = std::string(args->board_name)]() mutable {
+                                return std::make_unique<FakeSysinfo>(board_name);
+                              });
+  realm_builder.AddRoute(Route{
+      .capabilities = {Protocol{"fuchsia.sysinfo.SysInfo"}},
+      .source = {ChildRef{"fake-sysinfo"}},
+      .targets = {ParentRef()},
   });
 
   // Build the realm.

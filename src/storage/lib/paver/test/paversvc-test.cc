@@ -8,12 +8,16 @@
 #include <fidl/fuchsia.fshost/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.partition/cpp/wire.h>
 #include <fidl/fuchsia.paver/cpp/wire.h>
+#include <fidl/fuchsia.sysinfo/cpp/wire_test_base.h>
 #include <lib/abr/data.h>
 #include <lib/abr/util.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/cksum.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/wire/string_view.h>
@@ -234,11 +238,46 @@ class FakeBootArgs : public fidl::WireServer<fuchsia_boot::Arguments> {
     string_args_[std::move(key)] = std::move(value);
   }
 
+  fidl::ProtocolHandler<fuchsia_boot::Arguments> Handler(async_dispatcher_t* dispatcher) {
+    return bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure);
+  }
+
  private:
+  fidl::ServerBindingGroup<fuchsia_boot::Arguments> bindings_;
+
   bool astro_sysconfig_abr_wear_leveling_ = false;
   std::string arg_response_ = "-a";
 
   std::unordered_map<std::string, std::string> string_args_;
+};
+
+class FakeSysinfo : public fidl::testing::WireTestBase<fuchsia_sysinfo::SysInfo> {
+ public:
+  FakeSysinfo() = default;
+
+  void GetBoardName(GetBoardNameCompleter::Sync& completer) override {
+    completer.Reply(ZX_OK, fidl::StringView::FromExternal(board_name_));
+  }
+
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+    ZX_PANIC("Unexpected call to sysinfo: %s", name.c_str());
+  }
+
+  fidl::ProtocolHandler<fuchsia_sysinfo::SysInfo> Handler(async_dispatcher_t* dispatcher) {
+    return bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure);
+  }
+
+  void SetBoardName(const std::string& board_name) { board_name_ = board_name; }
+
+ private:
+  fidl::ServerBindingGroup<fuchsia_sysinfo::SysInfo> bindings_;
+  std::string board_name_;
+};
+
+struct IncomingNamespace {
+  component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
+  FakeBootArgs fake_boot_args;
+  FakeSysinfo fake_sysinfo;
 };
 
 class PaverServiceTest : public zxtest::Test {
@@ -265,19 +304,34 @@ class PaverServiceTest : public zxtest::Test {
     }
   }
 
+  void SetArgResponse(const std::string& response) {
+    ns_.SyncCall(
+        [response](IncomingNamespace* ns) { ns->fake_boot_args.SetArgResponse(response); });
+  }
+
+  void SetAstroSysConfigAbrWearLeveling(bool opt) {
+    ns_.SyncCall(
+        [opt](IncomingNamespace* ns) { ns->fake_boot_args.SetAstroSysConfigAbrWearLeveling(opt); });
+  }
+
+  void SetBoardName(const std::string& board_name) {
+    ns_.SyncCall(
+        [board_name](IncomingNamespace* ns) { ns->fake_sysinfo.SetBoardName(board_name); });
+  }
+
   std::unique_ptr<paver::Paver> paver_;
   fidl::WireSyncClient<fuchsia_paver::Paver> client_;
   async::Loop loop_;
   // The paver makes synchronous calls into /svc, so it must run in a separate loop to not
   // deadlock.
   async::Loop loop2_;
-  FakeSvc<FakeBootArgs> fake_svc_;
+  async_patterns::TestDispatcherBound<IncomingNamespace> ns_{loop2_.dispatcher(), std::in_place};
+  fidl::ClientEnd<fuchsia_io::Directory> svc_dir_;
 };
 
 PaverServiceTest::PaverServiceTest()
     : loop_(&kAsyncLoopConfigAttachToCurrentThread),
-      loop2_(&kAsyncLoopConfigNoAttachToCurrentThread),
-      fake_svc_(loop2_.dispatcher(), FakeBootArgs()) {
+      loop2_(&kAsyncLoopConfigNoAttachToCurrentThread) {
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::AstroPartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::NelsonPartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::SherlockPartitionerFactory>());
@@ -296,14 +350,32 @@ PaverServiceTest::PaverServiceTest()
 
   loop_.StartThread("paver-svc-test-loop");
   loop2_.StartThread("paver-svc-test-loop-2");
+
+  svc_dir_ = ns_.SyncCall([](IncomingNamespace* ns) {
+    ZX_ASSERT(ns->outgoing
+                  .AddUnmanagedProtocol<fuchsia_boot::Arguments>(
+                      ns->fake_boot_args.Handler(async_get_default_dispatcher()))
+                  .is_ok());
+    ZX_ASSERT(ns->outgoing
+                  .AddUnmanagedProtocol<fuchsia_sysinfo::SysInfo>(
+                      ns->fake_sysinfo.Handler(async_get_default_dispatcher()))
+                  .is_ok());
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Directory>::Create();
+
+    zx::result svc_local = component::ConnectAt<fuchsia_io::Directory>(client_end, "svc");
+    ZX_ASSERT(svc_local.is_ok());
+    ZX_ASSERT(ns->outgoing.Serve(std::move(server_end)).is_ok());
+    return std::move(svc_local.value());
+  });
 }
 
 PaverServiceTest::~PaverServiceTest() {
   loop_.Shutdown();
+  using Type = async_patterns::TestDispatcherBound<IncomingNamespace>;
+  ns_.~Type();
   loop2_.Shutdown();
   paver_.reset();
 }
-
 void PaverServiceTest::StartPaver(fbl::unique_fd devfs_root,
                                   fidl::ClientEnd<fuchsia_io::Directory> svc_root) {
   zx::result paver = paver::Paver::Create(std::move(devfs_root));
@@ -339,7 +411,8 @@ class PaverServiceSkipBlockTest : public PaverServiceTest {
   void SpawnIsolatedDevmgr(fuchsia_hardware_nand::wire::RamNandInfo nand_info) {
     ASSERT_EQ(device_.get(), nullptr);
     ASSERT_NO_FATAL_FAILURE(SkipBlockDevice::Create(std::move(nand_info), &device_));
-    StartPaver(device_->devfs_root(), std::move(fake_svc_.svc_chan()));
+    StartPaver(device_->devfs_root(), std::move(svc_dir_));
+    SetBoardName("astro");
   }
 
   void WaitForDevices() {
@@ -709,7 +782,7 @@ TEST_F(PaverServiceSkipBlockTest, QueryCurrentConfigurationSlotA) {
 
 TEST_F(PaverServiceSkipBlockTest, QueryCurrentConfigurationSlotB) {
   ASSERT_NO_FATAL_FAILURE(InitializeRamNand());
-  fake_svc_.fake_boot_args().SetArgResponse("-b");
+  SetArgResponse("-b");
 
   AbrData abr_data = kAbrData;
   ComputeCrc(&abr_data);
@@ -725,7 +798,7 @@ TEST_F(PaverServiceSkipBlockTest, QueryCurrentConfigurationSlotB) {
 
 TEST_F(PaverServiceSkipBlockTest, QueryCurrentConfigurationSlotR) {
   ASSERT_NO_FATAL_FAILURE(InitializeRamNand());
-  fake_svc_.fake_boot_args().SetArgResponse("-r");
+  SetArgResponse("-r");
 
   AbrData abr_data = kAbrData;
   ComputeCrc(&abr_data);
@@ -741,7 +814,7 @@ TEST_F(PaverServiceSkipBlockTest, QueryCurrentConfigurationSlotR) {
 
 TEST_F(PaverServiceSkipBlockTest, QueryCurrentConfigurationSlotInvalid) {
   ASSERT_NO_FATAL_FAILURE(InitializeRamNand());
-  fake_svc_.fake_boot_args().SetArgResponse("");
+  SetArgResponse("");
 
   AbrData abr_data = kAbrData;
   ComputeCrc(&abr_data);
@@ -1308,7 +1381,7 @@ TEST_F(PaverServiceSkipBlockTest, WriteAssetVbMetaConfigRecovery) {
 TEST_F(PaverServiceSkipBlockTest, AbrWearLevelingLayoutNotUpdated) {
   ASSERT_NO_FATAL_FAILURE(InitializeRamNand());
   // Enable write-caching + abr metadata wear-leveling
-  fake_svc_.fake_boot_args().SetAstroSysConfigAbrWearLeveling(true);
+  SetAstroSysConfigAbrWearLeveling(true);
 
   // Active slot b
   AbrData abr_data = kAbrData;
@@ -1394,7 +1467,7 @@ AbrData GetAbrWearlevelingSupportingLayout() {
 TEST_F(PaverServiceSkipBlockTest, AbrWearLevelingLayoutUpdated) {
   ASSERT_NO_FATAL_FAILURE(InitializeRamNand());
   // Enable write-caching + abr metadata wear-leveling
-  fake_svc_.fake_boot_args().SetAstroSysConfigAbrWearLeveling(true);
+  SetAstroSysConfigAbrWearLeveling(true);
 
   // Unbootable slot a, successful active slot b
   auto abr_data = GetAbrWearlevelingSupportingLayout();
@@ -1891,7 +1964,7 @@ TEST_F(PaverServiceSkipBlockTest, SysconfigWriteWithBufferredClientLayoutNotUpda
   ASSERT_NO_FATAL_FAILURE(InitializeRamNand());
 
   // Enable write-caching + abr metadata wear-leveling
-  fake_svc_.fake_boot_args().SetAstroSysConfigAbrWearLeveling(true);
+  SetAstroSysConfigAbrWearLeveling(true);
 
   ASSERT_NO_FATAL_FAILURE(FindSysconfig());
 
@@ -1902,7 +1975,7 @@ TEST_F(PaverServiceSkipBlockTest, SysconfigWriteWithBufferredClientLayoutUpdated
   ASSERT_NO_FATAL_FAILURE(InitializeRamNand());
 
   // Enable write-caching + abr metadata wear-leveling
-  fake_svc_.fake_boot_args().SetAstroSysConfigAbrWearLeveling(true);
+  SetAstroSysConfigAbrWearLeveling(true);
 
   auto abr_data = GetAbrWearlevelingSupportingLayout();
   SetAbr(abr_data);
@@ -1937,7 +2010,7 @@ TEST_F(PaverServiceSkipBlockTest, SysconfigWipeWithBufferredClientLayoutNotUpdat
   ASSERT_NO_FATAL_FAILURE(InitializeRamNand());
 
   // Enable write-caching + abr metadata wear-leveling
-  fake_svc_.fake_boot_args().SetAstroSysConfigAbrWearLeveling(true);
+  SetAstroSysConfigAbrWearLeveling(true);
 
   ASSERT_NO_FATAL_FAILURE(FindSysconfig());
 
@@ -1948,7 +2021,7 @@ TEST_F(PaverServiceSkipBlockTest, SysconfigWipeWithBufferredClientLayoutUpdated)
   ASSERT_NO_FATAL_FAILURE(InitializeRamNand());
 
   // Enable write-caching + abr metadata wear-leveling
-  fake_svc_.fake_boot_args().SetAstroSysConfigAbrWearLeveling(true);
+  SetAstroSysConfigAbrWearLeveling(true);
 
   auto abr_data = GetAbrWearlevelingSupportingLayout();
   SetAbr(abr_data);
@@ -1974,7 +2047,7 @@ class PaverServiceBlockTest : public PaverServiceTest {
 
     ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform/ram-disk/ramctl")
                   .status_value());
-    StartPaver(devmgr_.devfs_root().duplicate(), std::move(fake_svc_.svc_chan()));
+    StartPaver(devmgr_.devfs_root().duplicate(), std::move(svc_dir_));
   }
 
   void UseBlockDevice(DeviceAndController block_device) {
@@ -2067,11 +2140,10 @@ class PaverServiceGptDeviceTest : public PaverServiceTest {
     block_size_ = block_size;
     ASSERT_NO_FATAL_FAILURE(
         BlockDevice::Create(devmgr_.devfs_root(), kEmptyType, block_count, block_size, &gpt_dev_));
+    SetBoardName(board_name);
   }
 
-  fidl::ClientEnd<fuchsia_io::Directory> GetSvcRoot() {
-    return component::MaybeClone(fake_svc_.svc_chan());
-  }
+  fidl::ClientEnd<fuchsia_io::Directory> GetSvcRoot() { return component::MaybeClone(svc_dir_); }
 
   struct PartitionDescription {
     const char* name;
@@ -2437,7 +2509,7 @@ TEST_F(PaverServiceLuisTest, OneShotRecovery) {
   auto [local, remote] = fidl::Endpoints<fuchsia_paver::BootManager>::Create();
 
   // Required by FindBootManager().
-  fake_svc_.fake_boot_args().SetArgResponse("_a");
+  SetArgResponse("_a");
 
   auto result = client_->FindBootManager(std::move(remote));
   ASSERT_OK(result.status());

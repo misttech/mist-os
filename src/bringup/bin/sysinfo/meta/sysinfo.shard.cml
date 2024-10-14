@@ -15,8 +15,8 @@
             to: "#sysinfo",
         },
         {
-            directory: "dev-topological",
-            from: "#devfs-with-pkg",
+            service: "fuchsia.sysinfo.Service",
+            from: "#boot-drivers",
             to: "#sysinfo",
         },
         {

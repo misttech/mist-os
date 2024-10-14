@@ -28,6 +28,7 @@
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
 
+#include "lib/fidl/cpp/wire/channel.h"
 #include "src/devices/bus/drivers/platform/node-util.h"
 #include "src/devices/bus/drivers/platform/platform_bus_config.h"
 
@@ -65,6 +66,16 @@ zx_status_t AddProtocolPassthrough(const char* name, cpp20::span<const zx_device
     return status.error_value();
   }
 
+  status = parent->outgoing().AddService<fuchsia_sysinfo::Service>(
+      fuchsia_sysinfo::Service::InstanceHandler({
+          .device = parent->sysinfo_bindings().CreateHandler(
+              parent, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+              fidl::kIgnoreBindingClosure),
+      }));
+  if (status.is_error()) {
+    return status.error_value();
+  }
+
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (endpoints.is_error()) {
     return endpoints.status_value();
@@ -77,6 +88,7 @@ zx_status_t AddProtocolPassthrough(const char* name, cpp20::span<const zx_device
 
   std::array offers = {
       fuchsia_hardware_platform_bus::Service::Name,
+      fuchsia_sysinfo::Service::Name,
   };
 
   device_add_args_t args = {

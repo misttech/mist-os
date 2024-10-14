@@ -153,10 +153,10 @@ zx::result<> WipeBlockPartition(const paver::BlockDevices& devices, std::optiona
   return zx::ok();
 }
 
-zx::result<> IsBoard(const fbl::unique_fd& devfs_root, std::string_view board_name) {
-  fdio_cpp::UnownedFdioCaller caller(devfs_root.get());
+zx::result<> IsBoard(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+                     std::string_view board_name) {
   zx::result status =
-      component::ConnectAt<fuchsia_sysinfo::SysInfo>(caller.directory(), "sys/platform");
+      component::ConnectAt<fuchsia_sysinfo::SysInfo>(svc_root, "fuchsia.sysinfo.SysInfo");
   if (status.is_error()) {
     return status.take_error();
   }
@@ -174,10 +174,10 @@ zx::result<> IsBoard(const fbl::unique_fd& devfs_root, std::string_view board_na
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
-zx::result<> IsBootloader(const fbl::unique_fd& devfs_root, std::string_view vendor) {
-  fdio_cpp::UnownedFdioCaller caller(devfs_root.get());
+zx::result<> IsBootloader(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+                          std::string_view vendor) {
   zx::result status =
-      component::ConnectAt<fuchsia_sysinfo::SysInfo>(caller.directory(), "sys/platform");
+      component::ConnectAt<fuchsia_sysinfo::SysInfo>(svc_root, "fuchsia.sysinfo.SysInfo");
   if (status.is_error()) {
     return status.take_error();
   }

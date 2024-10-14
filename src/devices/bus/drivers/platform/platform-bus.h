@@ -32,13 +32,13 @@
 namespace platform_bus {
 
 class PlatformBus;
-using PlatformBusType =
-    ddk::Device<PlatformBus, ddk::Initializable, ddk::Messageable<fuchsia_sysinfo::SysInfo>::Mixin>;
+using PlatformBusType = ddk::Device<PlatformBus, ddk::Initializable>;
 
 // This is the main class for the platform bus driver.
 class PlatformBus : public PlatformBusType,
                     public fdf::WireServer<fuchsia_hardware_platform_bus::PlatformBus>,
-                    public fdf::WireServer<fuchsia_hardware_platform_bus::Iommu> {
+                    public fdf::WireServer<fuchsia_hardware_platform_bus::Iommu>,
+                    public fidl::WireServer<fuchsia_sysinfo::SysInfo> {
  public:
   static zx_status_t Create(zx_device_t* parent, const char* name, zx::channel items_svc);
 
@@ -118,6 +118,10 @@ class PlatformBus : public PlatformBusType,
     return iommu_bindings_;
   }
 
+  fidl::ServerBindingGroup<fuchsia_sysinfo::SysInfo>& sysinfo_bindings() {
+    return sysinfo_bindings_;
+  }
+
  private:
   fidl::WireClient<fuchsia_hardware_platform_bus::SysSuspend> suspend_cb_;
 
@@ -156,6 +160,7 @@ class PlatformBus : public PlatformBusType,
   fdf::OutgoingDirectory outgoing_;
   fdf::ServerBindingGroup<fuchsia_hardware_platform_bus::PlatformBus> bindings_;
   fdf::ServerBindingGroup<fuchsia_hardware_platform_bus::Iommu> iommu_bindings_;
+  fidl::ServerBindingGroup<fuchsia_sysinfo::SysInfo> sysinfo_bindings_;
   fdf::UnownedDispatcher dispatcher_;
   std::optional<inspect::ComponentInspector> inspector_;
 };
