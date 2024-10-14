@@ -6,7 +6,7 @@ library fuchsia.camera2;
 using fuchsia.sysmem;
 using zx;
 
-@discoverable
+@discoverable(client="platform,external", server="platform")
 @available(added=7, deprecated=NEXT, note="use fuchsia.camera3")
 closed protocol Manager {
     /// Notifies the client when a camera becomes available.  A number of these events will

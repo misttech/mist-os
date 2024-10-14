@@ -546,7 +546,7 @@ void PipelineManager::GetImageFormats(const std::vector<uint8_t>& origin,
 }
 
 void PipelineManager::GetBuffers(const std::vector<uint8_t>& origin,
-                                 fuchsia::camera2::Stream::GetBuffersCallback callback) {
+                                 fuchsia::camera2::Stream::GetBuffers2Callback callback) {
   // in_place nodes may not have bound buffer collection ptr, walk up to find the real collection.
   auto local_path = origin;
   local_path.pop_back();
@@ -568,10 +568,9 @@ void PipelineManager::GetBuffers(const std::vector<uint8_t>& origin,
   attach_token_request.set_token_request(token.NewRequest());
   input_buffer_collection->AttachToken(std::move(attach_token_request));
 
-  input_buffer_collection->Sync([callback = std::move(callback), token = std::move(token)](
-                                    fuchsia::sysmem2::Node_Sync_Result sync_result) mutable {
-    callback(fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(token.TakeChannel()));
-  });
+  input_buffer_collection->Sync(
+      [callback = std::move(callback), token = std::move(token)](
+          fuchsia::sysmem2::Node_Sync_Result sync_result) mutable { callback(std::move(token)); });
 }
 
 bool PipelineManager::FrameGraph::Contains(const Node::Path& path) const {

@@ -136,9 +136,18 @@ void OutputNode::GetImageFormats(GetImageFormatsCallback callback) {
   callbacks_.get_image_formats(std::move(callback));
 }
 
+void OutputNode::GetBuffers2(GetBuffers2Callback callback) {
+  TRACE_DURATION("camera", "OutputNode::GetBuffers2");
+  callbacks_.get_buffers(std::move(callback));
+}
+
 void OutputNode::GetBuffers(GetBuffersCallback callback) {
   TRACE_DURATION("camera", "OutputNode::GetBuffers");
-  callbacks_.get_buffers(std::move(callback));
+  callbacks_.get_buffers(
+      [callback = std::move(callback)](fuchsia::sysmem2::BufferCollectionTokenHandle token) {
+        std::move(callback)(
+            fuchsia::sysmem::BufferCollectionTokenHandle(std::move(token).TakeChannel()));
+      });
 }
 
 }  // namespace camera
