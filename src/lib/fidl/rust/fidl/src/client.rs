@@ -258,7 +258,7 @@ impl Client {
     ) -> Result<(), Error> {
         match self.inner.channel.write_etc(bytes, handles) {
             Ok(()) | Err(zx_status::Status::PEER_CLOSED) => Ok(()),
-            Err(e) => Err(Error::ClientWrite(e)),
+            Err(e) => Err(Error::ClientWrite(e.into())),
         }
     }
 
@@ -666,7 +666,7 @@ impl ClientInner {
                         reason: self.channel.closed_reason(),
                     });
                 }
-                Poll::Ready(Err(e)) => return Err(Error::ClientRead(e)),
+                Poll::Ready(Err(e)) => return Err(Error::ClientRead(e.into())),
                 Poll::Pending => return Ok(ControlFlow::Break(())),
             };
 
@@ -871,7 +871,7 @@ pub mod sync {
             )?;
             match self.channel.write_etc(&write_bytes, &mut write_handles) {
                 Ok(()) | Err(zx_status::Status::PEER_CLOSED) => Ok(()),
-                Err(e) => Err(Error::ClientWrite(e)),
+                Err(e) => Err(Error::ClientWrite(e.into())),
             }
         }
 
@@ -960,7 +960,7 @@ pub mod sync {
                         continue;
                     }
                     Err(e) => {
-                        return Err(self.wrap_error(Error::ClientRead, e));
+                        return Err(self.wrap_error(|e| Error::ClientRead(e.into()), e));
                     }
                 }
             }

@@ -253,7 +253,7 @@ impl SoftCodec {
                 None => {
                     self.terminated = TerminatedState::Terminating;
                     return Poll::Ready(Some(Err(Error::RequestStreamError(
-                        fidl::Error::ClientRead(zx::Status::PEER_CLOSED),
+                        fidl::Error::ClientRead(zx::Status::PEER_CLOSED.into()),
                     ))));
                 }
                 Some(Err(e)) => {

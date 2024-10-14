@@ -1938,10 +1938,7 @@ impl UnknownInteractionsAjarDriverProtocolRequest {
     }
 
     #[allow(irrefutable_let_patterns)]
-    pub fn read_from(
-        bytes: &[u8],
-        _handles: &mut [zx::HandleInfo],
-    ) -> Result<Self, fidl::Error> {
+    pub fn read_from(bytes: &[u8], _handles: &mut [zx::HandleInfo]) -> Result<Self, fidl::Error> {
         let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
 
         match header.ordinal {
@@ -3234,7 +3231,9 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                     return std::task::Poll::Ready(None);
                 }
                 std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e))))
+                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                        e.into(),
+                    ))))
                 }
             }
 
@@ -4684,10 +4683,7 @@ impl UnknownInteractionsClosedDriverProtocolRequest {
     }
 
     #[allow(irrefutable_let_patterns)]
-    pub fn read_from(
-        bytes: &[u8],
-        _handles: &mut [zx::HandleInfo],
-    ) -> Result<Self, fidl::Error> {
+    pub fn read_from(bytes: &[u8], _handles: &mut [zx::HandleInfo]) -> Result<Self, fidl::Error> {
         let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
 
         match header.ordinal {
@@ -5866,7 +5862,9 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                     return std::task::Poll::Ready(None);
                 }
                 std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e))))
+                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                        e.into(),
+                    ))))
                 }
             }
 
@@ -7641,10 +7639,7 @@ impl UnknownInteractionsDriverProtocolRequest {
     }
 
     #[allow(irrefutable_let_patterns)]
-    pub fn read_from(
-        bytes: &[u8],
-        _handles: &mut [zx::HandleInfo],
-    ) -> Result<Self, fidl::Error> {
+    pub fn read_from(bytes: &[u8], _handles: &mut [zx::HandleInfo]) -> Result<Self, fidl::Error> {
         let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
 
         match header.ordinal {
@@ -9747,7 +9742,9 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     return std::task::Poll::Ready(None);
                 }
                 std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e))))
+                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                        e.into(),
+                    ))))
                 }
             }
 

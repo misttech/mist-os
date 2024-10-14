@@ -695,9 +695,12 @@ mod test {
         std::mem::drop(request_stream);
         assert_matches::assert_matches!(control.or_terminal_event_no_return(Ok(())), Ok(()));
         assert_matches::assert_matches!(
-            control
-                .or_terminal_event_no_return(Err(fidl::Error::ClientWrite(zx::Status::INTERNAL))),
-            Err(super::TerminalError::Fidl(fidl::Error::ClientWrite(zx::Status::INTERNAL)))
+            control.or_terminal_event_no_return(Err(fidl::Error::ClientWrite(
+                zx::Status::INTERNAL.into()
+            ))),
+            Err(super::TerminalError::Fidl(fidl::Error::ClientWrite(
+                fidl::TransportError::Status(zx::Status::INTERNAL)
+            )))
         );
         #[cfg(target_os = "fuchsia")]
         assert_matches::assert_matches!(

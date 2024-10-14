@@ -552,7 +552,9 @@ impl futures::Stream for InterfaceRequestStream {
                     return std::task::Poll::Ready(None);
                 }
                 std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e))))
+                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                        e.into(),
+                    ))))
                 }
             }
 

@@ -35,10 +35,10 @@ impl From<Error> for zx::Status {
             Error::WritingFrame(_) => zx::Status::IO_REFUSED,
             Error::ScanError(e) => e.into(),
             Error::Fidl(e) => match e {
-                fidl::Error::ClientRead(status)
-                | fidl::Error::ClientWrite(status)
-                | fidl::Error::ServerResponseWrite(status)
-                | fidl::Error::ServerRequestRead(status) => status,
+                fidl::Error::ClientRead(fidl::TransportError::Status(status))
+                | fidl::Error::ClientWrite(fidl::TransportError::Status(status))
+                | fidl::Error::ServerResponseWrite(fidl::TransportError::Status(status))
+                | fidl::Error::ServerRequestRead(fidl::TransportError::Status(status)) => status,
                 _ => zx::Status::IO,
             },
             Error::Status(_, status) => status,
@@ -128,8 +128,9 @@ mod tests {
         let status = zx::Status::from(Error::BufferTooSmall);
         assert_eq!(status, zx::Status::BUFFER_TOO_SMALL);
 
-        let status =
-            zx::Status::from(Error::Fidl(fidl::Error::ClientWrite(zx::Status::NOT_SUPPORTED)));
+        let status = zx::Status::from(Error::Fidl(fidl::Error::ClientWrite(
+            zx::Status::NOT_SUPPORTED.into(),
+        )));
         assert_eq!(status, zx::Status::NOT_SUPPORTED);
     }
 }

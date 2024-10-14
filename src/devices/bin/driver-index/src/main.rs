@@ -269,7 +269,9 @@ async fn run_index_server_with_timeout(
                         .send(match_result.as_ref().map_err(|e| *e))
                         .or_else(ignore_peer_closed);
 
-                    if let Err(fidl::Error::ServerResponseWrite(Status::OUT_OF_RANGE)) = send_result
+                    if let Err(fidl::Error::ServerResponseWrite(fidl::TransportError::Status(
+                        Status::OUT_OF_RANGE,
+                    ))) = &send_result
                     {
                         send_result.context(format!(
                             "error responding to MatchDriver. Match result was too big: {:?}",

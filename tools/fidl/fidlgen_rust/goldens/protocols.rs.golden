@@ -535,7 +535,9 @@ impl futures::Stream for AnotherDiscoverableProtocolRequestStream {
                     return std::task::Poll::Ready(None);
                 }
                 std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e))))
+                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                        e.into(),
+                    ))))
                 }
             }
 
@@ -969,7 +971,9 @@ impl futures::Stream for ChannelProtocolRequestStream {
                     return std::task::Poll::Ready(None);
                 }
                 std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e))))
+                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                        e.into(),
+                    ))))
                 }
             }
 
@@ -1572,7 +1576,9 @@ impl futures::Stream for DiscoverableProtocolRequestStream {
                     return std::task::Poll::Ready(None);
                 }
                 std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e))))
+                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                        e.into(),
+                    ))))
                 }
             }
 
@@ -1956,7 +1962,9 @@ impl futures::Stream for HandleRightsProtocolRequestStream {
                     return std::task::Poll::Ready(None);
                 }
                 std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e))))
+                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                        e.into(),
+                    ))))
                 }
             }
 
@@ -2447,7 +2455,9 @@ impl futures::Stream for ManyParametersRequestStream {
                     return std::task::Poll::Ready(None);
                 }
                 std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e))))
+                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                        e.into(),
+                    ))))
                 }
             }
 
@@ -2859,7 +2869,9 @@ impl futures::Stream for MethodWithUnionRequestStream {
                     return std::task::Poll::Ready(None);
                 }
                 std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e))))
+                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                        e.into(),
+                    ))))
                 }
             }
 
@@ -3223,7 +3235,9 @@ impl futures::Stream for PlatformServer_RequestStream {
                     return std::task::Poll::Ready(None);
                 }
                 std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e))))
+                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                        e.into(),
+                    ))))
                 }
             }
 
@@ -3763,7 +3777,9 @@ impl futures::Stream for WithAndWithoutRequestResponseRequestStream {
                     return std::task::Poll::Ready(None);
                 }
                 std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e))))
+                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                        e.into(),
+                    ))))
                 }
             }
 
@@ -4696,7 +4712,9 @@ impl futures::Stream for WithErrorSyntaxRequestStream {
                     return std::task::Poll::Ready(None);
                 }
                 std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e))))
+                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                        e.into(),
+                    ))))
                 }
             }
 
@@ -5514,7 +5532,9 @@ impl futures::Stream for WithProtocolEndsRequestStream {
                     return std::task::Poll::Ready(None);
                 }
                 std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e))))
+                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                        e.into(),
+                    ))))
                 }
             }
 

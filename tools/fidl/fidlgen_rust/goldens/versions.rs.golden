@@ -374,7 +374,9 @@ impl futures::Stream for OtherProtocolRequestStream {
                     return std::task::Poll::Ready(None);
                 }
                 std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e))))
+                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                        e.into(),
+                    ))))
                 }
             }
 
@@ -674,7 +676,9 @@ impl futures::Stream for ProtocolRequestStream {
                     return std::task::Poll::Ready(None);
                 }
                 std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e))))
+                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                        e.into(),
+                    ))))
                 }
             }
 

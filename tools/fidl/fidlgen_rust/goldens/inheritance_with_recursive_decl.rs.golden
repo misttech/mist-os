@@ -296,7 +296,9 @@ impl futures::Stream for ChildRequestStream {
                     return std::task::Poll::Ready(None);
                 }
                 std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e))))
+                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                        e.into(),
+                    ))))
                 }
             }
 
@@ -644,7 +646,9 @@ impl futures::Stream for ParentRequestStream {
                     return std::task::Poll::Ready(None);
                 }
                 std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e))))
+                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                        e.into(),
+                    ))))
                 }
             }
 
