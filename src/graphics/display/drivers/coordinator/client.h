@@ -183,10 +183,6 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
                      SetLayerImageCompleter::Sync& _completer) override;
   void CheckConfig(CheckConfigRequestView request, CheckConfigCompleter::Sync& _completer) override;
   void ApplyConfig(ApplyConfigCompleter::Sync& _completer) override;
-  void ApplyConfig2(ApplyConfig2RequestView request,
-                    ApplyConfigCompleter::Sync& _completer) override {
-    ZX_PANIC("Not Implemented");
-  }
   void GetLatestAppliedConfigStamp(GetLatestAppliedConfigStampCompleter::Sync& _completer) override;
   void EnableVsync(EnableVsyncRequestView request, EnableVsyncCompleter::Sync& _completer) override;
   void SetVirtconMode(SetVirtconModeRequestView request,

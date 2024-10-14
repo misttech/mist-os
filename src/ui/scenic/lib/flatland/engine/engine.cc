@@ -13,17 +13,9 @@
 #include "src/ui/scenic/lib/flatland/global_topology_data.h"
 #include "src/ui/scenic/lib/flatland/scene_dumper.h"
 #include "src/ui/scenic/lib/scheduling/frame_scheduler.h"
-#include "src/ui/scenic/lib/utils/helpers.h"
-#include "src/ui/scenic/lib/utils/logging.h"
-
-// TODO(https://fxbug.dev/42157427): for hacky invocation of OnVsync() at the end of
-// RenderScheduledFrame().
-#include <lib/trace/event.h>
-#include <lib/zx/time.h>
 
 #include <sstream>
 #include <string>
-#include <unordered_set>
 
 // Hardcoded double buffering.
 // TODO(https://fxbug.dev/42156567): make this configurable.  Even fancier: is it worth considering
