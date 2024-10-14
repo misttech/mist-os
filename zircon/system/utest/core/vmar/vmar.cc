@@ -2749,13 +2749,33 @@ TEST(Vmar, MapRangeResizable) {
       zx::vmar::root_self()->map(ZX_VM_MAP_RANGE, 0, vmo, 0, zx_system_get_page_size(), &vaddr));
   zx::vmar::root_self()->unmap(vaddr, zx_system_get_page_size());
   // Extend out of range
-  ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_MAP_RANGE, 0, vmo, 0, zx_system_get_page_size() * 2,
-                                       &vaddr));
+  ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_MAP_RANGE | ZX_VM_PERM_READ, 0, vmo, 0,
+                                       zx_system_get_page_size() * 2, &vaddr));
+
+  // Mapping should be trimmed (can't read past end of VMO).
+  EXPECT_STATUS(probe_for_read(reinterpret_cast<void*>(vaddr + zx_system_get_page_size())),
+                ZX_ERR_OUT_OF_RANGE);
   zx::vmar::root_self()->unmap(vaddr, zx_system_get_page_size() * 2);
+
   // Start and end fully out of range
   ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_MAP_RANGE, 0, vmo, zx_system_get_page_size() * 2,
                                        zx_system_get_page_size() * 2, &vaddr));
   zx::vmar::root_self()->unmap(vaddr, zx_system_get_page_size() * 2);
+
+  // Resize VMO up to 2 pages & write to both.
+  vmo.set_size(_zx_system_get_page_size() * 2);
+
+  // Map both pages.
+  ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_MAP_RANGE | ZX_VM_PERM_READ, 0, vmo, 0,
+                                       zx_system_get_page_size() * 2, &vaddr));
+
+  // Resize VMO back down to 1.
+  vmo.set_size(zx_system_get_page_size());
+
+  // Read from both pages, the nonexistent page should fault.
+  EXPECT_STATUS(probe_for_read(reinterpret_cast<void*>(vaddr)), ZX_OK);
+  EXPECT_STATUS(probe_for_read(reinterpret_cast<void*>(vaddr + zx_system_get_page_size())),
+                ZX_ERR_OUT_OF_RANGE);
 }
 
 // Prefetch on an anonymous VMO only has an effect of decompressing pages, which we cannot trigger
