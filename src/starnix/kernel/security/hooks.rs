@@ -12,7 +12,6 @@ use crate::vfs::{
 use selinux::{SecurityPermission, SecurityServer};
 use starnix_logging::log_debug;
 use starnix_uapi::arc_key::WeakKey;
-use starnix_uapi::auth::CAP_SYS_ADMIN;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::ownership::TempRef;
@@ -445,13 +444,7 @@ pub fn fs_node_setsecurity(
                 op,
             )
         },
-        || {
-            if current_task.creds().has_capability(CAP_SYS_ADMIN) {
-                fs_node.ops().set_xattr(fs_node, current_task, name, value, op)
-            } else {
-                Err(errno!(EPERM))
-            }
-        },
+        || fs_node.ops().set_xattr(fs_node, current_task, name, value, op),
     )
 }
 

@@ -2152,11 +2152,6 @@ impl FsNode {
         name: &FsStr,
         max_size: usize,
     ) -> Result<ValueOrSize<FsString>, Errno> {
-        // Based on the man page for xattr(7), read access permissions to security attributes
-        // depend on the security module. If there isn't any, read access is always allowed.
-        if name.starts_with(XATTR_SECURITY_PREFIX.to_bytes()) {
-            return security::fs_node_getsecurity(current_task, self, name, max_size);
-        }
         self.check_access(
             current_task,
             mount,
@@ -2164,7 +2159,11 @@ impl FsNode {
             CheckAccessReason::InternalPermissionChecks,
         )?;
         self.check_trusted_attribute_access(current_task, name, || errno!(ENODATA))?;
-        self.ops().get_xattr(self, current_task, name, max_size)
+        if name.starts_with(XATTR_SECURITY_PREFIX.to_bytes()) {
+            security::fs_node_getsecurity(current_task, self, name, max_size)
+        } else {
+            self.ops().get_xattr(self, current_task, name, max_size)
+        }
     }
 
     pub fn set_xattr(
@@ -2175,12 +2174,6 @@ impl FsNode {
         value: &FsStr,
         op: XattrOp,
     ) -> Result<(), Errno> {
-        // Based on the man page for xattr(7), write access permissions to security attributes
-        // depend on the security module. If there isn't any, write access is liminuted to
-        // processed with the CAP_SYS_ADMIN capability.
-        if name.starts_with(XATTR_SECURITY_PREFIX.to_bytes()) {
-            return security::fs_node_setsecurity(current_task, self, name, value, op);
-        }
         self.check_access(
             current_task,
             mount,
@@ -2188,7 +2181,12 @@ impl FsNode {
             CheckAccessReason::InternalPermissionChecks,
         )?;
         self.check_trusted_attribute_access(current_task, name, || errno!(EPERM))?;
-        self.ops().set_xattr(self, current_task, name, value, op)
+        if name.starts_with(XATTR_SECURITY_PREFIX.to_bytes()) {
+            security::fs_node_setsecurity(current_task, self, name, value, op)?;
+        } else {
+            self.ops().set_xattr(self, current_task, name, value, op)?;
+        }
+        Ok(())
     }
 
     pub fn remove_xattr(
@@ -2557,92 +2555,5 @@ mod tests {
         assert_eq!(check_access(0, 3, 0o070, Access::EXEC), Ok(()));
         assert_eq!(check_access(0, 3, 0o070, Access::READ), Ok(()));
         assert_eq!(check_access(0, 3, 0o070, Access::WRITE), Ok(()));
-    }
-
-    #[::fuchsia::test]
-    async fn set_security_xattr_fails_without_security_module_or_root() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mut creds = Credentials::with_ids(1, 2);
-        creds.groups = vec![3, 4];
-        current_task.set_creds(creds);
-
-        // Create a node.
-        let node = &current_task
-            .fs()
-            .root()
-            .create_node(
-                &mut locked,
-                &current_task,
-                "foo".into(),
-                FileMode::IFREG,
-                DeviceType::NONE,
-            )
-            .expect("create_node")
-            .entry
-            .node;
-
-        // Give read-write-execute access.
-        node.update_info(|info| info.mode = mode!(IFREG, 0o777));
-
-        // Without a security module, and without CAP_SYS_ADMIN capabilities, setting the xattr
-        // should fail.
-        assert_eq!(
-            node.set_xattr(
-                &current_task,
-                &MountInfo::detached(),
-                "security.name".into(),
-                "security_label".into(),
-                XattrOp::Create,
-            ),
-            error!(EPERM)
-        );
-    }
-
-    #[::fuchsia::test]
-    async fn get_security_xattr_succeeds_without_read_access() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mut creds = Credentials::with_ids(1, 2);
-        creds.groups = vec![3, 4];
-        current_task.set_creds(creds);
-
-        // Create a node.
-        let node = &current_task
-            .fs()
-            .root()
-            .create_node(
-                &mut locked,
-                &current_task,
-                "foo".into(),
-                FileMode::IFREG,
-                DeviceType::NONE,
-            )
-            .expect("create_node")
-            .entry
-            .node;
-
-        // Only give read access to the root and give root access to the current task.
-        node.update_info(|info| info.mode = mode!(IFREG, 0o100));
-        current_task.set_creds(Credentials::root());
-
-        // Setting the label should succeed even without write access to the file.
-        assert_eq!(
-            node.set_xattr(
-                &current_task,
-                &MountInfo::detached(),
-                "security.name".into(),
-                "security_label".into(),
-                XattrOp::Create,
-            ),
-            Ok(())
-        );
-
-        // Remove root access from the current taks.
-        current_task.set_creds(Credentials::with_ids(1, 1));
-
-        // Getting the label should succeed even without read access to the file.
-        assert_eq!(
-            node.get_xattr(&current_task, &MountInfo::detached(), "security.name".into(), 4096),
-            Ok(ValueOrSize::Value("security_label".into()))
-        );
     }
 }
