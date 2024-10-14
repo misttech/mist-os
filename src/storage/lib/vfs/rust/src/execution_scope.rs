@@ -98,28 +98,25 @@ impl ExecutionScope {
     /// not necessary for now.
     pub fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) {
         let executor = self.executor.clone();
-        self.executor
-            .scope()
-            .spawn(async move {
-                let mut task = std::pin::pin!(task);
-                poll_fn(|cx| {
-                    let shutdown_state = executor.inner.lock().unwrap().shutdown_state;
-                    match task.as_mut().poll(cx) {
-                        Poll::Ready(()) => Poll::Ready(()),
-                        Poll::Pending => match shutdown_state {
-                            ShutdownState::Active => Poll::Pending,
-                            ShutdownState::Shutdown
-                                if executor.inner.lock().unwrap().active_count > 0 =>
-                            {
-                                Poll::Pending
-                            }
-                            _ => Poll::Ready(()),
-                        },
-                    }
-                })
-                .await;
+        self.executor.scope().spawn(async move {
+            let mut task = std::pin::pin!(task);
+            poll_fn(|cx| {
+                let shutdown_state = executor.inner.lock().unwrap().shutdown_state;
+                match task.as_mut().poll(cx) {
+                    Poll::Ready(()) => Poll::Ready(()),
+                    Poll::Pending => match shutdown_state {
+                        ShutdownState::Active => Poll::Pending,
+                        ShutdownState::Shutdown
+                            if executor.inner.lock().unwrap().active_count > 0 =>
+                        {
+                            Poll::Pending
+                        }
+                        _ => Poll::Ready(()),
+                    },
+                }
             })
-            .detach();
+            .await;
+        });
     }
 
     pub fn token_registry(&self) -> &TokenRegistry {
@@ -158,7 +155,7 @@ impl ExecutionScope {
                 // task so that we can just use `on_no_tasks`, and then we'll cancel the task when
                 // the active count drops to zero.
                 let scope = self.executor.scope();
-                inner.fake_active_task = Some(scope.spawn(pending::<()>()));
+                inner.fake_active_task = Some(scope.compute(pending::<()>()));
                 on_no_tasks.set(scope.on_no_tasks());
                 assert!(on_no_tasks.as_mut().poll(cx).is_pending());
                 Poll::Pending

@@ -96,12 +96,10 @@ mod test {
     ) -> DetectControllerProxy {
         let (client_end, server_end) =
             fidl::endpoints::create_endpoints::<DetectControllerMarker>();
-        scope
-            .spawn(run_test_service(
-                server_end.into_stream().expect("convert to stream"),
-                detection_runner,
-            ))
-            .detach();
+        scope.spawn(run_test_service(
+            server_end.into_stream().expect("convert to stream"),
+            detection_runner,
+        ));
         client_end.into_proxy().expect("Client end converts to proxy")
     }
 
@@ -140,15 +138,13 @@ mod test {
         controller_proxy.enter_test_mode(first_test_case_server_end).await.unwrap();
         let controller_proxy_clone = controller_proxy.clone();
         // The second test-mode session should run, but only after the first is done.
-        scope
-            .spawn(async move {
-                let (second_test_case_proxy, second_test_case_server_end) =
-                    fidl::endpoints::create_proxy::<TestCaseControllerMarker>()
-                        .expect("Creating proxy");
-                controller_proxy_clone.enter_test_mode(second_test_case_server_end).await.unwrap();
-                second_test_case_proxy.run_default_cycle().await.unwrap();
-            })
-            .detach();
+        scope.spawn(async move {
+            let (second_test_case_proxy, second_test_case_server_end) =
+                fidl::endpoints::create_proxy::<TestCaseControllerMarker>()
+                    .expect("Creating proxy");
+            controller_proxy_clone.enter_test_mode(second_test_case_server_end).await.unwrap();
+            second_test_case_proxy.run_default_cycle().await.unwrap();
+        });
         // Test the test-mode-lockout logic by giving the spawned second_test_case code an
         // opportunity to run as far as it can. It shouldn't run its test cycle yet.
         let _ = TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;
@@ -182,15 +178,13 @@ mod test {
         run_receiver.expect_n_messages(1).await;
         // Now we'll try to run a test cycle on second controller, while first controller is still
         // in test mode.
-        scope
-            .spawn(async move {
-                let (second_test_case_proxy, second_test_case_server_end) =
-                    fidl::endpoints::create_proxy::<TestCaseControllerMarker>()
-                        .expect("Creating proxy");
-                second_controller_proxy.enter_test_mode(second_test_case_server_end).await.unwrap();
-                second_test_case_proxy.run_default_cycle().await.unwrap();
-            })
-            .detach();
+        scope.spawn(async move {
+            let (second_test_case_proxy, second_test_case_server_end) =
+                fidl::endpoints::create_proxy::<TestCaseControllerMarker>()
+                    .expect("Creating proxy");
+            second_controller_proxy.enter_test_mode(second_test_case_server_end).await.unwrap();
+            second_test_case_proxy.run_default_cycle().await.unwrap();
+        });
         // Test the test-mode-lockout logic by giving the spawned second_test_case code an
         // opportunity to run as far as it can. It shouldn't run its test cycle yet.
         let _ = TestExecutor::poll_until_stalled(std::future::pending::<()>()).await;

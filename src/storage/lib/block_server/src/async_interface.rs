@@ -129,38 +129,34 @@ impl<I: Interface> super::SessionManager for SessionManager<I> {
                             let interface = interface.clone();
                             let fifo = fifo.clone();
                             let helper = helper.clone();
-                            scope_ref
-                                .spawn(async move {
-                                    let group_or_request = decoded_request.group_or_request;
-                                    let status = process_fifo_request(interface, decoded_request)
-                                        .await
-                                        .into();
-                                    match group_or_request {
-                                        GroupOrRequest::Group(group_id) => {
-                                            if let Some(response) =
-                                                helper.message_groups.complete(group_id, status)
-                                            {
-                                                if let Err(_) = fifo.write_entries(&response).await
-                                                {
-                                                    return;
-                                                }
-                                            }
-                                        }
-                                        GroupOrRequest::Request(reqid) => {
-                                            if let Err(_) = fifo
-                                                .write_entries(&BlockFifoResponse {
-                                                    status: status.into_raw(),
-                                                    reqid,
-                                                    ..Default::default()
-                                                })
-                                                .await
-                                            {
+                            scope_ref.spawn(async move {
+                                let group_or_request = decoded_request.group_or_request;
+                                let status =
+                                    process_fifo_request(interface, decoded_request).await.into();
+                                match group_or_request {
+                                    GroupOrRequest::Group(group_id) => {
+                                        if let Some(response) =
+                                            helper.message_groups.complete(group_id, status)
+                                        {
+                                            if let Err(_) = fifo.write_entries(&response).await {
                                                 return;
                                             }
                                         }
                                     }
-                                })
-                                .detach();
+                                    GroupOrRequest::Request(reqid) => {
+                                        if let Err(_) = fifo
+                                            .write_entries(&BlockFifoResponse {
+                                                status: status.into_raw(),
+                                                reqid,
+                                                ..Default::default()
+                                            })
+                                            .await
+                                        {
+                                            return;
+                                        }
+                                    }
+                                }
+                            });
                         }
                     }
                 }

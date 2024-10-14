@@ -21,7 +21,7 @@ use self::stub as implementation;
 pub use implementation::executor::{
     Duration, LocalExecutor, MonotonicInstant, SendExecutor, TestExecutor,
 };
-pub use implementation::task::{unblock, Task};
+pub use implementation::task::{unblock, JoinHandle, Task};
 pub use implementation::timer::Timer;
 
 #[cfg(not(target_arch = "wasm32"))]
