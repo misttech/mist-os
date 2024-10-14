@@ -25,7 +25,7 @@ async fn set_up_realm() -> Result<RealmBuilder, Error> {
     let builder = RealmBuilder::new().await?;
 
     let system_recovery = builder
-        .add_child("system_recovery", "#meta/system_recovery.cm", ChildOptions::new().eager())
+        .add_child("system_recovery", "#meta/system_recovery_fdr.cm", ChildOptions::new().eager())
         .await?;
 
     // Offer logsink to recovery, so we can see logs from it.
