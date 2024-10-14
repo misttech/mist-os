@@ -23,7 +23,7 @@ pub(crate) fn on_entrypoint_destruction() {
     // destruction).
 }
 
-pub fn get_object_handle1(object: ObjectHandle) -> TeeResult<ObjectInfo> {
+pub fn get_object_info1(object: ObjectHandle) -> TeeResult<ObjectInfo> {
     unimplemented!()
 }
 
