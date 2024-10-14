@@ -1038,6 +1038,7 @@ multiconst!(zx_excp_type_t, [
     ZX_EXCP_THREAD_STARTING       = 0x008 | ZX_EXCP_SYNTH;
     ZX_EXCP_THREAD_EXITING        = 0x108 | ZX_EXCP_SYNTH;
     ZX_EXCP_POLICY_ERROR          = 0x208 | ZX_EXCP_SYNTH;
+    ZX_EXCP_PROCESS_STARTING      = 0x308 | ZX_EXCP_SYNTH;
     ZX_EXCP_USER                  = 0x309 | ZX_EXCP_SYNTH;
 ]);
 
@@ -1094,20 +1095,7 @@ pub union zx_exception_header_arch_t {
 
 impl Debug for zx_exception_header_arch_t {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Safety: We only need unsafe to access members of the union. This is
-        // safe because we only access the field that corresponds to the
-        // current architecture.
-        unsafe {
-            if cfg!(target_arch = "x86_64") {
-                write!(f, "{:?}", self.x86_64)
-            } else if cfg!(target_arch = "aarch64") {
-                write!(f, "{:?}", self.arm_64)
-            } else if cfg!(target_arch = "riscv64") {
-                write!(f, "{:?}", self.riscv_64)
-            } else {
-                write!(f, "(none)")
-            }
-        }
+        write!(f, "zx_exception_header_arch_t")
     }
 }
 
@@ -1141,6 +1129,8 @@ multiconst!(zx_excp_policy_code_t, [
     ZX_EXCP_POLICY_CODE_PORT_TOO_MANY_PACKETS   = 17;
     ZX_EXCP_POLICY_CODE_BAD_SYSCALL             = 18;
     ZX_EXCP_POLICY_CODE_PORT_TOO_MANY_OBSERVERS = 19;
+    ZX_EXCP_POLICY_CODE_HANDLE_LEAK             = 20;
+    ZX_EXCP_POLICY_CODE_NEW_IOB                 = 21;
 ]);
 
 #[repr(C)]

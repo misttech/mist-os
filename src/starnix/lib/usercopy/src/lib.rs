@@ -142,12 +142,12 @@ pub struct Usercopy {
 /// that triggered the fault and `fault_address` is the address that faulted.
 fn parse_fault_exception(
     regs: &mut zx::sys::zx_thread_state_general_regs_t,
-    report: zx::sys::zx_exception_report_t,
+    report: zx::ExceptionReport,
 ) -> (usize, usize) {
     #[cfg(target_arch = "x86_64")]
     {
         let pc = regs.rip as usize;
-        let fault_address = unsafe { report.context.arch.x86_64.cr2 };
+        let fault_address = report.arch.cr2;
 
         (pc, fault_address as usize)
     }
@@ -155,7 +155,7 @@ fn parse_fault_exception(
     #[cfg(target_arch = "aarch64")]
     {
         let pc = regs.pc as usize;
-        let fault_address = unsafe { report.context.arch.arm_64.far };
+        let fault_address = report.arch.far;
 
         (pc, fault_address as usize)
     }
@@ -163,7 +163,7 @@ fn parse_fault_exception(
     #[cfg(target_arch = "riscv64")]
     {
         let pc = regs.pc as usize;
-        let fault_address = unsafe { report.context.arch.riscv_64.tval };
+        let fault_address = report.arch.tval;
 
         (pc, fault_address as usize)
     }

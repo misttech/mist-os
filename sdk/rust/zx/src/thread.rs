@@ -5,8 +5,8 @@
 //! Type-safe bindings for Zircon threads.
 
 use crate::{
-    object_get_info_single, ok, sys, AsHandleRef, Duration, Handle, HandleBased, HandleRef,
-    ObjectQuery, Profile, Status, Task, Topic,
+    object_get_info_single, ok, sys, AsHandleRef, Duration, ExceptionReport, Handle, HandleBased,
+    HandleRef, ObjectQuery, Profile, Status, Task, Topic,
 };
 use bitflags::bitflags;
 
@@ -82,8 +82,11 @@ impl Thread {
     /// Wraps the
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_THREAD_EXCEPTION_REPORT topic.
-    pub fn get_exception_report(&self) -> Result<sys::zx_exception_report_t, Status> {
-        object_get_info_single::<ThreadExceptionReport>(self.as_handle_ref())
+    pub fn get_exception_report(&self) -> Result<ExceptionReport, Status> {
+        let raw = object_get_info_single::<ThreadExceptionReport>(self.as_handle_ref())?;
+
+        // SAFETY: this value was provided by the kernel, the union is valid.
+        Ok(unsafe { ExceptionReport::from_raw(raw) })
     }
 
     /// Wraps the
