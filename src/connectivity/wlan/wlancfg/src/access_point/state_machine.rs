@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::access_point::types;
+use crate::mode_management::iface_manager_api::SmeForApStateMachine;
 use crate::mode_management::{Defect, IfaceFailure};
 use crate::telemetry::{TelemetryEvent, TelemetrySender};
 use crate::util::listener::Message::NotifyListeners;
@@ -264,7 +265,7 @@ impl ApStateTracker {
 
 struct CommonStateDependencies {
     iface_id: u16,
-    proxy: fidl_sme::ApSmeProxy,
+    proxy: SmeForApStateMachine,
     req_stream: ReqStream,
     state_tracker: Arc<ApStateTracker>,
     telemetry_sender: TelemetrySender,
@@ -274,7 +275,7 @@ struct CommonStateDependencies {
 
 pub async fn serve(
     iface_id: u16,
-    proxy: fidl_sme::ApSmeProxy,
+    proxy: SmeForApStateMachine,
     sme_event_stream: fidl_sme::ApSmeEventStream,
     req_stream: Fuse<mpsc::Receiver<ManualRequest>>,
     message_sender: ApListenerMessageSender,
@@ -649,13 +650,14 @@ mod tests {
     fn test_setup() -> TestValues {
         let (ap_req_sender, ap_req_stream) = mpsc::channel(1);
         let (update_sender, update_receiver) = mpsc::unbounded();
-        let (sme_proxy, sme_server) =
-            create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create an sme channel");
-        let sme_req_stream = sme_server.into_stream().expect("could not create SME request stream");
         let (telemetry_sender, telemetry_receiver) = mpsc::channel(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
         let (defect_sender, defect_receiver) = mpsc::unbounded();
         let (status_publisher, status_reader) = status_publisher_and_reader::<Status>();
+        let (sme_proxy, sme_server) =
+            create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create an sme channel");
+        let sme_req_stream = sme_server.into_stream().expect("could not create SME request stream");
+        let sme_proxy = SmeForApStateMachine::new(sme_proxy, 123, defect_sender.clone());
 
         let deps = CommonStateDependencies {
             iface_id: 123,

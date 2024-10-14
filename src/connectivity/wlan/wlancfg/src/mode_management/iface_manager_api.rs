@@ -244,6 +244,91 @@ impl SmeForScan {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct SmeForClientStateMachine {
+    proxy: fidl_sme::ClientSmeProxy,
+    iface_id: u16,
+    defect_sender: mpsc::UnboundedSender<Defect>,
+}
+
+impl SmeForClientStateMachine {
+    pub fn new(
+        proxy: fidl_sme::ClientSmeProxy,
+        iface_id: u16,
+        defect_sender: mpsc::UnboundedSender<Defect>,
+    ) -> Self {
+        Self { proxy, iface_id, defect_sender }
+    }
+
+    pub fn connect(
+        &self,
+        req: &fidl_sme::ConnectRequest,
+        txn: Option<fidl::endpoints::ServerEnd<fidl_sme::ConnectTransactionMarker>>,
+    ) -> Result<(), fidl::Error> {
+        self.proxy.connect(req, txn)
+    }
+
+    pub fn disconnect(
+        &self,
+        reason: fidl_sme::UserDisconnectReason,
+    ) -> <fidl_sme::ClientSmeProxy as fidl_sme::ClientSmeProxyInterface>::DisconnectResponseFut
+    {
+        self.proxy.disconnect(reason)
+    }
+
+    pub fn take_event_stream(&self) -> fidl_sme::ClientSmeEventStream {
+        self.proxy.take_event_stream()
+    }
+
+    pub fn sme_for_scan(&self) -> SmeForScan {
+        SmeForScan {
+            proxy: self.proxy.clone(),
+            iface_id: self.iface_id,
+            defect_sender: self.defect_sender.clone(),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct SmeForApStateMachine {
+    proxy: fidl_sme::ApSmeProxy,
+    #[allow(unused)]
+    iface_id: u16,
+    #[allow(unused)]
+    defect_sender: mpsc::UnboundedSender<Defect>,
+}
+
+impl SmeForApStateMachine {
+    pub fn new(
+        proxy: fidl_sme::ApSmeProxy,
+        iface_id: u16,
+        defect_sender: mpsc::UnboundedSender<Defect>,
+    ) -> Self {
+        Self { proxy, iface_id, defect_sender }
+    }
+
+    pub fn start(
+        &self,
+        config: &fidl_sme::ApConfig,
+    ) -> <fidl_sme::ApSmeProxy as fidl_sme::ApSmeProxyInterface>::StartResponseFut {
+        self.proxy.start(config)
+    }
+
+    pub fn stop(&self) -> <fidl_sme::ApSmeProxy as fidl_sme::ApSmeProxyInterface>::StopResponseFut {
+        self.proxy.stop()
+    }
+
+    pub fn status(
+        &self,
+    ) -> <fidl_sme::ApSmeProxy as fidl_sme::ApSmeProxyInterface>::StatusResponseFut {
+        self.proxy.status()
+    }
+
+    pub fn take_event_stream(&self) -> fidl_sme::ApSmeEventStream {
+        self.proxy.take_event_stream()
+    }
+}
+
 // A request to connect to a specific candidate, and count of attempts to find a BSS.
 #[cfg_attr(test, derive(Debug))]
 #[derive(Clone, PartialEq)]

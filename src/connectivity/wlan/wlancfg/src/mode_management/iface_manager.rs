@@ -8,7 +8,9 @@ use crate::client::connection_selection::ConnectionSelectionRequester;
 use crate::client::roaming::local_roam_manager::RoamManager;
 use crate::client::{state_machine as client_fsm, types as client_types};
 use crate::config_management::SavedNetworksManagerApi;
-use crate::mode_management::iface_manager_api::{ConnectAttemptRequest, SmeForScan};
+use crate::mode_management::iface_manager_api::{
+    ConnectAttemptRequest, SmeForApStateMachine, SmeForClientStateMachine, SmeForScan,
+};
 use crate::mode_management::iface_manager_types::*;
 use crate::mode_management::phy_manager::{CreateClientIfacesReason, PhyManagerApi};
 use crate::mode_management::{recovery, Defect};
@@ -54,7 +56,7 @@ enum ConnectionSelectionResponse {
 /// machine that maintains client connectivity.
 struct ClientIfaceContainer {
     iface_id: u16,
-    sme_proxy: fidl_fuchsia_wlan_sme::ClientSmeProxy,
+    sme_proxy: SmeForClientStateMachine,
     config: Option<ap_types::NetworkIdentifier>,
     client_state_machine: Option<Box<dyn client_fsm::ClientApi + Send>>,
     security_support: fidl_common::SecuritySupport,
@@ -108,6 +110,7 @@ async fn create_client_state_machine(
     let (sme_proxy, remote) = create_proxy()?;
     dev_monitor_proxy.get_client_sme(iface_id, remote).await?.map_err(zx::Status::from_raw)?;
     let event_stream = sme_proxy.take_event_stream();
+    let sme_proxy = SmeForClientStateMachine::new(sme_proxy, iface_id, defect_sender.clone());
 
     // State machine status information
     let (publisher, status) = status_publisher_and_reader::<client_fsm::Status>();
@@ -276,6 +279,8 @@ impl IfaceManagerService {
         self.dev_monitor_proxy.get_feature_support(iface_id, features_server).await?.map_err(
             |e| format_err!("Error occurred getting iface's features support proxy: {}", e),
         )?;
+        let sme_proxy =
+            SmeForClientStateMachine::new(sme_proxy, iface_id, self.defect_sender.clone());
 
         // Get the security support for this iface.
         let security_support =
@@ -332,6 +337,7 @@ impl IfaceManagerService {
             .get_ap_sme(iface_id, sme_server)
             .await?
             .map_err(zx::Status::from_raw)?;
+        let sme_proxy = SmeForApStateMachine::new(sme_proxy, iface_id, self.defect_sender.clone());
 
         // Spawn the AP state machine.
         let (sender, receiver) = mpsc::channel(1);
@@ -734,10 +740,9 @@ impl IfaceManagerService {
 
     async fn get_sme_proxy_for_scan(&mut self) -> Result<SmeForScan, Error> {
         let client_iface = self.get_client(None).await?;
-        let proxy = client_iface.sme_proxy.clone();
-        let iface_id = client_iface.iface_id;
+        let proxy = client_iface.sme_proxy.sme_for_scan();
         self.clients.push(client_iface);
-        Ok(SmeForScan::new(proxy, iface_id, self.defect_sender.clone()))
+        Ok(proxy)
     }
 
     fn stop_client_connections(
@@ -1852,6 +1857,11 @@ mod tests {
     ) -> (IfaceManagerService, StreamFuture<fidl_fuchsia_wlan_sme::ClientSmeRequestStream>) {
         let (sme_proxy, server) = create_proxy::<fidl_fuchsia_wlan_sme::ClientSmeMarker>()
             .expect("failed to create an sme channel");
+        let sme_proxy = SmeForClientStateMachine::new(
+            sme_proxy,
+            TEST_CLIENT_IFACE_ID,
+            test_values.defect_sender.clone(),
+        );
         let (_publisher, status) = status_publisher_and_reader::<client_fsm::Status>();
         let mut client_container = ClientIfaceContainer {
             iface_id: TEST_CLIENT_IFACE_ID,
@@ -6267,6 +6277,11 @@ mod tests {
         // Set up a fake client and fake AP and write some fake statuses for them.
         let (sme_proxy, _server) = create_proxy::<fidl_fuchsia_wlan_sme::ClientSmeMarker>()
             .expect("failed to create an sme channel");
+        let sme_proxy = SmeForClientStateMachine::new(
+            sme_proxy,
+            TEST_CLIENT_IFACE_ID,
+            test_values.defect_sender.clone(),
+        );
         let (client_publisher, status) = status_publisher_and_reader::<client_fsm::Status>();
         let client_status = client_fsm::Status::Connected { channel: 1, rssi: 2, snr: 3 };
         client_publisher.publish_status(client_status.clone());

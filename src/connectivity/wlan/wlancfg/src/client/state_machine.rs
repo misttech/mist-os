@@ -6,6 +6,7 @@ use crate::client::roaming::local_roam_manager::RoamManager;
 use crate::client::roaming::roam_monitor::RoamDataSender;
 use crate::client::types;
 use crate::config_management::{Credential, PastConnectionData, SavedNetworksManagerApi};
+use crate::mode_management::iface_manager_api::SmeForClientStateMachine;
 use crate::mode_management::{Defect, IfaceFailure};
 use crate::telemetry::{
     DisconnectInfo, TelemetryEvent, TelemetrySender, AVERAGE_SCORE_DELTA_MINIMUM_DURATION,
@@ -154,7 +155,7 @@ fn send_listener_state_update(
 
 pub async fn serve(
     iface_id: u16,
-    proxy: fidl_sme::ClientSmeProxy,
+    proxy: SmeForClientStateMachine,
     sme_event_stream: fidl_sme::ClientSmeEventStream,
     req_stream: mpsc::Receiver<ManualRequest>,
     update_sender: ClientListenerMessageSender,
@@ -214,7 +215,7 @@ pub async fn serve(
 
 /// Common parameters passed to all states
 struct CommonStateOptions {
-    proxy: fidl_sme::ClientSmeProxy,
+    proxy: SmeForClientStateMachine,
     req_stream: ReqStream,
     update_sender: ClientListenerMessageSender,
     saved_networks_manager: Arc<dyn SavedNetworksManagerApi>,
@@ -1202,7 +1203,7 @@ mod tests {
 
         TestValues {
             common_options: CommonStateOptions {
-                proxy: sme_proxy,
+                proxy: SmeForClientStateMachine::new(sme_proxy, 0, defect_sender.clone()),
                 req_stream: client_req_stream.fuse(),
                 update_sender,
                 saved_networks_manager: saved_networks_manager.clone(),
@@ -3705,7 +3706,11 @@ mod tests {
 
         let fut = serve(
             0,
-            sme_proxy,
+            SmeForClientStateMachine::new(
+                sme_proxy,
+                0,
+                test_values.common_options.defect_sender.clone(),
+            ),
             sme_event_stream,
             client_req_stream,
             test_values.common_options.update_sender,
