@@ -32,6 +32,13 @@ pub type BootTicks = Instant<BootTimeline, TicksUnit>;
 /// A duration between two system ticks timestamps.
 pub type DurationTicks = Duration<TicksUnit>;
 
+// TODO(https://fxbug.dev/328306129): remove this alias when everyone is referring to Durations
+// with their proper timeline.
+pub type MonotonicDuration = Duration<NsUnit>;
+
+// TODO(https://fxbug.dev/328306129): make this actually be on the Boot timeline.
+pub type BootDuration = Duration<NsUnit>;
+
 /// A timestamp from the kernel. Generic over both the timeline and the units it is measured in.
 #[repr(transparent)]
 pub struct Instant<T, U = NsUnit>(sys::zx_time_t, std::marker::PhantomData<(T, U)>);
