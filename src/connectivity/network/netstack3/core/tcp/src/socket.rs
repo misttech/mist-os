@@ -2810,6 +2810,7 @@ where
 
     /// Closes a socket.
     pub fn close(&mut self, id: TcpApiSocketId<I, C>) {
+        debug!("close on {id:?}");
         let (core_ctx, bindings_ctx) = self.contexts();
         let (destroy, pending) =
             core_ctx.with_socket_mut_transport_demux(&id, |core_ctx, socket_state| {
@@ -3585,6 +3586,7 @@ where
             None => return,
         };
         let (core_ctx, bindings_ctx) = self.contexts();
+        debug!("handle_timer on {id:?}");
         trace_duration!(bindings_ctx, c"tcp::handle_timer");
         // Alias refs so we can move weak_id to the closure.
         let id_alias = &id;
