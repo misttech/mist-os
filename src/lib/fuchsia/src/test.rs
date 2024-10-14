@@ -137,6 +137,14 @@ mod test {
         Ok(())
     }
 
+    #[fuchsia::test(logging = false)]
+    #[should_panic]
+    fn should_panic_tests_do_not_trigger_lsan_on_panic() {
+        let _v = vec![1, 2, 3];
+        // Note that with panic=abort we will not unwind and free the vec.
+        panic!()
+    }
+
     #[allow(dead_code)]
     #[fuchsia::main(add_test_attr = true)]
     fn empty_component_test_with_add_test_attr() {
