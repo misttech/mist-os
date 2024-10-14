@@ -37,6 +37,7 @@ group("per_test_timeout_allowlist") {
   # the test only in postsubmit on a builder that supports running slower tests.
   visibility = [
     # TODO(olivernewman): Trim down this list.
+    "//src/chromium/web_runner_tests:*",
     "//src/connectivity/network/tests/integration:netstack-multicast-forwarding-integration-test-no-err-logs_test_netstack-multicast-forwarding-integration-test",
     "//src/connectivity/network/tests/integration:netstack-multicast-forwarding-integration-test-with-err-logs_test_netstack-multicast-forwarding-integration-test",
     "//src/starnix/tests/gvisor:*",
