@@ -22,16 +22,13 @@ test("block-device-test-bin") {
   sources = [ "block-device-test.cc" ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
-    "//sdk/lib/fdio",
+    "//sdk/lib/driver/testing/cpp",
+    "//sdk/lib/driver/testing/cpp:minimal_compat_environment",
     "//sdk/lib/fit",
-    "//src/devices/block/lib/scsi:scsi-dfv1",
-    "//src/devices/lib/driver",
-    "//src/devices/testing/fake-bti",
-    "//src/devices/testing/mock-ddk",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
+    "//src/devices/block/lib/scsi",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zxtest",
   ]
 }
 
