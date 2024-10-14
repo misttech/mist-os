@@ -795,7 +795,21 @@ impl ImageAssemblyConfigBuilder {
                         package_name.clone(),
                     ));
                     let (_d, package_entry) =
-                        PackageEntry::parse_from(PackageOrigin::AIB, PackageSet::Base, p)?;
+                        PackageEntry::parse_from(PackageOrigin::AIB, PackageSet::Base, p.clone())?;
+
+                    // TODO(b/361426282): remove this block once we've migrated tee_manager
+                    if let Ok((board_origin_destination, _)) =
+                        PackageEntry::parse_from(PackageOrigin::Board, PackageSet::Base, &p)
+                    {
+                        if let Some(PackageSetDestination::Blob(PackageDestination::FromBoard(_))) =
+                            packages.existing_key(board_origin_destination)
+                        {
+                            // We only want to continue if this package exists and it was added by the
+                            // _board_ previously.
+                            continue;
+                        }
+                    }
+
                     packages
                         .try_insert_unique(d, package_entry)
                         .with_context(|| format!("Adding compiled package {package_name}"))?;
