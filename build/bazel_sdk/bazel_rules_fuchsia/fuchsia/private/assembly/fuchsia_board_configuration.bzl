@@ -295,7 +295,6 @@ def _fuchsia_hybrid_board_configuration_impl(ctx):
         subdirectories_to_skip = board_input_bundle_dirs,
     )
 
-    bib_outputs = []
     all_outputs = board_outputs
     for d in board_input_bundle_dirs:
         src_board_dirname = "/".join(ctx.attr.replacement_board_input_bundles[FuchsiaBoardConfigInfo].config.split("/")[:-1])
@@ -329,7 +328,7 @@ def _fuchsia_hybrid_board_configuration_impl(ctx):
             files = depset(all_outputs),
         ),
         FuchsiaBoardConfigInfo(
-            files = board_outputs + bib_outputs,  # XXX: SHOULD THIS BE all_outputs?
+            files = all_outputs,
             config = board_configuration_file.path,
         ),
     ]
