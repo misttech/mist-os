@@ -65,10 +65,10 @@ macro_rules! handle {
     ($name:ident, $tee_name:path) => {
         #[repr(C)]
         #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-        pub struct $name(usize);
+        pub struct $name(u64);
 
         impl $name {
-            pub fn from_value(value: usize) -> Self {
+            pub fn from_value(value: u64) -> Self {
                 Self(value)
             }
         }
@@ -76,7 +76,7 @@ macro_rules! handle {
         inout_parameter!($name, $tee_name);
 
         impl Deref for $name {
-            type Target = usize;
+            type Target = u64;
 
             fn deref(&self) -> &Self::Target {
                 &self.0
