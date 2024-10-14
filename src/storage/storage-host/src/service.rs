@@ -5,7 +5,6 @@
 use crate::gpt::GptManager;
 use anyhow::{Context as _, Error};
 use fidl::endpoints::{DiscoverableProtocolMarker as _, RequestStream as _};
-use fs_management::filesystem::BlockConnector;
 use futures::lock::Mutex as AsyncMutex;
 use futures::stream::TryStreamExt as _;
 use std::sync::Arc;
@@ -14,7 +13,7 @@ use vfs::directory::helper::DirectlyMutable as _;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
 use {
-    fidl_fuchsia_device as fdevice, fidl_fuchsia_io as fio,
+    fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio,
     fidl_fuchsia_process_lifecycle as flifecycle, fidl_fuchsia_storagehost as fstoragehost,
     fuchsia_async as fasync, zx,
 };
@@ -108,10 +107,10 @@ impl StorageHostService {
         while let Some(request) = stream.try_next().await.context("Reading request")? {
             tracing::debug!(?request);
             match request {
-                fstoragehost::StorageHostRequest::Start { device_controller, responder } => {
+                fstoragehost::StorageHostRequest::Start { volume_client, responder } => {
                     responder
                         .send(
-                            self.start(device_controller.into_proxy().unwrap())
+                            self.start(volume_client.into_proxy().unwrap())
                                 .await
                                 .map_err(|status| status.into_raw()),
                         )
@@ -122,25 +121,18 @@ impl StorageHostService {
         Ok(())
     }
 
-    async fn start(
-        self: &Arc<Self>,
-        controller_proxy: fdevice::ControllerProxy,
-    ) -> Result<(), zx::Status> {
+    async fn start(self: &Arc<Self>, volume_proxy: fvolume::VolumeProxy) -> Result<(), zx::Status> {
         let mut state = self.state.lock().await;
         if let State::Running(..) = *state {
             tracing::warn!("Device already bound");
             return Err(zx::Status::ALREADY_BOUND);
         }
 
-        let runner = GptManager::new(
-            Arc::new(controller_proxy) as Arc<dyn BlockConnector>,
-            self.partitions_dir.clone(),
-        )
-        .await
-        .map_err(|err| {
-            tracing::error!(?err, "Failed to load GPT");
-            zx::Status::INTERNAL
-        })?;
+        let runner =
+            GptManager::new(volume_proxy, self.partitions_dir.clone()).await.map_err(|err| {
+                tracing::error!(?err, "Failed to load GPT");
+                zx::Status::INTERNAL
+            })?;
         *state = State::Running(runner);
 
         Ok(())
@@ -170,16 +162,14 @@ impl StorageHostService {
 mod tests {
     use super::StorageHostService;
     use fake_block_server::FakeServer;
-    use fidl::endpoints::{create_endpoints, Proxy as _, RequestStream as _};
+    use fidl::endpoints::{create_request_stream, Proxy as _};
     use fidl_fuchsia_process_lifecycle::LifecycleMarker;
     use fuchsia_component::client::connect_to_protocol_at_dir_svc;
-    use futures::{FutureExt as _, StreamExt as _};
+    use futures::FutureExt as _;
     use gpt_testing::{format_gpt, Guid, PartitionInfo};
-    use std::sync::Arc;
     use {
-        fidl_fuchsia_device as fdevice, fidl_fuchsia_hardware_block_volume as fvolume,
-        fidl_fuchsia_io as fio, fidl_fuchsia_storagehost as fstoragehost, fuchsia_async as fasync,
-        zx,
+        fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio,
+        fidl_fuchsia_storagehost as fstoragehost, fuchsia_async as fasync, zx,
     };
 
     #[fuchsia::test]
@@ -188,8 +178,8 @@ mod tests {
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let (lifecycle_client, lifecycle_server) =
             fidl::endpoints::create_proxy::<LifecycleMarker>().unwrap();
-        let (controller_client, controller_server) =
-            create_endpoints::<fdevice::ControllerMarker>();
+        let (volume_client, volume_stream) =
+            create_request_stream::<fvolume::VolumeMarker>().unwrap();
 
         futures::join!(
             async {
@@ -198,7 +188,7 @@ mod tests {
                     &outgoing_dir,
                 )
                 .unwrap();
-                client.start(controller_client).await.expect("FIDL error").expect("Start failed");
+                client.start(volume_client).await.expect("FIDL error").expect("Start failed");
                 lifecycle_client.stop().expect("Stop failed");
                 fasync::OnSignals::new(
                     &lifecycle_client.into_channel().expect("into_channel failed"),
@@ -230,27 +220,7 @@ mod tests {
                         flags: 0,
                     }],
                 );
-                let block_server = Arc::new(FakeServer::from_vmo(512, vmo));
-                let mut stream = fdevice::ControllerRequestStream::from_channel(
-                    fasync::Channel::from_channel(controller_server.into_channel()),
-                );
-                while let Some(request) = stream.next().await {
-                    let block_server = block_server.clone();
-                    match request {
-                        Ok(fdevice::ControllerRequest::ConnectToDeviceFidl { server, .. }) => {
-                            fasync::Task::spawn(async move {
-                                let stream = fvolume::VolumeRequestStream::from_channel(
-                                    fasync::Channel::from_channel(server),
-                                );
-                                block_server.serve(stream).await.expect("Handle requests");
-                            })
-                            .detach();
-                        }
-                        _ => {
-                            unreachable!()
-                        }
-                    }
-                }
+                let _ = FakeServer::from_vmo(512, vmo).serve(volume_stream).await;
             }
             .fuse(),
         );

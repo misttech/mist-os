@@ -17,6 +17,7 @@
 #include <mutex>
 #include <vector>
 
+#include "src/devices/block/drivers/ramdisk/v2/ramdisk-controller.h"
 #include "src/storage/lib/block_server/block_server.h"
 
 namespace ramdisk_v2 {
@@ -25,8 +26,9 @@ class Ramdisk : public fidl::WireServer<fuchsia_hardware_ramdisk::Ramdisk>,
                 public block_server::Interface {
  public:
   static zx::result<std::unique_ptr<Ramdisk>> Create(
-      fdf::DriverBase* controller, async_dispatcher_t* dispatcher, zx::vmo vmo,
-      const block_server::PartitionInfo& partition_info, component::OutgoingDirectory outgoing);
+      RamdiskController* controller, async_dispatcher_t* dispatcher, zx::vmo vmo,
+      const block_server::PartitionInfo& partition_info, component::OutgoingDirectory outgoing,
+      int id, bool publish);
 
   Ramdisk(const Ramdisk&) = delete;
   Ramdisk& operator=(const Ramdisk&) = delete;
@@ -39,7 +41,7 @@ class Ramdisk : public fidl::WireServer<fuchsia_hardware_ramdisk::Ramdisk>,
   void GetBlockCounts(GetBlockCountsCompleter::Sync& completer) override;
 
  private:
-  Ramdisk(fdf::DriverBase* controller, fzl::OwnedVmoMapper mapping,
+  Ramdisk(RamdiskController* controller, fzl::OwnedVmoMapper mapping,
           const block_server::PartitionInfo& partition_info, component::OutgoingDirectory outgoing)
       : controller_(controller),
         block_size_(partition_info.block_size),
@@ -61,7 +63,7 @@ class Ramdisk : public fidl::WireServer<fuchsia_hardware_ramdisk::Ramdisk>,
   // Returns true if we should fail requests (due to being asleep).
   bool ShouldFailRequests() const TA_REQ(lock_);
 
-  fdf::DriverBase* controller_;
+  RamdiskController* controller_;
   const uint32_t block_size_;
   const uint64_t block_count_;
 

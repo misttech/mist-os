@@ -1323,7 +1323,7 @@ mod tests {
                         block_size: 512,
                         type_guid: [0; 16],
                         instance_guid: [0; 16],
-                        name: "foo".to_string(),
+                        name: Some("foo".to_string()),
                     },
                     Arc::new(Interface { flush_called: flush_called.clone() }),
                 );

@@ -7,6 +7,7 @@
 //! ramdisk_image option, in run modes where we need to operate on the real disk and can't run
 //! filesystems off it, such as recovery.
 
+use crate::device::{BlockDevice, Device, RamdiskDevice};
 use anyhow::{ensure, Context, Error};
 use fuchsia_component::client::connect_to_protocol;
 
@@ -31,7 +32,7 @@ struct ZbiHeader {
     _crc32: u32,
 }
 
-async fn create_ramdisk(zbi_vmo: zx::Vmo) -> Result<String, Error> {
+async fn create_ramdisk(zbi_vmo: zx::Vmo, storage_host: bool) -> Result<Box<dyn Device>, Error> {
     let mut header_buf = [0u8; std::mem::size_of::<ZbiHeader>()];
     zbi_vmo.read(&mut header_buf, 0).context("reading zbi item header")?;
     // Expect is fine here - we made the buffer ourselves to the exact size of the header so
@@ -67,32 +68,44 @@ async fn create_ramdisk(zbi_vmo: zx::Vmo) -> Result<String, Error> {
         zstd::decode_all(compressed_buf.as_slice()).context("zstd decompression failed")?;
     ramdisk_vmo.write(&decompressed_buf, 0).context("writing decompressed contents to vmo")?;
 
-    let ramdisk = ramdevice_client::RamdiskClientBuilder::new_with_vmo(ramdisk_vmo, None)
-        .build()
-        .await
-        .context("building ramdisk from vmo")?;
+    if storage_host {
+        let ramdisk = ramdevice_client::RamdiskClientBuilder::new_with_vmo(ramdisk_vmo, None)
+            .use_v2()
+            .build()
+            .await
+            .context("building ramdisk from vmo")?;
 
-    let topological_path = ramdisk
-        .as_controller()
-        .ok_or_else(|| anyhow::anyhow!("ramdisk instance missing controller"))?
-        .get_topological_path()
-        .await
-        .context("get_topological_path (fidl failure)")?
-        .map_err(zx::Status::from_raw)
-        .context("get_topological_path returned an error")?;
+        Ok(Box::new(RamdiskDevice::new(ramdisk)?))
+    } else {
+        let ramdisk = ramdevice_client::RamdiskClientBuilder::new_with_vmo(ramdisk_vmo, None)
+            .build()
+            .await
+            .context("building ramdisk from vmo")?;
 
-    tracing::info!(%topological_path, "launched ramdisk filesystem");
+        let topological_path = ramdisk
+            .as_controller()
+            .ok_or_else(|| anyhow::anyhow!("ramdisk instance missing controller"))?
+            .get_topological_path()
+            .await
+            .context("get_topological_path (fidl failure)")?
+            .map_err(zx::Status::from_raw)
+            .context("get_topological_path returned an error")?;
 
-    // Ensure the boot image remains attached for the system lifetime.
-    ramdisk.forget().context("detaching/forgetting ramdisk client")?;
+        tracing::info!(%topological_path, "launched ramdisk filesystem");
 
-    Ok(topological_path)
+        // Ensure the boot image remains attached for the system lifetime.
+        ramdisk.forget().context("detaching/forgetting ramdisk client")?;
+
+        let mut device = BlockDevice::new(topological_path).await?;
+        device.set_fshost_ramdisk(true);
+        Ok(Box::new(device))
+    }
 }
 
 /// Set up a ramdisk provided by the boot items service as a vmo. If there is no vmo provided, None
 /// is returned. If there is, the ramdisk is decoded and set up, and the topological path is
 /// returned.
-pub async fn set_up_ramdisk() -> Result<Option<String>, Error> {
+pub async fn set_up_ramdisk(storage_host: bool) -> Result<Option<Box<dyn Device>>, Error> {
     let proxy = connect_to_protocol::<fidl_fuchsia_boot::ItemsMarker>()?;
     let (maybe_vmo, _length) = proxy
         .get(ZBI_TYPE_STORAGE_RAMDISK, 0)
@@ -100,7 +113,7 @@ pub async fn set_up_ramdisk() -> Result<Option<String>, Error> {
         .context("boot items get failed (fidl failure)")?;
 
     if let Some(vmo) = maybe_vmo {
-        Ok(Some(create_ramdisk(vmo).await?))
+        Ok(Some(create_ramdisk(vmo, storage_host).await?))
     } else {
         Ok(None)
     }

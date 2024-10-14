@@ -363,6 +363,11 @@
             to: "#boot-drivers",
             source_availability: "unknown",
         },
+        {
+            service: "fuchsia.hardware.block.volume.Service",
+            from: "#boot-drivers",
+            to: "#fshost",
+        },
     ],
     expose: [
         {

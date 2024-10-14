@@ -114,6 +114,9 @@ type Options = resource table {
 
     /// If unspecified, a VMO will be created, in which case `block_count` must be specified.
     4: vmo zx.Handle:VMO;
+
+    /// If true, expose fuchsia.hardware.block.volume.Service for the ramdisk.
+    5: publish bool;
 };
 
 open protocol Controller {

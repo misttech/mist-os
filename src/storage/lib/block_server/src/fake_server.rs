@@ -6,7 +6,7 @@ use anyhow::Error;
 use block_server::async_interface::{Interface, SessionManager};
 use block_server::{BlockServer, PartitionInfo, WriteOptions};
 use std::sync::Arc;
-use {fidl_fuchsia_hardware_block_volume as fvolume, zx};
+use {fidl_fuchsia_hardware_block_volume as fvolume, fuchsia_async as fasync};
 
 pub const TYPE_GUID: [u8; 16] = [1; 16];
 pub const INSTANCE_GUID: [u8; 16] = [2; 16];
@@ -95,7 +95,7 @@ impl From<FakeServerOptions<'_>> for FakeServer {
                     block_size: options.block_size,
                     type_guid: TYPE_GUID.clone(),
                     instance_guid: INSTANCE_GUID.clone(),
-                    name: PARTITION_NAME.to_string(),
+                    name: Some(PARTITION_NAME.to_string()),
                 },
                 Arc::new(Data {
                     block_size: options.block_size,
@@ -124,6 +124,17 @@ impl FakeServer {
 
     pub async fn serve(&self, requests: fvolume::VolumeRequestStream) -> Result<(), Error> {
         self.server.handle_requests(requests).await
+    }
+
+    pub fn volume_proxy(self: &Arc<Self>) -> fvolume::VolumeProxy {
+        let (client, stream) =
+            fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>().unwrap();
+        let this = self.clone();
+        fasync::Task::spawn(async move {
+            let _ = this.serve(stream).await;
+        })
+        .detach();
+        client
     }
 }
 

@@ -988,7 +988,7 @@ impl Component {
                 block_size: fvm.block_size(),
                 type_guid: partition.type_guid,
                 instance_guid: partition.guid,
-                name: partition.name().to_string(),
+                name: Some(partition.name().to_string()),
             }
         };
 

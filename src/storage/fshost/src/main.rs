@@ -6,13 +6,13 @@ use crate::boot_args::BootArgs;
 use crate::config::apply_boot_args_to_config;
 use crate::environment::{Environment, FshostEnvironment};
 use crate::inspect::register_stats;
-use crate::watcher::{PathSource, PathSourceType, Watcher};
+use crate::watcher::{DirSource, PathSource, PathSourceType, WatchSource, Watcher};
 use anyhow::{format_err, Error};
 use fidl::prelude::*;
 use fuchsia_runtime::{take_startup_handle, HandleType};
 use futures::channel::mpsc;
 use futures::lock::Mutex;
-use futures::StreamExt;
+use futures::{stream, StreamExt};
 use std::collections::HashSet;
 use std::sync::Arc;
 use vfs::directory::entry_container::Directory;
@@ -39,8 +39,9 @@ mod storage_host;
 mod volume;
 mod watcher;
 
-const DEV_CLASS_BLOCK: &'static str = "/dev/class/block";
-const DEV_CLASS_NAND: &'static str = "/dev/class/nand";
+const DEV_CLASS_BLOCK: &str = "/dev/class/block";
+const DEV_CLASS_NAND: &str = "/dev/class/nand";
+const VOLUME_SERVICE_PATH: &str = "/svc/fuchsia.hardware.block.volume.Service";
 
 // Logs directly to the serial port.  To be used when it's expected that fshost will terminate
 // shortly afterwards since messages via the log subsystem often don't make it.
@@ -67,16 +68,30 @@ async fn main() -> Result<(), Error> {
         })?;
 
     let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<service::FshostShutdownResponder>(1);
-    let (watcher, device_stream) = Watcher::new(vec![
-        Box::new(PathSource::new(DEV_CLASS_BLOCK, PathSourceType::Block)),
-        Box::new(PathSource::new(DEV_CLASS_NAND, PathSourceType::Nand)),
-    ])
+    let (watcher, device_stream) = Watcher::new(if config.storage_host {
+        let mut sources =
+            vec![Box::new(PathSource::new(DEV_CLASS_NAND, PathSourceType::Nand))
+                as Box<dyn WatchSource>];
+        sources.extend(
+            fuchsia_fs::directory::open_in_namespace_deprecated(
+                VOLUME_SERVICE_PATH,
+                fio::OpenFlags::empty(),
+            )
+            .map(|d| Box::new(DirSource::new(d)) as Box<dyn WatchSource>),
+        );
+        sources
+    } else {
+        vec![
+            Box::new(PathSource::new(DEV_CLASS_BLOCK, PathSourceType::Block)),
+            Box::new(PathSource::new(DEV_CLASS_NAND, PathSourceType::Nand)),
+        ]
+    })
     .await?;
     // Potentially launch the boot items ramdisk. It's not fatal, so if it fails we print an error
     // and continue.
-    let ramdisk_path = if config.ramdisk_image {
+    let ramdisk_device = if config.ramdisk_image {
         tracing::info!("setting up ramdisk image from boot items");
-        ramdisk::set_up_ramdisk().await.unwrap_or_else(|error| {
+        ramdisk::set_up_ramdisk(config.storage_host).await.unwrap_or_else(|error| {
             tracing::error!(?error, "failed to set up ramdisk filesystems");
             None
         })
@@ -90,13 +105,8 @@ async fn main() -> Result<(), Error> {
     // matcher_lock is used to block matching temporarily and inject
     // paths to be ignored.
     let matcher_lock = Arc::new(Mutex::new(HashSet::new()));
-    let mut env = FshostEnvironment::new(
-        config.clone(),
-        ramdisk_path.clone(),
-        matcher_lock.clone(),
-        inspector.clone(),
-        watcher,
-    );
+    let mut env =
+        FshostEnvironment::new(config.clone(), matcher_lock.clone(), inspector.clone(), watcher);
 
     let launcher = env.launcher();
     // Records inspect metrics. Too expensive to build the tree data in newer fxfs environments.
@@ -122,7 +132,7 @@ async fn main() -> Result<(), Error> {
             service::fshost_admin(
                 env.clone(),
                 config.clone(),
-                ramdisk_path.clone(),
+                ramdisk_device.as_ref().map(|d| d.topological_path().to_string()),
                 launcher,
                 matcher_lock.clone()
             ),
@@ -180,7 +190,7 @@ async fn main() -> Result<(), Error> {
 
     // Run the main loop of fshost, handling devices as they appear according to our filesystem
     // policy.
-    let mut fs_manager = manager::Manager::new(&config, ramdisk_path, env, matcher_lock);
+    let mut fs_manager = manager::Manager::new(&config, env, matcher_lock);
     let shutdown_responder = if config.disable_block_watcher {
         // If the block watcher is disabled, fshost just waits on the shutdown receiver instead of
         // processing devices.
@@ -189,7 +199,9 @@ async fn main() -> Result<(), Error> {
             .await
             .ok_or_else(|| format_err!("shutdown signal stream ended unexpectedly"))?
     } else {
-        fs_manager.device_handler(device_stream, shutdown_rx).await?
+        fs_manager
+            .device_handler(stream::iter(ramdisk_device).chain(device_stream), shutdown_rx)
+            .await?
     };
 
     tracing::info!("shutdown signal received");

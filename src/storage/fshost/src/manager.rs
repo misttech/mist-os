@@ -25,11 +25,10 @@ pub struct Manager {
 impl Manager {
     pub fn new(
         config: &fshost_config::Config,
-        ramdisk_path: Option<String>,
         environment: Arc<Mutex<dyn Environment>>,
         matcher_lock: Arc<Mutex<HashSet<String>>>,
     ) -> Self {
-        Manager { matcher: matcher::Matchers::new(config, ramdisk_path), environment, matcher_lock }
+        Manager { matcher: matcher::Matchers::new(config), environment, matcher_lock }
     }
 
     /// The main loop of fshost. Watch for new devices, match them against filesystems we expect,
@@ -77,22 +76,20 @@ impl Manager {
                 path = %device.path(),
                 ?content_format,
                 ?label,
+                is_ramdisk = device.is_fshost_ramdisk(),
                 "Matching device"
             );
 
-            match self
-                .matcher
-                .match_device(device.as_mut(), &mut *self.environment.lock().await)
-                .await
-            {
+            let device_path = device.path().to_string();
+            match self.matcher.match_device(device, &mut *self.environment.lock().await).await {
                 Ok(true) => {}
                 // TODO(https://fxbug.dev/42069366): //src/tests/installer and //src/tests/femu look for
                 // "/dev/class/block/008 ignored"
-                Ok(false) => tracing::info!("{} ignored", device.path()),
-                Err(e) => {
+                Ok(false) => tracing::info!(path = %device_path, "ignored"),
+                Err(error) => {
                     tracing::error!(
-                        path = %device.path(),
-                        ?e,
+                        path = %device_path,
+                        ?error,
                         "Failed to match device",
                     );
                 }

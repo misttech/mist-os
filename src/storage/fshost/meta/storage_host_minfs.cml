@@ -49,6 +49,12 @@
             protocol: "fuchsia.component.Realm",
             from: "framework",
         },
+        {
+            service: [
+                "fuchsia.hardware.block.volume.Service",
+                "fuchsia.hardware.ramdisk.Service",
+            ],
+        },
     ],
     offer: [
         {

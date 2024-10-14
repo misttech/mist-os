@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::{BlockDevice, Device, NandDevice, StorageHostDevice};
+use crate::device::{BlockDevice, Device, NandDevice, VolumeProtocolDevice};
 use anyhow::{Context as _, Error};
 use async_trait::async_trait;
 use fuchsia_fs::directory::WatchEvent;
@@ -122,7 +122,7 @@ impl WatchSource for DirSource {
                 let dir_clone = fuchsia_fs::directory::clone_no_describe(&dir, None)
                     .map_err(|err| tracing::warn!(?err, "Failed to clone dir"))
                     .ok()?;
-                StorageHostDevice::new(dir_clone, filename)
+                VolumeProtocolDevice::new(dir_clone, filename)
                     .map(|d| Box::new(d) as Box<dyn Device>)
                     .map_err(|err| {
                         tracing::warn!(?err, "Failed to create device (maybe it went away?)");
@@ -254,10 +254,10 @@ mod tests {
 
         let partitions_dir = vfs::pseudo_directory! {
             "000" => vfs::pseudo_directory! {
-                "block" => volume_service(),
+                "volume" => volume_service(),
             },
             "001" => vfs::pseudo_directory! {
-                "block" => volume_service(),
+                "volume" => volume_service(),
             },
         };
 
@@ -296,8 +296,8 @@ mod tests {
             "block-001",
             "nand-000",
             "nand-001",
-            "000/block",
-            "001/block",
+            "000/volume",
+            "001/volume",
         ]);
 
         // There are four devices that were added before we started watching.

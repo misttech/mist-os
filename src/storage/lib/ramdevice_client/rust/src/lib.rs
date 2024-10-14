@@ -10,8 +10,8 @@ use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker as _, Proxy as _, Se
 use fidl_fuchsia_device::{ControllerMarker, ControllerProxy, ControllerSynchronousProxy};
 use fidl_fuchsia_hardware_ramdisk::{Guid, RamdiskControllerMarker};
 use fuchsia_component::client::{
-    connect_to_named_protocol_at_dir_root, connect_to_protocol_at_dir_svc,
-    connect_to_service_instance,
+    connect_to_instance_in_service_dir, connect_to_named_protocol_at_dir_root,
+    connect_to_protocol_at_dir_svc,
 };
 use fuchsia_fs::directory::WatchEvent;
 use futures::TryStreamExt;
@@ -32,6 +32,11 @@ pub struct RamdiskClientBuilder {
     dev_root: Option<fio::DirectoryProxy>,
     guid: Option<[u8; GUID_LEN]>,
     use_v2: bool,
+    ramdisk_service: Option<fio::DirectoryProxy>,
+
+    // Whether to publish this ramdisk as a fuchsia.hardware.block.volume.Service service.  This
+    // only works for the v2 driver.
+    publish: bool,
 }
 
 enum RamdiskSource {
@@ -48,6 +53,8 @@ impl RamdiskClientBuilder {
             guid: None,
             dev_root: None,
             use_v2: false,
+            ramdisk_service: None,
+            publish: false,
         }
     }
 
@@ -59,6 +66,8 @@ impl RamdiskClientBuilder {
             guid: None,
             dev_root: None,
             use_v2: false,
+            ramdisk_service: None,
+            publish: false,
         }
     }
 
@@ -80,17 +89,35 @@ impl RamdiskClientBuilder {
         self
     }
 
+    /// Specifies the ramdisk service.
+    pub fn ramdisk_service(mut self, service: fio::DirectoryProxy) -> Self {
+        self.ramdisk_service = Some(service);
+        self
+    }
+
+    /// Publish this ramdisk as a fuchsia.hardware.block.volume.Service service.
+    pub fn publish(mut self) -> Self {
+        self.publish = true;
+        self
+    }
+
     /// Create the ramdisk.
     pub async fn build(self) -> Result<RamdiskClient, Error> {
-        let Self { ramdisk_source, block_size, guid, dev_root, use_v2 } = self;
+        let Self { ramdisk_source, block_size, guid, dev_root, use_v2, ramdisk_service, publish } =
+            self;
 
         if use_v2 {
             // Pick the first service instance we find.
-            let ramdisk_service_dir = fuchsia_fs::directory::open_in_namespace_deprecated(
-                &format!("/svc/{}", fidl_fuchsia_hardware_ramdisk::ServiceMarker::SERVICE_NAME),
-                fio::OpenFlags::empty(),
-            )?;
-            let mut watcher = fuchsia_fs::directory::Watcher::new(&ramdisk_service_dir).await?;
+            let ramdisk_service_dir = match ramdisk_service {
+                Some(s) => s,
+                None => fuchsia_fs::directory::open_in_namespace_deprecated(
+                    &format!("/svc/{}", fidl_fuchsia_hardware_ramdisk::ServiceMarker::SERVICE_NAME),
+                    fio::OpenFlags::empty(),
+                )?,
+            };
+            let mut watcher = fuchsia_fs::directory::Watcher::new(&ramdisk_service_dir)
+                .await
+                .context("Watcher closed")?;
             let ramdisk_controller = loop {
                 let Some(item) = watcher.try_next().await? else {
                     bail!("Unexpected watcher end");
@@ -100,9 +127,9 @@ impl RamdiskClientBuilder {
                     if instance == "." {
                         continue;
                     }
-                    break connect_to_service_instance::<
+                    break connect_to_instance_in_service_dir::<
                         fidl_fuchsia_hardware_ramdisk::ServiceMarker,
-                    >(instance)?
+                    >(&ramdisk_service_dir, instance)?
                     .connect_to_controller()?;
                 }
             };
@@ -112,14 +139,20 @@ impl RamdiskClientBuilder {
             let options = match ramdisk_source {
                 RamdiskSource::Vmo { vmo } => framdisk::Options {
                     vmo: Some(vmo),
-                    block_size: Some(block_size.try_into().unwrap()),
+                    block_size: if block_size == 0 {
+                        None
+                    } else {
+                        Some(block_size.try_into().unwrap())
+                    },
                     type_guid,
+                    publish: Some(publish),
                     ..Default::default()
                 },
                 RamdiskSource::Size { block_count } => framdisk::Options {
                     block_count: Some(block_count),
                     block_size: Some(block_size.try_into().unwrap()),
                     type_guid,
+                    publish: Some(publish),
                     ..Default::default()
                 },
             };

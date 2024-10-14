@@ -356,9 +356,9 @@ impl PartitionInfo {
             type_guid: self.type_guid,
             instance_guid: self.instance_guid,
             name: if self.name.is_null() {
-                String::new()
+                None
             } else {
-                String::from_utf8_lossy(CStr::from_ptr(self.name).to_bytes()).to_string()
+                Some(String::from_utf8_lossy(CStr::from_ptr(self.name).to_bytes()).to_string())
             },
         }
     }

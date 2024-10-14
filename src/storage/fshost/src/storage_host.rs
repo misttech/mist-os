@@ -53,7 +53,7 @@ impl StorageHostInstance {
             &exposed_dir,
         )?;
         proxy
-            .start(device.device_controller()?.into_client_end().unwrap())
+            .start(device.volume_proxy()?.into_client_end().unwrap())
             .await?
             .map_err(zx::Status::from_raw)?;
 

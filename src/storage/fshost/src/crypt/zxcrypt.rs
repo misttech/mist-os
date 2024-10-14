@@ -39,6 +39,7 @@ pub struct ZxcryptDevice {
     parent_is_nand: bool,
     proxy: DeviceManagerProxy,
     inner_device: Box<dyn Device>,
+    is_fshost_ramdisk: bool,
 }
 
 impl ZxcryptDevice {
@@ -93,6 +94,7 @@ impl ZxcryptDevice {
                         parent_is_nand: outer_device.is_nand(),
                         proxy: proxy.clone(),
                         inner_device: outer_device.get_child("/zxcrypt/unsealed/block").await?,
+                        is_fshost_ramdisk: false,
                     };
                     tracing::info!(
                         path = device.path(),
@@ -192,5 +194,13 @@ impl Device for ZxcryptDevice {
 
     async fn get_child(&self, suffix: &str) -> Result<Box<dyn Device>, Error> {
         self.inner_device.get_child(suffix).await
+    }
+
+    fn is_fshost_ramdisk(&self) -> bool {
+        self.is_fshost_ramdisk
+    }
+
+    fn set_fshost_ramdisk(&mut self, v: bool) {
+        self.is_fshost_ramdisk = v;
     }
 }

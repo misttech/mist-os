@@ -43,6 +43,8 @@ rustc_library("fake_block_server") {
     ":block_server",
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
     "//sdk/rust/zx",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
   ]
 }

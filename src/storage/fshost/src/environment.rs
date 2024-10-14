@@ -14,7 +14,7 @@ use crate::device::constants::{
     DATA_VOLUME_LABEL, DEFAULT_F2FS_MIN_BYTES, FVM_DRIVER_PATH, LEGACY_DATA_PARTITION_LABEL,
     UNENCRYPTED_VOLUME_LABEL, ZXCRYPT_DRIVER_PATH,
 };
-use crate::device::{BlockDevice, Device};
+use crate::device::{BlockDevice, Device, RegisteredDevices};
 use crate::inspect::register_migration_status;
 use crate::storage_host::StorageHostInstance;
 use crate::watcher::{DirSource, Watcher};
@@ -27,7 +27,7 @@ use fidl_fuchsia_fs_startup::MountOptions;
 use fidl_fuchsia_hardware_block_partition::Guid;
 use fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeMarker};
 use fs_management::filesystem::{
-    ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem, ServingVolume,
+    BlockConnector, ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem, ServingVolume,
 };
 use fs_management::format::DiskFormat;
 use fs_management::partition::fvm_allocate_partition;
@@ -86,7 +86,11 @@ pub trait Environment: Send + Sync {
     /// Called after the fvm driver is bound. Waits for the block driver to bind itself to the
     /// data partition before creating a data BlockDevice, which it then passes into launch_data().
     /// Calls bind_data() on the mounted filesystem.
-    async fn mount_data_on(&mut self, data_partition_name: &str) -> Result<(), Error>;
+    async fn mount_data_on(
+        &mut self,
+        data_partition_name: &str,
+        is_fshost_ramdisk: bool,
+    ) -> Result<(), Error>;
 
     /// Wipe and recreate data partition before reformatting with a filesystem.
     async fn format_data(&mut self, fvm_topo_path: &str) -> Result<Filesystem, Error>;
@@ -114,6 +118,9 @@ pub trait Environment: Send + Sync {
 
     /// Synchronously shut down all associated filesystems.
     async fn shutdown(&mut self) -> Result<(), Error>;
+
+    /// Returns the registered devices.
+    fn registered_devices(&self) -> &Arc<RegisteredDevices>;
 }
 
 // Before a filesystem is mounted, we queue requests.
@@ -352,12 +359,12 @@ pub struct FshostEnvironment {
     matcher_lock: Arc<Mutex<HashSet<String>>>,
     inspector: fuchsia_inspect::Inspector,
     watcher: Watcher,
+    registered_devices: Arc<RegisteredDevices>,
 }
 
 impl FshostEnvironment {
     pub fn new(
         config: Arc<fshost_config::Config>,
-        ramdisk_prefix: Option<String>,
         matcher_lock: Arc<Mutex<HashSet<String>>>,
         inspector: fuchsia_inspect::Inspector,
         watcher: Watcher,
@@ -369,10 +376,11 @@ impl FshostEnvironment {
             blobfs: Filesystem::Queue(FilesystemQueue::default()),
             data: Filesystem::Queue(FilesystemQueue::default()),
             fvm: None,
-            launcher: Arc::new(FilesystemLauncher { config, ramdisk_prefix }),
+            launcher: Arc::new(FilesystemLauncher { config }),
             matcher_lock,
             inspector,
             watcher,
+            registered_devices: Arc::new(RegisteredDevices::default()),
         }
     }
 
@@ -431,7 +439,7 @@ impl FshostEnvironment {
 
     /// Set the max partition size for data
     async fn apply_data_partition_limits(&self, device: &mut dyn Device) {
-        if !self.launcher.is_ramdisk_device(device) {
+        if !device.is_fshost_ramdisk() {
             if let Err(error) = device.set_partition_max_bytes(self.config.data_max_bytes).await {
                 tracing::warn!(%error, "Failed to set max partition size for data");
             }
@@ -449,7 +457,7 @@ impl FshostEnvironment {
         // Potentially bind and format zxcrypt first.
         let mut zxcrypt_device;
         let device = if (self.config.use_disk_migration && format == DiskFormat::Zxcrypt)
-            || self.launcher.requires_zxcrypt(format, self.launcher.is_ramdisk_device(device))
+            || self.launcher.requires_zxcrypt(format, device.is_fshost_ramdisk())
         {
             tracing::info!(
                 path = device.path(),
@@ -670,7 +678,7 @@ impl FshostEnvironment {
         // Potentially bind and unseal zxcrypt before serving data.
         let mut zxcrypt_device = None;
         let device = if (self.config.use_disk_migration && format == DiskFormat::Zxcrypt)
-            || self.launcher.requires_zxcrypt(format, self.launcher.is_ramdisk_device(device))
+            || self.launcher.requires_zxcrypt(format, device.is_fshost_ramdisk())
         {
             tracing::info!(path = device.path(), "Attempting to unseal zxcrypt device",);
             let ignore_paths = &mut *self.matcher_lock.lock().await;
@@ -798,7 +806,7 @@ impl Environment for FshostEnvironment {
             expected_format = "fxfs",
             "Mounting fxblob"
         );
-        let serving_fs = self.launcher.serve_fxblob(device).await?;
+        let serving_fs = self.launcher.serve_fxblob(device.block_connector()?).await?;
         self.container = Some(Box::new(FxfsContainer::new(serving_fs)));
         Ok(())
     }
@@ -810,8 +818,7 @@ impl Environment for FshostEnvironment {
             "Mounting fvm"
         );
         let serving_fs = self.launcher.serve_fvm(device).await?;
-        self.container =
-            Some(Box::new(FvmContainer::new(serving_fs, self.launcher.is_ramdisk_device(device))));
+        self.container = Some(Box::new(FvmContainer::new(serving_fs, device.is_fshost_ramdisk())));
         Ok(())
     }
 
@@ -894,7 +901,11 @@ impl Environment for FshostEnvironment {
         self.mount_blobfs(&mut device).await
     }
 
-    async fn mount_data_on(&mut self, data_partition_name: &str) -> Result<(), Error> {
+    async fn mount_data_on(
+        &mut self,
+        data_partition_name: &str,
+        is_fshost_ramdisk: bool,
+    ) -> Result<(), Error> {
         let (fvm_topo_path, fvm_dir) = self.get_fvm()?;
         let data_topo_path = format!("{}/{data_partition_name}/block", fvm_topo_path);
         recursive_wait(fvm_dir, &format!("{data_partition_name}/block"))
@@ -903,6 +914,7 @@ impl Environment for FshostEnvironment {
         let mut device = BlockDevice::new(data_topo_path)
             .await
             .context("failed to create blobfs block device")?;
+        device.set_fshost_ramdisk(is_fshost_ramdisk);
         let (label, type_guid) =
             (device.partition_label().await?.to_string(), *device.partition_type().await?);
         if !((label == DATA_PARTITION_LABEL || label == LEGACY_DATA_PARTITION_LABEL)
@@ -1074,11 +1086,14 @@ impl Environment for FshostEnvironment {
         }
         Ok(())
     }
+
+    fn registered_devices(&self) -> &Arc<RegisteredDevices> {
+        &self.registered_devices
+    }
 }
 
 pub struct FilesystemLauncher {
     config: Arc<fshost_config::Config>,
-    ramdisk_prefix: Option<String>,
 }
 
 impl FilesystemLauncher {
@@ -1098,14 +1113,6 @@ impl FilesystemLauncher {
             Err(e) => Err(e.into()),
             Ok(()) => Ok(()),
         }
-    }
-
-    /// This helper method returns true if the given device is a ramdisk.
-    /// We want to enforce partition limits and use zxcrypt only on non-ramdisk devices.
-    pub fn is_ramdisk_device(&self, device: &dyn Device) -> bool {
-        self.ramdisk_prefix
-            .as_ref()
-            .map_or(false, |prefix| device.topological_path().starts_with(prefix))
     }
 
     pub fn requires_zxcrypt(&self, format: DiskFormat, is_ramdisk: bool) -> bool {
@@ -1139,7 +1146,7 @@ impl FilesystemLauncher {
         tracing::info!(path = %device.path(), "Mounting /blob");
 
         // Setting max partition size for blobfs
-        if !self.is_ramdisk_device(device) {
+        if !device.is_fshost_ramdisk() {
             if let Err(e) = device.set_partition_max_bytes(self.config.blobfs_max_bytes).await {
                 tracing::warn!("Failed to set max partition size for blobfs: {:?}", e);
             };
@@ -1169,16 +1176,6 @@ impl FilesystemLauncher {
             device.block_connector()?,
             Box::new(config),
         );
-        self.serve_data_from(device, fs).await
-    }
-
-    // NB: keep these larger functions monomorphized, otherwise they cause significant code size
-    // increases.
-    async fn serve_data_from(
-        &self,
-        device: &mut dyn Device,
-        mut fs: fs_management::filesystem::Filesystem,
-    ) -> Result<ServeFilesystemStatus, Error> {
         let format = fs.config().disk_format();
         tracing::info!(
             path = %device.path(),
@@ -1195,7 +1192,16 @@ impl FilesystemLauncher {
             );
             return Ok(ServeFilesystemStatus::FormatRequired);
         }
+        self.serve_data_from(fs).await
+    }
 
+    // NB: keep these larger functions monomorphized, otherwise they cause significant code size
+    // increases.
+    pub async fn serve_data_from(
+        &self,
+        mut fs: fs_management::filesystem::Filesystem,
+    ) -> Result<ServeFilesystemStatus, Error> {
+        let format = fs.config().disk_format();
         if self.config.check_filesystems {
             tracing::info!(?format, "fsck started");
             if let Err(error) = fs.fsck().await {
@@ -1319,10 +1325,10 @@ impl FilesystemLauncher {
     /// Starts serving Fxblob without opening any volumes.
     pub async fn serve_fxblob(
         &self,
-        device: &mut dyn Device,
+        block_connector: Box<dyn BlockConnector>,
     ) -> Result<ServingMultiVolumeFilesystem, Error> {
         let mut fs = fs_management::filesystem::Filesystem::from_boxed_config(
-            device.block_connector()?,
+            block_connector,
             Box::new(Fxfs {
                 component_type: ComponentType::StaticChild,
                 startup_profiling_seconds: Some(60),

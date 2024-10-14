@@ -56,7 +56,7 @@ impl PartitionsDirectoryEntry {
     pub fn new<SM: SessionManager + Send + Sync + 'static>(server: Weak<BlockServer<SM>>) -> Self {
         let node = vfs::directory::immutable::simple();
         node.add_entry(
-            "block",
+            "volume",
             vfs::service::host(move |requests| {
                 let server = server.clone();
                 async move {

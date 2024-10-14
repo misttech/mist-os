@@ -18,7 +18,10 @@
             path: "/dev",
         },
         {
-            service: "fuchsia.hardware.ramdisk.Service",
+            service: [
+                "fuchsia.hardware.ramdisk.Service",
+                "fuchsia.harwdare.block.volume.Service",
+            ],
             from: "#storage_driver_test_realm",
         },
     ],

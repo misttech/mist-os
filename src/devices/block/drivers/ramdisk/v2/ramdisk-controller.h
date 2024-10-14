@@ -23,6 +23,8 @@ class RamdiskController : public fdf::DriverBase,
 
   zx::result<> Start() override;
 
+  using fdf::DriverBase::outgoing;
+
  private:
   // FIDL Interface Controller.
   void Create(CreateRequestView request, CreateCompleter::Sync& completer) override;

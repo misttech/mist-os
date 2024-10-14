@@ -667,7 +667,7 @@ async fn shred_data_volume_when_mounted() {
 #[cfg_attr(not(feature = "fxfs"), ignore)]
 async fn shred_data_volume_from_recovery() {
     let mut builder = new_builder();
-    builder.with_disk().format_volumes(volumes_spec());
+    builder.with_disk().with_gpt().format_volumes(volumes_spec());
     let fixture = builder.build().await;
 
     let vmo = fixture.ramdisk_vmo().unwrap().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();

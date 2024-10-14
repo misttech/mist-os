@@ -104,8 +104,6 @@ void RamdiskController::Create(CreateRequestView request, CreateCompleter::Sync&
   static std::atomic<int> counter = 0;
 
   int id = counter.fetch_add(1);
-  std::string name = std::to_string(id);
-  partition_info.name = name.c_str();
   if (request->has_type_guid())
     memcpy(partition_info.type_guid, request->type_guid().value.data(), 16);
 
@@ -123,7 +121,8 @@ void RamdiskController::Create(CreateRequestView request, CreateCompleter::Sync&
                                   const zx_packet_signal_t*) { ramdisks_.erase(id); });
 
   if (zx::result ramdisk =
-          Ramdisk::Create(this, dispatcher(), std::move(vmo), partition_info, std::move(outgoing));
+          Ramdisk::Create(this, dispatcher(), std::move(vmo), partition_info, std::move(outgoing),
+                          id, request->has_publish() ? request->publish() : false);
       ramdisk.is_error()) {
     completer.Reply(ramdisk.take_error());
   } else {

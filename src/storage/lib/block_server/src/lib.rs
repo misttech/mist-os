@@ -29,7 +29,7 @@ pub struct PartitionInfo {
     pub block_size: u32,
     pub type_guid: [u8; 16],
     pub instance_guid: [u8; 16],
-    pub name: String,
+    pub name: Option<String>,
 }
 
 // Multiple Block I/O request may be sent as a group.
@@ -218,9 +218,10 @@ impl<SM: SessionManager> BlockServer<SM> {
                 guid.value.copy_from_slice(&self.partition_info.instance_guid);
                 responder.send(zx::sys::ZX_OK, Some(&guid))?;
             }
-            fvolume::VolumeRequest::GetName { responder } => {
-                responder.send(zx::sys::ZX_OK, Some(&self.partition_info.name))?;
-            }
+            fvolume::VolumeRequest::GetName { responder } => match &self.partition_info.name {
+                Some(name) => responder.send(zx::sys::ZX_OK, Some(name))?,
+                None => responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED, None)?,
+            },
             fvolume::VolumeRequest::QuerySlices { responder, start_slices } => {
                 match self.session_manager.query_slices(&start_slices).await {
                     Ok(mut results) => {
@@ -616,7 +617,7 @@ mod tests {
             block_size: BLOCK_SIZE,
             type_guid: [1; 16],
             instance_guid: [2; 16],
-            name: "foo".to_string(),
+            name: Some("foo".to_string()),
         }
     }
 
@@ -650,7 +651,7 @@ mod tests {
 
                 let (status, name) = proxy.get_name().await.unwrap();
                 assert_eq!(status, zx::sys::ZX_OK);
-                assert_eq!(&name.unwrap(), &partition_info.name);
+                assert_eq!(&name, &partition_info.name);
 
                 std::mem::drop(proxy);
             }
