@@ -18,6 +18,10 @@ constexpr zx::duration kSimulatedClockDuration = zx::sec(10);
 
 const common::MacAddr kDefaultMac({0x12, 0x34, 0x56, 0x65, 0x43, 0x21});
 
+// Rates are defined in 500 kbps
+constexpr uint8_t kExpectedBasic2gRates[] = {2, 4, 11, 22, 12, 18, 24, 36, 48, 72, 96, 108};
+constexpr uint8_t kExpectedBasic5gRates[] = {12, 18, 24, 36, 48, 72, 96, 108};
+
 // Verify that a query operation works on a client interface
 TEST_F(SimTest, ClientIfcQuery) {
   ASSERT_EQ(Init(), ZX_OK);
@@ -41,13 +45,24 @@ TEST_F(SimTest, ClientIfcQuery) {
 
   // Number of bands shouldn't exceed the maximum allowable
   ASSERT_LE(ifc_query_result.band_cap_count, (size_t)wlan_common::kMaxBands);
+  ASSERT_GT(ifc_query_result.band_cap_count, 0);
 
   for (size_t band = 0; band < ifc_query_result.band_cap_count; band++) {
     wlan_fullmac_wire::WlanFullmacBandCapability* band_cap = &ifc_query_result.band_cap_list[band];
 
     // Band id should be in valid range
-    EXPECT_TRUE(band_cap->band == wlan_common::WlanBand::kTwoGhz ||
+    ASSERT_TRUE(band_cap->band == wlan_common::WlanBand::kTwoGhz ||
                 band_cap->band == wlan_common::WlanBand::kFiveGhz);
+
+    if (band_cap->band == wlan_common::WlanBand::kTwoGhz) {
+      ASSERT_EQ(band_cap->basic_rate_count, std::size(kExpectedBasic2gRates));
+      ASSERT_EQ(0, std::memcmp(band_cap->basic_rate_list.data(), kExpectedBasic2gRates,
+                               band_cap->basic_rate_count));
+    } else {
+      ASSERT_EQ(band_cap->basic_rate_count, std::size(kExpectedBasic5gRates));
+      ASSERT_EQ(0, std::memcmp(band_cap->basic_rate_list.data(), kExpectedBasic5gRates,
+                               band_cap->basic_rate_count));
+    }
   }
 }
 
