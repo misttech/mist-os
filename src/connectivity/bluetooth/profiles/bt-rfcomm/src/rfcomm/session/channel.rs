@@ -216,7 +216,7 @@ impl CreditFlowController {
     async fn send_user_data(&mut self, user_data: UserData) {
         let data_size = user_data.information.len();
         if data_size != 0 && self.credits.local() == 0 {
-            trace!("No local credits available - staging user data");
+            trace!("No local credits available - staging user data ({data_size} bytes)");
             self.outgoing_data_pending_credits.push(user_data);
             return;
         }

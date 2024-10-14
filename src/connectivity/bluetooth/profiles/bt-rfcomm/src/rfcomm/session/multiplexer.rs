@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use bt_rfcomm::frame::Frame;
-use bt_rfcomm::{RfcommError, Role, DLCI, MAX_RFCOMM_FRAME_SIZE};
+use bt_rfcomm::{RfcommError, Role, DLCI};
 use fuchsia_bluetooth::types::Channel;
 use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::Inspect;
@@ -21,63 +21,51 @@ pub struct SessionParameters {
     /// Whether credit-based flow control is being used for this session.
     pub credit_based_flow: bool,
 
-    /// The max MTU size of a frame.
-    pub max_frame_size: usize,
+    /// The max MTU size of an RFCOMM frame.
+    pub max_frame_size: u16,
 }
 
 impl SessionParameters {
+    fn default_preferred(max_frame_size: u16) -> Self {
+        // By default, we prefer to use credit flow control.
+        SessionParameters { max_frame_size, credit_based_flow: true }
+    }
+
     /// Combines the current session parameters with the `other` parameters and returns
     /// a negotiated SessionParameters.
-    fn negotiated(&self, other: &SessionParameters) -> Self {
+    fn negotiate(&self, other: &SessionParameters) -> Self {
         // Our implementation is OK with credit based flow. We choose whatever the new
         // configuration requests.
         let credit_based_flow = other.credit_based_flow;
-        // Use the smaller (i.e more restrictive) max frame size.
+        // Use the smaller, more restrictive, max frame size.
         let max_frame_size = std::cmp::min(self.max_frame_size, other.max_frame_size);
         Self { credit_based_flow, max_frame_size }
-    }
-
-    /// Returns true if credit-based flow control is set.
-    pub fn credit_based_flow(&self) -> bool {
-        self.credit_based_flow
-    }
-
-    pub fn max_frame_size(&self) -> usize {
-        self.max_frame_size
-    }
-}
-
-impl Default for SessionParameters {
-    fn default() -> Self {
-        // Credit based flow must always be preferred - see RFCOMM 5.5.3.
-        Self { credit_based_flow: true, max_frame_size: MAX_RFCOMM_FRAME_SIZE }
     }
 }
 
 /// The current state of the session parameters.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ParameterNegotiationState {
-    /// Parameters have not been negotiated.
-    NotNegotiated,
+    /// Parameters have not been negotiated - contains our preferred `SessionParameters`
+    NotNegotiated(SessionParameters),
     /// Parameters have been negotiated.
     Negotiated(SessionParameters),
 }
 
 impl ParameterNegotiationState {
-    /// Returns the current parameters.
-    ///
-    /// If the parameters have not been negotiated, then the default is returned.
+    /// Returns the current session parameters.
+    /// If not negotiated, then the default preferred parameters is returned.
     fn parameters(&self) -> SessionParameters {
         match self {
             Self::Negotiated(params) => *params,
-            Self::NotNegotiated => SessionParameters::default(),
+            Self::NotNegotiated(params) => *params,
         }
     }
 
     /// Negotiates the `new` parameters with the (potential) current parameters. Returns
     /// the parameters that were set.
     fn negotiate(&mut self, new: SessionParameters) -> SessionParameters {
-        let updated = self.parameters().negotiated(&new);
+        let updated = self.parameters().negotiate(&new);
         *self = Self::Negotiated(updated);
         updated
     }
@@ -96,6 +84,8 @@ impl ParameterNegotiationState {
 pub struct SessionMultiplexer {
     /// The role for the multiplexer.
     role: Role,
+    /// The maximum RFCOMM packet size that can be sent over the underlying transport.
+    max_rfcomm_packet_size: u16,
     /// The parameters for the multiplexer.
     parameters: ParameterNegotiationState,
     /// Local opened RFCOMM channels for this session.
@@ -106,10 +96,13 @@ pub struct SessionMultiplexer {
 }
 
 impl SessionMultiplexer {
-    pub fn create() -> Self {
+    pub fn create(max_rfcomm_packet_size: u16) -> Self {
         Self {
             role: Role::Unassigned,
-            parameters: ParameterNegotiationState::NotNegotiated,
+            max_rfcomm_packet_size,
+            parameters: ParameterNegotiationState::NotNegotiated(
+                SessionParameters::default_preferred(max_rfcomm_packet_size),
+            ),
             channels: HashMap::new(),
             inspect: SessionMultiplexerInspect::default(),
         }
@@ -117,7 +110,7 @@ impl SessionMultiplexer {
 
     /// Resets the multiplexer back to its initial state with no opened channels.
     pub fn reset(&mut self) {
-        *self = Self::create();
+        *self = Self::create(self.max_rfcomm_packet_size);
     }
 
     pub fn role(&self) -> Role {
@@ -131,7 +124,7 @@ impl SessionMultiplexer {
 
     /// Returns true if credit-based flow control is enabled.
     pub fn credit_based_flow(&self) -> bool {
-        self.parameters().credit_based_flow()
+        self.parameters().credit_based_flow
     }
 
     #[cfg(test)]
@@ -149,8 +142,7 @@ impl SessionMultiplexer {
         self.parameters.parameters()
     }
 
-    /// Negotiates the parameters associated with this session - returns the session parameters
-    /// that were set.
+    /// Negotiates the parameters for this session - returns the session parameters that were set.
     pub fn negotiate_parameters(
         &mut self,
         new_session_parameters: SessionParameters,
@@ -237,14 +229,6 @@ impl SessionMultiplexer {
         })
     }
 
-    /// Returns the maximum TX size (in bytes) that can be sent over an individual RFCOMM channel.
-    fn max_tx_for_session_channel(&self) -> usize {
-        // The max TX size is bounded by the negotiated max. For User Data frames, at most 6
-        // bytes of data are added to every frame (5 bytes for headers, 1 byte for FCS).
-        const USER_DATA_HEADER_SIZE: usize = 6;
-        self.parameters().max_frame_size - USER_DATA_HEADER_SIZE
-    }
-
     /// Attempts to establish a SessionChannel for the provided `dlci`.
     /// `user_data_sender` is used by the SessionChannel to relay any received UserData
     /// frames from the client associated with the channel.
@@ -255,13 +239,14 @@ impl SessionMultiplexer {
         dlci: DLCI,
         user_data_sender: mpsc::Sender<Frame>,
     ) -> Result<Channel, Error> {
-        // If the session parameters have not been negotiated, set them to the default.
+        // If the session parameters have not been negotiated, set them to our preferred default.
         if !self.parameters_negotiated() {
-            let _ = self.negotiate_parameters(SessionParameters::default());
+            let _ = self.negotiate_parameters(self.parameters());
         }
 
-        // Potentially reserve a new SessionChannel for the provided DLCI.
-        let max_tx_size = self.max_tx_for_session_channel();
+        // Potentially reserve a new `SessionChannel` for the provided DLCI - the max TX for this
+        // channel is the negotiated `max_frame_size`.
+        let max_tx_size = self.parameters().max_frame_size;
         let channel = self.find_or_create_session_channel(dlci);
         if channel.is_established() {
             return Err(Error::ChannelAlreadyEstablished(dlci));
@@ -269,7 +254,7 @@ impl SessionMultiplexer {
 
         // Create endpoints for the session channel. The local end is held by this component
         // and the remote end is returned to be held by a RFCOMM profile.
-        let (local, remote) = Channel::create_with_max_tx(max_tx_size);
+        let (local, remote) = Channel::create_with_max_tx(max_tx_size.into());
         channel.establish(local, user_data_sender);
         Ok(remote)
     }
@@ -308,7 +293,7 @@ mod tests {
         let inspect = inspect::Inspector::default();
 
         // Setup multiplexer with inspect.
-        let mut multiplexer = SessionMultiplexer::create();
+        let mut multiplexer = SessionMultiplexer::create(600);
         multiplexer.iattach(inspect.root(), "multiplexer").expect("should attach to inspect tree");
         // Default inspect tree.
         assert_data_tree!(inspect, root: {
@@ -338,7 +323,7 @@ mod tests {
             multiplexer: {
                 role: "Unassigned",
                 flow_control: CREDIT_FLOW_CONTROL,
-                max_frame_size: 672u64,
+                max_frame_size: 600u64,
                 channel_0: contains {
                     dlci: 9u64,
                 },
@@ -361,7 +346,7 @@ mod tests {
             multiplexer: {
                 role: "Unassigned",
                 flow_control: CREDIT_FLOW_CONTROL,
-                max_frame_size: 672u64,
+                max_frame_size: 600u64,
                 channel_0: contains {
                     dlci: 9u64,
                 },
