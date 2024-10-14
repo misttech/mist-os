@@ -5,8 +5,8 @@
 //! Type-safe bindings for Zircon threads.
 
 use crate::{
-    object_get_info_single, ok, sys, AsHandleRef, Handle, HandleBased, HandleRef, ObjectQuery,
-    Profile, Status, Task, Topic,
+    object_get_info_single, ok, sys, AsHandleRef, Duration, Handle, HandleBased, HandleRef,
+    ObjectQuery, Profile, Status, Task, Topic,
 };
 use bitflags::bitflags;
 
@@ -89,8 +89,8 @@ impl Thread {
     /// Wraps the
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_THREAD_STATS topic.
-    pub fn get_stats(&self) -> Result<sys::zx_info_thread_stats_t, Status> {
-        object_get_info_single::<ThreadStatsQuery>(self.as_handle_ref())
+    pub fn get_stats(&self) -> Result<ThreadStats, Status> {
+        Ok(ThreadStats::from_raw(object_get_info_single::<ThreadStatsQuery>(self.as_handle_ref())?))
     }
 
     pub fn read_state_general_regs(&self) -> Result<sys::zx_thread_state_general_regs_t, Status> {
@@ -154,6 +154,20 @@ unsafe_handle_properties!(object: Thread,
         {query_ty: REGISTER_FS, tag: RegisterFsTag, prop_ty: usize, set: set_register_fs},
     ]
 );
+
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+pub struct ThreadStats {
+    pub total_runtime: Duration,
+    pub last_scheduled_cpu: u32,
+}
+
+impl ThreadStats {
+    fn from_raw(
+        sys::zx_info_thread_stats_t { total_runtime, last_scheduled_cpu }: sys::zx_info_thread_stats_t,
+    ) -> Self {
+        Self { total_runtime: Duration::from_nanos(total_runtime), last_scheduled_cpu }
+    }
+}
 
 #[cfg(test)]
 mod tests {
