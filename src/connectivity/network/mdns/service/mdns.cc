@@ -27,6 +27,7 @@
 #include "src/connectivity/network/mdns/service/common/mdns_addresses.h"
 #include "src/connectivity/network/mdns/service/common/mdns_names.h"
 #include "src/connectivity/network/mdns/service/encoding/dns_formatting.h"
+#include "src/connectivity/network/mdns/service/inspect.h"
 
 namespace mdns {
 
@@ -50,6 +51,9 @@ void Mdns::Start(fuchsia::net::interfaces::WatcherPtr interfaces_watcher,
 
   ready_callback_ = std::move(ready_callback);
   state_ = State::kWaitingForInterfaces;
+  // initialize mdns inspector and update state
+  auto& inspector = MdnsInspector::GetMdnsInspector();
+  inspector.NotifyStateChange(MdnsInspector::kWaitingForInterfaces);
 
   original_local_host_name_ = local_host_name;
 
@@ -146,6 +150,8 @@ void Mdns::Stop() {
   transceiver_.Stop();
   ready_callback_ = nullptr;
   state_ = State::kNotStarted;
+  auto& inspector = MdnsInspector::GetMdnsInspector();
+  inspector.NotifyStateChange(MdnsInspector::kNotStarted);
 }
 
 void Mdns::ResolveHostName(const std::string& host_name, zx::duration timeout, Media media,
@@ -416,6 +422,8 @@ void Mdns::OnInterfacesStarted(const std::string& local_host_name, bool perform_
 
 void Mdns::StartAddressProbe(const std::string& local_host_name) {
   state_ = State::kAddressProbeInProgress;
+  auto& inspector = MdnsInspector::GetMdnsInspector();
+  inspector.NotifyStateChange(MdnsInspector::kAddressProbeInProgress);
 
   RegisterLocalHostName(local_host_name);
   std::cout << "mDNS: Verifying uniqueness of host name " << local_host_full_name_ << "\n";
@@ -453,6 +461,8 @@ void Mdns::OnReady() {
 
   // Start all the agents.
   state_ = State::kActive;
+  auto& inspector = MdnsInspector::GetMdnsInspector();
+  inspector.NotifyStateChange(MdnsInspector::kActive);
 
   // |resource_renewer_| doesn't need to be started, but we do it
   // anyway in case that changes.
