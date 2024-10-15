@@ -194,7 +194,7 @@ fit::result<Errno, size_t> MemoryFileObject::write(const MemoryObject& memory,
     }
 
     // Check against the FSIZE limt
-    auto fsize_limit = current_task->thread_group->get_rlimit({ResourceEnum::FSIZE});
+    auto fsize_limit = current_task->thread_group()->get_rlimit({ResourceEnum::FSIZE});
     if (write_end > fsize_limit) {
       if (offset >= fsize_limit) {
         // Write starts beyond the FSIZE limt.

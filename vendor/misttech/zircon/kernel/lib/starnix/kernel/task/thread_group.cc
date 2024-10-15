@@ -186,7 +186,7 @@ ThreadGroup::ThreadGroup(
 }
 
 fit::result<Errno> ThreadGroup::add(fbl::RefPtr<Task> task) {
-  auto state = this->write();
+  auto state = Write();
   if (state->terminating) {
     return fit::error(errno(EINVAL));
   }
@@ -203,7 +203,7 @@ bool ProcessSelector::DoMatch(pid_t pid, const PidTable& pid_table) const {
                           if (task_ref) {
                             if (auto group = pid_table.get_process_group(pg.value)) {
                               if (group.has_value()) {
-                                return group == task_ref->thread_group->read()->process_group;
+                                return group == task_ref->thread_group()->Read()->process_group;
                               }
                             }
                           }

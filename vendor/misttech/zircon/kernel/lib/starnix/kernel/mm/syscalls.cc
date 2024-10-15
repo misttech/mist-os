@@ -144,7 +144,7 @@ fit::result<Errno, UserAddress> do_mmap(const CurrentTask& current_task, UserAdd
   }
 
   // TODO(tbodt): maximize protection flags so that mprotect works
-  auto file = current_task->files.get(fd) _EP(file);
+  auto file = current_task->files().get(fd) _EP(file);
   return file->mmap(current_task, daddr.value(), memory_offset, length, prot_flags.value(), options,
                     file->name);
 }

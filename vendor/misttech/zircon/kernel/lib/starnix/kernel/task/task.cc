@@ -52,15 +52,15 @@ fbl::RefPtr<Task> Task::New(pid_t id, const ktl::string_view& command,
 }  // namespace starnix
 
 fit::result<Errno, FdNumber> Task::add_file(FileHandle file, FdFlags flags) const {
-  return files.add_with_flags(*this, file, flags);
+  return files_.add_with_flags(*this, file, flags);
 }
 
-Task::Task(pid_t _id, fbl::RefPtr<ThreadGroup> _thread_group,
-           ktl::optional<fbl::RefPtr<ThreadDispatcher>> _thread, FdTable _files,
+Task::Task(pid_t id, fbl::RefPtr<ThreadGroup> thread_group,
+           ktl::optional<fbl::RefPtr<ThreadDispatcher>> thread, FdTable files,
            ktl::optional<fbl::RefPtr<MemoryManager>> mm, ktl::optional<fbl::RefPtr<FsContext>> fs)
-    : id(_id),
-      thread_group(ktl::move(_thread_group)),
-      files(_files),
+    : id_(id),
+      thread_group_(ktl::move(thread_group)),
+      files_(files),
       mm_(ktl::move(mm)),
       fs_(ktl::move(fs)) {
   //*thread.Write() = ktl::move(_thread);
@@ -78,13 +78,11 @@ const fbl::RefPtr<MemoryManager>& Task::mm() const {
   return mm_.value();
 }
 
-fbl::RefPtr<Kernel>& Task::kernel() const { return thread_group->kernel(); }
+fbl::RefPtr<Kernel>& Task::kernel() const { return thread_group_->kernel(); }
 
 util::WeakPtr<Task> Task::get_task(pid_t pid) const { return kernel()->pids.Read()->get_task(pid); }
 
-pid_t Task::get_pid() const { return thread_group->leader(); }
-
-pid_t Task::get_tid() const { return id; }
+pid_t Task::get_pid() const { return thread_group_->leader(); }
 
 fit::result<Errno, ktl::span<uint8_t>> Task::read_memory(UserAddress addr,
                                                          ktl::span<uint8_t>& bytes) const {

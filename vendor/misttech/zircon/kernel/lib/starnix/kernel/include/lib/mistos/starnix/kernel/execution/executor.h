@@ -66,12 +66,12 @@ void execute_task(TaskBuilder task_builder, PreRunFn&& pre_run,
   auto ref_task = weak_task.Lock();
 
   // Hold a lock on the task's thread slot until we have a chance to initialize it.
-  auto task_thread_guard = ref_task->thread.Write();
+  auto task_thread_guard = ref_task->thread().Write();
 
   auto current_task = CurrentTask::From(task_builder);
 
   auto user_thread =
-      create_thread(current_task->thread_group->process().dispatcher(), current_task->command());
+      create_thread(current_task->thread_group()->process().dispatcher(), current_task->command());
   if (user_thread.is_ok()) {
     *task_thread_guard = ktl::move(user_thread.value().release());
   }
