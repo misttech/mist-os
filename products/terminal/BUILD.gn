@@ -80,7 +80,74 @@ _base_packages = [
   },
 ]
 
+_cache_packages = [
+  {
+    package_target = "//src/ui/bin/terminal"
+  },
+  {
+    package_target = "//src/ui/bin/tiles-session"
+  },
+
+  # Used to mock out display hardware in UI integration tests.
+  {
+    package_target = "//src/graphics/display/testing/fake-coordinator-connector"
+  },
+
+  # Add validator package for use in tests.
+  # TODO(https://fxbug.dev/42077782): Remove once we support packages in the SDK.
+  {
+    package_target = "//src/diagnostics/validator/inspect:validator"
+  },
+
+  # Add test validation packages for use in tests.
+  # TODO(https://fxbug.dev/42077782): Remove once we support packages in the SDK and we want to put
+  # this in the SDK.
+  {
+    package_target = "//src/tests/fidl/dynsuite/client_suite/harness"
+  },
+  {
+    package_target = "//src/tests/fidl/dynsuite/server_suite/harness"
+  },
+
+  # Fake services needed by Chromium tests until subpackages are supported OOT
+  # and fakes are provided with the SDK. See crbug.com/1326674.
+  # TODO(crbug.com/1408597): Remove once the Chromium tests package the fakes.
+  {
+    package_target = "//src/developer/build_info/testing:fake-build-info"
+  },
+  {
+    # archivist-for-embedding is needed by
+    # WebEngineIntegrationLoggingTest.SetJavaScriptLogLevel_DEBUG.
+    # TODO(crbug.com/1451376): Move it to a peer group as appropriate.
+    package_target = "//src/diagnostics/archivist:archivist-for-embedding"
+  },
+  {
+    package_target = "//src/testing/fidl/intl_property_manager"
+  },
+  {
+    # A font provider with built-in font file assets.
+    # TODO(crbug.com/1408597): Once OOT fakes are available, this can be
+    # turned into a hermetic component, or a subpackage.
+    package_target = "//src/fonts:fonts_hermetic_for_test"
+  },
+  {
+    # A font provider without built-in font file assets.
+    package_target = "//src/fonts:fonts_configurable_for_test"
+  },
+
+  # Add Test UI Stack for use in tests.
+  # TODO(https://fxbug.dev/42056298): Remove once we migrate client usage to subpackages.
+  {
+    package_target =
+        "//src/ui/testing/test_ui_stack:flatland-scene-manager-test-ui-stack"
+  },
+  {
+    package_target = "//src/ui/testing/test_ui_stack:test-ui-stack"
+  },
+]
+
 product_assembly_configuration("terminal") {
+  testonly = true
   platform = {
     forward_variables_from(_platform_configuration_base, "*")
   }
@@ -91,12 +158,14 @@ product_assembly_configuration("terminal") {
   }
 
   base_packages = _base_packages
+  cache_packages = _cache_packages
   deps = [ "//build/info:build_info_files" ]
 }
 
 # TODO(https://fxbug.dev/370543906): Remove this product once it's no longer
 # needed.
 product_assembly_configuration("terminal_with_netstack2") {
+  testonly = true
   platform = {
     forward_variables_from(_platform_configuration_base, "*")
 
@@ -113,5 +182,6 @@ product_assembly_configuration("terminal_with_netstack2") {
   }
 
   base_packages = _base_packages
+  cache_packages = _cache_packages
   deps = [ "//build/info:build_info_files" ]
 }
