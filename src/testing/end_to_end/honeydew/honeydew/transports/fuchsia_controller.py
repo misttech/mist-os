@@ -50,8 +50,6 @@ class FuchsiaController(fuchsia_controller_interface.FuchsiaController):
         self.ctx: fuchsia_controller.Context
 
         self.create_context()
-        if self._target_ip_port:
-            self.add_target()
         self.check_connection()
 
     def create_context(self) -> None:
@@ -66,19 +64,7 @@ class FuchsiaController(fuchsia_controller_interface.FuchsiaController):
             isolate_dir: fuchsia_controller.IsolateDir | None = (
                 self._config.isolate_dir
             )
-
             config: dict[str, str] = {}
-
-            # Do not autostart the daemon if it is not running.
-            # If Fuchsia-Controller need to start a daemon then it needs to know
-            # SDK path to find FFX CLI.
-            # However, Honeydew calls FFX CLI (and thus starts the FFX daemon)
-            # even before it instantiates Fuchsia-Controller. So tell
-            # Fuchsia-Controller to use the same daemon (by pointing to same
-            # isolate-dir and logs-dir path used to start the daemon) and set
-            # "daemon.autostart" to "false".
-            config["daemon.autostart"] = "false"
-
             msg: str = (
                 f"Creating Fuchsia-Controller Context with "
                 f"target='{self._target}', config='{config}'"
@@ -142,21 +128,3 @@ class FuchsiaController(fuchsia_controller_interface.FuchsiaController):
             raise errors.FuchsiaControllerError(
                 "Fuchsia Controller FIDL Error"
             ) from status
-
-    def add_target(
-        self,
-    ) -> None:
-        """Adds a target to the ffx daemon manually and wait for the target to
-           connect to RCS.
-
-        Raises:
-            errors.FuchsiaControllerError: Failed to add target
-        """
-        try:
-            _LOGGER.debug("Adding target '%s'", self._target_ip_port)
-            self.ctx.target_add(target=str(self._target_ip_port), wait=True)
-            _LOGGER.debug("Target '%s' has been added", self._target_ip_port)
-        except Exception as err:  # pylint: disable=broad-except
-            raise errors.FuchsiaControllerError(
-                f"Failed to add the target {self._target_ip_port} "
-            ) from err
