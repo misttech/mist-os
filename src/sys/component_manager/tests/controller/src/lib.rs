@@ -410,13 +410,10 @@ async fn start_with_namespace_entries() {
         ns_server_end.into_channel().into(),
     );
 
-    let file_proxy = fuchsia_fs::directory::open_file_deprecated(
-        &test_dir_proxy,
-        "file.txt",
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .await
-    .unwrap();
+    let file_proxy =
+        fuchsia_fs::directory::open_file(&test_dir_proxy, "file.txt", fio::PERM_READABLE)
+            .await
+            .unwrap();
     let file_contents = fuchsia_fs::file::read_to_string(&file_proxy).await.unwrap();
     assert_eq!(file_contents, "hippos".to_string());
 }

@@ -64,9 +64,9 @@ impl FuchsiaBootResolver {
             return Ok(None);
         }
 
-        let boot_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+        let boot_proxy = fuchsia_fs::directory::open_in_namespace(
             bootfs_dir.to_str().unwrap(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+            fio::PERM_READABLE | fio::PERM_EXECUTABLE,
         )?;
 
         Ok(Some(Self::new_from_directory(boot_proxy).await?))
@@ -89,10 +89,10 @@ impl FuchsiaBootResolver {
         let namespace_root = ".";
 
         // Set up the fuchsia-boot path as the component's "package" namespace.
-        let path_proxy = fuchsia_fs::directory::open_directory_no_describe_deprecated(
+        let path_proxy = fuchsia_fs::directory::open_directory_async(
             &self.boot_proxy,
             namespace_root,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+            fio::PERM_READABLE | fio::PERM_EXECUTABLE,
         )
         .map_err(|_| fresolution::ResolverError::Internal)?;
 
@@ -289,10 +289,10 @@ impl BootPackageResolver {
             return Ok(None);
         }
 
-        let boot_blob_storage = fuchsia_fs::directory::open_directory_no_describe_deprecated(
+        let boot_blob_storage = fuchsia_fs::directory::open_directory_async(
             &proxy,
             BOOTFS_BLOB_DIR,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+            fio::PERM_READABLE | fio::PERM_EXECUTABLE,
         )
         .map_err(|err| format_err!("Bootfs blob directory existed, but converting it into a blob client for package resolution failed: {:?}", err))?;
 
@@ -311,10 +311,10 @@ impl BootPackageResolver {
     async fn extract_bootfs_index(
         boot_proxy: &fio::DirectoryProxy,
     ) -> Result<PathHashMapping<Bootfs>, Error> {
-        let bootfs_package_index = fuchsia_fs::directory::open_file_no_describe_deprecated(
+        let bootfs_package_index = fuchsia_fs::directory::open_file_async(
             &boot_proxy,
             BOOT_PACKAGE_INDEX,
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::PERM_READABLE,
         )?;
 
         let bootfs_package_contents = fuchsia_fs::file::read(&bootfs_package_index).await?;
@@ -416,7 +416,7 @@ mod tests {
     use fidl::endpoints::{create_endpoints, create_proxy};
     use fidl::persist;
     use fuchsia_async::Task;
-    use fuchsia_fs::directory::open_in_namespace_deprecated;
+    use fuchsia_fs::directory::open_in_namespace;
     use routing::bedrock::structured_dict::ComponentInput;
     use std::sync::Weak;
     use vfs::directory::entry::OpenRequest;
@@ -444,11 +444,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn hello_world_test() -> Result<(), Error> {
-        let bootfs = open_in_namespace_deprecated(
-            "/pkg",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        )
-        .unwrap();
+        let bootfs = open_in_namespace("/pkg", fio::PERM_READABLE | fio::PERM_EXECUTABLE).unwrap();
         let resolver = FuchsiaBootResolver::new_from_directory(bootfs).await.unwrap();
 
         let url = "fuchsia-boot:///#meta/hello-world-rust.cm".parse().unwrap();
@@ -497,12 +493,9 @@ mod tests {
 
         let dir_proxy = package_dir.into_proxy().unwrap();
         let path = "meta/hello-world-rust.cm";
-        let file_proxy = fuchsia_fs::directory::open_file_no_describe_deprecated(
-            &dir_proxy,
-            path,
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .expect("could not open cm");
+        let file_proxy =
+            fuchsia_fs::directory::open_file_async(&dir_proxy, path, fio::PERM_READABLE)
+                .expect("could not open cm");
 
         let decl = fuchsia_fs::file::read_fidl::<fdecl::Component>(&file_proxy)
             .await
@@ -526,11 +519,7 @@ mod tests {
     #[fuchsia::test]
     async fn capability_provider_test() {
         // Create a CapabilityProvider to serve fuchsia boot resolver requests.
-        let bootfs = open_in_namespace_deprecated(
-            "/pkg",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        )
-        .unwrap();
+        let bootfs = open_in_namespace("/pkg", fio::PERM_READABLE | fio::PERM_EXECUTABLE).unwrap();
         let resolver = FuchsiaBootResolver::new_from_directory(bootfs).await.unwrap();
         let resolver_provider =
             Box::new(ComponentResolverCapabilityProvider::new(resolver.clone()));

@@ -461,9 +461,9 @@ impl RootComponentInputBuilder {
             Arc::new(move |server_end, _| {
                 let path = path.clone();
                 let fut = async move {
-                    fuchsia_fs::node::open_channel_in_namespace_deprecated(
+                    fuchsia_fs::node::open_channel_in_namespace(
                         &path,
-                        fio::OpenFlags::empty(),
+                        fio::Flags::empty(),
                         ServerEnd::new(server_end),
                     )
                     .map_err(|e| {
@@ -736,10 +736,7 @@ impl BuiltinEnvironment {
         // If capability passthrough is enabled, add capabilities offered from
         // the parent to the input dictionary of the root component.
         if capability_passthrough {
-            match fuchsia_fs::directory::open_in_namespace_deprecated(
-                "/parent-offered",
-                fio::OpenFlags::empty(),
-            ) {
+            match fuchsia_fs::directory::open_in_namespace("/parent-offered", fio::Flags::empty()) {
                 Ok(passthrough_dir) => match fuchsia_fs::directory::readdir(&passthrough_dir).await
                 {
                     Ok(entries) => {

@@ -730,10 +730,10 @@ async fn open_storage_subdirectory() {
     .expect("Unable to route.  oh no!!");
 
     // Create the subdirectories we will open later
-    let bar_dir = fuchsia_fs::directory::create_directory_recursive_deprecated(
+    let bar_dir = fuchsia_fs::directory::create_directory_recursive(
         &root_dir,
         "foo/bar",
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        fio::PERM_READABLE | fio::PERM_WRITABLE,
     )
     .await
     .unwrap();

@@ -1326,10 +1326,10 @@ mod tests {
 
         // Open one of the entries.
         {
-            let instance_dir = fuchsia_fs::directory::open_directory_deprecated(
+            let instance_dir = fuchsia_fs::directory::open_directory(
                 &dir_proxy,
                 instance_names.iter().next().expect("failed to get instance name"),
-                fio::OpenFlags::empty(),
+                fio::Flags::empty(),
             )
             .await
             .expect("failed to open collection dir");
@@ -1549,13 +1549,10 @@ mod tests {
             .expect("failed to read directory entries");
         assert_eq!(dir_contents.len(), 6);
         for entry in &dir_contents {
-            let instance_dir = fuchsia_fs::directory::open_directory_deprecated(
-                &dir_proxy,
-                &entry.name,
-                fio::OpenFlags::empty(),
-            )
-            .await
-            .expect("failed to open collection dir");
+            let instance_dir =
+                fuchsia_fs::directory::open_directory(&dir_proxy, &entry.name, fio::Flags::empty())
+                    .await
+                    .expect("failed to open collection dir");
 
             // Make sure we're reading the expected directory.
             let instance_dir_contents = fuchsia_fs::directory::readdir(&instance_dir)
@@ -1656,13 +1653,10 @@ mod tests {
             .expect("failed to read directory entries");
         assert_eq!(dir_contents.len(), 2);
         for entry in &dir_contents {
-            let instance_dir = fuchsia_fs::directory::open_directory_deprecated(
-                &dir_proxy,
-                &entry.name,
-                fio::OpenFlags::empty(),
-            )
-            .await
-            .expect("failed to open collection dir");
+            let instance_dir =
+                fuchsia_fs::directory::open_directory(&dir_proxy, &entry.name, fio::Flags::empty())
+                    .await
+                    .expect("failed to open collection dir");
 
             // Make sure we're reading the expected directory.
             let instance_dir_contents = fuchsia_fs::directory::readdir(&instance_dir)
@@ -1774,13 +1768,10 @@ mod tests {
             .expect("failed to read directory entries");
         assert_eq!(dir_contents.len(), 2);
         for entry in &dir_contents {
-            let instance_dir = fuchsia_fs::directory::open_directory_deprecated(
-                &dir_proxy,
-                &entry.name,
-                fio::OpenFlags::empty(),
-            )
-            .await
-            .expect("failed to open collection dir");
+            let instance_dir =
+                fuchsia_fs::directory::open_directory(&dir_proxy, &entry.name, fio::Flags::empty())
+                    .await
+                    .expect("failed to open collection dir");
 
             // Make sure we're reading the expected directory.
             let instance_dir_contents = fuchsia_fs::directory::readdir(&instance_dir)
@@ -1957,10 +1948,10 @@ mod tests {
 
         // Open one of the entries.
         {
-            let instance_dir = fuchsia_fs::directory::open_directory_deprecated(
+            let instance_dir = fuchsia_fs::directory::open_directory(
                 &dir_proxy,
                 instance_names.iter().next().unwrap(),
-                fio::OpenFlags::empty(),
+                fio::Flags::empty(),
             )
             .await
             .unwrap();

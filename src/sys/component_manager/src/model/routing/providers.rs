@@ -7,7 +7,7 @@ use crate::model::component::WeakComponentInstance;
 use async_trait::async_trait;
 use clonable_error::ClonableError;
 use cm_rust::{Availability, CapabilityTypeName};
-use cm_types::{Name, OPEN_FLAGS_MAX_POSSIBLE_RIGHTS};
+use cm_types::{Name, FLAGS_MAX_POSSIBLE_RIGHTS};
 use cm_util::TaskGroup;
 use errors::{CapabilityProviderError, OpenError};
 use moniker::Moniker;
@@ -130,13 +130,11 @@ impl CapabilityProvider for NamespaceCapabilityProvider {
 
         open_request
             .open_remote(remote_dir(
-                fuchsia_fs::directory::open_in_namespace_deprecated(
-                    dir,
-                    OPEN_FLAGS_MAX_POSSIBLE_RIGHTS,
-                )
-                .map_err(|e| CapabilityProviderError::CmNamespaceError {
-                    err: ClonableError::from(anyhow::Error::from(e)),
-                })?,
+                fuchsia_fs::directory::open_in_namespace(dir, FLAGS_MAX_POSSIBLE_RIGHTS).map_err(
+                    |e| CapabilityProviderError::CmNamespaceError {
+                        err: ClonableError::from(anyhow::Error::from(e)),
+                    },
+                )?,
             ))
             .map_err(|e| CapabilityProviderError::CmNamespaceError {
                 err: ClonableError::from(anyhow::Error::from(e)),

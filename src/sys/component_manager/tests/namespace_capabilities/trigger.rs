@@ -8,7 +8,7 @@ use futures::{StreamExt, TryStreamExt};
 use tracing::*;
 use {
     fidl_fidl_examples_routing_echo as fecho, fidl_fidl_test_components as ftest,
-    fuchsia_async as fasync,
+    fidl_fuchsia_io as fio, fuchsia_async as fasync,
 };
 
 #[fuchsia::main]
@@ -38,11 +38,9 @@ async fn run_trigger_service(mut stream: ftest::TriggerRequestStream) {
         let out = out.expect("empty echo result");
 
         // Attempt to open test-pkg (a component manager namespace capability)
-        let file = fuchsia_fs::file::open_in_namespace_deprecated(
-            "/test-pkg/data/testdata",
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
-        )
-        .expect("could not open testdata");
+        let file =
+            fuchsia_fs::file::open_in_namespace("/test-pkg/data/testdata", fio::PERM_READABLE)
+                .expect("could not open testdata");
         let contents = fuchsia_fs::file::read_to_string(&file).await.expect("could not read file");
         assert_eq!(contents, "Hello world!\n");
 

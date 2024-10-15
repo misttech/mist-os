@@ -68,10 +68,10 @@ async fn list_instances_test(test_type: TestType) {
     start_provider(&branch, input.provider_b_moniker).await.expect("failed to start provider b");
 
     // List the instances in the BankAccount service.
-    let service_dir = fuchsia_fs::directory::open_directory_deprecated(
+    let service_dir = fuchsia_fs::directory::open_directory(
         branch.get_exposed_dir(),
         fexamples::BankAccountMarker::SERVICE_NAME,
-        fio::OpenFlags::empty(),
+        fio::Flags::empty(),
     )
     .await
     .expect("failed to open service dir");
@@ -95,10 +95,10 @@ async fn connect_to_instances_test(test_type: TestType) {
     start_provider(&branch, input.provider_b_moniker).await.expect("failed to start provider b");
 
     // List the instances in the BankAccount service.
-    let service_dir = fuchsia_fs::directory::open_directory_deprecated(
+    let service_dir = fuchsia_fs::directory::open_directory(
         branch.get_exposed_dir(),
         fexamples::BankAccountMarker::SERVICE_NAME,
-        fio::OpenFlags::empty(),
+        fio::Flags::empty(),
     )
     .await
     .expect("failed to open service dir");
@@ -139,10 +139,10 @@ async fn create_destroy_instance_test(test_type: TestType) {
     start_provider(&branch, input.provider_b_moniker).await.expect("failed to start provider b");
 
     // List the instances in the BankAccount service.
-    let service_dir = fuchsia_fs::directory::open_directory_deprecated(
+    let service_dir = fuchsia_fs::directory::open_directory(
         branch.get_exposed_dir(),
         fexamples::BankAccountMarker::SERVICE_NAME,
-        fio::OpenFlags::empty(),
+        fio::Flags::empty(),
     )
     .await
     .expect("failed to open service dir");
@@ -306,10 +306,10 @@ async fn static_aggregate_expose() {
     let realm = builder.build().await.unwrap();
 
     let exposed_dir = realm.root.get_exposed_dir();
-    let echo_svc = fuchsia_fs::directory::open_directory_deprecated(
+    let echo_svc = fuchsia_fs::directory::open_directory(
         exposed_dir,
         fecho::EchoServiceMarker::SERVICE_NAME,
-        fio::OpenFlags::empty(),
+        fio::Flags::empty(),
     )
     .await
     .unwrap();

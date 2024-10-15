@@ -1065,12 +1065,8 @@ async fn destroying_instance_blocks_on_routing() {
     // Connect to `data` in `b`'s namespace to kick off a directory routing task.
     let dir_proxy =
         capability_util::take_dir_from_namespace(&namespace, &"/data".parse().unwrap()).await;
-    let file_proxy = fuchsia_fs::directory::open_file_no_describe_deprecated(
-        &dir_proxy,
-        "hippo",
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .unwrap();
+    let file_proxy =
+        fuchsia_fs::directory::open_file_async(&dir_proxy, "hippo", fio::PERM_READABLE).unwrap();
     capability_util::add_dir_to_namespace(&namespace, &"/data".parse().unwrap(), dir_proxy).await;
 
     // Destroy `b`.
@@ -2928,13 +2924,10 @@ async fn use_filtered_service_from_sibling() {
     let namespace_c = test.bind_and_get_namespace(vec!["c"].try_into().unwrap()).await;
     let dir_c =
         capability_util::take_dir_from_namespace(&namespace_c, &"/svc".parse().unwrap()).await;
-    let service_dir_c = fuchsia_fs::directory::open_directory_deprecated(
-        &dir_c,
-        "my.service.Service",
-        fuchsia_fs::OpenFlags::empty(),
-    )
-    .await
-    .expect("failed to open service");
+    let service_dir_c =
+        fuchsia_fs::directory::open_directory(&dir_c, "my.service.Service", fio::Flags::empty())
+            .await
+            .expect("failed to open service");
     let entries: HashSet<String> = fuchsia_fs::directory::readdir(&service_dir_c)
         .await
         .expect("failed to read entries")
@@ -2949,13 +2942,10 @@ async fn use_filtered_service_from_sibling() {
     let namespace_d = test.bind_and_get_namespace(vec!["d"].try_into().unwrap()).await;
     let dir_d =
         capability_util::take_dir_from_namespace(&namespace_d, &"/svc".parse().unwrap()).await;
-    let service_dir_d = fuchsia_fs::directory::open_directory_deprecated(
-        &dir_d,
-        "my.service.Service",
-        fuchsia_fs::OpenFlags::empty(),
-    )
-    .await
-    .expect("failed to open service");
+    let service_dir_d =
+        fuchsia_fs::directory::open_directory(&dir_d, "my.service.Service", fio::Flags::empty())
+            .await
+            .expect("failed to open service");
     let entries: HashSet<String> = fuchsia_fs::directory::readdir(&service_dir_d)
         .await
         .expect("failed to read entries")
@@ -3057,13 +3047,10 @@ async fn use_filtered_aggregate_service_from_sibling() {
     let namespace_c = test.bind_and_get_namespace(vec!["c"].try_into().unwrap()).await;
     let dir_c =
         capability_util::take_dir_from_namespace(&namespace_c, &"/svc".parse().unwrap()).await;
-    let service_dir_c = fuchsia_fs::directory::open_directory_deprecated(
-        &dir_c,
-        "my.service.Service",
-        fuchsia_fs::OpenFlags::empty(),
-    )
-    .await
-    .expect("failed to open service");
+    let service_dir_c =
+        fuchsia_fs::directory::open_directory(&dir_c, "my.service.Service", fio::Flags::empty())
+            .await
+            .expect("failed to open service");
     let entries: HashSet<String> = fuchsia_fs::directory::readdir(&service_dir_c)
         .await
         .expect("failed to read entries")

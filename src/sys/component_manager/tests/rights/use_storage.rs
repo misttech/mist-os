@@ -4,7 +4,6 @@
 
 use anyhow::Error;
 use fuchsia_component::server::ServiceFs;
-use fuchsia_fs::OpenFlags;
 use futures::{StreamExt, TryStreamExt};
 use {fidl_fidl_test_components as ftest, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -24,10 +23,10 @@ async fn main() {
 async fn open_and_write_file(dir: &fio::DirectoryProxy) -> Result<(), Error> {
     // We are opening the file with the DESCRIBE flag and waiting for a response (no pipelining).
     // This should fail if the directory failed to route due to a rights issue.
-    let file = fuchsia_fs::directory::open_file_deprecated(
+    let file = fuchsia_fs::directory::open_file(
         &dir,
         "test",
-        OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
+        fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::FLAG_MAYBE_CREATE,
     )
     .await?;
     fuchsia_fs::file::write(&file, b"test_data").await?;
@@ -37,9 +36,9 @@ async fn open_and_write_file(dir: &fio::DirectoryProxy) -> Result<(), Error> {
 async fn run_trigger_service(mut stream: ftest::TriggerRequestStream) -> Result<(), Error> {
     while let Some(event) = stream.try_next().await? {
         let ftest::TriggerRequest::Run { responder } = event;
-        let data_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+        let data_proxy = fuchsia_fs::directory::open_in_namespace(
             "/data",
-            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
         )?;
         let msg = if open_and_write_file(&data_proxy).await.is_err() {
             "Failed to write to file"

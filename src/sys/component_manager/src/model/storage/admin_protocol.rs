@@ -408,12 +408,10 @@ impl StorageAdmin {
             match Self::is_storage_dir(path) {
                 // Open the storage directory and then create a task to delete
                 (DirType::ComponentStorage, ..) => {
-                    match ffs_dir::open_directory_deprecated(
+                    match ffs_dir::open_directory(
                         root_storage,
                         entry.name.as_str(),
-                        fuchsia_fs::OpenFlags::RIGHT_READABLE
-                            | fuchsia_fs::OpenFlags::RIGHT_WRITABLE
-                            | fuchsia_fs::OpenFlags::DIRECTORY,
+                        fio::PERM_READABLE | fio::PERM_WRITABLE,
                     )
                     .await
                     {
@@ -734,13 +732,10 @@ mod tests {
     }
 
     async fn create_file(directory: &fio::DirectoryProxy, file_name: &str, contents: &str) {
-        let file = fuchsia_fs::directory::open_file_deprecated(
+        let file = fuchsia_fs::directory::open_file(
             directory,
             file_name,
-            fio::OpenFlags::CREATE
-                | fio::OpenFlags::CREATE_IF_ABSENT
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::Flags::FLAG_MUST_CREATE | fio::PERM_READABLE | fio::PERM_WRITABLE,
         )
         .await
         .expect("Failed to create file");
@@ -751,21 +746,19 @@ mod tests {
         directory: &fio::DirectoryProxy,
         directory_name: &str,
     ) -> fio::DirectoryProxy {
-        fuchsia_fs::directory::create_directory_deprecated(
+        fuchsia_fs::directory::create_directory(
             directory,
             directory_name,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
         )
         .await
         .expect("Failed to create directory")
     }
 
     fn open_tempdir(tempdir: &tempfile::TempDir) -> fio::DirectoryProxy {
-        fuchsia_fs::directory::open_in_namespace_deprecated(
+        fuchsia_fs::directory::open_in_namespace(
             tempdir.path().to_str().unwrap(),
-            fio::OpenFlags::DIRECTORY
-                | fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
         )
         .expect("Failed to open directory")
     }

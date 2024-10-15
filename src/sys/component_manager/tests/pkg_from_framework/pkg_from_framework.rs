@@ -22,13 +22,10 @@ async fn read_example_config_and_assert_contents(
 ) -> Result<(), Error> {
     let config_dir =
         handles.clone_from_namespace("config").expect("failed to clone config from namespace");
-    let example_config_file = fuchsia_fs::directory::open_file_deprecated(
-        &config_dir,
-        path,
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .await
-    .expect("failed to open example config file");
+    let example_config_file =
+        fuchsia_fs::directory::open_file(&config_dir, path, fio::PERM_READABLE)
+            .await
+            .expect("failed to open example config file");
     let example_config_contents = fuchsia_fs::file::read_to_string(&example_config_file)
         .await
         .expect("failed to read example config file");

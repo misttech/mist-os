@@ -246,9 +246,9 @@ impl RoutingTest {
 
         // Create a directory for the components, starting with a single static file
         // "foo/hippo" in it.
-        let test_dir_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+        let test_dir_proxy = fuchsia_fs::directory::open_in_namespace(
             test_dir.path().to_str().unwrap(),
-            fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
         )
         .expect("failed to open temp directory");
         capability_util::create_static_file(&test_dir_proxy, Path::new("foo/hippo"), "hello")
@@ -448,10 +448,10 @@ impl RoutingTest {
             dir_path.push(relative_path);
         }
         if !dir_path.parent().is_none() {
-            let dir_proxy = fuchsia_fs::directory::open_directory_deprecated(
+            let dir_proxy = fuchsia_fs::directory::open_directory(
                 &self.test_dir_proxy,
                 &dir_path.to_str().unwrap(),
-                fuchsia_fs::OpenFlags::empty(),
+                fio::Flags::empty(),
             )
             .await
             .expect("failed to open directory");
@@ -463,13 +463,10 @@ impl RoutingTest {
 
     /// Lists the contents of a directory.
     pub async fn list_directory(&self, path: &str) -> Vec<String> {
-        let dir_proxy = fuchsia_fs::directory::open_directory_deprecated(
-            &self.test_dir_proxy,
-            path,
-            fuchsia_fs::OpenFlags::empty(),
-        )
-        .await
-        .expect("failed to open directory");
+        let dir_proxy =
+            fuchsia_fs::directory::open_directory(&self.test_dir_proxy, path, fio::Flags::empty())
+                .await
+                .expect("failed to open directory");
         list_directory(&dir_proxy).await
     }
 
@@ -729,11 +726,9 @@ impl RoutingTestModel for RoutingTest {
                 if let Some(moniker) = storage_relation {
                     if from_cm_namespace {
                         // Check for the file in the /tmp in the test's namespace
-                        let tmp_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
-                            "/tmp",
-                            fuchsia_fs::OpenFlags::RIGHT_READABLE,
-                        )
-                        .expect("failed to open /tmp");
+                        let tmp_proxy =
+                            fuchsia_fs::directory::open_in_namespace("/tmp", fio::PERM_READABLE)
+                                .expect("failed to open /tmp");
                         let res = capability_util::check_file_in_storage(
                             storage_subdir,
                             moniker,
@@ -943,11 +938,8 @@ impl RoutingTestModel for RoutingTest {
     }
 
     async fn check_namespace_subdir_contents(&self, path: &str, expected: Vec<String>) {
-        let dir_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
-            path,
-            fuchsia_fs::OpenFlags::empty(),
-        )
-        .expect("failed to open directory");
+        let dir_proxy = fuchsia_fs::directory::open_in_namespace(path, fio::Flags::empty())
+            .expect("failed to open directory");
         assert_eq!(list_directory(&dir_proxy).await, expected)
     }
 
@@ -985,25 +977,19 @@ pub mod capability_util {
         let dir_proxy = take_dir_from_namespace(namespace, &path).await;
         match expected_res {
             ExpectedResult::Ok => {
-                let file_proxy = fuchsia_fs::directory::open_file_deprecated(
-                    &dir_proxy,
-                    file,
-                    fio::OpenFlags::RIGHT_READABLE,
-                )
-                .await
-                .expect("failed to open file");
+                let file_proxy =
+                    fuchsia_fs::directory::open_file(&dir_proxy, file, fio::PERM_READABLE)
+                        .await
+                        .expect("failed to open file");
                 let res = fuchsia_fs::file::read_to_string(&file_proxy)
                     .await
                     .expect("failed to read file");
                 assert_eq!("hello", res);
             }
             ExpectedResult::Err(s) => {
-                let file_proxy = fuchsia_fs::directory::open_file_no_describe_deprecated(
-                    &dir_proxy,
-                    file,
-                    fio::OpenFlags::RIGHT_READABLE,
-                )
-                .expect("failed to open file");
+                let file_proxy =
+                    fuchsia_fs::directory::open_file_async(&dir_proxy, file, fio::PERM_READABLE)
+                        .expect("failed to open file");
                 let _ = fuchsia_fs::file::read_to_string(&file_proxy)
                     .await
                     .expect_err("read file successfully when it should fail");
@@ -1016,12 +1002,9 @@ pub mod capability_util {
                 );
             }
             ExpectedResult::ErrWithNoEpitaph => {
-                let file_proxy = fuchsia_fs::directory::open_file_no_describe_deprecated(
-                    &dir_proxy,
-                    file,
-                    fio::OpenFlags::RIGHT_READABLE,
-                )
-                .expect("failed to open file");
+                let file_proxy =
+                    fuchsia_fs::directory::open_file_async(&dir_proxy, file, fio::PERM_READABLE)
+                        .expect("failed to open file");
                 let _ = fuchsia_fs::file::read_to_string(&file_proxy)
                     .await
                     .expect_err("read file successfully when it should fail");
@@ -1093,24 +1076,24 @@ pub mod capability_util {
     ) -> Result<(), anyhow::Error> {
         // Open file, and create subdirectories if required.
         let file_proxy = if let Some(directory) = path.parent() {
-            let subdir = fuchsia_fs::directory::create_directory_recursive_deprecated(
+            let subdir = fuchsia_fs::directory::create_directory_recursive(
                 root,
                 directory.to_str().ok_or(anyhow!("{:?} is not a valid UTF-8 string", path))?,
-                fio::OpenFlags::RIGHT_WRITABLE,
+                fio::PERM_WRITABLE,
             )
             .await
             .map_err(|e| anyhow!(e).context(format!("failed to create subdirs for {:?}", path)))?;
-            fuchsia_fs::directory::open_file_deprecated(
+            fuchsia_fs::directory::open_file(
                 &subdir,
                 path.file_name().unwrap().to_str().unwrap(),
-                fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
+                fio::PERM_WRITABLE | fio::Flags::FLAG_MAYBE_CREATE,
             )
             .await?
         } else {
-            fuchsia_fs::directory::open_file_deprecated(
+            fuchsia_fs::directory::open_file(
                 root,
                 path.to_str().unwrap(),
-                fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
+                fio::PERM_READABLE | fio::Flags::FLAG_MAYBE_CREATE,
             )
             .await?
         };
@@ -1127,10 +1110,10 @@ pub mod capability_util {
     ) -> Result<(), anyhow::Error> {
         let mut dir_path = generate_storage_path(storage_subdir, &relation, instance_id);
         dir_path.push("hippos");
-        let file_proxy = fuchsia_fs::directory::open_file_deprecated(
+        let file_proxy = fuchsia_fs::directory::open_file(
             &test_dir_proxy,
             &dir_path.to_str().unwrap(),
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
+            fio::PERM_READABLE,
         )
         .await?;
 
@@ -1146,10 +1129,10 @@ pub mod capability_util {
         test_dir_proxy: &fio::DirectoryProxy,
     ) {
         let dir_path = generate_storage_path(storage_subdir, &relation, instance_id);
-        let res = fuchsia_fs::directory::open_directory_deprecated(
+        let res = fuchsia_fs::directory::open_directory(
             &test_dir_proxy,
             dir_path.to_str().unwrap(),
-            fuchsia_fs::OpenFlags::empty(),
+            fio::Flags::empty(),
         )
         .await
         .expect_err("open_directory shouldn't have succeeded");
@@ -1182,10 +1165,10 @@ pub mod capability_util {
         let dir_proxy = take_dir_from_namespace(namespace, &dirname).await;
         // TODO(https://fxbug.dev/42069409): Utilize the new fuchsia_component::client method to connect to
         // the service instance, passing in the service_dir, instance name, and member path.
-        let service_dir = fuchsia_fs::directory::open_directory_deprecated(
+        let service_dir = fuchsia_fs::directory::open_directory(
             &dir_proxy,
             path.basename().as_str(),
-            fio::OpenFlags::empty(),
+            fio::Flags::empty(),
         )
         .await;
         add_dir_to_namespace(namespace, &dirname, dir_proxy).await;
@@ -1198,18 +1181,15 @@ pub mod capability_util {
                 _ => panic!("Unexpected open error {:?}", e),
             })?;
 
-        let instance_dir = fuchsia_fs::directory::open_directory_deprecated(
-            &service_dir,
-            instance,
-            fio::OpenFlags::empty(),
-        )
-        .await
-        .map_err(|e| match e {
-            OpenError::OpenError(status) => {
-                fidl::Error::ClientChannelClosed { status, protocol_name: "" }
-            }
-            _ => panic!("Unexpected open error {:?}", e),
-        })?;
+        let instance_dir =
+            fuchsia_fs::directory::open_directory(&service_dir, instance, fio::Flags::empty())
+                .await
+                .map_err(|e| match e {
+                    OpenError::OpenError(status) => {
+                        fidl::Error::ClientChannelClosed { status, protocol_name: "" }
+                    }
+                    _ => panic!("Unexpected open error {:?}", e),
+                })?;
         Ok(connect_to_named_protocol_at_dir_root::<T>(&instance_dir, member)
             .expect("failed to open member protocol"))
     }
@@ -1220,10 +1200,10 @@ pub mod capability_util {
     ) -> Vec<String> {
         let dirname = path.parent();
         let dir_proxy = take_dir_from_namespace(namespace, &dirname).await;
-        let service_dir = fuchsia_fs::directory::open_directory_deprecated(
+        let service_dir = fuchsia_fs::directory::open_directory(
             &dir_proxy,
             path.basename().as_str(),
-            fio::OpenFlags::empty(),
+            fio::Flags::empty(),
         )
         .await
         .expect("failed to open service dir");
@@ -1325,10 +1305,10 @@ pub mod capability_util {
     /// an OnOpen event when opened with OPEN_FLAG_DESCRIBE.
     pub async fn call_node_svc_from_namespace(namespace: &ManagedNamespace, path: cm_types::Path) {
         let dir_proxy = take_dir_from_namespace(namespace, &path.parent()).await;
-        let _node_proxy = fuchsia_fs::directory::open_node_deprecated(
+        let _node_proxy = fuchsia_fs::directory::open_node(
             &dir_proxy,
             path.basename().as_str(),
-            fio::OpenFlags::empty(),
+            fio::Flags::PROTOCOL_NODE,
         )
         .await
         .expect("failed to open node");
@@ -1348,23 +1328,16 @@ pub mod capability_util {
         let dir_proxy = fio::DirectoryProxy::new(node_proxy.into_channel().unwrap());
         match expected_res {
             ExpectedResult::Ok => {
-                let file_proxy = fuchsia_fs::directory::open_file_deprecated(
-                    &dir_proxy,
-                    &file,
-                    fio::OpenFlags::RIGHT_READABLE,
-                )
-                .await
-                .expect("failed to open file");
+                let file_proxy =
+                    fuchsia_fs::directory::open_file(&dir_proxy, &file, fio::PERM_READABLE)
+                        .await
+                        .expect("failed to open file");
                 let res = fuchsia_fs::file::read_to_string(&file_proxy).await;
                 assert_eq!("hello", res.expect("failed to read file"));
             }
             ExpectedResult::Err(s) => {
-                fuchsia_fs::directory::open_file_no_describe_deprecated(
-                    &dir_proxy,
-                    &file,
-                    fio::OpenFlags::RIGHT_READABLE,
-                )
-                .expect("failed to open file");
+                fuchsia_fs::directory::open_file_async(&dir_proxy, &file, fio::PERM_READABLE)
+                    .expect("failed to open file");
                 let epitaph = dir_proxy.take_event_stream().next().await.expect("no epitaph");
                 assert_matches!(
                     epitaph,
@@ -1374,12 +1347,8 @@ pub mod capability_util {
                 );
             }
             ExpectedResult::ErrWithNoEpitaph => {
-                fuchsia_fs::directory::open_file_no_describe_deprecated(
-                    &dir_proxy,
-                    &file,
-                    fio::OpenFlags::RIGHT_READABLE,
-                )
-                .expect("failed to open file");
+                fuchsia_fs::directory::open_file_async(&dir_proxy, &file, fio::PERM_READABLE)
+                    .expect("failed to open file");
                 assert_matches!(dir_proxy.take_event_stream().next().await, None);
             }
         }
@@ -1412,13 +1381,10 @@ pub mod capability_util {
         // TODO(https://fxbug.dev/42069409): Utilize the new fuchsia_component::client method to connect to
         // the service instance, passing in the service_dir, instance name, and member path.
         let service_dir = fio::DirectoryProxy::from_channel(node_proxy.into_channel().unwrap());
-        let instance_dir = fuchsia_fs::directory::open_directory_deprecated(
-            &service_dir,
-            &instance,
-            fuchsia_fs::OpenFlags::empty(),
-        )
-        .await
-        .expect("failed to open instance");
+        let instance_dir =
+            fuchsia_fs::directory::open_directory(&service_dir, &instance, fio::Flags::empty())
+                .await
+                .expect("failed to open instance");
         let echo_proxy =
             connect_to_named_protocol_at_dir_root::<echo::EchoMarker>(&instance_dir, &member)
                 .expect("failed to connect to Echo service");

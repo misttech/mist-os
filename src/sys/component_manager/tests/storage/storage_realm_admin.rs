@@ -47,12 +47,8 @@ async fn main() {
         .await
         .expect("Error reading directory");
     assert_eq!(filenames, hashset! {filename.to_string()});
-    let file = fuchsia_fs::directory::open_file_no_describe_deprecated(
-        &dir_proxy,
-        &filename,
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .unwrap();
+    let file =
+        fuchsia_fs::directory::open_file_async(&dir_proxy, &filename, fio::PERM_READABLE).unwrap();
     assert_eq!(
         fuchsia_fs::file::read_to_string(&file).await.unwrap(),
         expected_contents.to_string()

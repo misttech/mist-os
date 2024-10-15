@@ -419,9 +419,7 @@ mod tests {
     }
 
     async fn open_file_to_read(dir: &fio::DirectoryProxy, name: &str) -> fio::FileProxy {
-        fuchsia_fs::directory::open_file_deprecated(&dir, &name, fio::OpenFlags::RIGHT_READABLE)
-            .await
-            .unwrap()
+        fuchsia_fs::directory::open_file(&dir, &name, fio::PERM_READABLE).await.unwrap()
     }
 
     fn parsed_payload(entry: &BootfsEntry) -> String {
@@ -449,11 +447,8 @@ mod tests {
             .create_and_bind_vfs()
             .unwrap();
 
-        let boot_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
-            "/boot",
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
-        )
-        .unwrap();
+        let boot_proxy =
+            fuchsia_fs::directory::open_in_namespace("/boot", fio::PERM_READABLE).unwrap();
 
         // Confirm that each entry from the uncompressed Bootfs is inserted into
         // the BootfsVFS as distinct copies.
@@ -503,11 +498,8 @@ mod tests {
             .create_and_bind_vfs()
             .unwrap();
 
-        let boot_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
-            "/boot",
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
-        )
-        .unwrap();
+        let boot_proxy =
+            fuchsia_fs::directory::open_in_namespace("/boot", fio::PERM_READABLE).unwrap();
 
         // Make sure entry1 was translated correctly to the VFS.
         let entry1_file = open_file_to_read(&boot_proxy, &entry1.name).await;
@@ -547,11 +539,8 @@ mod tests {
             .create_and_bind_vfs()
             .unwrap();
 
-        let boot_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
-            "/boot",
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
-        )
-        .unwrap();
+        let boot_proxy =
+            fuchsia_fs::directory::open_in_namespace("/boot", fio::PERM_READABLE).unwrap();
 
         // Make sure entry1 was translated correctly to the VFS.
         let entry1_file = open_file_to_read(&boot_proxy, &entry1.name).await;

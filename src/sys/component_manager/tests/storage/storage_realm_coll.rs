@@ -78,13 +78,10 @@ async fn main() {
         .unwrap()
         .unwrap();
     let exposed_dir = fio::DirectoryProxy::new(exposed_dir.into_channel().unwrap());
-    let memfs_dir = fuchsia_fs::directory::open_directory_deprecated(
-        &exposed_dir,
-        "memfs",
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .await
-    .unwrap();
+    let memfs_dir =
+        fuchsia_fs::directory::open_directory(&exposed_dir, "memfs", fio::PERM_READABLE)
+            .await
+            .unwrap();
     let entries = fuchsia_fs::directory::readdir(&memfs_dir).await.unwrap();
     assert!(entries.is_empty());
 }

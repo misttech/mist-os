@@ -65,9 +65,9 @@ async fn validate_open_with_node_reference_and_describe(path: &str) -> Result<()
     // VFS implementation of the io protocol.
     // TODO(https://fxbug.dev/42055559): If the rust VFS interpretation of the DESCRIBE
     // flag behavior on service nodes is incorrect, update this call.
-    let node = fuchsia_fs::node::open_in_namespace_deprecated(
+    let node = fuchsia_fs::node::open_in_namespace(
         path,
-        fio::OpenFlags::DESCRIBE | fio::OpenFlags::NODE_REFERENCE,
+        fio::Flags::PROTOCOL_NODE | fio::Flags::FLAG_SEND_REPRESENTATION,
     )?;
 
     let mut events = node.take_event_stream();
@@ -82,9 +82,13 @@ async fn validate_open_with_node_reference_and_describe(path: &str) -> Result<()
             let () = zx_status::Status::ok(status).map_err(OpenError::OpenError)?;
             info.ok_or(OpenError::MissingOnOpenInfo)?;
         }
-        event @ fio::NodeEvent::OnRepresentation { payload: _ } => {
-            panic!("Compliance test got unexpected event: {:?}", event)
-        }
+        fio::NodeEvent::OnRepresentation { payload } => match payload {
+            fio::Representation::Connector(fio::ConnectorInfo { .. }) => {}
+            fio::Representation::File(fio::FileInfo { .. }) => {}
+            fio::Representation::Directory(fio::DirectoryInfo { .. }) => {}
+            fio::Representation::Symlink(fio::SymlinkInfo { .. }) => {}
+            other => panic!("Compliance test got unexpected OnRepresentation event: {:?}", other),
+        },
         fio::NodeEvent::_UnknownEvent { ordinal, .. } => {
             panic!("Compliance test got unexpected unknown: {ordinal:?}")
         }
@@ -94,11 +98,8 @@ async fn validate_open_with_node_reference_and_describe(path: &str) -> Result<()
 }
 
 async fn validate_open_with_extra_path_should_fail(path: &str) {
-    let node = fuchsia_fs::node::open_in_namespace_deprecated(
-        &format!("{}/extra", path),
-        fio::OpenFlags::empty(),
-    )
-    .unwrap();
+    let node = fuchsia_fs::node::open_in_namespace(&format!("{}/extra", path), fio::Flags::empty())
+        .unwrap();
     let mut events = node.take_event_stream();
     let event = events.next().await.unwrap();
     event.expect_err("Opening a protocol with a non-empty relative path should fail.");
