@@ -120,34 +120,18 @@ void Dwc3::EpStartTransfer(Endpoint& ep, Fifo& fifo, uint32_t type, zx_paddr_t b
 void Dwc3::EpEndTransfers(Endpoint& ep, zx_status_t reason) {
   if (ep.current_req.has_value()) {
     CmdEpEndTransfer(ep);
-
-    if (std::holds_alternative<BanjoType>(*ep.current_req)) {
-      usb_request_t* req{std::get<BanjoType>(*ep.current_req).request()};
-      req->response.status = reason;
-      req->response.actual = 0;
-    } else {  // FidlType
-      auto& [metadata, req] = std::get<FidlType>(*ep.current_req);
-      metadata.actual = 0;
-      metadata.status = reason;
-    }
+    ep.current_req->actual = 0;
+    ep.current_req->status = reason;
 
     pending_completions_.push(std::move(*ep.current_req));
   }
   ep.got_not_ready = false;
 
   while (!ep.queued_reqs.empty()) {
-    std::optional<RequestVariant> rv{ep.queued_reqs.pop()};
-
-    if (std::holds_alternative<BanjoType>(*rv)) {
-      auto& req{std::get<BanjoType>(*rv)};
-      req.request()->response.status = reason;
-      req.request()->response.actual = 0;
-    } else {  // FidlType
-      auto& [metadata, req] = std::get<FidlType>(*rv);
-      metadata.status = reason;
-      metadata.actual = 0;
-    }
-    pending_completions_.push(std::move(*rv));
+    std::optional<RequestInfo> opt_info{ep.queued_reqs.pop()};
+    opt_info->status = reason;
+    opt_info->actual = 0;
+    pending_completions_.push(std::move(*opt_info));
   }
 }
 
@@ -163,57 +147,35 @@ void Dwc3::EpReadTrb(Endpoint& ep, Fifo& fifo, const dwc3_trb_t* src, dwc3_trb_t
 void Dwc3::UserEpQueueNext(UserEndpoint& uep) {
   Endpoint& ep = uep.ep;
 
-  std::optional<RequestVariant> rv;
+  std::optional<RequestInfo> opt_info;
 
   if (!ep.current_req.has_value() && ep.got_not_ready && !ep.queued_reqs.empty()) {
-    rv.emplace(*ep.queued_reqs.pop());
+    opt_info.emplace(*ep.queued_reqs.pop());
   }
 
-  if (rv.has_value()) {
-    ep.current_req.emplace(std::move(*rv));
+  if (opt_info.has_value()) {
+    ep.current_req.emplace(std::move(*opt_info));
+    auto* info{&ep.current_req.value()};
 
-    if (std::holds_alternative<BanjoType>(*ep.current_req)) {
-      usb_request_t* req{std::get<BanjoType>(*ep.current_req).request()};
+    zx_paddr_t phys;
+    size_t size;
 
-      ep.got_not_ready = false;
-
-      if (ep.IsInput()) {
-        usb_request_cache_flush(req, 0, req->header.length);
-      } else {
-        usb_request_cache_flush_invalidate(req, 0, req->header.length);
-      }
-
-      // TODO(voydanoff) scatter/gather support
-      phys_iter_t iter;
-      zx_paddr_t phys;
-      usb_request_physmap(req, bti_.get());
-      usb_request_phys_iter_init(&iter, req, zx_system_get_page_size());
-      usb_request_phys_iter_next(&iter, &phys);
-      bool send_zlp = req->header.send_zlp && ((req->header.length % ep.max_packet_size) == 0);
-      EpStartTransfer(ep, uep.fifo, TRB_TRBCTL_NORMAL, phys, req->header.length, send_zlp);
-    } else {  // FidlType
-      auto& [metadata, req] = std::get<FidlType>(*ep.current_req);
-
-      zx_paddr_t phys;
-      size_t size;
-
-      zx::result result{metadata.uep->server->get_iter(req, zx_system_get_page_size())};
-      if (result.is_error()) {
-        zxlogf(ERROR, "[BUG] server->phys_iter(): %s", result.status_string());
-      }
-      ZX_ASSERT(result.is_ok());
-
-      // TODO(voydanoff) scatter/gather support
-      std::tie(phys, size) = *result->at(0).begin();
-      bool send_zlp{(size % ep.max_packet_size) == 0};
-
-      EpStartTransfer(ep, uep.fifo, TRB_TRBCTL_NORMAL, phys, size, send_zlp);
+    zx::result result{info->uep->server->get_iter(info->req, zx_system_get_page_size())};
+    if (result.is_error()) {
+      zxlogf(ERROR, "[BUG] server->phys_iter(): %s", result.status_string());
     }
+    ZX_ASSERT(result.is_ok());
+
+    // TODO(voydanoff) scatter/gather support
+    std::tie(phys, size) = *result->at(0).begin();
+    bool send_zlp{(size % ep.max_packet_size) == 0};
+
+    EpStartTransfer(ep, uep.fifo, TRB_TRBCTL_NORMAL, phys, size, send_zlp);
   }
 }
 
 zx_status_t Dwc3::UserEpCancelAll(UserEndpoint& uep) {
-  VariantQueue to_complete;
+  FidlRequestQueue to_complete;
 
   {
     fbl::AutoLock lock(&uep.ep.lock);
@@ -226,10 +188,10 @@ zx_status_t Dwc3::UserEpCancelAll(UserEndpoint& uep) {
   return ZX_OK;
 }
 
-Dwc3::VariantQueue Dwc3::UserEpCancelAllLocked(UserEndpoint& uep) {
+Dwc3::FidlRequestQueue Dwc3::UserEpCancelAllLocked(UserEndpoint& uep) {
   // Move the endpoint's queue of requests into a local list so we can
   // complete the requests outside of the endpoint lock.
-  VariantQueue to_complete{std::move(uep.ep.queued_reqs)};
+  FidlRequestQueue to_complete{std::move(uep.ep.queued_reqs)};
 
   // If there is currently a request in-flight, be sure to cancel its
   // transfer, and add the in-flight request to the local queue of requests to
@@ -253,7 +215,7 @@ void Dwc3::HandleEpTransferCompleteEvent(uint8_t ep_num) {
     return;
   }
 
-  std::optional<RequestVariant> opt_req;
+  std::optional<RequestInfo> opt_info;
 
   {
     UserEndpoint* const uep = get_user_endpoint(ep_num);
@@ -262,9 +224,9 @@ void Dwc3::HandleEpTransferCompleteEvent(uint8_t ep_num) {
     fbl::AutoLock lock{&uep->ep.lock};
 
     if (uep->ep.current_req.has_value()) {
-      opt_req.emplace(std::move(*uep->ep.current_req));
-
+      opt_info.emplace(std::move(*uep->ep.current_req));
       uep->ep.current_req.reset();
+
       dwc3_trb_t trb;
       EpReadTrb(uep->ep, uep->fifo, uep->fifo.current, &trb);
       uep->fifo.current = nullptr;
@@ -273,21 +235,14 @@ void Dwc3::HandleEpTransferCompleteEvent(uint8_t ep_num) {
         zxlogf(ERROR, "TRB_HWO still set in dwc3_ep_xfer_complete");
       }
 
-      if (std::holds_alternative<BanjoType>(*opt_req)) {
-        usb_request_t* req{std::get<BanjoType>(*opt_req).request()};
-        req->response.actual = req->header.length - TRB_BUFSIZ(trb.status);
-        req->response.status = ZX_OK;
-      } else {  // FidlType
-        auto& [metadata, req] = std::get<FidlType>(*opt_req);
-        auto& freq{std::get<usb::FidlRequest>(req)};
-        metadata.actual = freq->data()->at(0).size().value();
-        metadata.status = ZX_OK;
-      }
+      auto& freq{std::get<usb::FidlRequest>(opt_info->req)};
+      opt_info->actual = freq->data()->at(0).size().value();
+      opt_info->status = ZX_OK;
     }
   }
 
-  if (opt_req.has_value()) {
-    pending_completions_.push(std::move(*opt_req));
+  if (opt_info.has_value()) {
+    pending_completions_.push(std::move(*opt_info));
   } else {
     zxlogf(ERROR, "no usb request found to complete!");
   }

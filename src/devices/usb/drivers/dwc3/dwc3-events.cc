@@ -185,17 +185,8 @@ int Dwc3::IrqThread() {
   while (!shutdown_now) {
     // Perform the callbacks for any requests which are pending completion.
     while (!pending_completions_.empty()) {
-      std::optional<RequestVariant> opt_req{pending_completions_.pop()};
-
-      if (std::holds_alternative<BanjoType>(*opt_req)) {
-        auto& req{std::get<BanjoType>(*opt_req)};
-        const zx_status_t status = req.request()->response.status;
-        const zx_off_t actual = req.request()->response.actual;
-        req.Complete(status, actual);
-      } else {  // FidlType
-        auto& [metadata, req] = std::get<FidlType>(*opt_req);
-        metadata.uep->server->RequestComplete(metadata.status, metadata.actual, std::move(req));
-      }
+      std::optional<RequestInfo> info{pending_completions_.pop()};
+      info->uep->server->RequestComplete(info->status, info->actual, std::move(info->req));
     }
 
     // Wait for a new interrupt.

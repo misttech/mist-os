@@ -2,11 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.usb.descriptor/cpp/wire.h>
+
 #include <fbl/auto_lock.h>
 
 #include "src/devices/usb/drivers/dwc3/dwc3.h"
 
 namespace dwc3 {
+
+namespace fdescriptor = fuchsia_hardware_usb_descriptor;
 
 zx_status_t Dwc3::Ep0Init() {
   fbl::AutoLock lock(&ep0_.lock);
@@ -43,9 +47,9 @@ void Dwc3::Ep0Start() {
 }
 
 void Dwc3::Ep0QueueSetupLocked() {
-  CacheFlushInvalidate(ep0_.buffer.get(), 0, sizeof(usb_setup_t));
+  CacheFlushInvalidate(ep0_.buffer.get(), 0, sizeof(fdescriptor::wire::UsbSetup));
   EpStartTransfer(ep0_.out, ep0_.shared_fifo, TRB_TRBCTL_SETUP, ep0_.buffer->phys(),
-                  sizeof(usb_setup_t), false);
+                  sizeof(fdescriptor::wire::UsbSetup), false);
   ep0_.state = Ep0::State::Setup;
 }
 
@@ -81,8 +85,8 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
     case Ep0::State::Setup: {
       void* const vaddr = ep0_.buffer->virt();
       const zx_paddr_t paddr = ep0_.buffer->phys();
-      usb_setup_t setup = ep0_.cur_setup;
-      //
+      fdescriptor::wire::UsbSetup setup = ep0_.cur_setup;
+
       memcpy(&setup, vaddr, sizeof(setup));
 
       zxlogf(DEBUG, "got setup: type: 0x%02X req: %d value: %d index: %d length: %d",
@@ -201,17 +205,19 @@ void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
   }
 }
 
-zx::result<size_t> Dwc3::HandleEp0Setup(const usb_setup_t& setup, void* buffer, size_t length) {
-  auto DoControlCall = [this](const usb_setup_t& setup, const uint8_t* in_buf, size_t in_len,
-                              uint8_t* out_buf, size_t out_len) -> zx::result<size_t> {
+zx::result<size_t> Dwc3::HandleEp0Setup(const fdescriptor::wire::UsbSetup& setup, void* buffer,
+                                        size_t length) {
+  auto DoControlCall = [this](const fdescriptor::wire::UsbSetup& setup, const uint8_t* in_buf,
+                              size_t in_len, uint8_t* out_buf,
+                              size_t out_len) -> zx::result<size_t> {
     fbl::AutoLock lock(&dci_lock_);
 
-    if (!dci_intf_valid()) {
+    if (!dci_intf_.is_valid()) {
       return zx::error(ZX_ERR_BAD_STATE);
     }
 
     size_t actual = 0;
-    zx_status_t status = DciIntfWrapControl(&setup, in_buf, in_len, out_buf, out_len, &actual);
+    zx_status_t status = DciIntfControl(&setup, in_buf, in_len, out_buf, out_len, &actual);
     if (status == ZX_OK) {
       return zx::ok(actual);
     } else {

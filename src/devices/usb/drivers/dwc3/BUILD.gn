@@ -35,7 +35,6 @@ fuchsia_driver("dwc3-driver") {
   ]
   deps = [
     ":dwc3_bind",
-    "//sdk/banjo/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.endpoint:fuchsia.hardware.usb.endpoint_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
@@ -84,7 +83,6 @@ test("dwc3-test-bin") {
   output_name = "dwc3-test"
   deps = [
     ":dwc3_bind",
-    "//sdk/banjo/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.endpoint:fuchsia.hardware.usb.endpoint_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",

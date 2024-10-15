@@ -6,6 +6,7 @@
 #define SRC_DEVICES_USB_DRIVERS_DWC3_DWC3_H_
 
 #include <fidl/fuchsia.hardware.usb.dci/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.usb.descriptor/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.endpoint/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
@@ -19,7 +20,6 @@
 #include <cstdint>
 #include <deque>
 #include <memory>
-#include <variant>
 
 #include <ddktl/device.h>
 #include <fbl/auto_lock.h>
@@ -30,8 +30,6 @@
 #include <usb/request-fidl.h>
 #include <usb/usb.h>
 
-#include "fuchsia/hardware/usb/dci/cpp/banjo.h"
-#include "fuchsia/hardware/usb/descriptor/cpp/banjo.h"
 #include "src/devices/usb/drivers/dwc3/dwc3-types.h"
 
 namespace dwc3 {
@@ -46,7 +44,6 @@ class Dwc3;
 using Dwc3Type = ddk::Device<Dwc3, ddk::Initializable, ddk::Unbindable>;
 
 class Dwc3 : public Dwc3Type,
-             public ddk::UsbDciProtocol<Dwc3, ddk::base_protocol>,
              public fidl::Server<fuchsia_hardware_usb_dci::UsbDci> {
  public:
   explicit Dwc3(zx_device_t* parent, async_dispatcher_t* dispatcher)
@@ -58,17 +55,6 @@ class Dwc3 : public Dwc3Type,
   void DdkInit(ddk::InitTxn txn);
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
-
-  // USB DCI protocol implementation.
-  void UsbDciRequestQueue(usb_request_t* req, const usb_request_complete_callback_t* cb);
-  zx_status_t UsbDciSetInterface(const usb_dci_interface_protocol_t* interface);
-  zx_status_t UsbDciConfigEp(const usb_endpoint_descriptor_t* ep_desc,
-                             const usb_ss_ep_comp_descriptor_t* ss_comp_desc);
-  zx_status_t UsbDciDisableEp(uint8_t ep_address);
-  zx_status_t UsbDciEpSetStall(uint8_t ep_address);
-  zx_status_t UsbDciEpClearStall(uint8_t ep_address);
-  size_t UsbDciGetRequestSize();
-  zx_status_t UsbDciCancelAll(uint8_t ep_address);
 
   // fuchsia_hardware_usb_dci::UsbDci protocol implementation.
   void ConnectToEndpoint(ConnectToEndpointRequest& request,
@@ -94,19 +80,12 @@ class Dwc3 : public Dwc3Type,
                              fidl::UnknownMethodCompleter::Sync& completer) override { /* no-op */ }
 
  private:
-  // For the purposes of banjo->FIDL migration.
-  zx_status_t CommonSetInterface();
-  zx_status_t CommonConfigureEndpoint(const usb_endpoint_descriptor_t* ep_desc,
-                                      const usb_ss_ep_comp_descriptor_t* ss_comp_desc);
-  zx_status_t CommonDisableEndpoint(uint8_t ep_addr);
-  zx_status_t CommonEndpointSetStall(uint8_t ep_addr);
-  zx_status_t CommonEndpointClearStall(uint8_t ep_addr);
   zx_status_t CommonCancelAll(uint8_t ep_addr);
-  void DciIntfWrapSetSpeed(usb_speed_t speed) TA_REQ(dci_lock_);
-  void DciIntfWrapSetConnected(bool connected) TA_REQ(dci_lock_);
-  zx_status_t DciIntfWrapControl(const usb_setup_t* setup, const uint8_t* write_buffer,
-                                 size_t write_size, uint8_t* read_buffer, size_t read_size,
-                                 size_t* read_actual) TA_REQ(dci_lock_);
+  void DciIntfSetSpeed(fuchsia_hardware_usb_descriptor::wire::UsbSpeed speed) TA_REQ(dci_lock_);
+  void DciIntfSetConnected(bool connected) TA_REQ(dci_lock_);
+  zx_status_t DciIntfControl(const fuchsia_hardware_usb_descriptor::wire::UsbSetup* setup,
+                             const uint8_t* write_buffer, size_t write_size, uint8_t* read_buffer,
+                             size_t read_size, size_t* read_actual) TA_REQ(dci_lock_);
 
   static inline const uint32_t kEventBufferSize = zx_system_get_page_size();
   static inline const uint32_t kEp0BufferSize = UINT16_MAX + 1;
@@ -121,38 +100,29 @@ class Dwc3 : public Dwc3Type,
   static inline constexpr zx::duration kHwResetTimeout{zx::msec(50)};
   static inline constexpr zx::duration kEndpointDeadline{zx::sec(10)};
 
-  using Request = usb::BorrowedRequest<void>;
-  using RequestQueue = usb::BorrowedRequestQueue<void>;
-
-  // As we move from banjo to fidl, there are places in the code where we need to support both types
-  // of requests, a usb::FidlRequest and a (banjo) Request. Because FIDL requests don't encode the
-  // endpoint or return metadata, we need to tow that information along as a tuple of ep_num,
-  // metadata, and FIDL request instance.
-  using BanjoType = Request;
-
   struct UserEndpoint;
-  struct FidlTypeMetadata {
+  struct RequestInfo {
     size_t actual;
     zx_status_t status;
     UserEndpoint* uep;
+    usb_endpoint::RequestVariant req;
   };
 
-  using FidlType = std::tuple<FidlTypeMetadata, usb_endpoint::RequestVariant>;
-  using RequestVariant = std::variant<BanjoType, FidlType>;
-
-  // Like a usb::RequestQueue, but can handle banjo or FIDL requests.
-  class VariantQueue {
+  // Like a usb::RequestQueue for usb::FidlRequests.
+  //
+  // TODO(hansens) We should probably implement something like this in usb/request-fidl.h
+  class FidlRequestQueue {
    public:
-    VariantQueue() = default;
+    FidlRequestQueue() = default;
 
     // Movable, not copyable.
-    VariantQueue(VariantQueue&& other) {
+    FidlRequestQueue(FidlRequestQueue&& other) {
       fbl::AutoLock lock{&lock_};
       q_ = std::move(other.q_);
       other.q_.clear();
     }
 
-    VariantQueue& operator=(VariantQueue&& other) {
+    FidlRequestQueue& operator=(FidlRequestQueue&& other) {
       fbl::AutoLock other_lock{&other.lock_};
       fbl::AutoLock my_lock{&lock_};
       q_ = std::move(other.q_);
@@ -160,33 +130,30 @@ class Dwc3 : public Dwc3Type,
       return *this;
     }
 
-    VariantQueue(const VariantQueue&) = delete;
-    VariantQueue& operator=(const VariantQueue&) = delete;
+    FidlRequestQueue(const FidlRequestQueue&) = delete;
+    FidlRequestQueue& operator=(const FidlRequestQueue&) = delete;
 
-    void push(RequestVariant&& v) {
+    void push(RequestInfo&& info) {
       fbl::AutoLock lock{&lock_};
 
-      if (std::holds_alternative<FidlType>(v)) {
-        auto& [metadata, req] = std::get<FidlType>(v);
-        if (metadata.uep == nullptr) {
-          zxlogf(ERROR, "[BUG] Enqueuing FidlType variant with no corresponding uep");
-        }
-        ZX_ASSERT(metadata.uep != nullptr);  // Halt and catch fire.
+      if (info.uep == nullptr) {
+        zxlogf(ERROR, "[BUG] Enqueuing usb::FidlRequest with no corresponding uep");
       }
+      ZX_ASSERT(info.uep != nullptr);  // Halt and catch fire.
 
-      q_.push_front(std::move(v));
+      q_.push_front(std::move(info));
     }
 
     // Pushes to the (semantic) front of the queue, cutting the line.
-    void push_next(RequestVariant&& v) {
+    void push_next(RequestInfo&& info) {
       fbl::AutoLock lock{&lock_};
-      q_.push_back(std::move(v));
+      q_.push_back(std::move(info));
     }
 
     // Pop the next value from the queue, if any.
-    std::optional<RequestVariant> pop() {
+    std::optional<RequestInfo> pop() {
       fbl::AutoLock lock{&lock_};
-      std::optional<RequestVariant> opt{std::nullopt};
+      std::optional<RequestInfo> opt{std::nullopt};
 
       if (!q_.empty()) {
         opt.emplace(std::move(q_.back()));
@@ -205,23 +172,15 @@ class Dwc3 : public Dwc3Type,
       fbl::AutoLock _{&lock_};
 
       while (!q_.empty()) {
-        RequestVariant rv{std::move(q_.back())};
+        RequestInfo info{std::move(q_.back())};
         q_.pop_back();
-
-        if (std::holds_alternative<BanjoType>(rv)) {
-          std::get<BanjoType>(rv).Complete(status, size);
-          return;
-        }
-
-        // FidlType.
-        auto& [metadata, req] = std::get<FidlType>(rv);
-        metadata.uep->server->RequestComplete(status, size, std::move(req));
+        info.uep->server->RequestComplete(status, size, std::move(info.req));
       }
     }
 
    private:
     mutable fbl::Mutex lock_;
-    std::deque<RequestVariant> q_ TA_GUARDED(lock_);  // Queued front-to-back.
+    std::deque<RequestInfo> q_ TA_GUARDED(lock_);  // Queued front-to-back.
   };
 
   enum class IrqSignal : uint32_t {
@@ -295,9 +254,9 @@ class Dwc3 : public Dwc3Type,
     bool IsOutput() const { return IsOutput(ep_num); }
     bool IsInput() const { return IsInput(ep_num); }
 
-    VariantQueue queued_reqs;                   // banjo requests waiting to be processed
-    std::optional<RequestVariant> current_req;  // request currently being processed (if any)
-    uint32_t rsrc_id{0};                        // resource ID for current_req
+    FidlRequestQueue queued_reqs;            // requests waiting to be processed
+    std::optional<RequestInfo> current_req;  // request currently being processed (if any)
+    uint32_t rsrc_id{0};                     // resource ID for current_req
 
     const uint8_t ep_num{0};
     uint8_t type{0};  // control, bulk, interrupt or isochronous
@@ -393,8 +352,11 @@ class Dwc3 : public Dwc3Type,
     TA_GUARDED(lock) State state { Ep0::State::None };
     TA_GUARDED(lock) Endpoint out;
     TA_GUARDED(lock) Endpoint in;
-    TA_GUARDED(lock) usb_setup_t cur_setup;  // current setup request
-    TA_GUARDED(lock) usb_speed_t cur_speed = USB_SPEED_UNDEFINED;
+    TA_GUARDED(lock) fuchsia_hardware_usb_descriptor::wire::UsbSetup cur_setup;
+
+    TA_GUARDED(lock)
+    fuchsia_hardware_usb_descriptor::wire::UsbSpeed cur_speed{
+        fuchsia_hardware_usb_descriptor::wire::UsbSpeed::kUndefined};
   };
 
   constexpr bool is_ep0_num(uint8_t ep_num) { return ((ep_num == kEp0Out) || (ep_num == kEp0In)); }
@@ -466,8 +428,8 @@ class Dwc3 : public Dwc3Type,
   void Ep0Start() TA_EXCL(lock_);
   void Ep0QueueSetupLocked() TA_REQ(ep0_.lock) TA_EXCL(lock_);
   void Ep0StartEndpoints() TA_REQ(ep0_.lock) TA_EXCL(lock_);
-  zx::result<size_t> HandleEp0Setup(const usb_setup_t& setup, void* buffer, size_t length)
-      TA_REQ(ep0_.lock) TA_EXCL(lock_);
+  zx::result<size_t> HandleEp0Setup(const fuchsia_hardware_usb_descriptor::wire::UsbSetup& setup,
+                                    void* buffer, size_t length) TA_REQ(ep0_.lock) TA_EXCL(lock_);
   void HandleEp0TransferCompleteEvent(uint8_t ep_num) TA_EXCL(lock_, ep0_.lock);
   void HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) TA_EXCL(lock_, ep0_.lock);
 
@@ -488,7 +450,7 @@ class Dwc3 : public Dwc3Type,
   // which were in-flight.  Note that these requests have not been completed
   // yet.  It is the responsibility of the caller to (eventually) take care of
   // this once the lock has been dropped.
-  [[nodiscard]] VariantQueue UserEpCancelAllLocked(UserEndpoint& uep) TA_REQ(uep.ep.lock)
+  [[nodiscard]] FidlRequestQueue UserEpCancelAllLocked(UserEndpoint& uep) TA_REQ(uep.ep.lock)
       TA_EXCL(lock_);
 
   // Commands
@@ -509,19 +471,7 @@ class Dwc3 : public Dwc3Type,
 
   ddk::PDevFidl pdev_;
 
-  using DciInterfaceBanjoClient = ddk::UsbDciInterfaceProtocolClient;
-  using DciInterfaceFidlClient = fidl::WireSyncClient<fuchsia_hardware_usb_dci::UsbDciInterface>;
-
-  std::variant<std::monostate, DciInterfaceBanjoClient, DciInterfaceFidlClient> dci_intf_
-      TA_GUARDED(dci_lock_);
-
-  inline bool dci_intf_valid() const TA_REQ(dci_lock_) {
-    return std::visit(
-        [](auto&& val) {  // True if the value is not of the monostate variant.
-          return !std::is_same_v<std::decay_t<decltype(val)>, std::monostate>;
-        },
-        dci_intf_);
-  }
+  fidl::WireSyncClient<fuchsia_hardware_usb_dci::UsbDciInterface> dci_intf_ TA_GUARDED(dci_lock_);
 
   std::optional<ddk::MmioBuffer> mmio_;
 
@@ -540,7 +490,7 @@ class Dwc3 : public Dwc3Type,
   Ep0 ep0_;
   UserEndpointCollection user_endpoints_;
 
-  VariantQueue pending_completions_;
+  FidlRequestQueue pending_completions_;
 
   // TODO(johngro): What lock protects this?  Right now, it is effectively
   // endpoints_[0].lock(), but how do we express this?
