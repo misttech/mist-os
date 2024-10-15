@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 use fidl::endpoints::Proxy;
+use fuchsia_inspect::ArrayProperty;
+use futures::FutureExt;
 use once_cell::sync::OnceCell;
 use starnix_logging::{log_debug, log_error, log_warn};
 use starnix_sync::{Mutex, MutexGuard};
@@ -118,12 +120,41 @@ impl HrTimerManagerState {
 }
 
 impl HrTimerManager {
-    pub fn new() -> HrTimerManagerHandle {
-        Arc::new(Self {
+    pub fn new(parent_node: &fuchsia_inspect::Node) -> HrTimerManagerHandle {
+        let new_manager = Arc::new(Self {
             device_proxy: connect_to_hrtimer().ok(),
             state: Default::default(),
             start_next_sender: Default::default(),
-        })
+        });
+        let manager_weak = Arc::downgrade(&new_manager);
+        // Create a lazy inspect node to get HrTimerManager info at read-time.
+        parent_node.record_lazy_child("hr_timer", move || {
+            let manager_ref = manager_weak.upgrade().expect("inner HrTimerManager");
+            async move {
+                let inspector = fuchsia_inspect::Inspector::default();
+                inspector.root().record_int("now", zx::MonotonicInstant::get().into_nanos());
+
+                let guard = manager_ref.lock();
+                let deadline =
+                    guard.current_deadline.unwrap_or(zx::MonotonicInstant::ZERO).into_nanos();
+                let mut sorted_heap = guard.timer_heap.clone().into_sorted_vec();
+                drop(guard);
+
+                inspector.root().record_int("deadline", deadline);
+
+                // Get the descending order
+                sorted_heap.reverse();
+                let heap_inspector = inspector.root().create_int_array("heap", sorted_heap.len());
+                for (index, timer) in sorted_heap.into_iter().enumerate() {
+                    heap_inspector.set(index, timer.deadline.into_nanos());
+                }
+                inspector.root().record(heap_inspector);
+
+                Ok(inspector)
+            }
+            .boxed()
+        });
+        new_manager
     }
 
     pub fn init(self: &HrTimerManagerHandle, system_task: &CurrentTask) -> Result<(), Errno> {
@@ -424,6 +455,7 @@ impl TimerOps for HrTimerHandle {
 }
 
 /// Represents a node of `HrTimer` in the binary heap used by the `HrTimerManager`.
+#[derive(Clone)]
 struct HrTimerNode {
     /// The deadline of the associated `HrTimer`.
     ///
