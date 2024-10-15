@@ -2291,6 +2291,9 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
                 is_packet_spurious(IpVersion::V4, &frame_data[..])
             }
             fhardware_network::FrameType::Ethernet => Ok(false),
+            fhardware_network::FrameType::__SourceBreaking { unknown_ordinal } => {
+                panic!("unknown frame type {unknown_ordinal}")
+            }
         }?;
         Ok((!is_spurious).then_some((frame_type, frame_data)))
     });

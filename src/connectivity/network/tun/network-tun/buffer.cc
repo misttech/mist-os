@@ -163,12 +163,8 @@ TxBuffer::TxBuffer(const tx_buffer_t& tx, bool get_meta, VmoStore* vmo_store)
     });
   }
   if (get_meta) {
-    auto info_type = static_cast<fuchsia_hardware_network::wire::InfoType>(tx.meta.info_type);
-    if (info_type != fuchsia_hardware_network::wire::InfoType::kNoInfo) {
-      FX_LOGF(WARNING, "tun", "Unrecognized InfoType %d", tx.meta.info_type);
-    }
     meta_ = fuchsia_net_tun::wire::FrameMetadata{
-        .info_type = info_type,
+        .info_type = fuchsia_hardware_network::wire::InfoType::kNoInfo,
         .flags = tx.meta.flags,
     };
   }

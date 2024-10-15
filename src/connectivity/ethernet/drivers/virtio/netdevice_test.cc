@@ -519,9 +519,6 @@ TEST_P(VirtioVersionTests, Rx) {
     EXPECT_EQ(result.part.id, expect.id);
     EXPECT_EQ(result.part.offset, device().virtio_header_len());
     EXPECT_EQ(result.part.length, expect.id * kReceivedLenMultiplier);
-
-    EXPECT_EQ(result.meta.info_type,
-              static_cast<uint32_t>(fuchsia_hardware_network::wire::InfoType::kNoInfo));
     EXPECT_EQ(result.meta.frame_type,
               static_cast<uint8_t>(fuchsia_hardware_network::wire::FrameType::kEthernet));
     EXPECT_EQ(result.meta.flags, 0);

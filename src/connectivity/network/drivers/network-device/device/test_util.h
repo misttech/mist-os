@@ -94,9 +94,6 @@ class RxFidlReturn : public fbl::DoublyLinkedListable<std::unique_ptr<RxFidlRetu
       : buffer_({
             .meta =
                 {
-                    .info = netdriver::wire::FrameInfo::WithNoInfo(netdriver::wire::NoInfo{
-                        static_cast<uint8_t>(netdev::wire::InfoType::kNoInfo)}),
-                    .info_type = netdev::wire::InfoType::kNoInfo,
                     .frame_type = netdev::wire::FrameType::kEthernet,
                 },
             .data =

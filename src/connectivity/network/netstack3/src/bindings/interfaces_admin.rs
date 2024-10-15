@@ -325,6 +325,7 @@ async fn create_interface(
                     Some(fnet_interfaces_admin::InterfaceRemovedReason::PortClosed)
                 }
                 netdevice_worker::Error::ConfigurationNotSupported
+                | netdevice_worker::Error::UnsupportedFrameType(_)
                 | netdevice_worker::Error::MacNotUnicast { .. }
                 | netdevice_worker::Error::MismatchedRxFrameType { .. }
                 | netdevice_worker::Error::InvalidPortClass(_) => {

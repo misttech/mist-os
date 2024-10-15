@@ -279,7 +279,6 @@ void SimDataPath::TxRegion(uint16_t id, uint64_t offset, uint64_t data_size) {
       .data = {arena, regions},
       .meta =
           {
-              .info = fuchsia_hardware_network_driver::wire::FrameInfo::WithNoInfo({}),
               .frame_type = fuchsia_hardware_network::wire::FrameType::kEthernet,
           },
       .head_length = *device_info_.tx_head_length(),

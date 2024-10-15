@@ -395,7 +395,7 @@ zx_status_t Session::FetchTx(TxQueue::SessionTransaction& transaction) {
         break;
       default:
         LOGF_ERROR("%s: info type (%u) not recognized, discarding information", name(),
-                   static_cast<uint32_t>(buffer->meta.info_type));
+                   static_cast<uint32_t>(info_type));
         info_type = netdev::wire::InfoType::kNoInfo;
         break;
     }
@@ -407,9 +407,6 @@ zx_status_t Session::FetchTx(TxQueue::SessionTransaction& transaction) {
         .meta =
             {
                 .port = desc.port_id.base,
-                .info = netdriver::wire::FrameInfo::WithNoInfo(
-                    netdriver::wire::NoInfo{static_cast<uint8_t>(netdev::wire::InfoType::kNoInfo)}),
-                .info_type = info_type,
                 .flags = desc.inbound_flags,
                 .frame_type = static_cast<netdev::wire::FrameType>(desc.frame_type),
             },
@@ -1030,9 +1027,6 @@ bool Session::ListenFromTx(const Session& owner, uint16_t owner_index) {
   // common routine to commit the descriptor.
   const fuchsia_hardware_network_driver::wire::BufferMetadata frame_meta = {
       .port = owner_desc.port_id.base,
-      .info = netdriver::wire::FrameInfo::WithNoInfo(
-          netdriver::wire::NoInfo{static_cast<uint8_t>(netdev::wire::InfoType::kNoInfo)}),
-      .info_type = static_cast<fuchsia_hardware_network::wire::InfoType>(info_type),
       .flags = static_cast<uint32_t>(netdev::wire::RxFlags::kRxEchoedTx),
       .frame_type = static_cast<fuchsia_hardware_network::wire::FrameType>(owner_desc.frame_type),
   };
@@ -1082,17 +1076,11 @@ zx_status_t Session::LoadRxInfo(const RxFrameInfo& info) {
     if (buffers_iterator == info.buffers.begin()) {
       // The descriptor pointer now points to the first descriptor in the chain, where we store the
       // metadata.
-      auto info_type = static_cast<netdev::wire::InfoType>(info.meta.info_type);
-      switch (info_type) {
-        case netdev::wire::InfoType::kNoInfo:
-          break;
-        default:
-          LOGF_ERROR("%s: info type (%u) not recognized, discarding information", name(),
-                     static_cast<uint32_t>(info.meta.info_type));
-          info_type = netdev::wire::InfoType::kNoInfo;
-          break;
-      }
-      desc.info_type = static_cast<uint32_t>(info_type);
+
+      // NB: Info type is currently unused by all drivers and has been removed
+      // from the driver API in https://fxbug.dev/369404264. We always report
+      // empty info to the application.
+      desc.info_type = static_cast<uint32_t>(netdev::wire::InfoType::kNoInfo);
       desc.frame_type = static_cast<uint8_t>(info.meta.frame_type);
       desc.inbound_flags = info.meta.flags;
       desc.port_id = {

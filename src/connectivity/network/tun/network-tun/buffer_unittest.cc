@@ -60,7 +60,6 @@ TEST_F(BufferTest, TestBufferBuildTx) {
       .data_count = std::size(regions),
       .meta =
           {
-              .info_type = static_cast<uint32_t>(fuchsia_hardware_network::wire::InfoType::kNoInfo),
               .flags = static_cast<uint32_t>(fuchsia_hardware_network::wire::TxFlags::kTxAccel0),
               .frame_type =
                   static_cast<uint8_t>(fuchsia_hardware_network::wire::FrameType::kEthernet),

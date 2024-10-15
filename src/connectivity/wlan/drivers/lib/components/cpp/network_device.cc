@@ -19,7 +19,6 @@ void PopulateRxBuffer(netdriver::wire::RxBuffer& buffer, netdriver::wire::RxBuff
                       const wlan::drivers::components::Frame& frame) {
   buffer.data = ::fidl::VectorView<::netdriver::wire::RxBufferPart>::FromExternal(&buffer_part, 1);
   buffer.meta.port = frame.PortId();
-  buffer.meta.info = netdriver::wire::FrameInfo::WithNoInfo({});
   buffer.meta.frame_type = ::fuchsia_hardware_network::wire::FrameType::kEthernet;
   buffer_part.id = frame.BufferId();
   buffer_part.length = frame.Size();

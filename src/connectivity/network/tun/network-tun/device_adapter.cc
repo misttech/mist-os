@@ -331,7 +331,6 @@ void DeviceAdapter::EnqueueRx(uint8_t port_id, fuchsia_hardware_network::wire::F
       .meta =
           {
               .port = port_id,
-              .info_type = static_cast<uint32_t>(fuchsia_hardware_network::wire::InfoType::kNoInfo),
               .frame_type = static_cast<uint8_t>(frame_type),
           },
       .data_list = &return_rx_parts_[old_rx_parts_count],
@@ -339,9 +338,8 @@ void DeviceAdapter::EnqueueRx(uint8_t port_id, fuchsia_hardware_network::wire::F
   });
   if (meta) {
     ret.meta.flags = meta->flags;
-    ret.meta.info_type = static_cast<uint32_t>(meta->info_type);
     if (meta->info_type != fuchsia_hardware_network::wire::InfoType::kNoInfo) {
-      FX_LOGF(WARNING, "tun", "Unrecognized info type %d", ret.meta.info_type);
+      FX_LOGF(WARNING, "tun", "Unrecognized info type %d", static_cast<uint32_t>(meta->info_type));
     }
   }
 }

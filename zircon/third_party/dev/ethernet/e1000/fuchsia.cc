@@ -329,9 +329,7 @@ Device<RxDescriptor>::Device(Driver& driver, std::unique_ptr<adapter>&& adapter,
     : DeviceBase(driver), adapter_(std::move(adapter)), compat_server_(std::move(compat_server)) {
   for (auto& buffer : adapter_->rx_buffers) {
     buffer = {
-        .meta = {.port = kPortId,
-                 .info = netdriver::wire::FrameInfo::WithNoInfo({}),
-                 .frame_type = netdev::wire::FrameType::kEthernet},
+        .meta = {.port = kPortId, .frame_type = netdev::wire::FrameType::kEthernet},
         .data = {adapter_->rx_buffer_arena, 1},
     };
   }

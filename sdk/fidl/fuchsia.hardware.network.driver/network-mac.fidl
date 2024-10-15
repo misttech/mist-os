@@ -22,7 +22,7 @@ const MAX_MAC_FILTER uint64 = 64;
 /// The variants of this type should match
 /// fuchsia.hardware.network.MacFilterMode.
 // LINT.IfChange
-type SupportedMacFilterMode = strict bits {
+type SupportedMacFilterMode = flexible bits {
     /// Device accepts only unicast frames addressed to its own unicast address,
     /// or multicast frames that are part of the multicast address filter list.
     MULTICAST_FILTER = 1;
@@ -57,8 +57,6 @@ closed protocol MacAddr {
     /// Gets this device's MAC address.
     // TODO(https://fxbug.dev/42120438) we need an address changed event (in
     // lockstep with FIDL definition).
-    // TODO(brunodalbo) use fuchsia.net.MacAddress here and in SetMode when we
-    // can use FIDL types in Banjo.
     strict GetAddress() -> (struct {
         mac fuchsia.net.MacAddress;
     });
