@@ -745,7 +745,8 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         // Keep track of the current task serving the different Binder protocol. When a given
         // Binder is closed, this task will actually wait for the associated Binder task to finish,
         // to ensure that the same device is not opened multiple times because of concurrency.
-        let binder_tasks = Rc::new(Mutex::new(HashMap::<zx::Koid, fasync::Task<()>>::new()));
+        let binder_tasks =
+            Rc::new(std::cell::RefCell::new(HashMap::<zx::Koid, fasync::Task<()>>::new()));
         while let Some(event) = stream.try_next().await? {
             // The tasks must be freed when this method returns, binder_tasks should always have a
             // single owner, and the RC is only used temporarily to let tasks clean themselves.
@@ -791,7 +792,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                                 async move {
                                     let result = task.await;
                                     if let Some(binder_tasks) = binder_tasks.upgrade() {
-                                        binder_tasks.lock().remove(&koid);
+                                        binder_tasks.borrow_mut().remove(&koid);
                                     }
                                     if let Err(err) = result {
                                         log_warn!("DevBinder::Open failed: {err:?}");
@@ -803,7 +804,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                             // `binder_tasks`, as it will never be removed.
                             if futures::poll!(&mut task).is_pending() {
                                 // Register the task associated with the koid of the remote handle.
-                                binder_tasks.lock().insert(koid, task);
+                                binder_tasks.borrow_mut().insert(koid, task);
                             }
                         }
                         Err(err) => {
@@ -819,7 +820,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                     let result: Result<_, Error> = (|| {
                         let binder = payload.binder.ok_or_else(|| errno!(EINVAL))?;
                         let koid = binder.get_koid()?;
-                        Ok(binder_tasks.lock().remove(&koid))
+                        Ok(binder_tasks.borrow_mut().remove(&koid))
                     })();
                     match result {
                         Err(err) => {
@@ -925,35 +926,28 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
             })
             .map_err(|_| errno!(EINVAL))?;
         let handle = self.clone();
-        current_task.kernel().kthreads.spawner().spawn(move |_, _| {
-            let mut executor = fasync::LocalExecutor::new();
-            let result = executor.run_singlethreaded({
-                let handle = handle.clone();
-                async {
-                    // Retrieve the Kernel and a `DropWaiter` for the thread_group, taking care not
-                    // to keep a strong reference to the thread_group itself.
-                    let kernel_and_drop_waiter = handle
-                        .state
-                        .lock()
-                        .thread_group
-                        .upgrade()
-                        .map(|tg| (tg.kernel.clone(), tg.drop_notifier.waiter()));
-                    let Some((kernel, drop_waiter)) = kernel_and_drop_waiter else {
-                        return Ok(());
-                    };
-                    // Start the 2 servers.
-                    let dev_binder_server =
-                        fasync::Task::local(handle.serve_dev_binder(dev_binder_server_end.into()));
-                    let lutex_controller_server = fasync::Task::local(
-                        Self::serve_lutex_controller(kernel, lutex_controller_server_end.into()),
-                    );
-                    // Wait until both are done, or the task exits.
-                    let binder_result = future_or_task_end(&drop_waiter, dev_binder_server).await;
-                    let lutex_controller_result =
-                        future_or_task_end(&drop_waiter, lutex_controller_server).await;
-                    binder_result.and(lutex_controller_result)
-                }
-            });
+        current_task.kernel().kthreads.spawn_future(async move {
+            // Retrieve the Kernel and a `DropWaiter` for the thread_group, taking care not
+            // to keep a strong reference to the thread_group itself.
+            let kernel_and_drop_waiter = handle
+                .state
+                .lock()
+                .thread_group
+                .upgrade()
+                .map(|tg| (tg.kernel.clone(), tg.drop_notifier.waiter()));
+            let Some((kernel, drop_waiter)) = kernel_and_drop_waiter else {
+                return;
+            };
+            // Start the 2 servers.
+            let dev_binder_future = handle.clone().serve_dev_binder(dev_binder_server_end.into());
+            let lutex_controller_future =
+                Self::serve_lutex_controller(kernel, lutex_controller_server_end.into());
+            // Wait until both are done, or the task exits.
+            let (binder_result, lutex_controller_result) = futures::join!(
+                future_or_task_end(&drop_waiter, dev_binder_future),
+                future_or_task_end(&drop_waiter, lutex_controller_future)
+            );
+            let result = binder_result.and(lutex_controller_result);
             if let Err(e) = &result {
                 log_error!("Error when servicing the DevBinder protocol: {e:#}");
             }
