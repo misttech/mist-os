@@ -5,7 +5,6 @@
 use crate::model::component::{
     ComponentInstance, ExtendedInstance, WeakComponentInstance, WeakExtendedInstance,
 };
-use crate::model::routing::router_ext::RouterExt;
 use ::routing::capability_source::CapabilitySource;
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::error::{ComponentInstanceError, RoutingError};
@@ -18,18 +17,17 @@ use fidl::epitaph::ChannelEpitaphExt;
 use fidl::AsyncChannel;
 use futures::future::BoxFuture;
 use futures::FutureExt;
-use router_error::RouterError;
-use sandbox::{Capability, Connectable, Connector, DirEntry, Message, Request, Routable, Router};
+use router_error::{Explain, RouterError};
+use sandbox::{Capability, Connectable, Connector, Message, Request, Routable, Router};
 use std::fmt::Debug;
 use std::sync::Arc;
 use tracing::warn;
-use vfs::directory::entry::{
-    DirectoryEntry, DirectoryEntryAsync, EntryInfo, GetEntryInfo, OpenRequest,
-};
+use vfs::directory::entry::OpenRequest;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
 use vfs::ToObjectRequest;
-use {fidl_fuchsia_io as fio, zx};
+use zx::AsHandleRef;
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
 
 pub fn take_handle_as_stream<P: ProtocolMarker>(channel: zx::Channel) -> P::RequestStream {
     let channel = AsyncChannel::from_channel(channel);
@@ -210,16 +208,15 @@ pub trait RoutableExt: Routable {
     /// Returns a router that resolves with a [`sandbox::Connector`] that watches for
     /// the channel to be readable, then delegates to the current router. The wait
     /// is performed in the provided `scope`.
-    fn on_readable(self, scope: ExecutionScope, entry_type: fio::DirentType) -> Router;
+    fn on_readable(self, scope: ExecutionScope) -> Router;
 }
 
 impl<T: Routable + 'static> RoutableExt for T {
-    fn on_readable(self, scope: ExecutionScope, entry_type: fio::DirentType) -> Router {
+    fn on_readable(self, scope: ExecutionScope) -> Router {
         #[derive(Debug)]
         struct OnReadableRouter {
             router: Router,
             scope: ExecutionScope,
-            entry_type: fio::DirentType,
         }
 
         #[async_trait]
@@ -239,77 +236,90 @@ impl<T: Routable + 'static> RoutableExt for T {
                 else {
                     return Err(cm_unexpected());
                 };
-                let subrouter = self.router.clone().with_default(request);
-                let entry = subrouter.into_directory_entry(
-                    self.entry_type,
-                    target.execution_scope.clone(),
-                    move |err| {
-                        // TODO(https://fxbug.dev/319754472): Improve the fidelity of error logging.
-                        // This should log into the component's log sink using the proper
-                        // `report_routing_failure`, but that function requires a legacy
-                        // `RouteRequest` at the moment.
-                        let target = target.clone();
-                        Some(Box::pin(async move {
-                            target
-                                .with_logger_as_default(|| {
-                                    warn!(
+                let router = self.router.clone().with_default(request);
+
+                // Wrap the router in something that will wait until the channel is readable.
+                #[derive(Debug)]
+                struct OnReadable {
+                    scope: ExecutionScope,
+                    target: Arc<ComponentInstance>,
+                    router: Router,
+                }
+                impl Connectable for OnReadable {
+                    fn send(&self, message: Message) -> Result<(), ()> {
+                        let router = self.router.clone();
+                        let target = self.target.clone();
+                        self.scope.spawn(async move {
+                            let Message { channel } = message;
+                            match Self::send_inner(&router, &target, &channel).await {
+                                Ok(conn) => {
+                                    // We're in an async task, and the original function already
+                                    // returned Ok. There's nothing we can do with this result.
+                                    let _ = conn.send(Message { channel });
+                                }
+                                Err(e) => {
+                                    let _ = channel.close_with_epitaph(e);
+                                }
+                            }
+                        });
+                        Ok(())
+                    }
+                }
+                impl OnReadable {
+                    async fn send_inner(
+                        router: &Router,
+                        target: &Arc<ComponentInstance>,
+                        channel: &fidl::Channel,
+                    ) -> Result<Connector, zx::Status> {
+                        let signals = fasync::OnSignalsRef::new(
+                            channel.as_handle_ref(),
+                            fidl::Signals::OBJECT_READABLE | fidl::Signals::CHANNEL_PEER_CLOSED,
+                        )
+                        .await
+                        .unwrap();
+                        if !signals.contains(fidl::Signals::OBJECT_READABLE) {
+                            return Err(zx::Status::PEER_CLOSED);
+                        }
+                        let conn = match router.route(None, false).await.and_then(|c| {
+                            if let Capability::Connector(c) = c {
+                                Ok(c)
+                            } else {
+                                Err(RoutingError::BedrockWrongCapabilityType {
+                                    actual: c.debug_typename().into(),
+                                    expected: "Connector".into(),
+                                    moniker: target.moniker.clone().into(),
+                                }
+                                .into())
+                            }
+                        }) {
+                            Ok(c) => c,
+                            Err(err) => {
+                                // TODO(https://fxbug.dev/319754472): Improve the fidelity of error
+                                // logging. This should log into the component's log sink using the
+                                // proper `report_routing_failure`, but that function requires a
+                                // legacy `RouteRequest` at the moment.
+                                target
+                                    .with_logger_as_default(|| {
+                                        warn!(
                                         "Request was not available for target component `{}`: `{}`",
                                         target.moniker, err
                                     );
-                                })
-                                .await
-                        }))
-                    },
-                );
-
-                // Wrap the entry in something that will wait until the channel is readable.
-                struct OnReadable(ExecutionScope, Arc<dyn DirectoryEntry>);
-
-                impl DirectoryEntry for OnReadable {
-                    fn open_entry(
-                        self: Arc<Self>,
-                        mut request: OpenRequest<'_>,
-                    ) -> Result<(), zx::Status> {
-                        request.set_scope(self.0.clone());
-                        if request.path().is_empty() && !request.requires_event() {
-                            request.spawn(self);
-                            Ok(())
-                        } else {
-                            self.1.clone().open_entry(request)
-                        }
+                                    })
+                                    .await;
+                                return Err(err.as_zx_status());
+                            }
+                        };
+                        Ok(conn)
                     }
                 }
 
-                impl GetEntryInfo for OnReadable {
-                    fn entry_info(&self) -> EntryInfo {
-                        self.1.entry_info()
-                    }
-                }
-
-                impl DirectoryEntryAsync for OnReadable {
-                    async fn open_entry_async(
-                        self: Arc<Self>,
-                        request: OpenRequest<'_>,
-                    ) -> Result<(), zx::Status> {
-                        if request.wait_till_ready().await {
-                            self.1.clone().open_entry(request)
-                        } else {
-                            // The channel was closed.
-                            Ok(())
-                        }
-                    }
-                }
-
-                Ok(Capability::DirEntry(DirEntry::new(Arc::new(OnReadable(
-                    self.scope.clone(),
-                    entry,
-                ))
-                    as Arc<dyn DirectoryEntry>)))
+                let on_readable = OnReadable { scope: self.scope.clone(), router, target };
+                Ok(Capability::from(Connector::new_sendable(on_readable)))
             }
         }
 
         let router = Router::new(self);
-        Router::new(OnReadableRouter { router, scope, entry_type })
+        Router::new(OnReadableRouter { router, scope })
     }
 }
 
@@ -544,7 +554,7 @@ pub mod tests {
         let (client_end, server_end) = zx::Channel::create();
 
         let route_counter = RouteCounter::new(sender.into());
-        let router = route_counter.clone().on_readable(scope.clone(), fio::DirentType::Service);
+        let router = route_counter.clone().on_readable(scope.clone());
 
         let mut receive = pin!(receiver.receive());
         assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Pending);
@@ -595,7 +605,7 @@ pub mod tests {
         let (client_end, server_end) = zx::Channel::create();
 
         let route_counter = RouteCounter::new(sender.into());
-        let router = route_counter.clone().on_readable(scope.clone(), fio::DirentType::Service);
+        let router = route_counter.clone().on_readable(scope.clone());
 
         let mut receive = pin!(receiver.receive());
         assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Pending);
@@ -660,7 +670,7 @@ pub mod tests {
             }
             .boxed()
         });
-        let router = debug_router.clone().on_readable(scope.clone(), fio::DirentType::Service);
+        let router = debug_router.clone().on_readable(scope.clone());
 
         let target = ComponentInstance::new_root(
             ComponentInput::default(),
