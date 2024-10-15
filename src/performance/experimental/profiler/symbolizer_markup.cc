@@ -6,6 +6,7 @@
 
 #include <elf.h>
 #include <lib/symbolizer-markup/writer.h>
+#include <lib/trace/event.h>
 
 #include "sampler.h"
 #include "symbolization_context.h"
@@ -17,6 +18,7 @@ struct Sink {
 };
 
 std::string profiler::symbolizer_markup::FormatModule(const profiler::Module& mod) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   const size_t kPageSize = zx_system_get_page_size();
   std::string markup;
   ::symbolizer_markup::Writer writer(Sink{markup});
@@ -36,6 +38,7 @@ std::string profiler::symbolizer_markup::FormatModule(const profiler::Module& mo
 }
 
 std::string profiler::symbolizer_markup::FormatSample(const profiler::Sample& sample) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   std::string markup;
   ::symbolizer_markup::Writer writer(Sink{markup});
   writer.DecimalDigits(sample.pid).Newline().DecimalDigits(sample.tid).Newline();

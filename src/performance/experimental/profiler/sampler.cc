@@ -8,6 +8,7 @@
 #include <lib/async/dispatcher.h>
 #include <lib/stdcompat/span.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/trace/event.h>
 #include <lib/zx/process.h>
 #include <lib/zx/result.h>
 #include <lib/zx/suspend_token.h>
@@ -36,6 +37,7 @@
 std::pair<zx::ticks, std::vector<uint64_t>> SampleThread(const zx::unowned_process& process,
                                                          const zx::unowned_thread& thread,
                                                          unwinder::FramePointerUnwinder& unwinder) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   zx_info_thread_t thread_info;
   zx_status_t status =
       thread->get_info(ZX_INFO_THREAD, &thread_info, sizeof(thread_info), nullptr, nullptr);
@@ -123,6 +125,7 @@ zx::result<> profiler::Sampler::AddTarget(JobTarget&& target) {
 }
 
 zx::result<> profiler::Sampler::WatchTarget(const JobTarget& target) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   std::vector<zx_koid_t> job_path = target.ancestry;
   job_path.push_back(target.job_id);
   auto job_watcher = std::make_unique<JobWatcher>(
@@ -169,9 +172,11 @@ zx::result<> profiler::Sampler::WatchTarget(const JobTarget& target) {
 }
 
 zx::result<> profiler::Sampler::Start(size_t buffer_size_mb /* unused, we buffer in memory */) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   // If a watched process launches a new thread, we want to add it to the set of monitored threads.
   zx::result<> res = targets_.ForEachProcess(
       [this](cpp20::span<const zx_koid_t> job_path, const ProcessTarget& p) -> zx::result<> {
+        TRACE_DURATION("cpu_profiler", "Sampler::Start/ForEachProcess");
         std::vector<zx_koid_t> saved_path{job_path.begin(), job_path.end()};
         auto process_watcher = std::make_unique<ProcessWatcher>(
             p.handle.borrow(),
@@ -221,6 +226,7 @@ zx::result<> profiler::Sampler::Start(size_t buffer_size_mb /* unused, we buffer
 }
 
 zx::result<> profiler::Sampler::Stop() {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   sample_task_.Cancel();
   FX_LOGS(INFO) << "Stopped! Collected " << inspecting_durations_.size() << " samples";
   sample_task_.Cancel();
@@ -229,6 +235,7 @@ zx::result<> profiler::Sampler::Stop() {
 
 void profiler::Sampler::CollectSamples(async_dispatcher_t* dispatcher, async::TaskBase* task,
                                        zx_status_t status) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   if (status != ZX_OK) {
     return;
   }
@@ -236,6 +243,7 @@ void profiler::Sampler::CollectSamples(async_dispatcher_t* dispatcher, async::Ta
   zx::result res =
       targets_.ForEachProcess([this](cpp20::span<const zx_koid_t>, const ProcessTarget& target) {
         for (const auto& [_, thread] : target.threads) {
+          TRACE_DURATION("cpu_profiler", "Sampler::CollectSamples/ForEachProcess");
           unwinder::CfiUnwinder cfi_unwinder{target.unwinder_data->modules};
           unwinder::FramePointerUnwinder fp_unwinder{&cfi_unwinder};
           auto [time_sampling, pcs] =
@@ -256,6 +264,7 @@ void profiler::Sampler::CollectSamples(async_dispatcher_t* dispatcher, async::Ta
 }
 
 zx::result<profiler::SymbolizationContext> profiler::Sampler::GetContexts() {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   std::map<zx_koid_t, std::vector<profiler::Module>> contexts;
   zx::result<> res =
       targets_.ForEachProcess([&contexts](cpp20::span<const zx_koid_t>,
@@ -278,6 +287,7 @@ zx::result<profiler::SymbolizationContext> profiler::Sampler::GetContexts() {
 
 void profiler::Sampler::AddThread(std::vector<zx_koid_t> job_path, zx_koid_t pid, zx_koid_t tid,
                                   zx::thread t) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   zx::result res = targets_.AddThread(job_path, pid, ThreadTarget{std::move(t), tid});
   if (res.is_error()) {
     FX_PLOGS(ERROR, res.status_value()) << "Failed to add thread to session: " << tid;
@@ -286,6 +296,7 @@ void profiler::Sampler::AddThread(std::vector<zx_koid_t> job_path, zx_koid_t pid
 
 void profiler::Sampler::RemoveThread(std::vector<zx_koid_t> job_path, zx_koid_t pid,
                                      zx_koid_t tid) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   zx::result res = targets_.RemoveThread(job_path, pid, tid);
   if (res.is_error()) {
     FX_PLOGS(ERROR, res.status_value()) << "Failed to remove exited thread: " << tid;

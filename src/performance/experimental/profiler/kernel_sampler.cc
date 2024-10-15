@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.kernel/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fit/defer.h>
+#include <lib/trace/event.h>
 #include <zircon/syscalls-next.h>
 #include <zircon/syscalls.h>
 
@@ -15,6 +16,7 @@
 
 zx::result<std::unique_ptr<profiler::KernelSamplerSession>>
 profiler::KernelSamplerSession::CreateAndInit(const zx_sampler_config_t& config) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   auto debug_client_end = component::Connect<fuchsia_kernel::DebugResource>();
   if (debug_client_end.is_error()) {
     FX_PLOGS(ERROR, debug_client_end.error_value()) << "Failed to get connect to debug resource";
@@ -40,6 +42,7 @@ profiler::KernelSamplerSession::CreateAndInit(const zx_sampler_config_t& config)
 }
 
 zx::result<> profiler::KernelSamplerSession::Start() {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   if (running_) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
@@ -48,6 +51,7 @@ zx::result<> profiler::KernelSamplerSession::Start() {
 }
 
 zx::result<> profiler::KernelSamplerSession::Stop() {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   if (!running_) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
@@ -56,11 +60,13 @@ zx::result<> profiler::KernelSamplerSession::Stop() {
 }
 
 zx::result<> profiler::KernelSamplerSession::AttachThread(const zx::thread& thread) const {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   FX_LOGS(INFO) << "Attaching to thread: " << thread.get();
   return zx::make_result(zx_sampler_attach(per_cpu_buffers_.get(), thread.get()));
 }
 
 zx::result<> profiler::KernelSampler::Start(size_t buffer_size_mb) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   // Verify we support the requested samples
   // We currently only support 1 samplespec, and that's backtraces via frame pointers
   if (sample_specs_.size() != 1) {
@@ -94,6 +100,7 @@ zx::result<> profiler::KernelSampler::Start(size_t buffer_size_mb) {
 
   zx::result known_threads_res = targets_.ForEachProcess(
       [this](cpp20::span<const zx_koid_t> job_path, const ProcessTarget& p) -> zx::result<> {
+        TRACE_DURATION("cpu_profiler", "KernelSampler::Start/ForEachProcess");
         for (const auto& [koid, thread] : p.threads) {
           if (zx::result res = session_->AttachThread(thread.handle); res.is_error()) {
             FX_PLOGS(ERROR, res.error_value()) << "failed to set up thread sampling";
@@ -137,12 +144,14 @@ zx::result<> profiler::KernelSampler::Start(size_t buffer_size_mb) {
 }
 
 zx::result<> profiler::KernelSampler::AddTarget(JobTarget&& target) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   if (session_) {
     if (zx::result<> watch_res = WatchTarget(target); watch_res.is_error()) {
       return watch_res;
     }
     zx::result<> res = target.ForEachProcess(
         [this](cpp20::span<const zx_koid_t> job_path, const ProcessTarget& p) -> zx::result<> {
+          TRACE_DURATION("cpu_profiler", "KernelSampler::AddTarget/ForEachProcess");
           for (const auto& [koid, thread] : p.threads) {
             if (zx::result res = session_->AttachThread(thread.handle); res.is_error()) {
               FX_PLOGS(ERROR, res.error_value()) << "failed Add thread target";
@@ -159,6 +168,7 @@ zx::result<> profiler::KernelSampler::AddTarget(JobTarget&& target) {
 }
 
 zx::result<> profiler::KernelSampler::Stop() {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   if (zx::result res = session_->Stop(); res.is_error()) {
     FX_PLOGS(WARNING, res.error_value()) << "Failed to stop";
     return res;
@@ -242,6 +252,7 @@ zx::result<> profiler::KernelSampler::Stop() {
 
 void profiler::KernelSampler::AddThread(std::vector<zx_koid_t> job_path, zx_koid_t pid,
                                         zx_koid_t tid, zx::thread t) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__, "pid", pid, "tid", tid);
   if (zx::result res = session_->AttachThread(t); res.is_error()) {
     FX_PLOGS(ERROR, res.status_value()) << "Failed to start sampling thread: " << tid;
   }
@@ -256,6 +267,7 @@ void profiler::KernelSampler::AddThread(std::vector<zx_koid_t> job_path, zx_koid
 
 void profiler::KernelSampler::RemoveThread(std::vector<zx_koid_t> job_path, zx_koid_t pid,
                                            zx_koid_t tid) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__, "pid", pid, "tid", tid);
   zx::result res = targets_.RemoveThread(job_path, pid, tid);
   if (res.is_error()) {
     FX_PLOGS(ERROR, res.status_value()) << "Failed to remove exited thread: " << tid;

@@ -8,6 +8,7 @@
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/trace-provider/provider.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -16,6 +17,8 @@
 int main() {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   async_dispatcher_t* dispatcher = loop.dispatcher();
+
+  trace::TraceProviderWithFdio trace_provider(dispatcher, "cpu_profiler");
 
   // Expose the FIDL server.
   component::OutgoingDirectory outgoing = component::OutgoingDirectory(dispatcher);

@@ -38,6 +38,7 @@ source_set("lib") {
     "//src/lib/zxdump",
     "//zircon/system/ulib/elf-search",
     "//zircon/system/ulib/task-utils",
+    "//zircon/system/ulib/trace",
     "//zircon/system/ulib/trace-reader",
     "//zircon/system/ulib/zircon-internal",
   ]
@@ -65,6 +66,7 @@ executable("bin") {
     "//sdk/lib/fidl/hlcpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fsl",
+    "//zircon/system/ulib/trace-provider",
   ]
   defines = [
     "EXPERIMENTAL_THREAD_SAMPLER_ENABLED=$experimental_thread_sampler_enabled",
