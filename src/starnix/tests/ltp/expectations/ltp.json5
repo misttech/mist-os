@@ -212,7 +212,6 @@
                 "fallocate05",
 
                 // These tests hang
-                "aio01",
                 "fork14",
 
                 // TODO(https://fxbug.dev/322874889) requires a working sched_setaffinity
