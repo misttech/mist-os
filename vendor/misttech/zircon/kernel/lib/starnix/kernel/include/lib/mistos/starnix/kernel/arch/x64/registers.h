@@ -2,9 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_ARCH_X64_REGISTERS_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_ARCH_X64_REGISTERS_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_ARCH_X64_REGISTERS_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_ARCH_X64_REGISTERS_H_
 
+#include <inttypes.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <zircon/syscalls/debug.h>
 #include <zircon/types.h>
 
@@ -55,6 +58,20 @@ struct RegisterState {
     return RegisterState(regs, regs.rax);
   }
 
+  static void print_regs(FILE* f, const zx_thread_state_general_regs_t* regs) {
+    fprintf(f, " CS:  %#18llx RIP: %#18" PRIx64 " EFL: %#18" PRIx64, 0ull, regs->rip, regs->rflags);
+    fprintf(f, "\n");
+    fprintf(f, " RAX: %#18" PRIx64 " RBX: %#18" PRIx64 " RCX: %#18" PRIx64 " RDX: %#18" PRIx64 "\n",
+            regs->rax, regs->rbx, regs->rcx, regs->rdx);
+    fprintf(f, " RSI: %#18" PRIx64 " RDI: %#18" PRIx64 " RBP: %#18" PRIx64 " RSP: %#18" PRIx64 "\n",
+            regs->rsi, regs->rdi, regs->rbp, regs->rsp);
+    fprintf(f, "  R8: %#18" PRIx64 "  R9: %#18" PRIx64 " R10: %#18" PRIx64 " R11: %#18" PRIx64 "\n",
+            regs->r8, regs->r9, regs->r10, regs->r11);
+    fprintf(f, " R12: %#18" PRIx64 " R13: %#18" PRIx64 " R14: %#18" PRIx64 " R15: %#18" PRIx64 "\n",
+            regs->r12, regs->r13, regs->r14, regs->r15);
+    fprintf(f, " fs.base: %#18" PRIx64 " gs.base: %#18" PRIx64 "\n", regs->fs_base, regs->gs_base);
+  }
+
  public:
   RegisterState() = default;
 
@@ -71,4 +88,4 @@ struct RegisterState {
 
 }  // namespace starnix
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_ARCH_X64_REGISTERS_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_ARCH_X64_REGISTERS_H_
