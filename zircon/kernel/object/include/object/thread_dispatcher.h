@@ -128,6 +128,8 @@ class ThreadDispatcher final : public SoloDispatcher<ThreadDispatcher, ZX_DEFAUL
 
   TaskWrapper* task();
   const TaskWrapper* task() const;
+
+  zx_status_t SetForkFrame(const zx_thread_state_general_regs_t& fork_frame);
 #endif
 
   // Returns true if the thread is dying or dead. Threads never return to a previous state
