@@ -682,18 +682,29 @@ impl FidlProtocol for TargetCollectionProtocol {
 // USB fastboot
 #[tracing::instrument(skip(tc))]
 fn handle_fastboot_target(tc: &Rc<TargetCollection>, target: ffx::FastbootTarget) {
-    let Some(serial) = target.serial else {
-        tracing::debug!("Fastboot target has no serial number. Not able to merge.");
-        return;
-    };
+    if let Some(serial) = target.serial {
+        tracing::debug!("Found new target via fastboot: {}", serial);
 
-    tracing::debug!("Found new target via fastboot: {}", serial);
+        let update = TargetUpdateBuilder::new()
+            .discovered(TargetProtocol::Fastboot, TargetTransport::Usb)
+            .identity(target::Identity::from_serial(serial.clone()))
+            .build();
+        tc.update_target(&[TargetUpdateFilter::Serial(&serial)], update, true);
+    } else if let Some(addrs) = target.addresses {
+        tracing::debug!("Found a new fastboot over network target {:?}.", addrs);
 
-    let update = TargetUpdateBuilder::new()
-        .discovered(TargetProtocol::Fastboot, TargetTransport::Usb)
-        .identity(target::Identity::from_serial(serial.clone()))
-        .build();
-    tc.update_target(&[TargetUpdateFilter::Serial(&serial)], update, true);
+        let mut nadders = vec![];
+        for addr in addrs {
+            nadders.push(SocketAddr::from(TargetAddr::from(addr)));
+        }
+        let update = TargetUpdateBuilder::new()
+            .discovered(TargetProtocol::Fastboot, TargetTransport::Network)
+            .net_addresses(&nadders)
+            .build();
+        tc.update_target(&[TargetUpdateFilter::NetAddrs(&nadders)], update, true);
+    } else {
+        tracing::warn!("Got a fastboot target without serial or addresses: {:?}", target);
+    }
 }
 
 // mDNS Fastboot & RCS

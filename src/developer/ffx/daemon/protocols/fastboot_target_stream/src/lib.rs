@@ -4,16 +4,19 @@
 
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
-use ffx_config::is_usb_discovery_disabled;
-use ffx_daemon_target::FASTBOOT_CHECK_INTERVAL;
+use discovery::{
+    wait_for_devices, DiscoverySources, FastbootConnectionState, TargetEvent, TargetState,
+};
+use ffx::TargetAddrInfo;
+use ffx_config::{get, is_usb_discovery_disabled};
 use ffx_stream_util::TryStreamUtilExt;
 use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_developer_ffx as ffx;
 use fuchsia_async::Task;
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStreamExt};
 use protocols::prelude::*;
+use std::path::PathBuf;
 use std::rc::Rc;
-use usb_fastboot_discovery::find_serial_numbers;
 
 struct Inner {
     events_in: async_channel::Receiver<ffx::FastbootTarget>,
@@ -24,7 +27,7 @@ struct Inner {
 #[derive(Default)]
 pub struct FastbootTargetStreamProtocol {
     inner: Option<Rc<Inner>>,
-    fastboot_task: Option<Task<()>>,
+    fastboot_task: Option<Task<Result<()>>>,
 }
 
 #[async_trait(?Send)]
@@ -61,21 +64,76 @@ impl FidlProtocol for FastbootTargetStreamProtocol {
         }
         self.fastboot_task.replace(Task::local(async move {
             loop {
-                let fastboot_serials = find_serial_numbers();
-                if let Some(inner) = inner.upgrade() {
-                    for serial in fastboot_serials {
-                        let _ = inner
-                            .events_out
-                            .send(ffx::FastbootTarget {
-                                serial: Some(serial),
-                                ..Default::default()
-                            })
-                            .await;
+                let fastboot_file_path: Option<PathBuf> =
+                    get(fastboot_file_discovery::FASTBOOT_FILE_PATH).await.ok();
+                let mut device_stream = wait_for_devices(
+                    |_: &_| true,
+                    None,
+                    fastboot_file_path,
+                    true,
+                    true,
+                    DiscoverySources::USB | DiscoverySources::FASTBOOT_FILE,
+                )
+                .await?;
+                while let Some(s) = device_stream.next().await {
+                    if let Ok(event) = s {
+                        match event {
+                            TargetEvent::Added(e) => match e.state {
+                                TargetState::Fastboot(fts) => match fts.connection_state {
+                                    FastbootConnectionState::Usb => {
+                                        if let Some(inner) = inner.upgrade() {
+                                            let _ = inner
+                                                .events_out
+                                                .send(ffx::FastbootTarget {
+                                                    serial: Some(fts.serial_number),
+                                                    ..Default::default()
+                                                })
+                                                .await;
+                                        }
+                                    }
+                                    FastbootConnectionState::Tcp(addrs) => {
+                                        if let Some(inner) = inner.upgrade() {
+                                            let _ = inner
+                                                .events_out
+                                                .send(ffx::FastbootTarget {
+                                                    addresses: Some(
+                                                        addrs
+                                                            .into_iter()
+                                                            .map(|x| TargetAddrInfo::from(x.into()))
+                                                            .collect(),
+                                                    ),
+                                                    ..Default::default()
+                                                })
+                                                .await;
+                                        }
+                                    }
+                                    FastbootConnectionState::Udp(addrs) => {
+                                        if let Some(inner) = inner.upgrade() {
+                                            let _ = inner
+                                                .events_out
+                                                .send(ffx::FastbootTarget {
+                                                    addresses: Some(
+                                                        addrs
+                                                            .into_iter()
+                                                            .map(|x| TargetAddrInfo::from(x.into()))
+                                                            .collect(),
+                                                    ),
+                                                    ..Default::default()
+                                                })
+                                                .await;
+                                        }
+                                    }
+                                },
+                                e @ _ => {
+                                    tracing::debug!("We only support Fastboot events in this module... skipping non fastboot event: {:?}", e);
+                                }
+                            },
+                            TargetEvent::Removed(_) => {
+                                tracing::debug!("Skipping removed event");
+                            }
+                        }
                     }
-                } else {
-                    break;
                 }
-                fuchsia_async::Timer::new(FASTBOOT_CHECK_INTERVAL).await;
             }
         }));
         Ok(())
