@@ -156,7 +156,7 @@ fit::result<Errno> FdTable::insert(const Task& task, FdNumber fd, FileHandle fil
 
 fit::result<Errno> FdTable::insert_with_flags(const Task& task, FdNumber fd, FileHandle file,
                                               FdFlags flags) const {
-  auto rlimit = task.thread_group->get_rlimit({ResourceEnum::NOFILE});
+  auto rlimit = task.thread_group()->get_rlimit({ResourceEnum::NOFILE});
   auto id_ = id();
   auto inner = inner_.Lock();
   auto state = inner->get()->store_.Lock();
@@ -167,7 +167,7 @@ fit::result<Errno> FdTable::insert_with_flags(const Task& task, FdNumber fd, Fil
 fit::result<Errno, FdNumber> FdTable::add_with_flags(const Task& task, FileHandle file,
                                                      FdFlags flags) const {
   // profile_duration!("AddFd");
-  auto rlimit = task.thread_group->get_rlimit({ResourceEnum::NOFILE});
+  auto rlimit = task.thread_group()->get_rlimit({ResourceEnum::NOFILE});
   auto id_ = id();
   auto inner = inner_.Lock();
   auto state = inner->get()->store_.Lock();

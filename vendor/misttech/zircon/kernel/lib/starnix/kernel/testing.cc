@@ -56,7 +56,7 @@ TaskBuilder create_test_init_task(fbl::RefPtr<Kernel> kernel, fbl::RefPtr<FsCont
   // Take the lock on thread group and task in the correct order to ensure any wrong ordering
   // will trigger the tracing-mutex at the right call site.
   {
-    auto _l1 = init_task->thread_group->read();
+    auto _l1 = init_task->thread_group()->Read();
     auto _l2 = init_task->mutable_state_.Read();
   }
 
