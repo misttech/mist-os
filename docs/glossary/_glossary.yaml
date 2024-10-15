@@ -1736,6 +1736,26 @@
   related_guides: [""]
   area: ["Zircon"]
 
+- term: "Platform"
+  short_description: "The platform is the common foundation for products built using Fuchsia."
+  full_description: "Products built using Fuchsia share a common foundation, which is the underlying
+  Fuchsia platform. The platform consists of (a) the core system, including the
+  <a href=\"/docs/glossary#zircon\">Zircon</a> kernel,
+  <a href=\"/docs/glossary#component-framework\">component framework</a>,
+  <a href=\"/docs/glossary#fdf\">driver framework</a>,
+  and software delivery subsystem, (b) services that let components share hardware
+  resources, including the connectivity, graphics, media, and local storage
+  subsystems, and (c) widely used components, including the web runtime,
+  <a href=\"/docs/glossary#fdio\">POSIX compatibility layers</a>, and diagnostics. Not every product
+  uses every aspect of the platform. For example, products without displays do not use the graphics
+  subsystem. The platform has a
+  <a href=\"/contribute/governance/rfcs/0239_platform_versioning_in_practice\">versioned</a>,
+  <a href=\"/docs/glossary#fuchsia-system-interface\">stable binary interface</a>, which developers
+  can target using the <a href=\"/docs/glossary#fuchsia-sdk\">Fuchsia SDK</a>."
+  see_also: ["<a href=\"/docs/glossary#product\">Product</a>"]
+  related_guides: [""]
+  area: ["System"]
+
 - term: "Platform device"
   short_description: "A <a href=\"/docs/glossary#node\">node</a> added by the
   <a href=\"/docs/glossary#board-driver\">board driver</a> to the
@@ -1744,7 +1764,6 @@
   see_also: [""]
   related_guides: ["<a href=\"/docs/development/drivers/concepts/device_driver_model/platform-bus.md\">Platform Bus</a>"]
   area: ["System", "Devices", "Drivers", "Driver SDK"]
-
 
 - term: "Platform bus"
   short_description: "The first driver loaded in Fuchsia. The platform bus is the root driver and
@@ -1769,7 +1788,8 @@
   full_description: "For instance, the Fuchsia platform defines products such as `bringup` and
   `core` in terms of build-time configuration values and a set of packages to assemble into a system
   image."
-  see_also: ["<a href=\"/docs/glossary#package\">Package</a>",
+  see_also: ["<a href=\"/docs/glossary#platform\">Platform</a>",
+             "<a href=\"/docs/glossary#package\">Package</a>",
              "<a href=\"/docs/glossary#product-owner\">Product owner</a>"]
   related_guides: ["<a href=\"/docs/development/build/build_system/bringup.md\">Bringup Product Definition</a>"]
   area: ["System"]
