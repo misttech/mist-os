@@ -51,7 +51,7 @@ zx::result<std::unique_ptr<RdmaEngine>> RdmaEngine::Create(
 
   // Map RDMA Done Interrupt
   zx::result<zx::interrupt> rdma_done_result =
-      GetInterrupt(InterruptResourceIndex::kRdmaDone, platform_device);
+      GetInterrupt(kInterruptNameRdmaDone, platform_device);
   if (rdma_done_result.is_error()) {
     return rdma_done_result.take_error();
   }

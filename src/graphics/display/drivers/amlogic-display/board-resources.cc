@@ -80,20 +80,21 @@ zx::result<fdf::MmioBuffer> MapMmio(
 }
 
 zx::result<zx::interrupt> GetInterrupt(
-    InterruptResourceIndex interrupt_index,
+    std::string_view interrupt_name,
     fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device) {
   ZX_DEBUG_ASSERT(platform_device.is_valid());
-  fidl::WireResult<fuchsia_hardware_platform_device::Device::GetInterruptById> result =
+  fidl::WireResult<fuchsia_hardware_platform_device::Device::GetInterruptByName> result =
       fidl::WireCall(platform_device)
-          ->GetInterruptById(static_cast<uint32_t>(interrupt_index), /*flags=*/0);
+          ->GetInterruptByName(fidl::StringView::FromExternal(interrupt_name), /*flags=*/0);
   if (result.status() != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to get interrupt resource #%" PRIu32 ": FIDL failed %s",
-            static_cast<uint32_t>(interrupt_index), result.status_string());
+    FDF_LOG(ERROR, "Failed to get interrupt resource '%.*s': FIDL failed %s",
+            static_cast<int>(interrupt_name.size()), interrupt_name.data(), result.status_string());
     return zx::error(result.status());
   }
   if (!result->is_ok()) {
-    FDF_LOG(ERROR, "Failed to get interrupt resource #%" PRIu32 ": Platform device failed %s",
-            static_cast<uint32_t>(interrupt_index), zx_status_get_string(result->error_value()));
+    FDF_LOG(ERROR, "Failed to get interrupt resource '%.*s': Platform device failed %s",
+            static_cast<int>(interrupt_name.size()), interrupt_name.data(),
+            zx_status_get_string(result->error_value()));
     return zx::error(result->error_value());
   }
   zx::interrupt interrupt = std::move(result->value()->irq);

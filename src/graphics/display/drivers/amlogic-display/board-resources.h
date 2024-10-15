@@ -12,6 +12,7 @@
 #include <lib/zx/result.h>
 
 #include <cstdint>
+#include <string_view>
 
 // The *ResourceIndex scoped enums define the interface between the board driver
 // and the display driver.
@@ -58,20 +59,25 @@ zx::result<fdf::MmioBuffer> MapMmio(
     MmioResourceIndex mmio_index,
     fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device);
 
-// The resource ordering in the board driver's `display_irqs` table.
-enum class InterruptResourceIndex : uint8_t {
-  kViu1Vsync = 0,  // VSync started on VIU1.
-  kRdmaDone = 1,   // RDMA transfer done.
-  kVid1Write = 2,  // Display capture done on VID1.
-};
+// The interrupt names are defined in the board driver's `display_irqs` table,
+// or in the board devicetree's display node.
 
-// Typesafe wrapper for [`fuchsia.hardware.platform.device/Device.GetInterruptById`].
+// VSync started on VIU1.
+constexpr std::string_view kInterruptNameViu1Vsync = "viu1-vsync";
+
+// RDMA transfer done.
+constexpr std::string_view kInterruptNameRdmaDone = "rdma-done";
+
+// Display capture done on VDIN1.
+constexpr std::string_view kInterruptNameVdin1WriteDone = "vdin1-write-done";
+
+// Typesafe wrapper for [`fuchsia.hardware.platform.device/Device.GetInterruptByName`].
 //
 // `platform_device` must be valid.
 //
 // If the result is successful, the zx::interrupt is guaranteed to be valid.
 zx::result<zx::interrupt> GetInterrupt(
-    InterruptResourceIndex interrupt_index,
+    std::string_view interrupt_name,
     fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device);
 
 // The resource ordering in the board driver's `display_btis` table.
