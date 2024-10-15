@@ -74,6 +74,12 @@ fuchsia_component("component") {
   deps = [ ":bin" ]
 }
 
+fuchsia_package("without-config") {
+  package_name = "bt-device-id"
+  validate_structured_config = false
+  deps = [ ":component" ]
+}
+
 fuchsia_package("bt-device-id") {
   deps = [
     ":component",

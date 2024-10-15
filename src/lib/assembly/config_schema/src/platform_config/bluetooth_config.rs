@@ -34,6 +34,34 @@ pub struct AvrcpConfig {
     pub enabled: bool,
 }
 
+/// Configuration options for Bluetooth Device Identification profile (bt-device-id).
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+pub struct DeviceIdConfig {
+    /// Enable the device identification profile (`bt-device-id`).
+    #[serde(default)]
+    pub enabled: bool,
+    /// Uniquely identifies the Vendor of the device.
+    /// Mandatory if `enabled` is true.
+    #[serde(default)]
+    pub vendor_id: u16,
+    /// Uniquely identifies the product - typically a value assigned by the Vendor.
+    /// Mandatory if `enabled` is true.
+    #[serde(default)]
+    pub product_id: u16,
+    /// Device release number.
+    /// Mandatory if `enabled` is true.
+    #[serde(default)]
+    pub version: u16,
+    /// If `true`, designates this identification as the primary service record for this device.
+    /// Mandatory if `enabled` is true.
+    #[serde(default)]
+    pub primary: bool,
+    /// A human-readable description of the service.
+    /// Optional if `enabled` is true.
+    #[serde(default)]
+    pub service_description: Option<String>,
+}
+
 /// HFP Audio Gateway Features
 /// See HFP v1.9 Page 100 for details.
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
@@ -130,6 +158,10 @@ pub struct BluetoothProfilesConfig {
     /// Specifies the configuration for `bt-avrcp`.
     #[serde(default)]
     pub avrcp: AvrcpConfig,
+
+    /// Specifies the configuration for `bt-device-id`.
+    #[serde(default)]
+    pub did: DeviceIdConfig,
 
     /// Specifies the configuration for `bt-hfp`.
     #[serde(default)]
@@ -229,6 +261,14 @@ mod tests {
                 "avrcp": {
                     "enabled": true,
                 },
+                "did": {
+                    "enabled": true,
+                    "vendor_id": 0,
+                    "product_id": 1,
+                    "version": 0x0100,
+                    "primary": true,
+                    "service_description": "foobar",
+                },
                 "hfp": {
                     "enabled": true,
                     "audio_gateway": [
@@ -254,6 +294,14 @@ mod tests {
         let expected_profiles = BluetoothProfilesConfig {
             a2dp: A2dpConfig { enabled: true },
             avrcp: AvrcpConfig { enabled: true },
+            did: DeviceIdConfig {
+                enabled: true,
+                vendor_id: 0,
+                product_id: 1,
+                version: 0x0100,
+                primary: true,
+                service_description: Some("foobar".to_string()),
+            },
             hfp: HfpConfig {
                 enabled: true,
                 audio_gateway: vec![

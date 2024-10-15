@@ -65,6 +65,20 @@ impl DefineSubsystemConfiguration<(&BluetoothConfig, &PlatformMediaConfig)>
         if profiles.avrcp.enabled {
             builder.platform_bundle("bluetooth_avrcp");
         }
+        if profiles.did.enabled {
+            builder.platform_bundle("bluetooth_device_id");
+            let mut did_config =
+                builder.package("bt-device-id").component("meta/bt-device-id.cm")?;
+            did_config
+                .field("vendor_id", profiles.did.vendor_id)?
+                .field("product_id", profiles.did.product_id)?
+                .field("version", profiles.did.version)?
+                .field("primary", profiles.did.primary)?
+                .field(
+                    "service_description",
+                    profiles.did.service_description.clone().unwrap_or(String::new()),
+                )?;
+        }
         if profiles.hfp.enabled {
             builder.platform_bundle("bluetooth_hfp_ag");
 

@@ -169,6 +169,7 @@ user_platform_aib_names =
       "bluetooth_a2dp",
       "bluetooth_avrcp",
       "bluetooth_core",
+      "bluetooth_device_id",
       "bluetooth_hfp_ag",
       "bluetooth_map_mce",
       "bluetooth_snoop_eager",

@@ -2186,6 +2186,27 @@ assembly_input_bundle("bluetooth_core") {
   ]
 }
 
+# Bluetooth profile support: Device Identification
+#
+# feature_set_levels: minimal
+# build-types: all
+#
+assembly_input_bundle("bluetooth_device_id") {
+  flexible_packages =
+      [ "//src/connectivity/bluetooth/profiles/bt-device-id:without-config" ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/connectivity/bluetooth/profiles/bt-device-id/meta/bt-device-id.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
 # Bluetooth profile support: HFP - AG
 #
 # feature_set_levels: minimal
