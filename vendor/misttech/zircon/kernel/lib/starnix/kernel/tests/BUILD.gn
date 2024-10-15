@@ -17,6 +17,7 @@ source_set("tests") {
     "memory_manager-test.cc",
     "path-test.cc",
     "pid_table-test.cc",
+    "signal/syscalls-test.cc",
     "task-test.cc",
     "task/syscalls-test.cc",
     "thread_group-test.cc",
