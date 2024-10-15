@@ -235,22 +235,23 @@ async fn get_local_repo(
                 ));
             };
 
-            let repos_proxy = fuchsia_fs::directory::open_directory_deprecated(
+            // Note that `fuchsia_fs::directory::create_directory` will open the directory if it
+            // already exists.
+            //
+            // Create direcectory at path `persisted_repos_dir` within `data_proxy` if it doesn't
+            // exist, and open it.
+            let repos_proxy = fuchsia_fs::directory::create_directory(
                 &data_proxy,
                 persisted_repos_dir,
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::CREATE,
+                fio::PERM_READABLE | fio::PERM_WRITABLE,
             )
             .await
             .with_context(|| format!("opening {persisted_repos_dir}"))?;
             let host = config.repo_url().host();
-            let proxy = fuchsia_fs::directory::open_directory_deprecated(
+            let proxy = fuchsia_fs::directory::create_directory(
                 &repos_proxy,
                 host,
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::CREATE,
+                fio::PERM_READABLE | fio::PERM_WRITABLE,
             )
             .await
             .with_context(|| format!("opening {host}"))?;
@@ -366,9 +367,9 @@ mod tests {
         async fn repo(&self, config: &pkg::RepositoryConfig) -> Result<Repository, anyhow::Error> {
             let (sender, _) = futures::channel::mpsc::channel(0);
             let cobalt_sender = ProtocolSender::new(sender);
-            let proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+            let proxy = fuchsia_fs::directory::open_in_namespace(
                 self.data_dir.path().to_str().unwrap(),
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                fio::PERM_READABLE | fio::PERM_WRITABLE,
             )
             .unwrap();
             Repository::new(

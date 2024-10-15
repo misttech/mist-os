@@ -8,6 +8,7 @@ use futures::future::{BoxFuture, FutureExt};
 use futures::stream::StreamExt;
 use std::collections::HashMap;
 use std::sync::Arc;
+use vfs::{ObjectRequest, ObjectRequestRef};
 use zx::Status;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
@@ -28,7 +29,7 @@ fn handle_directory_request_stream(
 async fn handle_directory_request(req: fio::DirectoryRequest, open_counts: OpenCounter) {
     match req {
         fio::DirectoryRequest::Clone { flags, object, control_handle: _control_handle } => {
-            reopen_self(object, flags, Arc::clone(&open_counts));
+            reopen_self_deprecated(object, flags, Arc::clone(&open_counts));
         }
         fio::DirectoryRequest::Open {
             flags,
@@ -38,15 +39,34 @@ async fn handle_directory_request(req: fio::DirectoryRequest, open_counts: OpenC
             control_handle: _control_handle,
         } => {
             if path == "." {
-                reopen_self(object, flags, Arc::clone(&open_counts));
+                reopen_self_deprecated(object, flags, Arc::clone(&open_counts));
             }
             *open_counts.lock().entry(path).or_insert(0) += 1;
+        }
+        fio::DirectoryRequest::Open3 {
+            path,
+            flags,
+            options,
+            object,
+            control_handle: _control_handle,
+        } => {
+            ObjectRequest::new3(flags, &options, object).handle(|request| {
+                if path == "." {
+                    reopen_self(request, flags, Arc::clone(&open_counts))?;
+                }
+                *open_counts.lock().entry(path).or_insert(0) += 1;
+                Ok(())
+            });
         }
         other => panic!("unhandled request type: {other:?}"),
     }
 }
 
-fn reopen_self(node: ServerEnd<fio::NodeMarker>, flags: fio::OpenFlags, open_counts: OpenCounter) {
+fn reopen_self_deprecated(
+    node: ServerEnd<fio::NodeMarker>,
+    flags: fio::OpenFlags,
+    open_counts: OpenCounter,
+) {
     let stream = node.into_stream().unwrap().cast_stream();
     describe_dir(flags, &stream);
     fasync::Task::spawn(handle_directory_request_stream(stream, Arc::clone(&open_counts))).detach();
@@ -58,6 +78,36 @@ pub fn describe_dir(flags: fio::OpenFlags, stream: &fio::DirectoryRequestStream)
         let ni = fio::NodeInfoDeprecated::Directory(fio::DirectoryObject);
         ch.send_on_open_(Status::OK.into_raw(), Some(ni)).expect("send_on_open");
     }
+}
+
+fn reopen_self(
+    object_request: ObjectRequestRef<'_>,
+    flags: fio::Flags,
+    open_counts: OpenCounter,
+) -> Result<(), Status> {
+    let stream = fio::NodeRequestStream::from_channel(fasync::Channel::from_channel(
+        object_request.take().into_channel(),
+    ));
+    send_directory_representation(flags, &stream)?;
+    fasync::Task::spawn(handle_directory_request_stream(
+        stream.cast_stream(),
+        Arc::clone(&open_counts),
+    ))
+    .detach();
+    Ok(())
+}
+
+pub fn send_directory_representation(
+    flags: fio::Flags,
+    stream: &fio::NodeRequestStream,
+) -> Result<(), Status> {
+    if flags.intersects(fio::Flags::FLAG_SEND_REPRESENTATION) {
+        let control_handle = stream.control_handle();
+        let representation = fio::Representation::Directory(fio::DirectoryInfo::default());
+        control_handle.send_on_representation(representation).map_err(|_| Status::PEER_CLOSED)?;
+    }
+
+    Ok(())
 }
 
 pub fn spawn_directory_handler() -> (fio::DirectoryProxy, OpenCounter) {

@@ -291,7 +291,7 @@ pub async fn create_directory_deprecated(
     node::verify_directory_describe_event(dir).await
 }
 
-/// Creates a directory named `path` within the `parent` directory.
+/// Creates a directory named `path` within the `parent` directory if it doesn't exist.
 pub async fn create_directory(
     parent: &fio::DirectoryProxy,
     path: &str,
@@ -300,9 +300,6 @@ pub async fn create_directory(
     let (dir, server_end) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>().map_err(OpenError::CreateProxy)?;
 
-    // NB: POSIX does not allow open(2) to create dirs, but fuchsia.io does not have an equivalent
-    // of mkdir(2), so on Fuchsia we're expected to call open on a DirectoryMarker with (flags &
-    // OPEN_FLAG_CREATE) set.
     let flags = flags
         | fio::Flags::FLAG_MAYBE_CREATE
         | fio::Flags::PROTOCOL_DIRECTORY

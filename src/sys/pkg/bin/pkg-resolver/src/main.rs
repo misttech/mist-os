@@ -127,9 +127,9 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
     .serve_and_log_errors();
     futures.push(cobalt_fut.boxed_local());
 
-    let data_proxy = match fuchsia_fs::directory::open_in_namespace_deprecated(
+    let data_proxy = match fuchsia_fs::directory::open_in_namespace(
         "/data",
-        fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
+        fio::PERM_READABLE | fio::PERM_WRITABLE,
     ) {
         Ok(proxy) => Some(proxy),
         Err(e) => {
@@ -143,16 +143,14 @@ async fn main_inner_async(startup_time: Instant) -> Result<(), Error> {
         namespace.unbind("/data").context("failed to unbind /data from default namespace")?;
     }
 
-    let config_proxy = match fuchsia_fs::directory::open_in_namespace_deprecated(
-        "/config/data",
-        fuchsia_fs::OpenFlags::RIGHT_READABLE,
-    ) {
-        Ok(proxy) => Some(proxy),
-        Err(e) => {
-            warn!("failed to open /config/data: {:#}", anyhow!(e));
-            None
-        }
-    };
+    let config_proxy =
+        match fuchsia_fs::directory::open_in_namespace("/config/data", fio::PERM_READABLE) {
+            Ok(proxy) => Some(proxy),
+            Err(e) => {
+                warn!("failed to open /config/data: {:#}", anyhow!(e));
+                None
+            }
+        };
 
     let repo_manager = Arc::new(AsyncRwLock::new(
         load_repo_manager(

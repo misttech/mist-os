@@ -267,10 +267,10 @@ impl<T: Resolver> EagerPackageManager<T> {
     async fn load_persistent_eager_packages_fidl(
         data_proxy: &fio::DirectoryProxy,
     ) -> Result<HashMap<String, CupData>, Error> {
-        let file_proxy = match fuchsia_fs::directory::open_file_deprecated(
+        let file_proxy = match fuchsia_fs::directory::open_file(
             data_proxy,
             EAGER_PACKAGE_PERSISTENT_FIDL_NAME,
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::PERM_READABLE,
         )
         .await
         {
@@ -763,9 +763,9 @@ mod tests {
     fn get_test_package_resolver_with_hash(hash: &str) -> (MockResolver, tempfile::TempDir) {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("meta"), hash).unwrap();
-        let proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+        let proxy = fuchsia_fs::directory::open_in_namespace(
             dir.path().to_str().unwrap(),
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
+            fio::PERM_READABLE,
         )
         .unwrap();
         let pkg_dir = PackageDirectory::from_proxy(proxy);
@@ -859,10 +859,10 @@ mod tests {
         data_proxy: &fio::DirectoryProxy,
         packages: impl IntoIterator<Item = (impl std::fmt::Display, CupData)>,
     ) {
-        let file_proxy = fuchsia_fs::directory::open_file_deprecated(
+        let file_proxy = fuchsia_fs::directory::open_file(
             data_proxy,
             EAGER_PACKAGE_PERSISTENT_FIDL_NAME,
-            fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
+            fio::PERM_WRITABLE | fio::Flags::FLAG_MAYBE_CREATE,
         )
         .await
         .unwrap();
@@ -1059,9 +1059,9 @@ mod tests {
         let (cobalt_sender, mut cobalt_receiver) = get_fake_cobalt_sender();
 
         let data_dir = tempfile::tempdir().unwrap();
-        let data_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+        let data_proxy = fuchsia_fs::directory::open_in_namespace(
             data_dir.path().to_str().unwrap(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
         )
         .unwrap();
 
@@ -1130,9 +1130,9 @@ mod tests {
         let (pkg_cache, pkg_cache_stream) = get_mock_pkg_cache();
 
         let data_dir = tempfile::tempdir().unwrap();
-        let data_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+        let data_proxy = fuchsia_fs::directory::open_in_namespace(
             data_dir.path().to_str().unwrap(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
         )
         .unwrap();
 
@@ -1187,9 +1187,9 @@ mod tests {
         let (cobalt_sender, mut cobalt_receiver) = get_fake_cobalt_sender();
 
         let data_dir = tempfile::tempdir().unwrap();
-        let data_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+        let data_proxy = fuchsia_fs::directory::open_in_namespace(
             data_dir.path().to_str().unwrap(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
         )
         .unwrap();
 
@@ -1223,9 +1223,9 @@ mod tests {
         let (cobalt_sender, mut cobalt_receiver) = get_fake_cobalt_sender();
 
         let data_dir = tempfile::tempdir().unwrap();
-        let data_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+        let data_proxy = fuchsia_fs::directory::open_in_namespace(
             data_dir.path().to_str().unwrap(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
         )
         .unwrap();
         let manager = TestEagerPackageManagerBuilder::default()
@@ -1290,9 +1290,9 @@ mod tests {
         let (cobalt_sender, mut cobalt_receiver) = get_fake_cobalt_sender();
 
         let data_dir = tempfile::tempdir().unwrap();
-        let data_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+        let data_proxy = fuchsia_fs::directory::open_in_namespace(
             data_dir.path().to_str().unwrap(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
         )
         .unwrap();
         write_persistent_fidl(&data_proxy, [] as [(String, CupData); 0]).await;
@@ -1324,9 +1324,9 @@ mod tests {
         let (pkg_cache, pkg_cache_stream) = get_mock_pkg_cache();
 
         let data_dir = tempfile::tempdir().unwrap();
-        let data_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+        let data_proxy = fuchsia_fs::directory::open_in_namespace(
             data_dir.path().to_str().unwrap(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
         )
         .unwrap();
         let mut manager = TestEagerPackageManagerBuilder::default()
@@ -1422,9 +1422,9 @@ mod tests {
         let (package_resolver, _test_dir) = get_test_package_resolver_with_hash(TEST_HASH);
 
         let data_dir = tempfile::tempdir().unwrap();
-        let data_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+        let data_proxy = fuchsia_fs::directory::open_in_namespace(
             data_dir.path().to_str().unwrap(),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
         )
         .unwrap();
         let mut manager = TestEagerPackageManagerBuilder::default()
