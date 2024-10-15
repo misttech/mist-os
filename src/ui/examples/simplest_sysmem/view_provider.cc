@@ -120,8 +120,7 @@ void ViewProviderImpl::WriteToSysmem(uint8_t* write_values, uint32_t image_width
 
   // BufferCollectionToken zircon handles are interchangeable between fuchsia::sysmem2
   // and fuchsia::sysmem(1).
-  args.set_buffer_collection_token(fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
-      dup_token.Unbind().TakeChannel()));
+  args.set_buffer_collection_token2(std::move(dup_token).Unbind());
   args.set_usages(fuchsia::ui::composition::RegisterBufferCollectionUsages::DEFAULT);
 
   fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection;
