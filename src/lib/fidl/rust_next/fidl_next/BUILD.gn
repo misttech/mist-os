@@ -10,7 +10,6 @@ import("//build/rust/rustc_test.gni")
 rustc_library("fidl_next") {
   edition = "2021"
   sources = [
-    "src/bytes.rs",
     "src/chunk.rs",
     "src/decode/error.rs",
     "src/decode/mod.rs",
@@ -44,6 +43,7 @@ rustc_library("fidl_next") {
     "//third_party/rust_crates:munge",
     "//third_party/rust_crates:rend",
     "//third_party/rust_crates:thiserror",
+    "//third_party/rust_crates:zerocopy",
   ]
 
   if (is_fuchsia) {

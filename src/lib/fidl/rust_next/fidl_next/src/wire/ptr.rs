@@ -53,7 +53,9 @@ impl<'buf, T> WirePointer<'buf, T> {
     /// Sets the decoded value of the pointer.
     pub fn set_decoded(slot: Slot<'_, Self>, ptr: Owned<'buf, T>) {
         munge!(let Self { mut decoded } = slot);
-        decoded.write(ptr.into_raw());
+        // SAFETY: Identical to `decoded.write(ptr.into_raw())`, but raw
+        // pointers don't currently implement `IntoBytes`.
+        unsafe { decoded.as_mut_ptr().write(ptr.into_raw()) };
     }
 
     /// Returns the underlying pointer.

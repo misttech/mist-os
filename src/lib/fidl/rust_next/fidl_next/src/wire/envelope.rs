@@ -177,7 +177,9 @@ impl<'buf> WireEnvelope<'buf> {
                     },
                 } = slot;
             }
-            ptr.write(value_ptr.cast());
+            // SAFETY: Identical to `ptr.write(value_ptr.cast())`, but raw
+            // pointers don't currently implement `IntoBytes`.
+            unsafe { ptr.as_mut_ptr().write(value_ptr.cast()) };
         } else {
             // Decode inline value
             if size_of::<T>() > 4 {
