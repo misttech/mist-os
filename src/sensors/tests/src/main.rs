@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::collections::HashSet;
+
 use fidl::endpoints::create_endpoints;
 use fidl_fuchsia_sensors::*;
 use fidl_fuchsia_sensors_types::*;
@@ -22,7 +24,7 @@ async fn setup_realm() -> anyhow::Result<InstalledNamespace> {
 
 fn get_heart_rate_sensor() -> SensorInfo {
     SensorInfo {
-        sensor_id: Some(1),
+        sensor_id: Some(12345678),
         name: Some(String::from("HEART_RATE")),
         vendor: Some(String::from("Fuchsia")),
         version: Some(1),
@@ -67,8 +69,6 @@ async fn setup() -> anyhow::Result<(InstalledNamespace, ManagerProxy), anyhow::E
     let manager_proxy = connect_to_protocol_at::<ManagerMarker>(&realm)?;
 
     let _ = manager_proxy.configure_playback(&get_playback_config()).await?;
-    // Populate the internal sensors list.
-    let _ = manager_proxy.get_sensors_list().await;
 
     Ok((realm, manager_proxy))
 }
@@ -87,17 +87,115 @@ async fn clear_playback_config(proxy: &ManagerProxy) {
         .await;
 }
 
+async fn setup_second_playback_driver(realm: &InstalledNamespace) -> playback_fidl::PlaybackProxy {
+    let playback_proxy = connect_to_protocol_at::<playback_fidl::PlaybackMarker>(&realm).unwrap();
+
+    let test_sensor = SensorInfo {
+        sensor_id: Some(87654321),
+        name: Some(String::from("HEART_RATE2")),
+        vendor: Some(String::from("Fuchsia")),
+        version: Some(1),
+        sensor_type: Some(SensorType::HeartRate),
+        wake_up: Some(SensorWakeUpType::NonWakeUp),
+        reporting_mode: Some(SensorReportingMode::OnChange),
+        ..Default::default()
+    };
+
+    let mut playback_events: Vec<SensorEvent> = Vec::new();
+    for i in 1..4 {
+        let event = SensorEvent {
+            sensor_id: test_sensor.sensor_id.unwrap(),
+            sensor_type: SensorType::HeartRate,
+            payload: EventPayload::Float(i as f32),
+            // These two values get ignored by playback
+            sequence_number: 0,
+            timestamp: 0,
+        };
+        playback_events.push(event);
+    }
+
+    let fixed_values_config = playback_fidl::FixedValuesPlaybackConfig {
+        sensor_list: Some(vec![test_sensor]),
+        sensor_events: Some(playback_events),
+        ..Default::default()
+    };
+
+    let _ = playback_proxy
+        .configure_playback(&playback_fidl::PlaybackSourceConfig::FixedValuesConfig(
+            fixed_values_config,
+        ))
+        .await
+        .unwrap();
+
+    playback_proxy
+}
+
+#[fuchsia::test]
+async fn test_configure_playback() -> anyhow::Result<()> {
+    let (_realm, proxy) = setup().await?;
+    clear_playback_config(&proxy).await;
+
+    let mut fixed_values_config = playback_fidl::FixedValuesPlaybackConfig {
+        sensor_list: Some(vec![get_heart_rate_sensor()]),
+        sensor_events: Some(get_heart_rate_events()),
+        ..Default::default()
+    };
+    let res = proxy
+        .configure_playback(&playback_fidl::PlaybackSourceConfig::FixedValuesConfig(
+            fixed_values_config,
+        ))
+        .await;
+    assert!(res.is_ok());
+    assert!(proxy.get_sensors_list().await.unwrap().contains(&get_heart_rate_sensor()));
+
+    fixed_values_config = playback_fidl::FixedValuesPlaybackConfig {
+        sensor_list: None,
+        sensor_events: None,
+        ..Default::default()
+    };
+
+    let res = proxy
+        .configure_playback(&playback_fidl::PlaybackSourceConfig::FixedValuesConfig(
+            fixed_values_config,
+        ))
+        .await;
+
+    assert_eq!(res.unwrap(), Err(ConfigurePlaybackError::ConfigMissingFields));
+
+    // Misconfiguring playback should remove the sensors and proxy from future requests.
+    assert_eq!(
+        proxy.activate(get_heart_rate_sensor().sensor_id.unwrap()).await.unwrap(),
+        Err(ActivateSensorError::InvalidSensorId)
+    );
+    assert!(!proxy.get_sensors_list().await.unwrap().contains(&get_heart_rate_sensor()));
+
+    Ok(())
+}
+
 #[fuchsia::test]
 async fn test_get_sensors_list() -> anyhow::Result<()> {
-    let (_realm, proxy) = setup().await?;
+    let (realm, proxy) = setup().await?;
+    let _playback = setup_second_playback_driver(&realm).await;
+
+    let test_sensor = SensorInfo {
+        sensor_id: Some(87654321),
+        name: Some(String::from("HEART_RATE2")),
+        vendor: Some(String::from("Fuchsia")),
+        version: Some(1),
+        sensor_type: Some(SensorType::HeartRate),
+        wake_up: Some(SensorWakeUpType::NonWakeUp),
+        reporting_mode: Some(SensorReportingMode::OnChange),
+        ..Default::default()
+    };
 
     let fidl_sensors = proxy.get_sensors_list().await.unwrap();
     assert!(fidl_sensors.contains(&get_heart_rate_sensor()));
+    assert!(fidl_sensors.contains(&test_sensor));
 
     clear_playback_config(&proxy).await;
 
     let fidl_sensors = proxy.get_sensors_list().await.unwrap();
-    assert!(fidl_sensors.is_empty());
+    assert!(!fidl_sensors.contains(&get_heart_rate_sensor()));
 
     Ok(())
 }
@@ -115,7 +213,9 @@ async fn test_activate_sensor() -> anyhow::Result<()> {
     assert_eq!(proxy.activate(-1).await.unwrap(), Err(ActivateSensorError::InvalidSensorId));
 
     clear_playback_config(&proxy).await;
-    assert_eq!(proxy.activate(id).await.unwrap(), Err(ActivateSensorError::DriverUnavailable));
+    // Playback config was cleared, so this sensor should not exist anymore;
+    assert_eq!(proxy.activate(id).await.unwrap(), Err(ActivateSensorError::InvalidSensorId));
+
     Ok(())
 }
 
@@ -258,6 +358,47 @@ async fn test_two_clients() -> anyhow::Result<()> {
     }
 
     assert_eq!(events1, events2);
+
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_two_driver_providers() -> anyhow::Result<()> {
+    let (realm, proxy) = setup().await?;
+    let _playback = setup_second_playback_driver(&realm).await;
+
+    let config = SensorRateConfig {
+        sampling_period_ns: Some(500000000), // 0.5s.
+        max_reporting_latency_ns: Some(0),
+        ..Default::default()
+    };
+
+    let fidl_sensors = proxy.get_sensors_list().await.unwrap();
+    assert_eq!(fidl_sensors.len(), 2);
+
+    for sensor in fidl_sensors {
+        let id = sensor.sensor_id.expect("sensor_id");
+        assert!(proxy.activate(id).await?.is_ok());
+        assert!(proxy.configure_sensor_rates(id, &config.clone()).await?.is_ok());
+    }
+
+    let mut unique_sensor_ids = HashSet::new();
+
+    let mut event_stream = proxy.take_event_stream();
+    let mut events: Vec<SensorEvent> = Vec::new();
+    for _i in 1..8 {
+        let mut event: SensorEvent =
+            event_stream.next().await.unwrap().unwrap().into_on_sensor_event().unwrap();
+        unique_sensor_ids.insert(event.sensor_id);
+        // The test cannot know these values ahead of time, so it can zero them so that it can
+        // match the rest of the event.
+        event.timestamp = 0;
+        event.sequence_number = 0;
+
+        events.push(event);
+    }
+
+    assert_eq!(unique_sensor_ids.len(), 2);
 
     Ok(())
 }

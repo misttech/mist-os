@@ -19,11 +19,24 @@
     ],
     use: [
         {
-            protocol: [
-                "fuchsia.hardware.sensors.Driver",
-                "fuchsia.hardware.sensors.Playback",
-            ],
+            service: "fuchsia.hardware.sensors.Service",
             from: "#sensors_playback",
+            path: "/svc/fuchsia.hardware.sensors.Service.Playback",
+        },
+        {
+            service: "fuchsia.hardware.sensors.Service",
+            from: "parent",
+            availability: "optional",
+        },
+        {
+            protocol: "fuchsia.hardware.sensors.Playback",
+            from: "#sensors_playback",
+        },
+
+        // Needed to open playback's exposed directory.
+        {
+            protocol: "fuchsia.component.Realm",
+            from: "framework",
         },
     ],
     expose: [

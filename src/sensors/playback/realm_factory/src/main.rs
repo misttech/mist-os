@@ -73,7 +73,7 @@ async fn create_realm() -> Result<RealmInstance, Error> {
     builder
         .add_route(
             Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.hardware.sensors.Driver"))
+                .capability(Capability::service_by_name("fuchsia.hardware.sensors.Service"))
                 .capability(Capability::protocol_by_name("fuchsia.hardware.sensors.Playback"))
                 .from(&playback_ref)
                 .to(Ref::parent()),

@@ -13,7 +13,7 @@
         },
         {
             name: "sensors",
-            url: "sensors#meta/sensors.cm",
+            url: "sensors_eng#meta/sensors.cm",
         },
         {
             name: "playback",

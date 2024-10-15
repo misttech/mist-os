@@ -22,6 +22,7 @@ rustc_library("lib") {
   sources = [
     "src/lib.rs",
     "src/sensor_manager.rs",
+    "src/utils.rs",
   ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.sensors:fuchsia.hardware.sensors_rust",
@@ -34,7 +35,6 @@ rustc_library("lib") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:futures-util",
-    "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:tracing",
   ]
 
@@ -53,8 +53,10 @@ rustc_binary("bin") {
   deps = [
     ":lib",
     "//sdk/fidl/fuchsia.hardware.sensors:fuchsia.hardware.sensors_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-fs",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:tracing",
   ]
@@ -95,7 +97,7 @@ fuchsia_component("sensors-test-component") {
 fuchsia_test_package("sensors-tests") {
   test_components = [ ":sensors-test-component" ]
   subpackages = [
-    ":sensors",
+    ":sensors_eng",
     ":test-driver",
     "//src/sensors/playback:sensors_playback",
   ]

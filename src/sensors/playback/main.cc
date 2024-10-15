@@ -64,16 +64,20 @@ int main(int argc, char* argv[]) {
     return -1;
   }
 
-  result = outgoing.AddUnmanagedProtocol<fuchsia_hardware_sensors::Driver>(
-      [fidl_dispatcher, &cleanup_executor,
-       &controller](fidl::ServerEnd<fuchsia_hardware_sensors::Driver> server_end) {
-        FX_LOGS(INFO) << "Incoming connection for "
-                      << fidl::DiscoverableProtocolName<fuchsia_hardware_sensors::Driver>;
-        DriverImpl::BindSelfManagedServer(fidl_dispatcher, cleanup_executor, controller,
-                                          std::move(server_end));
-      });
+  result = outgoing.AddService<fuchsia_hardware_sensors::Service>(
+      fuchsia_hardware_sensors::Service::InstanceHandler({
+          .driver =
+              [&fidl_dispatcher, &cleanup_executor,
+               &controller](fidl::ServerEnd<fuchsia_hardware_sensors::Driver> server_end) {
+                FX_LOGS(INFO) << "Incoming connection for "
+                              << fuchsia_hardware_sensors::Service::Name;
+                DriverImpl::BindSelfManagedServer(fidl_dispatcher, cleanup_executor, controller,
+                                                  std::move(server_end));
+              },
+      }),
+      "playback_sensor_driver");
   if (result.is_error()) {
-    FX_LOGS(ERROR) << "Failed to add Driver protocol: " << result.status_string();
+    FX_LOGS(ERROR) << "Failed to add Driver service: " << result.status_string();
     return -1;
   }
 
