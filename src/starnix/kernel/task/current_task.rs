@@ -48,10 +48,10 @@ use starnix_uapi::vfs::ResolveFlags;
 use starnix_uapi::{
     clone_args, errno, error, from_status_like_fdio, pid_t, rlimit, sock_filter,
     CLONE_CHILD_CLEARTID, CLONE_CHILD_SETTID, CLONE_FILES, CLONE_FS, CLONE_INTO_CGROUP,
-    CLONE_NEWUTS, CLONE_PARENT_SETTID, CLONE_PTRACE, CLONE_SETTLS, CLONE_SIGHAND, CLONE_SYSVSEM,
-    CLONE_THREAD, CLONE_VFORK, CLONE_VM, FUTEX_OWNER_DIED, FUTEX_TID_MASK, ROBUST_LIST_LIMIT,
-    SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER, SECCOMP_FILTER_FLAG_TSYNC,
-    SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SI_KERNEL,
+    CLONE_NEWUTS, CLONE_PARENT, CLONE_PARENT_SETTID, CLONE_PTRACE, CLONE_SETTLS, CLONE_SIGHAND,
+    CLONE_SYSVSEM, CLONE_THREAD, CLONE_VFORK, CLONE_VM, FUTEX_OWNER_DIED, FUTEX_TID_MASK,
+    ROBUST_LIST_LIMIT, SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER,
+    SECCOMP_FILTER_FLAG_TSYNC, SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SI_KERNEL,
 };
 use std::ffi::CString;
 use std::fmt;
@@ -1582,6 +1582,7 @@ impl CurrentTask {
             | CLONE_THREAD
             | CLONE_SYSVSEM
             | CLONE_SETTLS
+            | CLONE_PARENT
             | CLONE_PARENT_SETTID
             | CLONE_CHILD_CLEARTID
             | CLONE_CHILD_SETTID
@@ -1597,6 +1598,7 @@ impl CurrentTask {
 
         let clone_files = flags & (CLONE_FILES as u64) != 0;
         let clone_fs = flags & (CLONE_FS as u64) != 0;
+        let clone_parent = flags & (CLONE_PARENT as u64) != 0;
         let clone_parent_settid = flags & (CLONE_PARENT_SETTID as u64) != 0;
         let clone_child_cleartid = flags & (CLONE_CHILD_CLEARTID as u64) != 0;
         let clone_child_settid = flags & (CLONE_CHILD_SETTID as u64) != 0;
@@ -1677,8 +1679,27 @@ impl CurrentTask {
         let security_state = security::task_alloc(&self, flags);
 
         let TaskInfo { thread, thread_group, memory_manager } = {
+            // These variables hold the original parent in case we need to switch the parent of the
+            // new task because of CLONE_PARENT.
+            let weak_original_parent;
+            let original_parent;
+
             // Make sure to drop these locks ASAP to avoid inversion
-            let thread_group_state = self.thread_group.write();
+            let thread_group_state = {
+                let thread_group_state = self.thread_group.write();
+                if clone_parent {
+                    // With the CLONE_PARENT flag, the parent of the new task is our parent
+                    // instead of ourselves.
+                    weak_original_parent =
+                        thread_group_state.parent.clone().ok_or_else(|| errno!(EINVAL))?;
+                    std::mem::drop(thread_group_state);
+                    original_parent = weak_original_parent.upgrade();
+                    original_parent.write()
+                } else {
+                    thread_group_state
+                }
+            };
+
             let state = self.read();
 
             no_new_privs = state.no_new_privs();
