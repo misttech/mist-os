@@ -42,7 +42,6 @@
     expose: [
         {
             protocol: [
-                "fuchsia.power.suspend.Stats",
                 "fuchsia.power.system.ActivityGovernor",
                 "test.sagcontrol.State",
             ],

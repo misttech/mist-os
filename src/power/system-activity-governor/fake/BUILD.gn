@@ -14,7 +14,6 @@ rustc_binary("bin") {
   ]
   deps = [
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
-    "//sdk/fidl/fuchsia.power.suspend:fuchsia.power.suspend_rust",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
     "//src/lib/async-utils",
     "//src/lib/fidl/rust/fidl",

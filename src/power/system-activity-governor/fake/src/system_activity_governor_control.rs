@@ -22,9 +22,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use tracing::error;
 
-use {
-    fidl_fuchsia_power_suspend as fsuspend, fidl_test_sagcontrol as fctrl, fuchsia_async as fasync,
-};
+use {fidl_test_sagcontrol as fctrl, fuchsia_async as fasync};
 
 // TODO(b/336692041): Set up a more complex topology to allow fake SAG to override power element
 // states.
@@ -342,12 +340,6 @@ impl SystemActivityGovernorControl {
                     }
                 })
                 .detach();
-            })
-            .add_service_connector(move |server_end: ServerEnd<fsuspend::StatsMarker>| {
-                fclient::connect_channel_to_protocol::<fsuspend::StatsMarker>(
-                    server_end.into_channel(),
-                )
-                .unwrap();
             })
             .add_service_connector(
                 move |server_end: ServerEnd<fsystem::ActivityGovernorMarker>| {
