@@ -5,7 +5,7 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
-use crate::bpf::fs::{get_bpf_object, get_selinux_context, BpfFsDir, BpfFsObject, BpfHandle};
+use crate::bpf::fs::{get_bpf_object, BpfFsDir, BpfFsObject, BpfHandle};
 use crate::bpf::map::Map;
 use crate::bpf::program::{Program, ProgramInfo};
 use crate::mm::{MemoryAccessor, MemoryAccessorExt};
@@ -298,14 +298,7 @@ pub fn sys_bpf(
             )?;
             let bpf_dir =
                 parent.entry.node.downcast_ops::<BpfFsDir>().ok_or_else(|| errno!(EINVAL))?;
-            let selinux_context = get_selinux_context(pathname.as_ref());
-            bpf_dir.register_pin(
-                current_task,
-                &parent,
-                basename,
-                object,
-                selinux_context.as_ref(),
-            )?;
+            bpf_dir.register_pin(current_task, &parent, basename, object)?;
             Ok(SUCCESS)
         }
 
