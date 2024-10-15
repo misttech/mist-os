@@ -48,13 +48,13 @@ bool test_clone_pid_and_parent_pid() {
                                starnix_uapi::kSIGCHLD);
   ASSERT_EQ(current_task->get_pid(), thread->get_pid());
   ASSERT_NE(current_task->get_tid(), thread->get_tid());
-  ASSERT_EQ(current_task->thread_group->leader(), thread->thread_group->leader());
+  ASSERT_EQ(current_task->thread_group()->leader(), thread->thread_group()->leader());
 
   auto child_task = (*current_task).clone_task_for_test(0, starnix_uapi::kSIGCHLD);
 
   ASSERT_NE(current_task->get_pid(), child_task->get_pid());
   ASSERT_NE(current_task->get_tid(), child_task->get_tid());
-  ASSERT_EQ(current_task->get_pid(), child_task->thread_group->read()->get_ppid());
+  ASSERT_EQ(current_task->get_pid(), child_task->thread_group()->Read()->get_ppid());
 
   END_TEST;
 }
@@ -70,15 +70,19 @@ bool test_clone_rlimit() {
   BEGIN_TEST;
 
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
-  auto prev_fsize = (*current_task)->thread_group->get_rlimit({starnix_uapi::ResourceEnum::FSIZE});
+  auto prev_fsize =
+      (*current_task)->thread_group()->get_rlimit({starnix_uapi::ResourceEnum::FSIZE});
   ASSERT_NE(10u, prev_fsize);
-  (*current_task)->thread_group->limits.Lock()->set({starnix_uapi::ResourceEnum::FSIZE}, {10, 100});
+  (*current_task)
+      ->thread_group()
+      ->limits.Lock()
+      ->set({starnix_uapi::ResourceEnum::FSIZE}, {.rlim_cur = 10, .rlim_max = 100});
   auto current_fsize =
-      (*current_task)->thread_group->get_rlimit({starnix_uapi::ResourceEnum::FSIZE});
+      (*current_task)->thread_group()->get_rlimit({starnix_uapi::ResourceEnum::FSIZE});
   ASSERT_EQ(10u, current_fsize);
 
   auto child_task = (*current_task).clone_task_for_test(0, starnix_uapi::kSIGCHLD);
-  auto child_fsize = (*child_task)->thread_group->get_rlimit({starnix_uapi::ResourceEnum::FSIZE});
+  auto child_fsize = (*child_task)->thread_group()->get_rlimit({starnix_uapi::ResourceEnum::FSIZE});
   ASSERT_EQ(10u, child_fsize);
 
   END_TEST;

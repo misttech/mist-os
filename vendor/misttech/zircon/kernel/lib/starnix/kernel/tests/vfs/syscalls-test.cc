@@ -45,7 +45,7 @@ bool test_sys_open_cloexec() {
                  O_RDONLY | O_CLOEXEC, starnix_uapi::FileMode());
   ASSERT_TRUE(fd_or_error.is_ok(), "failed to sys_openat");
 
-  auto flag_or_error = current_task->files.get_fd_flags(fd_or_error.value());
+  auto flag_or_error = current_task->files().get_fd_flags(fd_or_error.value());
   ASSERT_TRUE(flag_or_error.is_ok());
   ASSERT_TRUE(flag_or_error.value().contains(starnix::FdFlagsEnum::CLOEXEC));
 

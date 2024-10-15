@@ -108,7 +108,7 @@ util::WeakPtr<Task> PidTable::get_task(pid_t pid) const {
 }
 
 void PidTable::add_task(const fbl::RefPtr<Task>& task) {
-  auto& entry = get_entry_mut(task->id);
+  auto& entry = get_entry_mut(task->id());
   ASSERT(!entry.task_.has_value());
   entry.task_ = util::WeakPtr<Task>(task.get());
 }

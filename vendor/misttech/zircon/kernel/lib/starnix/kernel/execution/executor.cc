@@ -95,7 +95,7 @@ fit::result<zx_status_t, KernelHandle<ThreadDispatcher>> create_thread(
 }
 
 fit::result<zx_status_t> run_task(const CurrentTask& current_task) {
-  auto thread = current_task->thread.Read();
+  auto thread = current_task->thread().Read();
 
   if (thread->has_value()) {
     auto t = thread->value();

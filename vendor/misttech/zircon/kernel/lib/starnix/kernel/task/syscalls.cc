@@ -100,17 +100,18 @@ fit::result<Errno, pid_t> do_clone(CurrentTask& current_task, struct clone_args 
 
   // RegisterState::print_regs(stdout, &*new_task.thread_state.registers);
 
-  auto tid = new_task.task()->id;
+  auto tid = new_task.task()->id();
   // auto task_ref = util::WeakPtr(new_task.task.get());
   execute_task(
       new_task,
-      [](const CurrentTask& current_task) -> fit::result<Errno> {
-        auto maybe_thread = current_task->thread.Write();
+      [](CurrentTask& current_task) -> fit::result<Errno> {
+        auto maybe_thread = current_task->thread().Write();
         if (maybe_thread->has_value()) {
           auto thread = maybe_thread->value();
 
           // Copy register state in the current task to fork_frame
           thread->SetForkFrame(*current_task.thread_state().registers);
+
           // RegisterState::print_regs(stdout, &*current_task.thread_state().registers);
         }
         return fit::ok();
@@ -202,8 +203,8 @@ fit::result<Errno> sys_execveat(CurrentTask& current_task, FdNumber dir_fd, User
   // See the Limits sections in https://man7.org/linux/man-pages/man2/execve.2.html
   const size_t PAGE_LIMIT = 32;
   size_t page_limit_size = PAGE_LIMIT * static_cast<size_t>(PAGE_SIZE);
-  auto rlimit =
-      current_task->thread_group->get_rlimit(starnix_uapi::Resource{.value = ResourceEnum::STACK});
+  auto rlimit = current_task->thread_group()->get_rlimit(
+      starnix_uapi::Resource{.value = ResourceEnum::STACK});
   auto stack_limit = rlimit / 4;
   auto argv_env_limit = ktl::max(page_limit_size, static_cast<size_t>(stack_limit));
 
@@ -257,7 +258,7 @@ fit::result<Errno> sys_execveat(CurrentTask& current_task, FdNumber dir_fd, User
       //   directory.
       //
       // See https://man7.org/linux/man-pages/man2/open.2.html
-      auto file = current_task->files.get_allowing_opath(dir_fd) _EP(file);
+      auto file = current_task->files().get_allowing_opath(dir_fd) _EP(file);
 
       // We are forced to reopen the file with O_RDONLY to get access to the underlying VMO.
       // Note that skip the access check in the arguments in case the file mode does
@@ -323,7 +324,7 @@ fit::result<Errno, pid_t> sys_gettid(const CurrentTask& current_task) {
   return fit::ok(current_task->get_tid());
 }
 fit::result<Errno, pid_t> sys_getppid(const CurrentTask& current_task) {
-  return fit::ok(current_task->thread_group->read()->get_ppid());
+  return fit::ok(current_task->thread_group()->Read()->get_ppid());
 }
 
 fit::result<Errno, pid_t> sys_getsid(const CurrentTask& current_task, pid_t pid) {
@@ -333,7 +334,7 @@ fit::result<Errno, pid_t> sys_getsid(const CurrentTask& current_task, pid_t pid)
     return result.take_error();
   auto target_task = result.value();
   // security::check_task_getsid(current_task, &target_task)?;
-  auto sid = target_task->thread_group->read()->process_group->session->leader;
+  auto sid = target_task->thread_group()->Read()->process_group->session->leader;
   return fit::ok(sid);
 }
 
@@ -345,7 +346,7 @@ fit::result<Errno, pid_t> sys_getpgid(const CurrentTask& current_task, pid_t pid
 
   auto task = result.value();
   // selinux_hooks::check_getpgid_access(current_task, &task)?;
-  auto pgid = task->thread_group->read()->process_group->leader;
+  auto pgid = task->thread_group()->Read()->process_group->leader;
   return fit::ok(pgid);
 }
 

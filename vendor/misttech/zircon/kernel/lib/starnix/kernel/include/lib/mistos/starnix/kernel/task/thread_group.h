@@ -352,11 +352,11 @@ class ThreadGroup : public fbl::RefCountedUpgradeable<ThreadGroup>,
   fit::result<Errno> add(fbl::RefPtr<Task> task);
 
   /// state_accessor!(ThreadGroup, mutable_state, Arc<ThreadGroup>);
-  starnix_sync::RwLock<ThreadGroupMutableState>::RwLockReadGuard read() const {
+  starnix_sync::RwLock<ThreadGroupMutableState>::RwLockReadGuard Read() const {
     return mutable_state_.Read();
   }
 
-  starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard write() {
+  starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard Write() {
     return mutable_state_.Write();
   }
 

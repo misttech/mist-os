@@ -185,18 +185,18 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_task_with_pid(
   // TODO (Herrera) Add fit::defer
   {
     auto temp_task = builder.task();
-    auto result = builder->thread_group->add(temp_task);
+    auto result = builder->thread_group()->add(temp_task);
     if (result.is_error()) {
       return result.take_error();
     }
 
     for (auto& [resouce, limit] : rlimits) {
-      builder->thread_group->limits.Lock()->set(resouce,
-                                                rlimit{.rlim_cur = limit, .rlim_max = limit});
+      builder->thread_group()->limits.Lock()->set(resouce,
+                                                  rlimit{.rlim_cur = limit, .rlim_max = limit});
     }
 
     pids->add_task(temp_task);
-    pids->add_thread_group(builder->thread_group);
+    pids->add_thread_group(builder->thread_group());
   }
 
   return fit::ok(builder);
@@ -277,7 +277,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
   }
 
   auto fs = clone_fs ? (*this)->fs() : (*this)->fs()->fork();
-  auto files = clone_files ? (*this)->files : (*this)->files.fork();
+  auto files = clone_files ? (*this)->files() : (*this)->files().fork();
 
   auto kernel = (*this)->kernel();
   auto pids = kernel->pids.Write();
@@ -298,7 +298,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
   auto task_info = [&]() -> fit::result<Errno, TaskInfo> {
     // Make sure to drop these locks ASAP to avoid inversion
     auto self = (*this);
-    auto thread_group_state = self->thread_group->write();
+    auto thread_group_state = self->thread_group()->Write();
     auto state = self->mutable_state_.Read();
 
     no_new_privs = (*state).no_new_privs();
@@ -327,8 +327,8 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
     */
 
     if (clone_thread) {
-      auto thread_group = (*this)->thread_group;
-      auto memory_manager = (*this)->mm();
+      auto thread_group = task_->thread_group();
+      auto memory_manager = task_->mm();
       return fit::ok(
           TaskInfo{.thread = {}, .thread_group = thread_group, .memory_manager = memory_manager});
     } else {
@@ -365,7 +365,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
     // takes place we have a self deadlock.
     pids->add_task(child_task);
     if (!clone_thread) {
-      pids->add_thread_group(child->thread_group);
+      pids->add_thread_group(child->thread_group());
     }
     pids.~RwLockGuard();
 
@@ -386,9 +386,9 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
     */
 
     if (clone_thread) {
-      _EP((*this)->thread_group->add(child_task));
+      _EP((*this)->thread_group()->add(child_task));
     } else {
-      _EP((*this)->thread_group->add(child_task));
+      _EP((*this)->thread_group()->add(child_task));
       auto child_state = child->mutable_state_.Write();
       auto state = (*this)->mutable_state_.Read();
       // child_state.signals.alt_stack = state.signals.alt_stack;
@@ -397,7 +397,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
     }
 
     if (clone_parent_settid) {
-      _EP(this->write_object(user_parent_tid, child->id));
+      _EP(this->write_object(user_parent_tid, child->id()));
     }
 
     if (clone_child_cleartid) {
@@ -405,7 +405,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
     }
 
     if (clone_child_settid) {
-      _EP(child->write_object(user_child_tid, child->id));
+      _EP(child->write_object(user_child_tid, child->id()));
     }
 
     child.thread_state() = this->thread_state().snapshot();
@@ -425,7 +425,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
 
 void CurrentTask::thread_group_exit(ExitStatus exit_status) {
   // self.ptrace_event(PtraceOptions::TRACEEXIT, exit_status.signal_info_status() as u64);
-  (*this)->thread_group->exit(exit_status, {});
+  task_->thread_group()->exit(exit_status, {});
 }
 
 starnix::testing::AutoReleasableTask CurrentTask::clone_task_for_test(
@@ -464,7 +464,7 @@ fit::result<Errno> CurrentTask::exec(const FileHandle& executable, const ktl::st
     return resolved_elf.take_error();
   }
 
-  if ((*this)->thread_group->read()->tasks_count() > 1) {
+  if (task_->thread_group()->Read()->tasks_count() > 1) {
     // track_stub !(TODO("https://fxbug.dev/297434895"), "exec on multithread process");
     return fit::error(errno(EINVAL));
   }
@@ -553,7 +553,7 @@ fit::result<Errno> CurrentTask::finish_exec(const ktl::string_view& path,
     // TODO: POSIX timers are not preserved.
   */
 
-  task_->thread_group->write()->did_exec = true;
+  task_->thread_group()->Write()->did_exec = true;
 
   // `prctl(PR_GET_NAME)` and `/proc/self/stat`
   /*
@@ -612,7 +612,7 @@ fit::result<Errno, ktl::pair<NamespaceNode, FsStr>> CurrentTask::resolve_dir_fd(
       //   directory.
       //
       // See https://man7.org/linux/man-pages/man2/open.2.html
-      auto result = (*this)->files.get_allowing_opath(dir_fd);
+      auto result = task_->files().get_allowing_opath(dir_fd);
       if (result.is_error()) {
         return result.take_error();
       }
