@@ -27,6 +27,11 @@
                 // clone of the VM, which is insufficient to pass this test because the test uses
                 // a volatile write to communicate the status of the child process.
                 "clone05",
+
+                // Requires CLONE_NEWNET. In order to implement CLONE_NEWNET, we would need to
+                // support network namespaces. Additionally, even if we supported network
+                // namespaces, this test would still fail until we implement CLONE_VM without
+                // CLONE_THREAD because the test uses a shared VM to send back the result.
                 "clone09",
                 "cpuacct_1_1",
                 "cve-2015-7550",
