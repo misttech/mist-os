@@ -1279,7 +1279,7 @@ impl Task {
     }
 
     /// Blocks the caller until the task has exited or executed execve(). This is used to implement
-    /// vfork() and clone(... CLONE_VFORK, ...). The task musy have created with CLONE_EXECVE.
+    /// vfork() and clone(... CLONE_VFORK, ...). The task must have created with CLONE_EXECVE.
     pub fn wait_for_execve(&self, task_to_wait: WeakRef<Task>) -> Result<(), Errno> {
         let event = task_to_wait.upgrade().and_then(|t| t.vfork_event.clone());
         if let Some(event) = event {
