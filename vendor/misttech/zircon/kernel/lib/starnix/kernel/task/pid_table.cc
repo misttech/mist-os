@@ -127,7 +127,7 @@ void PidTable::add_thread_group(const fbl::RefPtr<ThreadGroup>& thread_group) {
 }
 
 void PidTable::add_process_group(const fbl::RefPtr<ProcessGroup>& process_group) {
-  auto& entry = get_entry_mut(process_group->leader);
+  auto& entry = get_entry_mut(process_group->leader());
   ASSERT(!entry.process_group_.has_value());
   entry.process_group_ = util::WeakPtr<ProcessGroup>(process_group.get());
 }

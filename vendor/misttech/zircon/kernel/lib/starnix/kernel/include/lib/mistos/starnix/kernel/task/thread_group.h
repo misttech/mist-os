@@ -132,13 +132,13 @@ class ThreadGroupMutableState {
   using BTreeMapTaskContainer = fbl::WAVLTree<pid_t, ktl::unique_ptr<TaskContainer>>;
   using BTreeMapThreadGroup = fbl::WAVLTree<pid_t, util::WeakPtr<ThreadGroup>>;
 
+ private:
   // The parent thread group.
   //
   // The value needs to be writable so that it can be re-parent to the correct subreaper if the
   // parent ends before the child.
-  ktl::optional<fbl::RefPtr<ThreadGroup>> parent;
+  ktl::optional<fbl::RefPtr<ThreadGroup>> parent_;
 
- private:
   // The tasks in the thread group.
   //
   // The references to Task is weak to prevent cycles as Task have a Arc reference to their
@@ -147,7 +147,6 @@ class ThreadGroupMutableState {
   // themselves before they are deleted.
   BTreeMapTaskContainer tasks_;
 
- public:
   // The children of this thread group.
   //
   // The references to ThreadGroup is weak to prevent cycles as ThreadGroup have a Arc reference
@@ -157,31 +156,31 @@ class ThreadGroupMutableState {
   BTreeMapThreadGroup children_;
 
   /// Child tasks that have exited, but not yet been waited for.
-  fbl::Vector<fbl::RefPtr<ZombieProcess>> zombie_children;
+  fbl::Vector<fbl::RefPtr<ZombieProcess>> zombie_children_;
 
   /// ptracees of this process that have exited, but not yet been waited for.
-  // pub zombie_ptracees: ZombiePtraces,
+  // ZombiePtraces zombie_ptracees;
 
   // Child tasks that have exited, but the zombie ptrace needs to be consumed
   // before they can be waited for.  (pid_t, pid_t) is the original tracer and
   // tracee, so the tracer can be updated with a reaper if this thread group
   // exits.
-  // pub deferred_zombie_ptracers: Vec<(pid_t, pid_t)>,
+  // fbl::Vector<std::pair<pid_t, pid_t>> deferred_zombie_ptracers;
 
   /// WaitQueue for updates to the WaitResults of tasks in this group.
-  // pub child_status_waiters: WaitQueue,
+  // WaitQueue child_status_waiters;
 
   /// Whether this thread group will inherit from children of dying processes in its descendant
   /// tree.
-  // pub is_child_subreaper: bool,
+  // bool is_child_subreaper = false;
 
   /// The IDs used to perform shell job control.
-  fbl::RefPtr<ProcessGroup> process_group;
+  fbl::RefPtr<ProcessGroup> process_group_;
 
   /// The timers for this thread group (from timer_create(), etc.).
   // pub timers: TimerTable,
 
-  bool did_exec = false;
+  bool did_exec_ = false;
 
   /// Wait queue for updates to `stopped`.
   // pub stopped_waiters: WaitQueue,
@@ -193,7 +192,7 @@ class ThreadGroupMutableState {
 
   // pub leader_exit_info: Option<ProcessExitInfo>,
 
-  bool terminating = false;
+  bool terminating_ = false;
 
   /// The SELinux operations for this thread group.
   // pub selinux_state: Option<SeLinuxThreadGroupState>,
@@ -207,6 +206,7 @@ class ThreadGroupMutableState {
   /// Thread groups allowed to trace tasks in this this thread group.
   // pub allowed_ptracers: PtraceAllowedPtracers,
 
+ public:
   /// impl ThreadGroupMutableState<Base = ThreadGroup>
   pid_t leader() const;
 
@@ -224,6 +224,11 @@ class ThreadGroupMutableState {
 
   pid_t get_ppid() const;
 
+  void set_process_group(fbl::RefPtr<ProcessGroup> new_process_group, PidTable* pids);
+
+  // Removes this thread group from its current process group
+  void leave_process_group(PidTable& pids);
+
   // Indicates whether the thread group is waitable via waitid and waitpid for
   /// either WSTOPPED or WCONTINUED.
   bool is_waitable() const;
@@ -239,6 +244,19 @@ class ThreadGroupMutableState {
   /// Will remove the waitable status from the child depending on `options`.
   WaitableChildResult get_waitable_child(ProcessSelector selector, const WaitingOptions& options,
                                          PidTable& pids);
+
+  // C++
+  const fbl::Vector<fbl::RefPtr<ZombieProcess>>& get_zombie_children() const {
+    return zombie_children_;
+  }
+
+  const fbl::RefPtr<ProcessGroup>& process_group() const { return process_group_; }
+
+  const bool& did_exec() const { return did_exec_; }
+  bool& did_exec() { return did_exec_; }
+
+  const bool& terminating() const { return terminating_; }
+  bool& terminating() { return terminating_; }
 
   ThreadGroupMutableState();
 
@@ -349,14 +367,19 @@ class ThreadGroup : public fbl::RefCountedUpgradeable<ThreadGroup>,
 
   uint64_t get_rlimit(starnix_uapi::Resource resource) const;
 
-  fit::result<Errno> add(fbl::RefPtr<Task> task);
+  fit::result<Errno> add(fbl::RefPtr<Task> task) const;
+
+  void remove(fbl::RefPtr<Task> task) const;
+
+  // Sets the session ID for this thread group
+  fit::result<Errno> setsid() const;
 
   /// state_accessor!(ThreadGroup, mutable_state, Arc<ThreadGroup>);
   starnix_sync::RwLock<ThreadGroupMutableState>::RwLockReadGuard Read() const {
     return mutable_state_.Read();
   }
 
-  starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard Write() {
+  starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard Write() const {
     return mutable_state_.Write();
   }
 
