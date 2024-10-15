@@ -110,7 +110,6 @@ impl FshostBuilder {
             ("fxfs_blob", "fuchsia.fshost.FxfsBlob"),
             ("fxfs_crypt_url", "fuchsia.fshost.FxfsCryptUrl"),
             ("storage_host", "fuchsia.fshost.StorageHost"),
-            ("storage_host_url", "fuchsia.fshost.StorageHostUrl"),
             ("disable_automount", "fuchsia.fshost.DisableAutomount"),
             ("blobfs_write_compression_algorithm", "fuchsia.blobfs.WriteCompressionAlgorithm"),
             ("blobfs_cache_eviction_policy", "fuchsia.blobfs.CacheEvictionPolicy"),
@@ -118,7 +117,6 @@ impl FshostBuilder {
 
         // Add the overrides as capabilities and route them.
         self.config_values.insert("fxfs_crypt_url", "#meta/fxfs-crypt.cm".into_value_spec());
-        self.config_values.insert("storage_host_url", "#meta/storage-host.cm".into_value_spec());
         for (key, value) in self.config_values {
             let cap_name = map[key];
             realm_builder

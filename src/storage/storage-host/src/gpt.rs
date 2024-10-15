@@ -6,11 +6,11 @@ use crate::partition::PartitionBackend;
 use crate::partitions_directory::PartitionsDirectory;
 use anyhow::{anyhow, Context as _, Error};
 use block_client::{
-    BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient, VmoId, WriteOptions,
+    AsBlockProxy, BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient, VmoId,
+    WriteOptions,
 };
 use block_server::async_interface::SessionManager;
 use block_server::BlockServer;
-use fidl_fuchsia_hardware_block_volume as fvolume;
 
 use fuchsia_async as fasync;
 use futures::lock::Mutex;
@@ -204,11 +204,11 @@ impl std::fmt::Debug for GptManager {
 
 impl GptManager {
     pub async fn new(
-        volume_proxy: fvolume::VolumeProxy,
+        block: impl AsBlockProxy,
         partitions_dir: Arc<vfs::directory::immutable::Simple>,
     ) -> Result<Arc<Self>, Error> {
         tracing::info!("Binding to GPT");
-        let client = RemoteBlockClient::new(&volume_proxy).await?;
+        let client = RemoteBlockClient::new(&block).await?;
         let block_size = client.block_size();
         let block_count = client.block_count();
         let gpt = gpt::GptManager::open(client).await.context("Failed to load GPT")?;
@@ -230,7 +230,7 @@ impl GptManager {
             let mut partitions = BTreeMap::new();
             for (index, info) in inner.gpt.partitions().iter() {
                 tracing::info!("GPT part {index}: {info:?}");
-                let block_client = RemoteBlockClient::new(&volume_proxy).await?;
+                let block_client = RemoteBlockClient::new(&block).await?;
                 let partition = PartitionBackend::new(GptPartition::new(
                     &this,
                     block_client,

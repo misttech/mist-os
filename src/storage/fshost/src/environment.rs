@@ -16,12 +16,10 @@ use crate::device::constants::{
 };
 use crate::device::{BlockDevice, Device, RegisteredDevices};
 use crate::inspect::register_migration_status;
-use crate::storage_host::StorageHostInstance;
 use crate::watcher::{DirSource, Watcher};
 use anyhow::{anyhow, bail, Context, Error};
 use async_trait::async_trait;
 use device_watcher::{recursive_wait, recursive_wait_and_open};
-use either::Either;
 use fidl::endpoints::{create_proxy, ServerEnd};
 use fidl_fuchsia_fs_startup::MountOptions;
 use fidl_fuchsia_hardware_block_partition::Guid;
@@ -146,6 +144,7 @@ pub enum Filesystem {
         #[allow(dead_code)] Option<CryptService>,
         String,
     ),
+    ServingGpt(ServingMultiVolumeFilesystem),
     Shutdown,
 }
 
@@ -174,6 +173,7 @@ impl Filesystem {
                     None => return Ok(None),
                 }
             }
+            Filesystem::ServingGpt(..) => bail!(anyhow!("GPT has no crypt service")),
             Filesystem::Shutdown => bail!(anyhow!("filesystem is shutting down")),
         }
         Ok(Some(proxy))
@@ -198,6 +198,9 @@ impl Filesystem {
                 .unwrap()
                 .volume(&volume_name)
                 .ok_or(anyhow!("volume {volume_name} not found"))?
+                .exposed_dir()
+                .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?,
+            Filesystem::ServingGpt(fs) => fs
                 .exposed_dir()
                 .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?,
             Filesystem::Shutdown => bail!(anyhow!("filesystem is shutting down")),
@@ -249,6 +252,7 @@ impl Filesystem {
             Filesystem::ServingVolumeInMultiVolume(_, volume_name) => {
                 serving_fs.unwrap().shutdown_volume(&volume_name).await.context("shutdown failed")
             }
+            Filesystem::ServingGpt(fs) => fs.shutdown().await.context("shutdown failed"),
             Filesystem::Shutdown => Err(anyhow!("double shutdown!")),
         }
     }
@@ -344,9 +348,8 @@ impl MaybeFs for Option<Box<dyn Container>> {
 /// Implements the Environment trait and keeps track of mounted filesystems.
 pub struct FshostEnvironment {
     config: Arc<fshost_config::Config>,
-    // A queue of Directory requests, which are connected to the partitions dir of the resolved
-    // storage-host instance once it is bound.
-    storage_host: Either<Vec<ServerEnd<fio::DirectoryMarker>>, StorageHostInstance>,
+    // When storage-host is enabled, the GPT is run as a component.
+    gpt: Filesystem,
     // `container` is set inside mount_fxblob() or mount_fvm() and represents the overall
     // Fxfs/Fvm instance which contains both a data and blob volume.
     container: Option<Box<dyn Container>>,
@@ -371,7 +374,7 @@ impl FshostEnvironment {
     ) -> Self {
         Self {
             config: config.clone(),
-            storage_host: Either::Left(vec![]),
+            gpt: Filesystem::Queue(FilesystemQueue::default()),
             container: None,
             blobfs: Filesystem::Queue(FilesystemQueue::default()),
             data: Filesystem::Queue(FilesystemQueue::default()),
@@ -407,17 +410,10 @@ impl FshostEnvironment {
         self.data.exposed_dir(self.container.maybe_fs())
     }
 
-    /// Returns a proxy for the partitions dir of storage-host.  This must be called before
-    /// storage-host is mounted and it will get routed once bound.
-    pub fn storage_host_partitions_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
-        let (proxy, server) = create_proxy::<fio::DirectoryMarker>()?;
-        match self.storage_host {
-            Either::Left(ref mut requests) => {
-                requests.push(server);
-            }
-            Either::Right(_) => unreachable!(),
-        }
-        Ok(proxy)
+    /// Returns a proxy for the exposed dir of the GPT.  This must be called before
+    /// the GPT is mounted and it will get routed once bound.
+    pub fn gpt_exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
+        self.gpt.exposed_dir(None)
     }
 
     /// Returns a proxy for the exposed dir of the data filesystem's crypt service. This can be
@@ -746,27 +742,30 @@ impl Environment for FshostEnvironment {
     }
 
     async fn launch_storage_host(&mut self, device: &mut dyn Device) -> Result<(), Error> {
-        tracing::info!(path = %device.path(), "Binding storage-host to device");
-        let requests = if let Either::Left(ref mut requests) = self.storage_host {
-            std::mem::take(requests)
-        } else {
-            bail!("storage-host instance was already bound")
-        };
-        let instance = StorageHostInstance::new(device, &self.config.storage_host_url)
-            .await
-            .context("Failed to launch storage-host")?;
-        let partitions_dir =
-            instance.partitions_dir().await.context("Failed to open partitions dir")?;
-        for request in requests {
-            partitions_dir
-                .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, request.into_channel().into())?;
+        let queue = self.gpt.queue().ok_or_else(|| anyhow!("GPT already bound"))?;
+        let filesystem = fs_management::filesystem::Filesystem::from_boxed_config(
+            device.block_connector()?,
+            Box::new(fs_management::Gpt::dynamic_child()),
+        )
+        .serve_multi_volume()
+        .await
+        .context("Failed to start GPT")?;
+        let exposed_dir = filesystem.exposed_dir();
+        for server in queue.exposed_dir_queue.drain(..) {
+            exposed_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
         }
+        let partitions_dir = fuchsia_fs::directory::open_directory(
+            &exposed_dir,
+            "partitions",
+            fio::Flags::PERM_CONNECT | fio::Flags::PERM_ENUMERATE | fio::Flags::PERM_TRAVERSE,
+        )
+        .await?;
         const PARTITION_SERVICE_SUFFIX: &str = "/svc/fuchsia.storagehost.PartitionService";
         self.watcher
             .add_source(Box::new(DirSource::with_suffix(partitions_dir, PARTITION_SERVICE_SUFFIX)))
             .await
-            .context("Failed to watch storage-host partitions dir")?;
-        self.storage_host = Either::Right(instance);
+            .context("Failed to watch gpt partitions dir")?;
+        self.gpt = Filesystem::ServingGpt(filesystem);
         Ok(())
     }
 
@@ -1085,6 +1084,7 @@ impl Environment for FshostEnvironment {
                 tracing::error!(?error, "failed to shut down fxfs");
             })
         }
+        self.gpt = Filesystem::Queue(FilesystemQueue::default());
         Ok(())
     }
 

@@ -174,13 +174,6 @@
             type: "bool",
         },
         {
-            // Path to the storage_host component.
-            config: "fuchsia.fshost.StorageHostUrl",
-            key: "storage_host_url",
-            type: "string",
-            max_size: 64,
-        },
-        {
             config: "fuchsia.fshost.DisableAutomount",
             key: "disable_automount",
             type: "bool",

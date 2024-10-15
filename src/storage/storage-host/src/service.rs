@@ -13,9 +13,9 @@ use vfs::directory::helper::DirectlyMutable as _;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
 use {
-    fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio,
-    fidl_fuchsia_process_lifecycle as flifecycle, fidl_fuchsia_storagehost as fstoragehost,
-    fuchsia_async as fasync, zx,
+    fidl_fuchsia_fs_startup as fstartup, fidl_fuchsia_hardware_block as fblock,
+    fidl_fuchsia_io as fio, fidl_fuchsia_process_lifecycle as flifecycle,
+    fidl_fuchsia_storagehost as fstoragehost, fuchsia_async as fasync, zx,
 };
 
 pub struct StorageHostService {
@@ -36,11 +36,6 @@ enum State {
     #[default]
     Stopped,
     Running(Arc<GptManager>),
-}
-
-pub enum Services {
-    StorageHost(fstoragehost::StorageHostRequestStream),
-    PartitionsManager(fstoragehost::PartitionsManagerRequestStream),
 }
 
 impl StorageHostService {
@@ -67,7 +62,7 @@ impl StorageHostService {
         let weak = Arc::downgrade(&self);
         let weak2 = weak.clone();
         svc_dir.add_entry(
-            fstoragehost::StorageHostMarker::PROTOCOL_NAME,
+            fstartup::StartupMarker::PROTOCOL_NAME,
             vfs::service::host(move |requests| {
                 let weak = weak.clone();
                 async move {
@@ -115,37 +110,46 @@ impl StorageHostService {
 
     async fn handle_start_requests(
         self: Arc<Self>,
-        mut stream: fstoragehost::StorageHostRequestStream,
+        mut stream: fstartup::StartupRequestStream,
     ) -> Result<(), Error> {
         while let Some(request) = stream.try_next().await.context("Reading request")? {
             tracing::debug!(?request);
             match request {
-                fstoragehost::StorageHostRequest::Start { volume_client, responder } => {
+                fstartup::StartupRequest::Start { device, options: _, responder } => {
                     responder
                         .send(
-                            self.start(volume_client.into_proxy().unwrap())
+                            self.start(device.into_proxy().unwrap())
                                 .await
                                 .map_err(|status| status.into_raw()),
                         )
                         .unwrap_or_else(|e| tracing::error!(?e, "Failed to send Start response"));
+                }
+                fstartup::StartupRequest::Format { responder, .. } => {
+                    responder
+                        .send(Err(zx::Status::NOT_SUPPORTED.into_raw()))
+                        .unwrap_or_else(|e| tracing::error!(?e, "Failed to send Check response"));
+                }
+                fstartup::StartupRequest::Check { responder, .. } => {
+                    responder
+                        .send(Err(zx::Status::NOT_SUPPORTED.into_raw()))
+                        .unwrap_or_else(|e| tracing::error!(?e, "Failed to send Check response"));
                 }
             }
         }
         Ok(())
     }
 
-    async fn start(self: &Arc<Self>, volume_proxy: fvolume::VolumeProxy) -> Result<(), zx::Status> {
+    async fn start(self: &Arc<Self>, device: fblock::BlockProxy) -> Result<(), zx::Status> {
         let mut state = self.state.lock().await;
         if let State::Running(..) = *state {
             tracing::warn!("Device already bound");
             return Err(zx::Status::ALREADY_BOUND);
         }
 
-        let runner =
-            GptManager::new(volume_proxy, self.partitions_dir.clone()).await.map_err(|err| {
-                tracing::error!(?err, "Failed to load GPT");
-                zx::Status::INTERNAL
-            })?;
+        let runner = GptManager::new(device, self.partitions_dir.clone()).await.map_err(|err| {
+            tracing::error!(?err, "Failed to load GPT");
+            zx::Status::INTERNAL
+        })?;
         *state = State::Running(runner);
 
         Ok(())
@@ -221,12 +225,13 @@ impl StorageHostService {
 mod tests {
     use super::StorageHostService;
     use fake_block_server::FakeServer;
-    use fidl::endpoints::{create_request_stream, Proxy as _};
+    use fidl::endpoints::Proxy as _;
     use fidl_fuchsia_process_lifecycle::LifecycleMarker;
     use fuchsia_component::client::connect_to_protocol_at_dir_svc;
     use futures::FutureExt as _;
     use gpt_testing::{format_gpt, Guid, PartitionInfo};
     use {
+        fidl_fuchsia_fs_startup as fstartup, fidl_fuchsia_hardware_block as fblock,
         fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio,
         fidl_fuchsia_storagehost as fstoragehost, fuchsia_async as fasync, zx,
     };
@@ -237,17 +242,36 @@ mod tests {
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let (lifecycle_client, lifecycle_server) =
             fidl::endpoints::create_proxy::<LifecycleMarker>().unwrap();
-        let (volume_client, volume_stream) =
-            create_request_stream::<fvolume::VolumeMarker>().unwrap();
+        let (block_client, block_server) =
+            fidl::endpoints::create_endpoints::<fblock::BlockMarker>();
+        let volume_stream =
+            fidl::endpoints::ServerEnd::<fvolume::VolumeMarker>::from(block_server.into_channel())
+                .into_stream()
+                .unwrap();
 
         futures::join!(
             async {
                 // Client
-                let client = connect_to_protocol_at_dir_svc::<fstoragehost::StorageHostMarker>(
-                    &outgoing_dir,
-                )
-                .unwrap();
-                client.start(volume_client).await.expect("FIDL error").expect("Start failed");
+                let client =
+                    connect_to_protocol_at_dir_svc::<fstartup::StartupMarker>(&outgoing_dir)
+                        .unwrap();
+                client
+                    .start(
+                        block_client,
+                        fstartup::StartOptions {
+                            read_only: false,
+                            verbose: false,
+                            fsck_after_every_transaction: false,
+                            write_compression_algorithm:
+                                fstartup::CompressionAlgorithm::ZstdChunked,
+                            write_compression_level: 0,
+                            cache_eviction_policy_override: fstartup::EvictionPolicyOverride::None,
+                            startup_profiling_seconds: 0,
+                        },
+                    )
+                    .await
+                    .expect("FIDL error")
+                    .expect("Start failed");
                 lifecycle_client.stop().expect("Stop failed");
                 fasync::OnSignals::new(
                     &lifecycle_client.into_channel().expect("into_channel failed"),
@@ -291,15 +315,31 @@ mod tests {
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let (lifecycle_client, lifecycle_server) =
             fidl::endpoints::create_proxy::<LifecycleMarker>().unwrap();
-        let (volume_client, volume_stream) =
-            create_request_stream::<fvolume::VolumeMarker>().unwrap();
+        let (block_client, block_server) =
+            fidl::endpoints::create_endpoints::<fblock::BlockMarker>();
+        let volume_stream =
+            fidl::endpoints::ServerEnd::<fvolume::VolumeMarker>::from(block_server.into_channel())
+                .into_stream()
+                .unwrap();
 
         futures::join!(
             async {
                 // Client
-                connect_to_protocol_at_dir_svc::<fstoragehost::StorageHostMarker>(&outgoing_dir)
+                connect_to_protocol_at_dir_svc::<fstartup::StartupMarker>(&outgoing_dir)
                     .unwrap()
-                    .start(volume_client)
+                    .start(
+                        block_client,
+                        fstartup::StartOptions {
+                            read_only: false,
+                            verbose: false,
+                            fsck_after_every_transaction: false,
+                            write_compression_algorithm:
+                                fstartup::CompressionAlgorithm::ZstdChunked,
+                            write_compression_level: 0,
+                            cache_eviction_policy_override: fstartup::EvictionPolicyOverride::None,
+                            startup_profiling_seconds: 0,
+                        },
+                    )
                     .await
                     .expect("FIDL error")
                     .expect("Start failed");

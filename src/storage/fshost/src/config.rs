@@ -31,7 +31,6 @@ pub fn default_config() -> fshost_config::Config {
         netboot: false,
         no_zxcrypt: false,
         storage_host: false,
-        storage_host_url: String::from("#meta/storage-host.cm"),
         use_disk_migration: false,
         disable_automount: false,
         blobfs_write_compression_algorithm: "".to_string(),

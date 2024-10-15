@@ -215,13 +215,6 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             ("fuchsia.fshost.Nand", Config::new_bool(nand)),
             ("fuchsia.fshost.FxfsBlob", Config::new_bool(fxfs_blob)),
             ("fuchsia.fshost.StorageHost", Config::new_bool(storage_host)),
-            (
-                "fuchsia.fshost.StorageHostUrl",
-                Config::new(
-                    ConfigValueType::String { max_size: 64 },
-                    "fuchsia-boot:///storage-host#meta/storage-host.cm".into(),
-                ),
-            ),
             ("fuchsia.fshost.FvmSliceSize", Config::new_uint64(fvm_slice_size)),
             (
                 "fuchsia.fshost.DataFilesystemFormat",

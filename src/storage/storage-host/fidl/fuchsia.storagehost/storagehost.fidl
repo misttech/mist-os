@@ -8,20 +8,6 @@ using fuchsia.hardware.block.partition;
 using fuchsia.hardware.block.volume;
 using zx;
 
-/// Interface for controlling storage-host.
-@discoverable
-closed protocol StorageHost {
-    /// Binds the storage-host to the specified block device the
-    /// fuchsia.hardware.block.volume.Volume protocol offered by the driver, and attempt to load the
-    /// partitions from the block device.  The block device must be formatted in a supported format
-    /// (e.g. GPT).  Each partition will have an entry added to the `partitions` directory of
-    /// storage-host.  A service node named `block` can be used to connect to the
-    /// fuchsia.hardware.block.volume.Volume service for that partition.
-    strict Start(resource struct {
-        volume_client client_end:fuchsia.hardware.block.volume.Volume;
-    }) -> () error zx.Status;
-};
-
 @discoverable
 closed protocol Partition {
     /// Appends an update to `transaction` (see `PartitionManager.CreateTransaction`)
