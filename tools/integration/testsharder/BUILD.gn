@@ -5,7 +5,21 @@
 import("//build/go/go_binary.gni")
 import("//build/go/go_library.gni")
 import("//build/go/go_test.gni")
+import("//build/go/golden_go_proto.gni")
 import("//build/testing/host_test_data.gni")
+
+golden_go_proto("params") {
+  sources = [ "proto/params.proto" ]
+  generate_descriptor_set = true
+  import_protobuf_full = true
+}
+
+go_library("proto_lib") {
+  source_dir = "proto"
+  sources = [ "params.pb.go" ]
+  deps = [ "//third_party/golibs:google.golang.org/protobuf" ]
+  non_go_deps = [ ":params" ]
+}
 
 go_library("testsharder_lib") {
   sources = [
@@ -28,6 +42,7 @@ go_library("testsharder_lib") {
   ]
 
   deps = [
+    ":proto_lib",
     "//third_party/golibs:golang.org/x/exp",
     "//tools/build",
     "//tools/lib/color",
