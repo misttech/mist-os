@@ -21,14 +21,14 @@
 
 namespace starnix {
 
-fit::result<Errno> sys_arch_prctl(const CurrentTask& current_task, uint32_t code,
+fit::result<Errno> sys_arch_prctl(CurrentTask& current_task, uint32_t code,
                                   starnix_uapi::UserAddress addr) {
   switch (code) {
     case ARCH_SET_FS:
-      current_task.thread_state.registers->fs_base = static_cast<uint64_t>(addr.ptr());
+      current_task.thread_state().registers->fs_base = static_cast<uint64_t>(addr.ptr());
       return fit::ok();
     case ARCH_SET_GS:
-      current_task.thread_state.registers->gs_base = static_cast<uint64_t>(addr.ptr());
+      current_task.thread_state().registers->gs_base = static_cast<uint64_t>(addr.ptr());
       return fit::ok();
     default:
       return fit::error(errno(ENOSYS));

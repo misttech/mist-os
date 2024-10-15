@@ -3,8 +3,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_CURRENT_TASK_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_CURRENT_TASK_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_CURRENT_TASK_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_CURRENT_TASK_H_
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/arch/x64/registers.h>
@@ -63,16 +63,17 @@ struct ThreadState {
   /// impl ThreadState
 
   /// Returns a new `ThreadState` with the same `registers` as this one.
-  ThreadState snapshot() const { return ThreadState{this->registers}; }
+  ThreadState snapshot() const { return ThreadState{RegisterState::From(*this->registers)}; }
 };
 
 class TaskBuilder {
- public:
+ private:
   // The underlying task object.
-  fbl::RefPtr<Task> task;
+  fbl::RefPtr<Task> task_;
 
-  ThreadState thread_state;
+  ThreadState thread_state_;
 
+ public:
   /// impl TaskBuilder
   explicit TaskBuilder(fbl::RefPtr<Task> task);
 
@@ -80,6 +81,12 @@ class TaskBuilder {
   const Task* operator->() const;
 
   // C++
+  const fbl::RefPtr<Task>& task() const { return task_; }
+  fbl::RefPtr<Task>& task() { return task_; }
+
+  ThreadState& thread_state() { return thread_state_; }
+  const ThreadState& thread_state() const { return thread_state_; }
+
   ~TaskBuilder();
 };
 
@@ -100,14 +107,15 @@ struct NamespaceNode;
 //
 // See also `Task` for more information about tasks.
 class CurrentTask : public TaskMemoryAccessor {
+ private:
+  /// The underlying task object.
+  fbl::RefPtr<Task> task_;
+
+  ThreadState thread_state_;
+
  public:
   /// impl From<TaskBuilder> for CurrentTask
   static CurrentTask From(const TaskBuilder& builder);
-
-  /// The underlying task object.
-  fbl::RefPtr<Task> task;
-
-  ThreadState thread_state;
 
   /// impl CurrentTask
   util::WeakPtr<Task> weak_task() const;
@@ -324,13 +332,19 @@ class CurrentTask : public TaskMemoryAccessor {
   // C++
   ~CurrentTask() override;
 
+  const fbl::RefPtr<Task>& task() const { return task_; }
+  fbl::RefPtr<Task>& task() { return task_; }
+
+  const ThreadState& thread_state() const { return thread_state_; }
+  ThreadState& thread_state() { return thread_state_; }
+
   Task* operator->();
   const Task* operator->() const;
 
  private:
-  explicit CurrentTask(fbl::RefPtr<Task> task);
+  explicit CurrentTask(fbl::RefPtr<Task> task, ThreadState thread_state);
 };
 
 }  // namespace starnix
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_CURRENT_TASK_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_CURRENT_TASK_H_
