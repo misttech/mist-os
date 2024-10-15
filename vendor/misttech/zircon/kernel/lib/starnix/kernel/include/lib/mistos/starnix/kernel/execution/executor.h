@@ -62,32 +62,32 @@ template <typename PreRunFn, typename TaskCompleteFn>
 void execute_task(TaskBuilder task_builder, PreRunFn&& pre_run,
                                      TaskCompleteFn&& task_complete/*,
                   std::optional<PtraceCoreState> ptrace_state*/){
-  // Set the process handle to the new task's process, so the new thread is spawned in that
-  // process.
-
   auto weak_task = util::WeakPtr<Task>(task_builder.task().get());
   auto ref_task = weak_task.Lock();
 
   // Hold a lock on the task's thread slot until we have a chance to initialize it.
-  // auto task_thread_guard = ref_task->thread.Write();
+  auto task_thread_guard = ref_task->thread.Write();
 
   auto current_task = CurrentTask::From(task_builder);
+
+  auto user_thread =
+      create_thread(current_task->thread_group->process().dispatcher(), current_task->command());
+  if (user_thread.is_ok()) {
+    *task_thread_guard = ktl::move(user_thread.value().release());
+  }
+  std::destroy_at(std::addressof(task_thread_guard));
+
   auto pre_run_result = pre_run(current_task);
   if (pre_run_result.is_error()) {
     TRACEF("Pre run failed from %d. The task will not be run.",
            pre_run_result.error_value().error_code());
   } else {
-    auto init_thread =
-        create_thread(current_task->thread_group->process().dispatcher(), current_task->command());
-    if (init_thread.is_ok()) {
-      *ref_task->thread.Write() = ktl::move(init_thread.value().release());
-      // Spawn the process' thread.
-      auto run_result = run_task(current_task);
-      if (run_result.is_error()) {
-        TRACEF("Failed to run task %d\n", run_result.error_value());
-      }
-      task_complete(run_result);
+    // Spawn the process' thread.
+    auto run_result = run_task(current_task);
+    if (run_result.is_error()) {
+      TRACEF("Failed to run task %d\n", run_result.error_value());
     }
+    task_complete(run_result);
   }
 }
 
@@ -98,9 +98,7 @@ void execute_task_with_prerun_result(TaskBuilder task_builder, PreRunFn&& pre_ru
   execute_task(
       task_builder,
       [pre_run = ktl::move(pre_run)](CurrentTask& init_task) -> fit::result<Errno> {
-        if (auto pre_run_result = pre_run(init_task); pre_run_result.is_error()) {
-          return pre_run_result.take_error();
-        }
+        _EP(pre_run(init_task));
         return fit::ok();
       },
       ktl::move(task_complete));

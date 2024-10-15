@@ -98,7 +98,24 @@ fit::result<Errno, pid_t> do_clone(CurrentTask& current_task, struct clone_args 
     new_task.thread_state().registers.set_thread_pointer_register(args.tls);
   }
 
+  // RegisterState::print_regs(stdout, &*new_task.thread_state.registers);
+
   auto tid = new_task.task()->id;
+  // auto task_ref = util::WeakPtr(new_task.task.get());
+  execute_task(
+      new_task,
+      [](const CurrentTask& current_task) -> fit::result<Errno> {
+        auto maybe_thread = current_task->thread.Write();
+        if (maybe_thread->has_value()) {
+          auto thread = maybe_thread->value();
+
+          // Copy register state in the current task to fork_frame
+          thread->SetForkFrame(*current_task.thread_state().registers);
+          // RegisterState::print_regs(stdout, &*current_task.thread_state().registers);
+        }
+        return fit::ok();
+      },
+      [](fit::result<zx_status_t>) { return fit::ok(); });
 
   if ((args.flags & static_cast<uint64_t>(CLONE_VFORK)) != 0) {
     // current_task.wait_for_execve(task_ref) ? ;
