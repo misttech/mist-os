@@ -185,7 +185,6 @@
                 "times03",
                 "umount2_01",
                 "umount2_02",
-                "utsname03_clone",
                 "writetest01",
 
                 // These tests fail when an init is run in the container to set up /apex.

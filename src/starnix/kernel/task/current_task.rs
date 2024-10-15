@@ -28,7 +28,7 @@ use zx::sys::zx_thread_state_general_regs_t;
 use starnix_logging::{log_error, log_warn, set_zx_name, track_file_not_found, track_stub};
 use starnix_sync::{
     BeforeFsNodeAppend, DeviceOpen, EventWaitGuard, FileOpsCore, LockBefore, Locked, MmDumpable,
-    ProcessGroupState, RwLock, RwLockWriteGuard, TaskRelease, WakeReason,
+    ProcessGroupState, RwLockWriteGuard, TaskRelease, WakeReason,
 };
 use starnix_syscalls::decls::Syscall;
 use starnix_syscalls::SyscallResult;
@@ -1587,6 +1587,7 @@ impl CurrentTask {
             | CLONE_CHILD_CLEARTID
             | CLONE_CHILD_SETTID
             | CLONE_VFORK
+            | CLONE_NEWUTS
             | CLONE_PTRACE) as u64;
         // A mask with all valid flags set, because we want to return a different error code for an
         // invalid flag vs an unimplemented flag. Subtracting 1 from the largest valid flag gives a
@@ -1608,8 +1609,7 @@ impl CurrentTask {
         let clone_vm = flags & (CLONE_VM as u64) != 0;
         let clone_sighand = flags & (CLONE_SIGHAND as u64) != 0;
         let clone_vfork = flags & (CLONE_VFORK as u64) != 0;
-
-        let new_uts = flags & (CLONE_NEWUTS as u64) != 0;
+        let clone_newuts = flags & (CLONE_NEWUTS as u64) != 0;
 
         if clone_ptrace {
             track_stub!(TODO("https://fxbug.dev/322874630"), "CLONE_PTRACE");
@@ -1670,12 +1670,12 @@ impl CurrentTask {
         let command;
         let creds;
         let scheduler_policy;
-        let uts_ns;
         let no_new_privs;
         let seccomp_filters;
         let robust_list_head = UserAddress::NULL.into();
         let child_signal_mask;
         let timerslack_ns;
+        let uts_ns;
         let security_state = security::task_alloc(&self, flags);
 
         let TaskInfo { thread, thread_group, memory_manager } = {
@@ -1712,16 +1712,12 @@ impl CurrentTask {
             scheduler_policy = state.scheduler_policy.fork();
             timerslack_ns = state.timerslack_ns;
 
-            uts_ns = if new_uts {
+            uts_ns = if clone_newuts {
                 if !self.creds().has_capability(CAP_SYS_ADMIN) {
                     return error!(EPERM);
                 }
-
-                // Fork the UTS namespace of the existing task.
-                let new_uts_ns = state.uts_ns.read().clone();
-                Arc::new(RwLock::new(new_uts_ns))
+                state.uts_ns.read().fork()
             } else {
-                // Inherit the UTS of the existing task.
                 state.uts_ns.clone()
             };
 
