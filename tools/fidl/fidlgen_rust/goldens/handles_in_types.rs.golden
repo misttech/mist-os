@@ -7,6 +7,7 @@
 
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
+use fidl::encoding::ProxyChannelBox;
 use fidl::endpoints::{ControlHandle as _, Responder as _};
 use futures::future::{self, MaybeDone, TryFutureExt};
 use zx_status;
@@ -43,7 +44,7 @@ impl ObjType {
 #[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct EmptyResourceStruct;
 
-impl fidl::Standalone for EmptyResourceStruct {}
+impl fidl::Standalone<fidl::encoding::DefaultFuchsiaResourceDialect> for EmptyResourceStruct {}
 
 #[derive(Debug, PartialEq)]
 pub struct HandlesInTypes {
@@ -55,7 +56,7 @@ pub struct HandlesInTypes {
     pub union_with_handle: UnionWithHandle,
 }
 
-impl fidl::Standalone for HandlesInTypes {}
+impl fidl::Standalone<fidl::encoding::DefaultFuchsiaResourceDialect> for HandlesInTypes {}
 
 #[derive(Debug, Default, PartialEq)]
 pub struct EmptyResourceTable {
@@ -63,7 +64,7 @@ pub struct EmptyResourceTable {
     pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
-impl fidl::Standalone for EmptyResourceTable {}
+impl fidl::Standalone<fidl::encoding::DefaultFuchsiaResourceDialect> for EmptyResourceTable {}
 
 #[derive(Debug, Default, PartialEq)]
 pub struct TableWithHandle {
@@ -72,7 +73,7 @@ pub struct TableWithHandle {
     pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
-impl fidl::Standalone for TableWithHandle {}
+impl fidl::Standalone<fidl::encoding::DefaultFuchsiaResourceDialect> for TableWithHandle {}
 
 #[derive(Debug)]
 pub enum EmptyResourceUnion {
@@ -118,7 +119,7 @@ impl EmptyResourceUnion {
     }
 }
 
-impl fidl::Standalone for EmptyResourceUnion {}
+impl fidl::Standalone<fidl::encoding::DefaultFuchsiaResourceDialect> for EmptyResourceUnion {}
 
 #[derive(Debug)]
 pub enum UnionWithHandle {
@@ -170,7 +171,7 @@ impl UnionWithHandle {
     }
 }
 
-impl fidl::Standalone for UnionWithHandle {}
+impl fidl::Standalone<fidl::encoding::DefaultFuchsiaResourceDialect> for UnionWithHandle {}
 
 mod internal {
     use super::*;

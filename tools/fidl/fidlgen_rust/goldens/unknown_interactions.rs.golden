@@ -7,6 +7,7 @@
 
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
+use fidl::encoding::ProxyChannelBox;
 use fidl::endpoints::{ControlHandle as _, Responder as _};
 use futures::future::{self, MaybeDone, TryFutureExt};
 use zx_status;
@@ -2771,6 +2772,7 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::EmptyPayload,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x50e66d328336038,
             >(_buf?)?;
             Ok(_response)
@@ -2788,6 +2790,7 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i32, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x1947e36d61e4493a,
             >(_buf?)?;
             Ok(_response.some_field)
@@ -2808,6 +2811,7 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
         ) -> Result<UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x5177371967e0e6d1,
             >(_buf?)?;
             Ok(_response)
@@ -2831,6 +2835,7 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
         ) -> Result<UnknownInteractionsAjarProtocolStrictTwoWayTableResponse, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 UnknownInteractionsAjarProtocolStrictTwoWayTableResponse,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x6f8f9343b34e2ed4,
             >(_buf?)?;
             Ok(_response)
@@ -2854,6 +2859,7 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
         ) -> Result<UnknownInteractionsAjarProtocolStrictTwoWayErrResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x5b47637577c69006,
             >(_buf?)?;
             Ok(_response.map(|x| x))
@@ -2881,6 +2887,7 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
                     UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse,
                     i32,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x844ff7bb3f186d9,
             >(_buf?)?;
             Ok(_response.map(|x| x.some_field))
@@ -2908,6 +2915,7 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
                     UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse,
                     i32,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x2cbfd5a859d4ac95,
             >(_buf?)?;
             Ok(_response.map(|x| x))
@@ -2935,6 +2943,7 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
                     UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse,
                     i32,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x30c9e1b3da57dc37,
             >(_buf?)?;
             Ok(_response.map(|x| x))
@@ -3222,25 +3231,26 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
         if this.is_terminated {
             panic!("polled UnknownInteractionsAjarProtocolRequestStream after completion");
         }
-        fidl::encoding::with_tls_decode_buf(|bytes, handles| {
-            match this.inner.channel().read_etc(cx, bytes, handles) {
-                std::task::Poll::Ready(Ok(())) => {}
-                std::task::Poll::Pending => return std::task::Poll::Pending,
-                std::task::Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
-                    this.is_terminated = true;
-                    return std::task::Poll::Ready(None);
+        fidl::encoding::with_tls_decode_buf::<_, fidl::encoding::DefaultFuchsiaResourceDialect>(
+            |bytes, handles| {
+                match this.inner.channel().read_etc(cx, bytes, handles) {
+                    std::task::Poll::Ready(Ok(())) => {}
+                    std::task::Poll::Pending => return std::task::Poll::Pending,
+                    std::task::Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
+                        this.is_terminated = true;
+                        return std::task::Poll::Ready(None);
+                    }
+                    std::task::Poll::Ready(Err(e)) => {
+                        return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                            e.into(),
+                        ))))
+                    }
                 }
-                std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
-                        e.into(),
-                    ))))
-                }
-            }
 
-            // A message has been received from the channel
-            let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
+                // A message has been received from the channel
+                let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
 
-            std::task::Poll::Ready(Some(match header.ordinal {
+                std::task::Poll::Ready(Some(match header.ordinal {
                 0xd4663d6b2b5048b => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
@@ -3386,7 +3396,8 @@ impl futures::Stream for UnknownInteractionsAjarProtocolRequestStream {
                     protocol_name: <UnknownInteractionsAjarProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
                 }),
             }))
-        })
+            },
+        )
     }
 }
 
@@ -5494,6 +5505,7 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::EmptyPayload,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x5eda305d6b22f1f7,
             >(_buf?)?;
             Ok(_response)
@@ -5511,6 +5523,7 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i32, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x1323afa3e0541253,
             >(_buf?)?;
             Ok(_response.some_field)
@@ -5532,6 +5545,7 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
         {
             let _response = fidl::client::decode_transaction_body::<
                 UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x68b32554eb0f6fa7,
             >(_buf?)?;
             Ok(_response)
@@ -5556,6 +5570,7 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
         {
             let _response = fidl::client::decode_transaction_body::<
                 UnknownInteractionsClosedProtocolStrictTwoWayTableResponse,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x6e4a94d44b69e785,
             >(_buf?)?;
             Ok(_response)
@@ -5579,6 +5594,7 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
         ) -> Result<UnknownInteractionsClosedProtocolStrictTwoWayErrResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x4fa35d5433db4d3a,
             >(_buf?)?;
             Ok(_response.map(|x| x))
@@ -5607,6 +5623,7 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
                     UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse,
                     i32,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0xb22aebf23bb58fd,
             >(_buf?)?;
             Ok(_response.map(|x| x.some_field))
@@ -5634,6 +5651,7 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
                     UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse,
                     i32,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0xcd65d4d29a43c80,
             >(_buf?)?;
             Ok(_response.map(|x| x))
@@ -5661,6 +5679,7 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
                     UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse,
                     i32,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x117dde20b92f7b90,
             >(_buf?)?;
             Ok(_response.map(|x| x))
@@ -5853,25 +5872,26 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
         if this.is_terminated {
             panic!("polled UnknownInteractionsClosedProtocolRequestStream after completion");
         }
-        fidl::encoding::with_tls_decode_buf(|bytes, handles| {
-            match this.inner.channel().read_etc(cx, bytes, handles) {
-                std::task::Poll::Ready(Ok(())) => {}
-                std::task::Poll::Pending => return std::task::Poll::Pending,
-                std::task::Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
-                    this.is_terminated = true;
-                    return std::task::Poll::Ready(None);
+        fidl::encoding::with_tls_decode_buf::<_, fidl::encoding::DefaultFuchsiaResourceDialect>(
+            |bytes, handles| {
+                match this.inner.channel().read_etc(cx, bytes, handles) {
+                    std::task::Poll::Ready(Ok(())) => {}
+                    std::task::Poll::Pending => return std::task::Poll::Pending,
+                    std::task::Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
+                        this.is_terminated = true;
+                        return std::task::Poll::Ready(None);
+                    }
+                    std::task::Poll::Ready(Err(e)) => {
+                        return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                            e.into(),
+                        ))))
+                    }
                 }
-                std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
-                        e.into(),
-                    ))))
-                }
-            }
 
-            // A message has been received from the channel
-            let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
+                // A message has been received from the channel
+                let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
 
-            std::task::Poll::Ready(Some(match header.ordinal {
+                std::task::Poll::Ready(Some(match header.ordinal {
                 0x59282385962da24 => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
@@ -6000,7 +6020,8 @@ impl futures::Stream for UnknownInteractionsClosedProtocolRequestStream {
                     protocol_name: <UnknownInteractionsClosedProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
                 }),
             }))
-        })
+            },
+        )
     }
 }
 
@@ -9090,6 +9111,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::EmptyPayload,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x734c996b0f37b942,
             >(_buf?)?;
             Ok(_response)
@@ -9107,6 +9129,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i32, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 UnknownInteractionsProtocolStrictTwoWayFieldsResponse,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x334f4e7fff460ae3,
             >(_buf?)?;
             Ok(_response.some_field)
@@ -9127,6 +9150,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         ) -> Result<UnknownInteractionsProtocolStrictTwoWayUnionResponse, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 UnknownInteractionsProtocolStrictTwoWayUnionResponse,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x2212805eca592cad,
             >(_buf?)?;
             Ok(_response)
@@ -9150,6 +9174,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         ) -> Result<UnknownInteractionsProtocolStrictTwoWayTableResponse, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 UnknownInteractionsProtocolStrictTwoWayTableResponse,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x746ebf8659ff23b7,
             >(_buf?)?;
             Ok(_response)
@@ -9173,6 +9198,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         ) -> Result<UnknownInteractionsProtocolStrictTwoWayErrResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x6d1c6002c51bb967,
             >(_buf?)?;
             Ok(_response.map(|x| x))
@@ -9199,6 +9225,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
                     UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse,
                     i32,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x2182a49480e5bd2b,
             >(_buf?)?;
             Ok(_response.map(|x| x.some_field))
@@ -9225,6 +9252,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
                     UnknownInteractionsProtocolStrictTwoWayUnionErrResponse,
                     i32,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x453af745d38b20ca,
             >(_buf?)?;
             Ok(_response.map(|x| x))
@@ -9251,6 +9279,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
                     UnknownInteractionsProtocolStrictTwoWayTableErrResponse,
                     i32,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x4c26c7ab89cb68d8,
             >(_buf?)?;
             Ok(_response.map(|x| x))
@@ -9271,6 +9300,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::FlexibleType<fidl::encoding::EmptyStruct>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x4a5bb3397008b7c,
             >(_buf?)?
             .into_result::<UnknownInteractionsProtocolMarker>("flexible_two_way")?;
@@ -9291,6 +9321,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
                 fidl::encoding::FlexibleType<
                     UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x3b13f82f44813a32,
             >(_buf?)?
             .into_result::<UnknownInteractionsProtocolMarker>("flexible_two_way_fields")?;
@@ -9314,6 +9345,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
                 fidl::encoding::FlexibleType<
                     UnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x44301e4e8d514fb6,
             >(_buf?)?
             .into_result::<UnknownInteractionsProtocolMarker>("flexible_two_way_union")?;
@@ -9340,6 +9372,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
                 fidl::encoding::FlexibleType<
                     UnknownInteractionsProtocolFlexibleTwoWayTableResponse,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x7f492934b6c76187,
             >(_buf?)?
             .into_result::<UnknownInteractionsProtocolMarker>("flexible_two_way_table")?;
@@ -9364,6 +9397,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         ) -> Result<UnknownInteractionsProtocolFlexibleTwoWayErrResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::FlexibleResultType<fidl::encoding::EmptyStruct, i32>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x61240f878cc37c07,
             >(_buf?)?
             .into_result::<UnknownInteractionsProtocolMarker>("flexible_two_way_err")?;
@@ -9391,6 +9425,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
                     UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse,
                     i32,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0xf2b9611a9089b05,
             >(_buf?)?
             .into_result::<UnknownInteractionsProtocolMarker>("flexible_two_way_fields_err")?;
@@ -9418,6 +9453,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
                     UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse,
                     i32,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x2172940a75f107d7,
             >(_buf?)?
             .into_result::<UnknownInteractionsProtocolMarker>("flexible_two_way_union_err")?;
@@ -9445,6 +9481,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
                     UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse,
                     i32,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x6d8aab48e1693bf2,
             >(_buf?)?
             .into_result::<UnknownInteractionsProtocolMarker>("flexible_two_way_table_err")?;
@@ -9733,25 +9770,26 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
         if this.is_terminated {
             panic!("polled UnknownInteractionsProtocolRequestStream after completion");
         }
-        fidl::encoding::with_tls_decode_buf(|bytes, handles| {
-            match this.inner.channel().read_etc(cx, bytes, handles) {
-                std::task::Poll::Ready(Ok(())) => {}
-                std::task::Poll::Pending => return std::task::Poll::Pending,
-                std::task::Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
-                    this.is_terminated = true;
-                    return std::task::Poll::Ready(None);
+        fidl::encoding::with_tls_decode_buf::<_, fidl::encoding::DefaultFuchsiaResourceDialect>(
+            |bytes, handles| {
+                match this.inner.channel().read_etc(cx, bytes, handles) {
+                    std::task::Poll::Ready(Ok(())) => {}
+                    std::task::Poll::Pending => return std::task::Poll::Pending,
+                    std::task::Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
+                        this.is_terminated = true;
+                        return std::task::Poll::Ready(None);
+                    }
+                    std::task::Poll::Ready(Err(e)) => {
+                        return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                            e.into(),
+                        ))))
+                    }
                 }
-                std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
-                        e.into(),
-                    ))))
-                }
-            }
 
-            // A message has been received from the channel
-            let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
+                // A message has been received from the channel
+                let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
 
-            std::task::Poll::Ready(Some(match header.ordinal {
+                std::task::Poll::Ready(Some(match header.ordinal {
                 0x4e7273b964d117a6 => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
@@ -10024,7 +10062,8 @@ impl futures::Stream for UnknownInteractionsProtocolRequestStream {
                     protocol_name: <UnknownInteractionsProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
                 }),
             }))
-        })
+            },
+        )
     }
 }
 

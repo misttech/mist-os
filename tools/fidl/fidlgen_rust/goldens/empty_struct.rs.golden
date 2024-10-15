@@ -7,6 +7,7 @@
 
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
+use fidl::encoding::ProxyChannelBox;
 use fidl::endpoints::{ControlHandle as _, Responder as _};
 use futures::future::{self, MaybeDone, TryFutureExt};
 use zx_status;
@@ -194,6 +195,7 @@ impl EmptyProtocolProxyInterface for EmptyProtocolProxy {
         ) -> Result<Empty, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 EmptyProtocolSendAndReceiveResponse,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x76a931254962cea,
             >(_buf?)?;
             Ok(_response.e)
@@ -323,59 +325,63 @@ impl futures::Stream for EmptyProtocolRequestStream {
         if this.is_terminated {
             panic!("polled EmptyProtocolRequestStream after completion");
         }
-        fidl::encoding::with_tls_decode_buf(|bytes, handles| {
-            match this.inner.channel().read_etc(cx, bytes, handles) {
-                std::task::Poll::Ready(Ok(())) => {}
-                std::task::Poll::Pending => return std::task::Poll::Pending,
-                std::task::Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
-                    this.is_terminated = true;
-                    return std::task::Poll::Ready(None);
+        fidl::encoding::with_tls_decode_buf::<_, fidl::encoding::DefaultFuchsiaResourceDialect>(
+            |bytes, handles| {
+                match this.inner.channel().read_etc(cx, bytes, handles) {
+                    std::task::Poll::Ready(Ok(())) => {}
+                    std::task::Poll::Pending => return std::task::Poll::Pending,
+                    std::task::Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
+                        this.is_terminated = true;
+                        return std::task::Poll::Ready(None);
+                    }
+                    std::task::Poll::Ready(Err(e)) => {
+                        return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                            e.into(),
+                        ))))
+                    }
                 }
-                std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
-                        e.into(),
-                    ))))
-                }
-            }
 
-            // A message has been received from the channel
-            let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
+                // A message has been received from the channel
+                let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
 
-            std::task::Poll::Ready(Some(match header.ordinal {
-                0x132262fd8b200708 => {
-                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(
-                        EmptyProtocolSendRequest,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<EmptyProtocolSendRequest>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = EmptyProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(EmptyProtocolRequest::Send_ { e: req.e, control_handle })
-                }
-                0x76a931254962cea => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        EmptyProtocolSendAndReceiveRequest,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<EmptyProtocolSendAndReceiveRequest>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = EmptyProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(EmptyProtocolRequest::SendAndReceive {
-                        e: req.e,
+                std::task::Poll::Ready(Some(match header.ordinal {
+                    0x132262fd8b200708 => {
+                        header.validate_request_tx_id(fidl::MethodType::OneWay)?;
+                        let mut req = fidl::new_empty!(
+                            EmptyProtocolSendRequest,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<EmptyProtocolSendRequest>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle =
+                            EmptyProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(EmptyProtocolRequest::Send_ { e: req.e, control_handle })
+                    }
+                    0x76a931254962cea => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            EmptyProtocolSendAndReceiveRequest,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<EmptyProtocolSendAndReceiveRequest>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle =
+                            EmptyProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(EmptyProtocolRequest::SendAndReceive {
+                            e: req.e,
 
-                        responder: EmptyProtocolSendAndReceiveResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                _ => Err(fidl::Error::UnknownOrdinal {
-                    ordinal: header.ordinal,
-                    protocol_name:
-                        <EmptyProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
-                }),
-            }))
-        })
+                            responder: EmptyProtocolSendAndReceiveResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    _ => Err(fidl::Error::UnknownOrdinal {
+                        ordinal: header.ordinal,
+                        protocol_name:
+                            <EmptyProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
+                    }),
+                }))
+            },
+        )
     }
 }
 

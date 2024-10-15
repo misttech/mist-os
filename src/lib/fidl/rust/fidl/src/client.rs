@@ -6,8 +6,8 @@
 
 use crate::encoding::{
     decode_transaction_header, Decode, Decoder, DefaultFuchsiaResourceDialect, DynamicFlags,
-    Encode, Encoder, EpitaphBody, TransactionHeader, TransactionMessage, TransactionMessageType,
-    TypeMarker,
+    Encode, Encoder, EpitaphBody, ResourceDialect, TransactionHeader, TransactionMessage,
+    TransactionMessageType, TypeMarker,
 };
 use crate::handle::{AsyncChannel, HandleDisposition, MessageBufEtc};
 use crate::Error;
@@ -27,7 +27,7 @@ use zx_status;
 
 /// Decodes the body of `buf` as the FIDL type `T`.
 #[doc(hidden)] // only exported for use in macros or generated code
-pub fn decode_transaction_body<T: TypeMarker, const EXPECTED_ORDINAL: u64>(
+pub fn decode_transaction_body<T: TypeMarker, D: ResourceDialect, const EXPECTED_ORDINAL: u64>(
     mut buf: MessageBufEtc,
 ) -> Result<T::Owned, Error>
 where
@@ -222,7 +222,11 @@ impl Client {
             body,
             ORDINAL,
             dynamic_flags,
-            |buf| buf.and_then(decode_transaction_body::<Response, ORDINAL>),
+            |buf| {
+                buf.and_then(
+                    decode_transaction_body::<Response, DefaultFuchsiaResourceDialect, ORDINAL>,
+                )
+            },
         )
     }
 
@@ -272,10 +276,12 @@ impl Client {
         ) -> Result<(), Error>,
     {
         let id = self.inner.interests.lock().register_msg_interest();
-        crate::encoding::with_tls_encode_buf(|bytes, handles| {
-            encode_msg(id, bytes, handles)?;
-            self.send_raw(bytes, handles)
-        })?;
+        crate::encoding::with_tls_encode_buf::<_, DefaultFuchsiaResourceDialect>(
+            |bytes, handles| {
+                encode_msg(id, bytes, handles)?;
+                self.send_raw(bytes, handles)
+            },
+        )?;
 
         Ok(MessageResponse { id, client: Some(self.inner.clone()) })
     }
@@ -1459,7 +1465,8 @@ mod tests {
                 let x = x.expect("should contain one element");
                 let x = x.expect("fidl error");
                 let x: i32 =
-                    decode_transaction_body::<i32, ORDINAL>(x).expect("failed to decode event");
+                    decode_transaction_body::<i32, DefaultFuchsiaResourceDialect, ORDINAL>(x)
+                        .expect("failed to decode event");
                 assert_eq!(x, 55);
                 stream.into_future()
             })
@@ -1502,7 +1509,8 @@ mod tests {
                     let x = x.expect("should contain one element");
                     let x = x.expect("fidl error");
                     let x: i32 =
-                        decode_transaction_body::<i32, ORDINAL>(x).expect("failed to decode event");
+                        decode_transaction_body::<i32, DefaultFuchsiaResourceDialect, ORDINAL>(x)
+                            .expect("failed to decode event");
                     assert_eq!(x, 55);
                     stream.into_future()
                 })

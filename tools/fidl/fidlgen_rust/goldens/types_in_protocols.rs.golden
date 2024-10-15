@@ -7,6 +7,7 @@
 
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
+use fidl::encoding::ProxyChannelBox;
 use fidl::endpoints::{ControlHandle as _, Responder as _};
 use futures::future::{self, MaybeDone, TryFutureExt};
 use zx_status;
@@ -194,12 +195,12 @@ pub struct Resource {
     pub vector_union: Vec<ResourceUnion>,
 }
 
-impl fidl::Standalone for Resource {}
+impl fidl::Standalone<fidl::encoding::DefaultFuchsiaResourceDialect> for Resource {}
 
 #[derive(Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ResourceStruct;
 
-impl fidl::Standalone for ResourceStruct {}
+impl fidl::Standalone<fidl::encoding::DefaultFuchsiaResourceDialect> for ResourceStruct {}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Struct;
@@ -253,7 +254,7 @@ pub struct ResourceTable {
     pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
-impl fidl::Standalone for ResourceTable {}
+impl fidl::Standalone<fidl::encoding::DefaultFuchsiaResourceDialect> for ResourceTable {}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Table {
@@ -313,7 +314,7 @@ impl ResourceUnion {
     }
 }
 
-impl fidl::Standalone for ResourceUnion {}
+impl fidl::Standalone<fidl::encoding::DefaultFuchsiaResourceDialect> for ResourceUnion {}
 
 #[derive(Clone, Debug)]
 pub enum Union {
@@ -2615,8 +2616,11 @@ impl ProtocolProxyInterface for ProtocolProxy {
             (u8, u16, u32, u64, i8, i16, i32, i64, f32, f64, String, Option<String>),
             fidl::Error,
         > {
-            let _response =
-                fidl::client::decode_transaction_body::<Basic, 0x205b92db5139c88f>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                Basic,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+                0x205b92db5139c88f,
+            >(_buf?)?;
             Ok((
                 _response.uint8,
                 _response.uint16,
@@ -2650,6 +2654,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorBasicResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<Basic, u32>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x459eaa5d11b9ff93,
             >(_buf?)?;
             Ok(_response.map(|x| {
@@ -2719,8 +2724,11 @@ impl ProtocolProxyInterface for ProtocolProxy {
             (Bits, Enum, Struct, Table, Union, Option<Box<Struct>>, Option<Box<Union>>),
             fidl::Error,
         > {
-            let _response =
-                fidl::client::decode_transaction_body::<Compound, 0x79f279c7201da131>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                Compound,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+                0x79f279c7201da131,
+            >(_buf?)?;
             Ok((
                 _response.bits,
                 _response.enum_,
@@ -2749,6 +2757,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorCompoundResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<Compound, u32>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x29817d89a19ec77d,
             >(_buf?)?;
             Ok(_response
@@ -2846,8 +2855,11 @@ impl ProtocolProxyInterface for ProtocolProxy {
             ),
             fidl::Error,
         > {
-            let _response =
-                fidl::client::decode_transaction_body::<ArrayBasic, 0x49ad7a74e28ba114>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                ArrayBasic,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+                0x49ad7a74e28ba114,
+            >(_buf?)?;
             Ok((
                 _response.array_uint8,
                 _response.array_uint16,
@@ -2904,6 +2916,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorArrayBasicResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<ArrayBasic, u32>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0xf0dbde9626fff79,
             >(_buf?)?;
             Ok(_response.map(|x| {
@@ -2990,8 +3003,11 @@ impl ProtocolProxyInterface for ProtocolProxy {
             ),
             fidl::Error,
         > {
-            let _response =
-                fidl::client::decode_transaction_body::<ArrayCompound, 0xbcae616f8e1ea7b>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                ArrayCompound,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+                0xbcae616f8e1ea7b,
+            >(_buf?)?;
             Ok((
                 _response.array_bits,
                 _response.array_enum,
@@ -3034,6 +3050,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorArrayCompoundResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<ArrayCompound, u32>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x52257f80e29c1a04,
             >(_buf?)?;
             Ok(_response.map(|x| {
@@ -3142,8 +3159,11 @@ impl ProtocolProxyInterface for ProtocolProxy {
             ),
             fidl::Error,
         > {
-            let _response =
-                fidl::client::decode_transaction_body::<VectorBasic, 0x7860cb3ed8362e74>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                VectorBasic,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+                0x7860cb3ed8362e74,
+            >(_buf?)?;
             Ok((
                 _response.vector_uint8,
                 _response.vector_uint16,
@@ -3201,6 +3221,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorVectorBasicResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<VectorBasic, u32>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0xc27f841d6313f72,
             >(_buf?)?;
             Ok(_response.map(|x| {
@@ -3287,8 +3308,11 @@ impl ProtocolProxyInterface for ProtocolProxy {
             ),
             fidl::Error,
         > {
-            let _response =
-                fidl::client::decode_transaction_body::<VectorCompound, 0x371140db701b23b4>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                VectorCompound,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+                0x371140db701b23b4,
+            >(_buf?)?;
             Ok((
                 _response.vector_bits,
                 _response.vector_enum,
@@ -3331,6 +3355,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorVectorCompoundResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<VectorCompound, u32>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x760e278628f7a985,
             >(_buf?)?;
             Ok(_response.map(|x| {
@@ -3394,8 +3419,11 @@ impl ProtocolProxyInterface for ProtocolProxy {
             ),
             fidl::Error,
         > {
-            let _response =
-                fidl::client::decode_transaction_body::<VectorOptional, 0xe4b620aaafd73f3>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                VectorOptional,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+                0xe4b620aaafd73f3,
+            >(_buf?)?;
             Ok((
                 _response.opt_vector_uint8,
                 _response.opt_vector_string,
@@ -3424,6 +3452,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorVectorOptionalResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<VectorOptional, u32>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x58e75cf86e2d715e,
             >(_buf?)?;
             Ok(_response.map(|x| {
@@ -3474,6 +3503,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<([[u8; 5]; 5], [Vec<u8>; 5], Vec<[u8; 5]>, Vec<Vec<u8>>), fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 ArrayVectorNested,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x4a438ce0948817dc,
             >(_buf?)?;
             Ok((
@@ -3502,6 +3532,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorArrayVectorNestedResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<ArrayVectorNested, u32>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x7e168d89e1dac8a7,
             >(_buf?)?;
             Ok(_response.map(|x| {
@@ -3682,8 +3713,11 @@ impl ProtocolProxyInterface for ProtocolProxy {
             ),
             fidl::Error,
         > {
-            let _response =
-                fidl::client::decode_transaction_body::<Resource, 0x1904824a11c6ad5b>(_buf?)?;
+            let _response = fidl::client::decode_transaction_body::<
+                Resource,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+                0x1904824a11c6ad5b,
+            >(_buf?)?;
             Ok((
                 _response.handle,
                 _response.vmo,
@@ -3785,6 +3819,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         ) -> Result<ProtocolErrorResourceResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<Resource, u32>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x5b28634d603175b6,
             >(_buf?)?;
             Ok(_response.map(|x| {
@@ -4543,595 +4578,610 @@ impl futures::Stream for ProtocolRequestStream {
         if this.is_terminated {
             panic!("polled ProtocolRequestStream after completion");
         }
-        fidl::encoding::with_tls_decode_buf(|bytes, handles| {
-            match this.inner.channel().read_etc(cx, bytes, handles) {
-                std::task::Poll::Ready(Ok(())) => {}
-                std::task::Poll::Pending => return std::task::Poll::Pending,
-                std::task::Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
-                    this.is_terminated = true;
-                    return std::task::Poll::Ready(None);
+        fidl::encoding::with_tls_decode_buf::<_, fidl::encoding::DefaultFuchsiaResourceDialect>(
+            |bytes, handles| {
+                match this.inner.channel().read_etc(cx, bytes, handles) {
+                    std::task::Poll::Ready(Ok(())) => {}
+                    std::task::Poll::Pending => return std::task::Poll::Pending,
+                    std::task::Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
+                        this.is_terminated = true;
+                        return std::task::Poll::Ready(None);
+                    }
+                    std::task::Poll::Ready(Err(e)) => {
+                        return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                            e.into(),
+                        ))))
+                    }
                 }
-                std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
-                        e.into(),
-                    ))))
-                }
-            }
 
-            // A message has been received from the channel
-            let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
+                // A message has been received from the channel
+                let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
 
-            std::task::Poll::Ready(Some(match header.ordinal {
-                0x7c311f0d9e662df9 => {
-                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req =
-                        fidl::new_empty!(Basic, fidl::encoding::DefaultFuchsiaResourceDialect);
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<Basic>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::OneWayBasic {
-                        uint8: req.uint8,
-                        uint16: req.uint16,
-                        uint32: req.uint32,
-                        uint64: req.uint64,
-                        int8: req.int8,
-                        int16: req.int16,
-                        int32: req.int32,
-                        int64: req.int64,
-                        float32: req.float32,
-                        float64: req.float64,
-                        string: req.string,
-                        opt_string: req.opt_string,
+                std::task::Poll::Ready(Some(match header.ordinal {
+                    0x7c311f0d9e662df9 => {
+                        header.validate_request_tx_id(fidl::MethodType::OneWay)?;
+                        let mut req =
+                            fidl::new_empty!(Basic, fidl::encoding::DefaultFuchsiaResourceDialect);
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<Basic>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::OneWayBasic {
+                            uint8: req.uint8,
+                            uint16: req.uint16,
+                            uint32: req.uint32,
+                            uint64: req.uint64,
+                            int8: req.int8,
+                            int16: req.int16,
+                            int32: req.int32,
+                            int64: req.int64,
+                            float32: req.float32,
+                            float64: req.float64,
+                            string: req.string,
+                            opt_string: req.opt_string,
 
-                        control_handle,
-                    })
-                }
-                0x205b92db5139c88f => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req =
-                        fidl::new_empty!(Basic, fidl::encoding::DefaultFuchsiaResourceDialect);
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<Basic>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::TwoWayBasic {
-                        uint8: req.uint8,
-                        uint16: req.uint16,
-                        uint32: req.uint32,
-                        uint64: req.uint64,
-                        int8: req.int8,
-                        int16: req.int16,
-                        int32: req.int32,
-                        int64: req.int64,
-                        float32: req.float32,
-                        float64: req.float64,
-                        string: req.string,
-                        opt_string: req.opt_string,
+                            control_handle,
+                        })
+                    }
+                    0x205b92db5139c88f => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req =
+                            fidl::new_empty!(Basic, fidl::encoding::DefaultFuchsiaResourceDialect);
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<Basic>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::TwoWayBasic {
+                            uint8: req.uint8,
+                            uint16: req.uint16,
+                            uint32: req.uint32,
+                            uint64: req.uint64,
+                            int8: req.int8,
+                            int16: req.int16,
+                            int32: req.int32,
+                            int64: req.int64,
+                            float32: req.float32,
+                            float64: req.float64,
+                            string: req.string,
+                            opt_string: req.opt_string,
 
-                        responder: ProtocolTwoWayBasicResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0x459eaa5d11b9ff93 => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        fidl::encoding::EmptyPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::ErrorBasic {
-                        responder: ProtocolErrorBasicResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0x2bc2bc3a9237c6cc => {
-                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req =
-                        fidl::new_empty!(Compound, fidl::encoding::DefaultFuchsiaResourceDialect);
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<Compound>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::OneWayCompound {
-                        bits: req.bits,
-                        enum_: req.enum_,
-                        struct_: req.struct_,
-                        table: req.table,
-                        union: req.union,
-                        opt_struct: req.opt_struct,
-                        opt_union: req.opt_union,
+                            responder: ProtocolTwoWayBasicResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0x459eaa5d11b9ff93 => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            fidl::encoding::EmptyPayload,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::ErrorBasic {
+                            responder: ProtocolErrorBasicResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0x2bc2bc3a9237c6cc => {
+                        header.validate_request_tx_id(fidl::MethodType::OneWay)?;
+                        let mut req = fidl::new_empty!(
+                            Compound,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<Compound>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::OneWayCompound {
+                            bits: req.bits,
+                            enum_: req.enum_,
+                            struct_: req.struct_,
+                            table: req.table,
+                            union: req.union,
+                            opt_struct: req.opt_struct,
+                            opt_union: req.opt_union,
 
-                        control_handle,
-                    })
-                }
-                0x79f279c7201da131 => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req =
-                        fidl::new_empty!(Compound, fidl::encoding::DefaultFuchsiaResourceDialect);
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<Compound>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::TwoWayCompound {
-                        bits: req.bits,
-                        enum_: req.enum_,
-                        struct_: req.struct_,
-                        table: req.table,
-                        union: req.union,
-                        opt_struct: req.opt_struct,
-                        opt_union: req.opt_union,
+                            control_handle,
+                        })
+                    }
+                    0x79f279c7201da131 => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            Compound,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<Compound>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::TwoWayCompound {
+                            bits: req.bits,
+                            enum_: req.enum_,
+                            struct_: req.struct_,
+                            table: req.table,
+                            union: req.union,
+                            opt_struct: req.opt_struct,
+                            opt_union: req.opt_union,
 
-                        responder: ProtocolTwoWayCompoundResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0x29817d89a19ec77d => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        fidl::encoding::EmptyPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::ErrorCompound {
-                        responder: ProtocolErrorCompoundResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0x62e2ebcadf35ca19 => {
-                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req =
-                        fidl::new_empty!(ArrayBasic, fidl::encoding::DefaultFuchsiaResourceDialect);
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ArrayBasic>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::OneWayArrayBasic {
-                        array_uint8: req.array_uint8,
-                        array_uint16: req.array_uint16,
-                        array_uint32: req.array_uint32,
-                        array_uint64: req.array_uint64,
-                        array_int8: req.array_int8,
-                        array_int16: req.array_int16,
-                        array_int32: req.array_int32,
-                        array_int64: req.array_int64,
-                        array_float32: req.array_float32,
-                        array_float64: req.array_float64,
-                        array_string: req.array_string,
-                        array_opt_string: req.array_opt_string,
+                            responder: ProtocolTwoWayCompoundResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0x29817d89a19ec77d => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            fidl::encoding::EmptyPayload,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::ErrorCompound {
+                            responder: ProtocolErrorCompoundResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0x62e2ebcadf35ca19 => {
+                        header.validate_request_tx_id(fidl::MethodType::OneWay)?;
+                        let mut req = fidl::new_empty!(
+                            ArrayBasic,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ArrayBasic>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::OneWayArrayBasic {
+                            array_uint8: req.array_uint8,
+                            array_uint16: req.array_uint16,
+                            array_uint32: req.array_uint32,
+                            array_uint64: req.array_uint64,
+                            array_int8: req.array_int8,
+                            array_int16: req.array_int16,
+                            array_int32: req.array_int32,
+                            array_int64: req.array_int64,
+                            array_float32: req.array_float32,
+                            array_float64: req.array_float64,
+                            array_string: req.array_string,
+                            array_opt_string: req.array_opt_string,
 
-                        control_handle,
-                    })
-                }
-                0x49ad7a74e28ba114 => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req =
-                        fidl::new_empty!(ArrayBasic, fidl::encoding::DefaultFuchsiaResourceDialect);
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ArrayBasic>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::TwoWayArrayBasic {
-                        array_uint8: req.array_uint8,
-                        array_uint16: req.array_uint16,
-                        array_uint32: req.array_uint32,
-                        array_uint64: req.array_uint64,
-                        array_int8: req.array_int8,
-                        array_int16: req.array_int16,
-                        array_int32: req.array_int32,
-                        array_int64: req.array_int64,
-                        array_float32: req.array_float32,
-                        array_float64: req.array_float64,
-                        array_string: req.array_string,
-                        array_opt_string: req.array_opt_string,
+                            control_handle,
+                        })
+                    }
+                    0x49ad7a74e28ba114 => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            ArrayBasic,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ArrayBasic>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::TwoWayArrayBasic {
+                            array_uint8: req.array_uint8,
+                            array_uint16: req.array_uint16,
+                            array_uint32: req.array_uint32,
+                            array_uint64: req.array_uint64,
+                            array_int8: req.array_int8,
+                            array_int16: req.array_int16,
+                            array_int32: req.array_int32,
+                            array_int64: req.array_int64,
+                            array_float32: req.array_float32,
+                            array_float64: req.array_float64,
+                            array_string: req.array_string,
+                            array_opt_string: req.array_opt_string,
 
-                        responder: ProtocolTwoWayArrayBasicResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0xf0dbde9626fff79 => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        fidl::encoding::EmptyPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::ErrorArrayBasic {
-                        responder: ProtocolErrorArrayBasicResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0x464948bae1bda09d => {
-                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(
-                        ArrayCompound,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ArrayCompound>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::OneWayArrayCompound {
-                        array_bits: req.array_bits,
-                        array_enum: req.array_enum,
-                        array_struct: req.array_struct,
-                        array_table: req.array_table,
-                        array_union: req.array_union,
-                        array_opt_struct: req.array_opt_struct,
-                        array_opt_union: req.array_opt_union,
+                            responder: ProtocolTwoWayArrayBasicResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0xf0dbde9626fff79 => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            fidl::encoding::EmptyPayload,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::ErrorArrayBasic {
+                            responder: ProtocolErrorArrayBasicResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0x464948bae1bda09d => {
+                        header.validate_request_tx_id(fidl::MethodType::OneWay)?;
+                        let mut req = fidl::new_empty!(
+                            ArrayCompound,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ArrayCompound>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::OneWayArrayCompound {
+                            array_bits: req.array_bits,
+                            array_enum: req.array_enum,
+                            array_struct: req.array_struct,
+                            array_table: req.array_table,
+                            array_union: req.array_union,
+                            array_opt_struct: req.array_opt_struct,
+                            array_opt_union: req.array_opt_union,
 
-                        control_handle,
-                    })
-                }
-                0xbcae616f8e1ea7b => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        ArrayCompound,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ArrayCompound>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::TwoWayArrayCompound {
-                        array_bits: req.array_bits,
-                        array_enum: req.array_enum,
-                        array_struct: req.array_struct,
-                        array_table: req.array_table,
-                        array_union: req.array_union,
-                        array_opt_struct: req.array_opt_struct,
-                        array_opt_union: req.array_opt_union,
+                            control_handle,
+                        })
+                    }
+                    0xbcae616f8e1ea7b => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            ArrayCompound,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ArrayCompound>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::TwoWayArrayCompound {
+                            array_bits: req.array_bits,
+                            array_enum: req.array_enum,
+                            array_struct: req.array_struct,
+                            array_table: req.array_table,
+                            array_union: req.array_union,
+                            array_opt_struct: req.array_opt_struct,
+                            array_opt_union: req.array_opt_union,
 
-                        responder: ProtocolTwoWayArrayCompoundResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0x52257f80e29c1a04 => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        fidl::encoding::EmptyPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::ErrorArrayCompound {
-                        responder: ProtocolErrorArrayCompoundResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0x4f907dde77464657 => {
-                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(
-                        VectorBasic,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<VectorBasic>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::OneWayVectorBasic {
-                        vector_uint8: req.vector_uint8,
-                        vector_uint16: req.vector_uint16,
-                        vector_uint32: req.vector_uint32,
-                        vector_uint64: req.vector_uint64,
-                        vector_int8: req.vector_int8,
-                        vector_int16: req.vector_int16,
-                        vector_int32: req.vector_int32,
-                        vector_int64: req.vector_int64,
-                        vector_float32: req.vector_float32,
-                        vector_float64: req.vector_float64,
-                        vector_string: req.vector_string,
-                        vector_opt_string: req.vector_opt_string,
+                            responder: ProtocolTwoWayArrayCompoundResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0x52257f80e29c1a04 => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            fidl::encoding::EmptyPayload,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::ErrorArrayCompound {
+                            responder: ProtocolErrorArrayCompoundResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0x4f907dde77464657 => {
+                        header.validate_request_tx_id(fidl::MethodType::OneWay)?;
+                        let mut req = fidl::new_empty!(
+                            VectorBasic,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<VectorBasic>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::OneWayVectorBasic {
+                            vector_uint8: req.vector_uint8,
+                            vector_uint16: req.vector_uint16,
+                            vector_uint32: req.vector_uint32,
+                            vector_uint64: req.vector_uint64,
+                            vector_int8: req.vector_int8,
+                            vector_int16: req.vector_int16,
+                            vector_int32: req.vector_int32,
+                            vector_int64: req.vector_int64,
+                            vector_float32: req.vector_float32,
+                            vector_float64: req.vector_float64,
+                            vector_string: req.vector_string,
+                            vector_opt_string: req.vector_opt_string,
 
-                        control_handle,
-                    })
-                }
-                0x7860cb3ed8362e74 => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        VectorBasic,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<VectorBasic>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::TwoWayVectorBasic {
-                        vector_uint8: req.vector_uint8,
-                        vector_uint16: req.vector_uint16,
-                        vector_uint32: req.vector_uint32,
-                        vector_uint64: req.vector_uint64,
-                        vector_int8: req.vector_int8,
-                        vector_int16: req.vector_int16,
-                        vector_int32: req.vector_int32,
-                        vector_int64: req.vector_int64,
-                        vector_float32: req.vector_float32,
-                        vector_float64: req.vector_float64,
-                        vector_string: req.vector_string,
-                        vector_opt_string: req.vector_opt_string,
+                            control_handle,
+                        })
+                    }
+                    0x7860cb3ed8362e74 => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            VectorBasic,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<VectorBasic>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::TwoWayVectorBasic {
+                            vector_uint8: req.vector_uint8,
+                            vector_uint16: req.vector_uint16,
+                            vector_uint32: req.vector_uint32,
+                            vector_uint64: req.vector_uint64,
+                            vector_int8: req.vector_int8,
+                            vector_int16: req.vector_int16,
+                            vector_int32: req.vector_int32,
+                            vector_int64: req.vector_int64,
+                            vector_float32: req.vector_float32,
+                            vector_float64: req.vector_float64,
+                            vector_string: req.vector_string,
+                            vector_opt_string: req.vector_opt_string,
 
-                        responder: ProtocolTwoWayVectorBasicResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0xc27f841d6313f72 => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        fidl::encoding::EmptyPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::ErrorVectorBasic {
-                        responder: ProtocolErrorVectorBasicResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0x19baae42829dbe90 => {
-                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(
-                        VectorCompound,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<VectorCompound>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::OneWayVectorCompound {
-                        vector_bits: req.vector_bits,
-                        vector_enum: req.vector_enum,
-                        vector_struct: req.vector_struct,
-                        vector_table: req.vector_table,
-                        vector_union: req.vector_union,
-                        vector_opt_struct: req.vector_opt_struct,
-                        vector_opt_union: req.vector_opt_union,
+                            responder: ProtocolTwoWayVectorBasicResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0xc27f841d6313f72 => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            fidl::encoding::EmptyPayload,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::ErrorVectorBasic {
+                            responder: ProtocolErrorVectorBasicResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0x19baae42829dbe90 => {
+                        header.validate_request_tx_id(fidl::MethodType::OneWay)?;
+                        let mut req = fidl::new_empty!(
+                            VectorCompound,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<VectorCompound>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::OneWayVectorCompound {
+                            vector_bits: req.vector_bits,
+                            vector_enum: req.vector_enum,
+                            vector_struct: req.vector_struct,
+                            vector_table: req.vector_table,
+                            vector_union: req.vector_union,
+                            vector_opt_struct: req.vector_opt_struct,
+                            vector_opt_union: req.vector_opt_union,
 
-                        control_handle,
-                    })
-                }
-                0x371140db701b23b4 => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        VectorCompound,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<VectorCompound>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::TwoWayVectorCompound {
-                        vector_bits: req.vector_bits,
-                        vector_enum: req.vector_enum,
-                        vector_struct: req.vector_struct,
-                        vector_table: req.vector_table,
-                        vector_union: req.vector_union,
-                        vector_opt_struct: req.vector_opt_struct,
-                        vector_opt_union: req.vector_opt_union,
+                            control_handle,
+                        })
+                    }
+                    0x371140db701b23b4 => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            VectorCompound,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<VectorCompound>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::TwoWayVectorCompound {
+                            vector_bits: req.vector_bits,
+                            vector_enum: req.vector_enum,
+                            vector_struct: req.vector_struct,
+                            vector_table: req.vector_table,
+                            vector_union: req.vector_union,
+                            vector_opt_struct: req.vector_opt_struct,
+                            vector_opt_union: req.vector_opt_union,
 
-                        responder: ProtocolTwoWayVectorCompoundResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0x760e278628f7a985 => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        fidl::encoding::EmptyPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::ErrorVectorCompound {
-                        responder: ProtocolErrorVectorCompoundResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0x153c6b333c21c52f => {
-                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(
-                        VectorOptional,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<VectorOptional>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::OneWayVectorOptional {
-                        opt_vector_uint8: req.opt_vector_uint8,
-                        opt_vector_string: req.opt_vector_string,
-                        opt_vector_struct: req.opt_vector_struct,
-                        opt_vector_opt_struct: req.opt_vector_opt_struct,
+                            responder: ProtocolTwoWayVectorCompoundResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0x760e278628f7a985 => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            fidl::encoding::EmptyPayload,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::ErrorVectorCompound {
+                            responder: ProtocolErrorVectorCompoundResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0x153c6b333c21c52f => {
+                        header.validate_request_tx_id(fidl::MethodType::OneWay)?;
+                        let mut req = fidl::new_empty!(
+                            VectorOptional,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<VectorOptional>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::OneWayVectorOptional {
+                            opt_vector_uint8: req.opt_vector_uint8,
+                            opt_vector_string: req.opt_vector_string,
+                            opt_vector_struct: req.opt_vector_struct,
+                            opt_vector_opt_struct: req.opt_vector_opt_struct,
 
-                        control_handle,
-                    })
-                }
-                0xe4b620aaafd73f3 => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        VectorOptional,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<VectorOptional>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::TwoWayVectorOptional {
-                        opt_vector_uint8: req.opt_vector_uint8,
-                        opt_vector_string: req.opt_vector_string,
-                        opt_vector_struct: req.opt_vector_struct,
-                        opt_vector_opt_struct: req.opt_vector_opt_struct,
+                            control_handle,
+                        })
+                    }
+                    0xe4b620aaafd73f3 => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            VectorOptional,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<VectorOptional>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::TwoWayVectorOptional {
+                            opt_vector_uint8: req.opt_vector_uint8,
+                            opt_vector_string: req.opt_vector_string,
+                            opt_vector_struct: req.opt_vector_struct,
+                            opt_vector_opt_struct: req.opt_vector_opt_struct,
 
-                        responder: ProtocolTwoWayVectorOptionalResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0x58e75cf86e2d715e => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        fidl::encoding::EmptyPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::ErrorVectorOptional {
-                        responder: ProtocolErrorVectorOptionalResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0x520dc9cb9b9b5ed7 => {
-                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(
-                        ArrayVectorNested,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ArrayVectorNested>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::OneWayArrayVectorNested {
-                        array_array_uint8: req.array_array_uint8,
-                        array_vector_uint8: req.array_vector_uint8,
-                        vector_array_uint8: req.vector_array_uint8,
-                        vector_vector_uint8: req.vector_vector_uint8,
+                            responder: ProtocolTwoWayVectorOptionalResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0x58e75cf86e2d715e => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            fidl::encoding::EmptyPayload,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::ErrorVectorOptional {
+                            responder: ProtocolErrorVectorOptionalResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0x520dc9cb9b9b5ed7 => {
+                        header.validate_request_tx_id(fidl::MethodType::OneWay)?;
+                        let mut req = fidl::new_empty!(
+                            ArrayVectorNested,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ArrayVectorNested>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::OneWayArrayVectorNested {
+                            array_array_uint8: req.array_array_uint8,
+                            array_vector_uint8: req.array_vector_uint8,
+                            vector_array_uint8: req.vector_array_uint8,
+                            vector_vector_uint8: req.vector_vector_uint8,
 
-                        control_handle,
-                    })
-                }
-                0x4a438ce0948817dc => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        ArrayVectorNested,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ArrayVectorNested>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::TwoWayArrayVectorNested {
-                        array_array_uint8: req.array_array_uint8,
-                        array_vector_uint8: req.array_vector_uint8,
-                        vector_array_uint8: req.vector_array_uint8,
-                        vector_vector_uint8: req.vector_vector_uint8,
+                            control_handle,
+                        })
+                    }
+                    0x4a438ce0948817dc => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            ArrayVectorNested,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<ArrayVectorNested>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::TwoWayArrayVectorNested {
+                            array_array_uint8: req.array_array_uint8,
+                            array_vector_uint8: req.array_vector_uint8,
+                            vector_array_uint8: req.vector_array_uint8,
+                            vector_vector_uint8: req.vector_vector_uint8,
 
-                        responder: ProtocolTwoWayArrayVectorNestedResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0x7e168d89e1dac8a7 => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        fidl::encoding::EmptyPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::ErrorArrayVectorNested {
-                        responder: ProtocolErrorArrayVectorNestedResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0x5af4795a9ed3a022 => {
-                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req =
-                        fidl::new_empty!(Resource, fidl::encoding::DefaultFuchsiaResourceDialect);
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<Resource>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::OneWayResource {
-                        handle: req.handle,
-                        vmo: req.vmo,
-                        client_end: req.client_end,
-                        server_end: req.server_end,
-                        struct_: req.struct_,
-                        table: req.table,
-                        union: req.union,
-                        opt_handle: req.opt_handle,
-                        opt_vmo: req.opt_vmo,
-                        opt_client_end: req.opt_client_end,
-                        opt_server_end: req.opt_server_end,
-                        opt_struct: req.opt_struct,
-                        opt_union: req.opt_union,
-                        array_handle: req.array_handle,
-                        array_vmo: req.array_vmo,
-                        array_client_end: req.array_client_end,
-                        array_server_end: req.array_server_end,
-                        array_struct: req.array_struct,
-                        array_table: req.array_table,
-                        array_union: req.array_union,
-                        vector_handle: req.vector_handle,
-                        vector_vmo: req.vector_vmo,
-                        vector_client_end: req.vector_client_end,
-                        vector_server_end: req.vector_server_end,
-                        vector_struct: req.vector_struct,
-                        vector_table: req.vector_table,
-                        vector_union: req.vector_union,
+                            responder: ProtocolTwoWayArrayVectorNestedResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0x7e168d89e1dac8a7 => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            fidl::encoding::EmptyPayload,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::ErrorArrayVectorNested {
+                            responder: ProtocolErrorArrayVectorNestedResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0x5af4795a9ed3a022 => {
+                        header.validate_request_tx_id(fidl::MethodType::OneWay)?;
+                        let mut req = fidl::new_empty!(
+                            Resource,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<Resource>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::OneWayResource {
+                            handle: req.handle,
+                            vmo: req.vmo,
+                            client_end: req.client_end,
+                            server_end: req.server_end,
+                            struct_: req.struct_,
+                            table: req.table,
+                            union: req.union,
+                            opt_handle: req.opt_handle,
+                            opt_vmo: req.opt_vmo,
+                            opt_client_end: req.opt_client_end,
+                            opt_server_end: req.opt_server_end,
+                            opt_struct: req.opt_struct,
+                            opt_union: req.opt_union,
+                            array_handle: req.array_handle,
+                            array_vmo: req.array_vmo,
+                            array_client_end: req.array_client_end,
+                            array_server_end: req.array_server_end,
+                            array_struct: req.array_struct,
+                            array_table: req.array_table,
+                            array_union: req.array_union,
+                            vector_handle: req.vector_handle,
+                            vector_vmo: req.vector_vmo,
+                            vector_client_end: req.vector_client_end,
+                            vector_server_end: req.vector_server_end,
+                            vector_struct: req.vector_struct,
+                            vector_table: req.vector_table,
+                            vector_union: req.vector_union,
 
-                        control_handle,
-                    })
-                }
-                0x1904824a11c6ad5b => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req =
-                        fidl::new_empty!(Resource, fidl::encoding::DefaultFuchsiaResourceDialect);
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<Resource>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::TwoWayResource {
-                        handle: req.handle,
-                        vmo: req.vmo,
-                        client_end: req.client_end,
-                        server_end: req.server_end,
-                        struct_: req.struct_,
-                        table: req.table,
-                        union: req.union,
-                        opt_handle: req.opt_handle,
-                        opt_vmo: req.opt_vmo,
-                        opt_client_end: req.opt_client_end,
-                        opt_server_end: req.opt_server_end,
-                        opt_struct: req.opt_struct,
-                        opt_union: req.opt_union,
-                        array_handle: req.array_handle,
-                        array_vmo: req.array_vmo,
-                        array_client_end: req.array_client_end,
-                        array_server_end: req.array_server_end,
-                        array_struct: req.array_struct,
-                        array_table: req.array_table,
-                        array_union: req.array_union,
-                        vector_handle: req.vector_handle,
-                        vector_vmo: req.vector_vmo,
-                        vector_client_end: req.vector_client_end,
-                        vector_server_end: req.vector_server_end,
-                        vector_struct: req.vector_struct,
-                        vector_table: req.vector_table,
-                        vector_union: req.vector_union,
+                            control_handle,
+                        })
+                    }
+                    0x1904824a11c6ad5b => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            Resource,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<Resource>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::TwoWayResource {
+                            handle: req.handle,
+                            vmo: req.vmo,
+                            client_end: req.client_end,
+                            server_end: req.server_end,
+                            struct_: req.struct_,
+                            table: req.table,
+                            union: req.union,
+                            opt_handle: req.opt_handle,
+                            opt_vmo: req.opt_vmo,
+                            opt_client_end: req.opt_client_end,
+                            opt_server_end: req.opt_server_end,
+                            opt_struct: req.opt_struct,
+                            opt_union: req.opt_union,
+                            array_handle: req.array_handle,
+                            array_vmo: req.array_vmo,
+                            array_client_end: req.array_client_end,
+                            array_server_end: req.array_server_end,
+                            array_struct: req.array_struct,
+                            array_table: req.array_table,
+                            array_union: req.array_union,
+                            vector_handle: req.vector_handle,
+                            vector_vmo: req.vector_vmo,
+                            vector_client_end: req.vector_client_end,
+                            vector_server_end: req.vector_server_end,
+                            vector_struct: req.vector_struct,
+                            vector_table: req.vector_table,
+                            vector_union: req.vector_union,
 
-                        responder: ProtocolTwoWayResourceResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0x5b28634d603175b6 => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        fidl::encoding::EmptyPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(ProtocolRequest::ErrorResource {
-                        responder: ProtocolErrorResourceResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                _ => Err(fidl::Error::UnknownOrdinal {
-                    ordinal: header.ordinal,
-                    protocol_name: <ProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
-                }),
-            }))
-        })
+                            responder: ProtocolTwoWayResourceResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0x5b28634d603175b6 => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            fidl::encoding::EmptyPayload,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(ProtocolRequest::ErrorResource {
+                            responder: ProtocolErrorResourceResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    _ => Err(fidl::Error::UnknownOrdinal {
+                        ordinal: header.ordinal,
+                        protocol_name:
+                            <ProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
+                    }),
+                }))
+            },
+        )
     }
 }
 

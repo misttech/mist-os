@@ -86,7 +86,7 @@ impl {{ .Name }} {
     {{- end }}
 }
 
-impl fidl::{{ if .IsValueType }}Persistable{{ else }}Standalone{{ end }} for {{ .Name }} {}
+impl fidl::{{ if .IsValueType }}Persistable{{ else }}Standalone<{{ ResourceDialect }}>{{ end }} for {{ .Name }} {}
 {{- end }}
 
 {{- define "UnionInternal" }}

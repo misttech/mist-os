@@ -213,7 +213,7 @@ impl {{ $protocol.ProxyInterface }} for {{ $protocol.Proxy }} {
         {{- end }}
     ) -> Self::{{ $method.ResponseFut }} {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<{{ $method.Response.TupleType }}, fidl::Error> {
-            let _response = fidl::client::decode_transaction_body::<{{ $method.Response.FidlType "fidl::encoding::DefaultFuchsiaResourceDialect" }}, {{ $method.Ordinal | printf "%#x" }}>(_buf?)?
+            let _response = fidl::client::decode_transaction_body::<{{ $method.Response.FidlType "fidl::encoding::DefaultFuchsiaResourceDialect" }}, {{ ResourceDialect }}, {{ $method.Ordinal | printf "%#x" }}>(_buf?)?
             {{- if $method.IsFlexible }}
             .into_result::<{{ $protocol.Marker }}>("{{ $method.Name }}")?
             {{- end }};
@@ -403,7 +403,7 @@ impl futures::Stream for {{ $protocol.RequestStream }} {
         if this.is_terminated {
             panic!("polled {{ $protocol.RequestStream }} after completion");
         }
-        fidl::encoding::with_tls_decode_buf(|bytes, handles| {
+        fidl::encoding::with_tls_decode_buf::<_, {{ ResourceDialect }}>(|bytes, handles| {
             match this.inner.channel().read_etc(cx, bytes, handles) {
                 std::task::Poll::Ready(Ok(())) => {},
                 std::task::Poll::Pending => return std::task::Poll::Pending,

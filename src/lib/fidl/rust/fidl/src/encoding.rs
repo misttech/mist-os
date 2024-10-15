@@ -23,6 +23,11 @@ use std::{mem, ptr, str};
 // Traits
 ////////////////////////////////////////////////////////////////////////////////
 
+/// Trait for a "Box" that wraps a handle when it's inside a client. Useful when
+/// we need some infrastructure to make our underlying channels work the way the
+/// client code expects.
+pub trait ProxyChannelBox<D: ResourceDialect>: std::fmt::Debug + Send + Sync {}
+
 /// Describes how a given transport encodes resources like handles.
 pub trait ResourceDialect: 'static + Sized {}
 
@@ -140,7 +145,7 @@ pub unsafe trait Encode<T: TypeMarker, D: ResourceDialect>: Sized {
 }
 
 /// A Rust type that can be decoded from the FIDL type `T`.
-pub trait Decode<T: TypeMarker, D: ResourceDialect>: 'static + Sized {
+pub trait Decode<T: TypeMarker, D>: 'static + Sized {
     /// Creates a valid instance of `Self`. The specific value does not matter,
     /// since it will be overwritten by `decode`.
     // TODO(https://fxbug.dev/42069855): Take context parameter to discourage using this.
@@ -162,7 +167,9 @@ pub trait Decode<T: TypeMarker, D: ResourceDialect>: 'static + Sized {
         decoder: &mut Decoder<'_, D>,
         offset: usize,
         depth: Depth,
-    ) -> Result<()>;
+    ) -> Result<()>
+    where
+        D: ResourceDialect;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -3167,7 +3174,7 @@ pub(crate) const MIN_BUF_BYTES_SIZE: usize = 512;
 ///
 /// This function may not be called recursively.
 #[inline]
-pub fn with_tls_encode_buf<R>(
+pub fn with_tls_encode_buf<R, D: ResourceDialect>(
     f: impl FnOnce(&mut Vec<u8>, &mut Vec<HandleDisposition<'static>>) -> R,
 ) -> R {
     TLS_BUF.with(|buf| {
@@ -3184,7 +3191,9 @@ pub fn with_tls_encode_buf<R>(
 ///
 /// This function may not be called recursively.
 #[inline]
-pub fn with_tls_decode_buf<R>(f: impl FnOnce(&mut Vec<u8>, &mut Vec<HandleInfo>) -> R) -> R {
+pub fn with_tls_decode_buf<R, D: ResourceDialect>(
+    f: impl FnOnce(&mut Vec<u8>, &mut Vec<HandleInfo>) -> R,
+) -> R {
     TLS_BUF.with(|buf| {
         let (mut bytes, mut handles) =
             RefMut::map_split(buf.borrow_mut(), |b| (&mut b.bytes, &mut b.decode_handles));
@@ -3203,7 +3212,7 @@ pub fn with_tls_encoded<T: TypeMarker, D: ResourceDialect, Out>(
     val: impl Encode<T, D>,
     f: impl FnOnce(&mut Vec<u8>, &mut Vec<HandleDisposition<'static>>) -> Result<Out>,
 ) -> Result<Out> {
-    with_tls_encode_buf(|bytes, handles| {
+    with_tls_encode_buf::<_, D>(|bytes, handles| {
         Encoder::encode(bytes, handles, val)?;
         f(bytes, handles)
     })

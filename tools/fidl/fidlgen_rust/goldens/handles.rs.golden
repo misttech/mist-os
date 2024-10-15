@@ -7,6 +7,7 @@
 
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
+use fidl::encoding::ProxyChannelBox;
 use fidl::endpoints::{ControlHandle as _, Responder as _};
 use futures::future::{self, MaybeDone, TryFutureExt};
 use zx_status;
@@ -55,7 +56,7 @@ pub struct Handles {
     pub request_some_protocol: fidl::endpoints::ServerEnd<SomeProtocolMarker>,
 }
 
-impl fidl::Standalone for Handles {}
+impl fidl::Standalone<fidl::encoding::DefaultFuchsiaResourceDialect> for Handles {}
 
 #[cfg(feature = "driver")]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -315,32 +316,34 @@ impl futures::Stream for SomeProtocolRequestStream {
         if this.is_terminated {
             panic!("polled SomeProtocolRequestStream after completion");
         }
-        fidl::encoding::with_tls_decode_buf(|bytes, handles| {
-            match this.inner.channel().read_etc(cx, bytes, handles) {
-                std::task::Poll::Ready(Ok(())) => {}
-                std::task::Poll::Pending => return std::task::Poll::Pending,
-                std::task::Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
-                    this.is_terminated = true;
-                    return std::task::Poll::Ready(None);
+        fidl::encoding::with_tls_decode_buf::<_, fidl::encoding::DefaultFuchsiaResourceDialect>(
+            |bytes, handles| {
+                match this.inner.channel().read_etc(cx, bytes, handles) {
+                    std::task::Poll::Ready(Ok(())) => {}
+                    std::task::Poll::Pending => return std::task::Poll::Pending,
+                    std::task::Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
+                        this.is_terminated = true;
+                        return std::task::Poll::Ready(None);
+                    }
+                    std::task::Poll::Ready(Err(e)) => {
+                        return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                            e.into(),
+                        ))))
+                    }
                 }
-                std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
-                        e.into(),
-                    ))))
-                }
-            }
 
-            // A message has been received from the channel
-            let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
+                // A message has been received from the channel
+                let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
 
-            std::task::Poll::Ready(Some(match header.ordinal {
-                _ => Err(fidl::Error::UnknownOrdinal {
-                    ordinal: header.ordinal,
-                    protocol_name:
-                        <SomeProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
-                }),
-            }))
-        })
+                std::task::Poll::Ready(Some(match header.ordinal {
+                    _ => Err(fidl::Error::UnknownOrdinal {
+                        ordinal: header.ordinal,
+                        protocol_name:
+                            <SomeProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
+                    }),
+                }))
+            },
+        )
     }
 }
 

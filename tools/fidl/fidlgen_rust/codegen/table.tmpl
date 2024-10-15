@@ -20,7 +20,7 @@ pub struct {{ .Name }} {
     pub __source_breaking: fidl::marker::SourceBreaking,
 }
 
-impl fidl::{{ if .IsValueType }}Persistable{{ else }}Standalone{{ end }} for {{ .Name }} {}
+impl fidl::{{ if .IsValueType }}Persistable{{ else }}Standalone<{{ ResourceDialect }}>{{ end }} for {{ .Name }} {}
 {{- end }}
 
 {{- define "TableInternal" }}
