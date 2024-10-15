@@ -282,6 +282,26 @@ impl SocketAddress {
         }
     }
 
+    pub fn maybe_inet_port(&self) -> Option<u16> {
+        match self {
+            SocketAddress::Inet(addr) => {
+                if let Ok((parsed, _)) = sockaddr_in::ref_from_prefix(addr) {
+                    Some(u16::from_be(parsed.sin_port))
+                } else {
+                    None
+                }
+            }
+            SocketAddress::Inet6(addr) => {
+                if let Ok((parsed, _)) = sockaddr_in6::ref_from_prefix(addr) {
+                    Some(u16::from_be(parsed.sin6_port))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
     pub fn to_bytes(&self) -> Vec<u8> {
         match self {
             SocketAddress::Unspecified => AF_UNSPEC.to_ne_bytes().to_vec(),

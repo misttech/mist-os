@@ -16,6 +16,7 @@ use crate::vfs::{FdFlags, FdNumber, FileHandle, FsString, LookupContext};
 
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked};
+use starnix_uapi::auth::CAP_NET_BIND_SERVICE;
 use starnix_uapi::errors::{Errno, EEXIST, EINPROGRESS};
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::math::round_up_to_increment;
@@ -163,6 +164,18 @@ pub fn sys_bind(
             | SocketDomain::Packet => error!(EINVAL),
             SocketDomain::Inet => error!(EAFNOSUPPORT),
         };
+    }
+    if let Some(port) = address.maybe_inet_port() {
+        // See <https://man7.org/linux/man-pages/man7/ip.7.html>:
+        //
+        //   The port numbers below 1024 are called privileged ports (or
+        //   sometimes: reserved ports).  Only a privileged process (on Linux:
+        //   a process that has the CAP_NET_BIND_SERVICE capability in the
+        //   user namespace governing its network namespace) may bind(2) to
+        //   these sockets.
+        if port != 0 && port < 1024 && !current_task.creds().has_capability(CAP_NET_BIND_SERVICE) {
+            return error!(EACCES);
+        }
     }
     match address {
         SocketAddress::Unspecified => return error!(EINVAL),

@@ -859,13 +859,8 @@ impl SocketOps for RouteNetlinkSocket {
     ) -> Result<(), Errno> {
         let RouteNetlinkSocket { inner, client, message_sender: _ } = self;
         let multicast_groups = match socket_address {
-            SocketAddress::Unspecified
-            | SocketAddress::Inet(_)
-            | SocketAddress::Inet6(_)
-            | SocketAddress::Packet(_)
-            | SocketAddress::Unix(_)
-            | SocketAddress::Vsock(_) => return error!(EINVAL),
             SocketAddress::Netlink(NetlinkAddress { pid: _, groups }) => groups,
+            _ => return error!(EINVAL),
         };
         let pid = {
             let mut inner = inner.lock();

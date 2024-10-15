@@ -17,7 +17,6 @@
                 "adjtimex01",
                 "adjtimex02",
                 "adjtimex03",
-                "bind02",
                 "clock_adjtime01",
                 "clock_adjtime02",
                 "clock_settime01",
