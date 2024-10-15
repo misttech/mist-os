@@ -140,19 +140,16 @@ void CameraClient::ConnectToStream(uint32_t config_index, uint32_t stream_index)
   allocator_->AllocateSharedCollection(
       std::move(fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest{}.set_token_request(
           token_orig.NewRequest())));
-  stream->SetBufferCollection(
-      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(token_orig.TakeChannel()));
-  stream->WatchBufferCollection(
+  stream->SetBufferCollection2(std::move(token_orig));
+  stream->WatchBufferCollection2(
       [this, v2_image_format = std::move(v2_image_format), stream_index, frame_rate,
-       &stream](fuchsia::sysmem::BufferCollectionTokenHandle token_back) mutable {
+       &stream](fuchsia::sysmem2::BufferCollectionTokenHandle token_back) mutable {
         if (add_collection_handler_) {
           auto& stream_info = stream_infos_[stream_index];
           stream_info.add_collection_handler_returned_value = add_collection_handler_(
-              fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>(
-                  token_back.TakeChannel()),
-              std::move(v2_image_format), frame_rate);
+              std::move(token_back), std::move(v2_image_format), frame_rate);
         } else {
-          token_back.BindSync()->Close();
+          token_back.BindSync()->Release();
         }
         // Kick start the stream
         stream->GetNextFrame([this](fuchsia::camera3::FrameInfo frame_info) {
