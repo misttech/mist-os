@@ -88,7 +88,7 @@ inline fpromise::result<LogMessage, std::string> JsonToLogMessage(rapidjson::Val
   if (timestamp == metadata->value.MemberEnd() || !timestamp->value.IsUint64()) {
     return fpromise::error("Expected metadata.timestamp key");
   }
-  ret.time = timestamp->value.GetUint64();
+  ret.time = zx::time_boot(timestamp->value.GetInt64());
 
   auto severity = metadata->value.FindMember("severity");
   if (severity == metadata->value.MemberEnd() || !severity->value.IsString()) {

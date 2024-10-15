@@ -137,7 +137,7 @@ impl TestHarness {
     pub async fn manager_test(mut self, test_dump_logs: bool) {
         let mut p = setup_default_packet();
         let lm1 = LogMessage {
-            time: p.metadata.time,
+            time: zx::BootInstant::from_nanos(p.metadata.time),
             pid: p.metadata.pid,
             tid: p.metadata.tid,
             dropped_logs: p.metadata.dropped_logs,

@@ -69,6 +69,10 @@ pub struct LogEntry {
     /// The log
     pub data: LogData,
     /// The timestamp of the log translated to UTC
+    #[serde(
+        serialize_with = "diagnostics_data::serialize_timestamp",
+        deserialize_with = "diagnostics_data::deserialize_timestamp"
+    )]
     pub timestamp: Timestamp,
 }
 
@@ -94,7 +98,12 @@ async fn handle_value<S>(one: Data<Logs>, boot_ts: Timestamp, symbolizer: &S) ->
 where
     S: Symbolize + ?Sized,
 {
-    let entry = LogEntry { timestamp: one.metadata.timestamp + boot_ts, data: one.into() };
+    let entry = LogEntry {
+        timestamp: Timestamp::from_nanos(
+            one.metadata.timestamp.into_nanos() + boot_ts.into_nanos(),
+        ),
+        data: one.into(),
+    };
     symbolizer.symbolize(entry).await
 }
 

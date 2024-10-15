@@ -521,7 +521,7 @@ fn test_raw_severity_parsing_and_conversions() {
         message,
         LogMessage {
             severity: raw_severity as i32,
-            time: 72,
+            time: Timestamp::from_nanos(72),
             dropped_logs: 2,
             pid: 43,
             tid: 912,
@@ -582,7 +582,7 @@ fn test_from_structured() {
         message,
         LogMessage {
             severity,
-            time: 72,
+            time: Timestamp::from_nanos(72),
             dropped_logs: 2,
             pid: 43,
             tid: 912,

@@ -292,7 +292,7 @@ feedback_data::LogSink::MessageOr ToMessage(const std::string& msg,
   return ::fpromise::ok(fuchsia::logger::LogMessage{
       .pid = 100,
       .tid = 101,
-      .time = (zx::sec(1) + zx::msec(10)).get(),
+      .time = zx::time_boot((zx::sec(1) + zx::msec(10)).get()),
       .severity = severity,
       .dropped_logs = 0,
       .tags = std::move(tags),
@@ -304,7 +304,7 @@ feedback_data::LogSink::MessageOr ToMessage(const std::string& msg, const zx::du
   return ::fpromise::ok(fuchsia::logger::LogMessage{
       .pid = 100,
       .tid = 101,
-      .time = time.get(),
+      .time = zx::time_boot(time.to_nsecs()),
       .severity = kLogInfo,
       .dropped_logs = 0,
       .tags = {"tag1", "tag2"},
@@ -646,22 +646,22 @@ TEST(LogBufferTest, RunsActions) {
   LogBuffer buffer(StorageSize::Gigabytes(100), &redactor);
 
   bool run1{false};
-  buffer.ExecuteAfter(zx::sec(0), [&run1] { run1 = true; });
+  buffer.ExecuteAfter(zx::time_boot(0), [&run1] { run1 = true; });
 
   bool run2{false};
-  buffer.ExecuteAfter(zx::sec(0), [&run2] { run2 = true; });
+  buffer.ExecuteAfter(zx::time_boot(0), [&run2] { run2 = true; });
 
   bool run3{false};
-  buffer.ExecuteAfter(zx::sec(5), [&run3] { run3 = true; });
+  buffer.ExecuteAfter(zx::time_boot(zx::sec(5).to_nsecs()), [&run3] { run3 = true; });
 
   bool run4{false};
-  buffer.ExecuteAfter(zx::sec(5), [&run4] { run4 = true; });
+  buffer.ExecuteAfter(zx::time_boot(zx::sec(5).to_nsecs()), [&run4] { run4 = true; });
 
   bool run5{false};
-  buffer.ExecuteAfter(zx::sec(7), [&run5] { run5 = true; });
+  buffer.ExecuteAfter(zx::time_boot(zx::sec(7).to_nsecs()), [&run5] { run5 = true; });
 
   bool run6{false};
-  buffer.ExecuteAfter(zx::sec(30), [&run6] { run6 = true; });
+  buffer.ExecuteAfter(zx::time_boot(zx::sec(30).to_nsecs()), [&run6] { run6 = true; });
 
   buffer.Add(ToMessage("unused", zx::sec(0)));
 

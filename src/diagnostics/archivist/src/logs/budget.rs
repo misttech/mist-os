@@ -219,7 +219,7 @@ mod tests {
 
     fn fake_message(timestamp: zx::BootInstant) -> LogsData {
         diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
-            timestamp: timestamp.into(),
+            timestamp,
             component_url: Some(TEST_IDENTITY.url.clone()),
             moniker: TEST_IDENTITY.moniker.clone(),
             severity: Severity::Debug,

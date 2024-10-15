@@ -34,7 +34,7 @@ impl Into<LogMessage> for &Data<Logs> {
         LogMessage {
             pid: self.pid().unwrap_or(zx::sys::ZX_KOID_INVALID),
             tid: self.tid().unwrap_or(zx::sys::ZX_KOID_INVALID),
-            time: self.metadata.timestamp.into_nanos(),
+            time: self.metadata.timestamp,
             severity: self.metadata.raw_severity() as i32,
             dropped_logs: self.dropped_logs().unwrap_or(0) as _,
             tags,
@@ -62,7 +62,7 @@ impl Into<LogMessage> for Data<Logs> {
         LogMessage {
             pid: self.pid().unwrap_or(zx::sys::ZX_KOID_INVALID),
             tid: self.tid().unwrap_or(zx::sys::ZX_KOID_INVALID),
-            time: self.metadata.timestamp.into_nanos(),
+            time: self.metadata.timestamp,
             severity: self.metadata.raw_severity() as i32,
             dropped_logs: self.dropped_logs().unwrap_or(0) as _,
             tags: match self.metadata.tags {

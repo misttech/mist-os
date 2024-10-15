@@ -55,7 +55,8 @@ bool LogBuffer::Add(LogSink::MessageOr message) {
   }
 
   // Assume timestamp 0 if no messages have been added yet.
-  const int64_t last_timestamp = (messages_.empty()) ? 0 : messages_.back().timestamp;
+  const zx::time_boot last_timestamp =
+      (messages_.empty()) ? zx::time_boot(0) : messages_.back().timestamp;
   const auto& msg = (message.is_ok()) ? message.value().msg : message.error();
   const auto& severity = (message.is_ok()) ? message.value().severity : kDefaultLogSeverity;
   const auto& tags = (message.is_ok()) ? message.value().tags : kDefaultTags;
@@ -74,7 +75,7 @@ bool LogBuffer::Add(LogSink::MessageOr message) {
     return true;
   };
 
-  const int64_t action_timestamp = (message.is_ok()) ? message.value().time : last_timestamp;
+  const zx::time_boot action_timestamp = (message.is_ok()) ? message.value().time : last_timestamp;
   auto on_return = ::fit::defer([this, action_timestamp] {
     RunActions(action_timestamp);
     EnforceCapacity();
@@ -131,8 +132,8 @@ std::string LogBuffer::ToString() {
   return out;
 }
 
-void LogBuffer::ExecuteAfter(const zx::duration uptime, ::fit::closure action) {
-  actions_at_time_.insert({uptime.get(), std::move(action)});
+void LogBuffer::ExecuteAfter(const zx::time_boot uptime, ::fit::closure action) {
+  actions_at_time_.insert({uptime, std::move(action)});
 }
 
 void LogBuffer::Sort() {
@@ -166,7 +167,7 @@ void LogBuffer::Sort() {
   ResetLastMessage();
 }
 
-void LogBuffer::RunActions(const int64_t timestamp) {
+void LogBuffer::RunActions(const zx::time_boot timestamp) {
   for (auto it = actions_at_time_.lower_bound(timestamp); it != actions_at_time_.end();) {
     it->second();
     actions_at_time_.erase(it++);
@@ -193,7 +194,7 @@ void LogBuffer::ResetLastMessage() {
   last_msg_repeated_ = 0u;
 }
 
-LogBuffer::Message::Message(const LogSink::MessageOr& message, int64_t default_timestamp)
+LogBuffer::Message::Message(const LogSink::MessageOr& message, zx::time_boot default_timestamp)
     : timestamp(message.is_ok() ? message.value().time : default_timestamp),
       msg(message.is_ok() ? Format(message.value())
                           : fxl::StringPrintf("!!! Failed to format chunk: %s !!!\n",
@@ -256,7 +257,7 @@ auto CompletesAndConsume() {
 
   auto self = ptr_factory_.GetWeakPtr();
 
-  buffer_.ExecuteAfter(zx::nsec(clock_->MonotonicNow().get()), std::move(complete_ok));
+  buffer_.ExecuteAfter(clock_->BootNow(), std::move(complete_ok));
 
   return consume.then([self, ticket](const ::fpromise::result<void, Error>& result)
                           -> ::fpromise::result<AttachmentValue> {

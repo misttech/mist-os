@@ -111,7 +111,8 @@ where
                         let messages_gen = (1..).map(|v| fidl_fuchsia_logger::LogMessage {
                             pid: LOG_MSG_PID,
                             tid: LOG_MSG_TID,
-                            time: zx::MonotonicDuration::from_seconds(v).into_nanos(),
+                            time: zx::BootInstant::from_nanos(
+                                zx::BootDuration::from_seconds(v).into_nanos()),
                             severity: fidl_fuchsia_logger::LOG_LEVEL_DEFAULT.into_primitive().into(),
                             dropped_logs: 0,
                             tags: vec![LOG_MSG_TAG.to_string()],

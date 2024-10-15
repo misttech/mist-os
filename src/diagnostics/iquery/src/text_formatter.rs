@@ -52,7 +52,7 @@ where
     }
 
     writeln!(w, "    component_url = {component_url}")?;
-    writeln!(w, "    timestamp = {timestamp}")?;
+    writeln!(w, "    timestamp = {}", timestamp.into_nanos())?;
 
     if *escrowed {
         writeln!(w, "    escrowed = true")?;

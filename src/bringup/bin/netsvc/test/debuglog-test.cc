@@ -112,7 +112,7 @@ class LogListenerTest : public zxtest::Test {
         ->Log(fuchsia_logger::wire::LogMessage{
             .pid = kPid,
             .tid = kTid,
-            .time = (zx::sec(kTimeSecs) + zx::msec(kTimeMillis)).to_nsecs(),
+            .time = zx::time_boot((zx::sec(kTimeSecs) + zx::msec(kTimeMillis)).to_nsecs()),
             .severity = static_cast<int32_t>(fuchsia_logger::wire::kLogLevelDefault),
             .tags =
                 fidl::VectorView<fidl::StringView>::FromExternal(std::begin(tags), std::size(tags)),
@@ -134,7 +134,7 @@ class LogListenerTest : public zxtest::Test {
       message_vec.push_back(fuchsia_logger::wire::LogMessage{
           .pid = kPid,
           .tid = kTid,
-          .time = (zx::sec(kTimeSecs) + zx::msec(kTimeMillis)).to_nsecs(),
+          .time = zx::time_boot((zx::sec(kTimeSecs) + zx::msec(kTimeMillis)).to_nsecs()),
           .severity = static_cast<int32_t>(fuchsia_logger::wire::kLogLevelDefault),
           .tags =
               fidl::VectorView<fidl::StringView>::FromExternal(std::begin(tags), std::size(tags)),

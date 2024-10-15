@@ -22,7 +22,7 @@ use std::borrow::{Borrow, Cow};
 use std::cmp::Ordering;
 use std::fmt;
 use std::hash::Hash;
-use std::ops::{Add, Deref};
+use std::ops::Deref;
 use std::str::FromStr;
 use std::sync::LazyLock;
 use std::time::Duration;
@@ -197,51 +197,65 @@ impl Metadata for LogsMetadata {
     }
 }
 
-/// Wraps a time for serialization and deserialization purposes.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
-pub struct Timestamp(i64);
-
-impl Timestamp {
-    /// Returns the number of nanoseconds associated with this timestamp.
-    pub fn into_nanos(self) -> i64 {
-        self.0
-    }
-
-    /// Constructs a timestamp from the given nanoseconds.
-    pub fn from_nanos(nanos: i64) -> Self {
-        Self(nanos)
-    }
+pub fn serialize_timestamp<S>(timestamp: &Timestamp, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_i64(timestamp.into_nanos())
 }
 
-impl Add<Timestamp> for Timestamp {
-    type Output = Timestamp;
-    fn add(self, rhs: Timestamp) -> Self::Output {
-        Timestamp(self.0 + rhs.0)
-    }
-}
-
-impl fmt::Display for Timestamp {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
+pub fn deserialize_timestamp<'de, D>(deserializer: D) -> Result<Timestamp, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let nanos = i64::deserialize(deserializer)?;
+    Ok(Timestamp::from_nanos(nanos))
 }
 
 #[cfg(target_os = "fuchsia")]
 mod zircon {
-    use super::*;
+    pub type Timestamp = zx::BootInstant;
+}
+#[cfg(target_os = "fuchsia")]
+pub use zircon::Timestamp;
 
-    impl From<zx::BootInstant> for Timestamp {
-        fn from(t: zx::BootInstant) -> Timestamp {
-            Timestamp(t.into_nanos())
+#[cfg(not(target_os = "fuchsia"))]
+mod host {
+    use serde::{Deserialize, Serialize};
+    use std::fmt;
+    use std::ops::Add;
+    use std::time::Duration;
+
+    #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+    pub struct Timestamp(i64);
+
+    impl Timestamp {
+        /// Returns the number of nanoseconds associated with this timestamp.
+        pub fn into_nanos(self) -> i64 {
+            self.0
+        }
+
+        /// Constructs a timestamp from the given nanoseconds.
+        pub fn from_nanos(nanos: i64) -> Self {
+            Self(nanos)
         }
     }
 
-    impl Into<zx::BootInstant> for Timestamp {
-        fn into(self) -> zx::BootInstant {
-            zx::BootInstant::from_nanos(self.0)
+    impl Add<Duration> for Timestamp {
+        type Output = Timestamp;
+        fn add(self, rhs: Duration) -> Self::Output {
+            Timestamp(self.0 + rhs.as_nanos() as i64)
+        }
+    }
+
+    impl fmt::Display for Timestamp {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}", self.0)
         }
     }
 }
+#[cfg(not(target_os = "fuchsia"))]
+pub use host::Timestamp;
 
 /// The metadata contained in a `DiagnosticsData` object where the data source is
 /// `DataSource::Inspect`.
@@ -259,6 +273,7 @@ pub struct InspectMetadata {
     pub component_url: FlyStr,
 
     /// Boot time in nanos.
+    #[serde(serialize_with = "serialize_timestamp", deserialize_with = "deserialize_timestamp")]
     pub timestamp: Timestamp,
 
     /// When set to true, the data was escrowed. Otherwise, the data was fetched live from the
@@ -290,6 +305,7 @@ pub struct LogsMetadata {
     pub component_url: Option<FlyStr>,
 
     /// Boot time in nanos.
+    #[serde(serialize_with = "serialize_timestamp", deserialize_with = "deserialize_timestamp")]
     pub timestamp: Timestamp,
 
     /// Severity of the message.

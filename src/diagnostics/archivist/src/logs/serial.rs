@@ -228,7 +228,7 @@ mod tests {
     #[fuchsia::test]
     fn write_to_serial_handles_denied_tags() {
         let log = LogsDataBuilder::new(BuilderArgs {
-            timestamp: BootInstant::from_nanos(1).into(),
+            timestamp: BootInstant::from_nanos(1),
             component_url: Some("url".into()),
             moniker: "core/foo".try_into().unwrap(),
             severity: Severity::Info,
@@ -249,7 +249,7 @@ mod tests {
             "neque bibendum molestie. Etiam ac sapien justo. Nullam aliquet ipsum nec tincidunt."
         );
         let log = LogsDataBuilder::new(BuilderArgs {
-            timestamp: BootInstant::from_nanos(123456789).into(),
+            timestamp: BootInstant::from_nanos(123456789),
             component_url: Some("url".into()),
             moniker: "core/foo".try_into().unwrap(),
             severity: Severity::Info,
@@ -276,7 +276,7 @@ mod tests {
     #[fuchsia::test]
     fn when_no_tags_are_present_the_component_name_is_used() {
         let log = LogsDataBuilder::new(BuilderArgs {
-            timestamp: BootInstant::from_nanos(123456789).into(),
+            timestamp: BootInstant::from_nanos(123456789),
             component_url: Some("url".into()),
             moniker: "core/foo".try_into().unwrap(),
             severity: Severity::Info,

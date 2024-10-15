@@ -46,7 +46,7 @@ mod tests {
         let first_message = LogMessage {
             pid: first_packet.metadata.pid,
             tid: first_packet.metadata.tid,
-            time: first_packet.metadata.time,
+            time: zx::BootInstant::from_nanos(first_packet.metadata.time),
             dropped_logs: first_packet.metadata.dropped_logs,
             severity: first_packet.metadata.severity,
             msg: String::from("BBBBB"),
@@ -146,7 +146,7 @@ mod tests {
             let message = LogMessage {
                 pid: packet.metadata.pid,
                 tid: packet.metadata.tid,
-                time: packet.metadata.time,
+                time: zx::BootInstant::from_nanos(packet.metadata.time),
                 dropped_logs: packet.metadata.dropped_logs,
                 severity: packet.metadata.severity,
                 msg: String::from("BBBBB"),
@@ -319,7 +319,7 @@ mod tests {
         let lm = LogMessage {
             pid: p.metadata.pid,
             tid: p.metadata.tid,
-            time: p.metadata.time,
+            time: zx::BootInstant::from_nanos(p.metadata.time),
             dropped_logs: p.metadata.dropped_logs,
             severity: p.metadata.severity,
             msg: String::from("BBBBB"),
@@ -351,7 +351,7 @@ mod tests {
         let lm = LogMessage {
             pid: p.metadata.pid,
             tid: p.metadata.tid,
-            time: p.metadata.time,
+            time: zx::BootInstant::from_nanos(p.metadata.time),
             dropped_logs: p.metadata.dropped_logs,
             severity: p.metadata.severity,
             msg: String::from("BBBBB"),
@@ -390,7 +390,7 @@ mod tests {
         let lm = LogMessage {
             pid: p2.metadata.pid,
             tid: p2.metadata.tid,
-            time: p2.metadata.time,
+            time: zx::BootInstant::from_nanos(p2.metadata.time),
             dropped_logs: p2.metadata.dropped_logs,
             severity: p2.metadata.severity,
             msg: String::from("BBBBB"),
@@ -425,7 +425,7 @@ mod tests {
         let lm = LogMessage {
             pid: p2.metadata.pid,
             tid: p2.metadata.tid,
-            time: p2.metadata.time,
+            time: zx::BootInstant::from_nanos(p2.metadata.time),
             dropped_logs: p2.metadata.dropped_logs,
             severity: p2.metadata.severity,
             msg: String::from("BBBBB"),
@@ -465,7 +465,7 @@ mod tests {
         let lm1 = LogMessage {
             pid: p.metadata.pid,
             tid: p.metadata.tid,
-            time: p.metadata.time,
+            time: zx::BootInstant::from_nanos(p.metadata.time),
             dropped_logs: p.metadata.dropped_logs,
             severity: p.metadata.severity,
             msg: String::from("BBBBB"),
@@ -474,7 +474,7 @@ mod tests {
         let lm2 = LogMessage {
             pid: p2.metadata.pid,
             tid: p2.metadata.tid,
-            time: p2.metadata.time,
+            time: zx::BootInstant::from_nanos(p2.metadata.time),
             dropped_logs: p2.metadata.dropped_logs,
             severity: p2.metadata.severity,
             msg: String::from("CCCCC"),
@@ -537,7 +537,7 @@ mod tests {
             LogMessage {
                 pid: zx::sys::ZX_KOID_INVALID,
                 tid: zx::sys::ZX_KOID_INVALID,
-                time: 6,
+                time: zx::BootInstant::from_nanos(6),
                 severity: LogLevelFilter::Info as i32,
                 dropped_logs: 0,
                 msg: String::from("hi"),
@@ -546,7 +546,7 @@ mod tests {
             LogMessage {
                 pid: zx::sys::ZX_KOID_INVALID,
                 tid: zx::sys::ZX_KOID_INVALID,
-                time: 14,
+                time: zx::BootInstant::from_nanos(14),
                 severity: LogLevelFilter::Error as i32,
                 dropped_logs: 0,
                 msg: String::from(""),
@@ -555,7 +555,7 @@ mod tests {
             LogMessage {
                 pid: 0x1d1,
                 tid: 0x1d2,
-                time: 19,
+                time: zx::BootInstant::from_nanos(19),
                 severity: LogLevelFilter::Warn as i32,
                 dropped_logs: 23,
                 msg: String::from("message"),
@@ -564,7 +564,7 @@ mod tests {
             LogMessage {
                 pid: zx::sys::ZX_KOID_INVALID,
                 tid: zx::sys::ZX_KOID_INVALID,
-                time: 21,
+                time: zx::BootInstant::from_nanos(21),
                 severity: LogLevelFilter::Warn as i32,
                 dropped_logs: 0,
                 msg: String::from(""),
@@ -596,7 +596,7 @@ mod tests {
             LogMessage {
                 pid: log1.record.pid.raw_koid(),
                 tid: log1.record.tid.raw_koid(),
-                time: log1.record.timestamp.into_nanos(),
+                time: log1.record.timestamp,
                 dropped_logs: 0,
                 severity: LogLevelFilter::Info as i32,
                 msg: String::from("log1"),
@@ -605,7 +605,7 @@ mod tests {
             LogMessage {
                 pid: log2.record.pid.raw_koid(),
                 tid: log2.record.tid.raw_koid(),
-                time: log2.record.timestamp.into_nanos(),
+                time: log2.record.timestamp,
                 dropped_logs: 0,
                 severity: LogLevelFilter::Info as i32,
                 msg: String::from("log2"),
@@ -614,7 +614,7 @@ mod tests {
             LogMessage {
                 pid: log3.record.pid.raw_koid(),
                 tid: log3.record.tid.raw_koid(),
-                time: log3.record.timestamp.into_nanos(),
+                time: log3.record.timestamp,
                 dropped_logs: 0,
                 severity: LogLevelFilter::Info as i32,
                 msg: String::from("log3"),

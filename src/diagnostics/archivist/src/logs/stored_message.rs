@@ -270,7 +270,7 @@ mod tests {
         assert_eq!(
             data,
             LogsDataBuilder::new(BuilderArgs {
-                timestamp: klog.record.timestamp.into(),
+                timestamp: klog.record.timestamp,
                 component_url: Some(KERNEL_IDENTITY.url.clone()),
                 moniker: KERNEL_IDENTITY.moniker.clone(),
                 severity: Severity::Info,
@@ -289,7 +289,7 @@ mod tests {
             LogMessage {
                 pid: klog.record.pid.raw_koid(),
                 tid: klog.record.tid.raw_koid(),
-                time: klog.record.timestamp.into_nanos(),
+                time: klog.record.timestamp,
                 severity: fdiagnostics::Severity::Info.into_primitive() as i32,
                 dropped_logs: 10,
                 tags: vec!["klog".to_string()],
@@ -305,7 +305,7 @@ mod tests {
         assert_eq!(
             data,
             LogsDataBuilder::new(BuilderArgs {
-                timestamp: klog.record.timestamp.into(),
+                timestamp: klog.record.timestamp,
                 component_url: Some(KERNEL_IDENTITY.url.clone()),
                 moniker: KERNEL_IDENTITY.moniker.clone(),
                 severity: Severity::Info,
@@ -325,7 +325,7 @@ mod tests {
         assert_eq!(
             data,
             LogsDataBuilder::new(BuilderArgs {
-                timestamp: klog.record.timestamp.into(),
+                timestamp: klog.record.timestamp,
                 component_url: Some(KERNEL_IDENTITY.url.clone()),
                 moniker: KERNEL_IDENTITY.moniker.clone(),
                 severity: Severity::Info,
