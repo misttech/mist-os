@@ -79,7 +79,6 @@ executable("bin") {
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/files",
-    "//src/storage/lib/vfs/cpp",
     "//third_party/rapidjson",
   ]
 }

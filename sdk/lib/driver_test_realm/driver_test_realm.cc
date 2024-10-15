@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.driver.development/cpp/fidl.h>
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
 #include <fidl/fuchsia.driver.test/cpp/fidl.h>
+#include <fidl/fuchsia.io/cpp/markers.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <fidl/fuchsia.pkg/cpp/wire.h>
@@ -20,6 +21,7 @@
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fdio/directory.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/stdcompat/string_view.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/syslog/cpp/log_settings.h>
@@ -33,6 +35,7 @@
 #include <zircon/errors.h>
 #include <zircon/status.h>
 
+#include <format>
 #include <list>
 #include <memory>
 #include <unordered_map>
@@ -43,18 +46,9 @@
 #include <fbl/string_printf.h>
 #include <fbl/unique_fd.h>
 #include <rapidjson/document.h>
-
-#include "fidl/fuchsia.io/cpp/markers.h"
-#include "lib/fidl/cpp/wire/channel.h"
-#include "sdk/lib/driver_test_realm/driver_test_realm_config.h"
-#include "src/lib/files/directory.h"
-#include "src/lib/files/file.h"
-#include "src/lib/fxl/strings/concatenate.h"
-#include "src/lib/fxl/strings/join_strings.h"
-#include "src/lib/fxl/strings/substitute.h"
-#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
-#include "src/storage/lib/vfs/cpp/pseudo_file.h"
-#include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
+#include <sdk/lib/driver_test_realm/driver_test_realm_config.h>
+#include <src/lib/files/directory.h>
+#include <src/lib/files/file.h>
 
 namespace {
 
@@ -917,10 +911,10 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
         }
 
         // Construct the url entry from the pieces provided in the list entry.
-        std::string entry = fxl::Substitute("$0$1#meta/$2", url_prefix, pkg_name, manifest);
+        std::string entry = std::format("{}{}#meta/{}", url_prefix, pkg_name, manifest);
 
         // Protect against duplicate drivers. Only add the driver if it is unique.
-        if (inserted.insert(fxl::Substitute("$0/$1", pkg_name, manifest)).second) {
+        if (inserted.insert(std::format("{}/{}", pkg_name, manifest)).second) {
           // Add to corresponding list.
           if (entry.starts_with("fuchsia-boot:///") ||
               boot_driver_components.find(manifest) != boot_driver_components.end()) {
