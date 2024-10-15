@@ -5,6 +5,8 @@
 // TODO(https://fxbug.dev/370526509): Remove once wake lock features has stabilized.
 #![allow(dead_code, unused_imports)]
 
+// DNS: Comment for review
+
 use crate::power::{listener, SuspendState, SuspendStats};
 use crate::task::CurrentTask;
 use crate::vfs::EpollKey;
