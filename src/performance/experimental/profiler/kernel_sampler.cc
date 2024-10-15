@@ -61,7 +61,7 @@ zx::result<> profiler::KernelSamplerSession::Stop() {
 
 zx::result<> profiler::KernelSamplerSession::AttachThread(const zx::thread& thread) const {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
-  FX_LOGS(INFO) << "Attaching to thread: " << thread.get();
+  FX_LOGS(DEBUG) << "Attaching to thread: " << thread.get();
   return zx::make_result(zx_sampler_attach(per_cpu_buffers_.get(), thread.get()));
 }
 
