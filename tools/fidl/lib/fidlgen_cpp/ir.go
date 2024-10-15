@@ -560,7 +560,7 @@ func (c *compiler) compileType(val fidlgen.Type, maybeAlias *fidlgen.PartialType
 	r.InlineInEnvelope = val.TypeShapeV2.InlineSize <= 4
 	switch val.Kind {
 	case fidlgen.ArrayType:
-		t := c.compileType(*val.ElementType, val.MaybeAlias)
+		t := c.compileType(*val.ElementType, val.MaybeFromAlias)
 		// Because the unified bindings alias types from the natural domain objects,
 		// the name _transformation_ would be identical between natural and unified,
 		// here and below. We reserve the flexibility to specify different names
@@ -579,7 +579,7 @@ func (c *compiler) compileType(val fidlgen.Type, maybeAlias *fidlgen.PartialType
 		r.NaturalFieldConstraint = t.NaturalFieldConstraint
 		r.WireFieldConstraint = t.WireFieldConstraint
 	case fidlgen.VectorType:
-		t := c.compileType(*val.ElementType, val.MaybeAlias)
+		t := c.compileType(*val.ElementType, val.MaybeFromAlias)
 		r.nameVariants.Unified = makeName("std::vector").template(t.Unified)
 		r.nameVariants.Wire = makeName("fidl::VectorView").template(t.Wire)
 		if val.Nullable {

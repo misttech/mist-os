@@ -24,7 +24,7 @@ var _ namespaced = (*Alias)(nil)
 
 func (c *compiler) compileAlias(val fidlgen.Alias) *Alias {
 	name := c.compileNameVariants(val.Name)
-	t := c.compileType(val.Type, val.MaybeAlias)
+	t := c.compileType(val.Type, val.MaybeFromAlias)
 	r := Alias{
 		Attributes:   Attributes{val.Attributes},
 		Resourceness: fidlgen.Resourceness(t.IsResource),

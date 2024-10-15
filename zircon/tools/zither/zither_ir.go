@@ -975,11 +975,11 @@ func newStruct(strct fidlgen.Struct, decls declMap, typeKinds map[TypeKind]struc
 	for _, member := range strct.Members {
 		attrs := member.GetAttributes()
 
-		// TODO(https://fxbug.dev/42057022): For struct members, we have the `MaybeAlias`
+		// TODO(https://fxbug.dev/42057022): For struct members, we have the `MaybeFromAlias`
 		// field as a workaround for recovering any alias name.
 		memberType := recursiveType(fidlgenType(member.Type))
-		if member.MaybeAlias != nil {
-			memberType = recursiveType(fidlgenTypeCtor(*member.MaybeAlias))
+		if member.MaybeFromAlias != nil {
+			memberType = recursiveType(fidlgenTypeCtor(*member.MaybeFromAlias))
 		}
 		typ, err := resolveType(memberType, attrs, decls, typeKinds)
 		if err != nil {
@@ -1049,10 +1049,10 @@ func newOverlay(overlay fidlgen.Overlay, decls declMap, typeKinds map[TypeKind]s
 		attrs := member.GetAttributes()
 
 		// TODO(https://fxbug.dev/42057022): For overlay members, we have the
-		// `MaybeAlias` field as a workaround for recovering any alias name.
+		// `MaybeFromAlias` field as a workaround for recovering any alias name.
 		memberType := recursiveType(fidlgenType(member.Type))
-		if member.MaybeAlias != nil {
-			memberType = recursiveType(fidlgenTypeCtor(*member.MaybeAlias))
+		if member.MaybeFromAlias != nil {
+			memberType = recursiveType(fidlgenTypeCtor(*member.MaybeFromAlias))
 		}
 		typ, err := resolveType(memberType, attrs, decls, typeKinds)
 		if err != nil {

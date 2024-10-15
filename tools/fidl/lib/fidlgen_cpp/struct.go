@@ -136,7 +136,7 @@ func (sm StructMember) NaturalPossiblyInvalidDefaultInitializer() string {
 }
 
 func (c *compiler) compileStructMember(val fidlgen.StructMember) StructMember {
-	t := c.compileType(val.Type, val.MaybeAlias)
+	t := c.compileType(val.Type, val.MaybeFromAlias)
 
 	defaultValue := ConstantValue{}
 	if val.MaybeDefaultValue != nil {

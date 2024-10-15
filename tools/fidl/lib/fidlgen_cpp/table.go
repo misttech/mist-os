@@ -99,7 +99,7 @@ func (tm TableMember) StorageName() string {
 }
 
 func (c *compiler) compileTableMember(val fidlgen.TableMember, index int) TableMember {
-	t := c.compileType(val.Type, val.MaybeAlias)
+	t := c.compileType(val.Type, val.MaybeFromAlias)
 
 	return TableMember{
 		Attributes:         Attributes{val.Attributes},

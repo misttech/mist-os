@@ -566,7 +566,7 @@ type Type struct {
 	ResourceIdentifier string
 	TypeShapeV2        TypeShape
 	PointeeType        *Type
-	MaybeAlias         *PartialTypeConstructor
+	MaybeFromAlias     *PartialTypeConstructor
 
 	// TODO(https://fxbug.dev/42149402): These are fields that are no longer
 	// used in fidlgen, but still must appear in the IR. We just pass them
@@ -600,7 +600,7 @@ func (t *Type) UnmarshalJSON(b []byte) error {
 	}
 
 	if f := obj["experimental_maybe_from_alias"]; f != nil {
-		err = json.Unmarshal(*f, &t.MaybeAlias)
+		err = json.Unmarshal(*f, &t.MaybeFromAlias)
 		if err != nil {
 			return err
 		}
@@ -751,7 +751,7 @@ func (t *Type) MarshalJSON() ([]byte, error) {
 		obj["subtype"] = f
 	}
 
-	if f := t.MaybeAlias; f != nil {
+	if f := t.MaybeFromAlias; f != nil {
 		obj["experimental_maybe_from_alias"] = f
 	}
 
@@ -1224,8 +1224,8 @@ func (rl resourceableLayoutDecl) GetResourceness() Resourceness {
 // Alias represents the declaration of a FIDL alias.
 type Alias struct {
 	decl
-	Type       Type                    `json:"type"`
-	MaybeAlias *PartialTypeConstructor `json:"experimental_maybe_from_alias,omitempty"`
+	Type           Type                    `json:"type"`
+	MaybeFromAlias *PartialTypeConstructor `json:"experimental_maybe_from_alias,omitempty"`
 	// TODO(https://fxbug.dev/42158155): Remove PartialTypeConstructor.
 	PartialTypeConstructor PartialTypeConstructor `json:"partial_type_ctor"`
 }
@@ -1259,9 +1259,9 @@ type Union struct {
 // union.
 type UnionMember struct {
 	member
-	Ordinal    int                     `json:"ordinal"`
-	Type       Type                    `json:"type"`
-	MaybeAlias *PartialTypeConstructor `json:"experimental_maybe_from_alias,omitempty"`
+	Ordinal        int                     `json:"ordinal"`
+	Type           Type                    `json:"type"`
+	MaybeFromAlias *PartialTypeConstructor `json:"experimental_maybe_from_alias,omitempty"`
 }
 
 // Table represents a declaration of a FIDL table.
@@ -1275,9 +1275,9 @@ type Table struct {
 // TableMember represents the declaration of a field in a FIDL table.
 type TableMember struct {
 	member
-	Type       Type                    `json:"type"`
-	Ordinal    int                     `json:"ordinal"`
-	MaybeAlias *PartialTypeConstructor `json:"experimental_maybe_from_alias,omitempty"`
+	Type           Type                    `json:"type"`
+	Ordinal        int                     `json:"ordinal"`
+	MaybeFromAlias *PartialTypeConstructor `json:"experimental_maybe_from_alias,omitempty"`
 }
 
 // Struct represents a declaration of a FIDL struct.
@@ -1294,7 +1294,7 @@ type StructMember struct {
 	member
 	Type              Type                    `json:"type"`
 	MaybeDefaultValue *Constant               `json:"maybe_default_value,omitempty"`
-	MaybeAlias        *PartialTypeConstructor `json:"experimental_maybe_from_alias,omitempty"`
+	MaybeFromAlias    *PartialTypeConstructor `json:"experimental_maybe_from_alias,omitempty"`
 	FieldShapeV2      FieldShape              `json:"field_shape_v2"`
 }
 
@@ -1334,9 +1334,9 @@ type Overlay struct {
 // OverlayMember represents the declaration of a member in a FIDL overlay.
 type OverlayMember struct {
 	member
-	Ordinal    int                     `json:"ordinal"`
-	Type       Type                    `json:"type"`
-	MaybeAlias *PartialTypeConstructor `json:"experimental_maybe_from_alias,omitempty"`
+	Ordinal        int                     `json:"ordinal"`
+	Type           Type                    `json:"type"`
+	MaybeFromAlias *PartialTypeConstructor `json:"experimental_maybe_from_alias,omitempty"`
 }
 
 // Openness of a protocol. Affects whether unknown interaction handlers are generated. Also controls

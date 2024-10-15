@@ -812,7 +812,7 @@ func (c *compiler) compileType(val fidlgen.Type, maybeAlias *fidlgen.PartialType
 		t.Owned = s
 		t.Param = s
 	case fidlgen.ArrayType:
-		el := c.compileType(*val.ElementType, val.MaybeAlias)
+		el := c.compileType(*val.ElementType, val.MaybeFromAlias)
 		t.ElementType = &el
 		t.FidlTemplate = fmt.Sprintf("fidl::encoding::Array<%s, %d>", el.FidlTemplate, *val.ElementCount)
 		t.Owned = fmt.Sprintf("[%s; %d]", el.Owned, *val.ElementCount)
@@ -822,7 +822,7 @@ func (c *compiler) compileType(val fidlgen.Type, maybeAlias *fidlgen.PartialType
 			t.Param = "&" + t.Owned
 		}
 	case fidlgen.VectorType:
-		el := c.compileType(*val.ElementType, val.MaybeAlias)
+		el := c.compileType(*val.ElementType, val.MaybeFromAlias)
 		t.ElementType = &el
 		if val.ElementCount == nil {
 			t.FidlTemplate = fmt.Sprintf("fidl::encoding::UnboundedVector<%s>", el.FidlTemplate)
@@ -1105,7 +1105,7 @@ func (c *compiler) compileAlias(val fidlgen.Alias) Alias {
 	return Alias{
 		Alias: val,
 		Name:  c.compileDeclIdentifier(val.Name),
-		Type:  c.compileType(val.Type, val.MaybeAlias),
+		Type:  c.compileType(val.Type, val.MaybeFromAlias),
 	}
 }
 
@@ -1237,7 +1237,7 @@ func (c *compiler) payloadForType(payloadType Type) Payload {
 	var ownedTypes, encodeExprs []string
 	for _, v := range st.Members {
 		paramName := compileSnakeIdentifier(v.Name)
-		typ := c.compileType(v.Type, v.MaybeAlias)
+		typ := c.compileType(v.Type, v.MaybeFromAlias)
 		parameters = append(parameters, Parameter{
 			Name:             paramName,
 			Type:             typ.Param,
@@ -1433,7 +1433,7 @@ func (c *compiler) compileService(val fidlgen.Service) Service {
 func (c *compiler) compileStructMember(val fidlgen.StructMember) StructMember {
 	return StructMember{
 		StructMember: val,
-		Type:         c.compileType(val.Type, val.MaybeAlias),
+		Type:         c.compileType(val.Type, val.MaybeFromAlias),
 		Name:         compileSnakeIdentifier(val.Name),
 		OffsetV2:     val.FieldShapeV2.Offset,
 	}
@@ -1542,7 +1542,7 @@ func (c *compiler) compileUnion(val fidlgen.Union) Union {
 	for _, v := range val.Members {
 		r.Members = append(r.Members, UnionMember{
 			UnionMember: v,
-			Type:        c.compileType(v.Type, v.MaybeAlias),
+			Type:        c.compileType(v.Type, v.MaybeFromAlias),
 			Name:        compileCamelIdentifier(v.Name),
 			Ordinal:     v.Ordinal,
 		})
@@ -1559,7 +1559,7 @@ func (c *compiler) compileTable(table fidlgen.Table) Table {
 	for _, member := range table.Members {
 		r.Members = append(r.Members, TableMember{
 			TableMember: member,
-			Type:        c.compileType(member.Type, member.MaybeAlias),
+			Type:        c.compileType(member.Type, member.MaybeFromAlias),
 			Name:        compileSnakeIdentifier(member.Name),
 			Ordinal:     member.Ordinal,
 		})

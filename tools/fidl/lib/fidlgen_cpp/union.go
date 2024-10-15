@@ -115,7 +115,7 @@ func (c *compiler) compileUnion(val fidlgen.Union) *Union {
 	for _, mem := range val.Members {
 		name := unionMemberContext.transform(mem.Name)
 		tag := unionMemberTagContext.transform(mem.Name)
-		t := c.compileType(mem.Type, mem.MaybeAlias)
+		t := c.compileType(mem.Type, mem.MaybeFromAlias)
 		u.Members = append(u.Members, UnionMember{
 			Attributes:        Attributes{mem.Attributes},
 			Ordinal:           uint64(mem.Ordinal),
