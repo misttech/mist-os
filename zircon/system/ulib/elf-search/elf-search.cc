@@ -7,6 +7,7 @@
 #include <elf.h>
 #include <inttypes.h>
 #include <lib/elfldltl/constants.h>
+#include <lib/trace/event.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -131,6 +132,7 @@ class ProcessMemReader {
 [[nodiscard]] zx_status_t GetBuildID(ProcessMemReader* reader, uintptr_t base,
                                      const Elf64_Phdr& notes, uint8_t* buildID,
                                      size_t* buildIDSize) {
+  TRACE_DURATION("elf-search", __func__);
   auto NoteAlign = [](uint32_t x) { return (x + 3) & -4; };
   // TODO(jakehehrlich): Sanity check here that notes.p_vaddr falls in the
   // [p_vaddr,p_vaddr+p_filesz) range of some RO PT_LOAD.
@@ -185,16 +187,20 @@ class ProcessMemReader {
 }  // anonymous namespace
 
 zx_status_t ForEachModule(const zx::process& process, ModuleAction action) {
+  TRACE_DURATION("elf-search", __func__);
   ProcessMemReader reader(process);
 
   // Read in the process maps.
   size_t actual, avail;
+  TRACE_DURATION_BEGIN("elf-search", "ForEachModule/ReadProcessMaps");
   zx_status_t status = process.get_info(ZX_INFO_PROCESS_MAPS, nullptr, 0, &actual, &avail);
+  TRACE_DURATION_END("elf-search", "ForEachModule/ReadProcessMaps");
   if (status != ZX_OK) {
     return status;
   }
   std::unique_ptr<zx_info_maps[]> maps;
   do {
+    TRACE_DURATION_BEGIN("elf-search", "ForEachModule/ReadProcessMapsLoop");
     fbl::AllocChecker ac;
     maps.reset(new (&ac) zx_info_maps[avail]);
     if (!ac.check()) {
@@ -202,6 +208,7 @@ zx_status_t ForEachModule(const zx::process& process, ModuleAction action) {
     }
     status = process.get_info(ZX_INFO_PROCESS_MAPS, maps.get(), avail * sizeof(zx_info_maps),
                               &actual, &avail);
+    TRACE_DURATION_END("elf-search", "ForEachModule/ReadProcessMapsLoop");
     if (status != ZX_OK) {
       return status;
     }
@@ -216,6 +223,7 @@ zx_status_t ForEachModule(const zx::process& process, ModuleAction action) {
   zx_vaddr_t end_of_last_module = 0;
 
   for (size_t i = 0; i < actual; ++i) {
+    TRACE_DURATION("elf-search", "ForEachModule/IterateMaps");
     const auto& map = maps[i];
 
     // Skip regions overlapping with the last module to avoid parsing the same ELF header twice.
