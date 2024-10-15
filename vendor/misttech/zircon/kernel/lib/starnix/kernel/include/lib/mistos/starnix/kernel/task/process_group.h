@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_PROCESS_GROUP_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_PROCESS_GROUP_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_PROCESS_GROUP_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_PROCESS_GROUP_H_
 
 #include <lib/mistos/linux_uapi/typedefs.h>
 #include <lib/mistos/util/weak_wrapper.h>
@@ -14,6 +14,7 @@
 #include <fbl/intrusive_wavl_tree.h>
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
+#include <fbl/vector.h>
 #include <ktl/optional.h>
 
 class JobDispatcher;
@@ -23,9 +24,9 @@ namespace starnix {
 class ThreadGroup;
 
 class ProcessGroupMutableState {
+ private:
   using BTree = fbl::WAVLTree<pid_t, util::WeakPtr<ThreadGroup>>;
 
- private:
   /// The thread_groups in the process group.
   ///
   /// The references to ThreadGroup is weak to prevent cycles as ThreadGroup have a Arc
@@ -36,11 +37,22 @@ class ProcessGroupMutableState {
   // Whether this process group is orphaned and already notified its members.
   // bool orphaned_ = false;
 
+  // impl ProcessGroupMutableState<Base = ProcessGroup>
+ public:
+  fbl::Vector<fbl::RefPtr<ThreadGroup>> thread_groups() const;
+
+  /// Removes the thread group from the process group. Returns whether the process group is empty.
+  bool remove(fbl::RefPtr<ThreadGroup> thread_group);
+
  private:
   friend class ProcessGroup;
 };
 
 class Session;
+
+//namespace starnix_uapi {
+//class Signal;
+//}
 
 /// A process group is a set of processes that are considered to be a unit for the purposes of job
 /// control and signal delivery. Each process in a process group has the same process group
@@ -61,16 +73,13 @@ class Session;
 /// Process groups are destroyed when the last process in the group exits.
 class ProcessGroup : public fbl::RefCountedUpgradeable<ProcessGroup>,
                      public fbl::WAVLTreeContainable<util::WeakPtr<ProcessGroup>> {
- public:
+ private:
   // The session of the process group.
-  fbl::RefPtr<Session> session;
+  fbl::RefPtr<Session> session_;
 
   // The leader of the process group.
-  pid_t leader;
+  pid_t leader_;
 
-  // fbl::RefPtr<JobDispatcher> job;
-
- private:
   /// The mutable state of the ProcessGroup.
   mutable starnix_sync::RwLock<ProcessGroupMutableState> mutable_state_;
 
@@ -80,8 +89,22 @@ class ProcessGroup : public fbl::RefCountedUpgradeable<ProcessGroup>,
 
   void insert(fbl::RefPtr<ThreadGroup> thread_group);
 
+  /// Removes the thread group from the process group. Returns whether the process group is empty.
+  bool remove(fbl::RefPtr<ThreadGroup> thread_group);
+
+  //void send_signals(const fbl::Vector<Signal>& signals);
+
+  /// Check whether the process group became orphaned. If this is the case, send signals to its
+  /// members if at least one is stopped.
+  void check_orphaned();
+
  public:
   // C++
+  const fbl::RefPtr<Session>& session() const;
+
+  // Accessor for the leader
+  pid_t leader() const { return leader_; }
+
   ~ProcessGroup();
 
  private:
@@ -90,4 +113,4 @@ class ProcessGroup : public fbl::RefCountedUpgradeable<ProcessGroup>,
 
 }  // namespace starnix
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_PROCESS_GROUP_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_PROCESS_GROUP_H_

@@ -343,7 +343,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
           self.thread_group.signal_actions.fork()
       };
       */
-      auto process_group = thread_group_state->process_group;
+      auto process_group = thread_group_state->process_group();
       return create_zircon_process(kernel, ktl::move(thread_group_state), pid, process_group,
                                    command);
     }
@@ -553,7 +553,7 @@ fit::result<Errno> CurrentTask::finish_exec(const ktl::string_view& path,
     // TODO: POSIX timers are not preserved.
   */
 
-  task_->thread_group()->Write()->did_exec = true;
+  task_->thread_group()->Write()->did_exec() = true;
 
   // `prctl(PR_GET_NAME)` and `/proc/self/stat`
   /*

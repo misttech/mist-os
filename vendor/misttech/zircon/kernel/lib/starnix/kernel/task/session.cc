@@ -15,14 +15,13 @@ namespace starnix {
 
 SessionMutableState::~SessionMutableState() = default;
 
+Session::Session(pid_t leader) : leader_(leader) {}
 Session::~Session() = default;
 
-Session::Session(pid_t _leader) : leader(_leader) {}
-
-fbl::RefPtr<Session> Session::New(pid_t _leader) {
+fbl::RefPtr<Session> Session::New(pid_t leader) {
   fbl::AllocChecker ac;
 
-  fbl::RefPtr<Session> session = fbl::AdoptRef(new (&ac) Session(_leader));
+  fbl::RefPtr<Session> session = fbl::AdoptRef(new (&ac) Session(leader));
   ASSERT(ac.check());
 
   return ktl::move(session);

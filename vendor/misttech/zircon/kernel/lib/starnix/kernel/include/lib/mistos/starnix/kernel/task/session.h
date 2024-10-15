@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_SESSION_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_SESSION_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_SESSION_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_SESSION_H_
 
 #include <lib/mistos/linux_uapi/typedefs.h>
 #include <lib/mistos/util/weak_wrapper.h>
@@ -49,9 +49,9 @@ struct SessionMutableState {
 /// A session can be destroyed when the session leader exits or when all process groups in the
 /// session are destroyed.
 class Session : public fbl::RefCounted<Session> {
- public:
+ private:
   /// The leader of the session
-  pid_t leader;
+  pid_t leader_;
 
  private:
   // The mutable state of the Session.
@@ -59,16 +59,17 @@ class Session : public fbl::RefCounted<Session> {
 
  public:
   /// impl Session
-  static fbl::RefPtr<Session> New(pid_t _leader);
+  static fbl::RefPtr<Session> New(pid_t leader);
 
   // C++
  public:
+  pid_t leader() { return leader_; }
   ~Session();
 
  private:
-  Session(pid_t _leader);
+  Session(pid_t leader);
 };
 
 }  // namespace starnix
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_SESSION_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_SESSION_H_

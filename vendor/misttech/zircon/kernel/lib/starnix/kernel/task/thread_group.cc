@@ -9,6 +9,7 @@
 #include <lib/mistos/starnix/kernel/signals/syscalls.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
+#include <lib/mistos/starnix/kernel/task/session.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/util/weak_wrapper.h>
 #include <lib/starnix_sync/locks.h>
@@ -29,9 +30,9 @@ namespace starnix {
 ThreadGroupMutableState::ThreadGroupMutableState() = default;
 
 ThreadGroupMutableState::ThreadGroupMutableState(ThreadGroup* base,
-                                                 ktl::optional<fbl::RefPtr<ThreadGroup>> _parent,
-                                                 fbl::RefPtr<ProcessGroup> _process_group)
-    : parent(ktl::move(_parent)), process_group(ktl::move(_process_group)), base_(base) {}
+                                                 ktl::optional<fbl::RefPtr<ThreadGroup>> parent,
+                                                 fbl::RefPtr<ProcessGroup> process_group)
+    : parent_(ktl::move(parent)), process_group_(ktl::move(process_group)), base_(base) {}
 
 pid_t ThreadGroupMutableState::leader() const { return base_->leader(); }
 
@@ -86,10 +87,25 @@ fbl::RefPtr<Task> ThreadGroupMutableState::get_task(pid_t tid) const {
 }
 
 pid_t ThreadGroupMutableState::get_ppid() const {
-  if (parent.has_value()) {
-    return parent.value()->leader();
+  if (parent_.has_value()) {
+    return parent_.value()->leader();
   }
   return leader();
+}
+
+void ThreadGroupMutableState::set_process_group(fbl::RefPtr<ProcessGroup> process_group,
+                                                PidTable* pids) {
+  if (process_group_ == process_group) {
+    return;
+  }
+  // pids->move_thread_group(base_->leader_, process_group->get_pgid());
+}
+
+void ThreadGroupMutableState::leave_process_group(PidTable& pids) {
+  if (process_group_->remove(fbl::RefPtr<ThreadGroup>(base_))) {
+    // process_group_->session()->Write()->remove(process_group_->leader());
+    pids.remove_process_group(process_group_->leader());
+  }
 }
 
 bool ThreadGroupMutableState::is_waitable() const {
@@ -136,12 +152,12 @@ void ThreadGroup::exit(ExitStatus exit_status, ktl::optional<CurrentTask> curren
 
   auto pids = kernel_->pids.Write();
   auto state = mutable_state_.Write();
-  if (state->terminating) {
+  if (state->terminating_) {
     // The thread group is already terminating and all threads in the thread group have
     // already been interrupted.
     return;
   }
-  state->terminating = true;
+  state->terminating_ = true;
 
   // Drop ptrace zombies
   // state.zombie_ptracees.release(&mut pids);
@@ -180,18 +196,53 @@ ThreadGroup::ThreadGroup(
   ktl::optional<fbl::RefPtr<ThreadGroup>> ptg;
   if (parent.has_value()) {
     *limits.Lock() = *(*parent)->base_->limits.Lock();
-    ptg = (*parent)->parent;
+    ptg = (*parent)->parent_;
   }
   *mutable_state_.Write() = ktl::move(ThreadGroupMutableState(this, ptg, ktl::move(process_group)));
 }
 
-fit::result<Errno> ThreadGroup::add(fbl::RefPtr<Task> task) {
+fit::result<Errno> ThreadGroup::add(fbl::RefPtr<Task> task) const {
   auto state = Write();
-  if (state->terminating) {
+  if (state->terminating_) {
     return fit::error(errno(EINVAL));
   }
 
   state->tasks_.insert(TaskContainer::From(ktl::move(task)));
+  return fit::ok();
+}
+
+void ThreadGroup::remove(fbl::RefPtr<Task> task) const {}
+
+fit::result<Errno> ThreadGroup::setsid() const {
+  auto pids = kernel_->pids.Write();
+
+  // Check if this thread group is already a process group leader
+  if (pids->get_process_group(leader_).has_value()) {
+    return fit::error(errno(EPERM));
+  }
+
+  // Create a new process group with this thread group as the leader
+  auto new_process_group = ProcessGroup::New(leader_, ktl::nullopt);
+  pids->add_process_group(new_process_group);
+
+  // Update the thread group's process group
+  auto state = Write();
+  state->process_group_ = ktl::move(new_process_group);
+
+  /*
+    // Set the session ID to be the same as the process group ID
+    state->session_id = leader_;
+
+    // Remove this thread group from its parent's children list
+    if (state->parent.has_value()) {
+      auto parent = state->parent.value();
+      auto parent_state = parent->Write();
+      parent_state->children_.erase(weak_thread_group());
+    }
+
+    // Clear the parent
+    state->parent = ktl::nullopt;
+  */
   return fit::ok();
 }
 
@@ -203,7 +254,7 @@ bool ProcessSelector::DoMatch(pid_t pid, const PidTable& pid_table) const {
                           if (task_ref) {
                             if (auto group = pid_table.get_process_group(pg.value)) {
                               if (group.has_value()) {
-                                return group == task_ref->thread_group()->Read()->process_group;
+                                return group == task_ref->thread_group()->Read()->process_group();
                               }
                             }
                           }
