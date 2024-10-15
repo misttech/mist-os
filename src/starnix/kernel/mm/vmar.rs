@@ -8,6 +8,7 @@ use std::ops::Deref;
 
 /// A RAII container for a vmar. The vmar mapping will be destroyed when the container is dropped.
 /// User must ensure not to use the vmar mapping afterwards.
+#[derive(Debug)]
 pub struct AllocatedVmar {
     vmar: zx::Vmar,
 }

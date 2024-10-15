@@ -44,7 +44,7 @@ pub fn get_selinux_context(path: &FsStr) -> FsString {
 
 /// A reference to a BPF object that can be stored in either an FD or an entry in the /sys/fs/bpf
 /// filesystem.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum BpfHandle {
     Program(Arc<Program>),
     Map(Arc<Map>),
