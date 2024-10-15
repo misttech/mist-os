@@ -46,8 +46,8 @@ void CreateBufferCollectionInfoWithConstraints(
 
   fuchsia_ui_composition::RegisterBufferCollectionArgs rbc_args;
   rbc_args.export_token(fidl::HLCPPToNatural(std::move(export_token)));
-  rbc_args.buffer_collection_token(
-      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(dup_token.Unbind().TakeChannel()));
+  rbc_args.buffer_collection_token2(fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>(
+      std::move(dup_token).Unbind().TakeChannel()));
   rbc_args.usages(fuchsia_ui_composition::RegisterBufferCollectionUsages::kScreenshot);
 
   fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection;

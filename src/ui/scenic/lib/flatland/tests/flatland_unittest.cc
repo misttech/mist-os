@@ -214,8 +214,8 @@ struct BufferCollectionImportExportTokensNatural {
   bool processed_callback = false;                                                               \
   fuchsia_ui_composition::RegisterBufferCollectionArgs args;                                     \
   args.export_token(std::move(bc_export_token));                                                 \
-  args.buffer_collection_token(                                                                  \
-      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(token.TakeChannel()));              \
+  args.buffer_collection_token2(                                                                 \
+      fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>(std::move(token).TakeChannel()));  \
   allocator->RegisterBufferCollection(std::move(args), [&processed_callback](auto result) {      \
     EXPECT_EQ(expect_success, result.is_ok());                                                   \
     processed_callback = true;                                                                   \

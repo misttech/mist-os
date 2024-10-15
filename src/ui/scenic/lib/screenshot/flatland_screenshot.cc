@@ -110,8 +110,8 @@ FlatlandScreenshot::FlatlandScreenshot(
   // Initialize Flatland allocator state.
   fuchsia_ui_composition::RegisterBufferCollectionArgs args;
   args.export_token(fidl::HLCPPToNatural(std::move(ref_pair.export_token)));
-  args.buffer_collection_token(
-      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(dup_token.Unbind().TakeChannel()));
+  args.buffer_collection_token2(fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>(
+      std::move(dup_token).Unbind().TakeChannel()));
   args.usages(fuchsia_ui_composition::RegisterBufferCollectionUsages::kScreenshot);
 
   flatland_allocator_->RegisterBufferCollection(std::move(args),

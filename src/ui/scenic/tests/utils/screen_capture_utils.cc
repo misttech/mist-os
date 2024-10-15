@@ -101,9 +101,7 @@ fuchsia::sysmem2::BufferCollectionInfo CreateBufferCollectionInfoWithConstraints
   auto [local_token, dup_token] = utils::CreateSysmemTokens(sysmem_allocator);
 
   rbc_args.set_export_token(std::move(export_token));
-  rbc_args.set_buffer_collection_token(
-      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
-          dup_token.Unbind().TakeChannel()));
+  rbc_args.set_buffer_collection_token2(std::move(dup_token));
   rbc_args.set_usages(usage);
 
   fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection;
