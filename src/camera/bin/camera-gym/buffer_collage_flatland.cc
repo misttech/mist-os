@@ -157,8 +157,7 @@ fpromise::promise<uint32_t> BufferCollageFlatland::AddCollection(
       fuchsia::ui::composition::RegisterBufferCollectionArgs args = {};
 
       args.set_export_token(std::move(view.ref_pair.export_token));
-      args.set_buffer_collection_token(
-          fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(token.TakeChannel()));
+      args.set_buffer_collection_token2(std::move(token));
       flatland_allocator_->RegisterBufferCollection(
           std::move(args), [this, collection_id, result = std::move(result)](
                                fuchsia::ui::composition::Allocator_RegisterBufferCollection_Result
