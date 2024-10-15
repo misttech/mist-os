@@ -19,7 +19,6 @@
 #include "amlogic.h"
 #include "exynos-usi.h"
 #include "geni.h"
-#include "motmot.h"
 #include "ns8250.h"
 #include "null.h"
 #include "pl011.h"
