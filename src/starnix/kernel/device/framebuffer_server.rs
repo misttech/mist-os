@@ -13,7 +13,7 @@
 use crate::mm::memory::MemoryObject;
 use crate::task::Kernel;
 use anyhow::anyhow;
-use fidl::endpoints::{create_proxy, create_request_stream, ClientEnd};
+use fidl::endpoints::{create_proxy, create_request_stream};
 use fidl::HandleBased;
 use flatland_frame_scheduling_lib::{
     PresentationInfo, PresentedInfo, SchedulingLib, ThroughputScheduler,
@@ -199,13 +199,7 @@ fn init_fb_scene(
     let buffer_tokens = BufferCollectionTokenPair::new();
     let args = fuicomposition::RegisterBufferCollectionArgs {
         export_token: Some(buffer_tokens.export_token),
-        // The token channel is serving both sysmem(1) and sysmem2, so we can convert here until
-        // flatland has a field for a sysmem2 token.
-        buffer_collection_token: Some(
-            ClientEnd::<fidl_fuchsia_sysmem::BufferCollectionTokenMarker>::new(
-                sysmem_buffer_collection_token.into_channel(),
-            ),
-        ),
+        buffer_collection_token2: Some(sysmem_buffer_collection_token),
         ..Default::default()
     };
 
