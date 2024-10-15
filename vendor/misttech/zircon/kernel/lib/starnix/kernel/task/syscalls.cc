@@ -7,6 +7,8 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/arch/x86_64.h>
+#include <lib/mistos/starnix/kernel/arch/x64/registers.h>
+#include <lib/mistos/starnix/kernel/execution/executor.h>
 #include <lib/mistos/starnix/kernel/mm/memory_manager.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
@@ -24,6 +26,7 @@
 #include <lib/mistos/util/weak_wrapper.h>
 #include <trace.h>
 #include <zircon/compiler.h>
+#include <zircon/types.h>
 
 #include <arch/mistos.h>
 #include <fbl/alloc_checker.h>
@@ -73,7 +76,7 @@ fit::result<Errno, pid_t> do_clone(CurrentTask& current_task, struct clone_args 
   // Store the register state in the current task.
   ::zx_thread_state_general_regs_t regs;
   arch_get_general_regs_mistos(Thread::Current().Get(), &regs);
-  current_task.thread_state.registers = RegisterState::From(regs);
+  current_task.thread_state().registers = RegisterState::From(regs);
 
   auto task_builder = current_task.clone_task(
       args.flags, child_exit_signal, UserRef<pid_t>::New(UserAddress::from((args.parent_tid))),
@@ -81,23 +84,21 @@ fit::result<Errno, pid_t> do_clone(CurrentTask& current_task, struct clone_args 
   // Set the result register to 0 for the return value from clone in the
   // cloned process.
   auto new_task = task_builder.value();
-  new_task.thread_state.registers.set_return_register(0);
+  new_task.thread_state().registers.set_return_register(0);
   // let (trace_kind, ptrace_state) = current_task.get_ptrace_core_state_for_clone(args);
 
   if (args.stack != 0) {
     // In clone() the `stack` argument points to the top of the stack, while in clone3()
     // `stack` points to the bottom of the stack. Therefore, in clone3() we need to add
     // `stack_size` to calculate the stack pointer. Note that in clone() `stack_size` is 0.
-    new_task.thread_state.registers.set_stack_pointer_register(args.stack + args.stack_size);
-   }
-
-  if ((args.flags & static_cast<uint64_t>(CLONE_SETTLS)) != 0) {
-    new_task.thread_state.registers.set_thread_pointer_register(args.tls);
+    new_task.thread_state().registers.set_stack_pointer_register(args.stack + args.stack_size);
   }
 
-  auto tid = new_task.task->id;
-  auto task_ref = util::WeakPtr(new_task.task.get());
-  // execute_task(new_task, | _, _ | Ok(()), | _ | {}, ptrace_state);
+  if ((args.flags & static_cast<uint64_t>(CLONE_SETTLS)) != 0) {
+    new_task.thread_state().registers.set_thread_pointer_register(args.tls);
+  }
+
+  auto tid = new_task.task()->id;
 
   if ((args.flags & static_cast<uint64_t>(CLONE_VFORK)) != 0) {
     // current_task.wait_for_execve(task_ref) ? ;

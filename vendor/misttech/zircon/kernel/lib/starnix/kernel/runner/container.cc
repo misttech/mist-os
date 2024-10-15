@@ -119,7 +119,7 @@ fit::result<Errno, Container> create_container(const Config& config) {
     auto files = init_task->files;
     for (int i : {0, 1, 2}) {
       if (files.get(FdNumber::from_raw(i)).is_error()) {
-        auto result = files.insert(*init_task.task, FdNumber::from_raw(i), stdio) _EP(result);
+        auto result = files.insert(*init_task.task(), FdNumber::from_raw(i), stdio) _EP(result);
       }
     }
 
