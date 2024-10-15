@@ -148,7 +148,6 @@ template("product_bundle") {
     args = [
       "--partitions",
       rebase_path(invoker.partitions, root_build_dir),
-      "--include-blobs",
       "--output",
       rebase_path(files.hermetic_inputs, root_build_dir),
       "--depfile",
