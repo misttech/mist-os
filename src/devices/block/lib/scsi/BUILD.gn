@@ -22,7 +22,7 @@ zx_library("scsi") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
-    "//src/devices/block/lib/common:common",
+    "//src/devices/block/lib/common",
     "//zircon/third_party/ulib/safemath",
   ]
   public_deps = [
@@ -30,34 +30,6 @@ zx_library("scsi") {
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//src/devices/bin/driver_runtime",
     "//src/devices/bind/fuchsia:fuchsia_cpp",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/hwreg",
-  ]
-}
-
-zx_library("scsi-dfv1") {
-  sdk = "source"
-  sdk_headers = [
-    "lib/scsi/controller-dfv1.h",
-    "lib/scsi/block-device-dfv1.h",
-  ]
-  sources = [
-    "block-device-dfv1.cc",
-    "controller-dfv1.cc",
-  ]
-  deps = [
-    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
-    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
-    "//src/devices/block/lib/common:common-dfv1",
-    "//src/devices/lib/driver",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/third_party/ulib/safemath",
-  ]
-  public_deps = [
-    "//src/devices/lib/driver",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
   ]
