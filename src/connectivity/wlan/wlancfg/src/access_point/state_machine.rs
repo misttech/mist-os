@@ -566,7 +566,8 @@ async fn started_state(
 
     // Holds a pending status request.  Request status immediately upon entering the started state.
     let mut pending_status_req = FuturesUnordered::new();
-    pending_status_req.push(deps.proxy.status());
+    let status_proxy = deps.proxy.clone();
+    pending_status_req.push(async move { status_proxy.status().await }.boxed());
 
     let mut status_timer =
         fasync::Interval::new(zx::MonotonicDuration::from_seconds(AP_STATUS_INTERVAL_SEC));
@@ -585,7 +586,7 @@ async fn started_state(
                         deps.state_tracker.update_operating_state(types::OperatingState::Failed)
                             .map_err(|e| { ExitReason(Err(e)) })?;
 
-                        return Err(ExitReason(Err(anyhow::Error::from(e))));
+                        return Err(ExitReason(Err(e)));
                     }
                 };
 
@@ -611,7 +612,10 @@ async fn started_state(
             },
             _ = status_timer.select_next_some() => {
                 if pending_status_req.is_empty() {
-                    pending_status_req.push(deps.proxy.clone().status());
+                    let status_proxy = deps.proxy.clone();
+                    pending_status_req.push(async move {
+                        status_proxy.status().await
+                    }.boxed());
                 }
             },
             manual_req = deps.req_stream.next() => {
@@ -1473,12 +1477,6 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(exec.run_until_stalled(&mut start_receiver), Poll::Ready(Ok(())));
 
-        // When state machine goes to started state, it issues a status request. Ignore it.
-        let _status_responder = assert_variant!(
-            poll_sme_req(&mut exec, &mut sme_fut),
-            Poll::Ready(fidl_sme::ApSmeRequest::Status{ responder }) => responder
-        );
-
         // Stop request should be issued now to SME
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
@@ -1569,18 +1567,6 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(exec.run_until_stalled(&mut start_receiver), Poll::Ready(Ok(())));
         assert_variant!(exec.run_until_stalled(&mut second_start_receiver), Poll::Pending);
-
-        // The state machine checks for status to make sure AP is started
-        assert_variant!(
-            poll_sme_req(&mut exec, &mut sme_fut),
-            Poll::Ready(fidl_sme::ApSmeRequest::Status{ responder }) => {
-                let ap_info = fidl_sme::Ap { ssid: vec![], channel: 0, num_clients: 0 };
-                let response = fidl_sme::ApStatusResponse {
-                    running_ap: Some(Box::new(ap_info))
-                };
-                responder.send(&response).expect("could not send AP status response");
-            }
-        );
 
         // The state machine should transition back into the starting state and issue a stop
         // request, due to the second start request.

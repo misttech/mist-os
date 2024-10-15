@@ -23,6 +23,9 @@ use tracing::{info, warn};
 const SCAN_TIMEOUT: fuchsia_async::Duration = fuchsia_async::Duration::from_seconds(60);
 const CONNECT_TIMEOUT: fuchsia_async::Duration = fuchsia_async::Duration::from_seconds(30);
 const DISCONNECT_TIMEOUT: fuchsia_async::Duration = fuchsia_async::Duration::from_seconds(10);
+const START_AP_TIMEOUT: fuchsia_async::Duration = fuchsia_async::Duration::from_seconds(30);
+const STOP_AP_TIMEOUT: fuchsia_async::Duration = fuchsia_async::Duration::from_seconds(10);
+const AP_STATUS_TIMEOUT: fuchsia_async::Duration = fuchsia_async::Duration::from_seconds(10);
 
 #[async_trait]
 pub trait IfaceManagerApi {
@@ -389,9 +392,7 @@ fn connect_txn_event_name(event: &fidl_sme::ConnectTransactionEvent) -> &'static
 #[derive(Clone, Debug)]
 pub struct SmeForApStateMachine {
     proxy: fidl_sme::ApSmeProxy,
-    #[allow(unused)]
     iface_id: u16,
-    #[allow(unused)]
     defect_sender: mpsc::UnboundedSender<Defect>,
 }
 
@@ -404,25 +405,59 @@ impl SmeForApStateMachine {
         Self { proxy, iface_id, defect_sender }
     }
 
-    pub fn start(
+    pub async fn start(
         &self,
         config: &fidl_sme::ApConfig,
-    ) -> <fidl_sme::ApSmeProxy as fidl_sme::ApSmeProxyInterface>::StartResponseFut {
-        self.proxy.start(config)
+    ) -> Result<fidl_sme::StartApResultCode, Error> {
+        self.proxy
+            .start(config)
+            .map_err(|e| format_err!("Failed to send command to wlanstack: {:?}", e))
+            .on_timeout(START_AP_TIMEOUT, || {
+                self.report_defect(Defect::Iface(IfaceFailure::Timeout {
+                    iface_id: self.iface_id,
+                    source: telemetry::TimeoutSource::ApStart,
+                }));
+                Err(format_err!("Timed out waiting for AP to start"))
+            })
+            .await
     }
 
-    pub fn stop(&self) -> <fidl_sme::ApSmeProxy as fidl_sme::ApSmeProxyInterface>::StopResponseFut {
-        self.proxy.stop()
+    pub async fn stop(&self) -> Result<fidl_sme::StopApResultCode, Error> {
+        self.proxy
+            .stop()
+            .map_err(|e| format_err!("Failed to send command to wlanstack: {:?}", e))
+            .on_timeout(STOP_AP_TIMEOUT, || {
+                self.report_defect(Defect::Iface(IfaceFailure::Timeout {
+                    iface_id: self.iface_id,
+                    source: telemetry::TimeoutSource::ApStop,
+                }));
+                Err(format_err!("Timed out waiting for AP to stop"))
+            })
+            .await
     }
 
-    pub fn status(
-        &self,
-    ) -> <fidl_sme::ApSmeProxy as fidl_sme::ApSmeProxyInterface>::StatusResponseFut {
-        self.proxy.status()
+    pub async fn status(&self) -> Result<fidl_sme::ApStatusResponse, Error> {
+        self.proxy
+            .status()
+            .map_err(|e| format_err!("Failed to send command to wlanstack: {:?}", e))
+            .on_timeout(AP_STATUS_TIMEOUT, || {
+                self.report_defect(Defect::Iface(IfaceFailure::Timeout {
+                    iface_id: self.iface_id,
+                    source: telemetry::TimeoutSource::ApStatus,
+                }));
+                Err(format_err!("Timed out waiting for AP status"))
+            })
+            .await
     }
 
     pub fn take_event_stream(&self) -> fidl_sme::ApSmeEventStream {
         self.proxy.take_event_stream()
+    }
+}
+
+impl DefectReporter for SmeForApStateMachine {
+    fn defect_sender(&self) -> mpsc::UnboundedSender<Defect> {
+        self.defect_sender.clone()
     }
 }
 
@@ -464,6 +499,7 @@ mod tests {
     use anyhow::format_err;
     use fidl::endpoints::{create_proxy, RequestStream};
     use futures::future::BoxFuture;
+    use futures::stream::StreamFuture;
     use futures::task::Poll;
     use futures::StreamExt;
     use rand::Rng;
@@ -1965,5 +2001,277 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(response)) => {
             assert_eq!(sme_result, response);
         });
+    }
+
+    fn poll_ap_sme_req(
+        exec: &mut fasync::TestExecutor,
+        next_sme_req: &mut StreamFuture<fidl_sme::ApSmeRequestStream>,
+    ) -> Poll<fidl_sme::ApSmeRequest> {
+        exec.run_until_stalled(next_sme_req).map(|(req, stream)| {
+            *next_sme_req = stream.into_future();
+            req.expect("did not expect the SME request stream to end")
+                .expect("error polling SME request stream")
+        })
+    }
+
+    #[fuchsia::test]
+    fn state_machine_sme_starts_ap_successfully() {
+        let mut exec = fasync::TestExecutor::new();
+
+        // Build an SME wrapper.
+        let (proxy, sme_fut) =
+            create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
+        let (defect_sender, _defect_receiver) = mpsc::unbounded();
+        let mut rng = rand::thread_rng();
+        let iface_id = rng.gen::<u16>();
+        let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
+
+        // Start the AP and run the future until it stalls.
+        let config = fidl_sme::ApConfig::from(create_ap_config());
+        let fut = sme.start(&config);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Respond to the start request.
+        let mut sme_fut =
+            pin!(sme_fut.into_stream().expect("failed to convert to stream").into_future());
+        assert_variant!(
+            poll_ap_sme_req(&mut exec, &mut sme_fut),
+            Poll::Ready(fidl_sme::ApSmeRequest::Start { responder, .. }) => {
+                responder.send(fidl_sme::StartApResultCode::Success)
+                    .expect("could not send sme response");
+            }
+        );
+
+        // Verify that the start response was returned.
+        assert_variant!(
+            exec.run_until_stalled(&mut fut),
+            Poll::Ready(Ok(fidl_sme::StartApResultCode::Success))
+        );
+    }
+
+    #[fuchsia::test]
+    fn state_machine_sme_fails_to_request_start_ap() {
+        let mut exec = fasync::TestExecutor::new();
+
+        // Build an SME wrapper.
+        let (proxy, _) = create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
+        let (defect_sender, _defect_receiver) = mpsc::unbounded();
+        let mut rng = rand::thread_rng();
+        let iface_id = rng.gen::<u16>();
+        let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
+
+        // Start the AP and observe an immediate failure.
+        let config = fidl_sme::ApConfig::from(create_ap_config());
+        let fut = sme.start(&config);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+    }
+
+    #[fuchsia::test]
+    fn state_machine_sme_start_ap_timeout() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
+
+        // Build an SME wrapper.
+        let (proxy, _sme_fut) =
+            create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
+        let (defect_sender, mut defect_receiver) = mpsc::unbounded();
+        let mut rng = rand::thread_rng();
+        let iface_id = rng.gen::<u16>();
+        let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
+
+        // Start the AP and run the future until it stalls.
+        let config = fidl_sme::ApConfig::from(create_ap_config());
+        let fut = sme.start(&config);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Advance the clock beyond the timeout.
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            START_AP_TIMEOUT + fasync::Duration::from_seconds(1),
+        ));
+
+        // Verify that the future returns and that a defect is logged.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_eq!(
+            defect_receiver.try_next().expect("missing connection timeout"),
+            Some(Defect::Iface(IfaceFailure::Timeout {
+                iface_id,
+                source: telemetry::TimeoutSource::ApStart,
+            })),
+        );
+    }
+
+    #[fuchsia::test]
+    fn state_machine_sme_stops_ap_successfully() {
+        let mut exec = fasync::TestExecutor::new();
+
+        // Build an SME wrapper.
+        let (proxy, sme_fut) =
+            create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
+        let (defect_sender, _defect_receiver) = mpsc::unbounded();
+        let mut rng = rand::thread_rng();
+        let iface_id = rng.gen::<u16>();
+        let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
+
+        // Stop the AP and run the future until it stalls.
+        let fut = sme.stop();
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Respond to the stop request.
+        let mut sme_fut =
+            pin!(sme_fut.into_stream().expect("failed to convert to stream").into_future());
+        assert_variant!(
+            poll_ap_sme_req(&mut exec, &mut sme_fut),
+            Poll::Ready(fidl_sme::ApSmeRequest::Stop { responder }) => {
+                responder.send(fidl_sme::StopApResultCode::Success)
+                    .expect("could not send sme response");
+            }
+        );
+
+        // Verify that the start response was returned.
+        assert_variant!(
+            exec.run_until_stalled(&mut fut),
+            Poll::Ready(Ok(fidl_sme::StopApResultCode::Success))
+        );
+    }
+
+    #[fuchsia::test]
+    fn state_machine_sme_fails_to_request_stop_ap() {
+        let mut exec = fasync::TestExecutor::new();
+
+        // Build an SME wrapper.
+        let (proxy, _) = create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
+        let (defect_sender, _defect_receiver) = mpsc::unbounded();
+        let mut rng = rand::thread_rng();
+        let iface_id = rng.gen::<u16>();
+        let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
+
+        // Stop the AP and observe an immediate failure.
+        let fut = sme.stop();
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+    }
+
+    #[fuchsia::test]
+    fn state_machine_sme_stop_ap_timeout() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
+
+        // Build an SME wrapper.
+        let (proxy, _sme_fut) =
+            create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
+        let (defect_sender, mut defect_receiver) = mpsc::unbounded();
+        let mut rng = rand::thread_rng();
+        let iface_id = rng.gen::<u16>();
+        let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
+
+        // Stop the AP and run the future until it stalls.
+        let fut = sme.stop();
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Advance the clock beyond the timeout.
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            START_AP_TIMEOUT + fasync::Duration::from_seconds(1),
+        ));
+
+        // Verify that the future returns and that a defect is logged.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_eq!(
+            defect_receiver.try_next().expect("missing connection timeout"),
+            Some(Defect::Iface(IfaceFailure::Timeout {
+                iface_id,
+                source: telemetry::TimeoutSource::ApStop,
+            })),
+        );
+    }
+
+    #[fuchsia::test]
+    fn state_machine_sme_successfully_queries_ap_status() {
+        let mut exec = fasync::TestExecutor::new();
+
+        // Build an SME wrapper.
+        let (proxy, sme_fut) =
+            create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
+        let (defect_sender, _defect_receiver) = mpsc::unbounded();
+        let mut rng = rand::thread_rng();
+        let iface_id = rng.gen::<u16>();
+        let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
+
+        // Query AP status and run the future until it stalls.
+        let fut = sme.status();
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Respond to the status request.
+        let mut sme_fut =
+            pin!(sme_fut.into_stream().expect("failed to convert to stream").into_future());
+        assert_variant!(
+            poll_ap_sme_req(&mut exec, &mut sme_fut),
+            Poll::Ready(fidl_sme::ApSmeRequest::Status{ responder }) => {
+                let response = fidl_sme::ApStatusResponse { running_ap: None };
+                responder.send(&response).expect("could not send AP status response");
+            }
+        );
+
+        // Verify that the status response was returned.
+        assert_variant!(
+            exec.run_until_stalled(&mut fut),
+            Poll::Ready(Ok(fidl_sme::ApStatusResponse { running_ap: None }))
+        );
+    }
+
+    #[fuchsia::test]
+    fn state_machine_sme_fails_to_query_ap_status() {
+        let mut exec = fasync::TestExecutor::new();
+
+        // Build an SME wrapper.
+        let (proxy, _) = create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
+        let (defect_sender, _defect_receiver) = mpsc::unbounded();
+        let mut rng = rand::thread_rng();
+        let iface_id = rng.gen::<u16>();
+        let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
+
+        // Query status and observe an immediate failure.
+        let fut = sme.status();
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+    }
+
+    #[fuchsia::test]
+    fn state_machine_sme_query_ap_status_timeout() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
+
+        // Build an SME wrapper.
+        let (proxy, _sme_fut) =
+            create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
+        let (defect_sender, mut defect_receiver) = mpsc::unbounded();
+        let mut rng = rand::thread_rng();
+        let iface_id = rng.gen::<u16>();
+        let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
+
+        // Query AP status and run the future until it stalls.
+        let fut = sme.status();
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Advance the clock beyond the timeout.
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            AP_STATUS_TIMEOUT + fasync::Duration::from_seconds(1),
+        ));
+
+        // Verify that the future returns and that a defect is logged.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_eq!(
+            defect_receiver.try_next().expect("missing connection timeout"),
+            Some(Defect::Iface(IfaceFailure::Timeout {
+                iface_id,
+                source: telemetry::TimeoutSource::ApStatus,
+            })),
+        );
     }
 }
