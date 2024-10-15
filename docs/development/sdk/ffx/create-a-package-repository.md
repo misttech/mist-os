@@ -54,13 +54,14 @@ from experimental packages).
    The example command below sets `my-repo` to be the default repository:
 
    ```none {:.devsite-disable-click-to-copy}
-   $ ffx repository default set my-repo
+   ffx repository default set my-repo
    ```
 
    This is typically not needed since the build directory level configuration of
    ffx will already contain the correct value.
 
-   After setting the default repository, this command exits silently without output.
+   After setting the default repository, this command exits silently without
+   output.
 
 ## Start the Fuchsia package server
 
@@ -78,24 +79,63 @@ This will start a package server in the foreground. The log messages will appear
 in the terminal window.
 
 Alternatively, the server can be started in the background by using the
-`--background` flag. In this case the log messages will appear in ${log.dir}/repo-REPO_NAME.log
-
+`--background` flag. In this case the log messages will appear in
+`${log.dir}/repo-REPO_NAME.log`.
 
 For more options, see [Start package servers][start-package-servers].
+
+## Start a package server based on a product bundle
+
+If you need to serve packages from an existing product bundle. The product
+bundle can be downloaded and the package server started using the product bundle.
+
+1. To see the list of available products, run the following command:
+
+    ```posix-terminal
+    ffx product list
+    ```
+
+2. To download your desired product bundle, run the following command:
+
+    ```posix-terminal {:.devsite-disable-click-to-copy}
+    ffx product download <PRODUCT> <DOWNLOAD_DIR>
+    ```
+
+    Replace `PRODUCT` and `DOWNLOAD_DIR` with your desired product and download
+    directory, for example:
+
+    ```posix-terminal
+    ffx product download core.x64 ~/Downloads/product-bundles/
+    ```
+
+3. To start a Fuchsia package server, run the following command:
+
+    ```posix-terminal {:.devsite-disable-click-to-copy}
+    ffx repository server start --background --product-bundle <DOWNLOAD_DIR>
+    ```
+
+    Replace the following:
+
+    * `DOWNLOAD_DIR`: Is the directory that contains a product bundle. You can
+        confirm it is a product bundle directory by the presence of
+        _DOWNLOAD_DIR/product.bundle.json_.
+
+    For more options, see [Start package servers][start-package-servers].
 
 ## Register a package repository to a Fuchsia device {:#register-a-package-repository}
 
 Once the package server is running, the server address needs to be registered on
 the target device.
-T
+
 1. Enable your Fuchsia device to connect to the new repository:
 
    ```posix-terminal
    ffx target repository register [-r <REPO_NAME>] --alias fuchsia.com --alias chromium.org
    ```
 
-   Replace `REPO_NAME` with the name of the repository that you want the Fuchsia device
-   to connect to. If this flag is not specified, the command selects the default repository.
+   Replace `REPO_NAME` with the name of the repository that you want the
+   Fuchsia device to connect to. If this flag is not specified, the command
+   selects the default repository.
 
    The example below sets your current Fuchsia device to connect to the default
    repository (`my-repo`) at `fuchsia.com`:
