@@ -148,6 +148,18 @@ _all_named_host_envs += [
   },
 ]
 
+kola_env = {
+  dimensions = {
+    device_type = "Kola"
+  }
+}
+_all_named_fuchsia_envs += [
+  {
+    name = "kola"
+    env = kola_env
+  },
+]
+
 nelson_env = {
   dimensions = {
     device_type = "Nelson"

@@ -113,6 +113,8 @@ if (allowed_device_types == []) {
     allowed_device_types = [ "Vim3" ]
   } else if (board_name == "chromebook-x64") {
     allowed_device_types = [ "Atlas" ]
+  } else if (board_name == "kola") {
+    allowed_device_types = [ "Kola" ]
   }
 }
 
