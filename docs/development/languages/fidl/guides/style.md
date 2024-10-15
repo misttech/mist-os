@@ -353,22 +353,6 @@ the tooling supports it.  Subsequent references to that documented entity can
 use an abbreviated version, as long as that abbreviated version is unambiguous
 (e.g., `clone`). The form without brackets does not generate a hyperlink.
 
-Request parameters, response parameters, and error types should be documented as
-lists of the form:
-
-```fidl
-+ request `param1` <description>
-+ request `param2` <description>
-- response `param1` <description>
-- response `param2` <description>
-* error <description>
-```
-
-Requests, responses, and errors must appear in that order. A given set of
-parameters must also follow the order in which they were declared in the
-parameter list.  The terms "request" and "response" may be elided if the
-parameter names are only found in one of the request or response parameter list.
-
 The first part of a doc comment describing a variable, field, or type should be
 a noun phrase that briefly states the intended purpose of the documented entity,
 including information that cannot be deduced from the name and type. The
@@ -394,6 +378,18 @@ written in the present tense, agree with a third person singular pronoun, and
 use the indicative mood (this effectively means that you should pretend the word
 "it" comes before the verb, and that you are making a statement of fact).  The
 phrase should end with a period.
+
+Request and response parameters should be documented inline in the
+corresponding structs or tables.
+
+If a protocol returns an error value, it should be documented in the "Error"
+subsection:
+
+```fidl
+## Error
+
+Description of the error value.
+```
 
 A full example:
 
