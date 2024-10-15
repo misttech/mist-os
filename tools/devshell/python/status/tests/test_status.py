@@ -157,6 +157,41 @@ class TestStatusCommand(unittest.TestCase):
             f"Output to copy/paste:\n{formatted_output}",
         )
 
+    @parameterized.expand(
+        [
+            ("-f json", ["-f", "json"]),
+            ("--format json", ["--format", "json"]),
+        ]
+    )
+    def test_extended_json_output(self, _name: str, flags: list[str]) -> None:
+        """Check that json output is as expected for longer include paths and
+        non-alphanumeric names"""
+        out = io.StringIO()
+        self.stdout_gn_format = self.stdout_gn_format.replace(
+            "//boards/x64.gni", "//foo/bar/boards/x64-fb.gni"
+        )
+        with contextlib.redirect_stdout(out):
+            main.main(["-f", "json"])
+
+        formatted_output = json.dumps(json.loads(out.getvalue()), indent=2)
+
+        self.maxDiff = None
+        # Longer path
+        new_expected_json_output = EXPECTED_JSON_OUTPUT.replace(
+            "//boards/x64.gni", "//foo/bar/boards/x64.gni"
+        )
+        # Extended characters in name
+        new_expected_json_output = new_expected_json_output.replace(
+            "x64", "x64-fb"
+        )
+        self.assertEqual(
+            formatted_output,
+            new_expected_json_output.lstrip().replace(
+                "<<BUILD_DIR>>", str(self.out_dir)
+            ),
+            f"Output to copy/paste:\n{formatted_output}",
+        )
+
     def assertSetContains(self, input: set[str], *args: str) -> None:
         self.assertEqual(
             input,
