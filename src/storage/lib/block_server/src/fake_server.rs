@@ -5,6 +5,7 @@
 use anyhow::Error;
 use block_server::async_interface::{Interface, SessionManager};
 use block_server::{BlockServer, PartitionInfo, WriteOptions};
+use std::borrow::Cow;
 use std::sync::Arc;
 use {fidl_fuchsia_hardware_block_volume as fvolume, fuchsia_async as fasync};
 
@@ -90,15 +91,10 @@ impl From<FakeServerOptions<'_>> for FakeServer {
 
         Self {
             server: BlockServer::new(
-                PartitionInfo {
-                    block_count,
-                    block_size: options.block_size,
-                    type_guid: TYPE_GUID.clone(),
-                    instance_guid: INSTANCE_GUID.clone(),
-                    name: Some(PARTITION_NAME.to_string()),
-                },
+                options.block_size,
                 Arc::new(Data {
                     block_size: options.block_size,
+                    block_count: block_count,
                     data: vmo,
                     observer: options.observer,
                 }),
@@ -140,11 +136,22 @@ impl FakeServer {
 
 struct Data {
     block_size: u32,
+    block_count: u64,
     data: zx::Vmo,
     observer: Option<Box<dyn Observer>>,
 }
 
 impl Interface for Data {
+    async fn get_info(&self) -> Result<Cow<'_, PartitionInfo>, zx::Status> {
+        Ok(Cow::Owned(PartitionInfo {
+            block_count: self.block_count,
+            type_guid: TYPE_GUID.clone(),
+            instance_guid: INSTANCE_GUID.clone(),
+            name: Some(PARTITION_NAME.to_string()),
+            flags: 0u64,
+        }))
+    }
+
     async fn read(
         &self,
         device_block_offset: u64,

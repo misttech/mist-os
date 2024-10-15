@@ -4,6 +4,7 @@
 use crate::gpt::GptPartition;
 use block_client::{VmoId, WriteOptions};
 
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 
@@ -29,6 +30,10 @@ impl block_server::async_interface::Interface for PartitionBackend {
                 .expect("VMO removed while in use");
         }
         Ok(())
+    }
+
+    async fn get_info(&self) -> Result<Cow<'_, block_server::PartitionInfo>, zx::Status> {
+        Ok(Cow::Owned(self.partition.get_info().await?))
     }
 
     async fn read(

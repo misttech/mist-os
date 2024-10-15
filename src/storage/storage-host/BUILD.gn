@@ -26,7 +26,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:tracing",
   ]
   test_deps = [
-    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
+    "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/storage/gpt/rust:gpt_testing",

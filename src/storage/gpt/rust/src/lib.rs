@@ -338,6 +338,12 @@ pub struct Transaction {
     transaction_state: Arc<Mutex<TransactionState>>,
 }
 
+impl std::fmt::Debug for Transaction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.debug_struct("Transaction").field("partitions", &self.partitions).finish()
+    }
+}
+
 impl Drop for Transaction {
     fn drop(&mut self) {
         let mut state = self.transaction_state.lock().unwrap();

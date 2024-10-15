@@ -9,6 +9,7 @@ use fidl::endpoints::RequestStream;
 use fuchsia_async::{self as fasync, EHandle};
 use futures::stream::{AbortHandle, Abortable};
 use futures::TryStreamExt;
+use std::borrow::Cow;
 use std::collections::{HashMap, VecDeque};
 use std::ffi::{c_char, c_void, CStr};
 use std::mem::MaybeUninit;
@@ -21,6 +22,7 @@ pub struct SessionManager {
     open_sessions: Mutex<HashMap<usize, Weak<Session>>>,
     condvar: Condvar,
     mbox: ExecutorMailbox,
+    info: super::PartitionInfo,
 }
 
 unsafe impl Send for SessionManager {}
@@ -87,6 +89,10 @@ impl super::SessionManager for SessionManager {
         let _ = session.fifo.signal_handle(zx::Signals::empty(), zx::Signals::USER_0);
 
         result
+    }
+
+    async fn get_info(&self) -> Result<Cow<'_, super::PartitionInfo>, zx::Status> {
+        Ok(Cow::Borrowed(&self.info))
     }
 }
 
@@ -338,6 +344,7 @@ pub struct PartitionInfo {
     pub type_guid: [u8; 16],
     pub instance_guid: [u8; 16],
     pub name: *const c_char,
+    pub flags: u64,
 }
 
 /// cbindgen:no-export
@@ -352,7 +359,6 @@ impl PartitionInfo {
     unsafe fn to_rust(&self) -> super::PartitionInfo {
         super::PartitionInfo {
             block_count: self.block_count,
-            block_size: self.block_size,
             type_guid: self.type_guid,
             instance_guid: self.instance_guid,
             name: if self.name.is_null() {
@@ -360,6 +366,7 @@ impl PartitionInfo {
             } else {
                 Some(String::from_utf8_lossy(CStr::from_ptr(self.name).to_bytes()).to_string())
             },
+            flags: self.flags,
         }
     }
 }
@@ -377,6 +384,7 @@ pub unsafe extern "C" fn block_server_new(
         open_sessions: Mutex::default(),
         condvar: Condvar::new(),
         mbox: ExecutorMailbox::default(),
+        info: partition_info.to_rust(),
     });
 
     (session_manager.callbacks.start_thread)(
@@ -393,9 +401,10 @@ pub unsafe extern "C" fn block_server_new(
         )
     };
 
+    let block_size = partition_info.block_size;
     match mail {
         Mail::Initialized(ehandle, abort_handle) => Box::into_raw(Box::new(BlockServer {
-            server: super::BlockServer::new(partition_info.to_rust(), session_manager),
+            server: super::BlockServer::new(block_size, session_manager),
             ehandle,
             abort_handle,
         })),

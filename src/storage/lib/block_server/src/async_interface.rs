@@ -2,12 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{DecodedRequest, GroupOrRequest, IntoSessionManager, Operation, SessionHelper};
+use super::{
+    DecodedRequest, GroupOrRequest, IntoSessionManager, Operation, PartitionInfo, SessionHelper,
+};
 use anyhow::Error;
 use block_protocol::{BlockFifoRequest, BlockFifoResponse, WriteOptions};
 use fuchsia_async::{self as fasync, FifoReadable as _, FifoWritable as _};
 use futures::stream::StreamExt as _;
 use futures::FutureExt;
+use std::borrow::Cow;
 use std::future::Future;
 use std::mem::MaybeUninit;
 use std::sync::Arc;
@@ -23,6 +26,9 @@ pub trait Interface: Send + Sync + Unpin + 'static {
 
     /// Called whenever a VMO is detached.
     fn on_detach_vmo(&self, _vmo: &zx::Vmo) {}
+
+    /// Called to get partition information.
+    fn get_info(&self) -> impl Future<Output = Result<Cow<'_, PartitionInfo>, zx::Status>> + Send;
 
     /// Called for a request to read bytes.
     fn read(
@@ -184,6 +190,10 @@ impl<I: Interface> super::SessionManager for SessionManager<I> {
         }
 
         Ok(())
+    }
+
+    async fn get_info(&self) -> Result<Cow<'_, PartitionInfo>, zx::Status> {
+        self.interface.get_info().await
     }
 
     async fn get_volume_info(

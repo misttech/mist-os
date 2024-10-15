@@ -97,15 +97,24 @@ impl WatchSource for PathSource {
     }
 }
 
-/// An implementation of `WatchSource` based on a DirectoryProxy.
+/// An implementation of `WatchSource` based on a DirectoryProxy.  The source is expected to be
+/// a directory containing a "volume" node which implements fuchsia.hardware.block.volume.Volume.
 #[derive(Clone, Debug)]
 pub struct DirSource {
     dir: fio::DirectoryProxy,
+    suffix: Option<String>,
 }
 
 impl DirSource {
+    /// Creates a `DirSource` that connects a `VolumeProtocolDevice` to each entry in `dir`.
     pub fn new(dir: fio::DirectoryProxy) -> Self {
-        Self { dir }
+        Self { dir, suffix: None }
+    }
+
+    /// Creates a `DirSource` that connects a `VolumeProtocolDevice` to each entry in `dir` with
+    /// `suffix` appended to the entry.
+    pub fn with_suffix(dir: fio::DirectoryProxy, suffix: impl ToString) -> Self {
+        Self { dir, suffix: Some(suffix.to_string()) }
     }
 }
 
@@ -116,12 +125,17 @@ impl WatchSource for DirSource {
             .await
             .with_context(|| format!("Failed to watch dir"))?;
         let dir = Arc::new(fuchsia_fs::directory::clone_no_describe(&self.dir, None)?);
-        Ok(Box::pin(common_filters(watcher).filter_map(move |filename| {
+        let suffix = self.suffix.clone();
+        Ok(Box::pin(common_filters(watcher).filter_map(move |mut filename| {
             let dir = dir.clone();
+            let suffix = suffix.clone();
             async move {
                 let dir_clone = fuchsia_fs::directory::clone_no_describe(&dir, None)
                     .map_err(|err| tracing::warn!(?err, "Failed to clone dir"))
                     .ok()?;
+                if let Some(suffix) = &suffix {
+                    filename.push_str(suffix);
+                }
                 VolumeProtocolDevice::new(dir_clone, filename)
                     .map(|d| Box::new(d) as Box<dyn Device>)
                     .map_err(|err| {
@@ -254,10 +268,18 @@ mod tests {
 
         let partitions_dir = vfs::pseudo_directory! {
             "000" => vfs::pseudo_directory! {
-                "volume" => volume_service(),
+                "svc" => vfs::pseudo_directory! {
+                    "fuchsia.fstoragehost.PartitionService" => vfs::pseudo_directory! {
+                        "volume" => volume_service(),
+                    },
+                },
             },
             "001" => vfs::pseudo_directory! {
-                "volume" => volume_service(),
+                "svc" => vfs::pseudo_directory! {
+                    "fuchsia.fstoragehost.PartitionService" => vfs::pseudo_directory! {
+                        "volume" => volume_service(),
+                    },
+                },
             },
         };
 
@@ -286,28 +308,24 @@ mod tests {
         let (_watcher, mut device_stream) = Watcher::new(vec![
             Box::new(PathSource::new("/test-dev/class/block", PathSourceType::Block)),
             Box::new(PathSource::new("/test-dev/class/nand", PathSourceType::Nand)),
-            Box::new(DirSource::new(client)),
+            Box::new(DirSource::with_suffix(client, "/svc/fuchsia.fstoragehost.PartitionService")),
         ])
         .await
         .expect("failed to make watcher");
 
-        let mut devices = std::collections::HashSet::from([
-            "block-000",
-            "block-001",
-            "nand-000",
-            "nand-001",
-            "000/volume",
-            "001/volume",
+        let expected_devices = std::collections::HashSet::from([
+            "block-000".to_string(),
+            "block-001".to_string(),
+            "nand-000".to_string(),
+            "nand-001".to_string(),
+            "000/svc/fuchsia.fstoragehost.PartitionService/volume".to_string(),
+            "001/svc/fuchsia.fstoragehost.PartitionService/volume".to_string(),
         ]);
-
-        // There are four devices that were added before we started watching.
-        assert!(devices.remove(device_stream.next().await.unwrap().topological_path()));
-        assert!(devices.remove(device_stream.next().await.unwrap().topological_path()));
-        assert!(devices.remove(device_stream.next().await.unwrap().topological_path()));
-        assert!(devices.remove(device_stream.next().await.unwrap().topological_path()));
-        assert!(devices.remove(device_stream.next().await.unwrap().topological_path()));
-        assert!(devices.remove(device_stream.next().await.unwrap().topological_path()));
-        assert!(devices.is_empty());
+        let mut devices = std::collections::HashSet::new();
+        for _ in 0..expected_devices.len() {
+            devices.insert(device_stream.next().await.unwrap().topological_path().to_string());
+        }
+        assert_eq!(devices, expected_devices);
 
         // Removing an entry for a device already taken off the stream doesn't do anything.
         assert!(block

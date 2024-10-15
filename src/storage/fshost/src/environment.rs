@@ -761,8 +761,9 @@ impl Environment for FshostEnvironment {
             partitions_dir
                 .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, request.into_channel().into())?;
         }
+        const PARTITION_SERVICE_SUFFIX: &str = "/svc/fuchsia.storagehost.PartitionService";
         self.watcher
-            .add_source(Box::new(DirSource::new(partitions_dir)))
+            .add_source(Box::new(DirSource::with_suffix(partitions_dir, PARTITION_SERVICE_SUFFIX)))
             .await
             .context("Failed to watch storage-host partitions dir")?;
         self.storage_host = Either::Right(instance);

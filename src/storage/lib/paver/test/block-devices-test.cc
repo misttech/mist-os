@@ -41,8 +41,12 @@ class FakeStorageHost {
     for (unsigned i = 0; i < servers_.size(); ++i) {
       auto partition_dir = fbl::MakeRefCounted<fs::PseudoDir>();
       EXPECT_OK(root_dir_->AddEntry("part-" + std::to_string(i), partition_dir));
-      EXPECT_OK(partition_dir->AddEntry(
-          "block", fbl::MakeRefCounted<fs::Service>([this, i](zx::channel channel) {
+      auto svc_dir = fbl::MakeRefCounted<fs::PseudoDir>();
+      EXPECT_OK(partition_dir->AddEntry("svc", svc_dir));
+      auto service_dir = fbl::MakeRefCounted<fs::PseudoDir>();
+      EXPECT_OK(svc_dir->AddEntry("fuchsia.storagehost.PartitionService", service_dir));
+      EXPECT_OK(service_dir->AddEntry(
+          "volume", fbl::MakeRefCounted<fs::Service>([this, i](zx::channel channel) {
             fidl::ServerEnd<fuchsia_hardware_block_volume::Volume> request(std::move(channel));
             this->servers_[i].Serve(std::move(request));
             return ZX_OK;

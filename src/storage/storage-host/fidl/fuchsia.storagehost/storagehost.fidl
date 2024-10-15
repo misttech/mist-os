@@ -4,6 +4,7 @@
 @available(added=HEAD)
 library fuchsia.storagehost;
 
+using fuchsia.hardware.block.partition;
 using fuchsia.hardware.block.volume;
 using zx;
 
@@ -19,4 +20,41 @@ closed protocol StorageHost {
     strict Start(resource struct {
         volume_client client_end:fuchsia.hardware.block.volume.Volume;
     }) -> () error zx.Status;
+};
+
+@discoverable
+closed protocol Partition {
+    /// Appends an update to `transaction` (see `PartitionManager.CreateTransaction`)
+    /// to modify the partition's metadata.  The update is only applied once the transaction
+    /// is committed.  Fails if the transaction was already committed.
+    strict UpdateMetadata(resource table {
+        1: transaction zx.Handle:EVENTPAIR;
+        2: type_guid fuchsia.hardware.block.partition.Guid;
+        3: flags uint64;
+    }) -> () error zx.Status;
+};
+
+@discoverable
+closed protocol PartitionsManager {
+    /// Starts a new transaction to modify the partition table.  The transaction will only be
+    /// applied when `CommitTransaction` is called.  Only one transaction may be active at any given
+    /// time.  Closing all handles to the returned event will cancel the transaction.
+    /// Changes are added to the transaction via the `Partition` interface, passing in a
+    /// duplicate of the `transaction` object.
+    ///
+    /// All changes in the transaction are applied atomically.
+    strict CreateTransaction() -> (resource struct {
+        transaction zx.Handle:EVENTPAIR;
+    }) error zx.Status;
+
+    /// Commits the changes pending in the transaction.
+    strict CommitTransaction(resource struct {
+        transaction zx.Handle:EVENTPAIR;
+    }) -> () error zx.Status;
+};
+
+/// Each partition exposes this service.
+service PartitionService {
+    volume client_end:fuchsia.hardware.block.volume.Volume;
+    partition client_end:Partition;
 };

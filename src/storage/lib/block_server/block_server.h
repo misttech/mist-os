@@ -24,6 +24,7 @@ struct PartitionInfo {
   uint8_t type_guid[16];
   uint8_t instance_guid[16];
   const char* name;
+  uint64_t flags;
 };
 
 // Represents a session.  New sessions appear via `OnNewSession`.

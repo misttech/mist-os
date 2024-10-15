@@ -863,6 +863,7 @@ mod tests {
     use futures::stream::futures_unordered::FuturesUnordered;
     use futures::stream::StreamExt as _;
     use ramdevice_client::RamdiskClient;
+    use std::borrow::Cow;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use {fidl_fuchsia_hardware_block as block, zx};
@@ -1275,6 +1276,16 @@ mod tests {
             flush_called: Arc<AtomicBool>,
         }
         impl block_server::async_interface::Interface for Interface {
+            async fn get_info(&self) -> Result<Cow<'_, PartitionInfo>, zx::Status> {
+                Ok(Cow::Owned(PartitionInfo {
+                    block_count: 1000,
+                    type_guid: [0; 16],
+                    instance_guid: [0; 16],
+                    name: Some("foo".to_string()),
+                    flags: 0,
+                }))
+            }
+
             async fn read(
                 &self,
                 _device_block_offset: u64,
@@ -1320,13 +1331,7 @@ mod tests {
             },
             async {
                 let block_server = BlockServer::new(
-                    PartitionInfo {
-                        block_count: 1000,
-                        block_size: 512,
-                        type_guid: [0; 16],
-                        instance_guid: [0; 16],
-                        name: Some("foo".to_string()),
-                    },
+                    512,
                     Arc::new(Interface { flush_called: flush_called.clone() }),
                 );
                 block_server.handle_requests(stream.cast_stream()).await.unwrap();

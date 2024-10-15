@@ -40,6 +40,7 @@ enum State {
 
 pub enum Services {
     StorageHost(fstoragehost::StorageHostRequestStream),
+    PartitionsManager(fstoragehost::PartitionsManagerRequestStream),
 }
 
 impl StorageHostService {
@@ -64,6 +65,7 @@ impl StorageHostService {
         self.export_dir.add_entry("svc", svc_dir.clone()).expect("Unable to create svc dir");
 
         let weak = Arc::downgrade(&self);
+        let weak2 = weak.clone();
         svc_dir.add_entry(
             fstoragehost::StorageHostMarker::PROTOCOL_NAME,
             vfs::service::host(move |requests| {
@@ -71,6 +73,17 @@ impl StorageHostService {
                 async move {
                     if let Some(me) = weak.upgrade() {
                         let _ = me.handle_start_requests(requests).await;
+                    }
+                }
+            }),
+        )?;
+        svc_dir.add_entry(
+            fstoragehost::PartitionsManagerMarker::PROTOCOL_NAME,
+            vfs::service::host(move |requests| {
+                let weak = weak2.clone();
+                async move {
+                    if let Some(me) = weak.upgrade() {
+                        let _ = me.handle_partitions_manager_requests(requests).await;
                     }
                 }
             }),
@@ -138,6 +151,45 @@ impl StorageHostService {
         Ok(())
     }
 
+    async fn handle_partitions_manager_requests(
+        self: Arc<Self>,
+        mut stream: fstoragehost::PartitionsManagerRequestStream,
+    ) -> Result<(), Error> {
+        while let Some(request) = stream.try_next().await.context("Reading request")? {
+            tracing::debug!(?request);
+            match request {
+                fstoragehost::PartitionsManagerRequest::CreateTransaction { responder } => {
+                    responder
+                        .send(self.create_transaction().await.map_err(|status| status.into_raw()))
+                        .unwrap_or_else(|e| tracing::error!(?e, "Failed to send Start response"));
+                }
+                fstoragehost::PartitionsManagerRequest::CommitTransaction {
+                    transaction,
+                    responder,
+                } => {
+                    responder
+                        .send(
+                            self.commit_transaction(transaction)
+                                .await
+                                .map_err(|status| status.into_raw()),
+                        )
+                        .unwrap_or_else(|e| tracing::error!(?e, "Failed to send Start response"));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn create_transaction(&self) -> Result<zx::EventPair, zx::Status> {
+        let gpt_manager = self.gpt_manager().await?;
+        gpt_manager.create_transaction().await
+    }
+
+    async fn commit_transaction(&self, transaction: zx::EventPair) -> Result<(), zx::Status> {
+        let gpt_manager = self.gpt_manager().await?;
+        gpt_manager.commit_transaction(transaction).await
+    }
+
     async fn handle_lifecycle_requests(&self, lifecycle_channel: zx::Channel) -> Result<(), Error> {
         let mut stream = flifecycle::LifecycleRequestStream::from_channel(
             fasync::Channel::from_channel(lifecycle_channel),
@@ -155,6 +207,13 @@ impl StorageHostService {
             None => {}
         }
         Ok(())
+    }
+
+    async fn gpt_manager(&self) -> Result<Arc<GptManager>, zx::Status> {
+        match &*self.state.lock().await {
+            State::Stopped => Err(zx::Status::BAD_STATE),
+            State::Running(gpt) => Ok(gpt.clone()),
+        }
     }
 }
 
@@ -208,6 +267,98 @@ mod tests {
             async {
                 // Block device
                 let vmo = zx::Vmo::create(4096).unwrap();
+                format_gpt(
+                    &vmo,
+                    512,
+                    vec![PartitionInfo {
+                        label: "part".to_string(),
+                        type_guid: Guid::from_bytes([0xabu8; 16]),
+                        instance_guid: Guid::from_bytes([0xcdu8; 16]),
+                        start_block: 4,
+                        num_blocks: 1,
+                        flags: 0,
+                    }],
+                );
+                let _ = FakeServer::from_vmo(512, vmo).serve(volume_stream).await;
+            }
+            .fuse(),
+        );
+    }
+
+    #[fuchsia::test]
+    async fn transaction_lifecycle() {
+        let (outgoing_dir, outgoing_dir_server) =
+            fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let (lifecycle_client, lifecycle_server) =
+            fidl::endpoints::create_proxy::<LifecycleMarker>().unwrap();
+        let (volume_client, volume_stream) =
+            create_request_stream::<fvolume::VolumeMarker>().unwrap();
+
+        futures::join!(
+            async {
+                // Client
+                connect_to_protocol_at_dir_svc::<fstoragehost::StorageHostMarker>(&outgoing_dir)
+                    .unwrap()
+                    .start(volume_client)
+                    .await
+                    .expect("FIDL error")
+                    .expect("Start failed");
+
+                let pm_client = connect_to_protocol_at_dir_svc::<
+                    fstoragehost::PartitionsManagerMarker,
+                >(&outgoing_dir)
+                .unwrap();
+                let transaction = pm_client
+                    .create_transaction()
+                    .await
+                    .expect("FIDL error")
+                    .expect("create_transaction failed");
+
+                pm_client
+                    .create_transaction()
+                    .await
+                    .expect("FIDL error")
+                    .expect_err("create_transaction should fail while other txn exists");
+
+                pm_client
+                    .commit_transaction(transaction)
+                    .await
+                    .expect("FIDL error")
+                    .expect("commit_transaction failed");
+
+                {
+                    let _transaction = pm_client
+                        .create_transaction()
+                        .await
+                        .expect("FIDL error")
+                        .expect("create_transaction should succeed after committing txn");
+                }
+
+                pm_client
+                    .create_transaction()
+                    .await
+                    .expect("FIDL error")
+                    .expect("create_transaction should succeed after dropping txn");
+
+                lifecycle_client.stop().expect("Stop failed");
+                fasync::OnSignals::new(
+                    &lifecycle_client.into_channel().expect("into_channel failed"),
+                    zx::Signals::CHANNEL_PEER_CLOSED,
+                )
+                .await
+                .expect("OnSignals failed");
+            },
+            async {
+                // Server
+                let service = StorageHostService::new();
+                service
+                    .run(outgoing_dir_server.into_channel(), Some(lifecycle_server.into_channel()))
+                    .await
+                    .expect("Run failed");
+            },
+            async {
+                // Block device
+                let vmo = zx::Vmo::create(8192).unwrap();
                 format_gpt(
                     &vmo,
                     512,
