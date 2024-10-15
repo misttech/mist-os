@@ -17,8 +17,7 @@ use crate::util::listener::Message::NotifyListeners;
 use crate::util::listener::{ClientListenerMessageSender, ClientNetworkState, ClientStateUpdate};
 use crate::util::state_machine::{self, ExitReason, IntoStateExt, StateMachineStatusPublisher};
 use anyhow::format_err;
-use fidl::endpoints::create_proxy;
-use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
+use fuchsia_async::{self as fasync, DurationExt};
 use fuchsia_inspect::{Node as InspectNode, StringReference};
 use fuchsia_inspect_contrib::inspect_insert;
 use fuchsia_inspect_contrib::log::WriteInspect;
@@ -38,7 +37,6 @@ use {
 };
 
 const MAX_CONNECTION_ATTEMPTS: u8 = 4; // arbitrarily chosen until we have some data
-const CONNECT_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(30);
 const NUM_PAST_SCORES: usize = 91; // number of past periodic connection scores to store for metrics
 
 type State = state_machine::State<ExitReason>;
@@ -310,9 +308,7 @@ async fn disconnecting_state(
         .proxy
         .disconnect(types::convert_to_sme_disconnect_reason(options.reason))
         .await
-        .map_err(|e| {
-            ExitReason(Err(format_err!("Failed to send command to wlanstack: {:?}", e)))
-        })?;
+        .map_err(|e| ExitReason(Err(e)))?;
 
     notify_once_disconnected(&common_options, &mut options);
 
@@ -349,16 +345,6 @@ fn notify_once_disconnected(
     match options.disconnect_responder.take() {
         Some(responder) => responder.send(()).unwrap_or(()),
         None => (),
-    }
-}
-
-fn connect_txn_event_name(event: &fidl_sme::ConnectTransactionEvent) -> &'static str {
-    match event {
-        fidl_sme::ConnectTransactionEvent::OnConnectResult { .. } => "OnConnectResult",
-        fidl_sme::ConnectTransactionEvent::OnRoamResult { .. } => "OnRoamResult",
-        fidl_sme::ConnectTransactionEvent::OnDisconnect { .. } => "OnDisconnect",
-        fidl_sme::ConnectTransactionEvent::OnSignalReport { .. } => "OnSignalReport",
-        fidl_sme::ConnectTransactionEvent::OnChannelSwitched { .. } => "OnChannelSwitched",
     }
 }
 
@@ -409,33 +395,6 @@ async fn handle_connecting_error_and_retry(
     }
 }
 
-/// Wait until stream returns an OnConnectResult event or None. Ignore other event types.
-async fn wait_for_connect_result(
-    mut stream: fidl_sme::ConnectTransactionEventStream,
-) -> Result<fidl_sme::ConnectResult, ExitReason> {
-    loop {
-        let stream_fut = stream.try_next();
-        match stream_fut.await.map_err(|e| {
-            ExitReason(Err(format_err!("Failed to receive connect result from sme: {:?}", e)))
-        })? {
-            Some(fidl_sme::ConnectTransactionEvent::OnConnectResult { result }) => {
-                return Ok(result)
-            }
-            Some(other) => {
-                info!(
-                    "Expected ConnectTransactionEvent::OnConnectResult, got {}. Ignoring.",
-                    connect_txn_event_name(&other)
-                );
-            }
-            None => {
-                return Err(ExitReason(Err(format_err!(
-                    "Server closed the ConnectTransaction channel before sending a response"
-                ))));
-            }
-        };
-    }
-}
-
 /// The CONNECTING state requests an SME connect. It handles the SME connect response:
 /// - for a successful connection, transition to CONNECTED state
 /// - for a failed connection, retry connection by passing a next_network to the
@@ -465,9 +424,6 @@ async fn connecting_state<'a>(
         })?,
     );
 
-    // Send a connect request to the SME.
-    let (connect_txn, remote) = create_proxy()
-        .map_err(|e| ExitReason(Err(format_err!("Failed to create proxy: {:?}", e))))?;
     let sme_connect_request = fidl_sme::ConnectRequest {
         ssid: options.connect_selection.target.network.ssid.to_vec(),
         bss_description,
@@ -475,17 +431,11 @@ async fn connecting_state<'a>(
         authentication: options.connect_selection.target.authenticator.clone().into(),
         deprecated_scan_type: fidl_fuchsia_wlan_common::ScanType::Active,
     };
-    common_options.proxy.connect(&sme_connect_request, Some(remote)).map_err(|e| {
-        ExitReason(Err(format_err!("Failed to send command to wlanstack: {:?}", e)))
-    })?;
-
-    // Wait for connect result or timeout.
-    let stream = connect_txn.take_event_stream();
-    let sme_result = wait_for_connect_result(stream)
-        .on_timeout(CONNECT_TIMEOUT, || {
-            Err(ExitReason(Err(format_err!("Timed out waiting for connect result from SME."))))
-        })
-        .await?;
+    let (sme_result, connect_txn_stream) = common_options
+        .proxy
+        .connect(&sme_connect_request)
+        .await
+        .map_err(|e| ExitReason(Err(format_err!("{:?}", e))))?;
 
     notify_on_connection_result(&common_options, &options, ap_state.clone(), sme_result).await;
 
@@ -500,7 +450,7 @@ async fn connecting_state<'a>(
                 options.connect_selection.target.network.clone(),
                 options.connect_selection.target.credential.clone(),
                 options.connect_selection.reason,
-                connect_txn.take_event_stream(),
+                connect_txn_stream,
                 network_is_likely_hidden,
             );
             Ok(connected_state(common_options, connected_options).into_state())
@@ -1157,7 +1107,7 @@ mod tests {
         generate_connect_selection, generate_disconnect_info, poll_sme_req, random_connection_data,
         ConnectResultRecord, ConnectionRecord, FakeSavedNetworksManager,
     };
-    use fidl::endpoints::create_proxy_and_stream;
+    use fidl::endpoints::{create_proxy, create_proxy_and_stream};
     use fidl::prelude::*;
     use futures::task::Poll;
     use futures::Future;
@@ -1231,53 +1181,6 @@ mod tests {
         select! {
             _state_machine = state_machine.fuse() => return,
         }
-    }
-
-    #[fuchsia::test]
-    fn wait_for_connect_result_ignores_other_events() {
-        let mut exec = fasync::TestExecutor::new();
-        let (connect_txn, remote) = create_proxy::<fidl_sme::ConnectTransactionMarker>().unwrap();
-        let request_handle = remote.into_stream().unwrap().control_handle();
-        let response_stream = connect_txn.take_event_stream();
-
-        let fut = wait_for_connect_result(response_stream);
-
-        let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-
-        // Send some unexpected response
-        let ind = fidl_internal::SignalReportIndication { rssi_dbm: -20, snr_db: 25 };
-        request_handle.send_on_signal_report(&ind).unwrap();
-
-        // Future should still be waiting for OnConnectResult event
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-
-        // Send expected ConnectResult response
-        let sme_result = fidl_sme::ConnectResult {
-            code: fidl_ieee80211::StatusCode::Success,
-            is_credential_rejected: false,
-            is_reconnect: false,
-        };
-        request_handle.send_on_connect_result(&sme_result).unwrap();
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(response)) => {
-            assert_eq!(sme_result, response);
-        });
-    }
-
-    #[fuchsia::test]
-    fn wait_for_connect_result_error() {
-        let mut exec = fasync::TestExecutor::new();
-        let (connect_txn, remote) = create_proxy::<fidl_sme::ConnectTransactionMarker>().unwrap();
-        let response_stream = connect_txn.take_event_stream();
-
-        let fut = wait_for_connect_result(response_stream);
-
-        let mut fut = pin!(fut);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-
-        // Drop server end, and verify future completes with error
-        drop(remote);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(ExitReason(_))));
     }
 
     #[fuchsia::test]

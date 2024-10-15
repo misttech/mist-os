@@ -8,11 +8,21 @@ use crate::config_management::network_config::Credential;
 use crate::mode_management::iface_manager_types::*;
 use crate::mode_management::{Defect, IfaceFailure};
 use crate::regulatory_manager::REGION_CODE_LEN;
-use anyhow::Error;
+use crate::telemetry;
+use anyhow::{bail, format_err, Error};
 use async_trait::async_trait;
+use fidl::endpoints::create_proxy;
 use fidl_fuchsia_wlan_sme as fidl_sme;
+use fuchsia_async::TimeoutExt;
 use futures::channel::{mpsc, oneshot};
-use tracing::warn;
+use futures::{TryFutureExt, TryStreamExt};
+use tracing::{info, warn};
+
+// A long amount of time that a scan should be able to finish within. If a scan takes longer than
+// this is indicates something is wrong.
+const SCAN_TIMEOUT: fuchsia_async::Duration = fuchsia_async::Duration::from_seconds(60);
+const CONNECT_TIMEOUT: fuchsia_async::Duration = fuchsia_async::Duration::from_seconds(30);
+const DISCONNECT_TIMEOUT: fuchsia_async::Duration = fuchsia_async::Duration::from_seconds(10);
 
 #[async_trait]
 pub trait IfaceManagerApi {
@@ -200,6 +210,17 @@ impl IfaceManagerApi for IfaceManager {
     }
 }
 
+trait DefectReporter {
+    fn defect_sender(&self) -> mpsc::UnboundedSender<Defect>;
+
+    fn report_defect(&self, defect: Defect) {
+        let defect_sender = self.defect_sender();
+        if let Err(e) = defect_sender.unbounded_send(defect) {
+            warn!("Failed to report defect {:?}: {:?}", defect, e)
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct SmeForScan {
     proxy: fidl_sme::ClientSmeProxy,
@@ -216,11 +237,21 @@ impl SmeForScan {
         SmeForScan { proxy, iface_id, defect_sender }
     }
 
-    pub fn scan(
+    pub async fn scan(
         &self,
         req: &fidl_sme::ScanRequest,
-    ) -> <fidl_sme::ClientSmeProxy as fidl_sme::ClientSmeProxyInterface>::ScanResponseFut {
-        self.proxy.scan(req)
+    ) -> Result<fidl_sme::ClientSmeScanResult, Error> {
+        self.proxy
+            .scan(req)
+            .map_err(|e| format_err!("{:?}", e))
+            .on_timeout(SCAN_TIMEOUT, || {
+                self.report_defect(Defect::Iface(IfaceFailure::Timeout {
+                    iface_id: self.iface_id,
+                    source: telemetry::TimeoutSource::Scan,
+                }));
+                Err(format_err!("Timed out waiting on scan response from SME"))
+            })
+            .await
     }
 
     pub fn log_aborted_scan_defect(&self) {
@@ -236,11 +267,11 @@ impl SmeForScan {
             iface_id: self.iface_id,
         }))
     }
+}
 
-    fn report_defect(&self, defect: Defect) {
-        if let Err(e) = self.defect_sender.unbounded_send(defect) {
-            warn!("Failed to report defect {:?}: {:?}", defect, e)
-        }
+impl DefectReporter for SmeForScan {
+    fn defect_sender(&self) -> mpsc::UnboundedSender<Defect> {
+        self.defect_sender.clone()
     }
 }
 
@@ -260,20 +291,44 @@ impl SmeForClientStateMachine {
         Self { proxy, iface_id, defect_sender }
     }
 
-    pub fn connect(
+    pub async fn connect(
         &self,
         req: &fidl_sme::ConnectRequest,
-        txn: Option<fidl::endpoints::ServerEnd<fidl_sme::ConnectTransactionMarker>>,
-    ) -> Result<(), fidl::Error> {
-        self.proxy.connect(req, txn)
+    ) -> Result<(fidl_sme::ConnectResult, fidl_sme::ConnectTransactionEventStream), anyhow::Error>
+    {
+        let (connect_txn, remote) =
+            create_proxy().map_err(|e| format_err!("Failed to create proxy: {:?}", e))?;
+
+        self.proxy
+            .connect(req, Some(remote))
+            .map_err(|e| format_err!("Failed to send command to wlanstack: {:?}", e))?;
+
+        let mut stream = connect_txn.take_event_stream();
+        let result = wait_for_connect_result(&mut stream)
+            .on_timeout(CONNECT_TIMEOUT, || {
+                self.report_defect(Defect::Iface(IfaceFailure::Timeout {
+                    iface_id: self.iface_id,
+                    source: telemetry::TimeoutSource::Connect,
+                }));
+                Err(format_err!("Timed out waiting for connect result from SME."))
+            })
+            .await?;
+
+        Ok((result, stream))
     }
 
-    pub fn disconnect(
-        &self,
-        reason: fidl_sme::UserDisconnectReason,
-    ) -> <fidl_sme::ClientSmeProxy as fidl_sme::ClientSmeProxyInterface>::DisconnectResponseFut
-    {
-        self.proxy.disconnect(reason)
+    pub async fn disconnect(&self, reason: fidl_sme::UserDisconnectReason) -> Result<(), Error> {
+        self.proxy
+            .disconnect(reason)
+            .map_err(|e| format_err!("Failed to send command to wlanstack: {:?}", e))
+            .on_timeout(DISCONNECT_TIMEOUT, || {
+                self.report_defect(Defect::Iface(IfaceFailure::Timeout {
+                    iface_id: self.iface_id,
+                    source: telemetry::TimeoutSource::Disconnect,
+                }));
+                Err(format_err!("Timed out waiting for disconnect"))
+            })
+            .await
     }
 
     pub fn take_event_stream(&self) -> fidl_sme::ClientSmeEventStream {
@@ -286,6 +341,48 @@ impl SmeForClientStateMachine {
             iface_id: self.iface_id,
             defect_sender: self.defect_sender.clone(),
         }
+    }
+}
+
+impl DefectReporter for SmeForClientStateMachine {
+    fn defect_sender(&self) -> mpsc::UnboundedSender<Defect> {
+        self.defect_sender.clone()
+    }
+}
+
+/// Wait until stream returns an OnConnectResult event or None. Ignore other event types.
+async fn wait_for_connect_result(
+    stream: &mut fidl_sme::ConnectTransactionEventStream,
+) -> Result<fidl_sme::ConnectResult, Error> {
+    loop {
+        let stream_fut = stream.try_next();
+        match stream_fut
+            .await
+            .map_err(|e| format_err!("Failed to receive connect result from sme: {:?}", e))?
+        {
+            Some(fidl_sme::ConnectTransactionEvent::OnConnectResult { result }) => {
+                return Ok(result)
+            }
+            Some(other) => {
+                info!(
+                    "Expected ConnectTransactionEvent::OnConnectResult, got {}. Ignoring.",
+                    connect_txn_event_name(&other)
+                );
+            }
+            None => {
+                bail!("Server closed the ConnectTransaction channel before sending a response");
+            }
+        };
+    }
+}
+
+fn connect_txn_event_name(event: &fidl_sme::ConnectTransactionEvent) -> &'static str {
+    match event {
+        fidl_sme::ConnectTransactionEvent::OnConnectResult { .. } => "OnConnectResult",
+        fidl_sme::ConnectTransactionEvent::OnRoamResult { .. } => "OnRoamResult",
+        fidl_sme::ConnectTransactionEvent::OnDisconnect { .. } => "OnDisconnect",
+        fidl_sme::ConnectTransactionEvent::OnSignalReport { .. } => "OnSignalReport",
+        fidl_sme::ConnectTransactionEvent::OnChannelSwitched { .. } => "OnChannelSwitched",
     }
 }
 
@@ -363,8 +460,9 @@ impl From<client_types::ConnectSelection> for ConnectAttemptRequest {
 mod tests {
     use super::*;
     use crate::access_point::types;
+    use crate::util::testing::{generate_connect_selection, poll_sme_req};
     use anyhow::format_err;
-    use fidl::endpoints::create_proxy;
+    use fidl::endpoints::{create_proxy, RequestStream};
     use futures::future::BoxFuture;
     use futures::task::Poll;
     use futures::StreamExt;
@@ -372,8 +470,12 @@ mod tests {
     use std::pin::pin;
     use test_case::test_case;
     use wlan_common::channel::Cbw;
+    use wlan_common::sequestered::Sequestered;
     use wlan_common::{assert_variant, RadioConfig};
-    use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync};
+    use {
+        fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
+        fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync,
+    };
 
     struct TestValues {
         exec: fasync::TestExecutor,
@@ -1493,5 +1595,375 @@ mod tests {
             defect_receiver.try_next().expect("missing empty scan results error"),
             Some(Defect::Iface(IfaceFailure::EmptyScanResults { iface_id })),
         );
+    }
+
+    #[fuchsia::test]
+    fn sme_for_scan_timeout() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
+
+        // Create the SmeForScan
+        let (proxy, _server) =
+            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
+        let (defect_sender, mut defect_receiver) = mpsc::unbounded();
+        let mut rng = rand::thread_rng();
+        let iface_id = rng.gen::<u16>();
+        let sme = SmeForScan::new(proxy, iface_id, defect_sender);
+
+        // Issue the scan request.
+        let scan_request = fidl_sme::ScanRequest::Active(fidl_sme::ActiveScanRequest {
+            ssids: vec![vec![]],
+            channels: vec![],
+        });
+        let scan_result_fut = sme.scan(&scan_request);
+        let mut scan_result_fut = pin!(scan_result_fut);
+        assert_variant!(exec.run_until_stalled(&mut scan_result_fut), Poll::Pending);
+
+        // Advance the clock so that the timeout expires.
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            SCAN_TIMEOUT + fasync::Duration::from_seconds(1),
+        ));
+
+        // Verify that the future returns and that a defect is logged.
+        assert_variant!(exec.run_until_stalled(&mut scan_result_fut), Poll::Ready(Err(_)));
+        assert_eq!(
+            defect_receiver.try_next().expect("missing empty scan results error"),
+            Some(Defect::Iface(IfaceFailure::Timeout {
+                iface_id,
+                source: telemetry::TimeoutSource::Scan,
+            })),
+        );
+    }
+
+    #[fuchsia::test]
+    fn state_machine_sme_disconnects_successfully() {
+        let mut exec = fasync::TestExecutor::new();
+
+        // Build an SME wrapper.
+        let (proxy, sme_fut) =
+            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
+        let (defect_sender, _defect_receiver) = mpsc::unbounded();
+        let mut rng = rand::thread_rng();
+        let iface_id = rng.gen::<u16>();
+        let sme = SmeForClientStateMachine::new(proxy, iface_id, defect_sender);
+
+        // Request a disconnect and run the future until it stalls.
+        let fut = sme.disconnect(fidl_sme::UserDisconnectReason::FidlStopClientConnectionsRequest);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Ack the disconnect request.
+        let mut sme_fut =
+            pin!(sme_fut.into_stream().expect("failed to convert to stream").into_future());
+        assert_variant!(
+            poll_sme_req(&mut exec, &mut sme_fut),
+            Poll::Ready(fidl_sme::ClientSmeRequest::Disconnect{
+                responder,
+                reason: fidl_sme::UserDisconnectReason::FidlStopClientConnectionsRequest
+            }) => {
+                responder.send().expect("could not send sme response");
+            }
+        );
+
+        // Verify that the disconnect was successful.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
+    }
+
+    #[fuchsia::test]
+    fn state_machine_sme_fails_to_disconnect() {
+        let mut exec = fasync::TestExecutor::new();
+
+        // Build an SME wrapper.
+        let (proxy, _) =
+            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
+        let (defect_sender, _defect_receiver) = mpsc::unbounded();
+        let mut rng = rand::thread_rng();
+        let iface_id = rng.gen::<u16>();
+        let sme = SmeForClientStateMachine::new(proxy, iface_id, defect_sender);
+
+        // Request a disconnect and expect an immediate error return.
+        let fut = sme.disconnect(fidl_sme::UserDisconnectReason::FidlStopClientConnectionsRequest);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+    }
+
+    #[fuchsia::test]
+    fn state_machine_sme_disconnect_timeout() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
+
+        // Build an SME wrapper.
+        let (proxy, _sme_fut) =
+            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
+        let (defect_sender, mut defect_receiver) = mpsc::unbounded();
+        let mut rng = rand::thread_rng();
+        let iface_id = rng.gen::<u16>();
+        let sme = SmeForClientStateMachine::new(proxy, iface_id, defect_sender);
+
+        // Request a disconnect and run the future until it stalls.
+        let fut = sme.disconnect(fidl_sme::UserDisconnectReason::FidlStopClientConnectionsRequest);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Advance the clock beyond the timeout.
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            DISCONNECT_TIMEOUT + fasync::Duration::from_seconds(1),
+        ));
+
+        // Verify that the future returns and that a defect is logged.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+        assert_eq!(
+            defect_receiver.try_next().expect("missing empty scan results error"),
+            Some(Defect::Iface(IfaceFailure::Timeout {
+                iface_id,
+                source: telemetry::TimeoutSource::Disconnect,
+            })),
+        );
+    }
+
+    fn generate_connect_request() -> fidl_sme::ConnectRequest {
+        let connection_selection = generate_connect_selection();
+        fidl_sme::ConnectRequest {
+            ssid: connection_selection.target.network.ssid.to_vec(),
+            bss_description: Sequestered::release(connection_selection.target.bss.bss_description),
+            multiple_bss_candidates: connection_selection.target.network_has_multiple_bss,
+            authentication: connection_selection.target.authenticator.clone().into(),
+            deprecated_scan_type: fidl_fuchsia_wlan_common::ScanType::Active,
+        }
+    }
+
+    #[fuchsia::test]
+    fn state_machine_sme_connects_successfully() {
+        let mut exec = fasync::TestExecutor::new();
+
+        // Build an SME wrapper.
+        let (proxy, sme_fut) =
+            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
+        let (defect_sender, _defect_receiver) = mpsc::unbounded();
+        let mut rng = rand::thread_rng();
+        let iface_id = rng.gen::<u16>();
+        let sme = SmeForClientStateMachine::new(proxy, iface_id, defect_sender);
+
+        // Request a connection.
+        let connect_request = generate_connect_request();
+        let fut = sme.connect(&connect_request);
+        let mut fut = pin!(fut);
+        match exec.run_until_stalled(&mut fut) {
+            Poll::Pending => {}
+            _ => panic!("connect request should be pending."),
+        }
+
+        // Ack the connect request.
+        let mut sme_fut =
+            pin!(sme_fut.into_stream().expect("failed to convert to stream").into_future());
+        assert_variant!(
+            poll_sme_req(&mut exec, &mut sme_fut),
+            Poll::Ready(fidl_sme::ClientSmeRequest::Connect{
+                txn,
+                ..
+            }) => {
+                let (_stream, ctrl) = txn.expect("connect txn unused")
+                    .into_stream_and_control_handle().expect("error accessing control handle");
+                ctrl
+                    .send_on_connect_result(&fidl_sme::ConnectResult {
+                        code: fidl_ieee80211::StatusCode::Success,
+                        is_credential_rejected: false,
+                        is_reconnect: false,
+                    })
+                    .expect("failed to send connection completion");
+            }
+        );
+
+        // Expect a successful result.
+        match exec.run_until_stalled(&mut fut) {
+            Poll::Ready(Ok((result, txn))) => {
+                assert_eq!(
+                    result,
+                    fidl_sme::ConnectResult {
+                        code: fidl_ieee80211::StatusCode::Success,
+                        is_credential_rejected: false,
+                        is_reconnect: false,
+                    }
+                );
+                // This is required or else the test panics on exit with
+                // "receivers must not outlive their executor".
+                drop(txn)
+            }
+            Poll::Ready(Err(_)) => panic!("connection should be successful"),
+            Poll::Pending => panic!("connect request should not be pending."),
+        }
+    }
+
+    #[fuchsia::test]
+    fn state_machine_sme_connection_failure() {
+        let mut exec = fasync::TestExecutor::new();
+
+        // Build an SME wrapper.
+        let (proxy, sme_fut) =
+            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
+        let (defect_sender, _defect_receiver) = mpsc::unbounded();
+        let mut rng = rand::thread_rng();
+        let iface_id = rng.gen::<u16>();
+        let sme = SmeForClientStateMachine::new(proxy, iface_id, defect_sender);
+
+        // Request a connection.
+        let connect_request = generate_connect_request();
+        let fut = sme.connect(&connect_request);
+        let mut fut = pin!(fut);
+        match exec.run_until_stalled(&mut fut) {
+            Poll::Pending => {}
+            _ => panic!("connect request should be pending."),
+        }
+
+        // Ack the connect request.
+        let mut sme_fut =
+            pin!(sme_fut.into_stream().expect("failed to convert to stream").into_future());
+        assert_variant!(
+            poll_sme_req(&mut exec, &mut sme_fut),
+            Poll::Ready(fidl_sme::ClientSmeRequest::Connect{
+                txn,
+                ..
+            }) => {
+                let (_stream, ctrl) = txn.expect("connect txn unused")
+                    .into_stream_and_control_handle().expect("error accessing control handle");
+                ctrl
+                    .send_on_connect_result(&fidl_sme::ConnectResult {
+                        code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+                        is_credential_rejected: false,
+                        is_reconnect: false,
+                    })
+                    .expect("failed to send connection completion");
+            }
+        );
+
+        // Expect a successful result.
+        match exec.run_until_stalled(&mut fut) {
+            Poll::Ready(Ok((result, txn))) => {
+                assert_eq!(
+                    result,
+                    fidl_sme::ConnectResult {
+                        code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+                        is_credential_rejected: false,
+                        is_reconnect: false,
+                    }
+                );
+                // This is required or else the test panics on exit with
+                // "receivers must not outlive their executor".
+                drop(txn)
+            }
+            Poll::Ready(Err(_)) => panic!("connection should be successful"),
+            Poll::Pending => panic!("connect request should not be pending."),
+        }
+    }
+
+    #[fuchsia::test]
+    fn state_machine_sme_connect_request_fails() {
+        let mut exec = fasync::TestExecutor::new();
+
+        // Build an SME wrapper.
+        let (proxy, _) =
+            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
+        let (defect_sender, _defect_receiver) = mpsc::unbounded();
+        let mut rng = rand::thread_rng();
+        let iface_id = rng.gen::<u16>();
+        let sme = SmeForClientStateMachine::new(proxy, iface_id, defect_sender);
+
+        // Request a disconnect and expect an immediate error return.
+        let connect_request = generate_connect_request();
+        let fut = sme.connect(&connect_request);
+        let mut fut = pin!(fut);
+        match exec.run_until_stalled(&mut fut) {
+            Poll::Ready(Err(_)) => {}
+            _ => panic!("connect request should have failed."),
+        }
+    }
+
+    #[fuchsia::test]
+    fn state_machine_sme_connect_timeout() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
+
+        // Build an SME wrapper.
+        let (proxy, _sme_fut) =
+            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
+        let (defect_sender, mut defect_receiver) = mpsc::unbounded();
+        let mut rng = rand::thread_rng();
+        let iface_id = rng.gen::<u16>();
+        let sme = SmeForClientStateMachine::new(proxy, iface_id, defect_sender);
+
+        // Request a connection and run the future until it stalls.
+        let connect_request = generate_connect_request();
+        let fut = sme.connect(&connect_request);
+        let mut fut = pin!(fut);
+        match exec.run_until_stalled(&mut fut) {
+            Poll::Pending => {}
+            _ => panic!("connect future completed unexpectedly"),
+        }
+
+        // Advance the clock beyond the timeout.
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            CONNECT_TIMEOUT + fasync::Duration::from_seconds(1),
+        ));
+
+        // Verify that the future returns and that a defect is logged.
+        match exec.run_until_stalled(&mut fut) {
+            Poll::Ready(Err(_)) => {}
+            Poll::Ready(Ok(_)) => panic!("connect future completed successfully"),
+            Poll::Pending => panic!("connect future did not complete"),
+        }
+        assert_eq!(
+            defect_receiver.try_next().expect("missing connection timeout"),
+            Some(Defect::Iface(IfaceFailure::Timeout {
+                iface_id,
+                source: telemetry::TimeoutSource::Connect,
+            })),
+        );
+    }
+
+    #[fuchsia::test]
+    fn wait_for_connect_result_error() {
+        let mut exec = fasync::TestExecutor::new();
+        let (connect_txn, remote) = create_proxy::<fidl_sme::ConnectTransactionMarker>().unwrap();
+        let mut response_stream = connect_txn.take_event_stream();
+
+        let fut = wait_for_connect_result(&mut response_stream);
+
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Drop server end, and verify future completes with error
+        drop(remote);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Err(_)));
+    }
+
+    #[fuchsia::test]
+    fn wait_for_connect_result_ignores_other_events() {
+        let mut exec = fasync::TestExecutor::new();
+        let (connect_txn, remote) = create_proxy::<fidl_sme::ConnectTransactionMarker>().unwrap();
+        let request_handle = remote.into_stream().unwrap().control_handle();
+        let mut response_stream = connect_txn.take_event_stream();
+
+        let fut = wait_for_connect_result(&mut response_stream);
+
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Send some unexpected response
+        let ind = fidl_internal::SignalReportIndication { rssi_dbm: -20, snr_db: 25 };
+        request_handle.send_on_signal_report(&ind).unwrap();
+
+        // Future should still be waiting for OnConnectResult event
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Send expected ConnectResult response
+        let sme_result = fidl_sme::ConnectResult {
+            code: fidl_ieee80211::StatusCode::Success,
+            is_credential_rejected: false,
+            is_reconnect: false,
+        };
+        request_handle.send_on_connect_result(&sme_result).unwrap();
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(response)) => {
+            assert_eq!(sme_result, response);
+        });
     }
 }

@@ -37,9 +37,6 @@ pub use fidl_conversion::{
 const SCAN_RETRY_DELAY_MS: i64 = 100;
 // Max time allowed for consumers of scan results to retrieve results
 const SCAN_CONSUMER_MAX_SECONDS_ALLOWED: i64 = 5;
-// A long amount of time that a scan should be able to finish within. If a scan takes longer than
-// this is indicates something is wrong.
-const SCAN_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(60);
 /// Capacity of "first come, first serve" slots available to scan requesters
 pub const SCAN_REQUEST_BUFFER_SIZE: usize = 100;
 
@@ -258,13 +255,7 @@ async fn perform_scan(
                 return (scan_request, Err(types::ScanError::GeneralError));
             }
         };
-        // TODO(https://fxbug.dev/42062802) Log metrics when this times out so we are aware of the issue.
-        let scan_results = sme_scan(&sme_proxy, &scan_request, &mut scan_defects)
-            .on_timeout(SCAN_TIMEOUT, || {
-                error!("Timed out waiting on scan response from SME");
-                Err(fidl_policy::ScanErrorCode::GeneralError)
-            })
-            .await;
+        let scan_results = sme_scan(&sme_proxy, &scan_request, &mut scan_defects).await;
         report_scan_defects_to_sme(&sme_proxy, &scan_results, &scan_request).await;
 
         match scan_results {
