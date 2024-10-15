@@ -13,10 +13,13 @@ sdk_source_set("cpp") {
   sources = [
     "namespace.cc",
     "namespace.h",
+    "service_validator.cc",
+    "service_validator.h",
   ]
 
   public_deps = [
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_cpp",
+    "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fidl_driver:fidl_driver_transport",
   ]

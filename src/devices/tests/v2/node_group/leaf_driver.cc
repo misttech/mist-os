@@ -52,7 +52,7 @@ class LeafDriver : public fdf::DriverBase {
   zx::result<uint32_t> GetNumber(std::string_view instance) {
     auto device = incoming()->Connect<ft::Service::Device>(instance);
     if (device.status_value() != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to connect to %s: %s", instance.data(), device.status_string());
+      FDF_LOG(WARNING, "Failed to connect to %s: %s", instance.data(), device.status_string());
       return device.take_error();
     }
 
