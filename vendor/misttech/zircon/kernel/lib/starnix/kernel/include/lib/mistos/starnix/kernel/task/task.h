@@ -3,8 +3,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_TASK_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_TASK_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_TASK_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_TASK_H_
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
@@ -208,30 +208,30 @@ class ThreadGroup;
 /// executing.
 
 class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
- public:
+ private:
   // A unique identifier for this task.
   //
   // This value can be read in userspace using `gettid(2)`. In general, this value
   // is different from the value return by `getpid(2)`, which returns the `id` of the leader
   // of the `thread_group`.
-  pid_t id;
+  pid_t id_;
 
   // The thread group to which this task belongs.
   //
   // The group of tasks in a thread group roughly corresponds to the userspace notion of a
   // process.
-  fbl::RefPtr<ThreadGroup> thread_group;
+  fbl::RefPtr<ThreadGroup> thread_group_;
 
   // A handle to the underlying Zircon thread object.
   //
   // Some tasks lack an underlying Zircon thread. These tasks are used internally by the
   // Starnix kernel to track background work, typically on a `kthread`.
-  mutable starnix_sync::RwLock<ktl::optional<fbl::RefPtr<ThreadDispatcher>>> thread;
+  mutable starnix_sync::RwLock<ktl::optional<fbl::RefPtr<ThreadDispatcher>>> thread_;
 
   // The file descriptor table for this task.
   //
   // This table can be share by many tasks.
-  FdTable files;
+  FdTable files_;
 
  private:
   // The memory manager for this task.
@@ -325,7 +325,7 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
 
   pid_t get_pid() const;
 
-  pid_t get_tid() const;
+  pid_t get_tid() const { return id(); }
 
   bool is_leader() const { return get_pid() == get_tid(); }
 
@@ -355,6 +355,19 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   fit::result<Errno, size_t> zero(UserAddress addr, size_t length) const final;
 
   // C++
+  pid_t id() const { return id_; }
+
+  const fbl::RefPtr<ThreadGroup>& thread_group() const { return thread_group_; }
+
+  const starnix_sync::RwLock<ktl::optional<fbl::RefPtr<ThreadDispatcher>>>& thread() const {
+    return thread_;
+  }
+  starnix_sync::RwLock<ktl::optional<fbl::RefPtr<ThreadDispatcher>>>& thread() { return thread_; }
+
+  const FdTable& files() const { return files_; }
+
+  FdTable& files() { return files_; }
+
   ~Task() override;
 
  private:
@@ -411,4 +424,4 @@ class TaskContainer : public fbl::WAVLTreeContainable<ktl::unique_ptr<TaskContai
 
 }  // namespace starnix
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_TASK_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_TASK_H_
