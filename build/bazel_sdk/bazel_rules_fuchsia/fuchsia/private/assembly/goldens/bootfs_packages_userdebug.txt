@@ -52,6 +52,7 @@ registers
 rndis-function
 role_manager
 ?root
+?sdhci
 sdmmc
 serial
 shutdown-shim

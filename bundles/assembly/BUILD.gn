@@ -490,6 +490,16 @@ assembly_input_bundle("fake_battery_driver") {
   ]
 }
 
+# AIB for the sdhci driver
+assembly_input_bundle("sdhci_driver") {
+  boot_driver_packages = [
+    {
+      package_target = "//src/devices/block/drivers/sdhci:package"
+      driver_components = [ "meta/sdhci.cm" ]
+    },
+  ]
+}
+
 # Trusted execution environment.
 assembly_input_bundle("trusted_execution_environment") {
   bootfs_packages = [
