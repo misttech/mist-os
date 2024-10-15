@@ -78,7 +78,7 @@ void execute_task(TaskBuilder task_builder, PreRunFn&& pre_run,
            pre_run_result.error_value().error_code());
   } else {
     auto init_thread =
-        create_thread(current_task->thread_group->process.dispatcher(), current_task->command());
+        create_thread(current_task->thread_group->process().dispatcher(), current_task->command());
     if (init_thread.is_ok()) {
       *ref_task->thread.Write() = ktl::move(init_thread.value().release());
       // Spawn the process' thread.
