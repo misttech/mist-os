@@ -14,6 +14,7 @@
 #include "gtest/gtest_prod.h"
 #include "src/developer/debug/debug_agent/breakpoint.h"
 #include "src/developer/debug/debug_agent/debug_agent_observer.h"
+#include "src/developer/debug/debug_agent/debugged_job.h"
 #include "src/developer/debug/debug_agent/debugged_process.h"
 #include "src/developer/debug/debug_agent/filter.h"
 #include "src/developer/debug/debug_agent/job_exception_observer.h"
@@ -34,10 +35,7 @@ namespace debug_agent {
 class SystemInterface;
 
 // Main state and control for the debug agent.
-class DebugAgent : public RemoteAPI,
-                   public Breakpoint::ProcessDelegate,
-                   public debug::LogBackend,
-                   public JobExceptionObserver {
+class DebugAgent : public RemoteAPI, public Breakpoint::ProcessDelegate, public debug::LogBackend {
  public:
   // A MessageLoopZircon should already be set up on the current thread.
   //
@@ -65,11 +63,11 @@ class DebugAgent : public RemoteAPI,
   Breakpoint* GetBreakpoint(uint32_t breakpoint_id);
   void RemoveBreakpoint(uint32_t breakpoint_id);
 
-  void OnProcessStarting(std::unique_ptr<ProcessHandle> process) override;
-  void OnProcessNameChanged(std::unique_ptr<ProcessHandle> process) override;
-  void OnUnhandledException(std::unique_ptr<ExceptionHandle> process) override {}
-
-  void OnProcessChanged(bool starting, std::unique_ptr<ProcessHandle> process);
+  enum class ProcessChangedHow {
+    kStarting,
+    kNameChanged,
+  };
+  void OnProcessChanged(ProcessChangedHow how, std::unique_ptr<ProcessHandle> process);
 
   // Notified by ComponentManager.
   void OnComponentDiscovered(const std::string& moniker, const std::string& url);
@@ -79,6 +77,7 @@ class DebugAgent : public RemoteAPI,
 
   void InjectProcessForTest(std::unique_ptr<DebuggedProcess> process);
 
+  DebuggedJob* GetDebuggedJob(zx_koid_t koid);
   DebuggedProcess* GetDebuggedProcess(zx_koid_t koid);
   DebuggedThread* GetDebuggedThread(const debug_ipc::ProcessThreadId& id);
 
@@ -150,6 +149,7 @@ class DebugAgent : public RemoteAPI,
   // Process/Thread Management -----------------------------------------------------------------
 
   debug::Status AddDebuggedProcess(DebuggedProcessCreateInfo&&, DebuggedProcess** added);
+  debug::Status AddDebuggedJob(DebuggedJobCreateInfo&& create_info, DebuggedJob** added);
 
   // Attempts to attach to the given process and sends a AttachReply message
   // to the client with the result.
@@ -157,6 +157,9 @@ class DebugAgent : public RemoteAPI,
   debug::Status AttachToExistingProcess(zx_koid_t process_koid,
                                         const debug_ipc::AttachConfig& config,
                                         debug_ipc::AttachReply* reply);
+  debug::Status AttachToRootJob();
+  debug::Status AttachToExistingJob(zx_koid_t job_koid, const debug_ipc::AttachConfig& config,
+                                    debug_ipc::AttachReply* reply);
 
   void LaunchProcess(const debug_ipc::RunBinaryRequest&, debug_ipc::RunBinaryReply*);
 
@@ -180,8 +183,9 @@ class DebugAgent : public RemoteAPI,
   fxl::ObserverList<DebugAgentObserver> observers_;
   uint32_t ipc_version_ = 0;
 
-  std::unique_ptr<JobHandle> root_job_;
+  DebuggedJob* root_job_;
   std::map<zx_koid_t, std::unique_ptr<DebuggedProcess>> procs_;
+  std::map<zx_koid_t, std::unique_ptr<DebuggedJob>> jobs_;
 
   // Processes obtained through limbo do not have the ZX_RIGHT_DESTROY right, so cannot be killed
   // by the debugger. Instead what we do is detach from them and mark those as "waiting to be

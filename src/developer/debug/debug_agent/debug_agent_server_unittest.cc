@@ -163,7 +163,7 @@ TEST_F(DebugAgentServerTest, AddNewFilter) {
   auto handle = std::make_unique<MockProcessHandle>(kProcess2Koid);
   // Set the job koid so that we can look up the corresponding component information.
   handle->set_job_koid(kJob4Koid);
-  agent->OnProcessStarting(std::move(handle));
+  agent->OnProcessChanged(DebugAgent::ProcessChangedHow::kStarting, std::move(handle));
 
   status_reply = GetAgentStatus();
 
@@ -237,7 +237,7 @@ TEST_F(DebugAgentServerTest, GetMatchingProcesses) {
   auto handle = std::make_unique<MockProcessHandle>(kProcessKoid);
   // Set the job koid so that we can look up the corresponding component information.
   handle->set_job_koid(kJob4Koid);
-  agent->OnProcessStarting(std::move(handle));
+  agent->OnProcessChanged(DebugAgent::ProcessChangedHow::kStarting, std::move(handle));
 
   // We are now attached to something. Omitting the filter should give us back a process.
   result = GetMatchingProcesses(std::nullopt);

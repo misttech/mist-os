@@ -18,6 +18,7 @@
 #include "src/developer/debug/debug_agent/arch.h"
 #include "src/developer/debug/debug_agent/binary_launcher.h"
 #include "src/developer/debug/debug_agent/component_manager.h"
+#include "src/developer/debug/debug_agent/debugged_job.h"
 #include "src/developer/debug/debug_agent/debugged_process.h"
 #include "src/developer/debug/debug_agent/debugged_thread.h"
 #include "src/developer/debug/debug_agent/exception_handle.h"
@@ -76,8 +77,7 @@ DebugAgent::DebugAgent(std::unique_ptr<SystemInterface> system_interface)
 
 #ifdef __Fuchsia__
   // Watch the root job.
-  root_job_ = system_interface_->GetRootJob();
-  auto status = root_job_->WatchJobExceptions(this, JobExceptionChannelType::kDebugger);
+  auto status = AttachToRootJob();
   if (status.has_error()) {
     LOGS(Error) << "Failed to watch the root job: " << status.message();
   }
@@ -127,12 +127,13 @@ void DebugAgent::ClearState() {
   // Reset debugging State
   debug::LogBackend::Unset();
 
-  // Stop watching for process starting.
-  root_job_.reset();
+  // Detach from all jobs first so we stop getting process starting notifications.
+  jobs_.clear();
+
   // Removes breakpoints before we detach from the processes, although it should also be safe
   // to reverse the order.
   breakpoints_.clear();
-  // Detach us from the processes.
+  // Detach us from all processes.
   procs_.clear();
 }
 
@@ -529,7 +530,8 @@ void DebugAgent::OnUpdateFilter(const debug_ipc::UpdateFilterRequest& request,
   filters_.reserve(request.filters.size());
   for (const auto& filter : request.filters) {
     filters_.emplace_back(filter);
-    auto matched_processes = filters_.back().ApplyToJob(*root_job_, *system_interface_);
+    auto matched_processes =
+        filters_.back().ApplyToJob(root_job_->job_handle(), *system_interface_);
     if (!matched_processes.empty()) {
       reply->matched_processes_for_filter.emplace_back(filter.id, std::move(matched_processes));
     }
@@ -580,6 +582,15 @@ void DebugAgent::OnSaveMinidump(const debug_ipc::SaveMinidumpRequest& request,
   proc->OnSaveMinidump(request, reply);
 }
 
+DebuggedJob* DebugAgent::GetDebuggedJob(zx_koid_t koid) {
+  auto found = jobs_.find(koid);
+  if (found == jobs_.end()) {
+    return nullptr;
+  }
+
+  return found->second.get();
+}
+
 DebuggedProcess* DebugAgent::GetDebuggedProcess(zx_koid_t koid) {
   auto found = procs_.find(koid);
   if (found == procs_.end())
@@ -614,6 +625,33 @@ std::vector<debug_ipc::ProcessThreadId> DebugAgent::ClientSuspendAll(zx_koid_t e
   }
 
   return affected;
+}
+
+debug::Status DebugAgent::AddDebuggedJob(DebuggedJobCreateInfo&& create_info, DebuggedJob** added) {
+  *added = nullptr;
+
+  // This function should never be called with a null handle. At worst, something in the system has
+  // deleted this job out from under us, causing all syscalls using this handle to fail, but the
+  // object should still be valid.
+  FX_DCHECK(create_info.handle);
+
+  zx_koid_t job_koid = create_info.handle->GetKoid();
+  if (jobs_.find(job_koid) != jobs_.end()) {
+    return debug::Status(std::format("Already attached to job {}", job_koid));
+  }
+
+  auto unique = std::make_unique<DebuggedJob>(this);
+  *added = unique.get();
+
+  jobs_[job_koid] = std::move(unique);
+
+  if (auto status = (*added)->Init(std::move(create_info)); status.has_error()) {
+    jobs_.erase(job_koid);
+    *added = nullptr;
+    return status;
+  }
+
+  return debug::Status();
 }
 
 debug::Status DebugAgent::AddDebuggedProcess(DebuggedProcessCreateInfo&& create_info,
@@ -768,6 +806,22 @@ debug::Status DebugAgent::AttachToExistingProcess(zx_koid_t process_koid,
   return debug::Status();
 }
 
+debug::Status DebugAgent::AttachToRootJob() {
+  DebuggedJobCreateInfo info(system_interface().GetRootJob());
+  // Only ever attach to the root job's debugger channel.
+  info.type = JobExceptionChannelType::kDebugger;
+
+  // The root job is otherwise treated just like any other job.
+  auto status = AddDebuggedJob(std::move(info), &root_job_);
+
+  // This function should only be called on Fuchsia, and we should always be able to get the
+  // root job.
+  FX_DCHECK(status.ok());
+  FX_DCHECK(root_job_ != nullptr);
+
+  return status;
+}
+
 void DebugAgent::LaunchProcess(const debug_ipc::RunBinaryRequest& request,
                                debug_ipc::RunBinaryReply* reply) {
   FX_DCHECK(!request.argv.empty());
@@ -799,15 +853,8 @@ void DebugAgent::LaunchProcess(const debug_ipc::RunBinaryRequest& request,
   reply->process_name = new_process->process_handle().GetName();
 }
 
-void DebugAgent::OnProcessStarting(std::unique_ptr<ProcessHandle> process_handle) {
-  OnProcessChanged(true, std::move(process_handle));
-}
-
-void DebugAgent::OnProcessNameChanged(std::unique_ptr<ProcessHandle> process_handle) {
-  OnProcessChanged(false, std::move(process_handle));
-}
-
-void DebugAgent::OnProcessChanged(bool starting, std::unique_ptr<ProcessHandle> process_handle) {
+void DebugAgent::OnProcessChanged(ProcessChangedHow how,
+                                  std::unique_ptr<ProcessHandle> process_handle) {
   if (procs_.find(process_handle->GetKoid()) != procs_.end()) {
     return;  // The process might have been attached in |LaunchProcess|.
   }
@@ -817,8 +864,9 @@ void DebugAgent::OnProcessChanged(bool starting, std::unique_ptr<ProcessHandle> 
   std::string process_name_override;
   const debug_ipc::Filter* matched_filter = nullptr;
 
-  if (starting && system_interface_->GetComponentManager().OnProcessStart(*process_handle, &stdio,
-                                                                          &process_name_override)) {
+  if (how == ProcessChangedHow::kStarting &&
+      system_interface_->GetComponentManager().OnProcessStart(*process_handle, &stdio,
+                                                              &process_name_override)) {
     type = debug_ipc::NotifyProcessStarting::Type::kLaunch;
   } else if (std::any_of(filters_.begin(), filters_.end(), [&](const Filter& filter) {
                if (filter.MatchesProcess(*process_handle, *system_interface_)) {

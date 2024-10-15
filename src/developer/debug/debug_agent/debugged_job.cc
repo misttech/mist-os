@@ -31,13 +31,14 @@ debug::Status DebuggedJob::Init(DebuggedJobCreateInfo&& info) {
 void DebuggedJob::OnProcessStarting(std::unique_ptr<ProcessHandle> process) {
   FX_DCHECK(debug_agent_);
 
-  debug_agent_->OnProcessChanged(true, std::move(process));
+  debug_agent_->OnProcessChanged(DebugAgent::ProcessChangedHow::kStarting, std::move(process));
 }
 
 void DebuggedJob::OnProcessNameChanged(std::unique_ptr<ProcessHandle> process_handle) {
   FX_DCHECK(debug_agent_);
 
-  debug_agent_->OnProcessChanged(false, std::move(process_handle));
+  debug_agent_->OnProcessChanged(DebugAgent::ProcessChangedHow::kNameChanged,
+                                 std::move(process_handle));
 }
 
 void DebuggedJob::OnUnhandledException(std::unique_ptr<ExceptionHandle> exception_handle) {
