@@ -89,6 +89,7 @@ TEST_F(PowerSystemIntegration, StorageSuspendResumeTest) {
   state.execution_state_level(fuchsia_power_system::ExecutionStateLevel::kInactive);
   state.application_activity_level(fuchsia_power_system::ApplicationActivityLevel::kInactive);
   ASSERT_EQ(ChangeSagState(state), ZX_OK);
+  ASSERT_EQ(AwaitSystemSuspend(), ZX_OK);
 
   // Verify suspend state using inspect data:
   // - SAG: exec state level inactive
@@ -107,6 +108,7 @@ TEST_F(PowerSystemIntegration, StorageSuspendResumeTest) {
                    core_sdmmc_suspended, true);
 
   // Emulate system resume.
+  ASSERT_EQ(StartSystemResume(), ZX_OK);
   state.execution_state_level(fuchsia_power_system::ExecutionStateLevel::kActive);
   state.application_activity_level(fuchsia_power_system::ApplicationActivityLevel::kActive);
   ASSERT_EQ(ChangeSagState(state), ZX_OK);

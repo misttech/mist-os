@@ -21,7 +21,6 @@
             protocol: [
                 "fuchsia.power.suspend.Stats",
                 "fuchsia.power.system.ActivityGovernor",
-                "fuchsia.power.system.CpuElementManager",
                 "test.sagcontrol.State",
             ],
         },
@@ -68,10 +67,13 @@
             protocol: [
                 "fuchsia.power.suspend.Stats",
                 "fuchsia.power.system.ActivityGovernor",
-                "fuchsia.power.system.CpuElementManager",
                 "test.sagcontrol.State",
             ],
             from: "self",
+        },
+        {
+            protocol: [ "fuchsia.power.system.CpuElementManager" ],
+            from: "#system-activity-governor",
         },
     ],
 }

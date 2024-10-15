@@ -25,8 +25,7 @@ bootfs_test("bootfs_test") {
   name = "power-system-integration-storage-test"
   deps = [ ":test" ]
 
-  # TODO(b/368636358): Re-add vim3_env once test is updated to use revised power integration.
-  environments = []
+  environments = [ vim3_env ]
   isolated = true
   product_bundle = "power_testing_storage.power_testing_storage_vim3"
 }

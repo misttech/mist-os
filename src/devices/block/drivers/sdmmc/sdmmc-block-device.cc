@@ -449,8 +449,6 @@ void SdmmcBlockDevice::WatchHardwareRequiredLevel() {
             break;
           }
           case kPowerLevelOff: {
-// TODO(b/368636358): Re-enable power suspension.
-#if 0
             fbl::AutoLock lock(&worker_lock_);
             // Actually lower the hardware's power level.
             zx_status_t status = SuspendPower();
@@ -459,7 +457,6 @@ void SdmmcBlockDevice::WatchHardwareRequiredLevel() {
                        zx_status_get_string(status));
               return;
             }
-#endif
             // Communicate to Power Broker that the hardware power level has been lowered.
             UpdatePowerLevel(hardware_power_current_level_client_, kPowerLevelOff);
             break;

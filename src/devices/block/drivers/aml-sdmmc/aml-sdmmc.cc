@@ -485,8 +485,6 @@ void AmlSdmmc::WatchHardwareRequiredLevel() {
             break;
           }
           case kPowerLevelOff: {
-// TODO(b/368636358): Re-enable power suspension.
-#if 0
             // Complete any ongoing tuning first.
             std::lock_guard<std::mutex> tuning_lock(tuning_lock_);
             std::lock_guard<std::mutex> lock(lock_);
@@ -497,7 +495,6 @@ void AmlSdmmc::WatchHardwareRequiredLevel() {
                        zx_status_get_string(status));
               return;
             }
-#endif
             // Communicate to Power Broker that the hardware power level has been lowered.
             UpdatePowerLevel(hardware_power_current_level_client_, kPowerLevelOff);
             break;

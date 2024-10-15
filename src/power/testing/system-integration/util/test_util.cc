@@ -80,6 +80,9 @@ zx_status_t TestLoopBase::AwaitSystemSuspend() {
 zx_status_t TestLoopBase::StartSystemResume() {
   std::cout << "Starting system resume" << std::endl;
   test_suspendcontrol::SuspendResult suspend_result;
+  // Assign suspend results to provide the appearance of a normal return from suspension.
+  suspend_result.suspend_duration(2);
+  suspend_result.suspend_overhead(1);
   auto request = test_suspendcontrol::DeviceResumeRequest::WithResult(suspend_result);
   auto resume_result = fidl::Call(suspend_device_client_end_)->Resume(request);
   if (!resume_result.is_ok()) {

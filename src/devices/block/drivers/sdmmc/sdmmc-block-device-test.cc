@@ -2197,8 +2197,7 @@ TEST_P(SdmmcBlockDeviceTest, InspectInvalidLifetime) {
   EXPECT_EQ(max_lifetime->value(), 6);  // Only the valid value should be used.
 }
 
-// TODO(b/368636358): Re-enable power suspension.
-TEST_P(SdmmcBlockDeviceTest, DISABLED_PowerSuspendResume) {
+TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
   libsync::Completion sleep_complete;
   libsync::Completion awake_complete;
   sdmmc_.set_command_callback(MMC_SLEEP_AWAKE,
