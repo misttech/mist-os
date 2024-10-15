@@ -334,7 +334,7 @@ fit::result<Errno, pid_t> sys_getsid(const CurrentTask& current_task, pid_t pid)
     return result.take_error();
   auto target_task = result.value();
   // security::check_task_getsid(current_task, &target_task)?;
-  auto sid = target_task->thread_group()->Read()->process_group->session->leader;
+  auto sid = target_task->thread_group()->Read()->process_group()->session()->leader();
   return fit::ok(sid);
 }
 
@@ -346,7 +346,7 @@ fit::result<Errno, pid_t> sys_getpgid(const CurrentTask& current_task, pid_t pid
 
   auto task = result.value();
   // selinux_hooks::check_getpgid_access(current_task, &task)?;
-  auto pgid = task->thread_group()->Read()->process_group->leader;
+  auto pgid = task->thread_group()->Read()->process_group()->leader();
   return fit::ok(pgid);
 }
 

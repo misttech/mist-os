@@ -119,7 +119,7 @@ fit::result<Errno, pid_t> sys_wait4(const CurrentTask& current_task, pid_t raw_s
   auto selector = [&]() -> fit::result<Errno, ProcessSelector> {
     if (raw_selector == 0) {
       return fit::ok(ProcessSelector::ProcessGroup(
-          current_task->thread_group()->Read()->process_group->leader));
+          current_task->thread_group()->Read()->process_group()->leader()));
     } else if (raw_selector == -1) {
       return fit::ok(ProcessSelector::AnyProcess());
     } else if (raw_selector > 0) {
