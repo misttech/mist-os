@@ -9,6 +9,7 @@
 #include <lib/fdio/directory.h>
 #include <lib/trace/event.h>
 #include <vk_dispatch_table_helper.h>
+#include <zircon/availability.h>
 
 #include <string>
 
@@ -167,9 +168,11 @@ bool ImagePipeSurfaceAsync::CreateImage(VkDevice device, VkLayerDispatchTable* p
     if (flatland_allocator_.is_bound()) {
       fuchsia::ui::composition::RegisterBufferCollectionArgs args = {};
       args.set_export_token(std::move(export_token));
-      args.set_buffer_collection_token(
-          fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
-              scenic_token.TakeChannel()));
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+      args.set_buffer_collection_token2(std::move(scenic_token));
+#else
+      args.set_buffer_collection_token(fuchsia::sysmem::BufferCollectionTokenHandle(std::move(scenic_token).TakeChannel()));
+#endif
       args.set_usage(fuchsia::ui::composition::RegisterBufferCollectionUsage::DEFAULT);
       flatland_allocator_->RegisterBufferCollection(std::move(args), [this](auto result) {
         if (result.is_err()) {
