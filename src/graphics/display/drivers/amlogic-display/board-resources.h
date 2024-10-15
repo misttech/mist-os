@@ -36,27 +36,47 @@ struct BoardInfo {
 zx::result<BoardInfo> GetBoardInfo(
     fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device);
 
-// The resource ordering in the board driver's `display_mmios` table.
-enum class MmioResourceIndex : uint8_t {
-  kVpu = 0,                // VPU (Video Processing Unit)
-  kDsiTop = 1,             // TOP_MIPI_DSI (DSI "top" host controller integration)
-  kDsiPhy = 2,             // DSI_PHY
-  kDsiHostController = 3,  // DesignWare Cores MIPI DSI Host Controller IP block
-  kHhi = 4,                // HIU (Host Interface Unit) / HHI
-  kAonRti = 5,             // RTI / AO_RTI / AOBUS_RTI
-  kEeReset = 6,            // RESET
-  kGpioMux = 7,            // PERIPHS_REGS (GPIO Multiplexing)
-  kHdmiTxController = 8,   // HDMITX (HDMI Transmitter Controller IP)
-  kHdmiTxTop = 9,          // HDMITX (HDMI Transmitter Top-Level)
-};
+// The MMIO region names are defined in the board driver's `display_mmios`
+// table or in the board devicetree's display node.
 
-// Typesafe wrapper for [`fuchsia.hardware.platform.device/Device.GetMmioById`].
+// VPU (Video Processing Unit)
+constexpr std::string_view kMmioNameVpu = "vpu";
+
+// TOP_MIPI_DSI (DSI "top" host controller integration)
+constexpr std::string_view kMmioNameDsiTop = "dsi-top";
+
+// DSI_PHY
+constexpr std::string_view kMmioNameDsiPhy = "dsi-phy";
+
+// DesignWare Cores MIPI DSI Host Controller IP block.
+constexpr std::string_view kMmioNameDsiController = "dsi-controller";
+
+// HIU (Host Interface Unit) / HHI.
+constexpr std::string_view kMmioNameHhi = "hhi";
+
+// RTI registers of the AO (Always-On) power domain.
+// Also known as AO_RTI / AOBUS_RTI.
+constexpr std::string_view kMmioNameAlwaysOnRti = "always-on-rti";
+
+// RESET registers of the EE (Everything Else) power domain.
+constexpr std::string_view kMmioNameEeReset = "ee-reset";
+
+// PERIPHS_REGS (GPIO Multiplexing)
+constexpr std::string_view kMmioNameGpioMux = "gpio-mux";
+
+// HDMITX (HDMI Transmitter Controller IP)
+constexpr std::string_view kMmioNameHdmiTxController = "hdmitx-controller";
+
+// HDMITX (HDMI Transmitter Top-Level)
+constexpr std::string_view kMmioNameHdmiTxTop = "hdmitx-top";
+
+// Typesafe wrapper for [`fuchsia.hardware.platform.device/Device.GetMmioByName`].
 //
 // `platform_device` must be valid.
 //
 // If the result is successful, the MmioBuffer is guaranteed to be valid.
 zx::result<fdf::MmioBuffer> MapMmio(
-    MmioResourceIndex mmio_index,
+    std::string_view mmio_name,
     fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device);
 
 // The interrupt names are defined in the board driver's `display_irqs` table,

@@ -57,7 +57,7 @@ zx::result<std::unique_ptr<RdmaEngine>> RdmaEngine::Create(
   }
   zx::interrupt rdma_done_interrupt = std::move(rdma_done_result).value();
 
-  zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(MmioResourceIndex::kVpu, platform_device);
+  zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(kMmioNameVpu, platform_device);
   if (vpu_mmio_result.is_error()) {
     return vpu_mmio_result.take_error();
   }

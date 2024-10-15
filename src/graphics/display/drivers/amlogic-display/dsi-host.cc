@@ -31,7 +31,7 @@ namespace {
 zx::result<std::unique_ptr<designware_dsi::DsiHostController>> CreateDesignwareDsiHostController(
     fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device) {
   zx::result<fdf::MmioBuffer> dsi_host_mmio_result =
-      MapMmio(MmioResourceIndex::kDsiHostController, platform_device);
+      MapMmio(kMmioNameDsiController, platform_device);
   if (dsi_host_mmio_result.is_error()) {
     return dsi_host_mmio_result.take_error();
   }
@@ -96,14 +96,13 @@ zx::result<std::unique_ptr<DsiHost>> DsiHost::Create(fdf::Namespace& incoming, u
   fidl::ClientEnd<fuchsia_hardware_platform_device::Device> platform_device =
       std::move(pdev_result).value();
 
-  zx::result<fdf::MmioBuffer> dsi_top_mmio_result =
-      MapMmio(MmioResourceIndex::kDsiTop, platform_device);
+  zx::result<fdf::MmioBuffer> dsi_top_mmio_result = MapMmio(kMmioNameDsiTop, platform_device);
   if (dsi_top_mmio_result.is_error()) {
     return dsi_top_mmio_result.take_error();
   }
   fdf::MmioBuffer mipi_dsi_top_mmio = std::move(dsi_top_mmio_result).value();
 
-  zx::result<fdf::MmioBuffer> hhi_mmio_result = MapMmio(MmioResourceIndex::kHhi, platform_device);
+  zx::result<fdf::MmioBuffer> hhi_mmio_result = MapMmio(kMmioNameHhi, platform_device);
   if (hhi_mmio_result.is_error()) {
     return hhi_mmio_result.take_error();
   }

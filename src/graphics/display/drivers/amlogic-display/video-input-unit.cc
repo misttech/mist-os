@@ -823,7 +823,7 @@ zx::result<std::unique_ptr<VideoInputUnit>> VideoInputUnit::Create(
     inspect::Node* video_input_unit_node) {
   ZX_DEBUG_ASSERT(platform_device.is_valid());
 
-  zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(MmioResourceIndex::kVpu, platform_device);
+  zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(kMmioNameVpu, platform_device);
   if (vpu_mmio_result.is_error()) {
     return vpu_mmio_result.take_error();
   }

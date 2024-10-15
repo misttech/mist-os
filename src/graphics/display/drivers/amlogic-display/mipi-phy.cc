@@ -221,8 +221,7 @@ zx::result<std::unique_ptr<MipiPhy>> MipiPhy::Create(
     designware_dsi::DsiHostController* designware_dsi_host_controller, bool enabled) {
   ZX_DEBUG_ASSERT(platform_device.is_valid());
 
-  zx::result<fdf::MmioBuffer> d_phy_mmio_result =
-      MapMmio(MmioResourceIndex::kDsiPhy, platform_device);
+  zx::result<fdf::MmioBuffer> d_phy_mmio_result = MapMmio(kMmioNameDsiPhy, platform_device);
   if (d_phy_mmio_result.is_error()) {
     return d_phy_mmio_result.take_error();
   }

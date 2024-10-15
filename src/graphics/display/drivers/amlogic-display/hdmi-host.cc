@@ -134,7 +134,7 @@ zx::result<std::unique_ptr<HdmiTransmitter>> CreateHdmiTransmitter(
   }
 
   zx::result<fdf::MmioBuffer> hdmi_tx_mmio_result =
-      MapMmio(MmioResourceIndex::kHdmiTxController, platform_device);
+      MapMmio(kMmioNameHdmiTxController, platform_device);
   if (hdmi_tx_mmio_result.is_error()) {
     return hdmi_tx_mmio_result.take_error();
   }
@@ -148,8 +148,7 @@ zx::result<std::unique_ptr<HdmiTransmitter>> CreateHdmiTransmitter(
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
-  zx::result<fdf::MmioBuffer> hdmi_top_mmio_result =
-      MapMmio(MmioResourceIndex::kHdmiTxTop, platform_device);
+  zx::result<fdf::MmioBuffer> hdmi_top_mmio_result = MapMmio(kMmioNameHdmiTxTop, platform_device);
   if (hdmi_top_mmio_result.is_error()) {
     return hdmi_top_mmio_result.take_error();
   }
@@ -198,18 +197,17 @@ zx::result<std::unique_ptr<HdmiHost>> HdmiHost::Create(fdf::Namespace& incoming)
     return zx::error(ZX_ERR_INTERNAL);
   }
 
-  zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(MmioResourceIndex::kVpu, platform_device);
+  zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(kMmioNameVpu, platform_device);
   if (vpu_mmio_result.is_error()) {
     return vpu_mmio_result.take_error();
   }
 
-  zx::result<fdf::MmioBuffer> hhi_mmio_result = MapMmio(MmioResourceIndex::kHhi, platform_device);
+  zx::result<fdf::MmioBuffer> hhi_mmio_result = MapMmio(kMmioNameHhi, platform_device);
   if (hhi_mmio_result.is_error()) {
     return hhi_mmio_result.take_error();
   }
 
-  zx::result<fdf::MmioBuffer> gpio_mux_mmio_result =
-      MapMmio(MmioResourceIndex::kGpioMux, platform_device);
+  zx::result<fdf::MmioBuffer> gpio_mux_mmio_result = MapMmio(kMmioNameGpioMux, platform_device);
   if (gpio_mux_mmio_result.is_error()) {
     return gpio_mux_mmio_result.take_error();
   }
