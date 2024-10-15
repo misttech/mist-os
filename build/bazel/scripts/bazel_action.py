@@ -1332,42 +1332,45 @@ def main() -> int:
         bazel_execroot = find_bazel_execroot(args.workspace_dir)
 
         for entry in args.package_outputs:
-            if entry.archive_path or entry.manifest_path:
-                # Run a cquery to extract the FuchsiaPackageInfo provider values.
-                fuchsia_package_info = run_starlark_cquery(
-                    entry.package_label,
-                    "FuchsiaPackageInfo_archive_and_manifest.cquery",
+            if not (
+                entry.archive_path
+                or entry.manifest_path
+                or entry.copy_debug_symbols
+            ):
+                continue
+
+            # Run a cquery to extract the FuchsiaPackageInfo and
+            # FuchsiaDebugSymbolInfo provider values.
+            query_result = run_starlark_cquery(
+                entry.package_label,
+                "package_archive_manifest_and_debug_symbol_dirs.cquery",
+            )
+            assert (
+                len(query_result) > 2
+            ), f"Unexpected FuchsiaPackageInfo cquery result: {query_result}"
+
+            # Get all paths, which are relative to the Bazel execroot.
+            bazel_archive_path, bazel_manifest_path = query_result[:2]
+            bazel_debug_symbol_dirs = query_result[2:]
+
+            if entry.archive_path:
+                file_copies.append(
+                    (
+                        os.path.join(bazel_execroot, bazel_archive_path),
+                        entry.archive_path,
+                    )
                 )
-                assert (
-                    len(fuchsia_package_info) == 2
-                ), f"Unexpected FuchsiaPackageInfo cquery result: {fuchsia_package_info}"
 
-                # Get all paths, which are relative to the Bazel execroot.
-                bazel_archive_path, bazel_manifest_path = fuchsia_package_info
-                bazel_debug_symbol_dirs = fuchsia_package_info[2:]
-
-                if entry.archive_path:
-                    file_copies.append(
-                        (
-                            os.path.join(bazel_execroot, bazel_archive_path),
-                            entry.archive_path,
-                        )
+            if entry.manifest_path:
+                file_copies.append(
+                    (
+                        os.path.join(bazel_execroot, bazel_manifest_path),
+                        entry.manifest_path,
                     )
-
-                if entry.manifest_path:
-                    file_copies.append(
-                        (
-                            os.path.join(bazel_execroot, bazel_manifest_path),
-                            entry.manifest_path,
-                        )
-                    )
+                )
 
             if entry.copy_debug_symbols:
-                debug_symbol_dirs = run_starlark_cquery(
-                    entry.package_label,
-                    "FuchsiaDebugSymbolInfo_debug_symbol_dirs.cquery",
-                )
-                for debug_symbol_dir in debug_symbol_dirs:
+                for debug_symbol_dir in bazel_debug_symbol_dirs:
                     copy_build_id_dir(
                         os.path.join(bazel_execroot, debug_symbol_dir),
                         bazel_output_base_dir,
