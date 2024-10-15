@@ -12,6 +12,7 @@ fostr_fidl("fuchsia.ui.composition") {
     "//src/lib/fostr/fidl/fuchsia.math",
     "//src/lib/fostr/fidl/fuchsia.scenic.scheduling",
     "//src/lib/fostr/fidl/fuchsia.sysmem",
+    "//src/lib/fostr/fidl/fuchsia.sysmem2",
     "//src/lib/fostr/fidl/fuchsia.ui.pointer",
     "//src/lib/fostr/fidl/fuchsia.ui.views",
   ]

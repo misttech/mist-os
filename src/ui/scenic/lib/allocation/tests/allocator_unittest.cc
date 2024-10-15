@@ -53,7 +53,7 @@ RegisterBufferCollectionArgs CreateArgs(
     RegisterBufferCollectionUsage usage) {
   RegisterBufferCollectionArgs args;
   args.export_token(fidl::HLCPPToNatural(std::move(export_token)));
-  args.buffer_collection_token(fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(
+  args.buffer_collection_token2(fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>(
       buffer_collection_token.TakeChannel()));
   args.usage(usage);
   return args;
@@ -501,8 +501,8 @@ TEST_F(AllocatorTest, RegisterBufferCollectionCombined) {
 
   RegisterBufferCollectionArgs args;
   args.export_token(fidl::HLCPPToNatural(std::move(ref_pair.export_token)));
-  args.buffer_collection_token(
-      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(CreateToken().TakeChannel()));
+  args.buffer_collection_token2(
+      fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>(CreateToken().TakeChannel()));
   args.usages(usages);
 
   bool processed_callback = false;
