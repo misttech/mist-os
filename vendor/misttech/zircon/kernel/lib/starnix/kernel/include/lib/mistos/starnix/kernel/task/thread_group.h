@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_THREAD_GROUP_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_THREAD_GROUP_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_THREAD_GROUP_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_THREAD_GROUP_H_
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
@@ -276,13 +276,13 @@ class ThreadGroupMutableState {
 /// Thread groups are destroyed when the last task in the group exits.
 class ThreadGroup : public fbl::RefCountedUpgradeable<ThreadGroup>,
                     public fbl::WAVLTreeContainable<util::WeakPtr<ThreadGroup>> {
- public:
+ private:
   /// Weak reference to the `OwnedRef` of this `ThreadGroup`. This allows to retrieve the
   /// `TempRef` from a raw `ThreadGroup`.
-  util::WeakPtr<ThreadGroup> weak_thread_group;
+  util::WeakPtr<ThreadGroup> weak_thread_group_;
 
   // The kernel to which this thread group belongs.
-  fbl::RefPtr<Kernel> kernel;
+  fbl::RefPtr<Kernel> kernel_;
 
   /// A handle to the underlying Zircon process object.
   ///
@@ -292,12 +292,12 @@ class ThreadGroup : public fbl::RefCountedUpgradeable<ThreadGroup>,
   /// groups share an address space. To implement that situation, we might
   /// need to break the 1-to-1 mapping between thread groups and zx::process
   /// or teach zx::process to share address spaces.
-  KernelHandle<ProcessDispatcher> process;
+  KernelHandle<ProcessDispatcher> process_;
 
   /// The lead task of this thread group.
   ///
   /// The lead task is typically the initial thread created in the thread group.
-  pid_t leader;
+  pid_t leader_;
 
   /// The signal actions that are registered for this process.
   // pub signal_actions: Arc<SignalActions>,
@@ -361,10 +361,18 @@ class ThreadGroup : public fbl::RefCountedUpgradeable<ThreadGroup>,
   }
 
   // C++
+  const util::WeakPtr<ThreadGroup>& weak_thread_group() const { return weak_thread_group_; }
+
+  const fbl::RefPtr<Kernel>& kernel() const { return kernel_; }
+  fbl::RefPtr<Kernel>& kernel() { return kernel_; }
+
+  const KernelHandle<ProcessDispatcher>& process() const { return process_; }
+  pid_t leader() const { return leader_; }
+
   ~ThreadGroup();
 
   // WAVL-tree Index
-  pid_t GetKey() const { return leader; }
+  pid_t GetKey() const { return leader_; }
 
  private:
   ThreadGroup(fbl::RefPtr<Kernel> kernel, KernelHandle<ProcessDispatcher> process, pid_t leader,
@@ -374,4 +382,4 @@ class ThreadGroup : public fbl::RefCountedUpgradeable<ThreadGroup>,
 
 }  // namespace starnix
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_THREAD_GROUP_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_THREAD_GROUP_H_

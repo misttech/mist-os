@@ -121,7 +121,7 @@ void PidTable::remove_task(pid_t pid) {
 }
 
 void PidTable::add_thread_group(const fbl::RefPtr<ThreadGroup>& thread_group) {
-  auto& entry = get_entry_mut(thread_group->leader);
+  auto& entry = get_entry_mut(thread_group->leader());
   ASSERT(entry.process_.is_none());
   entry.process_ = ProcessEntry::ThreadGroupCtor(util::WeakPtr<ThreadGroup>(thread_group.get()));
 }
