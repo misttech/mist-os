@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_EXECUTION_EXECUTOR_H_
-#define ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_EXECUTION_EXECUTOR_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_EXECUTION_EXECUTOR_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_EXECUTION_EXECUTOR_H_
 
 #include <lib/fit/result.h>
 #include <lib/mistos/linux_uapi/typedefs.h>
@@ -65,7 +65,7 @@ void execute_task(TaskBuilder task_builder, PreRunFn&& pre_run,
   // Set the process handle to the new task's process, so the new thread is spawned in that
   // process.
 
-  auto weak_task = util::WeakPtr<Task>(task_builder.task.get());
+  auto weak_task = util::WeakPtr<Task>(task_builder.task().get());
   auto ref_task = weak_task.Lock();
 
   // Hold a lock on the task's thread slot until we have a chance to initialize it.
@@ -128,4 +128,4 @@ uint64_t execute_syscall(SyscallFn&& syscall, Args&&... args) {
 
 }  // namespace starnix
 
-#endif  // ZIRCON_KERNEL_LIB_MISTOS_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_EXECUTION_EXECUTOR_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_EXECUTION_EXECUTOR_H_

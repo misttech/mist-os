@@ -20,7 +20,7 @@ struct ThreadStartInfo;
 /// [`zx::sys::zx_thread_state_general_regs_t`] that this type wraps.
 struct RegisterState {
  private:
-  mutable ::zx_thread_state_general_regs_t real_registers_;
+  ::zx_thread_state_general_regs_t real_registers_ = {};
 
  public:
   /// A copy of the x64 `rax` register at the time of the `syscall` instruction. This is important
@@ -57,7 +57,12 @@ struct RegisterState {
 
  public:
   RegisterState() = default;
-  zx_thread_state_general_regs_t* operator->() const { return &real_registers_; }
+
+  zx_thread_state_general_regs_t* operator->() { return &real_registers_; }
+  const zx_thread_state_general_regs_t* operator->() const { return &real_registers_; }
+
+  zx_thread_state_general_regs_t& operator*() { return real_registers_; }
+  const zx_thread_state_general_regs_t& operator*() const { return real_registers_; }
 
  private:
   RegisterState(zx_thread_state_general_regs_t regs, uint64_t _orig_rax)

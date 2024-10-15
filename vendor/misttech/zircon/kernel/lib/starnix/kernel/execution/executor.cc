@@ -106,8 +106,8 @@ fit::result<zx_status_t> run_task(const CurrentTask& current_task) {
     }
 
     auto status = thread->value()->Start(
-        ThreadDispatcher::EntryState{.pc = current_task.thread_state.registers->rip,
-                                     .sp = current_task.thread_state.registers->rsp,
+        ThreadDispatcher::EntryState{.pc = current_task.thread_state().registers->rip,
+                                     .sp = current_task.thread_state().registers->rsp,
                                      .arg1 = {},
                                      .arg2 = 0},
         /* ensure_initial_thread= */ false);

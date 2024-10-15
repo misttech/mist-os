@@ -31,6 +31,7 @@
 #include <lib/mistos/util/default_construct.h>
 #include <lib/mistos/util/strings/split_string.h>
 #include <lib/mistos/util/weak_wrapper.h>
+#include <lib/starnix_sync/locks.h>
 #include <lib/user_copy/user_ptr.h>
 #include <trace.h>
 #include <zircon/errors.h>
@@ -60,32 +61,33 @@ using namespace util;
 
 namespace starnix {
 
-TaskBuilder::TaskBuilder(fbl::RefPtr<Task> task) : task(ktl::move(task)) {}
+TaskBuilder::TaskBuilder(fbl::RefPtr<Task> task) : task_(ktl::move(task)) {}
 
 TaskBuilder::~TaskBuilder() = default;
 
 const Task* TaskBuilder::operator->() const {
-  ASSERT_MSG(task, "called `operator->` empty Task");
-  return task.get();
+  ASSERT_MSG(task_, "called `operator->` empty Task");
+  return task_.get();
 }
 
 Task* TaskBuilder::operator->() {
-  ASSERT_MSG(task, "called `operator->` empty Task");
-  return task.get();
+  ASSERT_MSG(task_, "called `operator->` empty Task");
+  return task_.get();
 }
 
 CurrentTask::~CurrentTask() = default;
 
-CurrentTask::CurrentTask(fbl::RefPtr<Task> task) : task(ktl::move(task)) {}
+CurrentTask::CurrentTask(fbl::RefPtr<Task> task, ThreadState thread_state)
+    : task_(ktl::move(task)), thread_state_(thread_state) {}
 
 const Task* CurrentTask::operator->() const {
-  ASSERT_MSG(task, "called `operator->()` empty Task");
-  return task.get();
+  ASSERT_MSG(task_, "called `operator->()` empty Task");
+  return task_.get();
 }
 
 Task* CurrentTask::operator->() {
-  ASSERT_MSG(task, "called `operator->()` empty Task");
-  return task.get();
+  ASSERT_MSG(task_, "called `operator->()` empty Task");
+  return task_.get();
 }
 
 fit::result<Errno, TaskBuilder> CurrentTask::create_init_process(
@@ -182,7 +184,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_task_with_pid(
 
   // TODO (Herrera) Add fit::defer
   {
-    auto temp_task = builder.task;
+    auto temp_task = builder.task();
     auto result = builder->thread_group->add(temp_task);
     if (result.is_error()) {
       return result.take_error();
@@ -278,7 +280,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
   auto files = clone_files ? (*this)->files : (*this)->files.fork();
 
   auto kernel = (*this)->kernel();
-  auto& pids = *kernel->pids.Write();
+  auto pids = kernel->pids.Write();
 
   pid_t pid;
   ktl::string_view command;
@@ -288,12 +290,12 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
   bool no_new_privs;
   // let seccomp_filters;
   // let robust_list_head = UserAddress::NULL.into();
-  // let child_signal_mask;
+  // SigSet child_signal_mask;
   // let timerslack_ns;
 
   LTRACE;
 
-  auto task_info_or_error = [&]() -> fit::result<Errno, TaskInfo> {
+  auto task_info = [&]() -> fit::result<Errno, TaskInfo> {
     // Make sure to drop these locks ASAP to avoid inversion
     auto self = (*this);
     auto thread_group_state = self->thread_group->write();
@@ -303,7 +305,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
     // seccomp_filters = state.seccomp_filters.clone();
     // child_signal_mask = state.signals.mask();
 
-    pid = pids.allocate_pid();
+    pid = pids->allocate_pid();
     command = self->command();
     creds = self->creds();
     // scheduler_policy = state.scheduler_policy.fork();
@@ -333,8 +335,8 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
       // Drop the lock on this task before entering `create_zircon_process`, because it will
       // take a lock on the new thread group, and locks on thread groups have a higher
       // priority than locks on the task in the thread group.
+      state.~RwLockGuard();
       /*
-      std::mem::drop(state);
       let signal_actions = if clone_sighand {
           self.thread_group.signal_actions.clone()
       } else {
@@ -345,30 +347,27 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
       return create_zircon_process(kernel, ktl::move(thread_group_state), pid, process_group,
                                    command);
     }
-  }();
-
-  if (task_info_or_error.is_error())
-    return task_info_or_error.take_error();
+  }() _EP(task_info);
 
   // Only create the vfork event when the caller requested CLONE_VFORK.
   // let vfork_event = if clone_vfork { Some(Arc::new (zx::Event::create())) }
   // else {None};
 
-  auto& [thread, thread_group, memory_manager] = task_info_or_error.value();
+  auto& [thread, thread_group, memory_manager] = task_info.value();
 
   auto child = TaskBuilder(Task::New(pid, command, thread_group, ktl::move(thread), files,
                                      memory_manager, fs, creds, child_exit_signal));
 
   {
-    auto child_task = child.task;
+    auto child_task = child.task();
     // Drop the pids lock as soon as possible after creating the child. Destroying the child
     // and removing it from the pids table itself requires the pids lock, so if an early exit
     // takes place we have a self deadlock.
-    pids.add_task(child_task);
+    pids->add_task(child_task);
     if (!clone_thread) {
-      pids.add_thread_group(child->thread_group);
+      pids->add_thread_group(child->thread_group);
     }
-    // std::mem::drop(pids);
+    pids.~RwLockGuard();
 
     // Child lock must be taken before this lock. Drop the lock on the task, take a writable
     // lock on the child and take the current state back.
@@ -387,39 +386,29 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
     */
 
     if (clone_thread) {
-      auto result = (*this)->thread_group->add(child_task);
-      if (result.is_error())
-        return result.take_error();
+      _EP((*this)->thread_group->add(child_task));
     } else {
-      auto result = child->thread_group->add(child_task);
-      if (result.is_error())
-        return result.take_error();
-
-      // let mut child_state = child.write();
-      // let state = self.read();
+      _EP((*this)->thread_group->add(child_task));
+      auto child_state = child->mutable_state_.Write();
+      auto state = (*this)->mutable_state_.Read();
       // child_state.signals.alt_stack = state.signals.alt_stack;
       // child_state.signals.set_mask(state.signals.mask());
-      result = (*this)->mm()->snapshot_to(child->mm());
-      if (result.is_error())
-        return result.take_error();
+      _EP((*this)->mm()->snapshot_to(child->mm()));
     }
 
     if (clone_parent_settid) {
-      auto write_result = this->write_object(user_parent_tid, child->id);
-      if (write_result.is_error())
-        return write_result.take_error();
+      _EP(this->write_object(user_parent_tid, child->id));
     }
 
     if (clone_child_cleartid) {
+      // child.write().clear_child_tid = user_child_tid;
     }
 
     if (clone_child_settid) {
-      auto write_result = child->write_object(user_child_tid, child->id);
-      if (write_result.is_error())
-        return write_result.take_error();
+      _EP(child->write_object(user_child_tid, child->id));
     }
 
-    child.thread_state = this->thread_state.snapshot();
+    child.thread_state() = this->thread_state().snapshot();
   }
 
   /*
@@ -431,7 +420,6 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
       let _l2 = child.read();
   }
   */
-
   return fit::ok(child);
 }
 
@@ -524,7 +512,7 @@ fit::result<Errno> CurrentTask::finish_exec(const ktl::string_view& path,
 
   auto start_info = load_executable(*this, resolved_elf, path) _EP(start_info);
   auto regs = zx_thread_state_general_regs_t_from(start_info.value());
-  thread_state.registers = RegisterState::From(regs);
+  thread_state_.registers = RegisterState::From(regs);
 
   {
     // Guard<Mutex> lock(task_->task_mutable_state_rw_lock());
@@ -565,7 +553,7 @@ fit::result<Errno> CurrentTask::finish_exec(const ktl::string_view& path,
     // TODO: POSIX timers are not preserved.
   */
 
-  task->thread_group->write()->did_exec = true;
+  task_->thread_group->write()->did_exec = true;
 
   // `prctl(PR_GET_NAME)` and `/proc/self/stat`
   /*
@@ -581,11 +569,13 @@ fit::result<Errno> CurrentTask::finish_exec(const ktl::string_view& path,
   return fit::ok();
 }
 
-CurrentTask CurrentTask::From(const TaskBuilder& builder) { return CurrentTask(builder.task); }
+CurrentTask CurrentTask::From(const TaskBuilder& builder) {
+  return CurrentTask(builder.task(), builder.thread_state());
+}
 
 util::WeakPtr<Task> CurrentTask::weak_task() const {
-  ASSERT(task);
-  return util::WeakPtr<Task>(task.get());
+  ASSERT(task_);
+  return util::WeakPtr<Task>(task_.get());
 }
 
 void CurrentTask::set_creds(Credentials creds) const {
@@ -953,35 +943,35 @@ fit::result<Errno, NamespaceNode> CurrentTask::lookup_path_from_root(const FsStr
 
 fit::result<Errno, ktl::span<uint8_t>> CurrentTask::read_memory(UserAddress addr,
                                                                 ktl::span<uint8_t>& bytes) const {
-  return task->mm()->unified_read_memory(*this, addr, bytes);
+  return task_->mm()->unified_read_memory(*this, addr, bytes);
 }
 
 fit::result<Errno, ktl::span<uint8_t>> CurrentTask::read_memory_partial_until_null_byte(
     UserAddress addr, ktl::span<uint8_t>& bytes) const {
-  return task->mm()->unified_read_memory_partial_until_null_byte(*this, addr, bytes);
+  return task_->mm()->unified_read_memory_partial_until_null_byte(*this, addr, bytes);
 }
 
 fit::result<Errno, ktl::span<uint8_t>> CurrentTask::read_memory_partial(
     UserAddress addr, ktl::span<uint8_t>& bytes) const {
-  return task->mm()->unified_read_memory_partial(*this, addr, bytes);
+  return task_->mm()->unified_read_memory_partial(*this, addr, bytes);
 }
 
 fit::result<Errno, size_t> CurrentTask::write_memory(UserAddress addr,
                                                      const ktl::span<const uint8_t>& bytes) const {
-  return task->mm()->unified_write_memory(*this, addr, bytes);
+  return task_->mm()->unified_write_memory(*this, addr, bytes);
 }
 
 fit::result<Errno, size_t> CurrentTask::write_memory_partial(
     UserAddress addr, const ktl::span<const uint8_t>& bytes) const {
-  return task->mm()->unified_write_memory_partial(*this, addr, bytes);
+  return task_->mm()->unified_write_memory_partial(*this, addr, bytes);
 }
 
 fit::result<Errno, size_t> CurrentTask::zero(UserAddress addr, size_t length) const {
-  return task->mm()->unified_zero(*this, addr, length);
+  return task_->mm()->unified_zero(*this, addr, length);
 }
 
 UserAddress CurrentTask::maximum_valid_address() const {
-  return task->mm()->maximum_valid_user_address;
+  return task_->mm()->maximum_valid_user_address;
 }
 
 }  // namespace starnix
