@@ -4,8 +4,9 @@
 
 //! Round-robin multi-resolution time series.
 
-mod buffer;
 mod interval;
+
+pub(crate) mod buffer;
 
 pub mod interpolation;
 pub mod statistic;
@@ -19,7 +20,7 @@ use std::num::NonZeroUsize;
 use thiserror::Error;
 
 use crate::experimental::clock::{
-    MonotonicityError, ObservationTime, Tick, TimedSample, Timestamp, TimestampExt,
+    MonotonicityError, ObservationTime, Tick, Timed, Timestamp, TimestampExt,
 };
 use crate::experimental::series::buffer::{
     encoding, Buffer, BufferStrategy, DeltaSimple8bRle, DeltaZigzagSimple8bRle, RingBuffer,
@@ -90,15 +91,15 @@ pub trait Interpolator {
     ) -> Result<SerializedBuffer, Self::Error>;
 }
 
-/// A buffered round-robin sampler over [timed samples][`TimedSample`] (e.g., a [`TimeMatrix`]).
+/// A buffered round-robin sampler over [timed samples][`Timed`] (e.g., a [`TimeMatrix`]).
 ///
 /// Round-robin samplers aggregate samples into buffered time series and produce a serialized
 /// buffer of aggregations per series.
 ///
-/// [`TimedSample`]: crate::experimental::clock::TimedSample
+/// [`Timed`]: crate::experimental::clock::Timed
 /// [`TimeMatrix`]: crate::experimental::series::TimeMatrix
 pub trait MatrixSampler<T>:
-    Interpolator<Error = FoldError> + Sampler<TimedSample<T>, Error = FoldError>
+    Interpolator<Error = FoldError> + Sampler<Timed<T>, Error = FoldError>
 {
 }
 
@@ -107,6 +108,8 @@ pub trait MatrixSampler<T>:
 /// Data semantics determine how statistics are interpreted and time series are aggregated and
 /// buffered.
 pub trait DataSemantic {
+    type Metadata;
+
     fn display() -> impl Display;
 }
 
@@ -125,6 +128,8 @@ impl BufferStrategy<u64, LastSample> for Counter {
 }
 
 impl DataSemantic for Counter {
+    type Metadata = ();
+
     fn display() -> impl Display {
         "counter"
     }
@@ -168,6 +173,8 @@ impl BufferStrategy<u64, LastSample> for Gauge {
 }
 
 impl DataSemantic for Gauge {
+    type Metadata = ();
+
     fn display() -> impl Display {
         "gauge"
     }
@@ -188,6 +195,8 @@ where
 }
 
 impl DataSemantic for BitSet {
+    type Metadata = ();
+
     fn display() -> impl Display {
         "bitset"
     }
@@ -460,7 +469,7 @@ where
     /// [`Sampler::fold`]: crate::experimental::series::Sampler::fold
     pub fn fold_and_get_buffers(
         &mut self,
-        sample: TimedSample<F::Sample>,
+        sample: Timed<F::Sample>,
     ) -> Result<SerializedBuffer, FoldError>
     where
         FoldError: From<F::Error>,
@@ -575,7 +584,7 @@ where
     }
 }
 
-impl<F, P> Sampler<TimedSample<F::Sample>> for TimeMatrix<F, P>
+impl<F, P> Sampler<Timed<F::Sample>> for TimeMatrix<F, P>
 where
     FoldError: From<F::Error>,
     F: BufferStrategy<F::Aggregation, P> + Statistic,
@@ -583,8 +592,8 @@ where
 {
     type Error = FoldError;
 
-    fn fold(&mut self, timed: TimedSample<F::Sample>) -> Result<(), Self::Error> {
-        let (timestamp, sample) = timed.into();
+    fn fold(&mut self, sample: Timed<F::Sample>) -> Result<(), Self::Error> {
+        let (timestamp, sample) = sample.into();
         let tick = self.last.tick(timestamp, true)?;
         Ok(for buffer in self.buffers.iter_mut() {
             buffer.fold(tick, sample.clone())?;
@@ -604,7 +613,7 @@ where
 mod tests {
     use fuchsia_async as fasync;
 
-    use crate::experimental::clock::{TimedSample, Timestamp};
+    use crate::experimental::clock::{Timed, Timestamp};
     use crate::experimental::series::interpolation::{Constant, LastAggregation, LastSample};
     use crate::experimental::series::statistic::{
         ArithmeticMean, LatchMax, Max, PostAggregation, Sum, Transform, Union,
@@ -614,9 +623,9 @@ mod tests {
     };
 
     fn fold_and_interpolate_f32(sampler: &mut impl MatrixSampler<f32>) {
-        sampler.fold(TimedSample::now(0.0)).unwrap();
-        sampler.fold(TimedSample::now(1.0)).unwrap();
-        sampler.fold(TimedSample::now(2.0)).unwrap();
+        sampler.fold(Timed::now(0.0)).unwrap();
+        sampler.fold(Timed::now(1.0)).unwrap();
+        sampler.fold(Timed::now(2.0)).unwrap();
         let _buffers = sampler.interpolate(Timestamp::now()).unwrap();
     }
 
@@ -709,7 +718,7 @@ mod tests {
             ]
         );
 
-        time_matrix.fold(TimedSample::now(f32::from_bits(42u32))).unwrap();
+        time_matrix.fold(Timed::now(f32::from_bits(42u32))).unwrap();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(10_000_000_000));
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
@@ -759,7 +768,7 @@ mod tests {
             ]
         );
 
-        time_matrix.fold(TimedSample::now(42)).unwrap();
+        time_matrix.fold(Timed::now(42)).unwrap();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(10_000_000_000));
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
@@ -814,7 +823,7 @@ mod tests {
             ]
         );
 
-        time_matrix.fold(TimedSample::now(-2)).unwrap();
+        time_matrix.fold(Timed::now(-2)).unwrap();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(10_000_000_000));
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
@@ -869,7 +878,7 @@ mod tests {
             ]
         );
 
-        time_matrix.fold(TimedSample::now(42)).unwrap();
+        time_matrix.fold(Timed::now(42)).unwrap();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(10_000_000_000));
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
@@ -893,7 +902,7 @@ mod tests {
             ]
         );
 
-        time_matrix.fold(TimedSample::now(50)).unwrap();
+        time_matrix.fold(Timed::now(50)).unwrap();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(20_000_000_000));
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
@@ -949,7 +958,7 @@ mod tests {
             ]
         );
 
-        time_matrix.fold(TimedSample::now(42)).unwrap();
+        time_matrix.fold(Timed::now(42)).unwrap();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(10_000_000_000));
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
@@ -973,7 +982,7 @@ mod tests {
             ]
         );
 
-        time_matrix.fold(TimedSample::now(40)).unwrap();
+        time_matrix.fold(Timed::now(40)).unwrap();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(20_000_000_000));
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
@@ -1029,7 +1038,7 @@ mod tests {
             ]
         );
 
-        time_matrix.fold(TimedSample::now(1)).unwrap();
+        time_matrix.fold(Timed::now(1)).unwrap();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(10_000_000_000));
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
@@ -1053,7 +1062,7 @@ mod tests {
             ]
         );
 
-        time_matrix.fold(TimedSample::now(u64::MAX)).unwrap();
+        time_matrix.fold(Timed::now(u64::MAX)).unwrap();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(20_000_000_000));
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(

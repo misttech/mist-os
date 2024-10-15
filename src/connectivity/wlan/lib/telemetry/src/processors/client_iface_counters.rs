@@ -7,7 +7,7 @@ use fuchsia_sync::Mutex;
 
 use std::sync::Arc;
 use tracing::{error, warn};
-use windowed_stats::experimental::clock::TimedSample;
+use windowed_stats::experimental::clock::Timed;
 use windowed_stats::experimental::series::interpolation::LastAggregation;
 use windowed_stats::experimental::series::statistic::LatchMax;
 use windowed_stats::experimental::series::{SamplingProfile, TimeMatrix};
@@ -158,19 +158,19 @@ impl IfaceCountersTimeSeries {
     }
 
     fn log_rx_unicast_total(&self, data: u64) {
-        self.rx_unicast_total.fold_or_log_error(TimedSample::now(data));
+        self.rx_unicast_total.fold_or_log_error(Timed::now(data));
     }
 
     fn log_rx_unicast_drop(&self, data: u64) {
-        self.rx_unicast_drop.fold_or_log_error(TimedSample::now(data));
+        self.rx_unicast_drop.fold_or_log_error(Timed::now(data));
     }
 
     fn log_tx_total(&self, data: u64) {
-        self.tx_total.fold_or_log_error(TimedSample::now(data));
+        self.tx_total.fold_or_log_error(Timed::now(data));
     }
 
     fn log_tx_drop(&self, data: u64) {
-        self.tx_drop.fold_or_log_error(TimedSample::now(data));
+        self.tx_drop.fold_or_log_error(Timed::now(data));
     }
 }
 
@@ -217,20 +217,17 @@ mod tests {
 
         assert_eq!(
             &time_series.rx_unicast_total.drain_calls()[..],
-            &[TimeMatrixCall::Fold(TimedSample::now(100))]
+            &[TimeMatrixCall::Fold(Timed::now(100))]
         );
         assert_eq!(
             &time_series.rx_unicast_drop.drain_calls()[..],
-            &[TimeMatrixCall::Fold(TimedSample::now(5))]
+            &[TimeMatrixCall::Fold(Timed::now(5))]
         );
         assert_eq!(
             &time_series.tx_total.drain_calls()[..],
-            &[TimeMatrixCall::Fold(TimedSample::now(50))]
+            &[TimeMatrixCall::Fold(Timed::now(50))]
         );
-        assert_eq!(
-            &time_series.tx_drop.drain_calls()[..],
-            &[TimeMatrixCall::Fold(TimedSample::now(2))]
-        );
+        assert_eq!(&time_series.tx_drop.drain_calls()[..], &[TimeMatrixCall::Fold(Timed::now(2))]);
     }
 
     #[fuchsia::test]

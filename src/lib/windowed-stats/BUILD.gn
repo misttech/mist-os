@@ -31,6 +31,9 @@ rustc_library("windowed-stats") {
   sources = [
     "src/aggregations.rs",
     "src/experimental/clock.rs",
+    "src/experimental/event/builder.rs",
+    "src/experimental/event/mod.rs",
+    "src/experimental/event/reactor.rs",
     "src/experimental/mod.rs",
     "src/experimental/series/buffer/delta_simple8b_rle.rs",
     "src/experimental/series/buffer/delta_zigzag_simple8b_rle.rs",
