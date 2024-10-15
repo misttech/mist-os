@@ -275,38 +275,61 @@ inline zx_ticks_t platform_current_raw_ticks_synchronized() {
   // Do we need to guarantee that this clock read occurs after previous loads,
   // stores, or both?
   //
-  // If so, we need to implement one of two sequences.  One ensures our timer
-  // read takes place after all previous loads, and the other which ensures our
-  // timer read takes place after all previous memory accesses (loads and
-  // stores).
-  if constexpr ((Flags & (GetTicksSyncFlag::kAfterPreviousLoads |
-                          GetTicksSyncFlag::kAfterPreviousStores)) != GetTicksSyncFlag::kNone) {
-    if constexpr ((Flags & GetTicksSyncFlag::kAfterPreviousStores) != GetTicksSyncFlag::kNone) {
-      // We need our timer read to happen after all previous memory accesses.
-      // This is implemented as a DMB followed by read from any valid memory
-      // location with a "branch" which depends on that read.  Note that
-      // "branch" is in air quotes because its target is the next instruction,
-      // so whether or not the branch gets taken, the result is the same (to
-      // execute the next instruction).  Finally, the sequence ends with an ISB.
-      //
-      // Refer to Example D12-4 in the ARM ARM referenced above.
-      //
-      __asm__ volatile(
-          "dmb sy;"
-          "ldr %[temp], [sp];"
-          "cbz %[temp], 1f;"
-          "1: isb;"
-          : [temp] "=r"(temp)  // outputs  : we overwrite the register selected for "temp"
-          :                    // inputs   : we have no inputs
-          : "memory");         // clobbers : nothing, however we specify "memory" in order to
-                               // prevent re-ordering, as a signal fence would do.
-    } else {
-      // We need our timer read to happen after all previous reads from memory.
-      // An ISB should be all that we need.
-      //
-      // Refer to Example D12-3 in the ARM ARM referenced above.
-      __isb(ARM_MB_SY);
-    }
+  // If so, we need to implement the solution described in refer to Example
+  // D12-4 in the ARM ARM, referenced above.
+  //
+  // We need our timer read to happen after all previous memory accesses.
+  // This is implemented as a DMB followed by read from any valid memory
+  // location with a "branch" which depends on that read.  Note that
+  // "branch" is in air quotes because its target is the next instruction,
+  // so whether or not the branch gets taken, the result is the same (to
+  // execute the next instruction).  Finally, the sequence ends with an ISB.
+  //
+  // Also note that we need the DMB approach here, even when we only care about
+  // previous loads, because we are attempting to ensure that our counter read
+  // takes place after _all_ previous loads.  If we were interested in only
+  // ensuring that the counter observation took place after all previous loads
+  // of a _specific_ variable (call it `X`), there would be another option to
+  // consider.  It is shown in example D12-3 of the ARM ARM, and involves
+  // creating a branch which depends on the previously loaded value of `X`,
+  // followed by an ISB.  Since the spec of this function is to ensure that the
+  // counter observation follow _all_ previous loads, it is not a technique we
+  // can use here.
+  //
+  // TODO(johngro): Consider adding an API for a raw counter read which would
+  // allow for this.  There are two key cases (reading a synthetic kernel clock,
+  // and reading the monotonic or boot timeline) where we don't actually need to
+  // ensure that our counter read takes place after all previous loads, just the
+  // previous load of a specific variable (the generation counter in the case of
+  // a synthetic clock, and the offset in the case of a mono/boot timeline
+  // read).  That said, designing such an API presents some challenges as not
+  // all of the specific variable reads have the same requirements.  For
+  // example, in the case of synthetic kernel clocks, the extra variable needs
+  // to be read with acquire semantics.  In the case of mono/boot reads, relaxed
+  // semantics are all that are needed.
+  //
+  constexpr bool must_read_after_all_previous_accesses =
+      (Flags & (GetTicksSyncFlag::kAfterPreviousLoads | GetTicksSyncFlag::kAfterPreviousStores)) !=
+      GetTicksSyncFlag::kNone;
+  if constexpr (must_read_after_all_previous_accesses) {
+    // We need our timer read to happen after all previous memory accesses.
+    // This is implemented as a DMB followed by read from any valid memory
+    // location with a "branch" which depends on that read.  Note that
+    // "branch" is in air quotes because its target is the next instruction,
+    // so whether or not the branch gets taken, the result is the same (to
+    // execute the next instruction).  Finally, the sequence ends with an ISB.
+    //
+    // Refer to Example D12-4 in the ARM ARM referenced above.
+    //
+    __asm__ volatile(
+        "dmb sy;"
+        "ldr %[temp], [sp];"
+        "cbz %[temp], 1f;"
+        "1: isb;"
+        : [temp] "=r"(temp)  // outputs  : we overwrite the register selected for "temp"
+        :                    // inputs   : we have no inputs
+        : "memory");         // clobbers : nothing, however we specify "memory" in order to
+                             // prevent re-ordering, as a signal fence would do.
   }
 
   // Now actually read from the system timer.
@@ -323,8 +346,10 @@ inline zx_ticks_t platform_current_raw_ticks_synchronized() {
   //
   // Refer to Example D12-4 in the ARM ARM referenced above.
   //
-  if constexpr ((Flags & (GetTicksSyncFlag::kBeforeSubsequentLoads |
-                          GetTicksSyncFlag::kBeforeSubsequentStores)) != GetTicksSyncFlag::kNone) {
+  constexpr bool must_read_before_any_subsequent_access =
+      (Flags & (GetTicksSyncFlag::kBeforeSubsequentLoads |
+                GetTicksSyncFlag::kBeforeSubsequentStores)) != GetTicksSyncFlag::kNone;
+  if constexpr (must_read_before_any_subsequent_access) {
     __asm__ volatile(
         "eor %[temp], %[ret], %[ret];"
         "ldr %[temp], [sp, %[temp]];"
