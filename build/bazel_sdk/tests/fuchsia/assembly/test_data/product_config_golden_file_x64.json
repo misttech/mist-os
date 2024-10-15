@@ -1,5 +1,12 @@
 {
     "platform": {
+        "another": {
+            "random": {
+                "int": 0,
+                "path1": false,
+                "string2": "false"
+            }
+        },
         "build_type": "user",
         "connectivity": {
             "wlan": {
@@ -10,11 +17,11 @@
             "enabled": true
         },
         "diagnostics": {
-            "archivist": "default",
             "additional_serial_log_components": [
                 "/core/session-manager",
                 "/core/session-manager/session:session"
-            ]
+            ],
+            "archivist": "default"
         },
         "identity": {
             "password_pinweaver": "required"
@@ -27,16 +34,9 @@
         },
         "some": {
             "random": {
-                "path1": true,
                 "int1": 3234234324231434134141234,
+                "path1": true,
                 "string1": "I have a string"
-            }
-        },
-        "another": {
-            "random": {
-                "path1": false,
-                "int": 0,
-                "string2": "false"
             }
         }
     },
