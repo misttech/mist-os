@@ -13,6 +13,7 @@ import unittest.mock as mock
 from pathlib import Path
 
 from power_test_utils import power_test_utils
+from trace_processing import trace_time
 
 _METRIC_NAME = "M3tr1cN4m3"
 _MEASUREPOWER_PATH = "path/to/power"
@@ -222,3 +223,108 @@ class PowerSamplerTest(unittest.TestCase):
             ),
             (1.0, 0),
         )
+
+
+class GonkSampleTest(unittest.TestCase):
+    """Tests for Gonk sample parsing."""
+
+    HOST_TIME = "20240927 18:00:23.609548"
+    HOST_TIME_IN_MICROSECONDS = 1727474423609548
+
+    VALUES_WITH_DATA = [
+        HOST_TIME,
+        # Delta from last sample in microseconds.
+        "286",
+        # Voltage measurements.
+        "0.8148437500000001",
+        "1.010546875",
+        "4.894726562500001",
+        "1.0718750000000001",
+        "0.9806640625",
+        "3.3820312500000003",
+        "1.8125",
+        # Current measurements.
+        "0.5274375",
+        "0.052025",
+        "0.6104375000000001",
+        "0.2362578125",
+        "1.2365162037037039",
+        "0.3898229166666667",
+        "0.005085",
+        # Power measurements.
+        "0.42977915039062503",
+        "0.052573701171875",
+        "2.9879246459960944",
+        "0.25323884277343756",
+        "1.2126070036711518",
+        "1.3183932861328127",
+        "0.0092165625",
+        "",
+    ]
+
+    VALUES_WITH_COMMENT = [HOST_TIME, "0", "", "", "", "Header pin assert: 2"]
+
+    def parse_sample_from_values_with_data(self) -> None:
+        start = trace_time.TimePoint(0)
+        sample = power_test_utils.GonkSample.from_values(
+            GonkSampleTest.VALUES_WITH_DATA, start
+        )
+        self.assertEqual(
+            sample.host_time.to_epoch_delta().to_microseconds(),
+            GonkSampleTest.HOST_TIME_IN_MICROSECONDS,
+        )
+        self.assertEqual(
+            sample.gonk_time.to_epoch_delta().to_microseconds(), 286
+        )
+        self.assertListEqual(
+            sample.voltages,
+            [
+                0.8148437500000001,
+                1.010546875,
+                4.894726562500001,
+                1.0718750000000001,
+                0.9806640625,
+                3.3820312500000003,
+                1.8125,
+            ],
+        )
+        self.assertListEqual(
+            sample.currents,
+            [
+                0.5274375,
+                0.052025,
+                0.6104375000000001,
+                0.2362578125,
+                1.2365162037037039,
+                0.3898229166666667,
+                0.005085,
+            ],
+        )
+        self.assertListEqual(
+            sample.powers,
+            [
+                0.42977915039062503,
+                0.052573701171875,
+                2.9879246459960944,
+                0.25323884277343756,
+                1.2126070036711518,
+                1.3183932861328127,
+                0.0092165625,
+            ],
+        )
+        self.assertIsNone(sample.pin_assert)
+
+    def parse_sample_from_values_with_comment(self) -> None:
+        start = trace_time.TimePoint(123456)
+        sample = power_test_utils.GonkSample.from_values(
+            GonkSampleTest.VALUES_WITH_COMMENT, start
+        )
+        self.assertEqual(
+            sample.host_time.to_epoch_delta().to_microseconds(),
+            GonkSampleTest.HOST_TIME_IN_MICROSECONDS,
+        )
+        self.assertEqual(sample.gonk_time, start)
+        self.assertListEqual(sample.voltages, [float("nan")])
+        self.assertListEqual(sample.currents, [float("nan")])
+        self.assertListEqual(sample.powers, [float("nan")])
+        self.assertEqual(sample.pin_assert, 2)
