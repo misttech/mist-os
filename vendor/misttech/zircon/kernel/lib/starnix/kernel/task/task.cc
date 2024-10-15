@@ -45,7 +45,7 @@ fbl::RefPtr<Task> Task::New(pid_t id, const ktl::string_view& command,
       fbl::AdoptRef(new (&ac) Task(id, thread_group, ktl::move(thread), ktl::move(files), mm, fs));
   ASSERT(ac.check());
 
-  pid_t pid = thread_group->leader;
+  pid_t pid = thread_group->leader();
   task->persistent_info = TaskPersistentInfoState::New(id, pid, command, creds, exit_signal);
 
   return ktl::move(task);
@@ -78,11 +78,11 @@ const fbl::RefPtr<MemoryManager>& Task::mm() const {
   return mm_.value();
 }
 
-fbl::RefPtr<Kernel>& Task::kernel() const { return thread_group->kernel; }
+fbl::RefPtr<Kernel>& Task::kernel() const { return thread_group->kernel(); }
 
 util::WeakPtr<Task> Task::get_task(pid_t pid) const { return kernel()->pids.Read()->get_task(pid); }
 
-pid_t Task::get_pid() const { return thread_group->leader; }
+pid_t Task::get_pid() const { return thread_group->leader(); }
 
 pid_t Task::get_tid() const { return id; }
 
