@@ -150,6 +150,7 @@ void DriverHostComponent::Start(
     fidl::ClientEnd<fdf::Node> client_end, std::string node_name,
     fuchsia_driver_framework::wire::NodePropertyDictionary node_properties,
     fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
+    fidl::VectorView<fuchsia_driver_framework::wire::Offer> offers,
     frunner::wire::ComponentStartInfo start_info,
     fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) {
   auto binary = fdf_internal::ProgramValue(start_info.program(), "binary").value_or("");
@@ -158,6 +159,7 @@ void DriverHostComponent::Start(
   args.node(std::move(client_end))
       .node_name(fidl::StringView::FromExternal(node_name))
       .node_properties(node_properties)
+      .node_offers(offers)
       .url(start_info.resolved_url())
       .program(start_info.program())
       .incoming(start_info.ns())

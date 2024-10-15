@@ -48,6 +48,7 @@ class FakeDriverHost : public DriverHost {
   void Start(fidl::ClientEnd<fuchsia_driver_framework::Node> client_end, std::string node_name,
              fuchsia_driver_framework::wire::NodePropertyDictionary node_properties,
              fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
+             fidl::VectorView<fuchsia_driver_framework::wire::Offer> offers,
              fuchsia_component_runner::wire::ComponentStartInfo start_info,
              fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) override {
     drivers_[node_name] = std::move(driver);

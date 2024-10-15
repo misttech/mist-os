@@ -76,8 +76,7 @@ zx::result<> Runner::Publish(component::OutgoingDirectory& outgoing) {
 
 void Runner::StartDriverComponent(std::string_view moniker, std::string_view url,
                                   std::string_view collection_name,
-                                  fidl::VectorView<fuchsia_component_decl::wire::Offer> offers,
-                                  StartCallback callback) {
+                                  const std::vector<NodeOffer>& offers, StartCallback callback) {
   zx::event token;
   zx_status_t status = zx::event::create(0, &token);
   if (status != ZX_OK) {
@@ -105,7 +104,19 @@ void Runner::StartDriverComponent(std::string_view moniker, std::string_view url
   auto child_args_builder = fcomponent::wire::CreateChildArgs::Builder(arena).numbered_handles(
       fidl::VectorView<fprocess::wire::HandleInfo>::FromExternal(&handle_info, 1));
   if (!offers.empty()) {
-    child_args_builder.dynamic_offers(offers);
+    fidl::VectorView<fdecl::wire::Offer> dynamic_offers(arena, offers.size());
+    for (size_t i = 0; i < offers.size(); i++) {
+      const auto& offer = offers[i];
+      zx::result get_offer_result = GetInnerOffer(offer);
+      if (get_offer_result.is_error()) {
+        return callback(get_offer_result.take_error());
+      }
+
+      auto [inner_offer, _] = get_offer_result.value();
+      dynamic_offers[i] = inner_offer;
+    }
+
+    child_args_builder.dynamic_offers(dynamic_offers);
   }
   auto create_callback =
       [this, child_moniker = std::string(moniker.data()), koid = koid.value()](

@@ -46,24 +46,31 @@ constexpr auto kBootScheme = "fuchsia-boot://";
 constexpr std::string_view kRootDeviceName = "dev";
 
 template <typename R, typename F>
-std::optional<R> VisitOffer(fdecl::wire::Offer& offer, F apply) {
+std::optional<R> VisitOffer(const NodeOffer& offer, F apply) {
+  zx::result get_offer_result = GetInnerOffer(offer);
+  if (get_offer_result.is_error()) {
+    return {};
+  }
+
+  auto [inner_offer, _] = get_offer_result.value();
+
   // Note, we access each field of the union as mutable, so that `apply` can
   // modify the field if necessary.
-  switch (offer.Which()) {
+  switch (inner_offer.Which()) {
     case fdecl::wire::Offer::Tag::kService:
-      return apply(offer.service());
+      return apply(inner_offer.service());
     case fdecl::wire::Offer::Tag::kProtocol:
-      return apply(offer.protocol());
+      return apply(inner_offer.protocol());
     case fdecl::wire::Offer::Tag::kDirectory:
-      return apply(offer.directory());
+      return apply(inner_offer.directory());
     case fdecl::wire::Offer::Tag::kStorage:
-      return apply(offer.storage());
+      return apply(inner_offer.storage());
     case fdecl::wire::Offer::Tag::kRunner:
-      return apply(offer.runner());
+      return apply(inner_offer.runner());
     case fdecl::wire::Offer::Tag::kResolver:
-      return apply(offer.resolver());
+      return apply(inner_offer.resolver());
     case fdecl::wire::Offer::Tag::kEventStream:
-      return apply(offer.event_stream());
+      return apply(inner_offer.event_stream());
     default:
       return {};
   }
@@ -94,9 +101,9 @@ void InspectNode(inspect::Inspector& inspector, InspectStack& stack) {
     }
 
     // Populate root with data from node.
-    if (auto offers = node->offers(); !offers.empty()) {
+    if (const auto& offers = node->offers(); !offers.empty()) {
       std::vector<std::string_view> strings;
-      for (auto& offer : offers) {
+      for (const auto& offer : offers) {
         auto string = VisitOffer<std::string_view>(offer, inspect_decl);
         strings.push_back(string.value_or("unknown"));
       }

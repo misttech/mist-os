@@ -27,6 +27,16 @@
 
 namespace driver_manager {
 
+using NodeOffer = fuchsia_driver_framework::wire::Offer;
+
+enum class OfferTransport : std::uint8_t {
+  DriverTransport,
+  ZirconTransport,
+};
+
+zx::result<std::pair<fuchsia_component_decl::wire::Offer, OfferTransport>> GetInnerOffer(
+    const NodeOffer& offer);
+
 // This function creates a composite offer based on a service offer.
 std::optional<fuchsia_component_decl::wire::Offer> CreateCompositeServiceOffer(
     fidl::AnyArena& arena, fuchsia_component_decl::wire::Offer& offer,
@@ -256,12 +266,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
 
   fidl::ArenaBase& arena() { return arena_; }
 
-  // TODO(https://fxbug.dev/42144926): Once FIDL wire types support a Clone() method,
-  // remove the const_cast.
-  fidl::VectorView<fuchsia_component_decl::wire::Offer> offers() const {
-    return fidl::VectorView<fuchsia_component_decl::wire::Offer>::FromExternal(
-        const_cast<decltype(offers_)&>(offers_));
-  }
+  const std::vector<NodeOffer>& offers() const { return offers_; }
 
   // TODO(https://fxbug.dev/42160282): Remove const_cast once VectorView supports const.
   fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols() const {
@@ -298,9 +303,6 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
     driver_package_type_ = driver_package_type;
   }
 
-  void set_offers(std::vector<fuchsia_component_decl::wire::Offer> offers) {
-    offers_ = std::move(offers);
-  }
   void set_symbols(std::vector<fuchsia_driver_framework::wire::NodeSymbol> symbols) {
     symbols_ = std::move(symbols);
   }
@@ -451,7 +453,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   bool host_restart_on_crash_ = false;
 
   fidl::Arena<128> arena_;
-  std::vector<fuchsia_component_decl::wire::Offer> offers_;
+  std::vector<NodeOffer> offers_;
   std::vector<fuchsia_driver_framework::wire::NodeSymbol> symbols_;
 
   // Contains the properties of the node or its parents if the node is a composite or legacy

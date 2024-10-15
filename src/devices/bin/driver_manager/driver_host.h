@@ -40,6 +40,7 @@ class DriverHost {
   struct DriverStartArgs {
     DriverStartArgs(fuchsia_driver_framework::wire::NodePropertyDictionary node_properties,
                     fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
+                    fidl::VectorView<fuchsia_driver_framework::wire::Offer> offers,
                     fuchsia_component_runner::wire::ComponentStartInfo start_info)
         :  // We need to make a copy of these FIDL fields. We receive these fields
            // as part of the |fuchsia_component_runner::ComponentRunner::Start| FIDL call
@@ -47,10 +48,12 @@ class DriverHost {
            // |Node::StartDriverWithDynamicLinker| until later (after the FIDL call has returned).
           node_properties_(fidl::ToNatural(node_properties)),
           symbols_(fidl::ToNatural(symbols)),
+          offers_(fidl::ToNatural(offers)),
           start_info_(fidl::ToNatural(start_info)) {}
 
     std::optional<fuchsia_driver_framework::NodePropertyDictionary> node_properties_;
     std::optional<std::vector<fuchsia_driver_framework::NodeSymbol>> symbols_;
+    std::optional<std::vector<fuchsia_driver_framework::Offer>> offers_;
     fuchsia_component_runner::ComponentStartInfo start_info_;
   };
 
@@ -58,6 +61,7 @@ class DriverHost {
                      std::string node_name,
                      fuchsia_driver_framework::wire::NodePropertyDictionary node_properties,
                      fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
+                     fidl::VectorView<fuchsia_driver_framework::wire::Offer> offers,
                      fuchsia_component_runner::wire::ComponentStartInfo start_info,
                      fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) = 0;
 
@@ -85,6 +89,7 @@ class DriverHostComponent final
   void Start(fidl::ClientEnd<fuchsia_driver_framework::Node> client_end, std::string node_name,
              fuchsia_driver_framework::wire::NodePropertyDictionary node_properties,
              fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
+             fidl::VectorView<fuchsia_driver_framework::wire::Offer> offers,
              fuchsia_component_runner::wire::ComponentStartInfo start_info,
              fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) override;
 
@@ -122,6 +127,7 @@ class DynamicLinkerDriverHostComponent final
   void Start(fidl::ClientEnd<fuchsia_driver_framework::Node> node, std::string node_name,
              fuchsia_driver_framework::wire::NodePropertyDictionary node_properties,
              fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols,
+             fidl::VectorView<fuchsia_driver_framework::wire::Offer> offers,
              fuchsia_component_runner::wire::ComponentStartInfo start_info,
              fidl::ServerEnd<fuchsia_driver_host::Driver> driver, StartCallback cb) override {
     cb(zx::error(ZX_ERR_NOT_SUPPORTED));

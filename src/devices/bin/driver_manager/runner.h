@@ -12,6 +12,8 @@
 #include <fidl/fuchsia.process/cpp/wire.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 
+#include "src/devices/bin/driver_manager/node.h"
+
 namespace driver_manager {
 
 // This class serves as a runner for "driver" components. It also provides an API
@@ -31,8 +33,7 @@ class Runner : public fidl::WireServer<fuchsia_component_runner::ComponentRunner
   zx::result<> Publish(component::OutgoingDirectory& outgoing);
 
   void StartDriverComponent(std::string_view moniker, std::string_view url,
-                            std::string_view collection_name,
-                            fidl::VectorView<fuchsia_component_decl::wire::Offer> offers,
+                            std::string_view collection_name, const std::vector<NodeOffer>& offers,
                             StartCallback callback);
 
   const fidl::WireClient<fuchsia_component::Realm>& realm() const { return realm_; }
