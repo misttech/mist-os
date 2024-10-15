@@ -23,7 +23,7 @@ fit::result<Errno> sys_access(const CurrentTask& current_task, starnix_uapi::Use
 
 fit::result<Errno, uint32_t> sys_alarm(const CurrentTask& current_task, uint32_t duration);
 
-fit::result<Errno> sys_arch_prctl(const CurrentTask& current_task, uint32_t code,
+fit::result<Errno> sys_arch_prctl(CurrentTask& current_task, uint32_t code,
                                   starnix_uapi::UserAddress addr);
 
 fit::result<Errno> sys_chmod(const CurrentTask& current_task, starnix_uapi::UserCString user_path,
