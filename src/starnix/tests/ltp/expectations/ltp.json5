@@ -27,7 +27,6 @@
                 // clone of the VM, which is insufficient to pass this test because the test uses
                 // a volatile write to communicate the status of the child process.
                 "clone05",
-                "clone08",
                 "clone09",
                 "cpuacct_1_1",
                 "cve-2015-7550",

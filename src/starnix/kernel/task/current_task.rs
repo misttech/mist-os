@@ -1807,10 +1807,22 @@ impl CurrentTask {
                 self.thread_group.add(&child_task)?;
             } else {
                 child.thread_group.add(&child_task)?;
+
+                // These manipulations of the signal handling state appear to be related to
+                // CLONE_SIGHAND and CLONE_VM rather than CLONE_THREAD. However, we do not support
+                // all the combinations of these flags, which means doing these operations here
+                // might actually be correct. However, if you find a test that fails because of the
+                // placement of this logic here, we might need to move it.
                 let mut child_state = child.write();
                 let state = self.read();
                 child_state.set_sigaltstack(state.sigaltstack());
                 child_state.set_signal_mask(state.signal_mask());
+            }
+
+            if !clone_vm {
+                // We do not support running threads in the same process with different
+                // MemoryManagers.
+                assert!(!clone_thread);
                 self.mm().snapshot_to(locked, child.mm())?;
             }
 
@@ -1825,6 +1837,14 @@ impl CurrentTask {
             if clone_child_settid {
                 child.write_object(user_child_tid, &child.id)?;
             }
+
+            // TODO(https://fxbug.dev/42066087): We do not support running different processes with
+            // the same MemoryManager. Instead, we implement a rough approximation of that behavior
+            // by making a copy-on-write clone of the memory from the original process.
+            if clone_vm && !clone_thread {
+                self.mm().snapshot_to(locked, child.mm())?;
+            }
+
             child.thread_state = self.thread_state.snapshot();
             Ok(())
         });
