@@ -16,6 +16,7 @@ use std::process::Command;
 use std::time::Duration;
 use tempfile::Builder;
 use termion::{color, style};
+use tracing::info;
 use {fidl_fuchsia_cpu_profiler as profiler, fidl_fuchsia_test_manager as test_manager};
 
 use schemars::JsonSchema;
@@ -70,6 +71,7 @@ impl FfxMain for ProfilerTool {
     type Writer = Writer;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
+        info!(?self.cmd, "Running profiler...");
         Ok(profiler(self.controller, writer, self.cmd).await?)
     }
 }
@@ -118,6 +120,7 @@ fn gather_targets(opts: &args::Attach) -> Result<fidl_fuchsia_cpu_profiler::Targ
 }
 
 pub async fn symbolize(from: &PathBuf, to: &PathBuf) -> Result<()> {
+    info!("Symbolizing profile...");
     let sdk = ffx_config::global_env_context()
         .context("loading global environment context")?
         .get_sdk()
@@ -140,13 +143,17 @@ pub async fn symbolize(from: &PathBuf, to: &PathBuf) -> Result<()> {
         .map_err(|err| ffx_error!("Failed to wait cmd: {err:?}"))?
         .code()
     {
-        Some(0) => Ok(()),
+        Some(0) => {
+            info!("Symbolizer finished.");
+            Ok(())
+        }
         Some(exit_code) => ffx_bail!("Symbolizer exited with code: {exit_code}"),
         None => ffx_bail!("Symbolizer terminated by signal."),
     }
 }
 
 pub fn pprof_conversion(from: &PathBuf, to: PathBuf) -> Result<()> {
+    info!("Converting to pprof...");
     let from_str = from
         .clone()
         .into_os_string()
@@ -159,9 +166,11 @@ pub fn pprof_conversion(from: &PathBuf, to: PathBuf) -> Result<()> {
     if !samples_to_pprof::convert(from_str, to_str) {
         ffx_bail!("Failed to convert to pprof");
     }
+    info!("pprof conversion complete.");
     Ok(())
 }
 
+#[derive(Debug)]
 struct SessionOpts {
     symbolize: bool,
     print_stats: bool,
@@ -177,6 +186,7 @@ async fn run_session(
     config: profiler::Config,
     opts: SessionOpts,
 ) -> Result<()> {
+    info!(?config, ?opts, "Running profiler session...");
     let (client, server) = fidl::Socket::create_stream();
     let client = fidl::AsyncSocket::from_socket(client);
     let controller = controller.await?;
@@ -188,6 +198,7 @@ async fn run_session(
         })
         .await?
         .map_err(|e| ffx_error!("Failed to start: {:?}", e))?;
+    info!("Profiler session is configured.");
 
     let tmp_dir = Builder::new().prefix("fuchsia_cpu_profiler_").tempdir()?;
 
@@ -201,10 +212,12 @@ async fn run_session(
     let copy_task =
         fuchsia_async::Task::local(async move { futures::io::copy(client, &mut output).await });
 
+    info!("Starting profiler...");
     controller
         .start(&profiler::SessionStartRequest { buffer_results: Some(true), ..Default::default() })
         .await?
         .map_err(|e| ffx_error!("Failed to start: {:?}", e))?;
+    info!("Profiler started.");
 
     if let &Some(duration) = &opts.duration {
         writer.line(format!("Waiting for {} seconds...", duration))?;
@@ -216,6 +229,7 @@ async fn run_session(
         })
         .await;
     }
+    info!("Stopping profiler...");
     let stats = controller.stop().await?;
     if let Some(ref pids) = &stats.missing_process_mappings {
         if !pids.is_empty() {
@@ -245,8 +259,11 @@ async fn run_session(
         writer.machine(&output)?;
         writer.line(format!("\n{output}"))?;
     }
+    info!("Profiler stopped, waiting for copy to complete...");
     copy_task.await?;
+    info!("Copy from profiler completed, resetting profiler...");
     controller.reset().await?;
+    info!("Profiler state reset.");
 
     if !opts.symbolize {
         return Ok(());

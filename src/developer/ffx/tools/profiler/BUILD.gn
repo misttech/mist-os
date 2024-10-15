@@ -35,6 +35,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:tempfile",
     "//third_party/rust_crates:termion",
+    "//third_party/rust_crates:tracing",
   ]
 }
 
