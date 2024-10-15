@@ -30,8 +30,40 @@ using driver_manager::Collection;
 using driver_manager::Node;
 using testing::ElementsAre;
 
+// TODO(https://fxbug.dev/363012744): this fixture enables each test case being run twice, once with
+// the dynamic linker and once not (the legacy path). Once all test cases support the dynamic
+// linker path, we can merge this with the |DriverRunnerTest| base class.
+class DriverRunnerTest2 : public DriverRunnerTest, public ::testing::WithParamInterface<bool> {
+ public:
+  void SetUp() override { use_dynamic_linker_ = GetParam(); }
+
+  void SetupDriverRunner() {
+    if (use_dynamic_linker_) {
+      auto driver_host_runner =
+          std::make_unique<driver_manager::DriverHostRunner>(dispatcher(), ConnectToRealm());
+      DriverRunnerTest::SetupDriverRunnerWithDynamicLinker(dispatcher(),
+                                                           std::move(driver_host_runner));
+    } else {
+      DriverRunnerTest::SetupDriverRunner();
+    }
+  }
+
+  zx::result<StartDriverResult> StartRootDriver() {
+    if (use_dynamic_linker_) {
+      return DriverRunnerTest::StartRootDriverDynamicLinking();
+    } else {
+      return DriverRunnerTest::StartRootDriver();
+    }
+  }
+
+  bool use_dynamic_linker() const { return use_dynamic_linker_; }
+
+ private:
+  bool use_dynamic_linker_ = false;
+};
+
 // Start the root driver.
-TEST_F(DriverRunnerTest, StartRootDriver) {
+TEST_P(DriverRunnerTest2, StartRootDriver) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -1770,5 +1802,14 @@ TEST(NodeTest, ToCollection) {
   EXPECT_EQ(ToCollection(*child2, fdfw::DriverPackageType::kCached), Collection::kFullPackage);
   EXPECT_EQ(ToCollection(*child2, fdfw::DriverPackageType::kUniverse), Collection::kFullPackage);
 }
+
+// The tests are parameterized on whether to use the dynamic linker or not.
+INSTANTIATE_TEST_SUITE_P(/* no prefix */, DriverRunnerTest2, testing::Values(true, false),
+                         [](const testing::TestParamInfo<bool>& info) {
+                           if (info.param) {
+                             return "DynamicLinker";
+                           }
+                           return "Legacy";
+                         });
 
 }  // namespace driver_runner

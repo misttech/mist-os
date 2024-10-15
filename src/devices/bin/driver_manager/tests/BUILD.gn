@@ -44,6 +44,7 @@ source_set("driver_runner_test_fixture") {
     "test_pkg.h",
   ]
   public_deps = [
+    "modules:modules.basic",
     "//sdk/lib/inspect/testing/cpp",
     "//src/devices/bin/driver_manager:driver_runner",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
@@ -52,8 +53,7 @@ source_set("driver_runner_test_fixture") {
   ]
 }
 
-cc_test_executable("driver_runner_test") {
-  testonly = true
+test("driver_runner_test") {
   sources = [ "driver_runner_test.cc" ]
 
   deps = [ ":driver_runner_test_fixture" ]
@@ -89,6 +89,7 @@ fuchsia_component("driver_runner_death_test_component") {
 }
 
 fuchsia_unittest_component("driver-runner-test") {
+  manifest = "meta/driver_runner_test.cml"
   deps = [ ":driver_runner_test" ]
 }
 
