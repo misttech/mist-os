@@ -19,10 +19,11 @@ use crate::vfs::pipe::{new_pipe, PipeFileObject};
 use crate::vfs::timer::TimerFile;
 use crate::vfs::{
     checked_add_offset_and_length, new_memfd, splice, CheckAccessReason, DirentSink64,
-    EpollFileObject, FallocMode, FdFlags, FdNumber, FileAsyncOwner, FileHandle, FileSystemOptions,
-    FlockOperation, FsStr, FsString, LookupContext, NamespaceNode, PathWithReachability,
-    RecordLockCommand, RenameFlags, SeekTarget, StatxFlags, SymlinkMode, SymlinkTarget,
-    TargetFdNumber, TimeUpdateType, UnlinkKind, ValueOrSize, WdNumber, WhatToMount, XattrOp,
+    EpollFileObject, EpollKey, FallocMode, FdFlags, FdNumber, FileAsyncOwner, FileHandle,
+    FileSystemOptions, FlockOperation, FsStr, FsString, LookupContext, NamespaceNode,
+    PathWithReachability, RecordLockCommand, RenameFlags, SeekTarget, StatxFlags, SymlinkMode,
+    SymlinkTarget, TargetFdNumber, TimeUpdateType, UnlinkKind, ValueOrSize, WdNumber, WhatToMount,
+    XattrOp,
 };
 
 use starnix_logging::{log_trace, track_stub};
@@ -2269,6 +2270,10 @@ pub fn sys_epoll_ctl(
         }
         EPOLL_CTL_DEL => {
             epoll_file.delete(&operand_file)?;
+            current_task
+                .kernel()
+                .suspend_resume_manager
+                .remove_epoll(operand_file.weak_handle.as_ptr() as EpollKey);
             operand_file.unregister_epfd(epfd);
         }
         _ => return error!(EINVAL),
