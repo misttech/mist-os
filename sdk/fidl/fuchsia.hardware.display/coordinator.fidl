@@ -9,10 +9,6 @@ using fuchsia.math;
 using fuchsia.sysmem2;
 using zx;
 
-/// Maximum number of fences supported by
-/// [`fuchsia.hardware.display/Coordinator.ApplyConfig2`].
-const APPLY_CONFIG_MAX_SIGNAL_FENCES uint64 = 32;
-
 /// Provides updates from a `Coordinator` to one of its clients.
 open protocol CoordinatorListener {
     /// Called when displays are added or removed.
@@ -379,6 +375,8 @@ closed protocol Coordinator {
         ops vector<ClientCompositionOp>:MAX;
     });
 
+    // TODO(https://fxbug.dev/42152065): Deprecated; use ApplyConfig3() instead.
+    //
     /// Applies any pending changes to the current configuration. This will
     /// not apply pending changes to layers which are not on any display.
     ///
@@ -387,9 +385,9 @@ closed protocol Coordinator {
     /// CheckConfig.
     strict ApplyConfig();
 
-    // TODO(https://fxbug.dev/42152065): This is a temporary solution to support old
-    // ApplyConfig() with new OnVsync() events. Remove this once the migration
-    // is done.
+    // TODO(https://fxbug.dev/42152065): Deprecated; use ApplyConfig3() instead.
+    // This is a temporary solution to support old ApplyConfig() with new OnVsync() events.
+    // Remove this once the migration is done.
     //
     /// Gets the stamp provided with the latest configuration the client
     /// submitted (by calling ApplyConfig()) and the display core driver
@@ -398,6 +396,17 @@ closed protocol Coordinator {
     /// If no configuration was applied before, returns `INVALID_CONFIG_STAMP_VALUE`.
     strict GetLatestAppliedConfigStamp() -> (struct {
         stamp fuchsia.hardware.display.types.ConfigStamp;
+    });
+
+    /// Applies any pending changes to the current configuration. This will
+    /// not apply pending changes to layers which are not on any display.
+    ///
+    /// If the pending configuration cannot be applied, this call will silently
+    /// fail, so the client should ensure its configuration is valid with
+    /// CheckConfig.
+    strict ApplyConfig3(resource table {
+        /// Required. Must be valid and strictly monotonically-increasing.
+        1: stamp fuchsia.hardware.display.types.ConfigStamp;
     });
 
     /// Sets whether or not vsync events will be given to this client. Defaults

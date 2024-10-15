@@ -676,17 +676,38 @@ void Client::CheckConfig(CheckConfigRequestView request, CheckConfigCompleter::S
 }
 
 void Client::ApplyConfig(ApplyConfigCompleter::Sync& /*_completer*/) {
+  ApplyConfigFromFidl(latest_config_stamp_ + ConfigStamp(1));
+}
+
+void Client::ApplyConfig3(ApplyConfig3RequestView request, ApplyConfigCompleter::Sync& _completer) {
+  if (!request->has_stamp()) {
+    FDF_LOG(ERROR, "ApplyConfig3: stamp is required; none was provided");
+    TearDown();
+    return;
+  }
+  ApplyConfigFromFidl(ConfigStamp(request->stamp().value));
+}
+
+void Client::ApplyConfigFromFidl(ConfigStamp new_config_stamp) {
   if (!pending_config_valid_) {
     pending_config_valid_ = CheckConfig(nullptr, nullptr);
     if (!pending_config_valid_) {
-      FDF_LOG(INFO, "Tried to apply invalid config");
+      FDF_LOG(INFO, "Client tried to apply invalid config");
       return;
     }
   }
 
   // Now that we can guarantee that the configuration will be applied, it is
-  // safe to increment the config stamp counter.
-  ++latest_config_stamp_;
+  // safe to update the config stamp.
+  if (new_config_stamp <= latest_config_stamp_) {
+    FDF_LOG(ERROR,
+            "Config stamp must be monotonically increasing.  Previous stamp: %" PRIu64
+            " New stamp: %" PRIu64,
+            latest_config_stamp_.value(), new_config_stamp.value());
+    TearDown();
+    return;
+  }
+  latest_config_stamp_ = new_config_stamp;
 
   // First go through and reset any current layer lists that are changing, so
   // we don't end up trying to put an image into two lists.
