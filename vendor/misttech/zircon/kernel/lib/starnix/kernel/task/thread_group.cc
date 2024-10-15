@@ -33,7 +33,7 @@ ThreadGroupMutableState::ThreadGroupMutableState(ThreadGroup* base,
                                                  fbl::RefPtr<ProcessGroup> _process_group)
     : parent(ktl::move(_parent)), process_group(ktl::move(_process_group)), base_(base) {}
 
-pid_t ThreadGroupMutableState::leader() const { return base_->leader; }
+pid_t ThreadGroupMutableState::leader() const { return base_->leader(); }
 
 fbl::Vector<fbl::RefPtr<ThreadGroup>> ThreadGroupMutableState::children() const {
   fbl::Vector<fbl::RefPtr<ThreadGroup>> children_vec;
@@ -87,29 +87,28 @@ fbl::RefPtr<Task> ThreadGroupMutableState::get_task(pid_t tid) const {
 
 pid_t ThreadGroupMutableState::get_ppid() const {
   if (parent.has_value()) {
-    return parent.value()->leader;
+    return parent.value()->leader();
   }
   return leader();
 }
 
 bool ThreadGroupMutableState::is_waitable() const {
-  //return last_signal.has_value() && base_->load_stopped() != StopState::InProgress;
+  // return last_signal.has_value() && base_->load_stopped() != StopState::InProgress;
   return false;
 }
 
 WaitableChildResult ThreadGroupMutableState::get_waitable_running_children(
-    ProcessSelector selector,
-    const WaitingOptions& options,
-    const PidTable& pids) const {
+    ProcessSelector selector, const WaitingOptions& options, const PidTable& pids) const {
   // Implementation details omitted for brevity
   // This would contain the logic to find and return waitable running children
   // based on the given selector and options
+
   return WaitableChildResult::ShouldWait();
 }
 
 WaitableChildResult ThreadGroupMutableState::get_waitable_child(ProcessSelector selector,
-                                                     const WaitingOptions& options,
-                                                     PidTable& pids) {
+                                                                const WaitingOptions& options,
+                                                                PidTable& pids) {
   return get_waitable_running_children(selector, options, pids);
 }
 
@@ -135,7 +134,7 @@ void ThreadGroup::exit(ExitStatus exit_status, ktl::optional<CurrentTask> curren
     //             .ptrace_event(PtraceOptions::TRACEEXIT, exit_status.signal_info_status() as u64);
   }
 
-  auto pids = kernel->pids.Write();
+  auto pids = kernel_->pids.Write();
   auto state = mutable_state_.Write();
   if (state->terminating) {
     // The thread group is already terminating and all threads in the thread group have
@@ -174,10 +173,10 @@ uint64_t ThreadGroup::get_rlimit(starnix_uapi::Resource resource) const {
 ThreadGroup::~ThreadGroup() = default;
 
 ThreadGroup::ThreadGroup(
-    fbl::RefPtr<Kernel> _kernel, KernelHandle<ProcessDispatcher> _process, pid_t _leader,
+    fbl::RefPtr<Kernel> _kernel, KernelHandle<ProcessDispatcher> process, pid_t leader,
     ktl::optional<starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent,
     fbl::RefPtr<ProcessGroup> process_group)
-    : kernel(ktl::move(_kernel)), process(ktl::move(_process)), leader(_leader) {
+    : kernel_(ktl::move(_kernel)), process_(ktl::move(process)), leader_(leader) {
   ktl::optional<fbl::RefPtr<ThreadGroup>> ptg;
   if (parent.has_value()) {
     *limits.Lock() = *(*parent)->base_->limits.Lock();

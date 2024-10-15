@@ -48,7 +48,7 @@ bool test_clone_pid_and_parent_pid() {
                                starnix_uapi::kSIGCHLD);
   ASSERT_EQ(current_task->get_pid(), thread->get_pid());
   ASSERT_NE(current_task->get_tid(), thread->get_tid());
-  ASSERT_EQ(current_task->thread_group->leader, thread->thread_group->leader);
+  ASSERT_EQ(current_task->thread_group->leader(), thread->thread_group->leader());
 
   auto child_task = (*current_task).clone_task_for_test(0, starnix_uapi::kSIGCHLD);
 
