@@ -622,6 +622,27 @@
         "name": "fuchsia.web/DevToolsPerContextListenerOnHttpPortOpenRequest"
     },
     {
+        "kind": "enum/member",
+        "name": "fuchsia.web/ErrorDetail.CRASH",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.web/ErrorDetail.EXPLICIT_CONTENT_BLOCKED",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.web/ErrorDetail.LOAD_FAILED",
+        "value": "0"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.web/ErrorDetail",
+        "strictness": "flexible",
+        "type": "uint32"
+    },
+    {
         "kind": "table/member",
         "name": "fuchsia.web/Favicon.data",
         "ordinal": "1",
@@ -1715,6 +1736,12 @@
         "name": "fuchsia.web/NavigationState.can_go_forward",
         "ordinal": "4",
         "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.web/NavigationState.error_detail",
+        "ordinal": "8",
+        "type": "fuchsia.web/ErrorDetail"
     },
     {
         "kind": "table/member",

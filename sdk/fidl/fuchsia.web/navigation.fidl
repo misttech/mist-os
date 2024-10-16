@@ -124,6 +124,10 @@ type NavigationState = resource table {
     /// Current favicon for the page. The field is set only when the `FAVICON` flag is set for the
     /// `NavigationEventListener` and the favicon has changed.
     7: favicon Favicon;
+
+    /// Indicates type of the error when `page_type` is set to `ERROR`.
+    @available(added=NEXT)
+    8: error_detail ErrorDetail;
 };
 
 /// Characterizes the type of reload.
@@ -151,6 +155,21 @@ type PageType = strict enum {
 
     /// Error page.
     ERROR = 1;
+};
+
+/// Indicates the reason for the error when `page_type` is set to [`PageType.ERROR`].
+@available(added=NEXT)
+type ErrorDetail = flexible enum {
+    /// Page has failed to load. No content is rendered.
+    LOAD_FAILED = 0;
+
+    /// Tried to navigate to a site blocked by the explicit content filter. The corresponding
+    /// error page is rendered, see
+    /// [`CreateFrameParams.explicit_sites_filter_error_page`].
+    EXPLICIT_CONTENT_BLOCKED = 1;
+
+    /// The renderer process has crashed. No content is rendered.
+    CRASH = 2;
 };
 
 /// Unique identifier of a navigation. Can be used to correlate different phases for the
