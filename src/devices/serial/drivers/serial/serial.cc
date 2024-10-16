@@ -135,6 +135,11 @@ zx_status_t SerialDevice::Enable(bool enable) {
   return ZX_OK;
 }
 
+zx_status_t SerialDevice::CancelAll() {
+  fdf::Arena arena('SERI');
+  return serial_.sync().buffer(arena)->CancelAll().status();
+}
+
 zx_status_t SerialDevice::Bind(fidl::ServerEnd<fuchsia_hardware_serial::Device> server) {
   if (binding_.has_value()) {
     FDF_LOG(WARNING, "SerialDevice::Bind - already bound!");
@@ -149,6 +154,8 @@ zx_status_t SerialDevice::Bind(fidl::ServerEnd<fuchsia_hardware_serial::Device> 
                    [](SerialDevice* self, fidl::UnbindInfo) {
                      FDF_LOG(TRACE, "SerialDevice::Bind - on close");
 
+                     // Clear any pending read or write requests and disable the device.
+                     self->CancelAll();
                      self->Enable(false);
                      self->binding_.reset();
                    });
