@@ -5,9 +5,6 @@
 //! A library to create "pseudo" file systems.  These file systems are backed by in process
 //! callbacks.  Examples are: component configuration, debug information or statistics.
 
-// TODO: https://fxbug.dev/372974038 - Fix leaks and delete the next two lines.
-#![cfg_attr(test, allow(unused_crate_dependencies))]
-#![cfg(any(target_os = "fuchsia", not(test), not(feature = "variant_asan")))]
 #![recursion_limit = "1024"]
 
 pub mod test_utils;
