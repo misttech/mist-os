@@ -76,73 +76,54 @@ fn import_value_from_fidl(value: Value) -> Result<(Param, ParamInfo), Error> {
 }
 
 fn import_buffer_from_fidl(buffer: Buffer) -> Result<(Param, ParamInfo), Error> {
-    match buffer.direction {
-        Some(direction) => {
-            match direction {
-                Direction::Input | Direction::Inout => {
-                    let vmo = buffer.vmo;
-                    let mapped_length = match buffer.size {
-                        None => 0,
-                        Some(size) => size as usize,
-                    };
-                    let mapping_offset = match buffer.offset {
-                        None => anyhow::bail!("Missing offset"),
-                        Some(offset) => offset,
-                    };
-                    let (vmo, mapped_address, mapped_length) = if let Some(vmo) = vmo {
-                        let flags = match direction {
-                            Direction::Input => zx::VmarFlags::PERM_READ,
-                            Direction::Inout => {
-                                zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE
-                            }
-                            _ => anyhow::bail!("Invalid direction"),
-                        };
-                        let addr = fuchsia_runtime::vmar_root_self()
-                            .map(0, &vmo, mapping_offset, mapped_length, flags)
-                            .map_err(|e| anyhow::anyhow!("Unable to map VMO: {e:?}"))?;
+    if let Some(direction) = buffer.direction {
+        let vmo = buffer.vmo;
+        let mapped_length = match buffer.size {
+            None => 0,
+            Some(size) => size as usize,
+        };
+        let mapping_offset = match buffer.offset {
+            None => anyhow::bail!("Missing offset"),
+            Some(offset) => offset,
+        };
+        let (vmo, mapped_address, mapped_length) = if let Some(vmo) = vmo {
+            let flags = match direction {
+                Direction::Input => zx::VmarFlags::PERM_READ,
+                Direction::Inout | Direction::Output => {
+                    zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE
+                }
+            };
+            let addr = fuchsia_runtime::vmar_root_self()
+                .map(0, &vmo, mapping_offset, mapped_length, flags)
+                .map_err(|e| anyhow::anyhow!("Unable to map VMO: {e:?}"))?;
 
-                        (Some(vmo), addr, mapped_length)
-                    } else {
-                        // The VMO can be omitted meaning that no memory is
-                        // mapped. This is useful for asking the TA to compute
-                        // the size of a buffer needed for an operation. In this
-                        // case, the null address is provided as the buffer
-                        // address.
-                        (None, 0, 0)
-                    };
-                    return Ok((
-                        Param {
-                            memref: tee_internal::MemRef {
-                                buffer: mapped_address as *mut u8,
-                                size: mapped_length,
-                            },
-                        },
-                        ParamInfo::Memref(Memref {
-                            direction,
-                            vmo,
-                            offset: Some(mapping_offset),
-                            original_size: mapped_length,
-                            mapped_address,
-                            mapped_length,
-                        }),
-                    ));
-                }
-                Direction::Output => {
-                    return Ok((
-                        empty_tee_param(),
-                        ParamInfo::Memref(Memref {
-                            direction,
-                            vmo: None,
-                            offset: None,
-                            original_size: 0,
-                            mapped_address: 0,
-                            mapped_length: 0,
-                        }),
-                    ))
-                }
-            }
-        }
-        None => anyhow::bail!("Invalid direction"),
+            (Some(vmo), addr, mapped_length)
+        } else {
+            // The VMO can be omitted meaning that no memory is
+            // mapped. This is useful for asking the TA to compute
+            // the size of a buffer needed for an operation. In this
+            // case, the null address is provided as the buffer
+            // address.
+            (None, 0, 0)
+        };
+        return Ok((
+            Param {
+                memref: tee_internal::MemRef {
+                    buffer: mapped_address as *mut u8,
+                    size: mapped_length,
+                },
+            },
+            ParamInfo::Memref(Memref {
+                direction,
+                vmo,
+                offset: Some(mapping_offset),
+                original_size: mapped_length,
+                mapped_address,
+                mapped_length,
+            }),
+        ));
+    } else {
+        anyhow::bail!("Invalid direction")
     }
 }
 
@@ -379,6 +360,8 @@ mod test {
         vmo1.write(&[1, 2, 3, 4], 0).unwrap();
         let vmo2 = zx::Vmo::create(3 * page_size).unwrap();
         vmo2.write(&[5, 6, 7, 8], page_size).unwrap();
+        let vmo3 = zx::Vmo::create(page_size).unwrap();
+        vmo3.write(&[9, 10, 11, 12], 0).unwrap();
 
         let fidl_parameters = vec![
             ftee::Parameter::Buffer(Buffer {
@@ -402,13 +385,20 @@ mod test {
                 size: Some(0),
                 ..Default::default()
             }),
+            ftee::Parameter::Buffer(Buffer {
+                direction: Some(Direction::Output),
+                vmo: Some(vmo3),
+                offset: Some(0),
+                size: Some(page_size),
+                ..Default::default()
+            }),
         ];
 
         let (mut adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters)?;
         assert_eq!(param_types.get(0), ParamType::MemrefInout);
         assert_eq!(param_types.get(1), ParamType::MemrefInput);
         assert_eq!(param_types.get(2), ParamType::MemrefInout);
-        assert_eq!(param_types.get(3), ParamType::None);
+        assert_eq!(param_types.get(3), ParamType::MemrefOutput);
 
         let tee_params = adapter.tee_params_mut();
         // Accessing the 'value' field of the parameter's union is unsafe as it
@@ -429,10 +419,14 @@ mod test {
         assert_eq!(value.size, 0);
         assert_eq!(value.buffer, std::ptr::null_mut());
 
-        for i in 3..4 {
-            let value = unsafe { tee_params[i].value };
-            assert_eq!(value, ValueFields { a: 0, b: 0 });
-        }
+        // An output parameter should be mapped at this point with its
+        // original contents.
+        let value = unsafe { tee_params[3].memref };
+        assert_eq!(value.size, page_size as usize);
+        assert!(value.buffer != std::ptr::null_mut());
+        let memref_contents = unsafe { std::slice::from_raw_parts(value.buffer, 4) };
+        assert_eq!(memref_contents, &[9, 10, 11, 12]);
+
         Ok(())
     }
 
