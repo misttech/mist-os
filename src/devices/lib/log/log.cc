@@ -77,8 +77,8 @@ void Logger::VLogWrite(FuchsiaLogSeverity severity, const char* tag, const char*
     file = StripFile(file, severity);
   }
   BeginRecord(buffer, severity, file, line, fmt_string);
-  for (const auto& tag : tags_) {
-    buffer.WriteKeyValue("tag", tag);
+  for (const auto& global_tag : global_tags_) {
+    buffer.WriteKeyValue("tag", global_tag);
   }
   if (tag) {
     buffer.WriteKeyValue("tag", tag);

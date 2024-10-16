@@ -127,11 +127,13 @@ zx_status_t VmoPool::Init(cpp20::span<zx::unowned_vmo> vmos) {
   zx_status_t status = [&]() {
     for (size_t i = 0; i < vmos.size(); ++i) {
       free_buffers_.push_front(&buffers_[i]);
-      if (zx_status_t status = vmos[i]->get_size(&buffers_[i].buffer_size); status != ZX_OK) {
-        return status;
+      if (zx_status_t get_size_status = vmos[i]->get_size(&buffers_[i].buffer_size);
+          get_size_status != ZX_OK) {
+        return get_size_status;
       }
-      if (status = vmos[i]->duplicate(ZX_RIGHT_SAME_RIGHTS, &buffers_[i].vmo); status != ZX_OK) {
-        return status;
+      if (zx_status_t duplicate_status = vmos[i]->duplicate(ZX_RIGHT_SAME_RIGHTS, &buffers_[i].vmo);
+          duplicate_status != ZX_OK) {
+        return duplicate_status;
       }
     }
     return ZX_OK;
