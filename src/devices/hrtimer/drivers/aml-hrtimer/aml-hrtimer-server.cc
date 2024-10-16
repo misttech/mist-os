@@ -4,6 +4,7 @@
 #include "src/devices/hrtimer/drivers/aml-hrtimer/aml-hrtimer-server.h"
 
 #include <lib/driver/logging/cpp/structured_logger.h>
+#include <lib/fit/defer.h>
 
 #include <variant>
 
@@ -25,14 +26,22 @@ AmlHrtimerServer::AmlHrtimerServer(
     fidl::Client<fuchsia_power_broker::RequiredLevel> required_level,
     fidl::SyncClient<fuchsia_power_system::ActivityGovernor> sag, zx::interrupt irq_a,
     zx::interrupt irq_b, zx::interrupt irq_c, zx::interrupt irq_d, zx::interrupt irq_f,
-    zx::interrupt irq_g, zx::interrupt irq_h, zx::interrupt irq_i)
+    zx::interrupt irq_g, zx::interrupt irq_h, zx::interrupt irq_i,
+    inspect::ComponentInspector& inspect)
     : element_control_(std::move(element_control)),
       current_level_(std::move(current_level)),
       required_level_(std::move(required_level)),
-      sag_(std::move(sag)) {
+      sag_(std::move(sag)),
+      inspect_node_(inspect.root().CreateChild("hrtimer-trace")) {
   mmio_.emplace(std::move(mmio));
   dispatcher_ = dispatcher;
   wake_handling_lessor_ = std::move(lessor);
+  lease_requests_ = inspect_node_.CreateUint("lease_requests", 0);
+  lease_replies_ = inspect_node_.CreateUint("lease_replies", 0);
+  update_requests_ = inspect_node_.CreateUint("update_requests", 0);
+  update_replies_ = inspect_node_.CreateUint("update_replies", 0);
+  irq_entries_ = inspect_node_.CreateUint("irq_entries", 0);
+  irq_exits_ = inspect_node_.CreateUint("irq_exits", 0);
 
   timers_[0].irq_handler.set_object(irq_a.get());
   timers_[1].irq_handler.set_object(irq_b.get());
@@ -83,7 +92,9 @@ void AmlHrtimerServer::WatchRequiredLevel() {
           return;
         }
         FDF_LOG(DEBUG, "RequiredLevel : %u", static_cast<uint8_t>(result->required_level()));
+        update_requests_.Add(1);
         auto result_current = current_level_->Update(result->required_level());
+        update_replies_.Add(1);
         if (result_current.is_error()) {
           // TODO(https://fxbug.dev/342125175): Consider a different strategy to handle errors
           // when interacting with the power framework.
@@ -99,6 +110,9 @@ void AmlHrtimerServer::WatchRequiredLevel() {
 void AmlHrtimerServer::Timer::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq_base,
                                         zx_status_t status,
                                         const zx_packet_interrupt_t* interrupt) {
+  parent.IrqEntries().Add(1);
+  auto report_irq_exit = fit::defer([this]() { this->parent.IrqExits().Add(1); });
+
   // Do not log canceled cases; these happen particularly frequently in certain test cases.
   if (status != ZX_ERR_CANCELED && status != ZX_OK) {
     FDF_LOG(INFO, "IRQ timer id: %zu triggered: %s", properties.id, zx_status_get_string(status));
@@ -138,7 +152,9 @@ void AmlHrtimerServer::Timer::HandleIrq(async_dispatcher_t* dispatcher, async::I
         overloaded{[&](StartAndWaitCompleter::Async& completer) {
                      FDF_LOG(INFO, "Timer id: %zu IRQ w/wait triggered, last ticks: %lu",
                              properties.id, last_ticks);
+                     parent.lease_requests_.Add(1);
                      auto lease_control = parent.LeaseWakeHandling();
+                     parent.lease_replies_.Add(1);
                      if (lease_control.is_error()) {
                        completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kBadState));
                      } else {
@@ -149,7 +165,9 @@ void AmlHrtimerServer::Timer::HandleIrq(async_dispatcher_t* dispatcher, async::I
                    [&](StartAndWait2Completer::Async& completer) {
                      FDF_LOG(INFO, "Timer id: %zu IRQ w/wait2 triggered, last ticks: %lu",
                              properties.id, last_ticks);
+                     parent.lease_requests_.Add(1);
                      auto wake_lease = parent.sag_->TakeWakeLease(std::string("aml-hrtimer"));
+                     parent.lease_replies_.Add(1);
                      if (wake_lease.is_error()) {
                        completer.Reply(zx::error(fuchsia_hardware_hrtimer::DriverError::kBadState));
                      } else {
@@ -179,6 +197,9 @@ void AmlHrtimerServer::Timer::HandleIrq(async_dispatcher_t* dispatcher, async::I
     FDF_LOG(ERROR, "IRQ timer id: %zu invalid IRQ", properties.id);
   }
 }
+
+AmlHrtimerServer::Timer::Timer(AmlHrtimerServer& server, TimersProperties& props)
+    : parent(server), properties(props) {}
 
 // To get the lease on WakeHandling satisfied, we WatchStatus on the LeaseControl protocol.
 // This method is called only if we have a power_enabled_wait_completer, i.e. we have determined
