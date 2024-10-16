@@ -77,10 +77,16 @@ class TaskBuilder {
   /// impl TaskBuilder
   explicit TaskBuilder(fbl::RefPtr<Task> task);
 
+  /// C++
+
+  // Deref
   Task* operator->();
   const Task* operator->() const;
 
-  // C++
+  // Move support
+  TaskBuilder(TaskBuilder&& other);
+  TaskBuilder& operator=(TaskBuilder&& other);
+
   const fbl::RefPtr<Task>& task() const { return task_; }
   fbl::RefPtr<Task>& task() { return task_; }
 
@@ -88,6 +94,10 @@ class TaskBuilder {
   const ThreadState& thread_state() const { return thread_state_; }
 
   ~TaskBuilder();
+
+ private:
+  // move semantics only
+  DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(TaskBuilder);
 };
 
 class Kernel;

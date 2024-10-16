@@ -44,6 +44,8 @@ TaskBuilder create_test_init_task(fbl::RefPtr<Kernel> kernel, fbl::RefPtr<FsCont
   auto init_task =
       CurrentTask::create_init_process(kernel, init_pid, "test-task", fs, ktl::move(rlimits));
 
+  ZX_ASSERT_MSG(init_task.is_ok(), "failed to create first task");
+
   init_task->mm()->initialize_mmap_layout_for_test();
 
   auto system_task = CurrentTask::create_system_task(kernel, fs);

@@ -83,7 +83,7 @@ fit::result<Errno, pid_t> do_clone(CurrentTask& current_task, struct clone_args 
       UserRef<pid_t>::New(UserAddress::from((args.child_tid)))) _EP(task_builder);
   // Set the result register to 0 for the return value from clone in the
   // cloned process.
-  auto new_task = task_builder.value();
+  auto new_task = ktl::move(task_builder.value());
   new_task.thread_state().registers.set_return_register(0);
   // let (trace_kind, ptrace_state) = current_task.get_ptrace_core_state_for_clone(args);
 
@@ -103,7 +103,7 @@ fit::result<Errno, pid_t> do_clone(CurrentTask& current_task, struct clone_args 
   auto tid = new_task.task()->id();
   // auto task_ref = util::WeakPtr(new_task.task.get());
   execute_task(
-      new_task,
+      ktl::move(new_task),
       [](CurrentTask& current_task) -> fit::result<Errno> {
         auto maybe_thread = current_task->thread().Write();
         if (maybe_thread->has_value()) {

@@ -63,6 +63,17 @@ namespace starnix {
 
 TaskBuilder::TaskBuilder(fbl::RefPtr<Task> task) : task_(ktl::move(task)) {}
 
+TaskBuilder::TaskBuilder(TaskBuilder&& other) {
+  task_ = ktl::move(other.task_);
+  thread_state_ = ktl::move(other.thread_state_);
+}
+
+TaskBuilder& TaskBuilder::operator=(TaskBuilder&& other) {
+  task_ = ktl::move(other.task_);
+  thread_state_ = ktl::move(other.thread_state_);
+  return *this;
+}
+
 TaskBuilder::~TaskBuilder() = default;
 
 const Task* TaskBuilder::operator->() const {
@@ -139,7 +150,10 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_init_child_process(
     return create_zircon_process(kernel, {}, pid, process_group, initial_name);
   };
 
-  return create_task(kernel, initial_name, init_task->fs()->fork(), task_info_factory);
+  auto task =
+      create_task(kernel, initial_name, init_task->fs()->fork(), task_info_factory) _EP(task);
+
+  return fit::ok(ktl::move(task.value()));
 }
 
 template <typename TaskInfoFactory>
@@ -199,7 +213,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_task_with_pid(
     pids->add_thread_group(builder->thread_group());
   }
 
-  return fit::ok(builder);
+  return fit::ok(ktl::move(builder));
 }
 
 fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
@@ -355,8 +369,9 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
 
   auto& [thread, thread_group, memory_manager] = task_info.value();
 
-  auto child = TaskBuilder(Task::New(pid, command, thread_group, ktl::move(thread), files,
-                                     memory_manager, fs, creds, child_exit_signal));
+  auto child =
+      TaskBuilder(Task::New(pid, command, ktl::move(thread_group), ktl::move(thread), files,
+                            ktl::move(memory_manager), fs, creds, child_exit_signal));
 
   {
     auto child_task = child.task();
@@ -420,7 +435,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
       let _l2 = child.read();
   }
   */
-  return fit::ok(child);
+  return fit::ok(ktl::move(child));
 }
 
 void CurrentTask::thread_group_exit(ExitStatus exit_status) {
