@@ -18,6 +18,7 @@
         { protocol: "fuchsia.driver.framework.CompositeNodeManager" },
         { service: "fuchsia.driver.compat.Service" },
         { service: "fuchsia.hardware.gpio.Service" },
+        { service: "fuchsia.hardware.pin.Service" },
         { service: "fuchsia.hardware.platform.bus.Service" },
     ],
 }

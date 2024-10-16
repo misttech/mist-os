@@ -6,6 +6,7 @@ composite post_init;
 
 using fuchsia.amlogic.platform.t931;
 using fuchsia.google.platform;
+using fuchsia.gpio;
 using fuchsia.hardware.gpio;
 using fuchsia.hardware.platform.bus;
 
@@ -50,4 +51,8 @@ node "disp-soc-id1" {
 node "disp-soc-id2" {
   fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.t931.GPIOH_PIN_ID.PIN_2;
+}
+
+node "gpio-init" {
+  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
 }

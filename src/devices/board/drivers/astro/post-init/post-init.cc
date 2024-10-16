@@ -128,8 +128,6 @@ zx::result<> PostInit::SetBoardInfo() {
 }
 
 zx::result<uint8_t> PostInit::ReadGpios(cpp20::span<const char* const> node_names) {
-  constexpr uint64_t kAmlogicAltFunctionGpio = 0;
-
   uint8_t value = 0;
 
   for (size_t i = 0; i < node_names.size(); i++) {
@@ -142,41 +140,21 @@ zx::result<uint8_t> PostInit::ReadGpios(cpp20::span<const char* const> node_name
     fidl::SyncClient<fuchsia_hardware_gpio::Gpio> gpio_client(*std::move(gpio));
 
     {
-      fidl::Result<fuchsia_hardware_gpio::Gpio::SetAltFunction> result =
-          gpio_client->SetAltFunction(kAmlogicAltFunctionGpio);
+      fidl::Result<fuchsia_hardware_gpio::Gpio::SetBufferMode> result =
+          gpio_client->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kInput);
       if (result.is_error()) {
         if (result.error_value().is_framework_error()) {
-          FDF_LOG(ERROR, "Call to SetAltFunction failed: %s",
+          FDF_LOG(ERROR, "Call to SetBufferMode failed: %s",
                   result.error_value().framework_error().FormatDescription().c_str());
           return zx::error(result.error_value().framework_error().status());
         }
         if (result.error_value().is_domain_error()) {
-          FDF_LOG(ERROR, "SetAltFunction failed: %s",
+          FDF_LOG(ERROR, "SetBufferMode failed: %s",
                   zx_status_get_string(result.error_value().domain_error()));
           return zx::error(result.error_value().domain_error());
         }
 
-        FDF_LOG(ERROR, "Unknown error from call to SetAltFunction");
-        return zx::error(ZX_ERR_BAD_STATE);
-      }
-    }
-
-    {
-      fidl::Result<fuchsia_hardware_gpio::Gpio::ConfigIn> result =
-          gpio_client->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kNoPull);
-      if (result.is_error()) {
-        if (result.error_value().is_framework_error()) {
-          FDF_LOG(ERROR, "Call to ConfigIn failed: %s",
-                  result.error_value().framework_error().FormatDescription().c_str());
-          return zx::error(result.error_value().framework_error().status());
-        }
-        if (result.error_value().is_domain_error()) {
-          FDF_LOG(ERROR, "ConfigIn failed: %s",
-                  zx_status_get_string(result.error_value().domain_error()));
-          return zx::error(result.error_value().domain_error());
-        }
-
-        FDF_LOG(ERROR, "Unknown error from call to ConfigIn");
+        FDF_LOG(ERROR, "Unknown error from call to SetBufferMode");
         return zx::error(ZX_ERR_BAD_STATE);
       }
     }

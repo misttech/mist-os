@@ -23,6 +23,7 @@
 #include <bind/fuchsia/amlogic/platform/t931/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/google/platform/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/platform/bus/cpp/bind.h>
 #include <fbl/algorithm.h>
@@ -154,15 +155,15 @@ int Sherlock::Start() {
     return -1;
   }
 
+  if (AddPostInitDevice() != ZX_OK) {
+    zxlogf(ERROR, "AddPostInitDevice() failed");
+    return -1;
+  }
+
   // GpioInit() must be called after other subsystems that bind to GPIO have had a chance to add
   // their init steps.
   if (GpioInit() != ZX_OK) {
     zxlogf(ERROR, "GpioInit() failed");
-    return -1;
-  }
-
-  if (AddPostInitDevice() != ZX_OK) {
-    zxlogf(ERROR, "AddPostInitDevice() failed");
     return -1;
   }
 
@@ -243,6 +244,8 @@ void Sherlock::DdkInit(ddk::InitTxn txn) { txn.Reply(Start() == 0 ? ZX_OK : ZX_E
 void Sherlock::DdkRelease() { delete this; }
 
 zx_status_t Sherlock::AddPostInitDevice() {
+  constexpr uint64_t kAmlogicAltFunctionGpio = 0;
+
   constexpr std::array<uint32_t, 7> kPostInitGpios{
       bind_fuchsia_amlogic_platform_t931::GPIOA_PIN_ID_PIN_11,
       bind_fuchsia_amlogic_platform_t931::GPIOA_PIN_ID_PIN_12,
@@ -271,6 +274,15 @@ zx_status_t Sherlock::AddPostInitDevice() {
   };
 
   auto spec = ddk::CompositeNodeSpec(post_init_rules, post_init_properties);
+
+  const ddk::BindRule gpio_init_rules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+  const device_bind_prop_t gpio_init_properties[] = {
+      ddk::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+  spec.AddParentSpec(gpio_init_rules, gpio_init_properties);
+
   for (const uint32_t pin : kPostInitGpios) {
     const ddk::BindRule gpio_rules[] = {
         ddk::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
@@ -283,6 +295,14 @@ zx_status_t Sherlock::AddPostInitDevice() {
         ddk::MakeProperty(bind_fuchsia::GPIO_PIN, pin),
     };
     spec.AddParentSpec(gpio_rules, gpio_properties);
+
+    gpio_init_steps_.push_back(fuchsia_hardware_pinimpl::InitStep::WithCall({{
+        .pin = pin,
+        .call = fuchsia_hardware_pinimpl::InitCall::WithPinConfig({{
+            .pull = fuchsia_hardware_pin::Pull::kNone,
+            .function = kAmlogicAltFunctionGpio,
+        }}),
+    }}));
   }
 
   if (zx_status_t status = DdkAddCompositeNodeSpec("post-init", spec); status != ZX_OK) {

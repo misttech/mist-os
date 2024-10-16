@@ -19,6 +19,7 @@
 #include <bind/fuchsia/amlogic/platform/s905d2/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/google/platform/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/platform/bus/cpp/bind.h>
 #include <fbl/algorithm.h>
@@ -73,15 +74,15 @@ int Astro::Thread() {
     zxlogf(ERROR, "ClkInit failed: %d", status);
   }
 
+  if ((status = AddPostInitDevice()) != ZX_OK) {
+    zxlogf(ERROR, "AddPostInitDevice() failed: %s", zx_status_get_string(status));
+    return status;
+  }
+
   // GpioInit() must be called after other subsystems that bind to GPIO have had a chance to add
   // their init steps.
   if ((status = GpioInit()) != ZX_OK) {
     zxlogf(ERROR, "%s: GpioInit() failed: %d", __func__, status);
-    return status;
-  }
-
-  if ((status = AddPostInitDevice()) != ZX_OK) {
-    zxlogf(ERROR, "AddPostInitDevice() failed: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -226,6 +227,8 @@ zx_status_t Astro::Create(void* ctx, zx_device_t* parent) {
 }
 
 zx_status_t Astro::AddPostInitDevice() {
+  constexpr uint64_t kAmlogicAltFunctionGpio = 0;
+
   constexpr std::array<uint32_t, 6> kPostInitGpios{
       bind_fuchsia_amlogic_platform_s905d2::GPIOZ_PIN_ID_PIN_3,
       bind_fuchsia_amlogic_platform_s905d2::GPIOH_PIN_ID_PIN_5,
@@ -253,6 +256,15 @@ zx_status_t Astro::AddPostInitDevice() {
   };
 
   auto spec = ddk::CompositeNodeSpec(post_init_rules, post_init_properties);
+
+  const ddk::BindRule gpio_init_rules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+  const device_bind_prop_t gpio_init_properties[] = {
+      ddk::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+  spec.AddParentSpec(gpio_init_rules, gpio_init_properties);
+
   for (const uint32_t pin : kPostInitGpios) {
     const ddk::BindRule gpio_rules[] = {
         ddk::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
@@ -265,6 +277,9 @@ zx_status_t Astro::AddPostInitDevice() {
         ddk::MakeProperty(bind_fuchsia::GPIO_PIN, pin),
     };
     spec.AddParentSpec(gpio_rules, gpio_properties);
+
+    gpio_init_steps_.push_back(GpioFunction(pin, kAmlogicAltFunctionGpio));
+    gpio_init_steps_.push_back(GpioPull(pin, fuchsia_hardware_pin::Pull::kNone));
   }
 
   if (zx_status_t status = DdkAddCompositeNodeSpec("post-init", spec); status != ZX_OK) {
