@@ -13,6 +13,7 @@
 #include <lib/mistos/starnix/kernel/vfs/fs_context.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/util/weak_wrapper.h>
+#include <trace.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
@@ -21,6 +22,10 @@
 #include <fbl/ref_ptr.h>
 #include <ktl/unique_ptr.h>
 #include <object/thread_dispatcher.h>
+
+#include "../kernel_priv.h"
+
+#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 namespace starnix {
 
@@ -63,10 +68,38 @@ Task::Task(pid_t id, fbl::RefPtr<ThreadGroup> thread_group,
       files_(files),
       mm_(ktl::move(mm)),
       fs_(ktl::move(fs)) {
-  //*thread.Write() = ktl::move(_thread);
+  *thread_.Write() = ktl::move(thread);
+
+  LTRACEF("Task(%p)\n", this);
 }
 
-Task::~Task() = default;
+Task::~Task() { LTRACEF("~Task(%p)\n", this); }
+
+void Task::release(ThreadState context) {
+  LTRACE;
+
+  // ZX_ASSERT(IsLastReference());
+
+  // Release the fd table
+  files_.release();
+
+  // Signal vfork completion if needed
+  // signal_vfork();
+
+  // Drop fields that can end up owning a FsNode to ensure no FsNode are owned by this task
+  fs_.reset();
+  mm_.reset();
+
+  // Rebuild a temporary CurrentTask to run the release actions that require a CurrentState
+  auto current_task = CurrentTask::New(fbl::RefPtr<Task>(this), context);
+
+  // Apply any delayed releasers left
+  // current_task.trigger_delayed_releaser();
+
+  // auto task = current_task.task().reset();
+  //  Release the ThreadGroup
+  thread_group_->release();
+}
 
 fbl::RefPtr<FsContext> Task::fs() const {
   ASSERT_MSG(fs_.has_value(), "fs must be set");

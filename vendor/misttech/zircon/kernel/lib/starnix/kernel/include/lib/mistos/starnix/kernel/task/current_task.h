@@ -128,9 +128,13 @@ class CurrentTask : public TaskMemoryAccessor {
   static CurrentTask From(const TaskBuilder& builder);
 
   /// impl CurrentTask
+  static CurrentTask New(fbl::RefPtr<Task> task, ThreadState thread_state);
+
   util::WeakPtr<Task> weak_task() const;
 
   void set_creds(Credentials creds) const;
+
+  void release();
 
   /// Determine namespace node indicated by the dir_fd.
   ///

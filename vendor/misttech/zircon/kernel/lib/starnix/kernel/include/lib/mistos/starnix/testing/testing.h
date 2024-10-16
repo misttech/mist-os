@@ -43,6 +43,8 @@ class AutoReleasableTask {
     return task_.value();
   }
 
+  // ~AutoReleasableTask() { task_->release(); }
+
  private:
   explicit AutoReleasableTask(ktl::optional<starnix::CurrentTask> task) : task_(ktl::move(task)) {}
 
