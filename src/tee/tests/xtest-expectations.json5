@@ -7,6 +7,7 @@
             type: "expect_pass",
             matchers: [
                 "regression1007",
+                "regression1012",
                 "regression1014",
                 "regression1038",
             ],
@@ -18,7 +19,6 @@
                 "regression1008",
                 "regression1010",
                 "regression1011",
-                "regression1012",
                 "regression1013",
                 "regression1021",
                 "regression1040",
