@@ -330,7 +330,7 @@ impl FunctionFsRootDir {
             return Ok(());
         }
         let (device_proxy, adb_proxy, adb_proxy_resume_event) =
-            connect_to_device(AdbProxyMode::None)?;
+            connect_to_device(AdbProxyMode::WakeContainer)?;
         state.device_proxy = Some(device_proxy);
 
         let (command_sender, command_receiver) = async_channel::unbounded();
