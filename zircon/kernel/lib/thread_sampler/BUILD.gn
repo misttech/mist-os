@@ -17,7 +17,9 @@ zx_library("thread_sampler") {
     "//src/performance/lib/fxt",
     "//zircon/kernel/lib/boot-options",
     "//zircon/kernel/lib/init",
-    "//zircon/kernel/object",
   ]
-  public_deps = [ "//src/performance/lib/fxt:headers" ]
+  public_deps = [
+    "//src/performance/lib/fxt:headers",
+    "//zircon/kernel/object:headers",
+  ]
 }
