@@ -77,47 +77,54 @@ fn import_value_from_fidl(value: Value) -> Result<(Param, ParamInfo), Error> {
 
 fn import_buffer_from_fidl(buffer: Buffer) -> Result<(Param, ParamInfo), Error> {
     if let Some(direction) = buffer.direction {
-        let vmo = buffer.vmo;
-        let mapped_length = match buffer.size {
-            None => 0,
-            Some(size) => size as usize,
-        };
         let mapping_offset = match buffer.offset {
             None => anyhow::bail!("Missing offset"),
             Some(offset) => offset,
         };
-        let (vmo, mapped_address, mapped_length) = if let Some(vmo) = vmo {
+        let (vmo, mapped_address, data_size, mapped_length) = if let Some(vmo) = buffer.vmo {
             let flags = match direction {
                 Direction::Input => zx::VmarFlags::PERM_READ,
                 Direction::Inout | Direction::Output => {
                     zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE
                 }
             };
+
+            // A zero-length buffer at a valid address is okay, but that
+            // should be presented to the TA as valid memory. This manifests
+            // here as a VMO being provided with a size of zero: in that case
+            // we accordingly map in a zero-filled page - not trusting that the
+            // provided VMO has non-zero content - and specify a buffer of size
+            // 0 rooted at that address.
+            let data_size: usize = buffer.size.unwrap_or(0).try_into().unwrap();
+            let page_size: usize = zx::system_get_page_size().try_into().unwrap();
+            let (vmo, mapped_length) = if data_size == 0 {
+                (zx::Vmo::create(page_size as u64)?, page_size)
+            } else {
+                (vmo, data_size)
+            };
+
             let addr = fuchsia_runtime::vmar_root_self()
                 .map(0, &vmo, mapping_offset, mapped_length, flags)
                 .map_err(|e| anyhow::anyhow!("Unable to map VMO: {e:?}"))?;
 
-            (Some(vmo), addr, mapped_length)
+            (Some(vmo), addr, data_size, mapped_length)
         } else {
             // The VMO can be omitted meaning that no memory is
             // mapped. This is useful for asking the TA to compute
             // the size of a buffer needed for an operation. In this
             // case, the null address is provided as the buffer
             // address.
-            (None, 0, 0)
+            (None, 0, 0, 0)
         };
         return Ok((
             Param {
-                memref: tee_internal::MemRef {
-                    buffer: mapped_address as *mut u8,
-                    size: mapped_length,
-                },
+                memref: tee_internal::MemRef { buffer: mapped_address as *mut u8, size: data_size },
             },
             ParamInfo::Memref(Memref {
                 direction,
                 vmo,
                 offset: Some(mapping_offset),
-                original_size: mapped_length,
+                original_size: data_size,
                 mapped_address,
                 mapped_length,
             }),
@@ -426,6 +433,62 @@ mod test {
         assert!(value.buffer != std::ptr::null_mut());
         let memref_contents = unsafe { std::slice::from_raw_parts(value.buffer, 4) };
         assert_eq!(memref_contents, &[9, 10, 11, 12]);
+
+        Ok(())
+    }
+
+    // Empty VMO parameters should result in empty buffers within a mapped
+    // page.
+    #[fuchsia::test]
+    fn fidl_parameter_with_empty_buffers() -> Result<(), Error> {
+        let empty1 = zx::Vmo::create(0).unwrap();
+        let empty2 = zx::Vmo::create(0).unwrap();
+        let empty3 = zx::Vmo::create(0).unwrap();
+
+        let fidl_parameters = vec![
+            ftee::Parameter::Buffer(Buffer {
+                direction: Some(Direction::Input),
+                vmo: Some(empty1),
+                offset: Some(0),
+                size: Some(0),
+                ..Default::default()
+            }),
+            ftee::Parameter::Buffer(Buffer {
+                direction: Some(Direction::Inout),
+                vmo: Some(empty2),
+                offset: Some(0),
+                size: Some(0),
+                ..Default::default()
+            }),
+            ftee::Parameter::Buffer(Buffer {
+                direction: Some(Direction::Output),
+                vmo: Some(empty3),
+                offset: Some(0),
+                size: Some(0),
+                ..Default::default()
+            }),
+        ];
+
+        let (mut adapter, param_types) = ParamAdapter::from_fidl(fidl_parameters)?;
+        assert_eq!(param_types.get(0), ParamType::MemrefInput);
+        assert_eq!(param_types.get(1), ParamType::MemrefInout);
+        assert_eq!(param_types.get(2), ParamType::MemrefOutput);
+        assert_eq!(param_types.get(3), ParamType::None);
+
+        let tee_params = adapter.tee_params_mut();
+        // Accessing the 'value' field of the parameter's union is unsafe as it
+        // is a repr(C) union and carries no type information.
+        let value = unsafe { tee_params[0].memref };
+        assert_eq!(value.size, 0);
+        assert!(value.buffer != std::ptr::null_mut());
+
+        let value = unsafe { tee_params[1].memref };
+        assert_eq!(value.size, 0);
+        assert!(value.buffer != std::ptr::null_mut());
+
+        let value = unsafe { tee_params[2].memref };
+        assert_eq!(value.size, 0);
+        assert!(value.buffer != std::ptr::null_mut());
 
         Ok(())
     }
