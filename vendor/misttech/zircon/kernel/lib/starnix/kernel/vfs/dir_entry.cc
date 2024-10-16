@@ -52,7 +52,7 @@ DirEntry::~DirEntry() {
     auto parent = maybe_parent.value();
     parent->internal_remove_child(this);
   }
-  children_.Write()->clear_unsafe();
+  children_.Write()->clear();
 }
 
 DirEntryHandle DirEntry::New(FsNodeHandle node, ktl::optional<DirEntryHandle> parent,
