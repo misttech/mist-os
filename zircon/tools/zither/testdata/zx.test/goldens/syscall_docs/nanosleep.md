@@ -32,7 +32,7 @@ on **ZX_CLOCK_MONOTONIC**. *deadline* will be automatically adjusted according t
 To sleep for a duration, use [`zx_deadline_after()`] and the
 **ZX_\<time-unit\>** helpers:
 
-```
+```c
 #include <zircon/syscalls.h> // zx_deadline_after, zx_nanosleep
 #include <zircon/types.h> // ZX_MSEC et al.
 

@@ -561,7 +561,6 @@ closed protocol System {
     ///
     /// zx_status_t zx_system_set_processor_power_state(zx_handle_t port,
     ///                                                 const zx_processor_power_state_t* power_state);
-    ///
     /// ```
     ///
     /// ## Description
@@ -860,7 +859,7 @@ closed protocol System {
     /// *arg* type: `zx_system_powerctl_arg_t` with only the `x86_power_limit` union
     /// element considered valid.
     ///
-    /// ```
+    /// ```c
     /// struct {
     ///     uint32_t power_limit;  // PL1 value in milliwatts
     ///     uint32_t time_window;  // PL1 time window in microseconds

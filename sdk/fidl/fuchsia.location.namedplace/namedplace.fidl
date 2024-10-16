@@ -24,7 +24,7 @@ closed protocol RegulatoryRegionConfigurator {
     /// well-defined order. For example, when using Zircon channels as the
     /// underlying transport, the code below may not behave as intended.
     ///
-    /// ```
+    /// ```c++
     /// // DANGER: The service may receive "BB" before "AA".
     /// service1 = Open(RegulatoryRegionConfigurator);
     /// service1.SetRegion("AA");
@@ -37,7 +37,7 @@ closed protocol RegulatoryRegionConfigurator {
     /// A client can avoid this problem by holding a single channel open to
     /// the service, for the lifetime of the client.
     ///
-    /// ```
+    /// ```c++
     /// // We use a single channel to ensure that calls arrive in a
     /// // well-defined order.
     /// service = Open(RegulatoryRegionConfigurator);

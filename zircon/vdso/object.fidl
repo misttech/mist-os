@@ -137,7 +137,7 @@ closed protocol Object {
     /// asserting at least one of the specified signals, the wait ends immediately with
     /// `ZX_OK`.
     ///
-    /// ```
+    /// ```c
     /// typedef struct {
     ///     zx_handle_t handle;
     ///     zx_signals_t waitfor;
@@ -304,7 +304,7 @@ closed protocol Object {
     /// Packets generated via this syscall will have *type* set to `ZX_PKT_TYPE_SIGNAL_ONE`
     /// and the union is of type `zx_packet_signal_t`:
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_packet_signal {
     ///     zx_signals_t trigger;
     ///     zx_signals_t observed;
@@ -538,7 +538,7 @@ closed protocol Object {
     ///
     /// Property values have the prefix `ZX_PROP_`, and are defined in
     ///
-    /// ```
+    /// ```c
     /// #include <zircon/syscalls/object.h>
     /// ```
     ///
@@ -883,7 +883,7 @@ closed protocol Object {
     ///
     /// *buffer* type: `zx_info_handle_basic_t[1]`
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_info_handle_basic {
     ///     // The unique id assigned by kernel to the object referenced by the
     ///     // handle.
@@ -912,7 +912,7 @@ closed protocol Object {
     ///
     /// *buffer* type: `zx_info_handle_count_t[1]`
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_info_handle_count {
     ///     // The number of outstanding handles to a kernel object.
     ///     uint32_t handle_count;
@@ -931,7 +931,7 @@ closed protocol Object {
     ///
     /// *buffer* type: `zx_info_process_handle_stats_t[1]`
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_info_process_handle_stats {
     ///     // The number of outstanding handles to kernel objects of each type.
     ///     uint32_t handle_count[ZX_OBJ_TYPE_UPPER_BOUND];
@@ -948,7 +948,7 @@ closed protocol Object {
     /// Process at the moment of the call. The kernel ensures that the handles returned
     /// are consistent.
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_info_handle_extended {
     ///     // The object type: channel, event, socket, etc.
     ///     zx_obj_type_t type;
@@ -992,7 +992,7 @@ closed protocol Object {
     ///
     /// *buffer* type: `zx_info_job_t[1]`
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_info_job {
     ///     // The job's return code; only valid if |exited| is true.
     ///     // If the code is valid, it will be one of the ZX_TASK_RETCODE values.
@@ -1020,7 +1020,7 @@ closed protocol Object {
     ///
     /// *buffer* type: `zx_info_process_t[1]`
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_info_process {
     ///     // The process's return code; only valid if the
     ///     // |ZX_PROCESS_INFO_FLAG_EXITED| flag is set. If the process was killed, it
@@ -1061,7 +1061,7 @@ closed protocol Object {
     ///
     /// *buffer* type: `zx_info_thread_t[1]`
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_info_thread {
     ///     // One of ZX_THREAD_STATE_* values.
     ///     uint32_t state;
@@ -1087,7 +1087,7 @@ closed protocol Object {
     ///
     /// The various `ZX_THREAD_STATE_` values are defined by
     ///
-    /// ```
+    /// ```c
     /// #include <zircon/syscalls/object.h>
     /// ```
     ///
@@ -1123,7 +1123,7 @@ closed protocol Object {
     ///
     /// The various `ZX_EXCEPTION_CHANNEL_TYPE_` values are defined by
     ///
-    /// ```
+    /// ```c
     /// #include <zircon/syscalls/exception.h>
     /// ```
     ///
@@ -1140,7 +1140,7 @@ closed protocol Object {
     ///
     /// *buffer* type: `zx_exception_report_t[1]`
     ///
-    /// ```
+    /// ```c
     /// #include <zircon/syscalls/exception.h>
     /// ```
     ///
@@ -1157,7 +1157,7 @@ closed protocol Object {
     ///
     /// *buffer* type: `zx_info_thread_stats[1]`
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_info_thread_stats {
     ///     // Total accumulated running time of the thread.
     ///     //
@@ -1180,7 +1180,7 @@ closed protocol Object {
     ///
     /// *buffer* type: `zx_info_guest_stats_t[1]`
     ///
-    /// ```
+    /// ```c
     /// // Each machine has its own format for the same ZX_INFO_GUEST_STATS topic.
     /// // In each build, zx_info_guest_stats_t is a typedef alias for the type.
     /// // Cross-tools can select the machine-specific type to use based on the
@@ -1227,7 +1227,7 @@ closed protocol Object {
     ///
     /// *buffer* type: `zx_info_cpu_stats_t[1]`
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_info_cpu_stats {
     ///     uint32_t cpu_number;
     ///     uint32_t flags;
@@ -1262,7 +1262,7 @@ closed protocol Object {
     ///
     /// *buffer* type: `zx_info_vmar_t[1]`
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_info_vmar {
     ///     // Base address of the region.
     ///     uintptr_t base;
@@ -1303,7 +1303,7 @@ closed protocol Object {
     ///
     /// *buffer* type: `zx_info_vmo_t[1]`
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_info_vmo {
     ///     // The koid of this VMO.
     ///     zx_koid_t koid;
@@ -1379,7 +1379,7 @@ closed protocol Object {
     ///
     /// *buffer* type: `zx_info_socket_t[1]`
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_info_socket {
     ///     // The options passed to zx_socket_create().
     ///     uint32_t options;
@@ -1422,7 +1422,7 @@ closed protocol Object {
     ///
     /// *buffer* type: `zx_info_timer_t[1]`
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_info_timer {
     ///     // The options passed to zx_timer_create().
     ///     uint32_t options;
@@ -1471,7 +1471,7 @@ closed protocol Object {
     ///
     /// Returns statistics about resources (e.g., memory) used by a task.
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_info_task_stats {
     ///     // The total size of mapped memory ranges in the task.
     ///     // Not all will be backed by physical memory.
@@ -1511,7 +1511,7 @@ closed protocol Object {
     ///
     /// Returns statistics about the runtime of a task.
     ///
-    /// ```
+    /// ```c
     /// // Info on the runtime of a task.
     /// typedef struct zx_info_task_runtime {
     ///     // The total amount of time this task and its children were
@@ -1567,7 +1567,7 @@ closed protocol Object {
     /// process's Aspace/VMAR/Mapping tree. As per the pre-order traversal base
     /// addresses will be in ascending order.
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_info_maps {
     ///     // Name if available; empty string otherwise.
     ///     char name[ZX_MAX_NAME_LEN];
@@ -1648,7 +1648,7 @@ closed protocol Object {
     /// various processes, you may need to combine this information with
     /// ZX_INFO_PROCESS_MAPS.
     ///
-    /// ```
+    /// ```c
     /// // Describes a VMO.
     /// typedef struct zx_info_vmo {
     ///     // The koid of this VMO.
@@ -1727,7 +1727,7 @@ closed protocol Object {
     ///
     /// Returns information about kernel memory usage.
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_info_kmem_stats {
     ///     // The total amount of physical memory available to the system.
     ///     // Note, the values below may not exactly add up to this total.
@@ -1771,7 +1771,7 @@ closed protocol Object {
     /// the ZX_INFO_KMEM_STATS topic, plus some additional information that is more
     /// expensive to collect.
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_info_kmem_stats_extended {
     ///     // The total amount of physical memory available to the system.
     ///     uint64_t total_bytes;
@@ -1841,7 +1841,7 @@ closed protocol Object {
     /// Returns information about kernel memory usage as it pertains to the compressed
     /// memory subsystem.
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_info_kmem_stats_compression {
     ///     // Size in bytes of the content that is currently being compressed and stored.
     ///     uint64_t uncompressed_storage_bytes;
@@ -1920,7 +1920,7 @@ closed protocol Object {
     ///
     /// Returns information about a resource object via its handle.
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_info_resource {
     ///     // The resource kind; resource object kinds are described in resource.md
     ///     uint32_t kind;
@@ -1949,7 +1949,7 @@ closed protocol Object {
     ///
     /// *buffer* type: `zx_info_bti_t[1]`
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_info_bti {
     ///     // zx_bti_pin will always be able to return addresses that are contiguous for at
     ///     // least this many bytes. E.g. if this returns 1MB, then a call to
@@ -1978,7 +1978,7 @@ closed protocol Object {
     ///
     /// Returns information about the overall IOB instance.
     ///
-    /// ```
+    /// ```c
     /// typedef struct zx_info_iob {
     ///   // The value of the *options* parameter passed to `zx_iob_create`.
     ///   uint64_t options;
@@ -2089,7 +2089,7 @@ closed protocol Object {
     ///
     /// ## EXAMPLES
     ///
-    /// ```
+    /// ```c
     /// bool is_handle_valid(zx_handle_t handle) {
     ///     return zx_object_get_info(
     ///         handle, ZX_INFO_HANDLE_VALID, NULL, 0, NULL, NULL) == ZX_OK;
