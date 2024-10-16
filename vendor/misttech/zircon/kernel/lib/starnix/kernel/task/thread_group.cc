@@ -7,10 +7,12 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/signals/syscalls.h>
+#include <lib/mistos/starnix/kernel/task/exit_status.h>
 #include <lib/mistos/starnix/kernel/task/kernel.h>
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/session.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
+#include <lib/mistos/starnix_uapi/signals.h>
 #include <lib/mistos/util/weak_wrapper.h>
 #include <lib/starnix_sync/locks.h>
 #include <zircon/assert.h>
@@ -30,7 +32,7 @@ namespace starnix {
 ThreadGroupMutableState::ThreadGroupMutableState() = default;
 
 ThreadGroupMutableState::ThreadGroupMutableState(ThreadGroup* base,
-                                                 ktl::optional<fbl::RefPtr<ThreadGroup>> parent,
+                                                 ktl::optional<ThreadGroupParent> parent,
                                                  fbl::RefPtr<ProcessGroup> process_group)
     : parent_(ktl::move(parent)), process_group_(ktl::move(process_group)), base_(base) {}
 
@@ -40,7 +42,7 @@ fbl::Vector<fbl::RefPtr<ThreadGroup>> ThreadGroupMutableState::children() const 
   fbl::Vector<fbl::RefPtr<ThreadGroup>> children_vec;
   fbl::AllocChecker ac;
   for (auto iter = children_.begin(); iter != children_.end(); ++iter) {
-    auto strong = util::WeakPtr<ThreadGroup>(iter.CopyPointer()).Lock();
+    auto strong = iter.CopyPointer().Lock();
     ZX_ASSERT_MSG(strong, "Weak references to processes in ThreadGroup must always be valid");
     children_vec.push_back(strong, &ac);
     ZX_ASSERT(ac.check());
@@ -88,7 +90,7 @@ fbl::RefPtr<Task> ThreadGroupMutableState::get_task(pid_t tid) const {
 
 pid_t ThreadGroupMutableState::get_ppid() const {
   if (parent_.has_value()) {
-    return parent_.value()->leader();
+    return parent_->upgrade()->leader();
   }
   return leader();
 }
@@ -113,11 +115,124 @@ bool ThreadGroupMutableState::is_waitable() const {
   return false;
 }
 
+bool ThreadGroupMutableState::is_correct_exit_signal(bool wait_for_clone,
+                                                     ktl::optional<Signal> exit_signal) {
+  return wait_for_clone == (exit_signal != kSIGCHLD);
+}
+
 WaitableChildResult ThreadGroupMutableState::get_waitable_running_children(
     ProcessSelector selector, const WaitingOptions& options, const PidTable& pids) const {
-  // Implementation details omitted for brevity
-  // This would contain the logic to find and return waitable running children
-  // based on the given selector and options
+  // The children whose pid matches the pid selector queried.
+
+  auto filter_children_by_pid_selector = [&](const fbl::RefPtr<ThreadGroup>& child) -> bool {
+    return ktl::visit(ProcessSelector::overloaded{
+                          [](ProcessSelector::Any) { return true; },
+                          [&](ProcessSelector::Pid pid) { return child->leader() == pid.value; },
+                          [&](ProcessSelector::Pgid pgid) {
+                            return pids.get_process_group(pgid.value) ==
+                                   child->Read()->process_group();
+                          }},
+                      selector.selector());
+  };
+
+  // The children whose exit signal matches the waiting options queried.
+  auto filter_children_by_waiting_options = [&](const fbl::RefPtr<ThreadGroup>& child) {
+    if (options.wait_for_all()) {
+      return true;
+    }
+    auto child_state = child->Read();
+    if (child_state->terminating()) {
+      // Child is terminating.  In addition to its original location,
+      // the leader may have exited, and its exit signal may be in the
+      // leader_exit_info.
+      /*if (child_state->leader_exit_info_.has_value()) {
+        auto& info = child_state->leader_exit_info_.value();
+        if (info.exit_signal.has_value()) {
+          return ThreadGroup::is_correct_exit_signal(options.wait_for_clone(),
+                                                     info.exit_signal.value());
+        }
+      }*/
+    }
+
+    for (const auto& task : tasks_) {
+      auto info = task.info();
+      if (ThreadGroupMutableState::is_correct_exit_signal(options.wait_for_clone(),
+                                                          info->exit_signal())) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // If wait_for_exited flag is disabled or no terminated children were found we look for living
+  // children.
+  fbl::Vector<fbl::RefPtr<ThreadGroup>> selected_children;
+  fbl::AllocChecker ac;
+  for (auto it = children_.begin(); it != children_.end(); ++it) {
+    auto t = it.CopyPointer().Lock();
+    if (t && filter_children_by_pid_selector(t) && filter_children_by_waiting_options(t)) {
+      selected_children.push_back(t, &ac);
+    }
+  }
+
+  if (selected_children.is_empty()) {
+    /*
+    // There still might be a process that ptrace hasn't looked at yet.
+    if self.deferred_zombie_ptracers.iter().any(|&(_, tracee)| match selector {
+        ProcessSelector::Any => true,
+        ProcessSelector::Pid(pid) => tracee == pid,
+        ProcessSelector::Pgid(pgid) => {
+            pids.get_process_group(pgid).as_ref() == pids.get_process_group(tracee).as_ref()
+        }
+    }) {
+        return WaitableChildResult::ShouldWait;
+    }
+    */
+    return WaitableChildResult::NoneFound();
+  }
+
+  for (auto child : selected_children) {
+    auto c = child->Write();
+    if (c->last_signal_.has_value()) {
+      auto build_wait_result = [&](ThreadGroupMutableState& child,
+                                   const auto& exit_status_fn) -> WaitResult {
+        SignalInfo siginfo = [&options, &c]() {
+          if (options.keep_waitable_state()) {
+            return c->last_signal_.value();
+          } else {
+            return ktl::move(c->last_signal_).value();
+          }
+        }();
+
+        ExitStatus exit_status = [&siginfo, &exit_status_fn]() {
+          if (siginfo.signal == kSIGKILL) {
+            // This overrides the stop/continue choice.
+            return ExitStatus(ExitStatusKill{siginfo});
+          } else {
+            return exit_status_fn(siginfo);
+          }
+        }();
+
+        auto info = (*child.tasks_.begin()).info();
+        return WaitResult{.pid = child.base_->leader(),
+                          .uid = info->creds().uid,
+                          .exit_info = {.status = exit_status, .exit_signal = info->exit_signal()},
+                          .time_stats = {}};
+      };
+
+      auto child_stopped = c->base_->load_stopped();
+      if (child_stopped == StopState::Awake && options.wait_for_continued()) {
+        return WaitableChildResult::ReadyNow(build_wait_result(*c, [](const SignalInfo& siginfo) {
+          return ExitStatus(ExitStatusContinue(siginfo, PtraceEvent::None));
+        }));
+      }
+      if (child_stopped == StopState::GroupStopped && options.wait_for_stopped()) {
+        return WaitableChildResult::ReadyNow(build_wait_result(*c, [](const SignalInfo& siginfo) {
+          return ExitStatus(ExitStatusStop(siginfo, PtraceEvent::None));
+        }));
+      }
+    }
+  }
 
   return WaitableChildResult::ShouldWait();
 }
@@ -129,19 +244,52 @@ WaitableChildResult ThreadGroupMutableState::get_waitable_child(ProcessSelector 
 }
 
 fbl::RefPtr<ThreadGroup> ThreadGroup::New(
-    fbl::RefPtr<Kernel> _kernel, KernelHandle<ProcessDispatcher> _process,
+    fbl::RefPtr<Kernel> kernel, KernelHandle<ProcessDispatcher> process,
     ktl::optional<starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent,
-    pid_t _leader, fbl::RefPtr<ProcessGroup> process_group) {
+    pid_t leader, fbl::RefPtr<ProcessGroup> process_group) {
   fbl::AllocChecker ac;
-  fbl::RefPtr<ThreadGroup> thread_group =
-      fbl::AdoptRef(new (&ac) ThreadGroup(ktl::move(_kernel), ktl::move(_process), _leader,
-                                          ktl::move(parent), ktl::move(process_group)));
+  fbl::RefPtr<ThreadGroup> thread_group = fbl::AdoptRef(new (&ac) ThreadGroup(
+      ktl::move(kernel), ktl::move(process), ktl::move(parent), leader, process_group));
   ASSERT(ac.check());
 
-  if (parent) {
-    //  parent.value()->mutable_state_->children().insert()
+  thread_group->weak_thread_group_ = util::WeakPtr<ThreadGroup>(thread_group.get());
+
+  auto lock = thread_group->mutable_state_.Write();
+  if (lock->parent_.has_value()) {
+    // thread_group.next_seccomp_filter_id.reset(parent.base.next_seccomp_filter_id.get());
+    lock->children_.insert(thread_group->weak_thread_group_);
+    // process_group->insert(thread_group);
   }
+
   return ktl::move(thread_group);
+}
+
+ThreadGroup::ThreadGroup(
+    fbl::RefPtr<Kernel> _kernel, KernelHandle<ProcessDispatcher> process,
+    ktl::optional<starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent,
+    pid_t leader, fbl::RefPtr<ProcessGroup> process_group)
+    : kernel_(ktl::move(_kernel)),
+      process_(ktl::move(process)),
+      leader_(leader),
+      stop_state_(AtomicStopState(StopState::Awake)) {
+  ktl::optional<ThreadGroupParent> tgp;
+
+  if (parent.has_value()) {
+    // A child process created via fork(2) inherits its parent's
+    // resource limits.  Resource limits are preserved across execve(2).
+    *limits.Lock() = *(*parent)->base_->limits.Lock();
+
+    auto& p = *(*parent)->base_->weak_thread_group_;
+    tgp = ThreadGroupParent::From(&p);
+  }
+
+  *mutable_state_.Write() = ktl::move(ThreadGroupMutableState(this, tgp, process_group));
+}
+
+ThreadGroup::~ThreadGroup() {
+  // auto state = mutable_state_.Read();
+  // ZX_ASSERT(state->tasks_.is_empty());
+  //  ZX_ASSERT(state->children_.is_empty());
 }
 
 void ThreadGroup::exit(ExitStatus exit_status, ktl::optional<CurrentTask> current_task) {
@@ -186,21 +334,6 @@ uint64_t ThreadGroup::get_rlimit(starnix_uapi::Resource resource) const {
   return limits.Lock()->get(resource).rlim_cur;
 }
 
-ThreadGroup::~ThreadGroup() = default;
-
-ThreadGroup::ThreadGroup(
-    fbl::RefPtr<Kernel> _kernel, KernelHandle<ProcessDispatcher> process, pid_t leader,
-    ktl::optional<starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent,
-    fbl::RefPtr<ProcessGroup> process_group)
-    : kernel_(ktl::move(_kernel)), process_(ktl::move(process)), leader_(leader) {
-  ktl::optional<fbl::RefPtr<ThreadGroup>> ptg;
-  if (parent.has_value()) {
-    *limits.Lock() = *(*parent)->base_->limits.Lock();
-    ptg = (*parent)->parent_;
-  }
-  *mutable_state_.Write() = ktl::move(ThreadGroupMutableState(this, ptg, ktl::move(process_group)));
-}
-
 fit::result<Errno> ThreadGroup::add(fbl::RefPtr<Task> task) const {
   auto state = Write();
   if (state->terminating_) {
@@ -211,7 +344,56 @@ fit::result<Errno> ThreadGroup::add(fbl::RefPtr<Task> task) const {
   return fit::ok();
 }
 
-void ThreadGroup::remove(fbl::RefPtr<Task> task) const {}
+void ThreadGroup::remove(fbl::RefPtr<Task> task) const {
+  auto pids = kernel_->pids.Write();
+
+  // task->set_ptrace_zombie(pids.get());
+  pids->remove_task(task->id());
+
+  auto state = Write();
+
+  // TaskPersistentInfo persistent_info;
+  auto it = state->tasks_.find(task->id());
+  if (it != state->tasks_.end()) {
+    // persistent_info = it->();
+    state->tasks_.erase(it);
+  } else {
+    // The task has never been added. The only expected case is that this thread was
+    // already terminating.
+    ZX_DEBUG_ASSERT(state->terminating_);
+    return;
+  }
+
+  if (task->id() == leader_) {
+    // ExitStatus exit_status = task->exit_status().value_or(ExitStatus::Exit(255));
+    // state->leader_exit_info_ = ProcessExitInfo{
+    //    .status = exit_status,
+    //    .exit_signal = persistent_info.Lock()->exit_signal(),
+    //};
+  }
+
+  if (state->tasks_.is_empty()) {
+    state->terminating_ = true;
+
+    // Replace PID table entry with a zombie.
+    // auto exit_info = ktl::move(state->leader_exit_info_.value());
+    // auto zombie = ZombieProcess::New(this, persistent_info.Lock()->creds(), exit_info);
+    // pids->kill_process(leader_, fbl::WrapRefPtr(zombie.get()));
+
+    // state->leave_process_group(locked, &mut pids);
+    // TODO: Implement leave_process_group functionality
+
+    // I have no idea if dropping the lock here is correct, and I don't want to think about
+    // it. If problems do turn up with another thread observing an intermediate state of
+    // this exit operation, the solution is to unify locks. It should be sensible and
+    // possible for there to be a single lock that protects all (or nearly all) of the
+    // data accessed by both exit and wait. In gvisor and linux this is the lock on the
+    // equivalent of the PidTable. This is made more difficult by rust locks being
+    // containers that only lock the data they contain, but see
+    // https://docs.google.com/document/d/1YHrhBqNhU1WcrsYgGAu3JwwlVmFXPlwWHTJLAbwRebY/edit
+    // for an idea.
+  }
+}
 
 fit::result<Errno> ThreadGroup::setsid() const {
   auto pids = kernel_->pids.Write();
