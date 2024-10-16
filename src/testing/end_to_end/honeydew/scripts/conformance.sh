@@ -33,13 +33,13 @@ install_step () {
 
 coverage_step () {
     echo "INFO: Running $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/coverage.sh..."
-    sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/coverage.sh --affected >/dev/null 2>&1
+    sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/coverage.sh >/dev/null 2>&1
     if [ $? -eq 0 ]; then
         echo "INFO: coverage.sh completed successfully"
     else
         echo
         echo "ERROR: coverage.sh script failed."
-        echo "ERROR: Please run 'sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/coverage.sh --affected' for further instructions"
+        echo "ERROR: Please run 'sh $FUCHSIA_DIR/src/testing/end_to_end/honeydew/scripts/coverage.sh' for further instructions"
         echo
         exit 1
     fi
