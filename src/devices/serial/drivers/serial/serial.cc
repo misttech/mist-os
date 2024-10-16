@@ -18,6 +18,8 @@
 namespace serial {
 
 void SerialDevice::Read(ReadCompleter::Sync& completer) {
+  FDF_LOG(TRACE, "SerialDevice::Read");
+
   fdf::Arena arena('SERI');
   serial_.buffer(arena)->Read().Then([completer = completer.ToAsync()](auto& result) mutable {
     if (!result.ok()) {
@@ -46,12 +48,15 @@ void SerialDevice::Write(WriteRequestView request, WriteCompleter::Sync& complet
 }
 
 void SerialDevice::GetChannel(GetChannelRequestView request, GetChannelCompleter::Sync& completer) {
+  FDF_LOG(TRACE, "SerialDevice::GetChannel");
   if (zx_status_t status = Bind(std::move(request->req)); status != ZX_OK) {
+    FDF_LOG(ERROR, "SerialDevice::GetChannel error: %s", zx_status_get_string(status));
     completer.Close(status);
   }
 }
 
 void SerialDevice::GetClass(GetClassCompleter::Sync& completer) {
+  FDF_LOG(TRACE, "SerialDevice::GetClass");
   completer.Reply(static_cast<fuchsia_hardware_serial::wire::Class>(serial_class_));
 }
 
@@ -132,6 +137,7 @@ zx_status_t SerialDevice::Enable(bool enable) {
 
 zx_status_t SerialDevice::Bind(fidl::ServerEnd<fuchsia_hardware_serial::Device> server) {
   if (binding_.has_value()) {
+    FDF_LOG(WARNING, "SerialDevice::Bind - already bound!");
     return ZX_ERR_ALREADY_BOUND;
   }
 
@@ -141,6 +147,8 @@ zx_status_t SerialDevice::Bind(fidl::ServerEnd<fuchsia_hardware_serial::Device> 
 
   binding_.emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(server), this,
                    [](SerialDevice* self, fidl::UnbindInfo) {
+                     FDF_LOG(TRACE, "SerialDevice::Bind - on close");
+
                      self->Enable(false);
                      self->binding_.reset();
                    });
@@ -148,16 +156,21 @@ zx_status_t SerialDevice::Bind(fidl::ServerEnd<fuchsia_hardware_serial::Device> 
 }
 
 void SerialDevice::DevfsConnect(fidl::ServerEnd<fuchsia_hardware_serial::DeviceProxy> server) {
+  FDF_LOG(TRACE, "SerialDevice::DevfsConnect");
+
   proxy_bindings_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(server),
                              this, fidl::kIgnoreBindingClosure);
 }
 
 void SerialDevice::PrepareStop(fdf::PrepareStopCompleter completer) {
+  FDF_LOG(TRACE, "SerialDevice::PrepareStop");
   Enable(false);
   completer(zx::ok());
 }
 
 zx::result<> SerialDevice::Start() {
+  FDF_LOG(TRACE, "SerialDevice::Start");
+
   zx::result serial_client = incoming()->Connect<fuchsia_hardware_serialimpl::Service::Device>();
   if (serial_client.is_error()) {
     FDF_LOG(ERROR, "Failed to get FIDL serial client: %s", serial_client.status_string());
@@ -171,7 +184,7 @@ zx::result<> SerialDevice::Start() {
   }
 
   if (zx_status_t status = Bind(); status != ZX_OK) {
-    FDF_LOG(ERROR, "SerialDevice::Create: Bind failed");
+    FDF_LOG(ERROR, "SerialDevice::Create: Bind failed %s", zx_status_get_string(status));
     return zx::error(status);
   }
 
@@ -211,6 +224,8 @@ zx_status_t SerialDevice::Bind() {
     return result.error_value();
   }
 
+  FDF_LOG(TRACE, "SerialDevice added service to the outgoing directory");
+
   std::vector<fuchsia_driver_framework::Offer> offers{
       fdf::MakeOffer2<fuchsia_hardware_serial::Service>()};
 
@@ -226,6 +241,8 @@ zx_status_t SerialDevice::Bind() {
     return connector.error_value();
   }
 
+  FDF_LOG(TRACE, "SerialDevice bound devfs connector");
+
   fuchsia_driver_framework::DevfsAddArgs devfs{{
       .connector = *std::move(connector),
       .class_name = "serial",
@@ -238,6 +255,8 @@ zx_status_t SerialDevice::Bind() {
     FDF_LOG(ERROR, "AddChild failed: %s", controller.status_string());
     return controller.error_value();
   }
+
+  FDF_LOG(TRACE, "SerialDevice registered devfs node: %s", std::string(name()).c_str());
 
   controller_ = *std::move(controller);
   return ZX_OK;
