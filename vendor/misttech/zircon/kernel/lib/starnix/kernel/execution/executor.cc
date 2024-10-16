@@ -56,8 +56,10 @@ fit::result<Errno, TaskInfo> create_zircon_process(
 
   auto thread_group =
       ThreadGroup::New(kernel, ktl::move(process), ktl::move(parent), pid, process_group);
-  return fit::ok(
-      TaskInfo{.thread = {}, .thread_group = thread_group, .memory_manager = mm.value()});
+
+  return fit::ok(TaskInfo{.thread = {},
+                          .thread_group = ktl::move(thread_group),
+                          .memory_manager = ktl::move(mm.value())});
 }
 
 fit::result<zx_status_t, ktl::pair<KernelHandle<ProcessDispatcher>, Vmar>> create_process(

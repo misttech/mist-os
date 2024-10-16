@@ -127,11 +127,7 @@ fit::result<Errno, CurrentTask> CurrentTask::create_system_task(const fbl::RefPt
 
         return fit::ok(
             TaskInfo{.thread = {}, .thread_group = thread_group, .memory_manager = memory_manager});
-      });
-
-  if (builder.is_error()) {
-    return builder.take_error();
-  }
+      }) _EP(builder);
 
   return fit::ok(starnix::CurrentTask::From(builder.value()));
 }
@@ -152,6 +148,17 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_init_child_process(
 
   auto task =
       create_task(kernel, initial_name, init_task->fs()->fork(), task_info_factory) _EP(task);
+
+  {
+    auto init_writer = init_task->thread_group()->Write();
+    auto new_process_writer = task->thread_group()->Write();
+    // new_process_writer->parent() =
+  }
+
+  // A child process created via fork(2) inherits its parent's
+  // resource limits. Resource limits are preserved across execve(2).
+  auto limits = init_task->thread_group()->limits.Lock();
+  *task->thread_group()->limits.Lock() = *limits;
 
   return fit::ok(ktl::move(task.value()));
 }
@@ -180,13 +187,6 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_task_with_pid(
 
   fbl::RefPtr<ProcessGroup> process_group = ProcessGroup::New(pid, {});
   pids->add_process_group(process_group);
-  /*auto job_or_error =
-      create_job(0).map_error([](auto status) { return errno(from_status_like_fdio(status)); });
-
-  if (job_or_error.is_error()) {
-    return job_or_error.take_error();
-  }
-  process_group->job = ktl::move(job_or_error.value());*/
 
   auto task_info = task_info_factory(pid, process_group).value_or(TaskInfo{});
 
@@ -199,10 +199,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_task_with_pid(
   // TODO (Herrera) Add fit::defer
   {
     auto temp_task = builder.task();
-    auto result = builder->thread_group()->add(temp_task);
-    if (result.is_error()) {
-      return result.take_error();
-    }
+    _EP(builder->thread_group()->add(temp_task));
 
     for (auto& [resouce, limit] : rlimits) {
       builder->thread_group()->limits.Lock()->set(resouce,
@@ -447,7 +444,7 @@ starnix::testing::AutoReleasableTask CurrentTask::clone_task_for_test(
     uint64_t flags, ktl::optional<Signal> exit_signal) {
   auto result = clone_task(flags, exit_signal, mtl::DefaultConstruct<UserRef<pid_t>>(),
                            mtl::DefaultConstruct<UserRef<pid_t>>());
-  ASSERT_MSG(result.is_ok(), "failed to create task in test");
+  ZX_ASSERT_MSG(result.is_ok(), "failed to create task in test");
   return starnix::testing::AutoReleasableTask::From(result.value());
 }
 
@@ -585,7 +582,11 @@ fit::result<Errno> CurrentTask::finish_exec(const ktl::string_view& path,
 }
 
 CurrentTask CurrentTask::From(const TaskBuilder& builder) {
-  return CurrentTask(builder.task(), builder.thread_state());
+  return CurrentTask::New(builder.task(), builder.thread_state());
+}
+
+CurrentTask CurrentTask::New(fbl::RefPtr<Task> task, ThreadState thread_state) {
+  return CurrentTask(task, thread_state);
 }
 
 util::WeakPtr<Task> CurrentTask::weak_task() const {
@@ -596,6 +597,19 @@ util::WeakPtr<Task> CurrentTask::weak_task() const {
 void CurrentTask::set_creds(Credentials creds) const {
   // Guard<Mutex> lock(persistent_info->lock());
   // persistent_info->state().creds = creds;
+}
+
+void CurrentTask::release() {
+  // self.notify_robust_list();
+  // let _ignored = self.clear_child_tid_if_needed();
+
+  // We remove from the thread group here because the WeakRef in the pid
+  // table to this task must be valid until this task is removed from the
+  // thread group, but self.task.release() below invalidates it.
+  task_->thread_group()->remove(task_);
+
+  // let context = (self.thread_state, locked);
+  // self.task.release(context);
 }
 
 fit::result<Errno, ktl::pair<NamespaceNode, FsStr>> CurrentTask::resolve_dir_fd(

@@ -165,7 +165,9 @@ class FdTable {
 
   void retain(std::function<bool(FdNumber, FdFlags&)> func) const;
 
-  // Drop the fd table, closing any files opened exclusively by this table.
+  /// impl ReleasableByRef for FdTable
+
+  ///  Drop the fd table, closing any files opened exclusively by this table.
   void release() const { inner_.Lock()->reset(); }
 
   // C++

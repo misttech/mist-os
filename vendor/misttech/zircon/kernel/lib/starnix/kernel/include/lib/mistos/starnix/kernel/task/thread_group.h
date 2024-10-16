@@ -383,6 +383,9 @@ class ThreadGroup : public fbl::RefCountedUpgradeable<ThreadGroup>,
     return mutable_state_.Write();
   }
 
+  /// impl Releasable for ThreadGroup
+  void release();
+
   // C++
   const util::WeakPtr<ThreadGroup>& weak_thread_group() const { return weak_thread_group_; }
 

@@ -34,6 +34,7 @@ namespace starnix {
 class TaskBuilder;
 class Kernel;
 class FsContext;
+struct ThreadState;
 
 namespace testing {
 TaskBuilder create_test_init_task(fbl::RefPtr<Kernel> kernel, fbl::RefPtr<FsContext> fs);
@@ -335,8 +336,10 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
 
   ktl::string_view command() const { return persistent_info->Lock()->command(); }
 
-  // impl MemoryAccessor for Task
-  /// impl MemoryAccessor for CurrentTask
+  /// impl Releasable for Task
+  void release(ThreadState context);
+
+  /// impl MemoryAccessor for Task
   fit::result<Errno, ktl::span<uint8_t>> read_memory(UserAddress addr,
                                                      ktl::span<uint8_t>& bytes) const final;
 
@@ -365,7 +368,6 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   starnix_sync::RwLock<ktl::optional<fbl::RefPtr<ThreadDispatcher>>>& thread() { return thread_; }
 
   const FdTable& files() const { return files_; }
-
   FdTable& files() { return files_; }
 
   ~Task() override;
@@ -411,7 +413,9 @@ class TaskContainer : public fbl::WAVLTreeContainable<ktl::unique_ptr<TaskContai
 
   util::WeakPtr<Task> weak_clone() const { return weak_; }
 
-  auto info() const { info_->Lock(); }
+  starnix_sync::MutexGuard<TaskPersistentInfoState> info() const { return info_->Lock(); }
+
+  operator TaskPersistentInfoState() const { return *info_->Lock(); }
 
  private:
   TaskContainer(util::WeakPtr<Task> weak, TaskPersistentInfo& info)

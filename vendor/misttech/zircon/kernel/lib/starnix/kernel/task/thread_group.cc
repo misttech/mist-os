@@ -246,6 +246,8 @@ fit::result<Errno> ThreadGroup::setsid() const {
   return fit::ok();
 }
 
+void ThreadGroup::release() {}
+
 bool ProcessSelector::DoMatch(pid_t pid, const PidTable& pid_table) const {
   return ktl::visit(ProcessSelector::overloaded{
                         [](Any) { return true; }, [pid](Pid p) { return p.value == pid; },
