@@ -53,6 +53,10 @@ TEST_F(StartupAnnotationsTest, Keys) {
                                        Key(kBuildLatestCommitDateKey),
                                        Key(kBuildVersionKey),
                                        Key(kBuildVersionPreviousBootKey),
+                                       Key(kBuildPlatformVersionKey),
+                                       Key(kBuildPlatformVersionPreviousBootKey),
+                                       Key(kBuildProductVersionKey),
+                                       Key(kBuildProductVersionPreviousBootKey),
                                        Key(kBuildIsDebugKey),
                                        Key(kDeviceBoardNameKey),
                                        Key(kDeviceNumCPUsKey),
@@ -77,6 +81,10 @@ TEST_F(StartupAnnotationsTest, Values_FilesPresent) {
       {kBuildCommitDatePath, "commit-date"},
       {kCurrentBuildVersionPath, "current-version"},
       {kPreviousBuildVersionPath, "previous-version"},
+      {kCurrentBuildPlatformVersionPath, "current-platform-version"},
+      {kPreviousBuildPlatformVersionPath, "previous-platform-version"},
+      {kCurrentBuildProductVersionPath, "current-product-version"},
+      {kPreviousBuildProductVersionPath, "previous-product-version"},
       {kCurrentBootIdPath, "current-boot-id"},
       {kPreviousBootIdPath, "previous-boot-id"},
   });
@@ -92,6 +100,10 @@ TEST_F(StartupAnnotationsTest, Values_FilesPresent) {
           Pair(kBuildLatestCommitDateKey, ErrorOrString("commit-date")),
           Pair(kBuildVersionKey, ErrorOrString("current-version")),
           Pair(kBuildVersionPreviousBootKey, ErrorOrString("previous-version")),
+          Pair(kBuildPlatformVersionKey, ErrorOrString("current-platform-version")),
+          Pair(kBuildPlatformVersionPreviousBootKey, ErrorOrString("previous-platform-version")),
+          Pair(kBuildProductVersionKey, ErrorOrString("current-product-version")),
+          Pair(kBuildProductVersionPreviousBootKey, ErrorOrString("previous-product-version")),
           Pair(kBuildIsDebugKey, _), Pair(kDeviceBoardNameKey, _), Pair(kDeviceNumCPUsKey, _),
           Pair(kSystemBootIdCurrentKey, ErrorOrString("current-boot-id")),
           Pair(kSystemBootIdPreviousKey, ErrorOrString("previous-boot-id")),
@@ -111,11 +123,47 @@ TEST_F(StartupAnnotationsTest, Values_FilesMissing) {
           Pair(kBuildLatestCommitDateKey, ErrorOrString(Error::kFileReadFailure)),
           Pair(kBuildVersionKey, ErrorOrString(Error::kFileReadFailure)),
           Pair(kBuildVersionPreviousBootKey, ErrorOrString(Error::kFileReadFailure)),
+          Pair(kBuildPlatformVersionKey, ErrorOrString(Error::kFileReadFailure)),
+          Pair(kBuildPlatformVersionPreviousBootKey, ErrorOrString(Error::kFileReadFailure)),
+          Pair(kBuildProductVersionKey, ErrorOrString(Error::kFileReadFailure)),
+          Pair(kBuildProductVersionPreviousBootKey, ErrorOrString(Error::kFileReadFailure)),
           Pair(kBuildIsDebugKey, _), Pair(kDeviceBoardNameKey, _), Pair(kDeviceNumCPUsKey, _),
           Pair(kSystemBootIdCurrentKey, ErrorOrString(Error::kFileReadFailure)),
           Pair(kSystemBootIdPreviousKey, ErrorOrString(Error::kFileReadFailure)),
           Pair(kSystemLastRebootReasonKey, ErrorOrString(LastRebootReasonAnnotation(reboot_log))),
           Pair(kSystemLastRebootUptimeKey, LastRebootUptimeAnnotation(reboot_log))));
+}
+
+TEST_F(StartupAnnotationsTest, BuildProductVersionPreviousBootFallback) {
+  testing::ScopedMemFsManager memfs_manager;
+  memfs_manager.Create("/data");
+  memfs_manager.Create("/tmp");
+
+  // On the first OTA, the build platform and product versions for the previous boot won't be
+  // available. The build product version should match the legacy build version.
+  WriteFiles({
+      {kCurrentBuildVersionPath, "current-version"},
+      {kPreviousBuildVersionPath, "previous-version"},
+      {kCurrentBuildPlatformVersionPath, "current-platform-version"},
+      {kCurrentBuildProductVersionPath, "current-product-version"},
+  });
+
+  const RebootLog reboot_log(RebootReason::kOOM, "", std::nullopt, std::nullopt);
+  const auto startup_annotations = GetStartupAnnotations(reboot_log);
+
+  EXPECT_THAT(
+      startup_annotations,
+      UnorderedElementsAre(
+          Pair(kBuildBoardKey, _), Pair(kBuildProductKey, _), Pair(kBuildLatestCommitDateKey, _),
+          Pair(kBuildVersionKey, ErrorOrString("current-version")),
+          Pair(kBuildVersionPreviousBootKey, ErrorOrString("previous-version")),
+          Pair(kBuildPlatformVersionKey, ErrorOrString("current-platform-version")),
+          Pair(kBuildPlatformVersionPreviousBootKey, ErrorOrString(Error::kFileReadFailure)),
+          Pair(kBuildProductVersionKey, ErrorOrString("current-product-version")),
+          Pair(kBuildProductVersionPreviousBootKey, ErrorOrString("previous-version")),
+          Pair(kBuildIsDebugKey, _), Pair(kDeviceBoardNameKey, _), Pair(kDeviceNumCPUsKey, _),
+          Pair(kSystemBootIdCurrentKey, _), Pair(kSystemBootIdPreviousKey, _),
+          Pair(kSystemLastRebootReasonKey, _), Pair(kSystemLastRebootUptimeKey, _)));
 }
 
 }  // namespace

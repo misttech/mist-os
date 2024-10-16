@@ -71,7 +71,19 @@ int main() {
     }
     MoveAndRecordBootId(uuid::Generate());
     if (std::string build_version; files::ReadFileToString(kBuildVersionPath, &build_version)) {
-      MoveAndRecordBuildVersion(build_version);
+      MoveAndRecordBuildVersion(build_version, kPreviousBuildVersionPath, kCurrentBuildVersionPath);
+    }
+
+    if (std::string build_platform_version;
+        files::ReadFileToString(kBuildPlatformVersionPath, &build_platform_version)) {
+      MoveAndRecordBuildVersion(build_platform_version, kPreviousBuildPlatformVersionPath,
+                                kCurrentBuildPlatformVersionPath);
+    }
+
+    if (std::string build_product_version;
+        files::ReadFileToString(kBuildProductVersionPath, &build_product_version)) {
+      MoveAndRecordBuildVersion(build_product_version, kPreviousBuildProductVersionPath,
+                                kCurrentBuildProductVersionPath);
     }
   }
 

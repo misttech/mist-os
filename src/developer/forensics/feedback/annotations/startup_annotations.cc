@@ -30,6 +30,16 @@ ErrorOrString ReadAnnotation(const std::string& filepath) {
   return ErrorOrString(std::string(fxl::TrimString(content, "\r\n")));
 }
 
+ErrorOrString ReadAnnotationWithFallback(const std::string& filepath,
+                                         const std::string& fallback_filepath) {
+  std::string content;
+  if (!files::ReadFileToString(filepath, &content)) {
+    FX_LOGS(WARNING) << "Failed to read content from " << filepath;
+    return ReadAnnotation(fallback_filepath);
+  }
+  return ErrorOrString(std::string(fxl::TrimString(content, "\r\n")));
+}
+
 ErrorOrString BoardName() {
   fuchsia::sysinfo::SysInfoSyncPtr sysinfo;
 
@@ -78,6 +88,11 @@ Annotations GetStartupAnnotations(const RebootLog& reboot_log) {
       {kBuildLatestCommitDateKey, ReadAnnotation(kBuildCommitDatePath)},
       {kBuildVersionKey, ReadAnnotation(kCurrentBuildVersionPath)},
       {kBuildVersionPreviousBootKey, ReadAnnotation(kPreviousBuildVersionPath)},
+      {kBuildPlatformVersionKey, ReadAnnotation(kCurrentBuildPlatformVersionPath)},
+      {kBuildPlatformVersionPreviousBootKey, ReadAnnotation(kPreviousBuildPlatformVersionPath)},
+      {kBuildProductVersionKey, ReadAnnotation(kCurrentBuildProductVersionPath)},
+      {kBuildProductVersionPreviousBootKey,
+       ReadAnnotationWithFallback(kPreviousBuildProductVersionPath, kPreviousBuildVersionPath)},
       {kBuildIsDebugKey, ErrorOrString(IsDebug())},
       {kDeviceBoardNameKey, BoardName()},
       {kDeviceNumCPUsKey, ErrorOrString(NumCPUs())},

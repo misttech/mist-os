@@ -18,6 +18,11 @@ namespace forensics::feedback {
 constexpr const char kBuildBoardKey[] = "build.board";
 constexpr const char kBuildVersionKey[] = "build.version";
 constexpr const char kBuildVersionPreviousBootKey[] = "build.version.previous-boot";
+constexpr const char kBuildPlatformVersionKey[] = "build.platform.version";
+constexpr const char kBuildPlatformVersionPreviousBootKey[] =
+    "build.platform.version.previous-boot";
+constexpr const char kBuildProductVersionKey[] = "build.product.version";
+constexpr const char kBuildProductVersionPreviousBootKey[] = "build.product.version.previous-boot";
 constexpr const char kBuildProductKey[] = "build.product";
 constexpr const char kBuildLatestCommitDateKey[] = "build.latest-commit-date";
 constexpr const char kBuildIsDebugKey[] = "build.is_debug";
@@ -59,11 +64,11 @@ constexpr const char kSystemUserActivityCurrentDurationKey[] =
 // RESTRICTIONS
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-// 32 annotations may be collected by the platform.
-constexpr uint32_t kMaxNumPlatformAnnotations = 32u;
+// 36 annotations may be collected by the platform.
+constexpr uint32_t kMaxNumPlatformAnnotations = 36u;
 
-// 30 non-platform annotations may be registered by non-platform components.
-constexpr uint32_t kMaxNumNonPlatformAnnotations = 30u;
+// 26 non-platform annotations may be registered by non-platform components.
+constexpr uint32_t kMaxNumNonPlatformAnnotations = 26u;
 
 // 2 annotations are permitted to be from Feedback itself for debugging purposes.
 constexpr uint32_t kMaxNumDebugAnnotations = 2u;
