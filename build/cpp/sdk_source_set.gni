@@ -205,10 +205,7 @@ template("sdk_source_set") {
       deps += [ "//build/sdk:partner_idk_unstable_source_sets_allowlist" ]
     }
 
-    # TODO(https://fxbug.dev/42079584): Fix failures and remove exception.
-    if (invoker.category != "internal") {
-      configs += [ "//build/config:sdk_extra_warnings" ]
-    }
+    configs += [ "//build/config:sdk_extra_warnings" ]
 
     metadata = {
       if (defined(invoker.metadata)) {

@@ -14,6 +14,13 @@
 
 namespace fidl {
 
+#ifdef __Fuchsia__
+// Class template argument deduction (CTAD) guide.
+template <typename FidlProtocol, typename FidlMethod>
+WireResult(::fidl::UnownedClientEnd<FidlProtocol>,
+           ::fidl::internal::TransactionalRequest<FidlMethod>) -> WireResult<FidlMethod>;
+#endif
+
 // Returns true if the FidlMethod uses the result union (which is the case if it
 // is flexible or uses error syntax).
 template <typename FidlMethod>
