@@ -142,7 +142,7 @@ fit::result<Errno, Container> create_container(const Config& config) {
     LTRACEF("Finished running init process.\n");
   };
 
-  execute_task_with_prerun_result(init_task.value(), pre_run, task_complete);
+  execute_task_with_prerun_result(ktl::move(init_task.value()), pre_run, task_complete);
 
   return fit::ok(Container{kernel});
 }
