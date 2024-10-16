@@ -25,17 +25,17 @@ class ThreadGroup;
 
 class ProcessGroupMutableState {
  private:
-  using BTree = fbl::WAVLTree<pid_t, util::WeakPtr<ThreadGroup>>;
+  using BTreeMapThreadGroup = fbl::WAVLTree<pid_t, util::WeakPtr<ThreadGroup>>;
 
   /// The thread_groups in the process group.
   ///
   /// The references to ThreadGroup is weak to prevent cycles as ThreadGroup have a Arc
   /// reference to their process group. It is still expected that these weak references are
   /// always valid, as thread groups must unregister themselves before they are deleted.
-  BTree thread_groups_;
+  BTreeMapThreadGroup thread_groups_;
 
   // Whether this process group is orphaned and already notified its members.
-  // bool orphaned_ = false;
+  bool orphaned_ = false;
 
   // impl ProcessGroupMutableState<Base = ProcessGroup>
  public:
@@ -44,15 +44,13 @@ class ProcessGroupMutableState {
   /// Removes the thread group from the process group. Returns whether the process group is empty.
   bool remove(fbl::RefPtr<ThreadGroup> thread_group);
 
+  ProcessGroupMutableState();
+
  private:
   friend class ProcessGroup;
 };
 
 class Session;
-
-//namespace starnix_uapi {
-//class Signal;
-//}
 
 /// A process group is a set of processes that are considered to be a unit for the purposes of job
 /// control and signal delivery. Each process in a process group has the same process group
@@ -87,18 +85,26 @@ class ProcessGroup : public fbl::RefCountedUpgradeable<ProcessGroup>,
   /// impl ProcessGroup
   static fbl::RefPtr<ProcessGroup> New(pid_t pid, ktl::optional<fbl::RefPtr<Session>>);
 
+  // ordered_state_accessor!(ProcessGroup, mutable_state, ProcessGroupState);
+  starnix_sync::RwLock<ProcessGroupMutableState>::RwLockReadGuard Read() const {
+    return mutable_state_.Read();
+  }
+
+  starnix_sync::RwLock<ProcessGroupMutableState>::RwLockWriteGuard Write() const {
+    return mutable_state_.Write();
+  }
+
   void insert(fbl::RefPtr<ThreadGroup> thread_group);
 
   /// Removes the thread group from the process group. Returns whether the process group is empty.
   bool remove(fbl::RefPtr<ThreadGroup> thread_group);
 
-  //void send_signals(const fbl::Vector<Signal>& signals);
+  // void send_signals(const fbl::Vector<Signal>& signals);
 
   /// Check whether the process group became orphaned. If this is the case, send signals to its
   /// members if at least one is stopped.
   void check_orphaned();
 
- public:
   // C++
   const fbl::RefPtr<Session>& session() const;
 

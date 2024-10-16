@@ -19,6 +19,8 @@
 
 namespace starnix {
 
+ProcessGroupMutableState::ProcessGroupMutableState() = default;
+
 fbl::Vector<fbl::RefPtr<ThreadGroup>> ProcessGroupMutableState::thread_groups() const {
   fbl::Vector<fbl::RefPtr<ThreadGroup>> thread_groups_vec;
   // fbl::AllocChecker ac;
@@ -56,7 +58,7 @@ fbl::RefPtr<ProcessGroup> ProcessGroup::New(pid_t leader,
 }
 
 void ProcessGroup::insert(fbl::RefPtr<ThreadGroup> thread_group) {
-  mutable_state_.Write()->thread_groups_.insert(util::WeakPtr<ThreadGroup>(thread_group.get()));
+  mutable_state_.Write()->thread_groups_.insert(thread_group->weak_thread_group());
 }
 
 bool ProcessGroup::remove(fbl::RefPtr<ThreadGroup> thread_group) {
