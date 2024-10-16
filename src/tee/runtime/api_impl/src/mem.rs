@@ -29,6 +29,20 @@ pub unsafe fn free(buffer: *mut ::std::os::raw::c_void) {
 }
 
 pub fn mem_move(dest: *mut ::std::os::raw::c_void, src: *mut ::std::os::raw::c_void, size: usize) {
+    // The spec does not define the behaviour of this function when the size is
+    // zero (ditto for libc's memmove). However, there are xtest cases that
+    // explicitly rely on being able to do this(!) (with null pointers even),
+    // so better for this implementation to regard that as a no-op.
+    if size == 0 {
+        return;
+    }
+
+    // The spec also does not define the behavior of this function when either
+    // pointer is null - but at the very least this is a condition of
+    // std::ptr::copy, so check that here for a clearer panic.
+    assert!(!src.is_null());
+    assert!(!dest.is_null());
+
     // This is semantically equivalent to libc::memmove() with the order of operands reversed.
     // This uses the Rust library routine instead so that it can be optimized directly if the
     // toolchain decides, calling libc::memmove() would require an external library call here.
@@ -40,6 +54,12 @@ pub fn mem_compare(
     buffer2: *mut ::std::os::raw::c_void,
     size: usize,
 ) -> i32 {
+    // The spec does not define the behavior of this function when either
+    // pointer is null - but at the very least this is a condition of
+    // std::slice::from_raw_parts, so check that here for a clearer panic.
+    assert!(!buffer1.is_null());
+    assert!(!buffer2.is_null());
+
     unsafe {
         let buffer1 = std::slice::from_raw_parts::<u8>(buffer1 as *const u8, size);
         let buffer2 = std::slice::from_raw_parts::<u8>(buffer2 as *const u8, size);
@@ -52,6 +72,11 @@ pub fn mem_compare(
 }
 
 pub fn mem_fill(buffer: *mut ::std::os::raw::c_void, x: u8, size: usize) {
+    // The spec does not define the behavior of this function when the pointer
+    // is null - but at the very least this is a condition of
+    //std::ptr::write_bytes, so check that here for a clearer panic.
+    assert!(!buffer.is_null());
+
     // This is semantically equivalent to libc::memset() as it's called with a byte sized type.
     // This uses the Rust library routine instead so that it can be optimized directly if the
     // toolchain decides, calling libc::memmove() would require an external library call here.
@@ -145,6 +170,18 @@ mod test {
         unsafe {
             free(realloced_buf);
         }
+    }
+
+    // See note at top of implementation.
+    #[fuchsia::test]
+    fn mem_move_size_zero() {
+        mem_move(std::ptr::null_mut(), std::ptr::null_mut(), 0);
+
+        let nonnull = malloc(10, 0);
+        mem_move(nonnull, std::ptr::null_mut(), 0);
+        mem_move(std::ptr::null_mut(), nonnull, 0);
+
+        unsafe { free(nonnull) };
     }
 
     #[fuchsia::test]
