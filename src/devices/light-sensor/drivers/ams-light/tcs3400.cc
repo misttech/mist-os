@@ -709,20 +709,24 @@ zx_status_t Tcs3400Device::Bind() {
     zxlogf(ERROR, "DdkAdd failed: %d", status);
     return status;
   }
-  {
-    fidl::WireResult result = gpio_->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kNoPull);
-    if (!result.ok()) {
-      zxlogf(ERROR, "Failed to send ConfigIn request to gpio: %s", result.status_string());
-      return result.status();
-    }
-    if (result->is_error()) {
-      zxlogf(ERROR, "Failed to configure gpio to input: %s",
-             zx_status_get_string(result->error_value()));
-      return result->error_value();
-    }
+
+  fidl::Arena arena;
+  auto interrupt_config = fuchsia_hardware_gpio::wire::InterruptConfiguration::Builder(arena)
+                              .mode(fuchsia_hardware_gpio::InterruptMode::kEdgeLow)
+                              .Build();
+  fidl::WireResult configure_result = gpio_->ConfigureInterrupt(interrupt_config);
+  if (!configure_result.ok()) {
+    zxlogf(ERROR, "Failed to send ConfigureInterrupt request to gpio: %s",
+           configure_result.status_string());
+    return configure_result.status();
+  }
+  if (configure_result->is_error()) {
+    zxlogf(ERROR, "Failed to configure interrupt: %s",
+           zx_status_get_string(configure_result->error_value()));
+    return configure_result->error_value();
   }
 
-  fidl::WireResult interrupt_result = gpio_->GetInterrupt(ZX_INTERRUPT_MODE_EDGE_LOW);
+  fidl::WireResult interrupt_result = gpio_->GetInterrupt2({});
   if (!interrupt_result.ok()) {
     zxlogf(ERROR, "Failed to send GetInterrupt request to gpio: %s",
            interrupt_result.status_string());
@@ -733,7 +737,7 @@ zx_status_t Tcs3400Device::Bind() {
            zx_status_get_string(interrupt_result->error_value()));
     return interrupt_result->error_value();
   }
-  irq_ = std::move(interrupt_result->value()->irq);
+  irq_ = std::move(interrupt_result->value()->interrupt);
   irq_handler_.set_object(irq_.get());
   irq_handler_.Begin(dispatcher_);
 

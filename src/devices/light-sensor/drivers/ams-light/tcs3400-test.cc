@@ -152,9 +152,6 @@ class Tcs3400Test : public inspect::InspectTestHelper, public zxtest::Test {
       ASSERT_OK(status);
     });
     EXPECT_OK(result.status_value());
-    incoming_.SyncCall([](IncomingNamespace* incoming) {
-      ASSERT_EQ(fuchsia_hardware_gpio::GpioFlags::kNoPull, incoming->fake_gpio_.GetReadFlags());
-    });
     auto* child = fake_parent_->GetLatestChild();
     device_ = child->GetDeviceContext<Tcs3400Device>();
 
@@ -975,9 +972,6 @@ class Tcs3400MetadataTest : public zxtest::Test {
       ASSERT_OK(status);
     });
     ASSERT_OK(result);
-    incoming.SyncCall([](IncomingNamespace* incoming) {
-      ASSERT_EQ(fuchsia_hardware_gpio::GpioFlags::kNoPull, incoming->fake_gpio_.GetReadFlags());
-    });
     auto* child = fake_parent->GetLatestChild();
 
     sync_completion_t* completion;
