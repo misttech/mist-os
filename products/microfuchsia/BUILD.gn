@@ -9,36 +9,42 @@ import("//build/bazel/assembly/bazel_product_bundle.gni")
 
 assert(current_toolchain == default_toolchain,
        "Products only make sense in the context of the default toolchain")
-assert(target_cpu == "x64" || target_cpu == "arm64",
-       "Microfuchsia is only support for x64 and arm64")
 
-bazel_product_bundle("microfuchsia_eng.${target_cpu}") {
+# For boards with x64 architecture, we always use the x64 board.
+# For boards with arm64 architecture, we always use the arm64 board.
+board_name = target_cpu
+
+group("microfuchsia") {
   testonly = true
-  allow_eng_platform_bundle_use = true
-  image_has_fxfs_blob = false
-  image_has_fvm = false
-  product_bundle_name = target_name
-  bazel_product_bundle_target =
-      "//products/microfuchsia:product_bundle_eng.${target_cpu}"
-  bazel_product_image_target =
-      "//products/microfuchsia:microfuchsia_eng.${target_cpu}"
-  bazel_recovery_image_target = "//products/zedboot:${target_cpu}"
-  bazel_inputs_from_gn = [
-    "//build/images/flash:esp.bazel_input",
-    "//build/images/zedboot:zedboot.bazel_legacy_aib",
-    "//src/tee/ta/noop:ta-noop_for_bazel",
-
-    # Add the board configuration as a dependency via the GN arg, as vendor-
-    # repo boards can shadow the ones in //boards.
-    get_label_info(board_configuration_label, "label_no_toolchain") +
-        ".bazel_input",
-  ]
+  if (target_cpu == "x64" || target_cpu == "arm64") {
+    deps = [
+      ":microfuchsia_eng.${board_name}",
+      ":microfuchsia_eng.pkvm-${board_name}",
+    ]
+  }
 }
 
 if (target_cpu == "x64" || target_cpu == "arm64") {
-  board = "pkvm-${target_cpu}"
+  bazel_product_bundle("microfuchsia_eng.${board_name}") {
+    testonly = true
+    allow_eng_platform_bundle_use = true
+    image_has_fxfs_blob = false
+    image_has_fvm = false
+    product_bundle_name = target_name
+    bazel_product_bundle_target =
+        "//products/microfuchsia:product_bundle_eng.${board_name}"
+    bazel_product_image_target =
+        "//products/microfuchsia:microfuchsia_eng.${board_name}"
+    bazel_recovery_image_target = "//products/zedboot:${board_name}"
+    bazel_inputs_from_gn = [
+      "//build/images/flash:esp.bazel_input",
+      "//build/images/zedboot:zedboot.bazel_legacy_aib",
+      "//src/tee/ta/noop:ta-noop_for_bazel",
+      "//boards/${board_name}:${board_name}.bazel_input",
+    ]
+  }
 
-  bazel_product_bundle("microfuchsia_eng.${board}") {
+  bazel_product_bundle("microfuchsia_eng.pkvm-${board_name}") {
     testonly = true
     allow_eng_platform_bundle_use = true
     image_has_fxfs_blob = false
@@ -46,12 +52,12 @@ if (target_cpu == "x64" || target_cpu == "arm64") {
     image_use_vbmeta = false
     product_bundle_name = target_name
     bazel_product_bundle_target =
-        "//products/microfuchsia:product_bundle_eng.${board}"
+        "//products/microfuchsia:product_bundle_eng.pkvm-${board_name}"
     bazel_product_image_target =
-        "//products/microfuchsia:microfuchsia_eng.${board}"
+        "//products/microfuchsia:microfuchsia_eng.pkvm-${board_name}"
     bazel_inputs_from_gn = [
       "//build/images/flash:esp.bazel_input",
-      "//boards/pkvm:${target_cpu}.bazel_input",
+      "//boards/pkvm:${board_name}.bazel_input",
       "//src/tee/ta/noop:ta-noop_for_bazel",
     ]
   }
