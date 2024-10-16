@@ -61,8 +61,9 @@ DirEntryHandle DirEntry::New(FsNodeHandle node, ktl::optional<DirEntryHandle> pa
   fbl::AllocChecker ac;
   auto ops = ktl::make_unique<DefaultDirEntryOps>(&ac);
   ZX_ASSERT(ac.check());
-  auto result =
-      fbl::AdoptRef(new (&ac) DirEntry(node, ktl::move(ops), {parent, local_name, false, 0}));
+  auto result = fbl::AdoptRef(new (&ac) DirEntry(
+      node, ktl::move(ops),
+      {.parent = parent, .local_name = local_name, .is_dead = false, .mount_count = 0}));
   ZX_ASSERT(ac.check());
 
   // #[cfg(any(test, debug_assertions))]
@@ -88,11 +89,8 @@ fit::result<Errno, DirEntryHandle> DirEntry::component_lookup(const CurrentTask&
     return d->lookup(current_task, mount, name);
   };
 
-  auto get_or_create_child_result = get_or_create_child(current_task, mount, name, create_fn);
-
-  if (get_or_create_child_result.is_error())
-    return get_or_create_child_result.take_error();
-
+  auto get_or_create_child_result =
+      get_or_create_child(current_task, mount, name, create_fn) _EP(get_or_create_child_result);
   auto [node, _] = get_or_create_child_result.value();
   return fit::ok(node);
 }
@@ -127,8 +125,7 @@ fbl::Vector<FsString> DirEntry::copy_child_names() {
       if (child) {
         fbl::AllocChecker ac;
         child_names.push_back(child->local_name(), &ac);
-        if (!ac.check())
-          break;
+        ZX_ASSERT(ac.check());
       }
     }
   }
