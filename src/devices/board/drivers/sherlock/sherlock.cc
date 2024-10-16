@@ -160,6 +160,10 @@ int Sherlock::Start() {
     return -1;
   }
 
+  if (OtRadioInit() != ZX_OK) {
+    zxlogf(ERROR, "OtRadioInit() failed");
+  }
+
   // GpioInit() must be called after other subsystems that bind to GPIO have had a chance to add
   // their init steps.
   if (GpioInit() != ZX_OK) {
@@ -207,10 +211,6 @@ int Sherlock::Start() {
 
   if (NnaInit() != ZX_OK) {
     zxlogf(ERROR, "NnaInit() failed");
-  }
-
-  if (OtRadioInit() != ZX_OK) {
-    zxlogf(ERROR, "OtRadioInit() failed");
   }
 
   if (SecureMemInit() != ZX_OK) {

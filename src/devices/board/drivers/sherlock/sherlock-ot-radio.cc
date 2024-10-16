@@ -68,6 +68,13 @@ const std::vector<fdf::NodeProperty> kSpiProperties = std::vector{
                       bind_fuchsia_nordic_platform::BIND_PLATFORM_DEV_DID_THREAD),
 };
 
+const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+const std::vector<fdf::NodeProperty> kGpioInitProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+
 const std::map<uint32_t, std::string> kGpioPinFunctionMap = {
     {GPIO_OT_RADIO_INTERRUPT, bind_fuchsia_gpio::FUNCTION_OT_RADIO_INTERRUPT},
     {GPIO_OT_RADIO_RESET, bind_fuchsia_gpio::FUNCTION_OT_RADIO_RESET},
@@ -75,6 +82,8 @@ const std::map<uint32_t, std::string> kGpioPinFunctionMap = {
 };
 
 zx_status_t Sherlock::OtRadioInit() {
+  gpio_init_steps_.push_back(GpioPull(GPIO_OT_RADIO_INTERRUPT, fuchsia_hardware_pin::Pull::kNone));
+
   fpbus::Node dev;
   dev.name() = "nrf52840-radio";
   dev.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
@@ -82,7 +91,10 @@ zx_status_t Sherlock::OtRadioInit() {
   dev.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_OT_RADIO;
   dev.metadata() = kNrf52840RadioMetadata;
 
-  std::vector<fdf::ParentSpec> parents = {fdf::ParentSpec{{kSpiRules, kSpiProperties}}};
+  std::vector<fdf::ParentSpec> parents = {
+      fdf::ParentSpec{{kSpiRules, kSpiProperties}},
+      fdf::ParentSpec{{kGpioInitRules, kGpioInitProperties}},
+  };
   parents.reserve(parents.size() + kGpioPinFunctionMap.size());
 
   for (auto& [gpio_pin, function] : kGpioPinFunctionMap) {

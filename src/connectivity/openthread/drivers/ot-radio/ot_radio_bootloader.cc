@@ -194,9 +194,11 @@ zx_status_t OtRadioDeviceBootloader::PutRcpInBootloader() {
   zxlogf(DEBUG, "ot-radio : putting rcp in bootloader");
 
   {
-    fidl::WireResult result = dev_handle_->gpio_[OT_RADIO_BOOTLOADER_PIN]->Write(0);
+    fidl::WireResult result = dev_handle_->gpio_[OT_RADIO_BOOTLOADER_PIN]->SetBufferMode(
+        fuchsia_hardware_gpio::BufferMode::kOutputLow);
     if (!result.ok()) {
-      zxlogf(ERROR, "Failed to send Write request to bootloader gpio: %s", result.status_string());
+      zxlogf(ERROR, "Failed to send SetBufferMode request to bootloader gpio: %s",
+             result.status_string());
       return result.status();
     }
     if (result->is_error()) {
@@ -208,9 +210,11 @@ zx_status_t OtRadioDeviceBootloader::PutRcpInBootloader() {
   zx::nanosleep(zx::deadline_after(zx::msec(50)));
 
   {
-    fidl::WireResult result = dev_handle_->gpio_[OT_RADIO_RESET_PIN]->Write(0);
+    fidl::WireResult result = dev_handle_->gpio_[OT_RADIO_RESET_PIN]->SetBufferMode(
+        fuchsia_hardware_gpio::BufferMode::kOutputLow);
     if (!result.ok()) {
-      zxlogf(ERROR, "Failed to send Write request to reset gpio: %s", result.status_string());
+      zxlogf(ERROR, "Failed to send SetBufferMode request to reset gpio: %s",
+             result.status_string());
       return result.status();
     }
     if (result->is_error()) {
@@ -222,9 +226,11 @@ zx_status_t OtRadioDeviceBootloader::PutRcpInBootloader() {
   zx::nanosleep(zx::deadline_after(zx::msec(50)));
 
   {
-    fidl::WireResult result = dev_handle_->gpio_[OT_RADIO_RESET_PIN]->Write(1);
+    fidl::WireResult result = dev_handle_->gpio_[OT_RADIO_RESET_PIN]->SetBufferMode(
+        fuchsia_hardware_gpio::BufferMode::kOutputHigh);
     if (!result.ok()) {
-      zxlogf(ERROR, "Failed to send Write request to reset gpio: %s", result.status_string());
+      zxlogf(ERROR, "Failed to send SetBufferMode request to reset gpio: %s",
+             result.status_string());
       return result.status();
     }
     if (result->is_error()) {
@@ -243,9 +249,11 @@ zx_status_t OtRadioDeviceBootloader::PutRcpInBootloader() {
   zx::nanosleep(zx::deadline_after(zx::msec(400)));
 
   {
-    fidl::WireResult result = dev_handle_->gpio_[OT_RADIO_BOOTLOADER_PIN]->Write(1);
+    fidl::WireResult result = dev_handle_->gpio_[OT_RADIO_BOOTLOADER_PIN]->SetBufferMode(
+        fuchsia_hardware_gpio::BufferMode::kOutputHigh);
     if (!result.ok()) {
-      zxlogf(ERROR, "Failed to send Write request to bootloader gpio: %s", result.status_string());
+      zxlogf(ERROR, "Failed to send SetBufferMode request to bootloader gpio: %s",
+             result.status_string());
       return result.status();
     }
     if (result->is_error()) {

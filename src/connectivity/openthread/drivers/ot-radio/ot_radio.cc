@@ -221,9 +221,9 @@ zx_status_t OtRadioDevice::Init() {
 
   {
     fidl::WireResult result =
-        gpio_[OT_RADIO_INT_PIN]->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kNoPull);
+        gpio_[OT_RADIO_INT_PIN]->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kInput);
     if (!result.ok()) {
-      zxlogf(ERROR, "Failed to send ConfigIn request to interrupt gpio: %s",
+      zxlogf(ERROR, "Failed to send SetBufferMode request to interrupt gpio: %s",
              result.status_string());
       return result.status();
     }
@@ -234,8 +234,24 @@ zx_status_t OtRadioDevice::Init() {
     }
   }
 
-  fidl::WireResult interrupt_result =
-      gpio_[OT_RADIO_INT_PIN]->GetInterrupt(ZX_INTERRUPT_MODE_LEVEL_LOW);
+  fidl::Arena arena;
+  auto interrupt_config = fuchsia_hardware_gpio::wire::InterruptConfiguration::Builder(arena)
+                              .mode(fuchsia_hardware_gpio::InterruptMode::kLevelLow)
+                              .Build();
+  fidl::WireResult configure_interrupt_result =
+      gpio_[OT_RADIO_INT_PIN]->ConfigureInterrupt(interrupt_config);
+  if (!configure_interrupt_result.ok()) {
+    zxlogf(ERROR, "Failed to send ConfigureInterrupt request to interrupt gpio: %s",
+           configure_interrupt_result.status_string());
+    return configure_interrupt_result.status();
+  }
+  if (configure_interrupt_result->is_error()) {
+    zxlogf(ERROR, "Failed to configure interrupt gpio: %s",
+           zx_status_get_string(configure_interrupt_result->error_value()));
+    return configure_interrupt_result->error_value();
+  }
+
+  fidl::WireResult interrupt_result = gpio_[OT_RADIO_INT_PIN]->GetInterrupt2({});
   if (!interrupt_result.ok()) {
     zxlogf(ERROR, "Failed to send GetInterrupt request to interrupt gpio: %s",
            interrupt_result.status_string());
@@ -246,7 +262,7 @@ zx_status_t OtRadioDevice::Init() {
            zx_status_get_string(interrupt_result->error_value()));
     return interrupt_result->error_value();
   }
-  interrupt_ = std::move(interrupt_result.value()->irq);
+  interrupt_ = std::move(interrupt_result.value()->interrupt);
 
   const char* kResetGpioFragmentName = "gpio-reset";
   zx::result gpio_reset = DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
@@ -259,9 +275,11 @@ zx_status_t OtRadioDevice::Init() {
   gpio_[OT_RADIO_RESET_PIN].Bind(std::move(gpio_reset.value()));
 
   {
-    fidl::WireResult result = gpio_[OT_RADIO_RESET_PIN]->ConfigOut(1);
+    fidl::WireResult result =
+        gpio_[OT_RADIO_RESET_PIN]->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputHigh);
     if (!result.ok()) {
-      zxlogf(ERROR, "Failed to send ConfigOut request to reset gpio: %s", result.status_string());
+      zxlogf(ERROR, "Failed to send SetBufferMode request to reset gpio: %s",
+             result.status_string());
       return result.status();
     }
     if (result->is_error()) {
@@ -283,9 +301,10 @@ zx_status_t OtRadioDevice::Init() {
   gpio_[OT_RADIO_BOOTLOADER_PIN].Bind(std::move(gpio_bootloader.value()));
 
   {
-    fidl::WireResult result = gpio_[OT_RADIO_BOOTLOADER_PIN]->ConfigOut(1);
+    fidl::WireResult result = gpio_[OT_RADIO_BOOTLOADER_PIN]->SetBufferMode(
+        fuchsia_hardware_gpio::BufferMode::kOutputHigh);
     if (!result.ok()) {
-      zxlogf(ERROR, "Failed to send ConfigOut request to bootloader gpio: %s",
+      zxlogf(ERROR, "Failed to send SetBufferMode request to bootloader gpio: %s",
              result.status_string());
       return result.status();
     }
@@ -453,9 +472,10 @@ zx_status_t OtRadioDevice::AssertResetPin() {
   zx_status_t status = ZX_OK;
   zxlogf(DEBUG, "ot-radio: assert reset pin");
 
-  fidl::WireResult result = gpio_[OT_RADIO_RESET_PIN]->Write(0);
+  fidl::WireResult result =
+      gpio_[OT_RADIO_RESET_PIN]->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputLow);
   if (!result.ok()) {
-    zxlogf(ERROR, "Failed to send Write request to reset gpio: %s", result.status_string());
+    zxlogf(ERROR, "Failed to send SetBufferMode request to reset gpio: %s", result.status_string());
     return result.status();
   }
   if (result->is_error()) {
@@ -477,9 +497,10 @@ zx_status_t OtRadioDevice::Reset() {
     return status;
   }
 
-  fidl::WireResult result = gpio_[OT_RADIO_RESET_PIN]->Write(1);
+  fidl::WireResult result =
+      gpio_[OT_RADIO_RESET_PIN]->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputHigh);
   if (!result.ok()) {
-    zxlogf(ERROR, "Failed to send Write request to reset gpio: %s", result.status_string());
+    zxlogf(ERROR, "Failed to send SetBufferMode request to reset gpio: %s", result.status_string());
     return result.status();
   }
   if (result->is_error()) {
