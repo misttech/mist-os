@@ -2,14 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-declare_args() {
-  # Extra vendor-specific targets that may use the deprecated bindings.
-  vendor_hlcpp_visibility = []
-}
+# Extra vendor-specific targets that may use the deprecated bindings.
+import("//vendor/google/build/hlcpp_visibility.gni")
 
-# Are there any vendor HLCPP visibility overrides defined?
-vendor_hlcpp_included = vendor_hlcpp_visibility != []
-
+# Targets in this tree.
 hlcpp_visibility = [
   # Dependencies between SDK FIDL libraries.
   "//sdk/fidl/*",
@@ -32,9 +28,6 @@ hlcpp_visibility = [
 
   # Misc buildsystem stuff.
   "//sdk/ctf/*",
-
-  # We need to migrate vendor trees separately.
-  "//vendor/*",
 
   # Existing in-tree uses of HLCPP that should be removed.
   "//examples/components/config/integration_test:*",
