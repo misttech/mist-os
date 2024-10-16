@@ -118,7 +118,7 @@ $1 == "Relocation" && $2 == "section" {
 NF == 0 || $1 == "Offset" { next }
 !secname { exit(1); }
 # Ignore standard non-allocated sections.
-secname ~ /^\.debug/ || secname == ".comment" || secname == ".code-patches" { next }
+secname ~ /^\.debug/ || secname == ".comment" || secname == ".code-patches" || secname == ".stack_sizes" { next }
 secname == "__llvm_covdata" || secname == "__llvm_covname" { next }
 # .text.boot contains code that runs before fixups.
 secname == ".text.boot" { next }
