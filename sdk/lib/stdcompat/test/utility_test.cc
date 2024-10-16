@@ -9,32 +9,6 @@
 #include "gtest.h"
 
 namespace {
-TEST(InplaceTagTest, InplaceTagsSwitchToStdProvidedOnStd17) {
-  static_assert(std::is_trivially_default_constructible<cpp17::in_place_t>::value);
-  static_assert(std::is_trivially_default_constructible<cpp17::in_place_index_t<0>>::value);
-  static_assert(std::is_trivially_default_constructible<cpp17::in_place_type_t<void>>::value);
-
-#if __cplusplus >= 201411L && !defined(LIB_STDCOMPAT_USE_POLYFILLS)
-  static_assert(std::is_same<cpp17::in_place_t, std::in_place_t>::value);
-  static_assert(std::is_same<cpp17::in_place_type_t<void>, std::in_place_type_t<void>>::value);
-  static_assert(std::is_same<cpp17::in_place_index_t<0>, std::in_place_index_t<0>>::value);
-
-  static_assert(cpp17::addressof(cpp17::in_place) == std::addressof(std::in_place));
-  static_assert(cpp17::addressof(cpp17::in_place_type<void>) ==
-                std::addressof(std::in_place_type<void>));
-  static_assert(cpp17::addressof(cpp17::in_place_index<0>) ==
-                std::addressof(std::in_place_index<0>));
-#else  // Force template instantiation.
-
-  // Sanity checks that the instantiations are actually different for the polyfills.
-  static_assert(cpp17::addressof(cpp17::in_place) != nullptr);
-  static_assert(static_cast<const void*>(cpp17::addressof(cpp17::in_place_type<void>)) !=
-                static_cast<const void*>(cpp17::addressof(std::in_place_type<int>)));
-  static_assert(static_cast<const void*>(cpp17::addressof(cpp17::in_place_index<0>)) !=
-                static_cast<const void*>(cpp17::addressof(std::in_place_index<1>)));
-#endif
-}
-
 constexpr bool ExchangeCheck() {
   int a = 1;
   int b = 2;
@@ -80,41 +54,6 @@ TEST(ExchangeTest, IsAliasWhenAvailable) {
 }
 
 #endif
-
-template <typename T, typename = void>
-struct matches_as_const : std::false_type {};
-
-template <typename T>
-struct matches_as_const<T, cpp17::void_t<decltype(cpp17::as_const(std::declval<T>()))>>
-    : std::true_type {};
-
-template <typename T>
-static constexpr bool matches_as_const_v = matches_as_const<T>::value;
-
-template <typename T>
-constexpr bool match(T&& value) {
-  return matches_as_const_v<T>;
-}
-
-TEST(AsConstTest, ReturnsConstReference) {
-  int i = 0;
-  const int ci = 0;
-
-  static_assert(cpp17::is_same_v<decltype(cpp17::as_const(i)), const int&>, "");
-  static_assert(cpp17::is_same_v<decltype(cpp17::as_const(ci)), const int&>, "");
-}
-
-TEST(AsConstTest, DeniesRvalueReferences) {
-  int i = 0;
-  const int ci = 0;
-
-  static_assert(match(i) == true, "cpp17::as_const should accept lvalue references.");
-  static_assert(match(std::move(i)) == false,
-                "cpp17::as_const should not accept rvalue references.");
-  static_assert(match(ci) == true, "cpp17::as_const should accept lvalue references.");
-  static_assert(match(std::move(ci)) == false,
-                "cpp17::as_const should not accept rvalue references.");
-}
 
 // Note since these are static asserts the testing actually happens at compile
 // time.
