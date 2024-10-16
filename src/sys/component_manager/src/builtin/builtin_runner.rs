@@ -32,7 +32,8 @@ use zx::{AsHandleRef, HandleBased, Task};
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_io as fio, fidl_fuchsia_memory_attribution as fattribution,
-    fidl_fuchsia_process_lifecycle as fprocess_lifecycle, fuchsia_async as fasync,
+    fidl_fuchsia_process as fprocess, fidl_fuchsia_process_lifecycle as fprocess_lifecycle,
+    fuchsia_async as fasync,
 };
 
 use crate::builtin::runner::BuiltinRunnerFactory;
@@ -193,6 +194,24 @@ impl BuiltinRunner {
             )
         });
         out.insert("elf_runner", f);
+
+        let f: BuiltinProgramGen = Box::new(|| {
+            Box::new(move |
+                _job: zx::Job,
+                namespace: Namespace,
+                outgoing_dir: ServerEnd<fio::DirectoryMarker>,
+                lifecycle_server: ServerEnd<fprocess_lifecycle::LifecycleMarker>| {
+                async move {
+                    let ns_entries: Vec<fprocess::NameInfo> = namespace.into();
+                    let res = devfs::main(ns_entries, outgoing_dir, lifecycle_server).await;
+                    if let Err(e) = res {
+                        error!("[devfs] {e}");
+                    }
+                }
+                .boxed()
+            })
+        });
+        out.insert("devfs", f);
 
         out
     }
