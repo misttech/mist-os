@@ -298,6 +298,7 @@ group("bazel_action_allowlist") {
     "//src/devices/gpio/drivers/aml-gpio:bazel_package.bazel_build",
     "//src/devices/i2c/drivers/aml-i2c:aml-i2c-test-package.bazel_build",
     "//src/devices/i2c/drivers/aml-i2c:bazel_package.bazel_build",
+    "//src/devices/spmi/lib/hwreg-spmi:spmi-hwreg-test.bazel_build",
     "//src/devices/usb/drivers/aml-usb-phy:aml-usb-phy-test-package.bazel_build",
     "//src/devices/usb/drivers/aml-usb-phy:bazel_package.bazel_build",
     "//src/diagnostics/archivist/tests/pipeline_test:pipeline_test.bazel_build",

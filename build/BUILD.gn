@@ -162,6 +162,7 @@ group("non_hermetic_deps") {
     "//src/devices/clock/drivers/vim3-clk:*",
     "//src/devices/gpio/drivers/aml-gpio:*",
     "//src/devices/i2c/drivers/aml-i2c:*",
+    "//src/devices/spmi/lib/hwreg-spmi:*",
     "//src/devices/usb/drivers/aml-usb-phy:*",
     "//src/media/audio/drivers/aml-g12-tdm:*",
     "//src/starnix/kernel/device/gpu/gfxstream/*",
