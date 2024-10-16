@@ -130,7 +130,7 @@ pub struct MeasurementsQueue {
     // outer option refers to initialization
     most_recent_measurement: MostRecentMeasurement,
     ts: Arc<dyn TimeSource + Send + Sync>,
-    max_period: zx::MonotonicDuration,
+    max_period: zx::BootDuration,
     max_measurements: usize,
 }
 

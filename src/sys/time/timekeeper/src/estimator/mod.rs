@@ -140,7 +140,7 @@ mod test {
     use super::*;
     use crate::diagnostics::FakeDiagnostics;
     use crate::make_test_config;
-    use fuchsia_runtime::UtcInstant;
+    use fuchsia_runtime::{UtcDuration, UtcInstant};
     use test_util::assert_near;
 
     // Note: we need to ensure the absolute times are not near the January 1st leap second.
@@ -338,8 +338,7 @@ mod test {
         let mut samples = Vec::<Sample>::new();
         {
             let test_frequency = 1.000003;
-            let utc_spacing =
-                zx::MonotonicDuration::from_hours(1) + zx::MonotonicDuration::from_millis(1);
+            let utc_spacing = UtcDuration::from_hours(1) + UtcDuration::from_millis(1);
             let monotonic_spacing = zx::MonotonicDuration::from_nanos(
                 (utc_spacing.into_nanos() as f64 / test_frequency) as i64,
             );

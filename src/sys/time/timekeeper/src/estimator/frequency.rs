@@ -6,12 +6,12 @@ use crate::enums::FrequencyDiscardReason;
 use crate::time_source::Sample;
 use crate::Config;
 use chrono::{Datelike, Duration, TimeZone, Utc};
-use fuchsia_runtime::UtcInstant;
+use fuchsia_runtime::{UtcDuration, UtcInstant};
 use std::mem;
 use std::sync::Arc;
 
 /// The time period over which a set of time samples are collected to update the frequency estimate.
-const FREQUENCY_ESTIMATION_WINDOW: zx::MonotonicDuration = zx::MonotonicDuration::from_hours(24);
+const FREQUENCY_ESTIMATION_WINDOW: UtcDuration = UtcDuration::from_hours(24);
 
 /// The minimum number of samples that must be received in a frequency estimation window for it to
 /// be eligible for a frequency estimate.
@@ -259,7 +259,7 @@ mod test {
     fn create_sample_set(
         reference_sample: &Sample,
         quantity: u32,
-        utc_spacing: zx::MonotonicDuration,
+        utc_spacing: UtcDuration,
         frequency: f64,
     ) -> Vec<Sample> {
         let monotonic_spacing =
@@ -282,7 +282,7 @@ mod test {
     fn extend_sample_set(
         samples: &mut Vec<Sample>,
         quantity: u32,
-        utc_spacing: zx::MonotonicDuration,
+        utc_spacing: UtcDuration,
         frequency: f64,
     ) {
         let previous_sample = samples.last().expect("No existing samples to extend");
@@ -309,8 +309,7 @@ mod test {
         for freq in &[0.999, 1.0, 1.001] {
             let initial_sample = create_sample(TEST_UTC_STR, INITIAL_MONO);
             let mut window = EstimationWindow::new(&initial_sample);
-            for sample in
-                create_sample_set(&initial_sample, 20, zx::MonotonicDuration::from_hours(1), *freq)
+            for sample in create_sample_set(&initial_sample, 20, UtcDuration::from_hours(1), *freq)
             {
                 window.add_sample(&sample).unwrap();
             }
@@ -322,12 +321,12 @@ mod test {
     fn estimation_window_outside_window() {
         let initial = create_sample(TEST_UTC_STR, INITIAL_MONO);
         let earlier = Sample::new(
-            initial.utc - zx::MonotonicDuration::from_hours(1),
+            initial.utc - UtcDuration::from_hours(1),
             initial.monotonic - zx::MonotonicDuration::from_hours(1),
             STD_DEV,
         );
         let later = Sample::new(
-            initial.utc + zx::MonotonicDuration::from_hours(36),
+            initial.utc + UtcDuration::from_hours(36),
             initial.monotonic + zx::MonotonicDuration::from_hours(36),
             STD_DEV,
         );
@@ -341,9 +340,7 @@ mod test {
     fn estimation_window_insufficient_samples() {
         let initial_sample = create_sample(TEST_UTC_STR, INITIAL_MONO);
         let mut window = EstimationWindow::new(&initial_sample);
-        for sample in
-            create_sample_set(&initial_sample, 10, zx::MonotonicDuration::from_hours(1), 0.9876)
-        {
+        for sample in create_sample_set(&initial_sample, 10, UtcDuration::from_hours(1), 0.9876) {
             window.add_sample(&sample).unwrap();
         }
         assert_eq!(window.frequency(), Err(GetFrequencyError::InsufficientSamples));
@@ -384,7 +381,7 @@ mod test {
         extend_sample_set(
             &mut samples,
             47,
-            zx::MonotonicDuration::from_hours(1) + zx::MonotonicDuration::from_seconds(1),
+            UtcDuration::from_hours(1) + UtcDuration::from_seconds(1),
             0.999,
         );
         // Two more days of data at an different frequency (plus one extra sample so we can close
@@ -392,7 +389,7 @@ mod test {
         extend_sample_set(
             &mut samples,
             49,
-            zx::MonotonicDuration::from_hours(1) + zx::MonotonicDuration::from_seconds(1),
+            UtcDuration::from_hours(1) + UtcDuration::from_seconds(1),
             0.998,
         );
 
@@ -418,13 +415,13 @@ mod test {
         extend_sample_set(
             &mut samples,
             11,
-            zx::MonotonicDuration::from_hours(1) + zx::MonotonicDuration::from_seconds(1),
+            UtcDuration::from_hours(1) + UtcDuration::from_seconds(1),
             1.1,
         );
         extend_sample_set(
             &mut samples,
             25,
-            zx::MonotonicDuration::from_hours(1) + zx::MonotonicDuration::from_seconds(1),
+            UtcDuration::from_hours(1) + UtcDuration::from_seconds(1),
             0.999,
         );
 
@@ -450,13 +447,13 @@ mod test {
         extend_sample_set(
             &mut samples,
             6,
-            zx::MonotonicDuration::from_hours(4) + zx::MonotonicDuration::from_seconds(1),
+            UtcDuration::from_hours(4) + UtcDuration::from_seconds(1),
             1.1,
         );
         extend_sample_set(
             &mut samples,
             25,
-            zx::MonotonicDuration::from_hours(1) + zx::MonotonicDuration::from_seconds(1),
+            UtcDuration::from_hours(1) + UtcDuration::from_seconds(1),
             0.999,
         );
 
@@ -482,7 +479,7 @@ mod test {
         extend_sample_set(
             &mut samples,
             25,
-            zx::MonotonicDuration::from_hours(1) + zx::MonotonicDuration::from_seconds(1),
+            UtcDuration::from_hours(1) + UtcDuration::from_seconds(1),
             0.999,
         );
 

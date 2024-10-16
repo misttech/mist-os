@@ -5,8 +5,8 @@
 use crate::fs::fuchsia::ZxTimer;
 use crate::power::OnWakeOps;
 use crate::task::{
-    CurrentTask, EventHandler, HandleWaitCanceler, HrTimer, SignalHandler, SignalHandlerInner,
-    TargetTime, Timeline, TimerWakeup, WaitCanceler, Waiter,
+    CurrentTask, EventHandler, GenericDuration, HandleWaitCanceler, HrTimer, SignalHandler,
+    SignalHandlerInner, TargetTime, Timeline, TimerWakeup, WaitCanceler, Waiter,
 };
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
@@ -107,7 +107,7 @@ impl TimerFile {
             timespec_from_duration(zx::MonotonicDuration::default())
         } else {
             timespec_from_duration(
-                deadline.delta(&now).expect("deadline and now come from same timeline"),
+                *deadline.delta(&now).expect("deadline and now come from same timeline"),
             )
         };
 
@@ -141,7 +141,10 @@ impl TimerFile {
                 self.timeline.target_from_timespec(timer_spec.it_value)?
             } else {
                 // .. otherwise the deadline is computed relative to the current time.
-                self.timeline.now() + duration_from_timespec(timer_spec.it_value)?
+                self.timeline.now()
+                    + GenericDuration::from(duration_from_timespec::<zx::SyntheticTimeline>(
+                        timer_spec.it_value,
+                    )?)
             };
             let new_interval = duration_from_timespec(timer_spec.it_interval)?;
 
@@ -229,7 +232,7 @@ impl FileOps for TimerFile {
                     now.delta(&deadline).expect("timelines must match").into_nanos();
                 // The number of times the timer has triggered is written to `data`.
                 let num_intervals = elapsed_nanos / interval.into_nanos() + 1;
-                let new_deadline = deadline + interval * num_intervals;
+                let new_deadline = deadline + GenericDuration::from(interval * num_intervals);
 
                 // The timer is set to clear the `ZX_TIMER_SIGNALED` signal until the next deadline
                 // is reached.

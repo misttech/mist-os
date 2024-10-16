@@ -5,8 +5,8 @@
 //! Type-safe bindings for Zircon jobs.
 
 use crate::{
-    object_get_info_single, object_get_info_vec, ok, sys, AsHandleRef, Duration, Handle,
-    HandleBased, HandleRef, Koid, ObjectQuery, Process, ProcessOptions, Rights, Status, Task,
+    object_get_info_single, object_get_info_vec, ok, sys, AsHandleRef, Handle, HandleBased,
+    HandleRef, Koid, MonotonicDuration, ObjectQuery, Process, ProcessOptions, Rights, Status, Task,
     Topic, Vmar,
 };
 use bitflags::bitflags;
@@ -235,7 +235,7 @@ impl Into<u32> for JobPolicyOption {
 #[derive(Debug, Clone, PartialEq)]
 pub enum JobPolicy {
     Basic(JobPolicyOption, Vec<(JobCondition, JobAction)>),
-    TimerSlack(Duration, JobDefaultTimerMode),
+    TimerSlack(MonotonicDuration, JobDefaultTimerMode),
 }
 
 /// Represents the [ZX_POL_*](//docs/reference/syscalls/job_set_policy.md) constants
@@ -341,8 +341,9 @@ mod tests {
     use std::collections::HashSet;
     use std::ffi::CString;
     use zx::{
-        sys, AsHandleRef, Duration, Instant, Job, JobAction, JobCondition, JobCriticalOptions,
-        JobDefaultTimerMode, JobInfo, JobPolicy, JobPolicyOption, Koid, Signals, Task,
+        sys, AsHandleRef, Instant, Job, JobAction, JobCondition, JobCriticalOptions,
+        JobDefaultTimerMode, JobInfo, JobPolicy, JobPolicyOption, Koid, MonotonicDuration, Signals,
+        Task,
     };
 
     #[test]
@@ -404,7 +405,7 @@ mod tests {
             .expect("failed to set job basic policy");
         child_job
             .set_policy(JobPolicy::TimerSlack(
-                Duration::from_millis(10),
+                MonotonicDuration::from_millis(10),
                 JobDefaultTimerMode::Early,
             ))
             .expect("failed to set job timer slack policy");

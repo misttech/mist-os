@@ -16,7 +16,7 @@ use fidl_fuchsia_metrics::{
 };
 use fuchsia_cobalt_builders::MetricEventExt;
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_runtime::UtcClock;
+use fuchsia_runtime::{UtcClock, UtcDuration};
 use fuchsia_sync::Mutex;
 use futures::{future, FutureExt as _};
 use std::sync::Arc;
@@ -162,7 +162,7 @@ impl CobaltDiagnostics {
     fn record_clock_correction(
         &self,
         track: Track,
-        correction: zx::MonotonicDuration,
+        correction: UtcDuration,
         strategy: ClockCorrectionStrategy,
     ) {
         let mut locked_sender = self.sender.lock();
@@ -327,7 +327,7 @@ mod test {
     use test_util::{assert_geq, assert_leq};
 
     const TEST_EXPERIMENT: Experiment = Experiment::B;
-    const MONITOR_OFFSET: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(444);
+    const MONITOR_OFFSET: UtcDuration = UtcDuration::from_seconds(444);
     // The allowed half-interval of the offset error. Due to the non-determinism
     // in timing, this interval may sometimes be too small and cause flaky
     // tests. The flake rate for 10ms was 0.15 flakes/day, this should be
@@ -526,7 +526,7 @@ mod test {
 
         diagnostics.record(Event::ClockCorrection {
             track: Track::Monitor,
-            correction: zx::MonotonicDuration::from_micros(-777),
+            correction: UtcDuration::from_micros(-777),
             strategy: ClockCorrectionStrategy::NominalRateSlew,
         });
         assert_eq!(

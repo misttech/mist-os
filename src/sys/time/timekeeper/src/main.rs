@@ -28,7 +28,7 @@ use anyhow::{Context as _, Result};
 use chrono::prelude::*;
 use fidl::AsHandleRef;
 use fuchsia_component::server::ServiceFs;
-use fuchsia_runtime::{UtcClock, UtcClockDetails, UtcClockUpdate, UtcTimeline};
+use fuchsia_runtime::{UtcClock, UtcClockDetails, UtcClockUpdate, UtcDuration, UtcTimeline};
 use futures::channel::mpsc;
 use futures::future::{self, OptionFuture};
 use futures::stream::StreamExt as _;
@@ -463,7 +463,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
         // we start the clock from backstop and hope for the best.
         let backstop = &clock_details.backstop;
         // Not possible to start at backstop, so we start just a bit after.
-        let b1 = *backstop + zx::MonotonicDuration::from_nanos(1);
+        let b1 = *backstop + UtcDuration::from_nanos(1);
         let mono = zx::MonotonicInstant::get();
         info!("starting the UTC clock from backstop time, to handle legacy programs");
         debug!("`- synthetic (backstop+1): {:?}, reference (monotonic): {:?}", &b1, &mono);
@@ -1005,7 +1005,7 @@ mod tests {
         clock
             .update(
                 UtcClockUpdate::builder()
-                    .approximate_value(BACKSTOP_TIME + zx::MonotonicDuration::from_millis(1)),
+                    .approximate_value(BACKSTOP_TIME + UtcDuration::from_millis(1)),
             )
             .unwrap();
         let initial_update_ticks = clock.get_details().unwrap().last_value_update_ticks;

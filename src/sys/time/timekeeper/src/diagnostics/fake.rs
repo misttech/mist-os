@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::diagnostics::{any_time, Diagnostics, Event, ANY_DURATION};
+use fuchsia_runtime::UtcDuration;
 use fuchsia_sync::Mutex;
 
 /// A fake `Diagnostics` implementation useful for verifying unittest.
@@ -71,6 +72,12 @@ trait EqWithAny {
 impl EqWithAny for zx::MonotonicDuration {
     fn eq_with_any(&self, other: &Self) -> bool {
         *self == ANY_DURATION || self == other
+    }
+}
+
+impl EqWithAny for UtcDuration {
+    fn eq_with_any(&self, other: &Self) -> bool {
+        self.into_nanos() == ANY_DURATION.into_nanos() || self == other
     }
 }
 

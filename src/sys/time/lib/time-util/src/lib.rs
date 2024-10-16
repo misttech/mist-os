@@ -57,7 +57,7 @@ impl<Reference: zx::Timeline + Copy, Output: zx::Timeline + Copy> Transform<Refe
         &self,
         other: &Self,
         reference: zx::Instant<Reference>,
-    ) -> zx::MonotonicDuration {
+    ) -> zx::Duration<Output> {
         self.synthetic(reference) - other.synthetic(reference)
     }
 
@@ -287,22 +287,25 @@ mod test {
 
         assert_eq!(
             transform_1.difference(&transform_1, TEST_REFERENCE),
-            zx::MonotonicDuration::from_nanos(0)
+            zx::SyntheticDuration::from_nanos(0)
         );
-        assert_eq!(transform_1.difference(&transform_2, TEST_REFERENCE), TEST_OFFSET);
+        assert_eq!(
+            transform_1.difference(&transform_2, TEST_REFERENCE),
+            zx::SyntheticDuration::from_nanos(TEST_OFFSET.into_nanos())
+        );
         assert_eq!(
             transform_2.difference(&transform_1, TEST_REFERENCE),
-            zx::MonotonicDuration::from_nanos(-TEST_OFFSET.into_nanos())
+            zx::SyntheticDuration::from_nanos(-TEST_OFFSET.into_nanos())
         );
         assert_eq!(
             transform_1
                 .difference(&transform_2, TEST_REFERENCE + zx::MonotonicDuration::from_millis(500)),
-            TEST_OFFSET + zx::MonotonicDuration::from_nanos(75 * 500)
+            zx::SyntheticDuration::from_nanos(TEST_OFFSET.into_nanos() + 75 * 500)
         );
         assert_eq!(
             transform_1
                 .difference(&transform_2, TEST_REFERENCE - zx::MonotonicDuration::from_millis(300)),
-            TEST_OFFSET - zx::MonotonicDuration::from_nanos(75 * 300)
+            zx::SyntheticDuration::from_nanos(TEST_OFFSET.into_nanos() - 75 * 300)
         );
     }
 
@@ -363,7 +366,10 @@ mod test {
         clock.update(zx::ClockUpdate::builder().absolute_value(mono, BACKSTOP)).unwrap();
 
         let clock_time = time_at_monotonic(&clock, mono + TIME_DIFF);
-        assert_eq!(clock_time, BACKSTOP + TIME_DIFF);
+        assert_eq!(
+            clock_time,
+            BACKSTOP + zx::SyntheticDuration::from_nanos(TIME_DIFF.into_nanos())
+        );
     }
 
     #[fuchsia::test]
@@ -380,7 +386,13 @@ mod test {
             .unwrap();
 
         let clock_time = time_at_monotonic(&clock, mono + TIME_DIFF);
-        assert_eq!(clock_time, BACKSTOP + TIME_DIFF * (ONE_MILLION + SLEW_RATE_PPM) / ONE_MILLION);
+        assert_eq!(
+            clock_time,
+            BACKSTOP
+                + zx::SyntheticDuration::from_nanos(
+                    (TIME_DIFF * (ONE_MILLION + SLEW_RATE_PPM) / ONE_MILLION).into_nanos()
+                )
+        );
     }
 
     #[fuchsia::test]
@@ -397,6 +409,12 @@ mod test {
             .unwrap();
 
         let clock_time = time_at_monotonic(&clock, mono + TIME_DIFF);
-        assert_eq!(clock_time, BACKSTOP + TIME_DIFF * (ONE_MILLION - SLEW_RATE_PPM) / ONE_MILLION);
+        assert_eq!(
+            clock_time,
+            BACKSTOP
+                + zx::SyntheticDuration::from_nanos(
+                    (TIME_DIFF * (ONE_MILLION - SLEW_RATE_PPM) / ONE_MILLION).into_nanos()
+                )
+        );
     }
 }

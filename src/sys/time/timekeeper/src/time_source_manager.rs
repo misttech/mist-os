@@ -452,6 +452,7 @@ mod test {
     use crate::enums::{SampleValidationError as SVE, TimeSourceError as TSE};
     use crate::time_source::{FakePullTimeSource, FakePushTimeSource};
     use anyhow::anyhow;
+    use fuchsia_runtime::UtcDuration;
 
     const BACKSTOP_FACTOR: i64 = 100;
     const TEST_ROLE: Role = Role::Monitor;
@@ -506,7 +507,8 @@ mod test {
     ) -> TimeSourceManager<FakeDiagnostics, FakeMonotonicProvider> {
         let manager = TimeManager::Push(PushSourceManager {
             role: TEST_ROLE,
-            backstop: UtcInstant::ZERO + (MIN_UPDATE_DELAY * BACKSTOP_FACTOR),
+            backstop: UtcInstant::ZERO
+                + UtcDuration::from_nanos((MIN_UPDATE_DELAY * BACKSTOP_FACTOR).into_nanos()),
             delays_enabled: true,
             monotonic: FakeMonotonicProvider::new(MIN_UPDATE_DELAY),
             time_source: Box::new(time_source),
@@ -527,7 +529,8 @@ mod test {
     ) -> TimeSourceManager<FakeDiagnostics, FakeMonotonicProvider> {
         let manager = TimeManager::Pull(PullSourceManager {
             role: TEST_ROLE,
-            backstop: UtcInstant::ZERO + (MIN_UPDATE_DELAY * BACKSTOP_FACTOR),
+            backstop: UtcInstant::ZERO
+                + UtcDuration::from_nanos((MIN_UPDATE_DELAY * BACKSTOP_FACTOR).into_nanos()),
             delays_enabled: true,
             monotonic: FakeMonotonicProvider::new(MIN_UPDATE_DELAY),
             time_source: Box::new(time_source),
@@ -549,7 +552,8 @@ mod test {
         diagnostics: Arc<FakeDiagnostics>,
     ) -> TimeSourceManager<FakeDiagnostics, FakeMonotonicProvider> {
         let manager = TimeManager::Push(PushSourceManager {
-            backstop: UtcInstant::ZERO + (MIN_UPDATE_DELAY * BACKSTOP_FACTOR),
+            backstop: UtcInstant::ZERO
+                + UtcDuration::from_nanos((MIN_UPDATE_DELAY * BACKSTOP_FACTOR).into_nanos()),
             role: TEST_ROLE,
             delays_enabled: false,
             monotonic: FakeMonotonicProvider::new(MIN_UPDATE_DELAY),
@@ -567,7 +571,8 @@ mod test {
     /// accept between samples.rate at hence the rate we choose our fake monotonic clock to tick at.
     fn create_sample(utc_factor: i64, monotonic_factor: i64) -> Sample {
         Sample {
-            utc: UtcInstant::ZERO + (MIN_UPDATE_DELAY * utc_factor),
+            utc: UtcInstant::ZERO
+                + UtcDuration::from_nanos((MIN_UPDATE_DELAY * utc_factor).into_nanos()),
             monotonic: zx::MonotonicInstant::ZERO + (MIN_UPDATE_DELAY * monotonic_factor),
             std_dev: STD_DEV,
         }

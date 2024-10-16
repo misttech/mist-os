@@ -5,8 +5,8 @@
 //! Type-safe bindings for Zircon threads.
 
 use crate::{
-    object_get_info_single, ok, sys, AsHandleRef, Duration, ExceptionReport, Handle, HandleBased,
-    HandleRef, ObjectQuery, Profile, Status, Task, Topic,
+    object_get_info_single, ok, sys, AsHandleRef, ExceptionReport, Handle, HandleBased, HandleRef,
+    MonotonicDuration, ObjectQuery, Profile, Status, Task, Topic,
 };
 use bitflags::bitflags;
 
@@ -160,7 +160,7 @@ unsafe_handle_properties!(object: Thread,
 
 #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
 pub struct ThreadStats {
-    pub total_runtime: Duration,
+    pub total_runtime: MonotonicDuration,
     pub last_scheduled_cpu: u32,
 }
 
@@ -168,7 +168,7 @@ impl ThreadStats {
     fn from_raw(
         sys::zx_info_thread_stats_t { total_runtime, last_scheduled_cpu }: sys::zx_info_thread_stats_t,
     ) -> Self {
-        Self { total_runtime: Duration::from_nanos(total_runtime), last_scheduled_cpu }
+        Self { total_runtime: MonotonicDuration::from_nanos(total_runtime), last_scheduled_cpu }
     }
 }
 

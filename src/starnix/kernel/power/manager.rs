@@ -398,8 +398,8 @@ impl SuspendResumeManager {
         stats_guard.success_count = stats.success_count.unwrap_or_default();
         stats_guard.fail_count = stats.fail_count.unwrap_or_default();
         stats_guard.last_time_in_sleep =
-            zx::MonotonicDuration::from_millis(stats.last_time_in_suspend.unwrap_or_default());
-        stats_guard.last_time_in_suspend_operations = zx::MonotonicDuration::from_millis(
+            zx::BootDuration::from_millis(stats.last_time_in_suspend.unwrap_or_default());
+        stats_guard.last_time_in_suspend_operations = zx::BootDuration::from_millis(
             stats.last_time_in_suspend_operations.unwrap_or_default(),
         );
     }
@@ -561,7 +561,7 @@ impl SuspendResumeManager {
                     suspend_stats.last_time_in_suspend_operations =
                         (wake_time - suspend_start_time).into();
                     suspend_stats.last_time_in_sleep =
-                        zx::MonotonicDuration::from_nanos(res.suspend_time.unwrap_or(0));
+                        zx::BootDuration::from_nanos(res.suspend_time.unwrap_or(0));
                 });
                 self.lock().inspect_node.add_entry(|node| {
                     node.record_int(fobs::SUSPEND_RESUMED_AT, wake_time.into_nanos());

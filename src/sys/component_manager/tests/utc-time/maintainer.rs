@@ -7,7 +7,7 @@ use fuchsia_component::{client, server};
 use futures::StreamExt;
 use test_util::assert_geq;
 use tracing::*;
-use zx::{ClockUpdate, MonotonicDuration, MonotonicInstant, Signals, Status};
+use zx::{ClockUpdate, MonotonicDuration, MonotonicInstant, Signals, Status, SyntheticDuration};
 use {fidl_componentmanager_test as ftest, fidl_fuchsia_time as ftime};
 
 enum ExposedServices {
@@ -18,7 +18,7 @@ enum ExposedServices {
 const EXPECTED_BACKSTOP_TIME_NANOS: i64 = 1589910459000000000;
 
 /// Time to set in the UTC clock, as an offset above backstop time.
-const TEST_OFFSET: MonotonicDuration = MonotonicDuration::from_minutes(2);
+const TEST_OFFSET: SyntheticDuration = SyntheticDuration::from_minutes(2);
 
 #[fuchsia::main(logging_minimum_severity = "warn")]
 async fn main() {

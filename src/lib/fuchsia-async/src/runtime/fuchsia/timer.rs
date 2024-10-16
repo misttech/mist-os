@@ -319,7 +319,7 @@ impl<T: TimeInterface> Timers<T> {
     }
 
     fn set_timer(&self, inner: &mut Inner, time: i64) {
-        self.timer.set(T::zx_instant(time), Default::default()).unwrap();
+        self.timer.set(T::zx_instant(time), zx::Duration::ZERO).unwrap();
 
         if !inner.async_wait {
             if self.fake {

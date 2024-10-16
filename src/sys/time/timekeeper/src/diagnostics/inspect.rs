@@ -12,7 +12,7 @@ use fidl_fuchsia_time_external::Status;
 use fuchsia_inspect::{
     Inspector, IntProperty, Node, NumericProperty, Property, StringProperty, UintProperty,
 };
-use fuchsia_runtime::{UtcClock, UtcClockDetails, UtcInstant};
+use fuchsia_runtime::{UtcClock, UtcClockDetails, UtcDuration, UtcInstant};
 use fuchsia_sync::Mutex;
 
 use futures::FutureExt;
@@ -356,11 +356,7 @@ impl TrackNode {
     }
 
     /// Records a new planned correction for the clock.
-    pub fn clock_correction(
-        &mut self,
-        correction: zx::MonotonicDuration,
-        strategy: ClockCorrectionStrategy,
-    ) {
+    pub fn clock_correction(&mut self, correction: UtcDuration, strategy: ClockCorrectionStrategy) {
         let clock_correction = ClockCorrection {
             monotonic: monotonic_time(),
             correction: correction.into_nanos(),
@@ -539,7 +535,7 @@ mod tests {
     const ERROR_BOUNDS: u64 = 4444444444;
     const GENERATION_COUNTER: u32 = 7777;
     const OFFSET: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(311);
-    const CORRECTION: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(88);
+    const CORRECTION: UtcDuration = UtcDuration::from_millis(88);
     const SQRT_COVARIANCE: i64 = 5454545454;
 
     lazy_static! {
@@ -854,13 +850,13 @@ mod tests {
             test.record(Event::KalmanFilterUpdated {
                 track: Track::Primary,
                 monotonic: zx::MonotonicInstant::ZERO + OFFSET * i,
-                utc: UtcInstant::from_nanos(BACKSTOP_TIME) + OFFSET * i,
+                utc: UtcInstant::from_nanos(BACKSTOP_TIME + OFFSET.into_nanos() * i),
                 sqrt_covariance: zx::MonotonicDuration::from_nanos(SQRT_COVARIANCE) * i,
             });
             test.record(Event::FrequencyUpdated {
                 track: Track::Primary,
                 monotonic: zx::MonotonicInstant::ZERO + OFFSET * i,
-                rate_adjust_ppm: -i,
+                rate_adjust_ppm: -i as i32,
                 window_count: i as u32,
             });
             test.record(Event::ClockCorrection {

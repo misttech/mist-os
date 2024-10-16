@@ -10,7 +10,7 @@ use fdio::service_connect;
 use fidl::endpoints::create_proxy;
 use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_fs::directory;
-use fuchsia_runtime::UtcInstant;
+use fuchsia_runtime::{UtcDuration, UtcInstant};
 use futures::{select, StreamExt, TryFutureExt};
 use std::path::PathBuf;
 use std::pin::pin;
@@ -230,7 +230,7 @@ impl Rtc for RtcImpl {
                 zx::MonotonicDuration::from_seconds(1) - fractional_second,
             ))
             .await;
-            zx_time_to_fidl_time(value + zx::MonotonicDuration::from_seconds(1))
+            zx_time_to_fidl_time(value + UtcDuration::from_seconds(1))
         };
         let status = self
             .proxy
@@ -302,7 +302,7 @@ mod test {
         frtc::Time { year: 2020, month: 14, day: 0, hours: 0, minutes: 0, seconds: 0 };
     const INVALID_FIDL_TIME_2: frtc::Time =
         frtc::Time { year: 2020, month: 8, day: 14, hours: 99, minutes: 99, seconds: 99 };
-    const TEST_OFFSET: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(250);
+    const TEST_OFFSET: UtcDuration = UtcDuration::from_millis(250);
     const TEST_ZX_TIME: UtcInstant = UtcInstant::from_nanos(1_597_363_200_000_000_000);
     const DIFFERENT_ZX_TIME: UtcInstant = UtcInstant::from_nanos(1_597_999_999_000_000_000);
 
@@ -315,8 +315,7 @@ mod test {
         let to_fidl = zx_time_to_fidl_time(TEST_ZX_TIME);
         assert_eq!(to_fidl, TEST_FIDL_TIME);
         // Times should be truncated to the previous second
-        let to_fidl_2 =
-            zx_time_to_fidl_time(TEST_ZX_TIME + zx::MonotonicDuration::from_millis(999));
+        let to_fidl_2 = zx_time_to_fidl_time(TEST_ZX_TIME + UtcDuration::from_millis(999));
         assert_eq!(to_fidl_2, TEST_FIDL_TIME);
 
         let to_zx = fidl_time_to_zx_time(TEST_FIDL_TIME).unwrap();
@@ -396,7 +395,7 @@ mod test {
         // Setting a fractional second should cause a delay until the top of second before calling
         // the FIDL interface. We only verify half the expected time has passed to allow for some
         // slack in the timer calculation.
-        assert_gt!(span, TEST_OFFSET / 2);
+        assert_gt!(span, zx::MonotonicDuration::from_nanos(TEST_OFFSET.into_nanos() / 2));
     }
 
     #[fuchsia::test(allow_stalls = false)]

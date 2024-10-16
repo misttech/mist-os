@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 use crate::time::utc;
-use fuchsia_runtime::UtcInstant;
+use fuchsia_runtime::{UtcDuration, UtcInstant};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::time::{itimerspec_from_deadline_interval, time_from_timespec};
 use starnix_uapi::{itimerspec, timespec};
+use std::ops;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Timeline {
@@ -36,9 +37,9 @@ impl Timeline {
 
     pub fn zero_time(&self) -> TargetTime {
         match self {
-            Timeline::Monotonic => TargetTime::Monotonic(zx::Instant::from_nanos(0)),
-            Timeline::RealTime => TargetTime::RealTime(zx::Instant::from_nanos(0)),
-            Timeline::BootInstant => TargetTime::BootInstant(zx::Instant::from_nanos(0)),
+            Timeline::Monotonic => TargetTime::Monotonic(zx::Instant::ZERO),
+            Timeline::RealTime => TargetTime::RealTime(zx::Instant::ZERO),
+            Timeline::BootInstant => TargetTime::BootInstant(zx::Instant::ZERO),
         }
     }
 }
@@ -87,34 +88,42 @@ impl TargetTime {
 
     /// Find the difference between this time and `rhs`. Returns `None` if the timelines don't
     /// match.
-    pub fn delta(&self, rhs: &Self) -> Option<zx::MonotonicDuration> {
+    pub fn delta(&self, rhs: &Self) -> Option<GenericDuration> {
         match (*self, *rhs) {
-            (TargetTime::Monotonic(lhs), TargetTime::Monotonic(rhs)) => Some(lhs - rhs),
-            (TargetTime::BootInstant(lhs), TargetTime::BootInstant(rhs)) => Some(lhs - rhs),
-            (TargetTime::RealTime(lhs), TargetTime::RealTime(rhs)) => Some(lhs - rhs),
+            (TargetTime::Monotonic(lhs), TargetTime::Monotonic(rhs)) => {
+                Some(GenericDuration::from(lhs - rhs))
+            }
+            (TargetTime::BootInstant(lhs), TargetTime::BootInstant(rhs)) => {
+                Some(GenericDuration::from(lhs - rhs))
+            }
+            (TargetTime::RealTime(lhs), TargetTime::RealTime(rhs)) => {
+                Some(GenericDuration::from(lhs - rhs))
+            }
             _ => None,
         }
     }
 }
 
-impl std::ops::Add<zx::MonotonicDuration> for TargetTime {
+impl std::ops::Add<GenericDuration> for TargetTime {
     type Output = Self;
-    fn add(self, rhs: zx::MonotonicDuration) -> Self {
+    fn add(self, rhs: GenericDuration) -> Self {
         match self {
-            Self::RealTime(t) => Self::RealTime(t + rhs),
-            Self::Monotonic(t) => Self::Monotonic(t + rhs),
-            Self::BootInstant(t) => Self::BootInstant(t + rhs),
+            Self::RealTime(t) => Self::RealTime(t + rhs.into_utc()),
+            Self::Monotonic(t) => Self::Monotonic(t + rhs.into_mono()),
+            // TODO(https://fxbug.dev/328306129) handle boot and monotonic time properly
+            Self::BootInstant(t) => Self::BootInstant(t + rhs.into_mono()),
         }
     }
 }
 
-impl std::ops::Sub<zx::MonotonicDuration> for TargetTime {
-    type Output = zx::MonotonicDuration;
-    fn sub(self, rhs: zx::MonotonicDuration) -> Self::Output {
+impl std::ops::Sub<GenericDuration> for TargetTime {
+    type Output = Self;
+    fn sub(self, rhs: GenericDuration) -> Self::Output {
         match self {
-            TargetTime::Monotonic(t) => zx::MonotonicDuration::from_nanos((t - rhs).into_nanos()),
-            TargetTime::RealTime(t) => zx::MonotonicDuration::from_nanos((t - rhs).into_nanos()),
-            TargetTime::BootInstant(t) => zx::MonotonicDuration::from_nanos((t - rhs).into_nanos()),
+            TargetTime::Monotonic(t) => Self::Monotonic(t - rhs.into_mono()),
+            TargetTime::RealTime(t) => Self::RealTime(t - rhs.into_utc()),
+            // TODO(https://fxbug.dev/328306129) handle boot and monotonic time properly
+            TargetTime::BootInstant(t) => Self::BootInstant(t - rhs.into_mono()),
         }
     }
 }
@@ -127,5 +136,65 @@ impl std::cmp::PartialOrd for TargetTime {
             (Self::BootInstant(lhs), Self::BootInstant(rhs)) => Some(lhs.cmp(rhs)),
             _ => None,
         }
+    }
+}
+
+/// This type is a convenience to use when the Timeline isn't clear in Starnix. It allows storing a
+/// generic nanosecond duration which can be used to operate on Instants or Durations from any
+/// Timeline.
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct GenericDuration(zx::SyntheticDuration);
+
+impl GenericDuration {
+    pub fn from_nanos(nanos: zx::sys::zx_time_t) -> Self {
+        Self(zx::Duration::from_nanos(nanos))
+    }
+
+    pub fn into_mono(self) -> zx::MonotonicDuration {
+        zx::MonotonicDuration::from_nanos(self.0.into_nanos())
+    }
+
+    // TODO(https://fxbug.dev/328306129) handle boot and monotonic time properly and remove this
+    // allow.
+    #[allow(dead_code)]
+    fn into_boot(self) -> zx::BootDuration {
+        zx::BootDuration::from_nanos(self.0.into_nanos())
+    }
+
+    fn into_utc(self) -> UtcDuration {
+        UtcDuration::from_nanos(self.0.into_nanos())
+    }
+}
+
+impl From<zx::MonotonicDuration> for GenericDuration {
+    fn from(other: zx::MonotonicDuration) -> Self {
+        Self(zx::SyntheticDuration::from_nanos(other.into_nanos()))
+    }
+}
+
+impl From<zx::BootDuration> for GenericDuration {
+    fn from(other: zx::BootDuration) -> Self {
+        Self(zx::SyntheticDuration::from_nanos(other.into_nanos()))
+    }
+}
+
+impl From<zx::SyntheticDuration> for GenericDuration {
+    fn from(other: zx::SyntheticDuration) -> Self {
+        Self(other)
+    }
+}
+
+impl From<UtcDuration> for GenericDuration {
+    fn from(other: UtcDuration) -> Self {
+        Self(zx::SyntheticDuration::from_nanos(other.into_nanos()))
+    }
+}
+
+impl ops::Deref for GenericDuration {
+    type Target = zx::SyntheticDuration;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

@@ -17,8 +17,8 @@ use num_traits::cast::FromPrimitive;
 use thiserror::Error;
 use zx::sys::{zx_handle_t, zx_status_t, ZX_HANDLE_INVALID};
 use zx::{
-    Clock, ClockDetails, ClockTransformation, ClockUpdate, Handle, HandleBased, Instant, Job,
-    MonotonicTimeline, Process, Rights, Status, Thread, Timeline, Unowned, Vmar,
+    Clock, ClockDetails, ClockTransformation, ClockUpdate, Duration, Handle, HandleBased, Instant,
+    Job, MonotonicTimeline, Process, Rights, Status, Thread, Timeline, Unowned, Vmar,
 };
 
 // TODO(https://fxbug.dev/42139436): Document these.
@@ -354,6 +354,9 @@ impl Timeline for UtcTimeline {}
 
 /// A UTC timestamp, measured in nanoseconds since Jan 1 1970.
 pub type UtcInstant = Instant<UtcTimeline>;
+
+/// A duration in the UTC timeline.
+pub type UtcDuration = Duration<UtcTimeline>;
 
 /// A clock that will return UTC timestamps.
 // TODO(https://fxbug.dev/356911500) switch to boot timeline

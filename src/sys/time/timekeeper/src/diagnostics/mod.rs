@@ -20,7 +20,7 @@ use crate::enums::{
     WriteRtcOutcome,
 };
 use fidl_fuchsia_time_external::Status;
-use fuchsia_runtime::UtcInstant;
+use fuchsia_runtime::{UtcDuration, UtcInstant};
 
 /// A special `Duration` that will match any value during an `eq_with_any` operation.
 #[cfg(test)]
@@ -72,11 +72,7 @@ pub enum Event {
     },
     /// A strategy has been determined to align the userspace clock with the estimated UTC.
     /// This will be followed by zero or more `UpdateClock` events to implement the strategy.
-    ClockCorrection {
-        track: Track,
-        correction: zx::MonotonicDuration,
-        strategy: ClockCorrectionStrategy,
-    },
+    ClockCorrection { track: Track, correction: UtcDuration, strategy: ClockCorrectionStrategy },
     /// An attempt was made to write to the real time clock.
     WriteRtc { outcome: WriteRtcOutcome },
     /// The userspace clock has been started for the first time.

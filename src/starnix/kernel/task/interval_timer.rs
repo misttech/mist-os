@@ -4,7 +4,8 @@
 
 use crate::signals::{send_signal, SignalDetail, SignalEvent, SignalEventNotify, SignalInfo};
 use crate::task::{
-    CurrentTask, HrTimer, HrTimerHandle, TargetTime, ThreadGroup, Timeline, TimerId, TimerWakeup,
+    CurrentTask, GenericDuration, HrTimer, HrTimerHandle, TargetTime, ThreadGroup, Timeline,
+    TimerId, TimerWakeup,
 };
 use crate::vfs::timer::TimerOps;
 use fuchsia_async::Duration;
@@ -200,7 +201,7 @@ impl IntervalTimer {
             // specified by `target_time`.
             let mut guard = self.state.lock();
             if guard.interval != zx::MonotonicDuration::default() {
-                guard.target_time = self.timeline.now() + guard.interval;
+                guard.target_time = self.timeline.now() + GenericDuration::from(guard.interval);
             } else {
                 guard.disarm();
                 return;
@@ -225,7 +226,10 @@ impl IntervalTimer {
         let target_time = if is_absolute {
             self.timeline.target_from_timespec(new_value.it_value)?
         } else {
-            self.timeline.now() + duration_from_timespec(new_value.it_value)?
+            self.timeline.now()
+                + GenericDuration::from(duration_from_timespec::<zx::SyntheticTimeline>(
+                    new_value.it_value,
+                )?)
         };
         let interval = duration_from_timespec(new_value.it_interval)?;
 
@@ -290,7 +294,11 @@ impl IntervalTimer {
         TimerRemaining {
             remainder: std::cmp::max(
                 Duration::ZERO,
-                guard.target_time.delta(&self.timeline.now()).expect("timelines must match"),
+                guard
+                    .target_time
+                    .delta(&self.timeline.now())
+                    .expect("timelines must match")
+                    .into_mono(),
             ),
             interval: guard.interval,
         }

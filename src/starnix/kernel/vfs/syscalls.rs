@@ -2502,7 +2502,7 @@ pub fn sys_ppoll(
         -1
     } else {
         let ts = current_task.read_object(user_timespec)?;
-        duration_from_timespec(ts)?.into_millis() as i32
+        duration_from_timespec::<zx::MonotonicTimeline>(ts)?.into_millis() as i32
     };
 
     let deadline = start_time + duration_from_poll_timeout(timeout)?;
