@@ -15,6 +15,10 @@ class MmioVisitor : public Visitor {
  public:
   ~MmioVisitor() override = default;
   zx::result<> Visit(Node& node, const devicetree::PropertyDecoder& decoder) override;
+  zx::result<> FinalizeNode(Node& node) override;
+
+ private:
+  std::map<NodeID, std::vector<fuchsia_hardware_platform_bus::Mmio>> node_mmios_;
 };
 
 }  // namespace fdf_devicetree

@@ -88,6 +88,15 @@ class SpmiVisitorTester : public fdf_devicetree::testing::VisitorTestHelper<Spmi
 
     return {};
   }
+
+  std::optional<const fdf_devicetree::Node*> FindDevicetreeNode(std::string_view name) {
+    for (auto& node : manager()->nodes()) {
+      if (node->name() == name) {
+        return node.get();
+      }
+    }
+    return {};
+  }
 };
 
 TEST(SpmiVisitorTest, TwoControllers) {
@@ -335,6 +344,36 @@ TEST(SpmiVisitorTest, TwoControllers) {
           fdf::MakeProperty(bind_fuchsia_spmi::SUB_TARGET_NAME, "i2c-config"),
       },
       (*not_spmi->parents())[3].properties(), false));
+}
+
+TEST(SpmiVisitorTest, RegisterType) {
+  fdf_devicetree::VisitorRegistry visitors;
+  ASSERT_TRUE(
+      visitors.RegisterVisitor(std::make_unique<fdf_devicetree::BindPropertyVisitor>()).is_ok());
+  ASSERT_TRUE(visitors.RegisterVisitor(std::make_unique<fdf_devicetree::MmioVisitor>()).is_ok());
+
+  SpmiVisitorTester* const spmi_tester = new SpmiVisitorTester("/pkg/test-data/spmi.dtb");
+  ASSERT_TRUE(visitors.RegisterVisitor(std::unique_ptr<SpmiVisitorTester>{spmi_tester}).is_ok());
+
+  ASSERT_TRUE(spmi_tester->manager()->Walk(visitors).is_ok());
+  ASSERT_TRUE(spmi_tester->DoPublish().is_ok());
+
+  std::vector<std::string> mmio_nodes = {"spmi@abcd0000", "spmi@abcf0000", "not-spmi@abce0000"};
+
+  for (auto& mmio_node : mmio_nodes) {
+    ASSERT_TRUE(spmi_tester->FindDevicetreeNode(mmio_node));
+    ASSERT_EQ(spmi_tester->FindDevicetreeNode(mmio_node).value()->register_type(),
+              fdf_devicetree::RegisterType::kMmio);
+  }
+
+  std::vector<std::string> spmi_register_nodes = {"target-a@0", "vreg@1000",  "gpio@2000",
+                                                  "i2c@3000",   "target-b@3", "target-c@0"};
+
+  for (auto& spmi_register_node : spmi_register_nodes) {
+    ASSERT_TRUE(spmi_tester->FindDevicetreeNode(spmi_register_node));
+    ASSERT_EQ(spmi_tester->FindDevicetreeNode(spmi_register_node).value()->register_type(),
+              fdf_devicetree::RegisterType::kSpmi);
+  }
 }
 
 TEST(SpmiVisitorTest, DuplicateTargetId) {
