@@ -10,8 +10,6 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
 use std::borrow::Cow;
 
-// DNS: Comment for review
-
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum SuspendState {
     /// Suspend-to-disk

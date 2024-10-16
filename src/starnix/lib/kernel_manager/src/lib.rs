@@ -23,8 +23,6 @@ use {
     fidl_fuchsia_starnix_container as fstarnix, fidl_fuchsia_starnix_runner as fstarnixrunner, zx,
 };
 
-// DNS: Comment for review
-
 /// The name of the collection that the starnix_kernel is run in.
 const KERNEL_COLLECTION: &str = "kernels";
 

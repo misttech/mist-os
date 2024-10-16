@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// DNS: Comment for review
-
 use fidl::endpoints::Proxy;
 use fuchsia_inspect::ArrayProperty;
 use futures::FutureExt;

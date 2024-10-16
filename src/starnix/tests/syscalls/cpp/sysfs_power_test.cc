@@ -56,10 +56,6 @@ timer_t start_interval_timer() {
   its.it_interval.tv_sec = 2;
   EXPECT_NE(-1, timer_settime(timer_id, 0, &its, nullptr));
 
-  // TODO(https://fxbug.dev/373676361): This sleep is here to guarantee that
-  // the hrtimer request has been sent before tests try to suspend.
-  sleep(5);
-
   return timer_id;
 }
 
