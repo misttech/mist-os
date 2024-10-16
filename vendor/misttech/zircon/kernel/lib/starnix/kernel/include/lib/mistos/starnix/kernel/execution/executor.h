@@ -96,7 +96,7 @@ void execute_task_with_prerun_result(TaskBuilder task_builder, PreRunFn&& pre_ru
                                      TaskCompleteFn&& task_complete) {
   // Start the process going.
   execute_task(
-      task_builder,
+      ktl::move(task_builder),
       [pre_run = ktl::move(pre_run)](CurrentTask& init_task) -> fit::result<Errno> {
         _EP(pre_run(init_task));
         return fit::ok();
