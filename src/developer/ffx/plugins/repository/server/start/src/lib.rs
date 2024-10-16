@@ -9,8 +9,8 @@ use ffx_repository_serve::{serve_impl_validate_args, DEFAULT_REPO_NAME};
 use ffx_repository_server_start_args::StartCommand;
 use ffx_target::TargetProxy;
 use fho::{
-    bug, daemon_protocol, return_bug, return_user_error, Connector, Error, FfxContext, FfxMain,
-    FfxTool, Result, VerifiedMachineWriter,
+    bug, daemon_protocol, deferred, return_bug, return_user_error, Connector, Deferred, Error,
+    FfxContext, FfxMain, FfxTool, Result, VerifiedMachineWriter,
 };
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx_ext::RepositoryError;
@@ -45,8 +45,8 @@ pub enum CommandStatus {
 pub struct ServerStartTool {
     #[command]
     pub cmd: StartCommand,
-    #[with(daemon_protocol())]
-    pub repos: ffx::RepositoryRegistryProxy,
+    #[with(deferred(daemon_protocol()))]
+    pub repos: Deferred<ffx::RepositoryRegistryProxy>,
     pub context: EnvironmentContext,
     pub target_proxy_connector: Connector<TargetProxy>,
     pub rcs_proxy_connector: Connector<RemoteControlProxy>,
@@ -65,7 +65,7 @@ impl FfxMain for ServerStartTool {
         ) {
             // Daemon server mode
             (false, true, false) | (false, false, false) => {
-                start_daemon_server(self.cmd, self.repos).await
+                start_daemon_server(self.cmd, self.repos.await?).await
             }
             // Foreground server mode
             (false, false, true) => {
@@ -292,13 +292,13 @@ mod tests {
 
         let (sender, receiver) = channel();
         let mut sender = Some(sender);
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = Deferred::from_output(Ok(fho::testing::fake_proxy(move |req| match req {
             RepositoryRegistryRequest::ServerStart { responder, address: None } => {
                 sender.take().unwrap().send(()).unwrap();
                 responder.send(Ok(&SocketAddress(address).into())).unwrap()
             }
             other => panic!("Unexpected request: {:?}", other),
-        });
+        })));
         let empty_collection: TargetProxy =
             fho::testing::fake_proxy(move |_| panic!("unepxected call"));
         let tool_env = ToolEnv::new()
@@ -358,13 +358,13 @@ mod tests {
 
         let (sender, receiver) = channel();
         let mut sender = Some(sender);
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = Deferred::from_output(Ok(fho::testing::fake_proxy(move |req| match req {
             RepositoryRegistryRequest::ServerStart { responder, address: Some(_test) } => {
                 sender.take().unwrap().send(()).unwrap();
                 responder.send(Ok(&SocketAddress(address).into())).unwrap()
             }
             other => panic!("Unexpected request: {:?}", other),
-        });
+        })));
         let empty_collection: TargetProxy =
             fho::testing::fake_proxy(move |_| panic!("unepxected call"));
         let tool_env = ToolEnv::new()
@@ -431,13 +431,13 @@ mod tests {
 
         let (sender, receiver) = channel();
         let mut sender = Some(sender);
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = Deferred::from_output(Ok(fho::testing::fake_proxy(move |req| match req {
             RepositoryRegistryRequest::ServerStart { responder, address: None } => {
                 sender.take().unwrap().send(()).unwrap();
                 responder.send(Ok(&SocketAddress(address).into())).unwrap()
             }
             other => panic!("Unexpected request: {:?}", other),
-        });
+        })));
         let empty_collection: TargetProxy =
             fho::testing::fake_proxy(move |_| panic!("unepxected call"));
         let tool_env = ToolEnv::new()
@@ -502,13 +502,13 @@ mod tests {
 
         let (sender, receiver) = channel();
         let mut sender = Some(sender);
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = Deferred::from_output(Ok(fho::testing::fake_proxy(move |req| match req {
             RepositoryRegistryRequest::ServerStart { responder, address: None } => {
                 sender.take().unwrap().send(()).unwrap();
                 responder.send(Err(RepositoryError::ServerNotRunning)).unwrap()
             }
             other => panic!("Unexpected request: {:?}", other),
-        });
+        })));
         let empty_collection: TargetProxy =
             fho::testing::fake_proxy(move |_| panic!("unepxected call"));
 
@@ -581,13 +581,13 @@ mod tests {
 
         let (sender, receiver) = channel();
         let mut sender = Some(sender);
-        let repos = fho::testing::fake_proxy(move |req| match req {
+        let repos = Deferred::from_output(Ok(fho::testing::fake_proxy(move |req| match req {
             RepositoryRegistryRequest::ServerStart { responder, address: None } => {
                 sender.take().unwrap().send(()).unwrap();
                 responder.send(Ok(&SocketAddress(address).into())).unwrap()
             }
             other => panic!("Unexpected request: {:?}", other),
-        });
+        })));
         let empty_collection: TargetProxy =
             fho::testing::fake_proxy(move |_| panic!("unepxected call"));
 
