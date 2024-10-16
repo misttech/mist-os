@@ -170,7 +170,7 @@
     // Formats C/C++ include guards to match Fuchsia style.
     "C/C++ Include Guard.Comment Style": "Line",
     "C/C++ Include Guard.Macro Type": "Filepath",
-    "C/C++ Include Guard.Suffix": "_",
+    "C/C++ Include Guard.Suffix": "_H_",
     "C/C++ Include Guard.Spaces After Endif": 2,
 
     ////////
