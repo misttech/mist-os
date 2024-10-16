@@ -5,9 +5,8 @@
 #ifndef SRC_LIB_VULKAN_SWAPCHAIN_IMAGE_PIPE_SURFACE_DISPLAY_H_
 #define SRC_LIB_VULKAN_SWAPCHAIN_IMAGE_PIPE_SURFACE_DISPLAY_H_
 
-#include <fuchsia/hardware/display/cpp/fidl.h>
-#include <fuchsia/hardware/display/types/cpp/fidl.h>
-#include <fuchsia/sysmem2/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 
@@ -19,7 +18,9 @@
 namespace image_pipe_swapchain {
 
 // An implementation of ImagePipeSurface based on the display and sysmem APIs.
-class ImagePipeSurfaceDisplay : public ImagePipeSurface {
+class ImagePipeSurfaceDisplay final
+    : public ImagePipeSurface,
+      public fidl::AsyncEventHandler<fuchsia_hardware_display::Coordinator> {
  public:
   ImagePipeSurfaceDisplay();
 
@@ -42,8 +43,10 @@ class ImagePipeSurfaceDisplay : public ImagePipeSurface {
 
   SupportedImageProperties& GetSupportedImageProperties() override;
 
+  // fidl::AsyncEventHandler<fuchsia_hardware_display::Coordinator>
+  void on_fidl_error(fidl::UnbindInfo error) override;
+
  private:
-  void ControllerError(zx_status_t status);
   void ControllerOnDisplaysChanged(std::vector<fuchsia_hardware_display::Info>,
                                    std::vector<fuchsia_hardware_display_types::DisplayId>);
 
@@ -59,12 +62,12 @@ class ImagePipeSurfaceDisplay : public ImagePipeSurface {
   bool have_display_ = false;
   uint32_t width_ = 0;
   uint32_t height_ = 0;
-  fuchsia::hardware::display::types::DisplayId display_id_ = {
-      .value = fuchsia::hardware::display::types::INVALID_DISP_ID};
-  fuchsia::hardware::display::LayerId layer_id_{fuchsia::hardware::display::types::INVALID_DISP_ID};
-  fuchsia::hardware::display::CoordinatorPtr display_coordinator_;
+  fuchsia_hardware_display_types::DisplayId display_id_ = {
+      fuchsia_hardware_display_types::kInvalidDispId};
+  fuchsia_hardware_display::LayerId layer_id_{fuchsia_hardware_display_types::kInvalidDispId};
+  fidl::Client<fuchsia_hardware_display::Coordinator> display_coordinator_;
   std::unique_ptr<DisplayCoordinatorListener> display_coordinator_listener_;
-  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
+  fidl::SyncClient<fuchsia_sysmem2::Allocator> sysmem_allocator_;
   SupportedImageProperties supported_image_properties_;
 };
 
