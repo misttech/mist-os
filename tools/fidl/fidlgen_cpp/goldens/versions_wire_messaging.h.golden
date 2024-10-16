@@ -258,9 +258,9 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo>> {
@@ -465,6 +465,7 @@ class Service final {
     static constexpr char Name[] = "p";
     static constexpr char ServiceName[] = "test.versions.Service";
     using ProtocolType = ::test_versions::Protocol;
+    using ServiceType = Service;
   };
 
   // Client protocol for connecting to member protocols of a service instance.

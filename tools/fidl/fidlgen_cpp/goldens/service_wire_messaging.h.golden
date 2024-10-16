@@ -120,9 +120,9 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalRequest<::test_service::FirstProtocol::MethodOnFirst>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalRequest<::test_service::FirstProtocol::MethodOnFirst>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_service::FirstProtocol::MethodOnFirst>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_service::FirstProtocol::MethodOnFirst>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_service::FirstProtocol::MethodOnFirst>> {
@@ -387,9 +387,9 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 template <>
-struct IsFidlType<::fidl::internal::TransactionalRequest<::test_service::SecondProtocol::MethodOnSecond>> : public std::true_type{};
+struct IsFidlType<::fidl::internal::TransactionalRequest<::test_service::SecondProtocol::MethodOnSecond>> : public std::true_type {};
 template <>
-struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_service::SecondProtocol::MethodOnSecond>> : public std::true_type{};
+struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_service::SecondProtocol::MethodOnSecond>> : public std::true_type {};
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_service::SecondProtocol::MethodOnSecond>> {
@@ -637,6 +637,7 @@ class SingleMemberService final {
     static constexpr char Name[] = "single_member";
     static constexpr char ServiceName[] = "test.service.SingleMemberService";
     using ProtocolType = ::test_service::FirstProtocol;
+    using ServiceType = SingleMemberService;
   };
 
   // Client protocol for connecting to member protocols of a service instance.
@@ -745,6 +746,7 @@ class MultiHeterogeneousMemberService final {
     static constexpr char Name[] = "first_member";
     static constexpr char ServiceName[] = "test.service.MultiHeterogeneousMemberService";
     using ProtocolType = ::test_service::FirstProtocol;
+    using ServiceType = MultiHeterogeneousMemberService;
   };
 
   class SecondMember final {
@@ -753,6 +755,7 @@ class MultiHeterogeneousMemberService final {
     static constexpr char Name[] = "second_member";
     static constexpr char ServiceName[] = "test.service.MultiHeterogeneousMemberService";
     using ProtocolType = ::test_service::SecondProtocol;
+    using ServiceType = MultiHeterogeneousMemberService;
   };
 
   // Client protocol for connecting to member protocols of a service instance.
@@ -914,6 +917,7 @@ class MultiHomogeneousMemberService final {
     static constexpr char Name[] = "first_member";
     static constexpr char ServiceName[] = "test.service.MultiHomogeneousMemberService";
     using ProtocolType = ::test_service::FirstProtocol;
+    using ServiceType = MultiHomogeneousMemberService;
   };
 
   class SecondMember final {
@@ -922,6 +926,7 @@ class MultiHomogeneousMemberService final {
     static constexpr char Name[] = "second_member";
     static constexpr char ServiceName[] = "test.service.MultiHomogeneousMemberService";
     using ProtocolType = ::test_service::FirstProtocol;
+    using ServiceType = MultiHomogeneousMemberService;
   };
 
   // Client protocol for connecting to member protocols of a service instance.
