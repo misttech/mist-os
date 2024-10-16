@@ -12,6 +12,7 @@ lib_deps = [
   "//src/lib/diagnostics/hierarchy/rust",
   "//src/lib/diagnostics/selectors",
   "//src/lib/injectable-time",
+  "//src/sys/lib/moniker",
   "//third_party/rust_crates:anyhow",
   "//third_party/rust_crates:itertools",
   "//third_party/rust_crates:nom",
