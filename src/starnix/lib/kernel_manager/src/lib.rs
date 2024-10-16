@@ -466,7 +466,12 @@ fn forward_message(
             event.signal_handle(clear_mask, set_mask)?;
         }
     }
-    Ok(())
+
+    if wait_item.pending.contains(zx::Signals::CHANNEL_PEER_CLOSED) {
+        Err(anyhow!("Proxy peer was closed"))
+    } else {
+        Ok(())
+    }
 }
 
 async fn suspend_kernels(kernels: &Kernels, suspended_processes: &Mutex<Vec<zx::Handle>>) {
@@ -547,4 +552,51 @@ async fn suspend_kernel(kernel_job: &zx::Job) -> Result<Vec<zx::Handle>, Error> 
     }
 
     Ok(handles.into_values().collect())
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::{start_proxy, ChannelProxy};
+    use fidl::AsHandleRef;
+
+    #[fuchsia::test]
+    async fn test_peer_closed_kernel() {
+        let (local_client, local_server) = zx::Channel::create();
+        let (remote_client, remote_server) = zx::Channel::create();
+        let (resume_event, _local_resume_event) = zx::EventPair::create();
+
+        let channel_proxy = ChannelProxy {
+            container_channel: local_server,
+            remote_channel: remote_client,
+            resume_event,
+        };
+        start_proxy(channel_proxy, Default::default());
+
+        std::mem::drop(local_client);
+
+        assert!(remote_server
+            .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::MonotonicInstant::INFINITE)
+            .is_ok());
+    }
+
+    #[fuchsia::test]
+    async fn test_peer_closed_remote() {
+        let (local_client, local_server) = zx::Channel::create();
+        let (remote_client, remote_server) = zx::Channel::create();
+        let (resume_event, _local_resume_event) = zx::EventPair::create();
+
+        let channel_proxy = ChannelProxy {
+            container_channel: local_server,
+            remote_channel: remote_client,
+            resume_event,
+        };
+        start_proxy(channel_proxy, Default::default());
+
+        std::mem::drop(remote_server);
+
+        assert!(local_client
+            .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::MonotonicInstant::INFINITE)
+            .is_ok());
+    }
 }
