@@ -237,20 +237,23 @@ zx_status_t Nelson::SdioInit() {
   sd_emmc_dev.bti() = sd_emmc_btis;
   sd_emmc_dev.metadata() = sd_emmc_metadata;
 
-  gpio_init_steps_.push_back(GpioFunction(S905D3_WIFI_SDIO_D0, S905D3_WIFI_SDIO_D0_FN));
-  gpio_init_steps_.push_back(GpioFunction(S905D3_WIFI_SDIO_D1, S905D3_WIFI_SDIO_D1_FN));
-  gpio_init_steps_.push_back(GpioFunction(S905D3_WIFI_SDIO_D2, S905D3_WIFI_SDIO_D2_FN));
-  gpio_init_steps_.push_back(GpioFunction(S905D3_WIFI_SDIO_D3, S905D3_WIFI_SDIO_D3_FN));
-  gpio_init_steps_.push_back(GpioFunction(S905D3_WIFI_SDIO_CLK, S905D3_WIFI_SDIO_CLK_FN));
-  gpio_init_steps_.push_back(GpioFunction(S905D3_WIFI_SDIO_CMD, S905D3_WIFI_SDIO_CMD_FN));
-  gpio_init_steps_.push_back(GpioFunction(S905D3_WIFI_SDIO_WAKE_HOST, 0));
+  auto sdio_pin = [](uint32_t pin) {
+    return fuchsia_hardware_pinimpl::InitStep::WithCall({{
+        .pin = pin,
+        .call = fuchsia_hardware_pinimpl::InitCall::WithPinConfig({{
+            .function = S905D3_WIFI_SDIO_D0_FN,
+            .drive_strength_ua = 4'000,
+        }}),
+    }});
+  };
 
-  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_WIFI_SDIO_D0, 4000));
-  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_WIFI_SDIO_D1, 4000));
-  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_WIFI_SDIO_D2, 4000));
-  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_WIFI_SDIO_D3, 4000));
-  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_WIFI_SDIO_CLK, 4000));
-  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_WIFI_SDIO_CMD, 4000));
+  gpio_init_steps_.push_back(sdio_pin(S905D3_WIFI_SDIO_D0));
+  gpio_init_steps_.push_back(sdio_pin(S905D3_WIFI_SDIO_D1));
+  gpio_init_steps_.push_back(sdio_pin(S905D3_WIFI_SDIO_D2));
+  gpio_init_steps_.push_back(sdio_pin(S905D3_WIFI_SDIO_D3));
+  gpio_init_steps_.push_back(sdio_pin(S905D3_WIFI_SDIO_CLK));
+  gpio_init_steps_.push_back(sdio_pin(S905D3_WIFI_SDIO_CMD));
+  gpio_init_steps_.push_back(GpioFunction(S905D3_WIFI_SDIO_WAKE_HOST, 0));
 
   std::vector<fdf::ParentSpec> kSdioParents = {
       fdf::ParentSpec{{kPwmRules, kPwmProperties}},

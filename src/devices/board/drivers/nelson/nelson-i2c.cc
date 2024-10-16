@@ -236,21 +236,25 @@ zx_status_t AddI2cBus(const I2cBus& bus,
 zx_status_t Nelson::I2cInit() {
   // setup pinmux for our I2C busses
 
+  auto i2c_pin = [](uint32_t pin, uint64_t function, uint64_t drive_strength_ua) {
+    return fuchsia_hardware_pinimpl::InitStep::WithCall({{
+        .pin = pin,
+        .call = fuchsia_hardware_pinimpl::InitCall::WithPinConfig({{
+            .function = function,
+            .drive_strength_ua = drive_strength_ua,
+        }}),
+    }});
+  };
+
   // i2c_ao_0
-  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_SENSORS_I2C_SCL, 1));
-  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_SENSORS_I2C_SCL, 2500));
-  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_SENSORS_I2C_SDA, 1));
-  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_SENSORS_I2C_SDA, 2500));
+  gpio_init_steps_.push_back(i2c_pin(GPIO_SOC_SENSORS_I2C_SCL, 1, 2500));
+  gpio_init_steps_.push_back(i2c_pin(GPIO_SOC_SENSORS_I2C_SDA, 1, 2500));
   // i2c2
-  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_TOUCH_I2C_SDA, 3));
-  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_TOUCH_I2C_SDA, 3000));
-  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_TOUCH_I2C_SCL, 3));
-  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_TOUCH_I2C_SCL, 3000));
+  gpio_init_steps_.push_back(i2c_pin(GPIO_SOC_TOUCH_I2C_SDA, 3, 3000));
+  gpio_init_steps_.push_back(i2c_pin(GPIO_SOC_TOUCH_I2C_SCL, 3, 3000));
   // i2c3
-  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_AV_I2C_SDA, 2));
-  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_AV_I2C_SDA, 3000));
-  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_AV_I2C_SCL, 2));
-  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_AV_I2C_SCL, 3000));
+  gpio_init_steps_.push_back(i2c_pin(GPIO_SOC_AV_I2C_SDA, 2, 3000));
+  gpio_init_steps_.push_back(i2c_pin(GPIO_SOC_AV_I2C_SCL, 2, 3000));
 
   for (const auto& bus : buses) {
     AddI2cBus(bus, pbus_);

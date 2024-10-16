@@ -14,6 +14,8 @@
 #include <lib/mmio/mmio.h>
 #include <lib/zx/time.h>
 
+#include <optional>
+
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
@@ -44,6 +46,19 @@
 namespace {
 
 constexpr char kSpi1SchedulerRole[] = "fuchsia.devices.spi.drivers.aml-spi.spi1";
+
+fuchsia_hardware_pinimpl::InitStep SpiPin(
+    uint32_t pin, uint64_t function,
+    std::optional<fuchsia_hardware_pin::Pull> pull = std::nullopt) {
+  return fuchsia_hardware_pinimpl::InitStep::WithCall({{
+      .pin = pin,
+      .call = fuchsia_hardware_pinimpl::InitCall::WithPinConfig({{
+          .pull = pull,
+          .function = function,
+          .drive_strength_ua = 2'500,
+      }}),
+  }});
+}
 
 }  // namespace
 
@@ -173,19 +188,16 @@ zx_status_t Nelson::Spi0Init() {
   spi_0_dev.mmio() = spi_0_mmios;
   spi_0_dev.irq() = spi_0_irqs;
 
-  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_SPI_A_MOSI, 5));  // MOSI
-  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_SPI_A_MOSI, 2500));
-
-  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_SPI_A_MISO, 5));  // MISO
-  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_SPI_A_MISO, 2500));
+  gpio_init_steps_.push_back(SpiPin(GPIO_SOC_SPI_A_MOSI, 5));  // MOSI
+                                                               //
+  gpio_init_steps_.push_back(SpiPin(GPIO_SOC_SPI_A_MISO, 5));  // MISO
 
   gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_SPI_A_SS0, 0));
   gpio_init_steps_.push_back(GpioOutput(GPIO_SOC_SPI_A_SS0, true));  // SS0
 
   // SCLK must be pulled down to prevent SPI bit errors.
-  gpio_init_steps_.push_back(GpioPull(GPIO_SOC_SPI_A_SCLK, fuchsia_hardware_pin::Pull::kDown));
-  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_SPI_A_SCLK, 5));  // SCLK
-  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_SPI_A_SCLK, 2500));
+  gpio_init_steps_.push_back(
+      SpiPin(GPIO_SOC_SPI_A_SCLK, 5, fuchsia_hardware_pin::Pull::kDown));  // SCLK
 
   std::vector<fpbus::Metadata> spi_0_metadata;
   spi_0_metadata.emplace_back([]() {
@@ -293,16 +305,13 @@ zx_status_t Nelson::Spi1Init() {
   spi_1_dev.bti() = spi_1_btis;
 
   // setup pinmux for SPICC1 bus arbiter.
-  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_SPI_B_MOSI, 3));  // MOSI
-  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_SPI_B_MOSI, 2500));
+  gpio_init_steps_.push_back(SpiPin(GPIO_SOC_SPI_B_MOSI, 3));  // MOSI
 
-  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_SPI_B_MISO, 3));  // MISO
-  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_SPI_B_MISO, 2500));
+  gpio_init_steps_.push_back(SpiPin(GPIO_SOC_SPI_B_MISO, 3));  // MISO
 
   gpio_init_steps_.push_back(GpioOutput(GPIO_SOC_SPI_B_SS0, true));  // SS0
 
-  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_SPI_B_SCLK, 3));  // SCLK
-  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_SPI_B_SCLK, 2500));
+  gpio_init_steps_.push_back(SpiPin(GPIO_SOC_SPI_B_SCLK, 3));  // SCLK
 
   std::vector<fpbus::Metadata> spi_1_metadata;
   spi_1_metadata.emplace_back([]() {

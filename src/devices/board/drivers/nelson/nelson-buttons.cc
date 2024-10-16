@@ -47,17 +47,20 @@ static const buttons_gpio_config_t gpios[] = {
 };
 
 zx_status_t Nelson::ButtonsInit() {
-  gpio_init_steps_.push_back(GpioPull(GPIO_VOL_UP_L, fuchsia_hardware_pin::Pull::kUp));
-  gpio_init_steps_.push_back(GpioFunction(GPIO_VOL_UP_L, 0));
+  auto button_pin = [](uint32_t pin, fuchsia_hardware_pin::Pull pull) {
+    return fuchsia_hardware_pinimpl::InitStep::WithCall({{
+        .pin = pin,
+        .call = fuchsia_hardware_pinimpl::InitCall::WithPinConfig({{
+            .pull = pull,
+            .function = 0,
+        }}),
+    }});
+  };
 
-  gpio_init_steps_.push_back(GpioPull(GPIO_VOL_DN_L, fuchsia_hardware_pin::Pull::kUp));
-  gpio_init_steps_.push_back(GpioFunction(GPIO_VOL_DN_L, 0));
-
-  gpio_init_steps_.push_back(GpioPull(GPIO_FDR_L, fuchsia_hardware_pin::Pull::kNone));
-  gpio_init_steps_.push_back(GpioFunction(GPIO_FDR_L, 0));
-
-  gpio_init_steps_.push_back(GpioPull(GPIO_MUTE_SOC, fuchsia_hardware_pin::Pull::kNone));
-  gpio_init_steps_.push_back(GpioFunction(GPIO_MUTE_SOC, 0));
+  gpio_init_steps_.push_back(button_pin(GPIO_VOL_UP_L, fuchsia_hardware_pin::Pull::kUp));
+  gpio_init_steps_.push_back(button_pin(GPIO_VOL_DN_L, fuchsia_hardware_pin::Pull::kUp));
+  gpio_init_steps_.push_back(button_pin(GPIO_FDR_L, fuchsia_hardware_pin::Pull::kNone));
+  gpio_init_steps_.push_back(button_pin(GPIO_MUTE_SOC, fuchsia_hardware_pin::Pull::kNone));
 
   fidl::Arena<> fidl_arena;
   fdf::Arena buttons_arena('BTTN');

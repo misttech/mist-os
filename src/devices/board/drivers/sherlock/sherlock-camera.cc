@@ -231,8 +231,13 @@ static const fpbus::Node sensor_dev_sherlock = []() {
 // design and layout details.
 zx_status_t Sherlock::CameraInit() {
   // Set GPIO alternate functions.
-  gpio_init_steps_.push_back(GpioFunction(T931_GPIOAO(10), kClk24MAltFunc));
-  gpio_init_steps_.push_back(GpioDriveStrength(T931_GPIOAO(10), kClkGpioDriveStrengthUa));
+  gpio_init_steps_.push_back(fuchsia_hardware_pinimpl::InitStep::WithCall({{
+      .pin = T931_GPIOAO(10),
+      .call = fuchsia_hardware_pinimpl::InitCall::WithPinConfig({{
+          .function = kClk24MAltFunc,
+          .drive_strength_ua = kClkGpioDriveStrengthUa,
+      }}),
+  }}));
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('CAME');
