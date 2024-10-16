@@ -37,7 +37,7 @@ use starnix_uapi::seal_flags::SealFlags;
 use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{
-    errno, error, fsxattr, off_t, pid_t, uapi, FIONBIO, FIONREAD, FS_CASEFOLD_FL,
+    errno, error, fsxattr, off_t, pid_t, uapi, FIGETBSZ, FIONBIO, FIONREAD, FS_CASEFOLD_FL,
     FS_IOC_ENABLE_VERITY, FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR, FS_IOC_GETFLAGS,
     FS_IOC_MEASURE_VERITY, FS_IOC_READ_VERITY_METADATA, FS_IOC_SETFLAGS, FS_VERITY_FL, SEEK_CUR,
     SEEK_DATA, SEEK_END, SEEK_HOLE, SEEK_SET, TCGETS,
@@ -817,6 +817,17 @@ pub fn default_ioctl(
 ) -> Result<SyscallResult, Errno> {
     match request {
         TCGETS => error!(ENOTTY),
+        FIGETBSZ => {
+            let node = file.node();
+            let supported_file = node.is_reg() || node.is_dir();
+            if !supported_file {
+                return error!(ENOTTY);
+            }
+
+            let blocksize = file.node().stat(current_task)?.st_blksize;
+            current_task.write_object(arg.into(), &blocksize)?;
+            Ok(SUCCESS)
+        }
         FIONBIO => {
             file.update_file_flags(OpenFlags::NONBLOCK, OpenFlags::NONBLOCK);
             Ok(SUCCESS)
