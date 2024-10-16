@@ -73,6 +73,7 @@ impl ToolEnv {
 
     pub fn make_environment(self, context: EnvironmentContext) -> FhoEnvironment {
         let injector = Arc::new(self.injector);
+        #[allow(deprecated)] // injector field.
         FhoEnvironment {
             ffx: self.ffx_cmd_line,
             context,

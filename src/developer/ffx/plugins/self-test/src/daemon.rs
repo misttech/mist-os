@@ -117,9 +117,13 @@ pub(crate) async fn test_no_autostart() -> Result<()> {
     let isolate = new_isolate("daemon-no-autostart").await?;
     let out = isolate.ffx(&["daemon", "echo"]).await?;
     assert!(!out.status.success());
-    assert!(out.stderr.contains(
-        "FFX Daemon was told not to autostart and no existing Daemon instance was found"
-    ));
+    let want = "FFX Daemon was told not to autostart and no existing Daemon instance was found";
+    assert!(
+        out.stderr.contains(want),
+        "stderr does not have '{}'. stderr reads: '{}'",
+        want,
+        out.stderr.trim()
+    );
 
     let mut daemon = isolate.start_daemon().await?;
 

@@ -170,6 +170,7 @@ impl<T: FfxTool> FhoTool<T> {
             true => ffx.unredacted_args_for_analytics(),
         };
         let injector: Arc<dyn ffx_core::Injector> = Arc::new(injector);
+        #[allow(deprecated)] // injector field.
         let env = FhoEnvironment {
             behavior: crate::from_env::connection_behavior(&ffx, &injector, &context).await?,
             ffx,

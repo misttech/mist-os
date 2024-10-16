@@ -6,6 +6,7 @@ use super::FhoEnvironment;
 use crate::from_env::TryFromEnv;
 use ffx_command::{Error, FfxContext, Result};
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy, ServerEnd};
+use fidl_fuchsia_developer_ffx::DaemonProxy;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use std::time::Duration;
 
@@ -67,7 +68,7 @@ where
     P::Protocol: DiscoverableProtocolMarker,
 {
     let svc_name = <P::Protocol as DiscoverableProtocolMarker>::PROTOCOL_NAME;
-    let daemon = env.injector.daemon_factory().await.map_err(|err| anyhow::Error::from(err))?;
+    let daemon = DaemonProxy::try_from_env(env).await.map_err(|err| anyhow::Error::from(err))?;
     let (proxy, server_end) = create_proxy()?;
 
     daemon

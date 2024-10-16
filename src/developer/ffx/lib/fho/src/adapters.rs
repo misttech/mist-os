@@ -26,6 +26,7 @@ macro_rules! embedded_plugin {
                 $crate::macro_deps::return_bug!("global env context unavailable")
             };
             let injector = injector.clone();
+            #[allow(deprecated)] // injector field.
             let env = $crate::FhoEnvironment {
                 behavior: $crate::connection_behavior(&ffx, &injector, &context).await?,
                 ffx,
