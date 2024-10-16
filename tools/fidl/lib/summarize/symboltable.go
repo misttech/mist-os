@@ -111,6 +111,11 @@ func (n *symbolTable) fidlTypeString(t fidlgen.Type) Type {
 		default:
 			panic(fmt.Sprintf("unexpected fidlgen.EndpointRole: %#v", t.Role))
 		}
+	case fidlgen.ZxExperimentalPointerType:
+		ret.setLayout("experimental_pointer")
+		ret.addParam(string(n.fidlTypeString(*t.PointeeType)))
+	case fidlgen.StringArray:
+		ret.setLayout("string_array")
 	default:
 		ret.setLayout(fmt.Sprintf("<not_implemented:%#v>", t))
 	}
