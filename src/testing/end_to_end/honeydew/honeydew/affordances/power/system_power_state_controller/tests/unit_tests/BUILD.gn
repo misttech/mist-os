@@ -5,9 +5,9 @@
 import("//build/python/python_host_test.gni")
 
 if (is_host) {
-  python_host_test("system_power_state_controller_starnix_test") {
+  python_host_test("system_power_state_controller_using_starnix_test") {
     enable_mypy = true
-    main_source = "system_power_state_controller_test.py"
+    main_source = "system_power_state_controller_using_starnix_test.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
       "//third_party/parameterized",
@@ -20,5 +20,5 @@ if (is_host) {
 group("tests") {
   testonly = true
   public_deps =
-      [ ":system_power_state_controller_starnix_test($host_toolchain)" ]
+      [ ":system_power_state_controller_using_starnix_test($host_toolchain)" ]
 }

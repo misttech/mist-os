@@ -17,10 +17,10 @@ from typing import Any
 import fuchsia_inspect
 
 from honeydew import errors
-from honeydew.interfaces.affordances import inspect as inspect_affordance
-from honeydew.interfaces.affordances import (
+from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller as system_power_state_controller_interface,
 )
+from honeydew.interfaces.affordances import inspect as inspect_affordance
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.transports import ffx as ffx_transport
 from honeydew.typing import custom_types
@@ -110,7 +110,7 @@ _MAX_READ_SIZE: int = 1024
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class SystemPowerStateController(
+class SystemPowerStateControllerUsingStarnix(
     system_power_state_controller_interface.SystemPowerStateController
 ):
     """SystemPowerStateController affordance implementation using sysfs.
@@ -170,7 +170,7 @@ class SystemPowerStateController(
             resume_mode: Information about how to resume the device.
 
         Raises:
-            errors.SystemPowerStateControllerError: In case of failure
+            SystemPowerStateControllerError: In case of failure
             errors.NotSupportedError: If any of the suspend_state or resume_type
                 is not yet supported
             ValueError: If any of the input args are not valid
@@ -220,7 +220,7 @@ class SystemPowerStateController(
                 duration specified. If set to False, skips this verification. Default is True.
 
         Raises:
-            errors.SystemPowerStateControllerError: In case of failure
+            SystemPowerStateControllerError: In case of failure
             ValueError: If any of the input args are not valid
         """
         self.suspend_resume(
@@ -278,7 +278,7 @@ class SystemPowerStateController(
             suspend_state: Which state to suspend the Fuchsia device into.
 
         Raises:
-            errors.SystemPowerStateControllerError: In case of failure
+            SystemPowerStateControllerError: In case of failure
         """
         _LOGGER.info(
             "Putting '%s' into '%s'",
@@ -301,14 +301,14 @@ class SystemPowerStateController(
         """Perform Idle mode suspend operation.
 
         Raises:
-            errors.SystemPowerStateControllerError: In case of failure.
+            SystemPowerStateControllerError: In case of failure.
         """
         try:
             self._run_starnix_console_shell_cmd(
                 cmd=_StarnixCmds.IDLE_SUSPEND,
             )
         except errors.HoneydewError as err:
-            raise errors.SystemPowerStateControllerError(
+            raise system_power_state_controller_interface.SystemPowerStateControllerError(
                 f"Failed to put {self._device_name} into idle-suspend mode"
             ) from err
 
@@ -329,7 +329,7 @@ class SystemPowerStateController(
             resume_mode: Information about how to resume the device.
 
         Raises:
-            errors.SystemPowerStateControllerError: In case of failure
+            SystemPowerStateControllerError: In case of failure
             errors.HoneydewTimeoutError: If timer has not been started in 2 sec
         """
         _LOGGER.info(
@@ -358,7 +358,7 @@ class SystemPowerStateController(
             duration: Resume timer duration in seconds.
 
         Raises:
-            errors.SystemPowerStateControllerError: In case of failure.
+            SystemPowerStateControllerError: In case of failure.
         """
         try:
             _LOGGER.info(
@@ -375,7 +375,7 @@ class SystemPowerStateController(
             )
             return proc
         except Exception as err:  # pylint: disable=broad-except
-            raise errors.SystemPowerStateControllerError(
+            raise system_power_state_controller_interface.SystemPowerStateControllerError(
                 f"Failed to set timer on {self._device_name}"
             ) from err
 
@@ -387,11 +387,11 @@ class SystemPowerStateController(
             proc: process used to set the timer.
 
         Raises:
-            errors.SystemPowerStateControllerError: Timer start failed.
+            SystemPowerStateControllerError: Timer start failed.
         """
         std_out: typing.IO[str] | None = proc.stdout
         if not isinstance(std_out, io.TextIOWrapper):
-            raise errors.SystemPowerStateControllerError(
+            raise system_power_state_controller_interface.SystemPowerStateControllerError(
                 f"Failed to read hrtimer-ctl output on {self._device_name}"
             )
         _LOGGER.info("Waiting for the timer to start on %s", self._device_name)
@@ -409,11 +409,11 @@ class SystemPowerStateController(
                     )
                     break
                 elif line == "":  # End of output
-                    raise errors.SystemPowerStateControllerError(
+                    raise system_power_state_controller_interface.SystemPowerStateControllerError(
                         "hrtimer-ctl completed without starting a timer"
                     )
             except Exception as err:  # pylint: disable=broad-except
-                raise errors.SystemPowerStateControllerError(
+                raise system_power_state_controller_interface.SystemPowerStateControllerError(
                     f"Timer has not been started on {self._device_name}"
                 ) from err
 
@@ -428,7 +428,7 @@ class SystemPowerStateController(
             proc: process used to set the timer.
 
         Raises:
-            errors.SystemPowerStateControllerError: Timer end failed.
+            SystemPowerStateControllerError: Timer end failed.
         """
         output: str
         error: str
@@ -441,12 +441,14 @@ class SystemPowerStateController(
             )
             if error:
                 message = f"{message}, error='{error}'"
-            raise errors.SystemPowerStateControllerError(message)
+            raise system_power_state_controller_interface.SystemPowerStateControllerError(
+                message
+            )
 
         if _RegExPatterns.TIMER_ENDED.search(output):
             _LOGGER.info("Timer has been ended on %s", self._device_name)
         else:
-            raise errors.SystemPowerStateControllerError(
+            raise system_power_state_controller_interface.SystemPowerStateControllerError(
                 "hrtimer-ctl completed without ending the timer"
             )
 
@@ -531,7 +533,7 @@ class SystemPowerStateController(
             resume_mode: Information about how to resume the device.
 
         Raises:
-            errors.SystemPowerStateControllerError: In case of failure
+            SystemPowerStateControllerError: In case of failure
         """
         suspend_resume_stats_before: dict[
             str, int
@@ -579,7 +581,7 @@ class SystemPowerStateController(
             suspend_resume_stats_after: Suspend-Resume stats after.
 
         Raises:
-            errors.SystemPowerStateControllerError: In case of failure
+            SystemPowerStateControllerError: In case of failure
         """
         # "suspend_stats": {
         #     "fail_count": 0,
@@ -593,7 +595,7 @@ class SystemPowerStateController(
             suspend_resume_stats_after["success_count"]
             != suspend_resume_stats_before["success_count"] + 1
         ):
-            raise errors.SystemPowerStateControllerError(
+            raise system_power_state_controller_interface.SystemPowerStateControllerError(
                 f"Based on SAG inspect data, '{suspend_state}' followed "
                 f"by '{resume_mode}' operation didn't succeed on "
                 f"'{self._device_name}'. "
@@ -638,7 +640,7 @@ class SystemPowerStateController(
             suspend_resume_events_after: Suspend-Resume events after.
 
         Raises:
-            errors.SystemPowerStateControllerError: In case of failure
+            SystemPowerStateControllerError: In case of failure
         """
         # suspend_resume_events_before:
         # {
@@ -665,7 +667,7 @@ class SystemPowerStateController(
             if k not in suspend_resume_events_before
         }
         if len(current_suspend_resume_events) != 2:
-            raise errors.SystemPowerStateControllerError(
+            raise system_power_state_controller_interface.SystemPowerStateControllerError(
                 f"Based on FSH inspect data, '{suspend_state}' followed "
                 f"by '{resume_mode}' operation didn't succeed on "
                 f"'{self._device_name}'. "
@@ -688,7 +690,7 @@ class SystemPowerStateController(
                 "current suspend-resume operation: %s",
                 current_suspend_resume_events,
             )
-            raise errors.SystemPowerStateControllerError(
+            raise system_power_state_controller_interface.SystemPowerStateControllerError(
                 f"Based on FSH inspect data, '{suspend_state}' followed "
                 f"by '{resume_mode}' operation didn't succeed on "
                 f"'{self._device_name}'. "
@@ -733,7 +735,7 @@ class SystemPowerStateController(
             inspect_data_src: Inspect data source.
 
         Raises:
-            errors.SystemPowerStateControllerError: In case of failure
+            SystemPowerStateControllerError: In case of failure
         """
         if not isinstance(
             resume_mode,
@@ -760,7 +762,7 @@ class SystemPowerStateController(
                 actual_suspend_resume_duration_nano_sec / 1e9, 4
             )
 
-            raise errors.SystemPowerStateControllerError(
+            raise system_power_state_controller_interface.SystemPowerStateControllerError(
                 f"Based on {inspect_data_src} inspect data, '{suspend_state}' followed by "
                 f"'{resume_mode}' operation took "
                 f"'{actual_suspend_resume_duration_sec} seconds' on "
@@ -776,7 +778,7 @@ class SystemPowerStateController(
             suspend-resume stats.
 
         Raises:
-            errors.SystemPowerStateControllerError: Failed to read SAG inspect data.
+            SystemPowerStateControllerError: Failed to read SAG inspect data.
         """
         # TODO (https://fxbug.dev/335494603): Update this logic, once fxr/1072776 lands
         # Sample SAG inspect data:
@@ -867,7 +869,7 @@ class SystemPowerStateController(
             ]
             return sag_inspect_root_data["suspend_stats"]
         except errors.InspectError as err:
-            raise errors.SystemPowerStateControllerError(
+            raise system_power_state_controller_interface.SystemPowerStateControllerError(
                 f"Failed to read SAG inspect data from {self._device_name}"
             ) from err
 
@@ -880,7 +882,7 @@ class SystemPowerStateController(
             suspend-resume events.
 
         Raises:
-            errors.SystemPowerStateControllerError: Failed to read FSH inspect data.
+            SystemPowerStateControllerError: Failed to read FSH inspect data.
         """
         # Sample FSH inspect data:
         # [
@@ -940,7 +942,7 @@ class SystemPowerStateController(
 
             return suspend_events
         except errors.InspectError as err:
-            raise errors.SystemPowerStateControllerError(
+            raise system_power_state_controller_interface.SystemPowerStateControllerError(
                 f"Failed to read FSH inspect data from {self._device_name}"
             ) from err
 

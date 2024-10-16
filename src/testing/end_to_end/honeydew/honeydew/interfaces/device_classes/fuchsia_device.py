@@ -6,13 +6,15 @@
 import abc
 from collections.abc import Callable
 
+from honeydew.affordances.power.system_power_state_controller import (
+    system_power_state_controller,
+)
 from honeydew.interfaces.affordances import (
     inspect,
     location,
     netstack,
     rtc,
     session,
-    system_power_state_controller,
     tracing,
 )
 from honeydew.interfaces.affordances.bluetooth.profiles import (

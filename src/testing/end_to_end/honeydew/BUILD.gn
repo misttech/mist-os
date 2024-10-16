@@ -54,6 +54,10 @@ python_library("honeydew_no_testonly") {
     "affordances/fuchsia_controller/wlan/wlan.py",
     "affordances/fuchsia_controller/wlan/wlan_policy.py",
     "affordances/fuchsia_controller/wlan/wlan_policy_ap.py",
+    "affordances/power/__init__.py",
+    "affordances/power/system_power_state_controller/__init__.py",
+    "affordances/power/system_power_state_controller/system_power_state_controller.py",
+    "affordances/power/system_power_state_controller/system_power_state_controller_using_starnix.py",
     "affordances/sl4f/__init__.py",
     "affordances/sl4f/bluetooth/__init__.py",
     "affordances/sl4f/bluetooth/bluetooth_common.py",
@@ -63,8 +67,6 @@ python_library("honeydew_no_testonly") {
     "affordances/sl4f/wlan/__init__.py",
     "affordances/sl4f/wlan/wlan.py",
     "affordances/sl4f/wlan/wlan_policy.py",
-    "affordances/starnix/__init__.py",
-    "affordances/starnix/system_power_state_controller.py",
     "auxiliary_devices/__init__.py",
     "auxiliary_devices/power_switch_dmc.py",
     "errors.py",
@@ -81,7 +83,6 @@ python_library("honeydew_no_testonly") {
     "interfaces/affordances/netstack.py",
     "interfaces/affordances/rtc.py",
     "interfaces/affordances/session.py",
-    "interfaces/affordances/system_power_state_controller.py",
     "interfaces/affordances/tracing.py",
     "interfaces/affordances/ui/__init__.py",
     "interfaces/affordances/ui/screenshot.py",
@@ -193,4 +194,33 @@ group("sl4f_packages") {
     "//src/sys/bin/start_sl4f",
     "//src/testing/sl4f",
   ]
+}
+
+# Honeydew unit tests
+# Command to run unit tests:
+# fx set core.x64 --with-host //src/testing/end_to_end/honeydew:unit_tests
+# fx test //src/testing/end_to_end/honeydew --host --output
+group("unit_tests") {
+  testonly = true
+  public_deps = []
+
+  if (host_os != "mac") {
+    public_deps += [
+      "honeydew/affordances/power/system_power_state_controller/tests/unit_tests:tests",
+      "tests/unit_tests:tests",
+    ]
+  }
+}
+
+# Honeydew functional tests
+group("functional_tests") {
+  testonly = true
+  public_deps = []
+
+  if (host_os != "mac") {
+    public_deps += [
+      "honeydew/affordances/power/system_power_state_controller/tests/functional_tests/test_system_power_state_controller:tests",
+      "tests/functional_tests:tests",
+    ]
+  }
 }

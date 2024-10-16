@@ -6,6 +6,8 @@
 import abc
 from dataclasses import dataclass
 
+from honeydew import errors
+
 
 @dataclass(frozen=True)
 class SuspendState(abc.ABC):
@@ -50,6 +52,10 @@ class ButtonPressResume(ResumeMode):
         return "ButtonPressResume"
 
 
+class SystemPowerStateControllerError(errors.HoneydewError):
+    """Exception to be raised by SystemPowerStateController affordance."""
+
+
 class SystemPowerStateController(abc.ABC):
     """Abstract base class for SystemPowerStateController affordance."""
 
@@ -68,7 +74,7 @@ class SystemPowerStateController(abc.ABC):
             resume_mode: Information about how to resume the device.
 
         Raises:
-            errors.SystemPowerStateControllerError: In case of failure
+            SystemPowerStateControllerError: In case of failure
             errors.NotSupportedError: If any of the suspend_state or resume_type
                 is not yet supported
         """
@@ -87,5 +93,5 @@ class SystemPowerStateController(abc.ABC):
                 duration specified. If set to False, skips this verification. Default is True.
 
         Raises:
-            errors.SystemPowerStateControllerError: In case of failure
+            SystemPowerStateControllerError: In case of failure
         """

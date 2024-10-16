@@ -45,6 +45,12 @@ from honeydew.affordances.fuchsia_controller.wlan import (
 from honeydew.affordances.fuchsia_controller.wlan import (
     wlan_policy_ap as wlan_policy_ap_fc,
 )
+from honeydew.affordances.power.system_power_state_controller import (
+    system_power_state_controller as system_power_state_controller_interface,
+)
+from honeydew.affordances.power.system_power_state_controller import (
+    system_power_state_controller_using_starnix,
+)
 from honeydew.affordances.sl4f.bluetooth.profiles import (
     bluetooth_avrcp as bluetooth_avrcp_sl4f,
 )
@@ -53,16 +59,8 @@ from honeydew.affordances.sl4f.bluetooth.profiles import (
 )
 from honeydew.affordances.sl4f.wlan import wlan as wlan_sl4f
 from honeydew.affordances.sl4f.wlan import wlan_policy as wlan_policy_sl4f
-from honeydew.affordances.starnix import (
-    system_power_state_controller as system_power_state_controller_starnix,
-)
 from honeydew.interfaces.affordances import inspect as inspect_interface
-from honeydew.interfaces.affordances import (
-    rtc,
-    session,
-    system_power_state_controller,
-    tracing,
-)
+from honeydew.interfaces.affordances import rtc, session, tracing
 from honeydew.interfaces.affordances.bluetooth.profiles import (
     bluetooth_avrcp as bluetooth_avrcp_interface,
 )
@@ -420,16 +418,16 @@ class FuchsiaDevice(
     @properties.Affordance
     def system_power_state_controller(
         self,
-    ) -> system_power_state_controller.SystemPowerStateController:
+    ) -> system_power_state_controller_interface.SystemPowerStateController:
         """Returns a SystemPowerStateController affordance object.
 
         Returns:
-            system_power_state_controller.SystemPowerStateController object
+            system_power_state_controller_interface.SystemPowerStateController object
 
         Raises:
             errors.NotSupportedError: If Fuchsia device does not support Starnix
         """
-        return system_power_state_controller_starnix.SystemPowerStateController(
+        return system_power_state_controller_using_starnix.SystemPowerStateControllerUsingStarnix(
             device_name=self.device_name,
             ffx=self.ffx,
             inspect=self.inspect,
