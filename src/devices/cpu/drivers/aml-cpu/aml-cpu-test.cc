@@ -455,15 +455,18 @@ TEST_F(AmlCpuTest, TestCpuInfo) {
   driver_test().RunInDriverContext([](AmlCpuDriver& driver) {
     auto& dut = driver.performance_domains().front();
 
-    auto hierarchy = inspect::ReadFromVmo(dut->inspect_vmo());
+    auto hierarchy = inspect::ReadFromVmo(dut->Inspector().inspector().DuplicateVmo());
     EXPECT_TRUE(hierarchy.is_ok());
     auto* cpu_info = hierarchy.value().GetByPath({"cpu_info_service"});
     EXPECT_TRUE(cpu_info);
 
     // cpu_major_revision : 40
-    EXPECT_THAT(*cpu_info, NodeMatches(AllOf(PropertyList(::testing::UnorderedElementsAre(
-                               UintIs("cpu_major_revision", 40), UintIs("cpu_minor_revision", 11),
-                               UintIs("cpu_package_id", 2))))));
+    EXPECT_THAT(
+        *cpu_info,
+        NodeMatches(AllOf(NameMatches("cpu_info_service"),
+                          PropertyList(testing::IsSupersetOf({UintIs("cpu_major_revision", 40),
+                                                              UintIs("cpu_minor_revision", 11),
+                                                              UintIs("cpu_package_id", 2)})))));
   });
 }
 
