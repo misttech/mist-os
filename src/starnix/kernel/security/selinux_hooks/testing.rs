@@ -8,7 +8,7 @@ use crate::security;
 use crate::security::selinux_hooks::XATTR_NAME_SELINUX;
 use crate::security::SecurityServer;
 use crate::task::CurrentTask;
-use crate::testing::AutoReleasableTask;
+use crate::testing::spawn_kernel_with_selinux_and_run;
 use crate::vfs::{FsStr, NamespaceNode, XattrOp};
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::device_type::DeviceType;
@@ -80,17 +80,29 @@ pub fn create_directory_with_parents(
 const HOOKS_TESTS_BINARY_POLICY: &[u8] =
     include_bytes!("../../../lib/selinux/testdata/micro_policies/hooks_tests_policy.pp");
 
-pub fn security_server_with_policy() -> Arc<SecurityServer> {
-    let policy_bytes = HOOKS_TESTS_BINARY_POLICY.to_vec();
-    let security_server = SecurityServer::new();
-    security_server.set_enforcing(true);
-    security_server.load_policy(policy_bytes).expect("policy load failed");
-    security_server
+/// Instantiates a kernel with SELinux enabled, switches from permissive to enforcing mode, and
+/// loads the hooks test policy, before delegating to the supplied test `callback`.
+// TODO: https://fxbug.dev/335397745 - Only provide an admin/test API to the test, so that tests
+// must generally exercise hooks via public entrypoints.
+pub fn spawn_kernel_with_selinux_hooks_test_policy_and_run<F>(callback: F)
+where
+    F: FnOnce(&mut Locked<'_, Unlocked>, &mut CurrentTask, &Arc<SecurityServer>)
+        + Send
+        + Sync
+        + 'static,
+{
+    spawn_kernel_with_selinux_and_run(|locked, current_task, security_server| {
+        let policy_bytes = HOOKS_TESTS_BINARY_POLICY.to_vec();
+        security_server.set_enforcing(true);
+        security_server.load_policy(policy_bytes).expect("policy load failed");
+        super::selinuxfs_policy_loaded(security_server, current_task);
+        callback(locked, current_task, security_server)
+    })
 }
 
 pub fn create_test_executable(
     locked: &mut Locked<'_, Unlocked>,
-    current_task: &AutoReleasableTask,
+    current_task: &CurrentTask,
     security_context: &[u8],
 ) -> NamespaceNode {
     let namespace_node = current_task
