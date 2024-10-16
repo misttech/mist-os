@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
-import("//src/sys/core/build/core_shard.gni")
 import("epoch/generate_epoch.gni")
 
 base_epoch_file = "$target_out_dir/epoch.json"

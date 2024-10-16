@@ -10,7 +10,6 @@ import("//build/icu/icu_rustc_binary.gni")
 import("//build/icu/icu_rustc_library.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
-import("//src/sys/core/build/core_shard.gni")
 import("//third_party/cobalt/metrics_registry.gni")
 
 group("service") {
@@ -358,24 +357,6 @@ icu_fuchsia_package("setui_service") {
     ":setui_service_with_camera",
     "//src/lib/icu:icudtl",
   ]
-}
-
-# Core shard for products that don't have a camera.
-# TODO(https://fxbug.dev/42069176): Make into an empty target on migration.
-group("setui_service_core_shard") {
-  visibility = [
-    ":*",
-    "//build/images/fuchsia:*",
-    "//build/images/recovery:*",
-    "//bundles/assembly_input_groups:*",
-    "//vendor/google/*",
-  ]
-  public_deps = [ ":setui_service_core_shard_migration" ]
-}
-core_shard("setui_service_core_shard_migration") {
-  visibility = []
-  visibility = [ ":*" ]
-  shard_file = "meta/setui_service.core_shard.cml"
 }
 
 rustc_binary("setui-config-test") {

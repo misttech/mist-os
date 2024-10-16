@@ -498,19 +498,6 @@ group("config_data_template_allowlist") {
 group("core_realm_shards_allowlist") {
   visibility = []
 
-  # Used by recovery images
-  visibility += [
-    "//src/diagnostics/realm:core_shard",
-    "//src/firmware/fastboot-tcp:fastboot-tcp-core-shard",
-    "//src/firmware/fastboot-usb:fastboot-usb-core-shard",
-    "//src/performance/memory/attribution/monitor:memory_monitor2_core_shard",
-    "//src/recovery/system:system_recovery_core_shard",
-    "//src/recovery/system:system_recovery_fdr_core_shard",
-    "//src/recovery/system:system_recovery_installer_core_shard",
-    "//src/settings/service:setui_service_core_shard_migration",
-    "//src/ui/bin/brightness_manager:auto-brightness_core_shard",
-  ]
-
   # Used by in-tree tests
   visibility +=
       [ "//src/security/lib/scrutiny/tests/structured_config:core_shard" ]
