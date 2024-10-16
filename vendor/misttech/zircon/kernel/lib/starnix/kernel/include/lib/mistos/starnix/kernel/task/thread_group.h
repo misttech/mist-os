@@ -16,6 +16,7 @@
 #include <lib/mistos/starnix_uapi/stats.h>
 #include <lib/mistos/util/weak_wrapper.h>
 #include <lib/starnix_sync/locks.h>
+#include <zircon/assert.h>
 
 #include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
@@ -38,10 +39,6 @@ class WaitingOptions;
 struct ProcessExitInfo {
   ExitStatus status;
   ktl::optional<Signal> exit_signal;
-
-  ProcessExitInfo() = default;
-  ProcessExitInfo(ExitStatus status, ktl::optional<Signal> exit_signal)
-      : status(status), exit_signal(exit_signal) {}
 };
 
 // Represents the result of a wait operation
@@ -50,10 +47,6 @@ struct WaitResult {
   uid_t uid;
   ProcessExitInfo exit_info;
   TaskTimeStats time_stats;
-
-  WaitResult() = default;
-  WaitResult(pid_t pid, uid_t uid, ProcessExitInfo exit_info, TaskTimeStats time_stats)
-      : pid(pid), uid(uid), exit_info(exit_info), time_stats(time_stats) {}
 
   // Converts the wait result to a signal info
   /*SignalInfo AsSignalInfo() const {
@@ -90,19 +83,57 @@ class WaitableChildResult {
   ktl::optional<WaitResult> result_;
 };
 
-// A selector that can match a process. Works as a representation of the pid argument to syscalls
-// like wait and kill.
+class ThreadGroupParent {
+ public:
+  static ThreadGroupParent New(util::WeakPtr<ThreadGroup> t) {
+    DEBUG_ASSERT(t.Lock());
+    return ThreadGroupParent(t);
+  }
+
+  fbl::RefPtr<ThreadGroup> upgrade() const {
+    auto ret = inner_.Lock();
+    ZX_ASSERT_MSG(ret, "ThreadGroupParent references must always be valid");
+    return ret;
+  }
+
+#if 0
+  ThreadGroupParent& operator=(ThreadGroupParent&& other) noexcept {
+    inner_ = std::move(other.inner_);
+    return *this;
+  }
+#endif
+
+  template <typename I>
+  static ThreadGroupParent From(I&& r) {
+    return ThreadGroupParent(util::WeakPtr<ThreadGroup>(std::forward<I>(r)));
+  }
+
+ private:
+  ThreadGroupParent(util::WeakPtr<ThreadGroup> t) : inner_(std::move(t)) {}
+
+  util::WeakPtr<ThreadGroup> inner_;
+};
+
+/// A selector that can match a process. Works as a representation of the pid argument to syscalls
+/// like wait and kill.
 class ProcessSelector {
  public:
+  /// Matches any process at all.
   struct Any {};
+
+  /// Matches only the process with the specified pid
   struct Pid {
     pid_t value;
   };
+
+  /// Matches all the processes in the given process group
   struct Pgid {
     pid_t value;
   };
 
   using Variant = ktl::variant<Any, Pid, Pgid>;
+
+  const Variant& selector() const { return selector_; }
 
   static ProcessSelector AnyProcess() { return ProcessSelector(Any{}); }
   static ProcessSelector SpecificPid(pid_t pid) { return ProcessSelector(Pid{pid}); }
@@ -110,7 +141,6 @@ class ProcessSelector {
 
   bool DoMatch(pid_t pid, const PidTable& pid_table) const;
 
- private:
   // Helpers from the reference documentation for ktl::visit<>, to allow
   // visit-by-overload of the ktl::variant<> returned by GetLastReference():
   template <class... Ts>
@@ -121,6 +151,7 @@ class ProcessSelector {
   template <class... Ts>
   overloaded(Ts...) -> overloaded<Ts...>;
 
+ private:
   explicit ProcessSelector(Variant selector) : selector_(ktl::move(selector)) {}
 
   Variant selector_;
@@ -137,7 +168,7 @@ class ThreadGroupMutableState {
   //
   // The value needs to be writable so that it can be re-parent to the correct subreaper if the
   // parent ends before the child.
-  ktl::optional<fbl::RefPtr<ThreadGroup>> parent_;
+  ktl::optional<ThreadGroupParent> parent_;
 
   // The tasks in the thread group.
   //
@@ -188,9 +219,11 @@ class ThreadGroupMutableState {
   /// A signal that indicates whether the process is going to become waitable
   /// via waitid and waitpid for either WSTOPPED or WCONTINUED, depending on
   /// the value of `stopped`. If not None, contains the SignalInfo to return.
-  // pub last_signal: Option<SignalInfo>,
+  // Last signal received by the thread group
+  ktl::optional<SignalInfo> last_signal_;
 
-  // pub leader_exit_info: Option<ProcessExitInfo>,
+  // Exit information for the thread group leader
+  ktl::optional<ProcessExitInfo> leader_exit_info_;
 
   bool terminating_ = false;
 
@@ -233,6 +266,9 @@ class ThreadGroupMutableState {
   /// either WSTOPPED or WCONTINUED.
   bool is_waitable() const;
 
+  // Returns true if the exit signal matches the wait options for clone or non-clone processes
+  static bool is_correct_exit_signal(bool wait_for_clone, ktl::optional<Signal> exit_signal);
+
   WaitableChildResult get_waitable_running_children(ProcessSelector selector,
                                                     const WaitingOptions& options,
                                                     const PidTable& pids) const;
@@ -250,6 +286,9 @@ class ThreadGroupMutableState {
     return zombie_children_;
   }
 
+  const ktl::optional<ThreadGroupParent>& parent() const { return parent_; }
+  ktl::optional<ThreadGroupParent>& parent() { return parent_; }
+
   const fbl::RefPtr<ProcessGroup>& process_group() const { return process_group_; }
 
   const bool& did_exec() const { return did_exec_; }
@@ -259,8 +298,7 @@ class ThreadGroupMutableState {
   bool& terminating() { return terminating_; }
 
   ThreadGroupMutableState();
-
-  ThreadGroupMutableState(ThreadGroup* base, ktl::optional<fbl::RefPtr<ThreadGroup>> parent,
+  ThreadGroupMutableState(ThreadGroup* base, ktl::optional<ThreadGroupParent> parent,
                           fbl::RefPtr<ProcessGroup> process_group);
 
  private:
@@ -326,7 +364,7 @@ class ThreadGroup : public fbl::RefCountedUpgradeable<ThreadGroup>,
   /// Whether the process is currently stopped.
   ///
   /// Must only be set when the `mutable_state` write lock is held.
-  // stop_state: AtomicStopState,
+  AtomicStopState stop_state_;
 
  private:
   /// The mutable state of the ThreadGroup.
@@ -358,6 +396,8 @@ class ThreadGroup : public fbl::RefCountedUpgradeable<ThreadGroup>,
       fbl::RefPtr<Kernel> kernel, KernelHandle<ProcessDispatcher> process,
       ktl::optional<starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent,
       pid_t leader, fbl::RefPtr<ProcessGroup> process_group);
+
+  StopState load_stopped() const { return stop_state_.load(std::memory_order_relaxed); }
 
   // Causes the thread group to exit.  If this is being called from a task
   // that is part of the current thread group, the caller should pass
@@ -401,9 +441,9 @@ class ThreadGroup : public fbl::RefCountedUpgradeable<ThreadGroup>,
   pid_t GetKey() const { return leader_; }
 
  private:
-  ThreadGroup(fbl::RefPtr<Kernel> kernel, KernelHandle<ProcessDispatcher> process, pid_t leader,
+  ThreadGroup(fbl::RefPtr<Kernel> kernel, KernelHandle<ProcessDispatcher> process,
               ktl::optional<starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent,
-              fbl::RefPtr<ProcessGroup> process_group);
+              pid_t leader, fbl::RefPtr<ProcessGroup> process_group);
 };
 
 }  // namespace starnix
