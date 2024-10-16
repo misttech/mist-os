@@ -5,9 +5,13 @@
 use anyhow::Error;
 use block_server::async_interface::{Interface, SessionManager};
 use block_server::{BlockServer, PartitionInfo, WriteOptions};
+use fidl::endpoints::Proxy as _;
 use std::borrow::Cow;
 use std::sync::Arc;
-use {fidl_fuchsia_hardware_block_volume as fvolume, fuchsia_async as fasync};
+use {
+    fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume,
+    fuchsia_async as fasync,
+};
 
 pub const TYPE_GUID: [u8; 16] = [1; 16];
 pub const INSTANCE_GUID: [u8; 16] = [2; 16];
@@ -131,6 +135,10 @@ impl FakeServer {
         })
         .detach();
         client
+    }
+
+    pub fn block_proxy(self: &Arc<Self>) -> fblock::BlockProxy {
+        fblock::BlockProxy::from_channel(self.volume_proxy().into_channel().unwrap())
     }
 }
 

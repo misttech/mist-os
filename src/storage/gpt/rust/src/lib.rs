@@ -33,6 +33,14 @@ impl Guid {
     pub fn to_string(&self) -> String {
         self.0.to_string()
     }
+
+    pub fn nil() -> Self {
+        Self(uuid::Uuid::nil())
+    }
+
+    pub fn generate() -> Self {
+        Self(uuid::Uuid::new_v4())
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -249,6 +257,21 @@ impl GptManager {
         &self.partitions
     }
 
+    /// Computes the number of blocks required to store a single copy of metadata for a given
+    /// partition table size.  In other words, what the minimal value of the `first_usable` in a
+    /// header would be for the given size.
+    pub fn metadata_blocks_for_partition_table_size(
+        &self,
+        partition_table_size: usize,
+    ) -> Result<u64, Error> {
+        let bs = self.client.block_size() as usize;
+        partition_table_size
+            .checked_mul(self.header.part_size as usize)
+            .and_then(|s| s.checked_next_multiple_of(bs))
+            .map(|size| 2 + (size / bs) as u64)
+            .ok_or(anyhow!("Partition table overflow"))
+    }
+
     // We only store valid partitions in memory.  This function allows us to flatten this back out
     // to a non-sparse array for serialization.
     fn flattened_partitions(&self) -> Vec<PartitionInfo> {
@@ -433,6 +456,8 @@ mod tests {
                 let manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
                     .await
                     .expect("load should succeed");
+                assert_eq!(manager.header.first_usable, 3);
+                assert_eq!(manager.header.last_usable, 3);
                 let partition = manager.partitions().get(&0).expect("No entry found");
                 assert_eq!(partition.start_block, 3);
                 assert_eq!(partition.num_blocks, 1);
@@ -987,6 +1012,114 @@ mod tests {
                 assert_eq!(partition.start_block, 7);
                 assert_eq!(partition.num_blocks, 1);
                 assert!(manager.partitions().get(&1).is_none());
+            }.fuse() => {},
+        );
+    }
+
+    #[fuchsia::test]
+    async fn grow_partition_table_in_transaction() {
+        let vmo = zx::Vmo::create(1024 * 1024).unwrap();
+        format_gpt(
+            &vmo,
+            512,
+            vec![PartitionInfo {
+                label: "part".to_string(),
+                type_guid: Guid::from_bytes([1u8; 16]),
+                instance_guid: Guid::from_bytes([1u8; 16]),
+                start_block: 34,
+                num_blocks: 1,
+                flags: 0,
+            }],
+        );
+        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let (client, server_end) =
+            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+
+        futures::select!(
+            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
+                unreachable!();
+            },
+            _ = async {
+                let mut manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                    .await
+                    .expect("load should succeed");
+                assert_eq!(manager.header().num_parts, 1);
+                assert_eq!(manager.header().first_usable, 3);
+                let mut transaction = manager.create_transaction().unwrap();
+                transaction.partitions.resize(128, crate::PartitionInfo::nil());
+                manager.commit_transaction(transaction).await.expect("Commit failed");
+
+                // Check state before and after a reload, to ensure both the in-memory and on-disk
+                // representation match.
+                assert_eq!(manager.header().num_parts, 128);
+                assert_eq!(manager.header().first_usable, 34);
+                let partition = manager.partitions().get(&0).expect("No entry found");
+                assert_eq!(partition.label, "part");
+                assert_eq!(partition.type_guid.to_bytes(), [1u8; 16]);
+                assert_eq!(partition.instance_guid.to_bytes(), [1u8; 16]);
+                assert_eq!(partition.start_block, 34);
+                assert_eq!(partition.num_blocks, 1);
+                assert!(manager.partitions().get(&1).is_none());
+                let manager = GptManager::open(manager.take_client())
+                    .await
+                    .expect("reload should succeed");
+                assert_eq!(manager.header().num_parts, 128);
+                assert_eq!(manager.header().first_usable, 34);
+                let partition = manager.partitions().get(&0).expect("No entry found");
+                assert_eq!(partition.label, "part");
+                assert_eq!(partition.type_guid.to_bytes(), [1u8; 16]);
+                assert_eq!(partition.instance_guid.to_bytes(), [1u8; 16]);
+                assert_eq!(partition.start_block, 34);
+                assert_eq!(partition.num_blocks, 1);
+                assert!(manager.partitions().get(&1).is_none());
+            }.fuse() => {},
+        );
+    }
+
+    #[fuchsia::test]
+    async fn shrink_partition_table_in_transaction() {
+        let vmo = zx::Vmo::create(1024 * 1024).unwrap();
+        let mut partitions = vec![];
+        for i in 0..128 {
+            partitions.push(PartitionInfo {
+                label: format!("part-{i}"),
+                type_guid: Guid::from_bytes([i as u8 + 1; 16]),
+                instance_guid: Guid::from_bytes([i as u8 + 1; 16]),
+                start_block: 34 + i,
+                num_blocks: 1,
+                flags: 0,
+            });
+        }
+        format_gpt(&vmo, 512, partitions);
+        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let (client, server_end) =
+            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+
+        futures::select!(
+            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
+                unreachable!();
+            },
+            _ = async {
+                let mut manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                    .await
+                    .expect("load should succeed");
+                assert_eq!(manager.header().num_parts, 128);
+                assert_eq!(manager.header().first_usable, 34);
+                let mut transaction = manager.create_transaction().unwrap();
+                transaction.partitions.clear();
+                manager.commit_transaction(transaction).await.expect("Commit failed");
+
+                // Check state before and after a reload, to ensure both the in-memory and on-disk
+                // representation match.
+                assert_eq!(manager.header().num_parts, 0);
+                assert_eq!(manager.header().first_usable, 2);
+                assert!(manager.partitions().get(&0).is_none());
+                let manager = GptManager::open(manager.take_client())
+                    .await
+                    .expect("reload should succeed");
+                assert_eq!(manager.header().num_parts, 0);
+                assert_eq!(manager.header().first_usable, 2);
+                assert!(manager.partitions().get(&0).is_none());
             }.fuse() => {},
         );
     }

@@ -39,6 +39,31 @@ closed protocol PartitionsManager {
     }) -> () error zx.Status;
 };
 
+type PartitionInfo = struct {
+    name string:fuchsia.hardware.block.partition.NAME_LENGTH;
+    type_guid fuchsia.hardware.block.partition.Guid;
+    num_blocks uint64;
+    flags uint64;
+};
+
+// This limit is arbitrary and can change as needed.
+const MAX_PARTITIONS uint32 = 128;
+
+@discoverable
+closed protocol PartitionsAdmin {
+    /// Wipes and re-initializes the partition table.  This is a destructive operation!
+    /// If there are any active clients of existing partitions, their connections will be severed.
+    /// This function is only intended to be used in product configurations where nothing is
+    /// actively using any partitions, so there's no need to make this operation graceful.
+    ///
+    /// Partitions are allocated contiguously and in the provided order.  Random instance GUIDs are
+    /// assigned.  Empty entries are permitted (i.e. all fields set to 0) and will result in an
+    /// empty slot in the partition table, which allows the table size to be set appropriately.
+    strict ResetPartitionTable(struct {
+        partitions vector<PartitionInfo>:MAX_PARTITIONS;
+    }) -> () error zx.Status;
+};
+
 /// Each partition exposes this service.
 service PartitionService {
     volume client_end:fuchsia.hardware.block.volume.Volume;

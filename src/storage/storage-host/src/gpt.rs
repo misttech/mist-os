@@ -6,13 +6,11 @@ use crate::partition::PartitionBackend;
 use crate::partitions_directory::PartitionsDirectory;
 use anyhow::{anyhow, Context as _, Error};
 use block_client::{
-    AsBlockProxy, BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient, VmoId,
-    WriteOptions,
+    BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient, VmoId, WriteOptions,
 };
 use block_server::async_interface::SessionManager;
 use block_server::BlockServer;
 
-use fuchsia_async as fasync;
 use futures::lock::Mutex;
 use futures::stream::TryStreamExt as _;
 use std::collections::BTreeMap;
@@ -20,6 +18,10 @@ use std::ops::Range;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 use zx::AsHandleRef as _;
+use {
+    fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_storagehost as fstoragehost,
+    fuchsia_async as fasync,
+};
 
 /// A single partition in a GPT device.
 pub struct GptPartition {
@@ -183,10 +185,41 @@ impl Inner {
             Err(zx::Status::BAD_STATE)
         }
     }
+
+    async fn bind_partitions(&mut self, parent: &Arc<GptManager>) -> Result<(), Error> {
+        self.partitions.clear();
+        self.partitions_dir.clear();
+        let mut partitions = BTreeMap::new();
+        for (index, info) in self.gpt.partitions().iter() {
+            tracing::info!("GPT part {index}: {info:?}");
+            let block_client = RemoteBlockClient::new(&parent.block).await?;
+            let partition = PartitionBackend::new(GptPartition::new(
+                parent,
+                block_client,
+                *index,
+                info.start_block
+                    ..info
+                        .start_block
+                        .checked_add(info.num_blocks)
+                        .ok_or(anyhow!("Overflow in partition range"))?,
+            ));
+            let block_server = Arc::new(BlockServer::new(parent.block_size, partition));
+            self.partitions_dir.add_entry(
+                &format!("part-{}", index),
+                Arc::downgrade(&block_server),
+                Arc::downgrade(parent),
+                *index as usize,
+            );
+            partitions.insert(*index, block_server);
+        }
+        self.partitions = partitions;
+        Ok(())
+    }
 }
 
 /// Runs a GPT device.
 pub struct GptManager {
+    block: fblock::BlockProxy,
     block_size: u32,
     block_count: u64,
     inner: Mutex<Inner>,
@@ -204,7 +237,7 @@ impl std::fmt::Debug for GptManager {
 
 impl GptManager {
     pub async fn new(
-        block: impl AsBlockProxy,
+        block: fblock::BlockProxy,
         partitions_dir: Arc<vfs::directory::immutable::Simple>,
     ) -> Result<Arc<Self>, Error> {
         tracing::info!("Binding to GPT");
@@ -214,6 +247,7 @@ impl GptManager {
         let gpt = gpt::GptManager::open(client).await.context("Failed to load GPT")?;
 
         let this = Arc::new(Self {
+            block,
             block_size,
             block_count,
             inner: Mutex::new(Inner {
@@ -225,33 +259,7 @@ impl GptManager {
             shutdown: AtomicBool::new(false),
         });
         tracing::info!("Bind to GPT OK, binding partitions");
-        {
-            let mut inner = this.inner.lock().await;
-            let mut partitions = BTreeMap::new();
-            for (index, info) in inner.gpt.partitions().iter() {
-                tracing::info!("GPT part {index}: {info:?}");
-                let block_client = RemoteBlockClient::new(&block).await?;
-                let partition = PartitionBackend::new(GptPartition::new(
-                    &this,
-                    block_client,
-                    *index,
-                    info.start_block
-                        ..info
-                            .start_block
-                            .checked_add(info.num_blocks)
-                            .ok_or(anyhow!("Overflow in partition range"))?,
-                ));
-                let block_server = Arc::new(BlockServer::new(block_size, partition));
-                inner.partitions_dir.add_entry(
-                    &format!("part-{}", index),
-                    Arc::downgrade(&block_server),
-                    Arc::downgrade(&this),
-                    *index as usize,
-                );
-                partitions.insert(*index, block_server);
-            }
-            inner.partitions = partitions;
-        }
+        this.inner.lock().await.bind_partitions(&this).await?;
         tracing::info!("Starting all partitions OK!");
         Ok(this)
     }
@@ -335,6 +343,57 @@ impl GptManager {
         Ok(())
     }
 
+    pub async fn reset_partition_table(
+        self: &Arc<Self>,
+        partitions: Vec<fstoragehost::PartitionInfo>,
+    ) -> Result<(), zx::Status> {
+        let mut inner = self.inner.lock().await;
+        if inner.pending_transaction.is_some() {
+            return Err(zx::Status::BAD_STATE);
+        }
+
+        tracing::info!("Resetting gpt.  Expect data loss!!!");
+        let mut transaction = inner.gpt.create_transaction().unwrap();
+
+        fn convert_partition_info(info: fstoragehost::PartitionInfo) -> gpt::PartitionInfo {
+            gpt::PartitionInfo {
+                label: info.name,
+                instance_guid: gpt::Guid::nil(),
+                type_guid: gpt::Guid::from_bytes(info.type_guid.value),
+                start_block: 0,
+                num_blocks: info.num_blocks,
+                flags: info.flags,
+            }
+        }
+        transaction.partitions =
+            partitions.into_iter().map(convert_partition_info).collect::<Vec<_>>();
+        let mut start_block = inner
+            .gpt
+            .metadata_blocks_for_partition_table_size(transaction.partitions.len())
+            .map_err(|_| zx::Status::INTERNAL)?;
+        for partition in transaction.partitions.iter_mut() {
+            if partition.num_blocks > 0 {
+                partition.instance_guid = gpt::Guid::generate();
+                partition.start_block = start_block;
+                start_block = start_block
+                    .checked_add(partition.num_blocks)
+                    .ok_or(zx::Status::INVALID_ARGS)?;
+            }
+        }
+
+        if let Err(err) = inner.gpt.commit_transaction(transaction).await {
+            tracing::error!(?err, "Failed to commit transaction to reset partition table");
+            return Err(zx::Status::IO);
+        }
+        tracing::info!("Rebinding partitions...");
+        if let Err(err) = inner.bind_partitions(&self).await {
+            tracing::error!(?err, "Failed to rebind partitions");
+            return Err(zx::Status::BAD_STATE);
+        }
+        tracing::info!("Rebinding partitions OK!");
+        Ok(())
+    }
+
     pub async fn shutdown(self: Arc<Self>) {
         tracing::info!("Shutting down gpt");
         let mut inner = self.inner.lock().await;
@@ -367,6 +426,7 @@ mod tests {
     use vfs::execution_scope::ExecutionScope;
     use vfs::ObjectRequest;
     use {
+        fidl_fuchsia_hardware_block_partition as fpartition,
         fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio,
         fidl_fuchsia_storagehost as fstoragehost, zx,
     };
@@ -383,7 +443,7 @@ mod tests {
         let vmo = zx::Vmo::create(4096).unwrap();
         let (block_device, partitions_dir) = setup(vmo, 512);
 
-        GptManager::new(block_device.volume_proxy(), partitions_dir)
+        GptManager::new(block_device.block_proxy(), partitions_dir)
             .await
             .expect_err("load should fail");
     }
@@ -394,7 +454,7 @@ mod tests {
         format_gpt(&vmo, 512, vec![]);
         let (block_device, partitions_dir) = setup(vmo, 512);
 
-        let runner = GptManager::new(block_device.volume_proxy(), partitions_dir)
+        let runner = GptManager::new(block_device.block_proxy(), partitions_dir)
             .await
             .expect("load should succeed");
         runner.shutdown().await;
@@ -422,7 +482,7 @@ mod tests {
         let (block_device, partitions_dir) = setup(vmo, 512);
 
         let partitions_dir_clone = partitions_dir.clone();
-        let runner = GptManager::new(block_device.volume_proxy(), partitions_dir_clone)
+        let runner = GptManager::new(block_device.block_proxy(), partitions_dir_clone)
             .await
             .expect("load should succeed");
         partitions_dir.get_entry("part-0").expect("No entry found");
@@ -464,7 +524,7 @@ mod tests {
         let (block_device, partitions_dir) = setup(vmo, 512);
 
         let partitions_dir_clone = partitions_dir.clone();
-        let runner = GptManager::new(block_device.volume_proxy(), partitions_dir_clone)
+        let runner = GptManager::new(block_device.block_proxy(), partitions_dir_clone)
             .await
             .expect("load should succeed");
         partitions_dir.get_entry("part-0").expect("No entry found");
@@ -496,7 +556,7 @@ mod tests {
         let (block_device, partitions_dir) = setup(vmo, 512);
 
         let partitions_dir_clone = partitions_dir.clone();
-        let runner = GptManager::new(block_device.volume_proxy(), partitions_dir_clone)
+        let runner = GptManager::new(block_device.block_proxy(), partitions_dir_clone)
             .await
             .expect("load should succeed");
 
@@ -582,7 +642,7 @@ mod tests {
 
         let (block_device, partitions_dir) = setup(vmo, 512);
 
-        let runner = GptManager::new(block_device.volume_proxy(), partitions_dir.clone())
+        let runner = GptManager::new(block_device.block_proxy(), partitions_dir.clone())
             .await
             .expect("load should succeed");
         partitions_dir.get_entry("part-0").expect("No entry found");
@@ -626,7 +686,7 @@ mod tests {
 
         let (block_device, partitions_dir) = setup(vmo, 512);
 
-        let runner = GptManager::new(block_device.volume_proxy(), partitions_dir.clone())
+        let runner = GptManager::new(block_device.block_proxy(), partitions_dir.clone())
             .await
             .expect("load should succeed");
         partitions_dir.get_entry("part-0").expect("No entry found");
@@ -683,7 +743,7 @@ mod tests {
         }));
 
         let partitions_dir = simple();
-        let manager = GptManager::new(server.volume_proxy(), partitions_dir.clone()).await.unwrap();
+        let manager = GptManager::new(server.block_proxy(), partitions_dir.clone()).await.unwrap();
 
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("Failed to create connection endpoints");
@@ -752,7 +812,7 @@ mod tests {
             ],
         );
         let (block_device, partitions_dir) = setup(vmo, 512);
-        let runner = GptManager::new(block_device.volume_proxy(), partitions_dir.clone())
+        let runner = GptManager::new(block_device.block_proxy(), partitions_dir.clone())
             .await
             .expect("load should succeed");
 
@@ -835,6 +895,87 @@ mod tests {
         let (status, guid) = part_1_block.get_type_guid().await.expect("FIDL error");
         assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
         assert_eq!(guid.unwrap().value, PART_TYPE_GUID);
+
+        runner.shutdown().await;
+    }
+
+    #[fuchsia::test]
+    async fn reset_partition_tables() {
+        // The test will reset the tables from ["part", "part2"] to ["part3", <127 empty entries>].
+        const PART_TYPE_GUID: [u8; 16] = [2u8; 16];
+        const PART_1_INSTANCE_GUID: [u8; 16] = [2u8; 16];
+        const PART_1_NAME: &str = "part";
+        const PART_2_INSTANCE_GUID: [u8; 16] = [3u8; 16];
+        const PART_2_NAME: &str = "part2";
+        const PART_3_NAME: &str = "part3";
+
+        let vmo = zx::Vmo::create(1048576).unwrap();
+        format_gpt(
+            &vmo,
+            512,
+            vec![
+                PartitionInfo {
+                    label: PART_1_NAME.to_string(),
+                    type_guid: Guid::from_bytes(PART_TYPE_GUID),
+                    instance_guid: Guid::from_bytes(PART_1_INSTANCE_GUID),
+                    start_block: 4,
+                    num_blocks: 1,
+                    flags: 0,
+                },
+                PartitionInfo {
+                    label: PART_2_NAME.to_string(),
+                    type_guid: Guid::from_bytes(PART_TYPE_GUID),
+                    instance_guid: Guid::from_bytes(PART_2_INSTANCE_GUID),
+                    start_block: 5,
+                    num_blocks: 1,
+                    flags: 0,
+                },
+            ],
+        );
+        let (block_device, partitions_dir) = setup(vmo, 512);
+        let runner = GptManager::new(block_device.block_proxy(), partitions_dir.clone())
+            .await
+            .expect("load should succeed");
+        let nil_entry = fstoragehost::PartitionInfo {
+            name: "".to_string(),
+            type_guid: fpartition::Guid { value: [0u8; 16] },
+            num_blocks: 0,
+            flags: 0,
+        };
+        let mut new_partitions = vec![nil_entry; 128];
+        new_partitions[0] = fstoragehost::PartitionInfo {
+            name: PART_3_NAME.to_string(),
+            type_guid: fpartition::Guid { value: PART_TYPE_GUID },
+            num_blocks: 2,
+            flags: 0,
+        };
+        runner.reset_partition_table(new_partitions).await.expect("reset_partition_table failed");
+        partitions_dir.get_entry("part-0").expect("No entry found");
+        partitions_dir.get_entry("part-1").map(|_| ()).expect_err("Extra entry found");
+
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+            .expect("Failed to create connection endpoints");
+        let flags =
+            fio::Flags::PERM_CONNECT | fio::Flags::PERM_TRAVERSE | fio::Flags::PERM_ENUMERATE;
+        let options = fio::Options::default();
+        let scope = vfs::execution_scope::ExecutionScope::new();
+        partitions_dir
+            .clone()
+            .open3(
+                scope.clone(),
+                vfs::path::Path::validate_and_split("part-0").unwrap(),
+                flags.clone(),
+                &mut ObjectRequest::new3(flags, &options, server_end.into_channel().into()),
+            )
+            .unwrap();
+        let block = connect_to_named_protocol_at_dir_root::<fvolume::VolumeMarker>(
+            &proxy,
+            "svc/fuchsia.storagehost.PartitionService/volume",
+        )
+        .expect("Failed to open block service");
+        let (status, name) = block.get_name().await.expect("FIDL error");
+        assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
+        assert_eq!(name.unwrap(), PART_3_NAME);
 
         runner.shutdown().await;
     }

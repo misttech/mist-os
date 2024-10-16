@@ -61,6 +61,7 @@ impl StorageHostService {
 
         let weak = Arc::downgrade(&self);
         let weak2 = weak.clone();
+        let weak3 = weak.clone();
         svc_dir.add_entry(
             fstartup::StartupMarker::PROTOCOL_NAME,
             vfs::service::host(move |requests| {
@@ -79,6 +80,17 @@ impl StorageHostService {
                 async move {
                     if let Some(me) = weak.upgrade() {
                         let _ = me.handle_partitions_manager_requests(requests).await;
+                    }
+                }
+            }),
+        )?;
+        svc_dir.add_entry(
+            fstoragehost::PartitionsAdminMarker::PROTOCOL_NAME,
+            vfs::service::host(move |requests| {
+                let weak = weak3.clone();
+                async move {
+                    if let Some(me) = weak.upgrade() {
+                        let _ = me.handle_partitions_admin_requests(requests).await;
                     }
                 }
             }),
@@ -192,6 +204,38 @@ impl StorageHostService {
     async fn commit_transaction(&self, transaction: zx::EventPair) -> Result<(), zx::Status> {
         let gpt_manager = self.gpt_manager().await?;
         gpt_manager.commit_transaction(transaction).await
+    }
+
+    async fn handle_partitions_admin_requests(
+        self: Arc<Self>,
+        mut stream: fstoragehost::PartitionsAdminRequestStream,
+    ) -> Result<(), Error> {
+        while let Some(request) = stream.try_next().await.context("Reading request")? {
+            tracing::debug!(?request);
+            match request {
+                fstoragehost::PartitionsAdminRequest::ResetPartitionTable {
+                    partitions,
+                    responder,
+                } => {
+                    responder
+                        .send(
+                            self.reset_partition_table(partitions)
+                                .await
+                                .map_err(|status| status.into_raw()),
+                        )
+                        .unwrap_or_else(|e| tracing::error!(?e, "Failed to send Start response"));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn reset_partition_table(
+        &self,
+        partitions: Vec<fstoragehost::PartitionInfo>,
+    ) -> Result<(), zx::Status> {
+        let gpt_manager = self.gpt_manager().await?;
+        gpt_manager.reset_partition_table(partitions).await
     }
 
     async fn handle_lifecycle_requests(&self, lifecycle_channel: zx::Channel) -> Result<(), Error> {

@@ -29,6 +29,7 @@ impl PartitionsDirectory {
     }
 
     pub fn clear(&self) {
+        self.node.remove_all_entries();
         self.entries.lock().unwrap().clear();
     }
 
@@ -45,6 +46,7 @@ impl PartitionsDirectory {
     }
 }
 
+/// A node which hosts all of the per-partition services.  See fuchsia.storagehost.PartitionService.
 pub struct PartitionsDirectoryEntry {
     node: Arc<vfs::directory::immutable::Simple>,
 }

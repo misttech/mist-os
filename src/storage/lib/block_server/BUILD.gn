@@ -41,6 +41,7 @@ rustc_library("fake_block_server") {
   source_root = "src/fake_server.rs"
   deps = [
     ":block_server",
+    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
     "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
