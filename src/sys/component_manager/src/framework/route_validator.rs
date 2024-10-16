@@ -15,7 +15,7 @@ use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::RouteRequest as LegacyRouteRequest;
 use async_trait::async_trait;
 use cm_rust::{ExposeDecl, SourceName, UseDecl};
-use cm_types::Name;
+use cm_types::{Name, RelativePath};
 use errors::{ActionError, StartActionError};
 use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
 use futures::future::join_all;
@@ -59,7 +59,10 @@ impl RouteValidatorCapabilityProvider {
             let resolved =
                 state.get_resolved_state().ok_or(fcomponent::Error::InstanceCannotResolve)?;
 
-            let uses = resolved.decl().uses.clone();
+            let mut uses = resolved.decl().uses.clone();
+            if let Some(runner) = resolved.decl().program.as_ref().and_then(|d| d.runner.as_ref()) {
+                uses.push(Self::use_for_runner(runner));
+            }
             let exposes = resolved.decl().exposes.clone();
 
             (uses, exposes)
@@ -142,25 +145,40 @@ impl RouteValidatorCapabilityProvider {
         targets: Vec<fsys::RouteTarget>,
     ) -> Result<Vec<(fsys::RouteTarget, RouteRequest)>, fsys::RouteValidatorError> {
         if targets.is_empty() {
-            let use_requests = resolved.decl().uses.iter().map(|use_| {
+            let mut requests: Vec<_> = resolved
+                .decl()
+                .uses
+                .iter()
+                .map(|use_| {
+                    let target = fsys::RouteTarget {
+                        name: use_.source_name().as_str().into(),
+                        decl_type: fsys::DeclType::Use,
+                    };
+                    let request = RouteRequest::try_from(use_.clone()).unwrap();
+                    (target, request)
+                })
+                .collect();
+            // `program.runner`, if set, is equivalent to a `use`.
+            if let Some(runner) = resolved.decl().program.as_ref().and_then(|d| d.runner.as_ref()) {
                 let target = fsys::RouteTarget {
-                    name: use_.source_name().as_str().into(),
+                    name: runner.as_str().into(),
                     decl_type: fsys::DeclType::Use,
                 };
-                let request = RouteRequest::try_from(use_.clone()).unwrap();
-                (target, request)
-            });
+                let use_ = Self::use_for_runner(runner);
+                let request = RouteRequest::try_from(use_).unwrap();
+                requests.push((target, request));
+            }
 
             let exposes = routing::aggregate_exposes(resolved.decl().exposes.iter());
-            let expose_requests = exposes.into_iter().map(|(target_name, e)| {
+            requests.extend(exposes.into_iter().map(|(target_name, e)| {
                 let target = fsys::RouteTarget {
                     name: target_name.to_string(),
                     decl_type: fsys::DeclType::Expose,
                 };
                 let request = RouteRequest::from_expose_decls(resolved.moniker(), e).unwrap();
                 (target, request)
-            });
-            Ok(use_requests.chain(expose_requests).collect())
+            }));
+            Ok(requests)
         } else {
             // Return results that fuzzy match (substring match) `target.name`.
             let targets = targets
@@ -179,7 +197,7 @@ impl RouteValidatorCapabilityProvider {
             targets
                 .map(|target| match target.decl_type {
                     fsys::DeclType::Use => {
-                        let matching_requests: Vec<_> = resolved
+                        let mut matching_requests: Vec<_> = resolved
                             .decl()
                             .uses
                             .iter()
@@ -196,6 +214,23 @@ impl RouteValidatorCapabilityProvider {
                                 Some(Ok((target, request)))
                             })
                             .collect();
+                        // `program.runner`, if set, is equivalent to a `use`.
+                        if let Some(runner) = resolved
+                            .decl()
+                            .program
+                            .as_ref()
+                            .and_then(|d| d.runner.as_ref())
+                            .filter(|r| r.as_str().contains(&target.name))
+                        {
+                            let target = fsys::RouteTarget {
+                                name: runner.as_str().into(),
+                                decl_type: fsys::DeclType::Use,
+                            };
+                            let u = Self::use_for_runner(runner);
+                            let request = RouteRequest::try_from(u).unwrap();
+                            matching_requests.push(Ok((target, request)));
+                        }
+
                         matching_requests.into_iter()
                     }
                     fsys::DeclType::Expose => {
@@ -226,6 +261,14 @@ impl RouteValidatorCapabilityProvider {
                 .flatten()
                 .collect()
         }
+    }
+
+    fn use_for_runner(runner: &Name) -> cm_rust::UseDecl {
+        cm_rust::UseDecl::Runner(cm_rust::UseRunnerDecl {
+            source: cm_rust::UseSource::Environment,
+            source_name: runner.clone(),
+            source_dictionary: RelativePath::dot(),
+        })
     }
 
     /// Serve the fuchsia.sys2.RouteValidator protocol for a given scope on a given stream
@@ -695,6 +738,19 @@ mod tests {
             fsys::RouteReport {
                 outcome: Some(fsys::RouteOutcome::Success),
                 capability: Some(s),
+                decl_type: Some(fsys::DeclType::Use),
+                source_moniker: Some(m),
+                error: None,
+                ..
+            } if s == "test_runner" && m == "<component_manager>"
+        );
+
+        let report = results.remove(0);
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                outcome: Some(fsys::RouteOutcome::Success),
+                capability: Some(s),
                 decl_type: Some(fsys::DeclType::Expose),
                 source_moniker: Some(m),
                 error: None,
@@ -753,7 +809,7 @@ mod tests {
         let components = vec![
             (
                 "root",
-                ComponentDeclBuilder::new()
+                ComponentDeclBuilder::new_empty_component()
                     .use_(use_from_child_decl)
                     .expose(expose_from_child_decl)
                     .child_default("my_child")
@@ -761,7 +817,7 @@ mod tests {
             ),
             (
                 "my_child",
-                ComponentDeclBuilder::new()
+                ComponentDeclBuilder::new_empty_component()
                     .protocol_default("foo.bar")
                     .expose(expose_from_void_decl)
                     .build(),
@@ -849,13 +905,13 @@ mod tests {
         let components = vec![
             (
                 "root",
-                ComponentDeclBuilder::new()
+                ComponentDeclBuilder::new_empty_component()
                     .use_(invalid_source_name_use_from_child_decl)
                     .expose(invalid_source_name_expose_from_child_decl)
                     .child_default("my_child")
                     .build(),
             ),
-            ("my_child", ComponentDeclBuilder::new().build()),
+            ("my_child", ComponentDeclBuilder::new_empty_component().build()),
         ];
 
         let test = TestEnvironmentBuilder::new().set_components(components).build().await;
@@ -1258,6 +1314,23 @@ mod tests {
         );
 
         assert!(results.is_empty());
+
+        // Validate the child, passing an empty vector. Here we only care about checking that the
+        // program's runner was routed.
+        let mut results = validator.route("my_child", &[]).await.unwrap().unwrap();
+
+        let report = results.remove(0);
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                outcome: Some(fsys::RouteOutcome::Success),
+                capability: Some(s),
+                decl_type: Some(fsys::DeclType::Use),
+                source_moniker: Some(m),
+                error: None,
+                ..
+            } if s == "test_runner" && m == "<component_manager>"
+        );
     }
 
     /// Route API reports that routing succeeded normally, with a partial capability name (fuzzy
@@ -1374,6 +1447,27 @@ mod tests {
                 ..
             } if s == "fuchsia.buz" && m == "my_child"
         );
+
+        // Validate the child (program runner)
+        let targets = &[fsys::RouteTarget {
+            name: "test_run".parse().unwrap(),
+            decl_type: fsys::DeclType::Any,
+        }];
+        let mut results = validator.route("my_child", targets).await.unwrap().unwrap();
+
+        assert_eq!(results.len(), 1);
+        let report = results.remove(0);
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                outcome: Some(fsys::RouteOutcome::Success),
+                capability: Some(s),
+                decl_type: Some(fsys::DeclType::Use),
+                source_moniker: Some(m),
+                error: None,
+                ..
+            } if s == "test_runner" && m == "<component_manager>"
+        );
     }
 
     /// Route API reports that routing succeeded normally with a service capability, including
@@ -1473,13 +1567,9 @@ mod tests {
             let ns = ns.remove(1);
             assert_eq!(ns.path.to_string(), "/svc");
             let svc_dir = ns.directory.into_proxy().unwrap();
-            fuchsia_fs::directory::open_directory_deprecated(
-                &svc_dir,
-                "foo.bar",
-                fio::OpenFlags::empty(),
-            )
-            .await
-            .unwrap();
+            fuchsia_fs::directory::open_directory(&svc_dir, "foo.bar", fio::Flags::empty())
+                .await
+                .unwrap();
         }
 
         let targets = &[fsys::RouteTarget {

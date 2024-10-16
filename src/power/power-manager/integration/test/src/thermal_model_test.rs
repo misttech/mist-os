@@ -192,8 +192,10 @@ impl Simulator {
 
         fake_clock_control
             .resume_with_increments(
-                zx::Duration::from_millis(1).into_nanos(),
-                &ftesting::Increment::Determined(zx::Duration::from_millis(1).into_nanos()),
+                zx::MonotonicDuration::from_millis(1).into_nanos(),
+                &ftesting::Increment::Determined(
+                    zx::MonotonicDuration::from_millis(1).into_nanos(),
+                ),
             )
             .await
             .expect("failed to set fake time scale: FIDL error")
@@ -271,7 +273,7 @@ impl Simulator {
 
         self.fake_clock_control
             .advance(&ftesting::Increment::Determined(
-                zx::Duration::from_seconds(self.sample_interval.0 as i64).into_nanos(),
+                zx::MonotonicDuration::from_seconds(self.sample_interval.0 as i64).into_nanos(),
             ))
             .await
             .expect("failed to advance fake time: FIDL error")

@@ -167,7 +167,8 @@
             max_size: 64,
         },
         {
-            // storage-host.
+            // Whether the storage-host stack should be used instead of the legacy DFv2-based
+            // storage stack.
             config: "fuchsia.fshost.StorageHost",
             key: "storage_host",
             type: "bool",

@@ -27,6 +27,17 @@ var zirconNames = map[string]zxName{
 	},
 }
 
+var zirconTimes = map[string]zxName{
+	"InstantMono": {
+		typeName: "fidl::basic_time<ZX_CLOCK_MONOTONIC>",
+		prefix:   "",
+	},
+	"InstantBoot": {
+		typeName: "fidl::basic_time<ZX_CLOCK_BOOT>",
+		prefix:   "",
+	},
+}
+
 func isZirconLibrary(li fidlgen.LibraryIdentifier) bool {
 	return len(li) == 1 && li[0] == fidlgen.Identifier("zx")
 }
@@ -54,6 +65,16 @@ func zirconType(id fidlgen.Identifier) (name, bool) {
 		return makeName(zn.typeName), true
 	}
 
+	return name{}, false
+}
+
+func zirconTime(ci fidlgen.CompoundIdentifier) (name, bool) {
+	if isZirconLibrary(ci.Library) {
+		n := string(ci.Name)
+		if zt, ok := zirconTimes[n]; ok {
+			return makeName(zt.typeName), true
+		}
+	}
 	return name{}, false
 }
 

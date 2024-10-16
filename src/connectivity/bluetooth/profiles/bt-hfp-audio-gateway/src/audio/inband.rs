@@ -295,7 +295,7 @@ impl InbandAudioControl {
 
     // This is currently 2x an SCO frame which holds 7.5ms
     // This must be a multiple of 7.5ms for the CVSD encoder to not have any remainder bytes.
-    const AUDIO_BUFFER_DURATION: zx::Duration = zx::Duration::from_millis(15);
+    const AUDIO_BUFFER_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(15);
 
     fn start_input(
         &mut self,
@@ -330,7 +330,7 @@ impl InbandAudioControl {
             Self::LOCAL_MONOTONIC_CLOCK_DOMAIN,
             codec_id.try_into()?,
             Self::AUDIO_BUFFER_DURATION,
-            zx::Duration::from_millis(0),
+            zx::MonotonicDuration::from_millis(0),
         )
         .map_err(|e| AudioError::audio_core(format_err!("Couldn't create output: {e:?}")))?;
         self.audio_core.add_device_by_channel(super::DEVICE_NAME, false, client)?;

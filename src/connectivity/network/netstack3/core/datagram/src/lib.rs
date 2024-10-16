@@ -22,8 +22,8 @@ mod internal {
 
 pub use internal::datagram::{
     BoundSocketState, BoundSocketStateType, BoundSockets, ConnInfo, ConnState, ConnectError,
-    DatagramApi, DatagramBoundStateContext, DatagramFlowId, DatagramSocketMapSpec,
-    DatagramSocketOptions, DatagramSocketSet, DatagramSocketSpec, DatagramStateContext,
+    DatagramApi, DatagramBoundStateContext, DatagramFlowId, DatagramIpSpecificSocketOptions,
+    DatagramSocketMapSpec, DatagramSocketSet, DatagramSocketSpec, DatagramStateContext,
     DualStackConnState, DualStackConverter, DualStackDatagramBoundStateContext, DualStackIpExt,
     EitherIpSocket, ExpectedConnError, ExpectedUnboundError, InUseError, IpExt, IpOptions,
     ListenerInfo, MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,

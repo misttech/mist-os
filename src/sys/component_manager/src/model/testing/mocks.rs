@@ -424,7 +424,7 @@ pub enum ControlMessage {
 /// What the MockController should do when it receives a message.
 pub struct ControllerActionResponse {
     pub close_channel: bool,
-    pub delay: Option<zx::Duration>,
+    pub delay: Option<zx::MonotonicDuration>,
 }
 
 pub struct MockController {

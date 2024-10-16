@@ -101,7 +101,7 @@ class BuildIDIndex {
   void AddBuildIdDir(const std::string& dir, const std::string& build_dir = "");
 
   // Adds a symbol server.
-  void AddSymbolServer(const std::string& url, bool require_authentication = true);
+  void AddSymbolServer(const std::string& url, bool require_authentication);
 
   // cache_dir saves the downloaded symbol files. Its layout is the same as a build_id_dir but it
   // also features garbage collection.

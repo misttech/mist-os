@@ -23,7 +23,7 @@ use {
 };
 
 // TODO(https://fxbug.dev/42171393): Currently hardcoded until parameters supported.
-const MIN_HOME_TIME: zx::Duration = zx::Duration::from_millis(0);
+const MIN_HOME_TIME: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(0);
 const MIN_PROBES_PER_CHANNEL: u8 = 0;
 const MAX_PROBES_PER_CHANNEL: u8 = 0;
 
@@ -218,10 +218,12 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
                     // is required since fuchsia.wlan.mlme/ScanRequest.min_channel_time has a width of
                     // four octets.
                     min_channel_time: Some(
-                        zx::Duration::from(TimeUnit(req.min_channel_time as u16)).into_nanos(),
+                        zx::MonotonicDuration::from(TimeUnit(req.min_channel_time as u16))
+                            .into_nanos(),
                     ),
                     max_channel_time: Some(
-                        zx::Duration::from(TimeUnit(req.max_channel_time as u16)).into_nanos(),
+                        zx::MonotonicDuration::from(TimeUnit(req.max_channel_time as u16))
+                            .into_nanos(),
                     ),
                     min_home_time: Some(MIN_HOME_TIME.into_nanos()),
                     ..Default::default()
@@ -254,8 +256,8 @@ impl<'a, D: DeviceOps> BoundScanner<'a, D> {
             req.channel_list,
             ssids_list,
             mac_header,
-            zx::Duration::from(TimeUnit(req.min_channel_time as u16)).into_nanos(),
-            zx::Duration::from(TimeUnit(req.max_channel_time as u16)).into_nanos(),
+            zx::MonotonicDuration::from(TimeUnit(req.min_channel_time as u16)).into_nanos(),
+            zx::MonotonicDuration::from(TimeUnit(req.max_channel_time as u16)).into_nanos(),
             MIN_HOME_TIME.into_nanos(),
             MIN_PROBES_PER_CHANNEL,
             MAX_PROBES_PER_CHANNEL,

@@ -23,7 +23,8 @@ struct CommandLineOptions {
   std::vector<std::string> symbol_paths;
   std::vector<std::string> build_id_dirs;
   std::vector<std::string> ids_txts;
-  std::vector<std::string> symbol_servers;
+  std::vector<std::string> private_symbol_servers;
+  std::vector<std::string> public_symbol_servers;
   std::optional<std::string> symbol_cache;
   std::optional<std::string> dumpfile_output;
 

@@ -1,1 +1,1 @@
-include /src/lib/zircon/rust/OWNERS
+include /sdk/rust/zx/OWNERS

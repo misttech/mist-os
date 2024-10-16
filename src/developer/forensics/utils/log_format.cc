@@ -43,9 +43,9 @@ fit::function<std::string(int32_t, const std::string&)> FormatFn(
     const fuchsia::logger::LogMessage& message) {
   return [&message](int32_t severity, const std::string& msg) {
     return fxl::StringPrintf("[%05d.%03d][%05" PRIu64 "][%05" PRIu64 "][%s] %s: %s\n",
-                             static_cast<int>(message.time / 1000000000ULL),
-                             static_cast<int>((message.time / 1000000ULL) % 1000ULL), message.pid,
-                             message.tid, fxl::JoinStrings(message.tags, ", ").c_str(),
+                             static_cast<int>(message.time.get() / 1000000000ULL),
+                             static_cast<int>((message.time.get() / 1000000ULL) % 1000ULL),
+                             message.pid, message.tid, fxl::JoinStrings(message.tags, ", ").c_str(),
                              SeverityToString(severity).c_str(), msg.c_str());
   };
 }

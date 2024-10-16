@@ -220,13 +220,10 @@ impl RepositoryManager {
 
             // TODO(https://fxbug.dev/42164009): We need to reopen because `resolve_succeeds_with_broken_minfs`
             // expects it, this should be removed once the test is fixed.
-            let data_proxy = fuchsia_fs::directory::open_directory_deprecated(
-                data_proxy,
-                ".",
-                fio::OpenFlags::RIGHT_WRITABLE,
-            )
-            .await
-            .context("reopen /data")?;
+            let data_proxy =
+                fuchsia_fs::directory::open_directory(data_proxy, ".", fio::PERM_WRITABLE)
+                    .await
+                    .context("reopen /data")?;
 
             let temp_path = &format!("{dynamic_configs_path}.new");
             crate::util::do_with_atomic_file(
@@ -480,9 +477,9 @@ impl RepositoryManagerBuilder<UnsetCobaltSender, UnsetInspectNode> {
     where
         P: Into<String>,
     {
-        let proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
+        let proxy = fuchsia_fs::directory::open_in_namespace(
             data_dir.path().to_str().unwrap(),
-            fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
         )
         .unwrap();
         Self::new(Some(proxy), dynamic_configs_path, std::time::Duration::from_secs(30)).await
@@ -711,13 +708,7 @@ async fn load_configs_file_from_proxy(
     proxy: &fio::DirectoryProxy,
     path: &str,
 ) -> Result<Vec<RepositoryConfig>, LoadError> {
-    let file = match fuchsia_fs::directory::open_file_deprecated(
-        proxy,
-        path,
-        fuchsia_fs::OpenFlags::RIGHT_READABLE,
-    )
-    .await
-    {
+    let file = match fuchsia_fs::directory::open_file(proxy, path, fio::PERM_READABLE).await {
         Ok(file) => file,
         Err(fuchsia_fs::node::OpenError::OpenError(Status::NOT_FOUND)) => return Ok(vec![]),
         Err(error) => return Err(LoadError::Open { path: path.into(), error }),

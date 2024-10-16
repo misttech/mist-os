@@ -33,8 +33,6 @@ typedef struct zx_vmo_dirty_range {
 // Declared here in the next syscall header since it is not published
 // in the SDK.
 
-#define ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL ((uint32_t)1)
-
 typedef uint64_t zx_restricted_reason_t;
 
 // Reason codes provided to normal mode when a restricted process traps
@@ -178,8 +176,11 @@ typedef struct {
 } zx_processor_power_state_t;
 
 typedef struct {
-  uint32_t domain_id;
   zx_cpu_set_t cpus;
+  uint32_t domain_id;
+  // Padding.
+  uint8_t padding1[4];
+
 } zx_processor_power_domain_t;
 
 // ====== End of runtime processor power management support ====== //

@@ -26,11 +26,6 @@ rustc_test("iptables_test") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-fuchsia_test_component("iptables") {
-  manifest = "meta/iptables.cml"
-  test_type = "starnix"
-}
-
 fuchsia_test_component("iptables-restore") {
   manifest = "meta/iptables-restore.cml"
   test_type = "starnix"

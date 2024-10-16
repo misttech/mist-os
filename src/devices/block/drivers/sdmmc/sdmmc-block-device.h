@@ -35,6 +35,7 @@
 #include "sdmmc-partition-device.h"
 #include "sdmmc-rpmb-device.h"
 #include "sdmmc-types.h"
+#include "src/storage/lib/block_server/block_server.h"
 
 namespace sdmmc {
 
@@ -88,7 +89,7 @@ struct ReadWriteMetadata {
   SdmmcBlockDevice* const block_device;
 };
 
-class SdmmcBlockDevice {
+class SdmmcBlockDevice : public block_server::Interface {
  public:
   static constexpr char kHardwarePowerElementName[] = "sdmmc-hardware";
 
@@ -108,23 +109,33 @@ class SdmmcBlockDevice {
   std::unique_ptr<SdmmcDevice> TakeSdmmcDevice() { return std::move(sdmmc_); }
 
   // Probe for SD first, then MMC.
-  zx_status_t Probe(const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata) {
-    return ProbeSd(metadata) == ZX_OK ? ZX_OK : ProbeMmc(metadata);
+  zx_status_t Probe(const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata)
+      TA_EXCL(worker_lock_) {
+    fbl::AutoLock lock(&worker_lock_);
+    return ProbeSdLocked(metadata) == ZX_OK ? ZX_OK : ProbeMmcLocked(metadata);
   }
-  zx_status_t ProbeSd(const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata);
-  zx_status_t ProbeMmc(const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata);
+  zx_status_t ProbeSd(const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata)
+      TA_EXCL(worker_lock_) {
+    fbl::AutoLock lock(&worker_lock_);
+    return ProbeSdLocked(metadata);
+  }
+  zx_status_t ProbeMmc(const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata)
+      TA_EXCL(worker_lock_) {
+    fbl::AutoLock lock(&worker_lock_);
+    return ProbeMmcLocked(metadata);
+  }
 
-  zx_status_t AddDevice() TA_EXCL(lock_);
+  zx_status_t AddDevice() TA_EXCL(queue_lock_);
 
   void StopWorkerDispatcher(std::optional<fdf::PrepareStopCompleter> completer = std::nullopt)
-      TA_EXCL(lock_);
+      TA_EXCL(queue_lock_);
 
-  zx_status_t SuspendPower() TA_REQ(lock_);
-  zx_status_t ResumePower() TA_REQ(lock_);
+  zx_status_t SuspendPower() TA_REQ(worker_lock_);
+  zx_status_t ResumePower() TA_REQ(worker_lock_);
 
   // Called by children of this device.
-  void Queue(BlockOperation txn) TA_EXCL(lock_);
-  void RpmbQueue(RpmbRequestInfo info) TA_EXCL(lock_);
+  void Queue(BlockOperation txn) TA_EXCL(queue_lock_);
+  void RpmbQueue(RpmbRequestInfo info) TA_EXCL(queue_lock_);
   fidl::WireSyncClient<fuchsia_driver_framework::Node>& block_node() { return block_node_; }
   std::string_view block_name() const { return block_name_; }
   SdmmcRootDevice* parent() { return parent_; }
@@ -147,36 +158,46 @@ class SdmmcBlockDevice {
   // until both queues are empty.
   static constexpr size_t kRoundRobinRequestCount = 16;
 
-  zx_status_t ReadWriteWithRetries(std::vector<BlockOperation>& btxns, EmmcPartition partition);
-  zx_status_t ReadWriteAttempt(std::vector<BlockOperation>& btxns, bool suppress_error_messages);
-  zx_status_t Flush();
-  zx_status_t Trim(const block_trim_t& txn, const EmmcPartition partition);
-  zx_status_t SetPartition(const EmmcPartition partition);
-  zx_status_t RpmbRequest(const RpmbRequestInfo& request);
+  zx_status_t ProbeSdLocked(const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata)
+      TA_REQ(worker_lock_);
+  zx_status_t ProbeMmcLocked(const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata)
+      TA_REQ(worker_lock_);
 
-  void HandleBlockOps(block::BorrowedOperationQueue<PartitionInfo>& txn_list);
-  void HandleRpmbRequests(std::deque<RpmbRequestInfo>& rpmb_list);
+  template <typename Request>
+  zx_status_t ReadWriteWithRetries(std::vector<Request>& requests, EmmcPartition partition)
+      TA_REQ(worker_lock_);
+  template <typename Request>
+  zx_status_t ReadWriteAttempt(std::vector<Request>& requests, bool suppress_error_messages)
+      TA_REQ(worker_lock_);
+  zx_status_t Flush() TA_REQ(worker_lock_);
+  zx_status_t Trim(const block_trim_t& txn, const EmmcPartition partition) TA_REQ(worker_lock_);
+  zx_status_t SetPartition(const EmmcPartition partition) TA_REQ(worker_lock_);
+  zx_status_t RpmbRequest(const RpmbRequestInfo& request) TA_REQ(worker_lock_);
+
+  void HandleBlockOps(block::BorrowedOperationQueue<PartitionInfo>& txn_list) TA_REQ(worker_lock_);
+  void HandleRpmbRequests(std::deque<RpmbRequestInfo>& rpmb_list) TA_REQ(worker_lock_);
 
   void WorkerLoop();
 
   zx_status_t WaitForTran();
 
-  zx_status_t MmcDoSwitch(uint8_t index, uint8_t value);
-  zx_status_t MmcWaitForSwitch(uint8_t index, uint8_t value);
-  zx_status_t MmcSetBusWidth(sdmmc_bus_width_t bus_width, uint8_t mmc_ext_csd_bus_width);
-  sdmmc_bus_width_t MmcSelectBusWidth();
+  zx_status_t MmcDoSwitch(uint8_t index, uint8_t value) TA_REQ(worker_lock_);
+  zx_status_t MmcWaitForSwitch(uint8_t index, uint8_t value) TA_REQ(worker_lock_);
+  zx_status_t MmcSetBusWidth(sdmmc_bus_width_t bus_width, uint8_t mmc_ext_csd_bus_width)
+      TA_REQ(worker_lock_);
+  sdmmc_bus_width_t MmcSelectBusWidth() TA_REQ(worker_lock_);
   // The host is expected to switch the timing from HS200 to HS as part of HS400 initialization.
   // Checking the status of the switch requires special handling to avoid a temporary mismatch
   // between the host and device timings.
-  zx_status_t MmcSwitchTiming(sdmmc_timing_t new_timing);
-  zx_status_t MmcSwitchTimingHs200ToHs();
+  zx_status_t MmcSwitchTiming(sdmmc_timing_t new_timing) TA_REQ(worker_lock_);
+  zx_status_t MmcSwitchTimingHs200ToHs() TA_REQ(worker_lock_);
   zx_status_t MmcSwitchFreq(uint32_t new_freq);
-  zx_status_t MmcDecodeExtCsd();
-  bool MmcSupportsHs();
-  bool MmcSupportsHsDdr();
-  bool MmcSupportsHs200();
-  bool MmcSupportsHs400();
-  void MmcSetInspectProperties() TA_REQ(lock_);
+  zx_status_t MmcDecodeExtCsd() TA_REQ(worker_lock_);
+  bool MmcSupportsHs() TA_REQ(worker_lock_);
+  bool MmcSupportsHsDdr() TA_REQ(worker_lock_);
+  bool MmcSupportsHs200() TA_REQ(worker_lock_);
+  bool MmcSupportsHs400() TA_REQ(worker_lock_);
+  void MmcSetInspectProperties() TA_REQ(worker_lock_) TA_REQ(queue_lock_);
 
   void BlockComplete(sdmmc::BlockOperation& txn, zx_status_t status);
 
@@ -190,7 +211,8 @@ class SdmmcBlockDevice {
 
   // Acquires a lease on a power element via the supplied |lessor_client|, returning the resulting
   // lease control client end.
-  zx::result<fidl::ClientEnd<fuchsia_power_broker::LeaseControl>> AcquireLease(
+  // This method is planned for use in a future change.
+  zx::result<fidl::ClientEnd<fuchsia_power_broker::LeaseControl>> AcquireInitLease(
       const fidl::WireSyncClient<fuchsia_power_broker::Lessor>& lessor_client);
 
   // Informs Power Broker of the updated |power_level| via the supplied |current_level_client|.
@@ -203,6 +225,11 @@ class SdmmcBlockDevice {
   // transitions to the Power Broker.
   void WatchHardwareRequiredLevel();
 
+  // block_server::Interface
+  void StartThread(block_server::Thread) override;
+  void OnNewSession(block_server::Session) override;
+  void OnRequests(block_server::Session&, cpp20::span<const block_server::Request>) override;
+
   SdmmcRootDevice* const parent_;
   // Only accessed by ProbeSd, ProbeMmc, SuspendPower, ResumePower, and WorkerLoop.
   std::unique_ptr<SdmmcDevice> sdmmc_;
@@ -214,36 +241,34 @@ class SdmmcBlockDevice {
 
   // mmc
   std::array<uint8_t, SDMMC_CID_SIZE> raw_cid_;
-  std::array<uint8_t, SDMMC_CSD_SIZE> raw_csd_;
-  std::array<uint8_t, MMC_EXT_CSD_SIZE> raw_ext_csd_;
+  std::array<uint8_t, MMC_EXT_CSD_SIZE> raw_ext_csd_ TA_GUARDED(worker_lock_);
 
-  fbl::Mutex lock_;
+  // `worker_lock_` must be held before interacting with the device.
+  fbl::Mutex worker_lock_ TA_ACQ_BEFORE(queue_lock_);
+  fbl::ConditionVariable worker_condition_;
+  fbl::Mutex queue_lock_ TA_ACQ_AFTER(worker_lock_);
+
   // Signals the worker loop to process incoming commands (or driver shutdown).
-  fbl::ConditionVariable worker_event_ TA_GUARDED(lock_);
-  // Signals that the worker loop is idle and awaiting incoming commands (or driver shutdown).
-  fbl::ConditionVariable idle_event_ TA_GUARDED(lock_);
+  libsync::Completion worker_event_;
 
   // blockio requests
-  block::BorrowedOperationQueue<PartitionInfo> txn_list_ TA_GUARDED(lock_);
-  std::deque<RpmbRequestInfo> rpmb_list_ TA_GUARDED(lock_);
+  block::BorrowedOperationQueue<PartitionInfo> txn_list_ TA_GUARDED(queue_lock_);
+  std::deque<RpmbRequestInfo> rpmb_list_ TA_GUARDED(queue_lock_);
 
   // Dispatcher for processing queued block requests.
   fdf::Dispatcher worker_dispatcher_;
   // Signaled when worker_dispatcher_ is shut down.
   libsync::Completion worker_shutdown_completion_;
-  // Signaled when power has been resumed.
-  libsync::Completion wait_for_power_resumed_;
 
-  bool worker_idle_ TA_GUARDED(lock_) = false;
-  bool power_suspended_ TA_GUARDED(lock_) = false;
-  bool shutdown_ TA_GUARDED(lock_) = false;
+  bool power_suspended_ TA_GUARDED(worker_lock_) = false;
+  bool shutdown_ TA_GUARDED(worker_lock_) = false;
   trace_async_id_t trace_async_id_;
 
   fidl::WireSyncClient<fuchsia_power_broker::ElementControl> hardware_power_element_control_client_;
   fidl::WireSyncClient<fuchsia_power_broker::Lessor> hardware_power_lessor_client_;
   fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel> hardware_power_current_level_client_;
   fidl::WireClient<fuchsia_power_broker::RequiredLevel> hardware_power_required_level_client_;
-
+  zx::event hardware_power_element_assertive_token_;
   fidl::ClientEnd<fuchsia_power_broker::LeaseControl> hardware_power_lease_control_client_end_;
 
   block_info_t block_info_{};
@@ -253,7 +278,7 @@ class SdmmcBlockDevice {
 
   uint32_t max_packed_reads_effective_ = 0;   // Use command packing up to this many reads.
   uint32_t max_packed_writes_effective_ = 0;  // Use command packing up to this many writes.
-  ReadWriteMetadata readwrite_metadata_{this};
+  ReadWriteMetadata readwrite_metadata_ TA_GUARDED(worker_lock_){this};
 
   inspect::Node root_;
   struct InspectProperties {
@@ -279,6 +304,8 @@ class SdmmcBlockDevice {
 
   std::vector<std::unique_ptr<PartitionDevice>> child_partition_devices_;
   std::unique_ptr<RpmbDevice> child_rpmb_device_;
+  std::optional<block_server::BlockServer> block_server_ TA_GUARDED(queue_lock_);
+  EmmcPartition current_partition_ TA_GUARDED(worker_lock_) = EmmcPartition::USER_DATA_PARTITION;
 };
 
 }  // namespace sdmmc

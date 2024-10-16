@@ -57,6 +57,30 @@ zx_status_t fdio_pipe_half(int* out_fd, zx_handle_t* out_handle) {
   return ZX_ERR_NO_RESOURCES;
 }
 
+__EXPORT
+zx_status_t fdio_transferable_fd(int* out_fd, zx_handle_t* out_handle) {
+  zx::channel h0, h1;
+  zx_status_t status = zx::channel::create(0, &h0, &h1);
+  if (status != ZX_OK) {
+    return status;
+  }
+  zx::result io = fdio_internal::zxio::create();
+  if (io.is_error()) {
+    return io.status_value();
+  }
+  status = zxio_create_with_type(&io->zxio_storage(), ZXIO_OBJECT_TYPE_TRANSFERABLE, h0.release());
+  if (status != ZX_OK) {
+    return status;
+  }
+  std::optional fd = bind_to_fd(io.value());
+  if (fd.has_value()) {
+    *out_fd = fd.value();
+    *out_handle = h1.release();
+    return ZX_OK;
+  }
+  return ZX_ERR_NO_RESOURCES;
+}
+
 namespace {
 
 template <typename F>

@@ -78,9 +78,7 @@ if (current_cpu == "x64") {
   ]
 
   # The Linux/x86 64-bit protocol is supported by CrosVM.
-  linuxboot64_environments = [
-    # TODO(https://fxbug.dev/335547883): crosvm_env
-  ]
+  linuxboot64_environments = [ crosvm_env ]
 
   qemu_boot_formats += [
     {
@@ -151,6 +149,7 @@ if (current_cpu == "arm64" || current_cpu == "riscv64") {
 
       supported_environments = [ qemu_env ]
       if (current_cpu == "arm64") {
+        # TODO(https://fxbug.dev/371274109): Also crosvm_env.
         supported_environments += [ aemu_env ]
       }
     },

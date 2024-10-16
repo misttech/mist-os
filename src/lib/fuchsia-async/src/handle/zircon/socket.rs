@@ -283,13 +283,13 @@ mod tests {
         // faster feedback. This is set to 10s rather than something shorter to avoid triggering
         // flakes if things happen to be slow.
         let receiver = receive_future
-            .on_timeout(MonotonicInstant::after(zx::Duration::from_seconds(10)), || {
+            .on_timeout(MonotonicInstant::after(zx::MonotonicDuration::from_seconds(10)), || {
                 panic!("timeout")
             });
 
         // Sends a message after the timeout has passed
         let sender = async move {
-            Timer::new(MonotonicInstant::after(zx::Duration::from_millis(100))).await;
+            Timer::new(MonotonicInstant::after(zx::MonotonicDuration::from_millis(100))).await;
             tx.write_all(bytes).await.expect("writing into socket");
             // close socket to signal no more bytes will be written
             drop(tx);

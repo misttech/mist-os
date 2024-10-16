@@ -36,50 +36,6 @@ struct pointer_traits<weird_ptr<T>> {
 
 namespace {
 
-constexpr bool IsAddressOfConstexpr() {
-  int a = 1;
-  return cpp17::addressof(a) == &a;
-}
-
-TEST(MemoryTest, AddressOfReturnsCorrectPointer) {
-  static_assert(IsAddressOfConstexpr() == true,
-                "cpp17::addressof should be evaluated in constexpr.");
-}
-
-TEST(MemoryTest, AddressOfReturnsAddressNotOverridenOperator) {
-  struct Misleading {
-    constexpr Misleading* operator&() const { return nullptr; }
-  };
-
-  alignas(Misleading) std::array<char, sizeof(Misleading)> buffer;
-  const Misleading* ptr = new (static_cast<void*>(buffer.data())) Misleading();
-  const Misleading& misleading = *ptr;
-
-  ASSERT_EQ(&misleading, nullptr);
-  ASSERT_EQ(cpp17::addressof(misleading), ptr);
-}
-
-// TODO(https://fxbug.dev/42180908) Disable these tests until we can avoid taking  the address of std::
-// functions #if __cpp_lib_addressof_constexpr >= 201603L && !defined(LIB_STDCOMPAT_USE_POLYFILLS)
-
-// template <typename T>
-// constexpr void check_addressof_alias() {
-//// Need so the compiler picks the right overload.
-// constexpr T* (*cpp17_addressof)(T&) = &cpp17::addressof<T>;
-// constexpr T* (*std_addressof)(T&) = &std::addressof<T>;
-// static_assert(cpp17_addressof == std_addressof);
-//}
-
-// struct UserType {
-// int var;
-//};
-
-// TEST(MemoryTest, AddressOfIsAliasForStdWhenAvailable) {
-// check_addressof_alias<int>();
-// check_addressof_alias<UserType>();
-//}
-// #endif
-
 TEST(MemoryTest, ToAddressWithRawReturnsRightPointer) {
   constexpr int* a = nullptr;
   static_assert(cpp20::to_address(a) == nullptr, "To Address returns right raw ptr.");
@@ -102,11 +58,11 @@ TEST(MemoryTest, ToAddressWithArrowReturnsRightPointer) {
   cpp17::optional<const arrow> c;
   EXPECT_EQ(&*c, cpp20::to_address(c));
 
-  // TODO(https://fxbug.dev/42149777): libc++ and libstdc++ currently both have broken implementations of
-  // std::to_address that require specializing std::pointer_traits and don't allow operator-> to
-  // return non-raw-pointers, so the chaining in this test case (which seems to be intentionally
-  // allowed by the standard, given that there is a recursive path through the function) is
-  // impossible.
+  // TODO(https://fxbug.dev/42149777): libc++ and libstdc++ currently both have broken
+  // implementations of std::to_address that require specializing std::pointer_traits and don't
+  // allow operator-> to return non-raw-pointers, so the chaining in this test case (which seems to
+  // be intentionally allowed by the standard, given that there is a recursive path through the
+  // function) is impossible.
   //
   // Here we do go two levels because weird_ptr<T>::operator->() returns const T&, which goes back
   // to the overload for operator->() and then we get a raw pointer.
@@ -143,8 +99,8 @@ TEST(MemoryTest, BannedUses) {
   // EXPECT_EQ(&*d.value, cpp20::to_address(d));
 }
 
-// TODO(https://fxbug.dev/42180908) Disable these tests until we can avoid taking  the address of std::
-// functions #if __cpp_lib_to_address >= 201711L && !defined(LIB_STDCOMPAT_USE_POLYFILLS)
+// TODO(https://fxbug.dev/42180908) Disable these tests until we can avoid taking  the address of
+// std:: functions #if __cpp_lib_to_address >= 201711L && !defined(LIB_STDCOMPAT_USE_POLYFILLS)
 
 // template <typename T>
 // constexpr void check_to_address_alias() {

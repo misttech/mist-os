@@ -1522,8 +1522,8 @@ mod tests {
         let result = fake_device
             .start_passive_scan(&fidl_softmac::WlanSoftmacBaseStartPassiveScanRequest {
                 channels: Some(vec![1u8, 2, 3]),
-                min_channel_time: Some(zx::Duration::from_millis(0).into_nanos()),
-                max_channel_time: Some(zx::Duration::from_millis(200).into_nanos()),
+                min_channel_time: Some(zx::MonotonicDuration::from_millis(0).into_nanos()),
+                max_channel_time: Some(zx::MonotonicDuration::from_millis(200).into_nanos()),
                 min_home_time: Some(0),
                 ..Default::default()
             })
@@ -1570,8 +1570,8 @@ mod tests {
                     0x08,   // Length
                     0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, // Supported Rates
                 ]),
-                min_channel_time: Some(zx::Duration::from_millis(0).into_nanos()),
-                max_channel_time: Some(zx::Duration::from_millis(200).into_nanos()),
+                min_channel_time: Some(zx::MonotonicDuration::from_millis(0).into_nanos()),
+                max_channel_time: Some(zx::MonotonicDuration::from_millis(200).into_nanos()),
                 min_home_time: Some(0),
                 min_probes_per_channel: Some(1),
                 max_probes_per_channel: Some(3),

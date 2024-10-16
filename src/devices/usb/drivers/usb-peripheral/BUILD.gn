@@ -11,7 +11,12 @@ driver_bind_rules("usb_peripheral_bind") {
   rules = "meta/usb_peripheral.bind"
   bind_output = "usb-peripheral.bindbc"
   tests = "meta/tests.json"
-  deps = [ "//src/devices/bind/fuchsia.usb" ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_bindlib",
+    "//src/devices/bind/fuchsia",
+    "//src/devices/bind/fuchsia.designware.platform",
+    "//src/devices/bind/fuchsia.usb",
+  ]
 }
 
 fuchsia_driver("usb-peripheral-driver") {

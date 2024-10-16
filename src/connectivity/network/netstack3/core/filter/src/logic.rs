@@ -92,9 +92,6 @@ pub(crate) enum RoutineResult<I: IpExt> {
         /// The optional range of source ports used to rewrite the packet.
         ///
         /// If absent, the source port of the packet is not rewritten.
-        //
-        // TODO(https://fxbug.dev/341771631): implement Masquerade NAT.
-        #[allow(dead_code)]
         src_port: Option<RangeInclusive<NonZeroU16>>,
     },
 }

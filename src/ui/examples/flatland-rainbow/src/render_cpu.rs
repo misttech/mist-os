@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::render::Renderer;
-use fidl::endpoints::ClientEnd;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_framebuffer::sysmem::{minimum_row_bytes, BufferCollectionAllocator};
 use fuchsia_framebuffer::FrameUsage;
@@ -115,11 +114,7 @@ impl CpuRenderer {
             export_token: Some(buffer_tokens.export_token),
             // A token channel serves both sysmem(1) and sysmem2 token protocols, so we can convert
             // here until flatland has a field for a sysmem2 token.
-            buffer_collection_token: Some(ClientEnd::<
-                fidl_fuchsia_sysmem::BufferCollectionTokenMarker,
-            >::new(
-                sysmem_buffer_collection_token.into_channel()
-            )),
+            buffer_collection_token2: Some(sysmem_buffer_collection_token),
             ..Default::default()
         };
 

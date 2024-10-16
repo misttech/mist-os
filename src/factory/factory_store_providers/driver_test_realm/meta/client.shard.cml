@@ -19,10 +19,7 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
-            ],
+            protocol: [ "fuchsia.inspect.InspectSink" ],
             from: "parent",
             to: "#factory_driver_test_realm",
         },

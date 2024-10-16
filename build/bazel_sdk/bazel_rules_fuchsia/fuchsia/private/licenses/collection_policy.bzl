@@ -23,8 +23,8 @@ ignore_policy = struct(
 
     # These targets will be ignored:
     targets = bool_dict([
-        str(Label(l))
-        for l in [
+        str(Label(label))
+        for label in [
             "@fuchsia_sdk//:meta/manifest.json",  # SDK metadata, not shipping to clients.
             "@platforms//os:os",  # Constraint
             "@platforms//os:fuchsia",  # Constraint
@@ -45,8 +45,8 @@ ignore_policy = struct(
 
     # Anything withing these package will be ignored:
     packages = bool_dict([
-        to_package_str(Label(l))
-        for l in [
+        to_package_str(Label(label))
+        for label in [
             "@fuchsia_sdk//fuchsia/tools",
         ]
     ]),

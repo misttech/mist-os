@@ -84,11 +84,20 @@ class FakeFlatland : public fuchsia::ui::composition::testing::Allocator_TestBas
                       .set_name(fsl::GetCurrentProcessName())
                       .set_id(fsl::GetCurrentProcessKoid())));
 
+    // Exactly one of these must be set.
+    EXPECT_TRUE(!!args.has_buffer_collection_token2() ^ !!args.has_buffer_collection_token());
+    fuchsia::sysmem2::BufferCollectionTokenHandle token;
+    if (args.has_buffer_collection_token2()) {
+      token = std::move(*args.mutable_buffer_collection_token2());
+    } else {
+      token = fuchsia::sysmem2::BufferCollectionTokenHandle(
+          args.mutable_buffer_collection_token()->TakeChannel());
+    }
+
     fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection;
     status = sysmem_allocator->BindSharedCollection(
         std::move(fuchsia::sysmem2::AllocatorBindSharedCollectionRequest{}
-                      .set_token(fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>(
-                          args.mutable_buffer_collection_token()->TakeChannel()))
+                      .set_token(std::move(token))
                       .set_buffer_collection_request(buffer_collection.NewRequest())));
     EXPECT_EQ(status, ZX_OK);
 

@@ -160,7 +160,6 @@ impl FshostBuilder {
             .add_route(
                 Route::new()
                     .capability(Capability::protocol::<ffshost::AdminMarker>())
-                    .capability(Capability::protocol::<ffshost::BlockWatcherMarker>())
                     .capability(Capability::protocol::<ffuv::BlobfsVerifierMarker>())
                     .capability(Capability::protocol::<ffxfs::CryptManagementMarker>())
                     .capability(Capability::protocol::<BlobCreatorMarker>())

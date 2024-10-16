@@ -25,7 +25,7 @@ use {
 use crate::bindings::util::TaskWaitGroupSpawner;
 use crate::bindings::{routes, Ctx};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub(super) struct AddableMatcher<I: Ip> {
     /// Matches whether the source address of the packet is from the subnet.
     from: Option<Subnet<I::Addr>>,

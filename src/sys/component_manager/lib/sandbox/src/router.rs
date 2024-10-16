@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{Capability, Dict, WeakInstanceToken};
+use crate::{
+    Capability, CapabilityBound, Dict, SpecificRouter, SpecificRouterResponse, Unit,
+    WeakInstanceToken,
+};
 use async_trait::async_trait;
 use futures::future::BoxFuture;
 use router_error::{Explain, RouterError};
@@ -62,6 +65,8 @@ pub struct Router {
     routable: Arc<dyn Routable>,
 }
 
+impl CapabilityBound for Router {}
+
 impl fmt::Debug for Router {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // TODO(https://fxbug.dev/329680070): Require `Debug` on `Routable` trait.
@@ -100,6 +105,32 @@ impl Routable for Router {
         debug: bool,
     ) -> Result<Capability, RouterError> {
         Router::route(self, request, debug).await
+    }
+}
+
+// TODO(https://fxbug.dev/360221168): Delete this once all routers are their specialized types
+impl<T: CapabilityBound> From<SpecificRouter<T>> for Router {
+    fn from(router: SpecificRouter<T>) -> Self {
+        Router::new(InnerRouter { router })
+    }
+}
+
+struct InnerRouter<T: CapabilityBound> {
+    router: SpecificRouter<T>,
+}
+#[async_trait]
+impl<T: CapabilityBound> Routable for InnerRouter<T> {
+    async fn route(
+        &self,
+        request: Option<Request>,
+        debug: bool,
+    ) -> Result<Capability, RouterError> {
+        let resp = self.router.route(request, debug).await?;
+        Ok(match resp {
+            SpecificRouterResponse::Capability(c) => c.into(),
+            SpecificRouterResponse::Unavailable => Capability::Unit(Unit {}),
+            SpecificRouterResponse::Debug(d) => Capability::Data(d),
+        })
     }
 }
 

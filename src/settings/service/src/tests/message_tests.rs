@@ -271,7 +271,7 @@ fn test_timeout() {
         let mut reply_receptor = messenger_client_1.message_with_timeout(
             ORIGINAL.clone(),
             Audience::Address(crate::Address::Test(2)),
-            Some(zx::Duration::from_millis(timeout_ms)),
+            Some(zx::MonotonicDuration::from_millis(timeout_ms)),
         );
 
         verify_payload(
@@ -290,7 +290,8 @@ fn test_timeout() {
 
     loop {
         let new_time = fuchsia_async::MonotonicInstant::from_nanos(
-            executor.now().into_nanos() + zx::Duration::from_millis(timeout_ms).into_nanos(),
+            executor.now().into_nanos()
+                + zx::MonotonicDuration::from_millis(timeout_ms).into_nanos(),
         );
         match executor.run_until_stalled(&mut fut) {
             Poll::Ready(x) => break x,

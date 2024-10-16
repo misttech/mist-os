@@ -9,7 +9,6 @@ use fidl_fuchsia_metrics_test::{LogMethod, MetricEventLoggerQuerierProxy};
 use fidl_fuchsia_time_external::TimeSample;
 use fuchsia_cobalt_builders::MetricEventExt;
 use fuchsia_component::client;
-
 use futures::stream::StreamExt;
 use futures::Future;
 use std::sync::Arc;
@@ -156,7 +155,13 @@ async fn test_no_rtc_start_clock_from_time_source() {
         let reported_utc = clock.read().unwrap();
         let monotonic_after_update = zx::MonotonicInstant::get();
         assert_geq!(reported_utc, *VALID_TIME);
-        assert_leq!(reported_utc, *VALID_TIME + (monotonic_after_update - sample_monotonic));
+        assert_leq!(
+            reported_utc,
+            *VALID_TIME
+                + zx::SyntheticDuration::from_nanos(
+                    (monotonic_after_update - sample_monotonic).into_nanos()
+                )
+        );
 
         let cobalt_event_stream =
             create_cobalt_event_stream(Arc::new(cobalt), LogMethod::LogMetricEvents);
@@ -254,7 +259,13 @@ async fn test_invalid_rtc_start_clock_from_time_source() {
             let reported_utc = clock.read().unwrap();
             let monotonic_after = zx::MonotonicInstant::get();
             assert_geq!(reported_utc, *VALID_TIME);
-            assert_leq!(reported_utc, *VALID_TIME + (monotonic_after - sample_monotonic));
+            assert_leq!(
+                reported_utc,
+                *VALID_TIME
+                    + zx::SyntheticDuration::from_nanos(
+                        (monotonic_after - sample_monotonic).into_nanos()
+                    )
+            );
             // RTC should also be set.
             let rtc_update = poll_until_some_async!(async { rtc_updates.to_vec().await.pop() });
             let monotonic_after_rtc_set = zx::MonotonicInstant::get();
@@ -262,7 +273,10 @@ async fn test_invalid_rtc_start_clock_from_time_source() {
             assert_geq!(rtc_reported_utc, *VALID_TIME);
             assert_leq!(
                 rtc_reported_utc,
-                *VALID_TIME + (monotonic_after_rtc_set - sample_monotonic)
+                *VALID_TIME
+                    + zx::SyntheticDuration::from_nanos(
+                        (monotonic_after_rtc_set - sample_monotonic).into_nanos()
+                    )
             );
             assert_eq!(
                 cobalt_event_stream.take(4).collect::<Vec<_>>().await,
@@ -311,7 +325,13 @@ async fn test_start_clock_from_rtc() {
             let reported_utc = clock.read().unwrap();
             let monotonic_after = zx::MonotonicInstant::get();
             assert_geq!(reported_utc, *VALID_RTC_TIME);
-            assert_leq!(reported_utc, *VALID_RTC_TIME + (monotonic_after - monotonic_before));
+            assert_leq!(
+                reported_utc,
+                *VALID_RTC_TIME
+                    + zx::SyntheticDuration::from_nanos(
+                        (monotonic_after - monotonic_before).into_nanos()
+                    )
+            );
 
             tracing::info!("[https://fxbug.dev/42080434]: before cobalt_event_stream.take");
             assert_eq!(
@@ -356,7 +376,13 @@ async fn test_start_clock_from_rtc() {
             let clock_utc = clock.read().unwrap();
             let monotonic_after_read = zx::MonotonicInstant::get();
             assert_geq!(clock_utc, *VALID_TIME);
-            assert_leq!(clock_utc, *VALID_TIME + (monotonic_after_read - sample_monotonic));
+            assert_leq!(
+                clock_utc,
+                *VALID_TIME
+                    + zx::SyntheticDuration::from_nanos(
+                        (monotonic_after_read - sample_monotonic).into_nanos()
+                    )
+            );
             // RTC should be set too.
             let rtc_update = poll_until_some_async!(async { rtc_updates.to_vec().await.pop() });
             let monotonic_after_rtc_set = zx::MonotonicInstant::get();
@@ -364,7 +390,10 @@ async fn test_start_clock_from_rtc() {
             assert_geq!(rtc_reported_utc, *VALID_TIME);
             assert_leq!(
                 rtc_reported_utc,
-                *VALID_TIME + (monotonic_after_rtc_set - sample_monotonic)
+                *VALID_TIME
+                    + zx::SyntheticDuration::from_nanos(
+                        (monotonic_after_rtc_set - sample_monotonic).into_nanos()
+                    )
             );
 
             assert_eq!(
@@ -477,7 +506,7 @@ async fn test_slew_clock() {
     // Constants for controlling the duration of the slew we want to induce. These constants
     // are intended to tune the test to avoid flakes and do not necessarily need to match up with
     // those in timekeeper.
-    const SLEW_DURATION: zx::Duration = zx::Duration::from_minutes(90);
+    const SLEW_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_minutes(90);
     const NOMINAL_SLEW_PPM: i64 = 20;
     let error_for_slew = SLEW_DURATION * NOMINAL_SLEW_PPM / 1_000_000;
 
@@ -513,7 +542,10 @@ async fn test_slew_clock() {
 
         // Push a second sample that indicates UTC running slightly behind monotonic.
         let sample_2_monotonic = sample_1_monotonic + BETWEEN_SAMPLES;
-        let sample_2_utc = sample_1_utc + BETWEEN_SAMPLES - error_for_slew * 2;
+        let sample_2_utc = sample_1_utc
+            + zx::SyntheticDuration::from_nanos(
+                (BETWEEN_SAMPLES - error_for_slew * 2).into_nanos(),
+            );
         tracing::info!("[https://fxbug.dev/42080434]: before push_source_controller.set_sample 2");
         push_source_controller
             .set_sample(TimeSample {
@@ -538,7 +570,7 @@ async fn test_slew_clock() {
 
 #[fuchsia::test]
 async fn test_step_clock() {
-    const STEP_ERROR: zx::Duration = zx::Duration::from_hours(1);
+    const STEP_ERROR: zx::MonotonicDuration = zx::MonotonicDuration::from_hours(1);
     let clock = new_nonshareable_clock();
     timekeeper_test(clock, None, |clock, push_source_controller, _, _| async move {
         // Let the first sample be slightly in the past so later samples are not in the future.
@@ -567,13 +599,23 @@ async fn test_step_clock() {
         .unwrap();
         let utc_now = clock.read().unwrap();
         let monotonic_after = zx::MonotonicInstant::get();
-        assert_geq!(utc_now, sample_1_utc + BETWEEN_SAMPLES);
-        assert_leq!(utc_now, sample_1_utc + BETWEEN_SAMPLES + (monotonic_after - monotonic_before));
+        assert_geq!(
+            utc_now,
+            sample_1_utc + zx::SyntheticDuration::from_nanos(BETWEEN_SAMPLES.into_nanos())
+        );
+        assert_leq!(
+            utc_now,
+            sample_1_utc
+                + zx::SyntheticDuration::from_nanos(
+                    (BETWEEN_SAMPLES + monotonic_after - monotonic_before).into_nanos()
+                )
+        );
 
         let clock_last_set_ticks = clock.get_details().unwrap().last_value_update_ticks;
 
         let sample_2_monotonic = sample_1_monotonic + BETWEEN_SAMPLES;
-        let sample_2_utc = sample_1_utc + BETWEEN_SAMPLES + STEP_ERROR;
+        let sample_2_utc = sample_1_utc
+            + zx::SyntheticDuration::from_nanos((BETWEEN_SAMPLES + STEP_ERROR).into_nanos());
         tracing::info!("[https://fxbug.dev/42080434]: before push_source_controller.set_sample 2");
         push_source_controller
             .set_sample(TimeSample {
@@ -594,11 +636,16 @@ async fn test_step_clock() {
         // between the offsets defined in the two samples. 500 ms is added to the upper bound as
         // the estimate takes more of the second sample into account (as the oscillator drift is
         // added to the uncertainty of the first sample).
-        let jump_utc = sample_2_utc - STEP_ERROR / 2;
+        let jump_utc =
+            sample_2_utc - zx::SyntheticDuration::from_nanos(STEP_ERROR.into_nanos() / 2);
         assert_geq!(utc_now_2, jump_utc);
         assert_leq!(
             utc_now_2,
-            jump_utc + (monotonic_after_2 - monotonic_before) + zx::Duration::from_millis(500)
+            jump_utc
+                + zx::SyntheticDuration::from_nanos(
+                    (monotonic_after_2 - monotonic_before).into_nanos()
+                )
+                + zx::SyntheticDuration::from_millis(500)
         );
     })
     .await
@@ -653,8 +700,12 @@ async fn test_restart_crashed_time_source() {
         // Time from clock should incorporate the second sample.
         let result_utc = clock.read().unwrap();
         let monotonic_after = zx::MonotonicInstant::get();
-        let minimum_expected = avg(sample_1_utc + BETWEEN_SAMPLES, sample_2_utc)
-            + (monotonic_after - monotonic_before);
+        let minimum_expected = avg(
+            sample_1_utc + zx::SyntheticDuration::from_nanos(BETWEEN_SAMPLES.into_nanos()),
+            sample_2_utc,
+        ) + zx::SyntheticDuration::from_nanos(
+            (monotonic_after - monotonic_before).into_nanos(),
+        );
         assert_geq!(result_utc, minimum_expected);
     })
     .await

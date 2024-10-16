@@ -7,8 +7,9 @@ use netstack3_base::socket::MaybeDualStack;
 use netstack3_base::{Uninstantiable, UninstantiableWrapper};
 
 use crate::internal::datagram::{
-    BoundSockets, DatagramBoundStateContext, DatagramSocketMapSpec, DatagramSocketOptions,
-    DatagramSocketSpec, DualStackConverter, IpExt, IpOptions, NonDualStackConverter,
+    BoundSockets, DatagramBoundStateContext, DatagramIpSpecificSocketOptions,
+    DatagramSocketMapSpec, DatagramSocketSpec, DualStackConverter, IpExt, IpOptions,
+    NonDualStackConverter,
 };
 use crate::internal::spec_context::{
     DatagramSpecBoundStateContext, DualStackDatagramSpecBoundStateContext,
@@ -93,7 +94,7 @@ impl<I: IpExt, S: DatagramSocketSpec, P: DatagramBoundStateContext<I, C, S>, C>
     fn to_other_socket_options<'a>(
         core_ctx: &UninstantiableWrapper<P>,
         _state: &'a IpOptions<I, P::WeakDeviceId, S>,
-    ) -> &'a DatagramSocketOptions<I::OtherVersion, P::WeakDeviceId> {
+    ) -> &'a DatagramIpSpecificSocketOptions<I::OtherVersion, P::WeakDeviceId> {
         core_ctx.uninstantiable_unreachable()
     }
 

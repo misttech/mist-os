@@ -989,11 +989,6 @@ func (s Schema) lookupDeclByQualifiedName(name string, nullable bool) (Declarati
 			nullable:  nullable,
 			schema:    s,
 		}, true
-	case *fidlgen.Protocol:
-		return &ClientEndDecl{
-			protocolDecl: *typ,
-			nullable:     nullable,
-		}, true
 	}
 	return nil, false
 }
@@ -1049,13 +1044,26 @@ func (s Schema) lookupDeclByType(typ fidlgen.Type) (Declaration, bool) {
 		return &ArrayDecl{schema: s, typ: typ}, true
 	case fidlgen.VectorType:
 		return &VectorDecl{schema: s, typ: typ}, true
-	case fidlgen.RequestType:
-		fidlType := s.types[string(typ.RequestSubtype)]
+	case fidlgen.EndpointType:
+		fidlType := s.types[string(typ.Protocol)]
 		protocolDecl, ok := fidlType.(*fidlgen.Protocol)
 		if !ok {
-			panic(fmt.Sprintf("malformed FIDL schema: %+v refers to a %+v but we expect a protocol", typ.RequestSubtype, fidlType))
+			panic(fmt.Sprintf("malformed FIDL schema: %+v refers to a %+v but we expect a protocol", typ.Protocol, fidlType))
 		}
-		return &ServerEndDecl{protocolDecl: *protocolDecl, nullable: typ.Nullable}, true
+		switch typ.Role {
+		case fidlgen.ClientRole:
+			return &ClientEndDecl{
+				protocolDecl: *protocolDecl,
+				nullable:     typ.Nullable,
+			}, true
+		case fidlgen.ServerRole:
+			return &ServerEndDecl{
+				protocolDecl: *protocolDecl,
+				nullable:     typ.Nullable,
+			}, true
+		default:
+			panic(fmt.Sprintf("unexpected fidlgen.EndpointRole: %#v", typ.Role))
+		}
 	default:
 		panic("not implemented")
 	}

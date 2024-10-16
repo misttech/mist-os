@@ -16,11 +16,11 @@ TEST(AsyncTestClockTest, Increment) {
   async::TestLoop loop;
   AsyncTestClock clock(loop.dispatcher());
 
-  auto time1 = clock.Now();
+  auto time1 = clock.MonotonicNow();
 
   EXPECT_EQ(async::Now(loop.dispatcher()), time1);
 
-  auto time2 = clock.Now();
+  auto time2 = clock.MonotonicNow();
   EXPECT_GT(time2, time1);
 }
 

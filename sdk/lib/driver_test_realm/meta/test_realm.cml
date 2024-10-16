@@ -5,7 +5,6 @@
     include: [
         "inspect/client.shard.cml",
         "syslog/client.shard.cml",
-        "trace/client.shard.cml",
     ],
     children: [
         {
@@ -78,6 +77,12 @@
         },
     ],
     offer: [
+        {
+            protocol: "fuchsia.tracing.provider.Registry",
+            from: "void",
+            to: "all",
+            availability: "optional",
+        },
         {
             config: [
                 "fuchsia.driver.DelayFallbackUntilBaseDriversIndexed",

@@ -73,6 +73,8 @@ enumerable_enum! {
         Process,
         /// The SELinux "file" object class.
         File,
+        /// The SELinux "dir" object class.
+        Dir,
         /// The SELinux "blk_file" object class.
         Block,
         /// The SELinux "chr_file" object class.
@@ -93,6 +95,7 @@ impl ObjectClass {
         match self {
             Self::Process => "process",
             Self::File => "file",
+            Self::Dir => "dir",
             Self::Block => "blk_file",
             Self::Character => "chr_file",
             Self::Link => "lnk_file",
@@ -122,6 +125,8 @@ enumerable_enum! {
     FileClass {
         /// The SELinux "file" object class.
         File,
+        /// The SELinux "dir" object class.
+        Dir,
         /// The SELinux "blk_file" object class.
         Block,
         /// The SELinux "chr_file" object class.
@@ -139,6 +144,7 @@ impl From<FileClass> for ObjectClass {
     fn from(file_class: FileClass) -> Self {
         match file_class {
             FileClass::File => Self::File,
+            FileClass::Dir => Self::Dir,
             FileClass::Block => Self::Block,
             FileClass::Character => Self::Character,
             FileClass::Link => Self::Link,
@@ -442,6 +448,8 @@ pub enum FileSystemLabelingScheme {
     /// identifies the context to use for unlabeled files in the filesystem (the "default
     /// context").
     FsUse { fs_use_type: FsUseType, def_sid: SecurityId, root_sid: SecurityId },
+    /// This filesystem has one or more "genfscon" statements associated with it in the policy.
+    GenFsCon,
 }
 
 /// SELinux security context-related filesystem mount options. These options are documented in the

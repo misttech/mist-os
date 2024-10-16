@@ -50,11 +50,6 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: "#tee_manager",
-        },
-        {
             directory: "dev-tee",
             from: "parent",
             to: "#tee_manager",

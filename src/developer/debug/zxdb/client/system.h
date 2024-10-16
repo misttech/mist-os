@@ -183,8 +183,8 @@ class System : public ClientObject, public SessionObserver, public SettingStoreO
 
   // Searches through for an open slot (Target without an attached process) or creates another one
   // if none is found. Calls attach on that target, passing |callback| into it.
-  void AttachToProcess(uint64_t pid, Target::AttachMode mode,
-                       Target::CallbackWithTimestamp callback);
+  void AttachToPid(uint64_t pid, debug_ipc::AttachConfig config,
+                   Target::CallbackWithTimestamp callback);
 
   // Detach from all targets, and delete the now unused Target objects. This can be called by user
   // commands (e.g. "detach *", or "quit" when in embedded mode).

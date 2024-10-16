@@ -86,7 +86,7 @@ impl ActionResults {
 /// It can be returned from the library as part of ActionResults.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SnapshotTrigger {
-    pub interval: i64, // zx::Duration but this library has to run on host.
+    pub interval: i64, // zx::MonotonicDuration but this library has to run on host.
     pub signature: String,
 }
 

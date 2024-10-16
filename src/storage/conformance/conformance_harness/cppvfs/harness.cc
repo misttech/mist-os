@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.io.test/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/fidl.h>
+#include <fidl/test.placeholders/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
@@ -21,13 +22,20 @@
 #include "src/storage/lib/vfs/cpp/managed_vfs.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/remote_dir.h"
+#include "src/storage/lib/vfs/cpp/service.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vmo_file.h"
 
 namespace fio = fuchsia_io;
 namespace fio_test = fuchsia_io_test;
 
-class TestHarness : public fidl::Server<fio_test::Io1Harness> {
+class EchoServer : public fidl::Server<test_placeholders::Echo> {
+  void EchoString(EchoStringRequest& request, EchoStringCompleter::Sync& completer) override {
+    completer.Reply(request.value());
+  }
+};
+
+class TestHarness : public fidl::Server<fio_test::TestHarness> {
  public:
   explicit TestHarness() : vfs_loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
     vfs_loop_.StartThread("vfs_thread");
@@ -48,14 +56,14 @@ class TestHarness : public fidl::Server<fio_test::Io1Harness> {
   }
 
   void GetConfig(GetConfigCompleter::Sync& completer) final {
-    fio_test::Io1Config config;
+    fio_test::HarnessConfig config;
 
     // Supported options
     config.supports_get_backing_memory(true);
     config.supports_remote_dir(true);
     config.supports_get_token(true);
-    config.supports_open3(true);
     config.supports_mutable_file(true);
+    config.supports_services(true);
     config.supported_attributes(fio::NodeAttributesQuery::kContentSize |
                                 fio::NodeAttributesQuery::kStorageSize);
     // TODO(https://fxbug.dev/324112857): Support append mode when adding open3 support.
@@ -79,6 +87,23 @@ class TestHarness : public fidl::Server<fio_test::Io1Harness> {
     }
   }
 
+  void GetServiceDir(GetServiceDirCompleter::Sync& completer) final {
+    // Create a directory with a fuchsia.test.placeholders/Echo server at the discoverable name.
+    fbl::RefPtr svc_dir = fbl::MakeRefCounted<fs::PseudoDir>();
+    auto handler = [this](fidl::ServerEnd<test_placeholders::Echo> server_end) {
+      auto instance = std::make_unique<EchoServer>();
+      fidl::BindServer(vfs_loop_.dispatcher(), std::move(server_end), std::move(instance));
+      return ZX_OK;
+    };
+    ZX_ASSERT(svc_dir->AddEntry(fidl::DiscoverableProtocolName<test_placeholders::Echo>,
+                                fbl::MakeRefCounted<fs::Service>(std::move(handler))) == ZX_OK);
+    // Serve it and reply to the request with the client end.
+    auto [client_end, server_end] = fidl::Endpoints<fio::Directory>::Create();
+    ZX_ASSERT(vfs_->ServeDirectory(std::move(svc_dir), std::move(server_end)) == ZX_OK);
+    completer.Reply({std::move(client_end)});
+  }
+
+  // NOLINTNEXTLINE(misc-no-recursion): Test-only code, recursion is acceptable here.
   void AddEntry(fio_test::DirectoryEntry entry, fs::PseudoDir& dest) {
     switch (entry.Which()) {
       case fio_test::DirectoryEntry::Tag::kDirectory: {
@@ -136,7 +161,7 @@ int main(int argc, const char** argv) {
     return EXIT_FAILURE;
   }
 
-  result = outgoing.AddProtocol<fio_test::Io1Harness>(std::make_unique<TestHarness>());
+  result = outgoing.AddProtocol<fio_test::TestHarness>(std::make_unique<TestHarness>());
   if (result.is_error()) {
     FX_LOGS(ERROR) << "Failed to server test harness: " << result.status_string();
     return EXIT_FAILURE;

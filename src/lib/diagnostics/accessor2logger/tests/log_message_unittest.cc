@@ -102,8 +102,8 @@ TEST(LogMessage, MonikerStringification) {
   auto message = messages[0].value();
   auto encoded_message =
       fxl::StringPrintf("[%05d.%03d][%05" PRIu64 "][%05" PRIu64 "][%s] %s: %s\n",
-                        static_cast<int>(message.time / 1000000000ULL),
-                        static_cast<int>((message.time / 1000000ULL) % 1000ULL), message.pid,
+                        static_cast<int>(message.time.get() / 1000000000ULL),
+                        static_cast<int>((message.time.get() / 1000000ULL) % 1000ULL), message.pid,
                         message.tid, fxl::JoinStrings(message.tags, ", ").c_str(),
                         SeverityToString(message.severity).c_str(), message.msg.c_str());
   ASSERT_TRUE(encoded_message.find("[<test_moniker>] INFO: "
@@ -159,8 +159,8 @@ TEST(LogMessage, LegacyHostEncoding) {
   auto message = messages[0].value();
   auto encoded_message =
       fxl::StringPrintf("[%05d.%03d][%05" PRIu64 "][%05" PRIu64 "][%s] %s: %s\n",
-                        static_cast<int>(message.time / 1000000000ULL),
-                        static_cast<int>((message.time / 1000000ULL) % 1000ULL), message.pid,
+                        static_cast<int>(message.time.get() / 1000000000ULL),
+                        static_cast<int>((message.time.get() / 1000000ULL) % 1000ULL), message.pid,
                         message.tid, fxl::JoinStrings(message.tags, ", ").c_str(),
                         SeverityToString(message.severity).c_str(), message.msg.c_str());
   ASSERT_TRUE(encoded_message.find("[some tag, some other tag] INFO: "
@@ -353,7 +353,7 @@ TEST(LogMessage, Valid) {
     EXPECT_EQ(300u, val.value().tid);
     ASSERT_EQ(1u, val.value().tags.size());
     EXPECT_EQ("a", val.value().tags[0]);
-    EXPECT_EQ(1000u, val.value().time);
+    EXPECT_EQ(1000u, val.value().time.get());
     EXPECT_EQ(0u, val.value().dropped_logs);
     EXPECT_EQ(static_cast<int32_t>(fuchsia::logger::LogLevelFilter::INFO), val.value().severity);
   }

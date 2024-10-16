@@ -29,7 +29,7 @@ use zx::sys::zx_thread_state_general_regs_t;
 use starnix_logging::{log_error, log_warn, set_zx_name, track_file_not_found, track_stub};
 use starnix_sync::{
     BeforeFsNodeAppend, DeviceOpen, EventWaitGuard, FileOpsCore, LockBefore, Locked, MmDumpable,
-    ProcessGroupState, RwLock, RwLockWriteGuard, TaskRelease, WakeReason,
+    ProcessGroupState, RwLockWriteGuard, TaskRelease, WakeReason,
 };
 use starnix_syscalls::decls::Syscall;
 use starnix_syscalls::SyscallResult;
@@ -49,10 +49,10 @@ use starnix_uapi::vfs::ResolveFlags;
 use starnix_uapi::{
     clone_args, errno, error, from_status_like_fdio, pid_t, rlimit, sock_filter,
     CLONE_CHILD_CLEARTID, CLONE_CHILD_SETTID, CLONE_FILES, CLONE_FS, CLONE_INTO_CGROUP,
-    CLONE_NEWUTS, CLONE_PARENT_SETTID, CLONE_PTRACE, CLONE_SETTLS, CLONE_SIGHAND, CLONE_SYSVSEM,
-    CLONE_THREAD, CLONE_VFORK, CLONE_VM, FUTEX_OWNER_DIED, FUTEX_TID_MASK, ROBUST_LIST_LIMIT,
-    SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER, SECCOMP_FILTER_FLAG_TSYNC,
-    SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SI_KERNEL,
+    CLONE_NEWUTS, CLONE_PARENT, CLONE_PARENT_SETTID, CLONE_PTRACE, CLONE_SETTLS, CLONE_SIGHAND,
+    CLONE_SYSVSEM, CLONE_THREAD, CLONE_VFORK, CLONE_VM, FUTEX_OWNER_DIED, FUTEX_TID_MASK,
+    ROBUST_LIST_LIMIT, SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER,
+    SECCOMP_FILTER_FLAG_TSYNC, SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SI_KERNEL,
 };
 use std::ffi::CString;
 use std::fmt;
@@ -1583,10 +1583,12 @@ impl CurrentTask {
             | CLONE_THREAD
             | CLONE_SYSVSEM
             | CLONE_SETTLS
+            | CLONE_PARENT
             | CLONE_PARENT_SETTID
             | CLONE_CHILD_CLEARTID
             | CLONE_CHILD_SETTID
             | CLONE_VFORK
+            | CLONE_NEWUTS
             | CLONE_PTRACE) as u64;
         // A mask with all valid flags set, because we want to return a different error code for an
         // invalid flag vs an unimplemented flag. Subtracting 1 from the largest valid flag gives a
@@ -1598,6 +1600,7 @@ impl CurrentTask {
 
         let clone_files = flags & (CLONE_FILES as u64) != 0;
         let clone_fs = flags & (CLONE_FS as u64) != 0;
+        let clone_parent = flags & (CLONE_PARENT as u64) != 0;
         let clone_parent_settid = flags & (CLONE_PARENT_SETTID as u64) != 0;
         let clone_child_cleartid = flags & (CLONE_CHILD_CLEARTID as u64) != 0;
         let clone_child_settid = flags & (CLONE_CHILD_SETTID as u64) != 0;
@@ -1607,8 +1610,7 @@ impl CurrentTask {
         let clone_vm = flags & (CLONE_VM as u64) != 0;
         let clone_sighand = flags & (CLONE_SIGHAND as u64) != 0;
         let clone_vfork = flags & (CLONE_VFORK as u64) != 0;
-
-        let new_uts = flags & (CLONE_NEWUTS as u64) != 0;
+        let clone_newuts = flags & (CLONE_NEWUTS as u64) != 0;
 
         if clone_ptrace {
             track_stub!(TODO("https://fxbug.dev/322874630"), "CLONE_PTRACE");
@@ -1669,17 +1671,36 @@ impl CurrentTask {
         let command;
         let creds;
         let scheduler_policy;
-        let uts_ns;
         let no_new_privs;
         let seccomp_filters;
         let robust_list_head = UserAddress::NULL.into();
         let child_signal_mask;
         let timerslack_ns;
+        let uts_ns;
         let security_state = security::task_alloc(&self, flags);
 
         let TaskInfo { thread, thread_group, memory_manager } = {
+            // These variables hold the original parent in case we need to switch the parent of the
+            // new task because of CLONE_PARENT.
+            let weak_original_parent;
+            let original_parent;
+
             // Make sure to drop these locks ASAP to avoid inversion
-            let thread_group_state = self.thread_group.write();
+            let thread_group_state = {
+                let thread_group_state = self.thread_group.write();
+                if clone_parent {
+                    // With the CLONE_PARENT flag, the parent of the new task is our parent
+                    // instead of ourselves.
+                    weak_original_parent =
+                        thread_group_state.parent.clone().ok_or_else(|| errno!(EINVAL))?;
+                    std::mem::drop(thread_group_state);
+                    original_parent = weak_original_parent.upgrade();
+                    original_parent.write()
+                } else {
+                    thread_group_state
+                }
+            };
+
             let state = self.read();
 
             no_new_privs = state.no_new_privs();
@@ -1694,16 +1715,12 @@ impl CurrentTask {
             scheduler_policy = state.scheduler_policy.fork();
             timerslack_ns = state.timerslack_ns;
 
-            uts_ns = if new_uts {
+            uts_ns = if clone_newuts {
                 if !self.creds().has_capability(CAP_SYS_ADMIN) {
                     return error!(EPERM);
                 }
-
-                // Fork the UTS namespace of the existing task.
-                let new_uts_ns = state.uts_ns.read().clone();
-                Arc::new(RwLock::new(new_uts_ns))
+                state.uts_ns.read().fork()
             } else {
-                // Inherit the UTS of the existing task.
                 state.uts_ns.clone()
             };
 
@@ -1789,10 +1806,22 @@ impl CurrentTask {
                 self.thread_group.add(&child_task)?;
             } else {
                 child.thread_group.add(&child_task)?;
+
+                // These manipulations of the signal handling state appear to be related to
+                // CLONE_SIGHAND and CLONE_VM rather than CLONE_THREAD. However, we do not support
+                // all the combinations of these flags, which means doing these operations here
+                // might actually be correct. However, if you find a test that fails because of the
+                // placement of this logic here, we might need to move it.
                 let mut child_state = child.write();
                 let state = self.read();
                 child_state.set_sigaltstack(state.sigaltstack());
                 child_state.set_signal_mask(state.signal_mask());
+            }
+
+            if !clone_vm {
+                // We do not support running threads in the same process with different
+                // MemoryManagers.
+                assert!(!clone_thread);
                 self.mm().snapshot_to(locked, child.mm())?;
             }
 
@@ -1807,6 +1836,14 @@ impl CurrentTask {
             if clone_child_settid {
                 child.write_object(user_child_tid, &child.id)?;
             }
+
+            // TODO(https://fxbug.dev/42066087): We do not support running different processes with
+            // the same MemoryManager. Instead, we implement a rough approximation of that behavior
+            // by making a copy-on-write clone of the memory from the original process.
+            if clone_vm && !clone_thread {
+                self.mm().snapshot_to(locked, child.mm())?;
+            }
+
             child.thread_state = self.thread_state.snapshot();
             Ok(())
         });

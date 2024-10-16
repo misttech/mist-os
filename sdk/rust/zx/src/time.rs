@@ -29,8 +29,20 @@ pub type MonotonicTicks = Instant<MonotonicTimeline, TicksUnit>;
 /// A timestamp from system ticks on the boot timeline. Advances while the system is suspended.
 pub type BootTicks = Instant<BootTimeline, TicksUnit>;
 
-/// A duration between two system ticks timestamps.
-pub type DurationTicks = Duration<TicksUnit>;
+/// A duration on the monotonic timeline.
+pub type MonotonicDuration = Duration<MonotonicTimeline>;
+
+/// A duration on the boot timeline.
+pub type BootDuration = Duration<BootTimeline>;
+
+/// A duration from a user-defined clock with arbitrary behavior.
+pub type SyntheticDuration = Duration<SyntheticTimeline, NsUnit>;
+
+/// A duration between two system ticks monotonic timestamps.
+pub type MonotonicDurationTicks = Duration<MonotonicTimeline, TicksUnit>;
+
+/// A duration between two system ticks boot timestamps.
+pub type BootDurationTicks = Duration<BootTimeline, TicksUnit>;
 
 /// A timestamp from the kernel. Generic over both the timeline and the units it is measured in.
 #[repr(transparent)]
@@ -103,7 +115,7 @@ impl MonotonicInstant {
     /// Wraps the
     /// [zx_deadline_after](https://fuchsia.dev/fuchsia-src/reference/syscalls/deadline_after.md)
     /// syscall.
-    pub fn after(duration: Duration) -> Self {
+    pub fn after(duration: MonotonicDuration) -> Self {
         unsafe { Self::from_nanos(sys::zx_deadline_after(duration.0)) }
     }
 
@@ -133,9 +145,13 @@ impl BootInstant {
     }
 
     /// Compute a deadline for the time in the future that is the given `Duration` away.
-    pub fn after(duration: Duration) -> Self {
+    pub fn after(duration: BootDuration) -> Self {
         Self::from_nanos(Self::get().into_nanos().saturating_add(duration.0))
     }
+}
+
+impl<T: Timeline, U: TimeUnit> Instant<T, U> {
+    pub const ZERO: Instant<T, U> = Instant(0, std::marker::PhantomData);
 }
 
 impl<T: Timeline> Instant<T> {
@@ -143,7 +159,6 @@ impl<T: Timeline> Instant<T> {
         Instant(sys::ZX_TIME_INFINITE, std::marker::PhantomData);
     pub const INFINITE_PAST: Instant<T, NsUnit> =
         Instant(sys::ZX_TIME_INFINITE_PAST, std::marker::PhantomData);
-    pub const ZERO: Instant<T, NsUnit> = Instant(0, std::marker::PhantomData);
 
     /// Returns the number of nanoseconds since the epoch contained by this `Time`.
     pub const fn into_nanos(self) -> i64 {
@@ -208,35 +223,35 @@ impl<T: Timeline> Ticks<T> {
     }
 }
 
-impl<T: Timeline, U: TimeUnit> ops::Add<Duration<U>> for Instant<T, U> {
+impl<T: Timeline, U: TimeUnit> ops::Add<Duration<T, U>> for Instant<T, U> {
     type Output = Instant<T, U>;
-    fn add(self, dur: Duration<U>) -> Self::Output {
+    fn add(self, dur: Duration<T, U>) -> Self::Output {
         Self(self.0.saturating_add(dur.0), std::marker::PhantomData)
     }
 }
 
-impl<T: Timeline, U: TimeUnit> ops::Sub<Duration<U>> for Instant<T, U> {
+impl<T: Timeline, U: TimeUnit> ops::Sub<Duration<T, U>> for Instant<T, U> {
     type Output = Instant<T, U>;
-    fn sub(self, dur: Duration<U>) -> Self::Output {
+    fn sub(self, dur: Duration<T, U>) -> Self::Output {
         Self(self.0.saturating_sub(dur.0), std::marker::PhantomData)
     }
 }
 
 impl<T: Timeline, U: TimeUnit> ops::Sub<Instant<T, U>> for Instant<T, U> {
-    type Output = Duration<U>;
+    type Output = Duration<T, U>;
     fn sub(self, rhs: Instant<T, U>) -> Self::Output {
         Duration(self.0.saturating_sub(rhs.0), std::marker::PhantomData)
     }
 }
 
-impl<T: Timeline, U: TimeUnit> ops::AddAssign<Duration<U>> for Instant<T, U> {
-    fn add_assign(&mut self, dur: Duration<U>) {
+impl<T: Timeline, U: TimeUnit> ops::AddAssign<Duration<T, U>> for Instant<T, U> {
+    fn add_assign(&mut self, dur: Duration<T, U>) {
         self.0 = self.0.saturating_add(dur.0);
     }
 }
 
-impl<T: Timeline, U: TimeUnit> ops::SubAssign<Duration<U>> for Instant<T, U> {
-    fn sub_assign(&mut self, dur: Duration<U>) {
+impl<T: Timeline, U: TimeUnit> ops::SubAssign<Duration<T, U>> for Instant<T, U> {
+    fn sub_assign(&mut self, dur: Duration<T, U>) {
         self.0 = self.0.saturating_sub(dur.0);
     }
 }
@@ -280,63 +295,63 @@ impl TimeUnit for TicksUnit {}
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(transparent)]
-pub struct Duration<U = NsUnit>(sys::zx_duration_t, std::marker::PhantomData<U>);
+pub struct Duration<T, U = NsUnit>(sys::zx_duration_t, std::marker::PhantomData<(T, U)>);
 
-impl From<stdtime::Duration> for Duration<NsUnit> {
+impl<T: Timeline> From<stdtime::Duration> for Duration<T, NsUnit> {
     fn from(dur: stdtime::Duration) -> Self {
         Duration::from_seconds(dur.as_secs() as i64)
             + Duration::from_nanos(dur.subsec_nanos() as i64)
     }
 }
 
-impl<T: Timeline, U: TimeUnit> ops::Add<Instant<T, U>> for Duration<U> {
+impl<T: Timeline, U: TimeUnit> ops::Add<Instant<T, U>> for Duration<T, U> {
     type Output = Instant<T, U>;
     fn add(self, time: Instant<T, U>) -> Self::Output {
         Instant(self.0.saturating_add(time.0), std::marker::PhantomData)
     }
 }
 
-impl<U: TimeUnit> ops::Add for Duration<U> {
-    type Output = Duration<U>;
-    fn add(self, rhs: Duration<U>) -> Self::Output {
+impl<T: Timeline, U: TimeUnit> ops::Add for Duration<T, U> {
+    type Output = Duration<T, U>;
+    fn add(self, rhs: Duration<T, U>) -> Self::Output {
         Self(self.0.saturating_add(rhs.0), std::marker::PhantomData)
     }
 }
 
-impl<U: TimeUnit> ops::Sub for Duration<U> {
-    type Output = Duration<U>;
-    fn sub(self, rhs: Duration<U>) -> Duration<U> {
+impl<T: Timeline, U: TimeUnit> ops::Sub for Duration<T, U> {
+    type Output = Duration<T, U>;
+    fn sub(self, rhs: Duration<T, U>) -> Duration<T, U> {
         Self(self.0.saturating_sub(rhs.0), std::marker::PhantomData)
     }
 }
 
-impl<U: TimeUnit> ops::AddAssign for Duration<U> {
-    fn add_assign(&mut self, rhs: Duration<U>) {
+impl<T: Timeline, U: TimeUnit> ops::AddAssign for Duration<T, U> {
+    fn add_assign(&mut self, rhs: Duration<T, U>) {
         self.0 = self.0.saturating_add(rhs.0);
     }
 }
 
-impl<U: TimeUnit> ops::SubAssign for Duration<U> {
-    fn sub_assign(&mut self, rhs: Duration<U>) {
+impl<T: Timeline, U: TimeUnit> ops::SubAssign for Duration<T, U> {
+    fn sub_assign(&mut self, rhs: Duration<T, U>) {
         self.0 = self.0.saturating_sub(rhs.0);
     }
 }
 
-impl<T: Into<i64>, U: TimeUnit> ops::Mul<T> for Duration<U> {
+impl<T: Timeline, S: Into<i64>, U: TimeUnit> ops::Mul<S> for Duration<T, U> {
     type Output = Self;
-    fn mul(self, mul: T) -> Self {
+    fn mul(self, mul: S) -> Self {
         Self(self.0.saturating_mul(mul.into()), std::marker::PhantomData)
     }
 }
 
-impl<T: Into<i64>, U: TimeUnit> ops::Div<T> for Duration<U> {
+impl<S: Into<i64>, T: Timeline, U: TimeUnit> ops::Div<S> for Duration<T, U> {
     type Output = Self;
-    fn div(self, div: T) -> Self {
+    fn div(self, div: S) -> Self {
         Self(self.0.saturating_div(div.into()), std::marker::PhantomData)
     }
 }
 
-impl<U: TimeUnit> ops::Neg for Duration<U> {
+impl<T: Timeline, U: TimeUnit> ops::Neg for Duration<T, U> {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
@@ -344,15 +359,11 @@ impl<U: TimeUnit> ops::Neg for Duration<U> {
     }
 }
 
-impl Duration<NsUnit> {
-    pub const INFINITE: Duration = Duration(sys::zx_duration_t::MAX, std::marker::PhantomData);
-    pub const INFINITE_PAST: Duration = Duration(sys::zx_duration_t::MIN, std::marker::PhantomData);
-    pub const ZERO: Duration = Duration(0, std::marker::PhantomData);
-
-    /// Sleep for the given amount of time.
-    pub fn sleep(self) {
-        MonotonicInstant::after(self).sleep()
-    }
+impl<T: Timeline> Duration<T, NsUnit> {
+    pub const INFINITE: Duration<T> = Duration(sys::zx_duration_t::MAX, std::marker::PhantomData);
+    pub const INFINITE_PAST: Duration<T> =
+        Duration(sys::zx_duration_t::MIN, std::marker::PhantomData);
+    pub const ZERO: Duration<T> = Duration(0, std::marker::PhantomData);
 
     /// Returns the number of nanoseconds contained by this `Duration`.
     pub const fn into_nanos(self) -> i64 {
@@ -414,7 +425,7 @@ impl Duration<NsUnit> {
     }
 }
 
-impl Duration<TicksUnit> {
+impl<T: Timeline> Duration<T, TicksUnit> {
     /// Return the raw number of ticks represented by this `Duration`.
     pub const fn into_raw(self) -> i64 {
         self.0
@@ -423,6 +434,13 @@ impl Duration<TicksUnit> {
     /// Return a typed wrapper around the provided number of ticks.
     pub const fn from_raw(raw: i64) -> Self {
         Self(raw, std::marker::PhantomData)
+    }
+}
+
+impl MonotonicDuration {
+    /// Sleep for the given amount of time.
+    pub fn sleep(self) {
+        MonotonicInstant::after(self).sleep()
     }
 }
 
@@ -491,7 +509,7 @@ impl<T: Timeline> Timer<T> {
     /// Start a one-shot timer that will fire when `deadline` passes. Wraps the
     /// [zx_timer_set](https://fuchsia.dev/fuchsia-src/reference/syscalls/timer_set.md)
     /// syscall.
-    pub fn set(&self, deadline: Instant<T>, slack: Duration<NsUnit>) -> Result<(), Status> {
+    pub fn set(&self, deadline: Instant<T>, slack: Duration<T, NsUnit>) -> Result<(), Status> {
         let status = unsafe {
             sys::zx_timer_set(self.raw_handle(), deadline.into_nanos(), slack.into_nanos())
         };
@@ -584,7 +602,7 @@ mod tests {
         let ticks2 = MonotonicTicks::get();
 
         // The number of ticks should have increased by at least 1 ms worth
-        let sleep_ticks = DurationTicks::from_raw(
+        let sleep_ticks = MonotonicDurationTicks::from_raw(
             sleep_time.into_millis() * (MonotonicTicks::per_second() / 1000),
         );
         assert!(ticks2 >= (ticks1 + sleep_ticks));
@@ -602,7 +620,7 @@ mod tests {
     #[test]
     fn from_std() {
         let std_dur = stdtime::Duration::new(25, 25);
-        let dur = Duration::from(std_dur);
+        let dur = MonotonicDuration::from(std_dur);
         let std_dur_nanos = (1_000_000_000 * std_dur.as_secs()) + std_dur.subsec_nanos() as u64;
         assert_eq!(std_dur_nanos as i64, dur.into_nanos());
     }
@@ -610,8 +628,8 @@ mod tests {
     #[test]
     fn i64_conversions() {
         let nanos_in_one_hour = 3_600_000_000_000;
-        let dur_from_nanos = Duration::from_nanos(nanos_in_one_hour);
-        let dur_from_hours = Duration::from_hours(1);
+        let dur_from_nanos = MonotonicDuration::from_nanos(nanos_in_one_hour);
+        let dur_from_hours = MonotonicDuration::from_hours(1);
         assert_eq!(dur_from_nanos, dur_from_hours);
         assert_eq!(dur_from_nanos.into_nanos(), dur_from_hours.into_nanos());
         assert_eq!(dur_from_nanos.into_nanos(), nanos_in_one_hour);
@@ -753,58 +771,70 @@ mod tests {
     #[test]
     fn duration_saturation() {
         // Addition
-        assert_eq!(Duration::from_nanos(10) + Duration::from_nanos(30), Duration::from_nanos(40));
-        assert_eq!(Duration::from_nanos(10) + Duration::INFINITE, Duration::INFINITE);
-        assert_eq!(Duration::from_nanos(-10) + Duration::INFINITE_PAST, Duration::INFINITE_PAST);
+        assert_eq!(
+            MonotonicDuration::from_nanos(10) + Duration::from_nanos(30),
+            Duration::from_nanos(40)
+        );
+        assert_eq!(MonotonicDuration::from_nanos(10) + Duration::INFINITE, Duration::INFINITE);
+        assert_eq!(
+            MonotonicDuration::from_nanos(-10) + Duration::INFINITE_PAST,
+            Duration::INFINITE_PAST
+        );
 
         // Subtraction
-        assert_eq!(Duration::from_nanos(10) - Duration::from_nanos(30), Duration::from_nanos(-20));
-        assert_eq!(Duration::from_nanos(-10) - Duration::INFINITE, Duration::INFINITE_PAST);
-        assert_eq!(Duration::from_nanos(10) - Duration::INFINITE_PAST, Duration::INFINITE);
+        assert_eq!(
+            MonotonicDuration::from_nanos(10) - Duration::from_nanos(30),
+            Duration::from_nanos(-20)
+        );
+        assert_eq!(
+            MonotonicDuration::from_nanos(-10) - Duration::INFINITE,
+            Duration::INFINITE_PAST
+        );
+        assert_eq!(MonotonicDuration::from_nanos(10) - Duration::INFINITE_PAST, Duration::INFINITE);
 
         // Multiplication
-        assert_eq!(Duration::from_nanos(10) * 3, Duration::from_nanos(30));
-        assert_eq!(Duration::from_nanos(10) * i64::MAX, Duration::INFINITE);
-        assert_eq!(Duration::from_nanos(10) * i64::MIN, Duration::INFINITE_PAST);
+        assert_eq!(MonotonicDuration::from_nanos(10) * 3, Duration::from_nanos(30));
+        assert_eq!(MonotonicDuration::from_nanos(10) * i64::MAX, Duration::INFINITE);
+        assert_eq!(MonotonicDuration::from_nanos(10) * i64::MIN, Duration::INFINITE_PAST);
 
         // Division
-        assert_eq!(Duration::from_nanos(30) / 3, Duration::from_nanos(10));
-        assert_eq!(Duration::INFINITE_PAST / -1, Duration::INFINITE);
+        assert_eq!(MonotonicDuration::from_nanos(30) / 3, Duration::from_nanos(10));
+        assert_eq!(MonotonicDuration::INFINITE_PAST / -1, Duration::INFINITE);
 
         // Negation
-        assert_eq!(-Duration::from_nanos(30), Duration::from_nanos(-30));
-        assert_eq!(-Duration::INFINITE_PAST, Duration::INFINITE);
+        assert_eq!(-MonotonicDuration::from_nanos(30), Duration::from_nanos(-30));
+        assert_eq!(-MonotonicDuration::INFINITE_PAST, Duration::INFINITE);
 
         // Assigning addition
         {
-            let mut t = Duration::from_nanos(10);
+            let mut t = MonotonicDuration::from_nanos(10);
             t += Duration::from_nanos(30);
             assert_eq!(t, Duration::from_nanos(40));
         }
         {
-            let mut t = Duration::from_nanos(10);
+            let mut t = MonotonicDuration::from_nanos(10);
             t += Duration::INFINITE;
             assert_eq!(t, Duration::INFINITE);
         }
         {
-            let mut t = Duration::from_nanos(-10);
+            let mut t = MonotonicDuration::from_nanos(-10);
             t += Duration::INFINITE_PAST;
             assert_eq!(t, Duration::INFINITE_PAST);
         }
 
         // Assigning subtraction
         {
-            let mut t = Duration::from_nanos(10);
+            let mut t = MonotonicDuration::from_nanos(10);
             t -= Duration::from_nanos(30);
             assert_eq!(t, Duration::from_nanos(-20));
         }
         {
-            let mut t = Duration::from_nanos(-10);
+            let mut t = MonotonicDuration::from_nanos(-10);
             t -= Duration::INFINITE;
             assert_eq!(t, Duration::INFINITE_PAST);
         }
         {
-            let mut t = Duration::from_nanos(10);
+            let mut t = MonotonicDuration::from_nanos(10);
             t -= Duration::INFINITE_PAST;
             assert_eq!(t, Duration::INFINITE);
         }
@@ -821,6 +851,6 @@ mod tests {
     #[test]
     fn time_and_duration_defaults() {
         assert_eq!(MonotonicInstant::default(), MonotonicInstant::from_nanos(0));
-        assert_eq!(Duration::default(), Duration::from_nanos(0));
+        assert_eq!(Duration::default(), MonotonicDuration::from_nanos(0));
     }
 }

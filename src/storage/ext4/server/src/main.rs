@@ -39,13 +39,13 @@ use zx::{Channel, Vmo};
 async fn run_ext4_server(mut stream: Server_RequestStream) -> Result<(), Error> {
     while let Some(req) = stream.try_next().await.context("Error while reading request")? {
         match req {
-            Server_Request::MountVmo { source, flags, root, responder } => {
-                // Each mount get's its own scope.  We may provide additional control over this
+            Server_Request::MountVmo { source, root, responder } => {
+                // Each mount gets its own scope.  We may provide additional control over this
                 // scope in the future.  For example, one thing we may want to do is also return an
                 // "administrative chanel" that would allow calling "shutdown" on a mount.
                 let scope = ExecutionScope::new();
 
-                let res = serve_vmo(scope, source, flags, root);
+                let res = serve_vmo(scope, source, root);
 
                 // If the connection was already closed when we tried to send the result, there is
                 // nothing we can do.
@@ -152,7 +152,6 @@ fn construct_fs_error_to_mount_vmo_result(source: ConstructFsError) -> MountVmoR
 fn serve_vmo(
     scope: ExecutionScope,
     source: Vmo,
-    flags: fio::OpenFlags,
     root: ServerEnd<fio::DirectoryMarker>,
 ) -> MountVmoResult {
     let tree = match construct_fs(FsSourceType::Vmo(source)) {
@@ -160,7 +159,7 @@ fn serve_vmo(
         Err(err) => return construct_fs_error_to_mount_vmo_result(err),
     };
 
-    tree.open(scope, flags, Path::dot(), root.into_channel().into());
+    tree.open(scope, fio::OpenFlags::RIGHT_READABLE, Path::dot(), root.into_channel().into());
 
     MountVmoResult::Success(Success {})
 }

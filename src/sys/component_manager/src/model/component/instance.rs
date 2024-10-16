@@ -44,6 +44,7 @@ use cm_rust::{
 };
 use cm_types::{Name, Path};
 use config_encoder::ConfigFields;
+use derivative::Derivative;
 use errors::{
     AddChildError, AddDynamicChildError, CapabilityProviderError, ComponentProviderError,
     CreateNamespaceError, DynamicCapabilityError, OpenError, OpenOutgoingDirError,
@@ -61,9 +62,10 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 use tracing::warn;
-use vfs::directory::entry::SubNode;
+use vfs::directory::entry::{DirectoryEntry, OpenRequest, SubNode};
 use vfs::directory::immutable::simple as pfs;
 use vfs::execution_scope::ExecutionScope;
+use vfs::ToObjectRequest;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync,
@@ -445,7 +447,6 @@ impl ResolvedInstanceState {
             component_input,
             &state.program_input_dict_additions,
             program_output_dict,
-            component.program_output(),
             build_framework_dictionary(component),
             build_storage_admin_dictionary(component, &decl),
             declared_dictionaries,
@@ -475,11 +476,35 @@ impl ResolvedInstanceState {
             .get_outgoing()
             .try_into_directory_entry()
             .expect("conversion to directory entry should succeed");
-        let dir_entry =
-            DirEntry::new(Arc::new(SubNode::new(outgoing_dir_entry, relative_path, entry_type)));
+
+        #[derive(Derivative)]
+        #[derivative(Debug)]
+        struct OutgoingConnector {
+            #[derivative(Debug = "ignore")]
+            node: Arc<dyn DirectoryEntry>,
+        }
+        impl sandbox::Connectable for OutgoingConnector {
+            fn send(&self, message: sandbox::Message) -> Result<(), ()> {
+                let scope = ExecutionScope::new();
+                let flags = fio::OpenFlags::empty();
+                flags.to_object_request(message.channel).handle(|object_request| {
+                    let path = vfs::path::Path::dot();
+                    self.node.clone().open_entry(OpenRequest::new(
+                        scope,
+                        flags,
+                        path,
+                        object_request,
+                    ))
+                });
+                Ok(())
+            }
+        }
+        let node = Arc::new(SubNode::new(outgoing_dir_entry, relative_path, entry_type));
         let capability: Capability = match capability_decl {
-            CapabilityDecl::Protocol(_) => sandbox::Connector::new_sendable(dir_entry).into(),
-            _ => dir_entry.into(),
+            CapabilityDecl::Protocol(_) => {
+                sandbox::Connector::new_sendable(OutgoingConnector { node }).into()
+            }
+            _ => sandbox::DirEntry::new(node).into(),
         };
         let hook = CapabilityRequestedHook {
             source: component.as_weak(),
@@ -490,9 +515,7 @@ impl ResolvedInstanceState {
         match capability_decl {
             CapabilityDecl::Protocol(p) => match p.delivery {
                 DeliveryType::Immediate => Router::new(hook),
-                DeliveryType::OnReadable => {
-                    hook.on_readable(component.execution_scope.clone(), entry_type)
-                }
+                DeliveryType::OnReadable => hook.on_readable(component.execution_scope.clone()),
             },
             _ => Router::new(hook),
         }
@@ -776,7 +799,7 @@ impl ResolvedInstanceState {
                 &child_component_output_dictionary_routers,
                 &self.sandbox.component_input,
                 &dynamic_offers,
-                &component.program_output(),
+                &self.sandbox.program_output_dict,
                 &self.sandbox.framework_dict,
                 &self.sandbox.capability_sourced_capabilities_dict,
                 &child_input,
@@ -1074,8 +1097,12 @@ pub struct StartedInstanceState {
     /// If set, that means this component is associated with a running program.
     program: Option<ProgramRuntime>,
 
-    /// Approximates when the component was started.
-    pub timestamp: zx::MonotonicInstant,
+    /// Approximates when the component was started in nanoseconds since boot.
+    pub timestamp: zx::BootInstant,
+
+    /// Approximates when the component was started in monotonic time. This time doesn't measure
+    /// the time since boot and won't include time the system spent suspended.
+    pub timestamp_monotonic: zx::MonotonicInstant,
 
     /// Describes why the component instance was started
     pub start_reason: StartReason,
@@ -1107,10 +1134,12 @@ impl StartedInstanceState {
         execution_controller_task: Option<controller::ExecutionControllerTask>,
         logger: Option<ScopedLogger>,
     ) -> Self {
-        let timestamp = zx::MonotonicInstant::get();
+        let timestamp = zx::BootInstant::get();
+        let timestamp_monotonic = zx::MonotonicInstant::get();
         StartedInstanceState {
             program: program.map(|p| ProgramRuntime::new(p, component)),
             timestamp,
+            timestamp_monotonic,
             binder_server_ends: vec![],
             start_reason,
             execution_controller_task,

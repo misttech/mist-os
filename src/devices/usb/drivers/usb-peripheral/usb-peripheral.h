@@ -253,7 +253,7 @@ class UsbPeripheral : public UsbPeripheralType,
   uint8_t configuration_ = 0;
   // USB connection speed.
   usb_speed_t speed_ = 0;
-  // Size of our parent's usb_request_t.
+  // Size of our parent's usb_request_t, only relevant to the banjo interface.
   size_t parent_request_size_ = 0;
   // Registered listener
   fidl::ClientEnd<fuchsia_hardware_usb_peripheral::Events> listener_;

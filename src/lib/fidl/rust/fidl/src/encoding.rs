@@ -12,7 +12,7 @@ use crate::endpoints::ProtocolMarker;
 use crate::handle::{
     Handle, HandleBased, HandleDisposition, HandleInfo, HandleOp, ObjectType, Rights, Status,
 };
-use crate::time::{BootInstant, MonotonicInstant};
+use crate::time::{Instant, Ticks, Timeline};
 use crate::{Error, MethodType, Result};
 use bitflags::bitflags;
 use std::cell::{RefCell, RefMut};
@@ -22,6 +22,11 @@ use std::{mem, ptr, str};
 ////////////////////////////////////////////////////////////////////////////////
 // Traits
 ////////////////////////////////////////////////////////////////////////////////
+
+/// Trait for a "Box" that wraps a handle when it's inside a client. Useful when
+/// we need some infrastructure to make our underlying channels work the way the
+/// client code expects.
+pub trait ProxyChannelBox<D: ResourceDialect>: std::fmt::Debug + Send + Sync {}
 
 /// Describes how a given transport encodes resources like handles.
 pub trait ResourceDialect: 'static + Sized {}
@@ -140,7 +145,7 @@ pub unsafe trait Encode<T: TypeMarker, D: ResourceDialect>: Sized {
 }
 
 /// A Rust type that can be decoded from the FIDL type `T`.
-pub trait Decode<T: TypeMarker, D: ResourceDialect>: 'static + Sized {
+pub trait Decode<T: TypeMarker, D>: 'static + Sized {
     /// Creates a valid instance of `Self`. The specific value does not matter,
     /// since it will be overwritten by `decode`.
     // TODO(https://fxbug.dev/42069855): Take context parameter to discourage using this.
@@ -162,7 +167,9 @@ pub trait Decode<T: TypeMarker, D: ResourceDialect>: 'static + Sized {
         decoder: &mut Decoder<'_, D>,
         offset: usize,
         depth: Depth,
-    ) -> Result<()>;
+    ) -> Result<()>
+    where
+        D: ResourceDialect;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -494,7 +501,7 @@ impl<'a, D: ResourceDialect> Encoder<'a, D> {
     }
 }
 
-unsafe impl TypeMarker for BootInstant {
+unsafe impl<T: Timeline + 'static, U: 'static> TypeMarker for Instant<T, U> {
     type Owned = Self;
 
     #[inline(always)]
@@ -508,14 +515,14 @@ unsafe impl TypeMarker for BootInstant {
     }
 }
 
-impl ValueTypeMarker for BootInstant {
+impl<T: Timeline + Copy + 'static, U: Copy + 'static> ValueTypeMarker for Instant<T, U> {
     type Borrowed<'a> = Self;
-    fn borrow(value: &<Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
+    fn borrow(value: &Self::Owned) -> Self::Borrowed<'_> {
         *value
     }
 }
 
-unsafe impl<D: ResourceDialect> Encode<BootInstant, D> for BootInstant {
+unsafe impl<T: Timeline + Copy + 'static, D: ResourceDialect> Encode<Instant<T>, D> for Instant<T> {
     #[inline]
     unsafe fn encode(
         self,
@@ -529,28 +536,7 @@ unsafe impl<D: ResourceDialect> Encode<BootInstant, D> for BootInstant {
     }
 }
 
-unsafe impl TypeMarker for MonotonicInstant {
-    type Owned = Self;
-
-    #[inline(always)]
-    fn inline_align(_context: Context) -> usize {
-        mem::align_of::<Self>()
-    }
-
-    #[inline(always)]
-    fn inline_size(_context: Context) -> usize {
-        mem::size_of::<Self>()
-    }
-}
-
-impl ValueTypeMarker for MonotonicInstant {
-    type Borrowed<'a> = Self;
-    fn borrow(value: &<Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
-        *value
-    }
-}
-
-unsafe impl<D: ResourceDialect> Encode<MonotonicInstant, D> for MonotonicInstant {
+unsafe impl<T: Timeline + 'static, D: ResourceDialect> Encode<Ticks<T>, D> for Ticks<T> {
     #[inline]
     unsafe fn encode(
         self,
@@ -559,7 +545,7 @@ unsafe impl<D: ResourceDialect> Encode<MonotonicInstant, D> for MonotonicInstant
         _depth: Depth,
     ) -> Result<()> {
         encoder.debug_check_bounds::<Self>(offset);
-        encoder.write_num(self.into_nanos(), offset);
+        encoder.write_num(self.into_raw(), offset);
         Ok(())
     }
 }
@@ -886,10 +872,10 @@ impl<'a, D: ResourceDialect> Decoder<'a, D> {
     }
 }
 
-impl<D: ResourceDialect> Decode<Self, D> for BootInstant {
+impl<T: Timeline + 'static, D: ResourceDialect> Decode<Self, D> for Instant<T> {
     #[inline(always)]
     fn new_empty() -> Self {
-        BootInstant::ZERO
+        Instant::ZERO
     }
 
     #[inline]
@@ -905,10 +891,10 @@ impl<D: ResourceDialect> Decode<Self, D> for BootInstant {
     }
 }
 
-impl<D: ResourceDialect> Decode<Self, D> for MonotonicInstant {
+impl<T: Timeline + 'static, D: ResourceDialect> Decode<Self, D> for Ticks<T> {
     #[inline(always)]
     fn new_empty() -> Self {
-        MonotonicInstant::ZERO
+        Ticks::<T>::ZERO
     }
 
     #[inline]
@@ -919,7 +905,7 @@ impl<D: ResourceDialect> Decode<Self, D> for MonotonicInstant {
         _depth: Depth,
     ) -> Result<()> {
         decoder.debug_check_bounds::<Self>(offset);
-        *self = Self::from_nanos(decoder.read_num(offset));
+        *self = Self::from_raw(decoder.read_num(offset));
         Ok(())
     }
 }
@@ -1344,8 +1330,8 @@ impl<T: ResourceTypeMarker, const N: usize> ResourceTypeMarker for Array<T, N> {
     }
 }
 
-unsafe impl<'a, T: ValueTypeMarker, const N: usize, D: ResourceDialect> Encode<Array<T, N>, D>
-    for &'a [T::Owned; N]
+unsafe impl<T: ValueTypeMarker, const N: usize, D: ResourceDialect> Encode<Array<T, N>, D>
+    for &[T::Owned; N]
 where
     for<'q> T::Borrowed<'q>: Encode<T, D>,
 {
@@ -1361,8 +1347,8 @@ where
     }
 }
 
-unsafe impl<'a, T: ResourceTypeMarker, const N: usize, D: ResourceDialect> Encode<Array<T, N>, D>
-    for &'a mut [<T as TypeMarker>::Owned; N]
+unsafe impl<T: ResourceTypeMarker, const N: usize, D: ResourceDialect> Encode<Array<T, N>, D>
+    for &mut [<T as TypeMarker>::Owned; N]
 where
     for<'q> T::Borrowed<'q>: Encode<T, D>,
 {
@@ -1560,8 +1546,8 @@ impl<T: ResourceTypeMarker, const N: usize> ResourceTypeMarker for Vector<T, N> 
     }
 }
 
-unsafe impl<'a, T: ValueTypeMarker, const N: usize, D: ResourceDialect> Encode<Vector<T, N>, D>
-    for &'a [<T as TypeMarker>::Owned]
+unsafe impl<T: ValueTypeMarker, const N: usize, D: ResourceDialect> Encode<Vector<T, N>, D>
+    for &[<T as TypeMarker>::Owned]
 where
     for<'q> T::Borrowed<'q>: Encode<T, D>,
 {
@@ -1577,8 +1563,8 @@ where
     }
 }
 
-unsafe impl<'a, T: ResourceTypeMarker + TypeMarker, const N: usize, D: ResourceDialect>
-    Encode<Vector<T, N>, D> for &'a mut [<T as TypeMarker>::Owned]
+unsafe impl<T: ResourceTypeMarker + TypeMarker, const N: usize, D: ResourceDialect>
+    Encode<Vector<T, N>, D> for &mut [<T as TypeMarker>::Owned]
 where
     for<'q> T::Borrowed<'q>: Encode<T, D>,
 {
@@ -1771,7 +1757,7 @@ impl<const N: usize> ValueTypeMarker for BoundedString<N> {
     }
 }
 
-unsafe impl<'a, const N: usize, D: ResourceDialect> Encode<BoundedString<N>, D> for &'a str {
+unsafe impl<const N: usize, D: ResourceDialect> Encode<BoundedString<N>, D> for &str {
     #[inline]
     unsafe fn encode(
         self,
@@ -3188,7 +3174,7 @@ pub(crate) const MIN_BUF_BYTES_SIZE: usize = 512;
 ///
 /// This function may not be called recursively.
 #[inline]
-pub fn with_tls_encode_buf<R>(
+pub fn with_tls_encode_buf<R, D: ResourceDialect>(
     f: impl FnOnce(&mut Vec<u8>, &mut Vec<HandleDisposition<'static>>) -> R,
 ) -> R {
     TLS_BUF.with(|buf| {
@@ -3205,7 +3191,9 @@ pub fn with_tls_encode_buf<R>(
 ///
 /// This function may not be called recursively.
 #[inline]
-pub fn with_tls_decode_buf<R>(f: impl FnOnce(&mut Vec<u8>, &mut Vec<HandleInfo>) -> R) -> R {
+pub fn with_tls_decode_buf<R, D: ResourceDialect>(
+    f: impl FnOnce(&mut Vec<u8>, &mut Vec<HandleInfo>) -> R,
+) -> R {
     TLS_BUF.with(|buf| {
         let (mut bytes, mut handles) =
             RefMut::map_split(buf.borrow_mut(), |b| (&mut b.bytes, &mut b.decode_handles));
@@ -3224,7 +3212,7 @@ pub fn with_tls_encoded<T: TypeMarker, D: ResourceDialect, Out>(
     val: impl Encode<T, D>,
     f: impl FnOnce(&mut Vec<u8>, &mut Vec<HandleDisposition<'static>>) -> Result<Out>,
 ) -> Result<Out> {
-    with_tls_encode_buf(|bytes, handles| {
+    with_tls_encode_buf::<_, D>(|bytes, handles| {
         Encoder::encode(bytes, handles, val)?;
         f(bytes, handles)
     })
@@ -3244,6 +3232,7 @@ mod test {
 
     use super::*;
     use crate::handle::{convert_handle_dispositions_to_infos, AsHandleRef};
+    use crate::time::{BootInstant, BootTicks, MonotonicInstant, MonotonicTicks};
     use assert_matches::assert_matches;
     use std::fmt;
 
@@ -3342,9 +3331,13 @@ mod test {
     fn encode_decode_instants() {
         let monotonic = MonotonicInstant::from_nanos(987654321);
         let boot = BootInstant::from_nanos(987654321);
+        let monotonic_ticks = MonotonicTicks::from_raw(111111111);
+        let boot_ticks = BootTicks::from_raw(22222222);
         for ctx in CONTEXTS {
             assert_eq!(encode_decode::<BootInstant>(ctx, boot), boot);
             assert_eq!(encode_decode::<MonotonicInstant>(ctx, monotonic), monotonic);
+            assert_eq!(encode_decode::<BootTicks>(ctx, boot_ticks), boot_ticks);
+            assert_eq!(encode_decode::<MonotonicTicks>(ctx, monotonic_ticks), monotonic_ticks);
         }
     }
 

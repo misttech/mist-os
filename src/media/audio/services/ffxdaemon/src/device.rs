@@ -278,7 +278,7 @@ impl Device {
         let mut next_frame_to_write = 0u64; // The number of frames written to the ring buffer.
 
         let nanos_per_wakeup_interval = 10e6f64; // 10 milliseconds
-        let wakeup_interval = zx::Duration::from_millis(10);
+        let wakeup_interval = zx::MonotonicDuration::from_millis(10);
 
         let frames_per_nanosecond = format.frames_per_second as f64 * SECONDS_PER_NANOSECOND;
 
@@ -445,7 +445,7 @@ impl Device {
         // Hardware might not use all bytes in vmo. Only want to read frames hardware will write to.
         let bytes_in_rb = ring_buffer.vmo_buffer().data_size_bytes();
         let producer_bytes = ring_buffer.producer_bytes();
-        let wakeup_interval = zx::Duration::from_millis(10);
+        let wakeup_interval = zx::MonotonicDuration::from_millis(10);
 
         // We multiply (with u64) before dividing to preserve precision. We intentionally round-up
         // the result, so this byte amount is worst-case.
@@ -474,7 +474,7 @@ impl Device {
         // If we want to read approx. wakeup_interval of data each time we awaken, we should delay
         // our first wakeup by the duration needed for the device to advance by `producer_bytes`.
         // We intentionally round-up the result, so this delay duration is conservative.
-        let first_capture_delay = zx::Duration::from_nanos(
+        let first_capture_delay = zx::MonotonicDuration::from_nanos(
             (producer_frames * NANOSECONDS_PER_SECOND).div_ceil(format.frames_per_second as u64)
                 as i64,
         );

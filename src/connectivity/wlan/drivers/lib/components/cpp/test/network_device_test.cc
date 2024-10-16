@@ -386,7 +386,6 @@ struct NetworkDeviceTestFixture : public BasicNetworkDeviceTest {
       buffers[i].head_length = head_length;
       buffers[i].tail_length = tail_length;
       buffers[i].meta.port = kPortId;
-      buffers[i].meta.info = fuchsia_hardware_network_driver::wire::FrameInfo::WithNoInfo({});
       buffers[i].meta.frame_type = ::fuchsia_hardware_network::wire::FrameType::kEthernet;
       buffers[i].id = buffer_id++;
     }

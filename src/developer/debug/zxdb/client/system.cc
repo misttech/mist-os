@@ -138,8 +138,12 @@ static const char* kIdsTxtsDescription =
 
   To view the currently indexed files run "sym-stat --dump-index".)";
 
-const char* ClientSettings::System::kSymbolServers = "symbol-servers";
-static const char* kSymbolServersDescription = R"(  List of symbol server URLs.)";
+const char* ClientSettings::System::kPrivateSymbolServers = "private-symbol-servers";
+static const char* kPrivateSymbolServersDescription =
+    R"(  List of all private symbol server URLs.)";
+
+const char* ClientSettings::System::kPublicSymbolServers = "public-symbol-servers";
+static const char* kPublicSymbolServersDescription = R"(  List of all public symbol server URLs.)";
 
 const char* ClientSettings::System::kSymbolCache = "symbol-cache";
 static const char* kSymbolCacheDescription =
@@ -211,7 +215,10 @@ fxl::RefPtr<SettingSchema> CreateSchema() {
   schema->AddList(ClientSettings::System::kSymbolPaths, kSymbolPathsDescription, {});
   schema->AddList(ClientSettings::System::kBuildIdDirs, kBuildIdDirsDescription, {});
   schema->AddList(ClientSettings::System::kIdsTxts, kIdsTxtsDescription, {});
-  schema->AddList(ClientSettings::System::kSymbolServers, kSymbolServersDescription, {});
+  schema->AddList(ClientSettings::System::kPrivateSymbolServers, kPrivateSymbolServersDescription,
+                  {});
+  schema->AddList(ClientSettings::System::kPublicSymbolServers, kPublicSymbolServersDescription,
+                  {});
   schema->AddString(ClientSettings::System::kSymbolCache, kSymbolCacheDescription, "");
   schema->AddList(ClientSettings::Target::kSourceMap,
                   ClientSettings::Target::kSourceMapDescription);
@@ -265,7 +272,8 @@ System::System(Session* session)
   settings_.AddObserver(ClientSettings::System::kSymbolPaths, this);
   settings_.AddObserver(ClientSettings::System::kBuildIdDirs, this);
   settings_.AddObserver(ClientSettings::System::kIdsTxts, this);
-  settings_.AddObserver(ClientSettings::System::kSymbolServers, this);
+  settings_.AddObserver(ClientSettings::System::kPrivateSymbolServers, this);
+  settings_.AddObserver(ClientSettings::System::kPublicSymbolServers, this);
   settings_.AddObserver(ClientSettings::System::kSecondChanceExceptions, this);
   settings_.AddObserver(ClientSettings::System::kContextLines, this);
 }
@@ -617,7 +625,8 @@ void System::OnSettingChanged(const SettingStore& store, const std::string& sett
       setting_name == ClientSettings::System::kBuildIdDirs ||
       setting_name == ClientSettings::System::kIdsTxts ||
       setting_name == ClientSettings::System::kSymbolCache ||
-      setting_name == ClientSettings::System::kSymbolServers) {
+      setting_name == ClientSettings::System::kPrivateSymbolServers ||
+      setting_name == ClientSettings::System::kPublicSymbolServers) {
     // Clear the symbol sources and add them back to sync the index with the setting.
     BuildIDIndex& build_id_index = GetSymbols()->build_id_index();
     build_id_index.ClearAll();
@@ -636,8 +645,11 @@ void System::OnSettingChanged(const SettingStore& store, const std::string& sett
     for (const std::string& path : store.GetList(ClientSettings::System::kIdsTxts)) {
       build_id_index.AddIdsTxt(path);
     }
-    for (const std::string& url : store.GetList(ClientSettings::System::kSymbolServers)) {
-      build_id_index.AddSymbolServer(url);
+    for (const std::string& url : store.GetList(ClientSettings::System::kPrivateSymbolServers)) {
+      build_id_index.AddSymbolServer(url, true);
+    }
+    for (const std::string& url : store.GetList(ClientSettings::System::kPublicSymbolServers)) {
+      build_id_index.AddSymbolServer(url, false);
     }
 
     // Cache directory.
@@ -720,7 +732,7 @@ void System::OnFilterMatches(const std::vector<debug_ipc::FilterMatch>& matches)
   // A collection of pids that we are going to attach to. The corresponding mode will determine if
   // it should be performed as a weak attach. If a pid is matched by multiple filters, they must
   // ALL be configured as weak filters for a weak attach to occur.
-  std::map<uint64_t, Target::AttachMode> pids_to_attach;
+  std::map<uint64_t, debug_ipc::AttachConfig> pids_to_attach;
 
   for (const auto& match : matches) {
     // Check that we don't accidentally attach to too many processes.
@@ -744,7 +756,10 @@ void System::OnFilterMatches(const std::vector<debug_ipc::FilterMatch>& matches)
         mode = Target::AttachMode::kWeak;
       }
 
-      auto inserted = pids_to_attach.insert({matched_pid, mode});
+      auto inserted = pids_to_attach.insert({matched_pid,
+                                             {
+                                                 .weak = mode == Target::AttachMode::kWeak,
+                                             }});
 
       // Make sure we double check weak_attach after the insertion. If the pid had already been
       // added to the map by a weak filter and this is a strong filter that also matched, then we
@@ -752,21 +767,19 @@ void System::OnFilterMatches(const std::vector<debug_ipc::FilterMatch>& matches)
       // filter. If the filter id for this match is invalid or isn't found, perform a strong
       // attach.
       if (mode != Target::AttachMode::kWeak)
-        inserted.first->second = Target::AttachMode::kStrong;
+        inserted.first->second.weak = false;
     }
   }
 
   // Now we can attach to all of the matched pids.
-  for (const auto& [pid, mode] : pids_to_attach) {
-    // The pid = pid assignment capture is because capturing from a structured binding is a C++20
-    // extension and causes a compilation error.
-    AttachToProcess(pid, mode,
-                    [pid = pid](fxl::WeakPtr<Target> target, const Err& err, uint64_t timestamp) {
-                      if (err.has_error()) {
-                        LOGS(Error) << "Could not attach to process " << pid << ": " << err.msg();
-                        return;
-                      }
-                    });
+  for (const auto& [pid, config] : pids_to_attach) {
+    AttachToPid(pid, config,
+                [pid](fxl::WeakPtr<Target> target, const Err& err, uint64_t timestamp) {
+                  if (err.has_error()) {
+                    LOGS(Error) << "Could not attach to process " << pid << ": " << err.msg();
+                    return;
+                  }
+                });
   }
 }
 
@@ -798,8 +811,8 @@ Target* System::GetNextTarget() {
   return open_slot;
 }
 
-void System::AttachToProcess(uint64_t pid, Target::AttachMode mode,
-                             Target::CallbackWithTimestamp callback) {
+void System::AttachToPid(uint64_t pid, debug_ipc::AttachConfig config,
+                         Target::CallbackWithTimestamp callback) {
   // Don't allow attaching to a process more than once.
   if (Process* process = ProcessFromKoid(pid)) {
     debug::MessageLoop::Current()->PostTask(
@@ -811,7 +824,7 @@ void System::AttachToProcess(uint64_t pid, Target::AttachMode mode,
     return;
   }
 
-  GetNextTarget()->Attach(pid, mode, std::move(callback));
+  GetNextTarget()->Attach(pid, config, std::move(callback));
 }
 
 void System::HandlePreviousConnectedProcesses(const std::vector<debug_ipc::ProcessRecord>& procs) {

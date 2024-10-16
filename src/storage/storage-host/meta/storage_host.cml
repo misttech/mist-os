@@ -12,7 +12,13 @@
         lifecycle: { stop_event: "notify" },
     },
     capabilities: [
-        { protocol: "fuchsia.storagehost.StorageHost" },
+        {
+            protocol: [
+                "fuchsia.fs.startup.Startup",
+                "fuchsia.storagehost.PartitionsAdmin",
+                "fuchsia.storagehost.PartitionsManager",
+            ],
+        },
         {
             directory: "partitions",
             rights: [ "rw*" ],
@@ -25,7 +31,11 @@
             from: "self",
         },
         {
-            protocol: "fuchsia.storagehost.StorageHost",
+            protocol: [
+                "fuchsia.fs.startup.Startup",
+                "fuchsia.storagehost.PartitionsAdmin",
+                "fuchsia.storagehost.PartitionsManager",
+            ],
             from: "self",
         },
     ],

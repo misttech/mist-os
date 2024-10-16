@@ -5,10 +5,26 @@
 //! Error (common to all fidl operations)
 
 use crate::handle::{ObjectType, Rights};
+use std::sync::Arc;
 use zx_status::Status;
 
 /// A specialized `Result` type for FIDL operations.
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;
+
+#[derive(Debug, Clone, thiserror::Error)]
+#[allow(missing_docs)]
+pub enum TransportError {
+    #[error(transparent)]
+    Status(#[from] Status),
+    #[error(transparent)]
+    Other(Arc<dyn std::error::Error + Send + Sync>),
+}
+
+// This prevents some binary size bloat.
+impl Drop for TransportError {
+    #[inline(never)]
+    fn drop(&mut self) {}
+}
 
 /// The error type used by FIDL operations.
 #[derive(Debug, Clone, thiserror::Error)]
@@ -144,21 +160,21 @@ pub enum Error {
     HandleReplace(#[source] Status),
 
     #[error("A server encountered an IO error writing a FIDL response to a channel: {0}")]
-    ServerResponseWrite(#[source] Status),
+    ServerResponseWrite(#[source] TransportError),
 
     #[error(
         "A FIDL server encountered an IO error reading incoming FIDL requests from a channel: {0}"
     )]
-    ServerRequestRead(#[source] Status),
+    ServerRequestRead(#[source] TransportError),
 
     #[error("A FIDL server encountered an IO error writing an epitaph into a channel: {0}")]
-    ServerEpitaphWrite(#[source] Status),
+    ServerEpitaphWrite(#[source] TransportError),
 
     #[error("A FIDL client encountered an IO error reading a response from a channel: {0}")]
-    ClientRead(#[source] Status),
+    ClientRead(#[source] TransportError),
 
     #[error("A FIDL client encountered an IO error writing a request into a channel: {0}")]
-    ClientWrite(#[source] Status),
+    ClientWrite(#[source] TransportError),
 
     #[error("A FIDL client encountered an IO error issuing a channel call: {0}")]
     ClientCall(#[source] Status),

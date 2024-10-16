@@ -144,7 +144,7 @@ pub enum TelemetryEvent {
 /// the mpsc::Sender<TelemetryEvent>. This threshold is arbitrary.
 const TELEMETRY_EVENT_BUFFER_SIZE: usize = 100;
 
-const TELEMETRY_QUERY_INTERVAL: zx::Duration = zx::Duration::from_seconds(10);
+const TELEMETRY_QUERY_INTERVAL: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(10);
 
 pub fn serve_telemetry(
     cobalt_proxy: fidl_fuchsia_metrics::MetricEventLoggerProxy,
@@ -155,7 +155,7 @@ pub fn serve_telemetry(
     let cloned_sender = sender.clone();
     let fut = async move {
         let mut report_interval_stream = fasync::Interval::new(TELEMETRY_QUERY_INTERVAL);
-        const ONE_MINUTE: zx::Duration = zx::Duration::from_minutes(1);
+        const ONE_MINUTE: zx::MonotonicDuration = zx::MonotonicDuration::from_minutes(1);
         const_assert_eq!(ONE_MINUTE.into_nanos() % TELEMETRY_QUERY_INTERVAL.into_nanos(), 0);
         const INTERVAL_TICKS_PER_MINUTE: u64 =
             (ONE_MINUTE.into_nanos() / TELEMETRY_QUERY_INTERVAL.into_nanos()) as u64;
@@ -209,7 +209,7 @@ macro_rules! log_cobalt_batch {
     }};
 }
 
-fn round_to_nearest_second(duration: zx::Duration) -> i64 {
+fn round_to_nearest_second(duration: zx::MonotonicDuration) -> i64 {
     const MILLIS_PER_SEC: i64 = 1000;
     let millis = duration.into_millis();
     let rounded_portion = if millis % MILLIS_PER_SEC >= 500 { 1 } else { 0 };
@@ -516,7 +516,7 @@ mod tests {
     use std::pin::Pin;
     use test_case::test_case;
 
-    const STEP_INCREMENT: zx::Duration = zx::Duration::from_seconds(1);
+    const STEP_INCREMENT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(1);
 
     #[test]
     fn test_log_state_change() {
@@ -529,7 +529,7 @@ mod tests {
             .telemetry_sender
             .send(TelemetryEvent::SystemStateUpdate { update: update.clone() });
 
-        test_helper.advance_by(zx::Duration::from_seconds(25), &mut test_fut);
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(25), &mut test_fut);
 
         update.system_state = IpVersions {
             ipv4: Some(State {
@@ -569,7 +569,7 @@ mod tests {
         );
 
         test_helper.cobalt_events.clear();
-        test_helper.advance_by(zx::Duration::from_seconds(3575), &mut test_fut);
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(3575), &mut test_fut);
 
         // At the 1 hour mark, the new state is logged via periodic telemetry.
         // All metrics are the same as before, except for the elapsed duration and the
@@ -656,7 +656,7 @@ mod tests {
 
         test_helper.cobalt_events.clear();
 
-        test_helper.advance_by(zx::Duration::from_hours(2), &mut test_fut);
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(2), &mut test_fut);
         update.system_state = IpVersions {
             ipv4: Some(State {
                 link: LinkState::Internet,
@@ -699,7 +699,7 @@ mod tests {
         test_helper
             .telemetry_sender
             .send(TelemetryEvent::NetworkConfig { has_default_ipv4_route, has_default_ipv6_route });
-        test_helper.advance_by(zx::Duration::from_hours(1), &mut test_fut);
+        test_helper.advance_by(zx::MonotonicDuration::from_hours(1), &mut test_fut);
 
         let logged_metrics = test_helper
             .get_logged_metrics(metrics::REACHABILITY_GLOBAL_DEFAULT_ROUTE_DURATION_METRIC_ID);
@@ -766,7 +766,7 @@ mod tests {
     fn test_state_snapshot_duration_inspect_stats() {
         let (mut test_helper, mut test_fut) = setup_test();
 
-        test_helper.advance_by(zx::Duration::from_seconds(25), &mut test_fut);
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(25), &mut test_fut);
 
         let time_series = test_helper.get_time_series(&mut test_fut);
         let internet_available_sec: Vec<_> =
@@ -797,7 +797,7 @@ mod tests {
             time_series.lock().total_duration_sec.minutely_iter().map(|v| *v).collect();
         assert_eq!(total_duration_sec, vec![25]);
 
-        test_helper.advance_by(zx::Duration::from_seconds(15), &mut test_fut);
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(15), &mut test_fut);
 
         // Now 40 seconds mark
 
@@ -826,7 +826,7 @@ mod tests {
             .telemetry_sender
             .send(TelemetryEvent::SystemStateUpdate { update: update.clone() });
 
-        test_helper.advance_by(zx::Duration::from_seconds(50), &mut test_fut);
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(50), &mut test_fut);
 
         // Now 90 seconds mark
 
@@ -855,7 +855,7 @@ mod tests {
             .telemetry_sender
             .send(TelemetryEvent::SystemStateUpdate { update: update.clone() });
 
-        test_helper.advance_by(zx::Duration::from_seconds(60), &mut test_fut);
+        test_helper.advance_by(zx::MonotonicDuration::from_seconds(60), &mut test_fut);
 
         // Now 120 seconds mark
 
@@ -990,7 +990,7 @@ mod tests {
         /// any expired timers and running the test_fut, until `duration` is reached.
         fn advance_by<T>(
             &mut self,
-            duration: zx::Duration,
+            duration: zx::MonotonicDuration,
             test_fut: &mut (impl Future<Output = T> + Unpin),
         ) {
             assert_eq!(

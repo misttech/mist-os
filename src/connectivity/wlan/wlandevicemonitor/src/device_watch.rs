@@ -107,7 +107,7 @@ mod tests {
 
         phy_watcher
             .next()
-            .expect_within(zx::Duration::from_seconds(60), "phy_watcher did not respond")
+            .expect_within(zx::MonotonicDuration::from_seconds(60), "phy_watcher did not respond")
             .await
             .expect("phy_watcher ended without yielding a phy")
             .expect("phy_watcher returned an error");
@@ -132,7 +132,10 @@ mod tests {
         for _ in 0..2 {
             phy_watcher
                 .next()
-                .expect_within(zx::Duration::from_seconds(60), "phy_watcher did not respond")
+                .expect_within(
+                    zx::MonotonicDuration::from_seconds(60),
+                    "phy_watcher did not respond",
+                )
                 .await
                 .expect("phy_watcher ended without yielding a phy")
                 .expect("phy_watcher returned an error");

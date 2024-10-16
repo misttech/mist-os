@@ -208,10 +208,7 @@
             source_availability: "unknown",
         },
         {
-            protocol: [
-                "fuchsia.fshost.Admin",
-                "fuchsia.fshost.BlockWatcher",
-            ],
+            protocol: [ "fuchsia.fshost.Admin" ],
             from: "#fshost",
             to: "#console-launcher",
             source_availability: "unknown",
@@ -318,6 +315,13 @@
             protocol: "fuchsia.power.broker.Topology",
             from: "#power-broker",
             to: "#console-launcher",
+            source_availability: "unknown",
+        },
+        {
+            protocol: "test.suspendcontrol.Device",
+            from: "#fake-suspend",
+            to: "#console-launcher",
+            availability: "optional",
             source_availability: "unknown",
         },
     ],

@@ -46,7 +46,7 @@ func closeHandles(expr string, exprType cpp.Type, context *closeHandleContext) s
 	}
 
 	switch exprType.Kind {
-	case cpp.TypeKinds.Handle, cpp.TypeKinds.Request, cpp.TypeKinds.Protocol:
+	case cpp.TypeKinds.Handle, cpp.TypeKinds.Endpoint:
 		return fmt.Sprintf("%s.reset();", expr)
 	case cpp.TypeKinds.Array, cpp.TypeKinds.Vector:
 		// Iterating over array and vector views isn't affected by optionality.

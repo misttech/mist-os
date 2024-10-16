@@ -3,15 +3,19 @@
 # found in the LICENSE file.
 
 load("@bazel_skylib//rules:diff_test.bzl", "diff_test")
-load("@fuchsia_sdk//fuchsia:defs.bzl", "fuchsia_devicetree_fragment")
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_devicetree",
+    "fuchsia_devicetree_fragment",
+    "fuchsia_devicetree_source",
+)
 
 package(default_visibility = ["//visibility:public"])
 
 test_suite(
     name = "tests",
     tests = [
-        ":test-soc-common_golden_test",
-        ":test-soc_golden_test",
+        ":test-board-dts_golden_test",
     ],
 )
 
@@ -32,14 +36,21 @@ fuchsia_devicetree_fragment(
     ],
 )
 
-diff_test(
-    name = "test-soc-common_golden_test",
-    file1 = "dts/test-soc-common_golden.dtsi",
-    file2 = ":test-soc-common",
+fuchsia_devicetree(
+    name = "test-board",
+    dtcflags = ["-Wno-unique_unit_address"],
+    source = "dts/test-board.dts",
+    deps = [":test-soc"],
+)
+
+fuchsia_devicetree_source(
+    name = "test-board-dts",
+    dtcflags = ["-Wno-unique_unit_address"],
+    source = ":test-board",
 )
 
 diff_test(
-    name = "test-soc_golden_test",
-    file1 = "dts/test-soc_golden.dtsi",
-    file2 = ":test-soc",
+    name = "test-board-dts_golden_test",
+    file1 = "dts/test-board_golden.dts",
+    file2 = ":test-board-dts",
 )

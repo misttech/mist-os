@@ -37,9 +37,9 @@ use {
     fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_ext as fnet_routes_ext, zx,
 };
 
-const REPORT_PERIOD: zx::Duration = zx::Duration::from_seconds(60);
-const PROBE_PERIOD: zx::Duration = zx::Duration::from_seconds(60);
-const FIDL_TIMEOUT: zx::Duration = zx::Duration::from_seconds(90);
+const REPORT_PERIOD: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(60);
+const PROBE_PERIOD: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(60);
+const FIDL_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(90);
 
 struct SystemDispatcher;
 

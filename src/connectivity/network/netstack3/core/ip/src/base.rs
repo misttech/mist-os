@@ -39,8 +39,7 @@ use netstack3_base::{
 use netstack3_filter::{
     self as filter, ConntrackConnection, FilterBindingsContext, FilterBindingsTypes,
     FilterHandler as _, FilterIpContext, FilterIpExt, FilterIpMetadata, FilterTimerId,
-    ForwardedPacket, IngressVerdict, IpPacket, NestedWithInnerIpPacket, TransportPacketSerializer,
-    Tuple,
+    ForwardedPacket, IngressVerdict, IpPacket, TransportPacketSerializer, Tuple,
 };
 use packet::{Buf, BufferMut, GrowBuffer, ParseBufferMut, ParseMetadata, Serializer};
 use packet_formats::error::IpParseError;
@@ -829,8 +828,10 @@ pub trait IpDeviceConfirmReachableContext<I: IpLayerIpExt, BC>: DeviceIdContext<
 }
 
 /// Provides access to an IP device's MTU for the IP layer.
-pub trait IpDeviceMtuContext<I: IpLayerIpExt>: DeviceIdContext<AnyDevice> {
+pub trait IpDeviceMtuContext<I: Ip>: DeviceIdContext<AnyDevice> {
     /// Returns the MTU of the device.
+    ///
+    /// The MTU is the maximum size of an IP packet.
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu;
 }
 
@@ -1364,6 +1365,7 @@ impl<
             + IpDeviceContext<I>
             + IpDeviceConfirmReachableContext<I, BC>
             + IpDeviceStateContext<I>
+            + IpDeviceMtuContext<I>
             + device::IpDeviceConfigurationContext<I, BC>
             + UseIpSocketContextBlanket,
     > IpSocketContext<I, BC> for CC
@@ -2372,6 +2374,7 @@ where
             destination,
             packet,
             packet_meta,
+            Mtu::no_limit(),
         ) {
             Ok(()) => (),
             Err(IpSendFrameError { serializer, error }) => {
@@ -2619,11 +2622,12 @@ pub(crate) fn send_ip_frame<I, CC, BC, S>(
     destination: IpPacketDestination<I, &CC::DeviceId>,
     mut body: S,
     mut packet_metadata: IpLayerPacketMetadata<I, BC>,
+    limit_mtu: Mtu,
 ) -> Result<(), IpSendFrameError<S>>
 where
     I: IpLayerIpExt,
     BC: FilterBindingsContext,
-    CC: IpLayerEgressContext<I, BC>,
+    CC: IpLayerEgressContext<I, BC> + IpDeviceMtuContext<I>,
     S: Serializer + IpPacket<I>,
     S::Buffer: BufferMut,
 {
@@ -2656,7 +2660,18 @@ where
         });
     }
 
-    core_ctx.send_ip_frame(bindings_ctx, device, destination, body, proof).map_err(|e| e.err_into())
+    // Use the minimum MTU between the target device and the requested mtu.
+    let mtu = limit_mtu.min(core_ctx.get_mtu(device));
+
+    // TODO(https://fxbug.dev/42148827): Check that the serializer fits in MTU
+    // and fragment if necessary instead of just applying the limit.
+    let body = body.with_size_limit(mtu.into());
+    core_ctx.send_ip_frame(bindings_ctx, device, destination, body, proof).map_err(
+        |ErrorAndSerializer { serializer, error }| IpSendFrameError {
+            serializer: serializer.into_inner(),
+            error: error.into(),
+        },
+    )
 }
 
 /// Drop a packet and undo the effects of parsing it.
@@ -4003,7 +4018,7 @@ fn lookup_route_table<I: IpLayerIpExt, CC: IpStateContext<I>>(
 }
 
 /// Packed destination passed to [`IpDeviceSendContext::send_ip_frame`].
-#[derive(Debug, Derivative)]
+#[derive(Debug, Derivative, Clone)]
 #[derivative(Eq(bound = "D: Eq"), PartialEq(bound = "D: PartialEq"))]
 pub enum IpPacketDestination<I: BroadcastIpExt, D> {
     /// Broadcast packet.
@@ -4041,7 +4056,7 @@ impl<I: BroadcastIpExt, D> IpPacketDestination<I, D> {
 }
 
 /// The metadata associated with an outgoing IP packet.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SendIpPacketMeta<I: IpExt, D, Src> {
     /// The outgoing device.
     pub device: D,
@@ -4065,8 +4080,9 @@ pub struct SendIpPacketMeta<I: IpExt, D, Src> {
 
     /// An MTU to artificially impose on the whole IP packet.
     ///
-    /// Note that the device's MTU will still be imposed on the packet.
-    pub mtu: Option<u32>,
+    /// Note that the device's and discovered path MTU may still be imposed on
+    /// the packet.
+    pub mtu: Mtu,
 
     /// Traffic Class (IPv6) or Type of Service (IPv4) field for the packet.
     pub dscp_and_ecn: DscpAndEcn,
@@ -4134,7 +4150,7 @@ pub trait IpLayerHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
 impl<
         I: IpLayerIpExt,
         BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        CC: IpLayerEgressContext<I, BC> + IpDeviceStateContext<I>,
+        CC: IpLayerEgressContext<I, BC> + IpDeviceStateContext<I> + IpDeviceMtuContext<I>,
     > IpLayerHandler<I, BC> for CC
 {
     fn send_ip_packet_from_device<S>(
@@ -4168,6 +4184,7 @@ impl<
             destination,
             body,
             IpLayerPacketMetadata::default(),
+            Mtu::no_limit(),
         )
     }
 }
@@ -4191,8 +4208,8 @@ pub(crate) fn send_ip_packet_from_device<I, BC, CC, S>(
 ) -> Result<(), IpSendFrameError<S>>
 where
     I: IpLayerIpExt,
-    BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
-    CC: IpLayerEgressContext<I, BC> + IpDeviceStateContext<I>,
+    BC: FilterBindingsContext,
+    CC: IpLayerEgressContext<I, BC> + IpDeviceStateContext<I> + IpDeviceMtuContext<I>,
     S: TransportPacketSerializer<I>,
     S::Buffer: BufferMut,
 {
@@ -4222,16 +4239,9 @@ where
 
     builder.set_dscp_and_ecn(dscp_and_ecn);
 
-    let body = body.encapsulate(builder);
-
-    if let Some(mtu) = mtu {
-        let body = NestedWithInnerIpPacket::new(body.with_size_limit(mtu as usize));
-        send_ip_frame(core_ctx, bindings_ctx, device, destination, body, packet_metadata)
-            .map_err(|ser| ser.map_serializer(|s| s.into_inner()).into_inner())
-    } else {
-        send_ip_frame(core_ctx, bindings_ctx, device, destination, body, packet_metadata)
-            .map_err(|ser| ser.into_inner())
-    }
+    let ip_frame = body.encapsulate(builder);
+    send_ip_frame(core_ctx, bindings_ctx, device, destination, ip_frame, packet_metadata, mtu)
+        .map_err(|ser| ser.map_serializer(|s| s.into_inner()))
 }
 
 /// Abstracts access to a [`filter::FilterHandler`] for core contexts.

@@ -410,8 +410,6 @@ void FakeNetworkDeviceImpl::QueueRxSpace(
       rx_buffer = {
           .meta =
               {
-                  .info = netdriver::wire::FrameInfo::WithNoInfo(netdriver::wire::NoInfo{
-                      static_cast<uint8_t>(netdev::wire::InfoType::kNoInfo)}),
                   .frame_type = fuchsia_hardware_network::wire::FrameType::kEthernet,
               },
           .data =

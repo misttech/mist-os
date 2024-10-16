@@ -12,7 +12,7 @@
 
 #include <type_traits>
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(24)
 #include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/internal/test_environment.h>
 #else
@@ -62,7 +62,7 @@ class EnvWrapper {
 
  private:
   fdf_testing::TestNode node_server_{"root"};
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(24)
   TestEnvironment test_environment_;
 #else
   fdf_testing::TestEnvironment test_environment_;

@@ -28,7 +28,7 @@ impl<'a> Arbitrary<'a> for RandomLogRecord {
         let datalen = std::cmp::min(u16::arbitrary(u)?, zx::sys::ZX_LOG_RECORD_DATA_MAX as u16);
         let severity = u8::arbitrary(u)?;
         let flags = u8::arbitrary(u)?;
-        let timestamp = i64::arbitrary(u)? as zx::sys::zx_time_t;
+        let timestamp = i64::arbitrary(u)? as zx::sys::zx_instant_boot_t;
         let pid = u64::arbitrary(u)?;
         let tid = u64::arbitrary(u)?;
 

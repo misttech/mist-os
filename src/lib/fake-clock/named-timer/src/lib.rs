@@ -44,7 +44,7 @@ extern "C" {
 
 fn create_named_deadline_rust(
     deadline: &DeadlineId<'_>,
-    duration: zx::Duration,
+    duration: zx::MonotonicDuration,
 ) -> fasync::MonotonicInstant {
     let mut time: zx_time_t = 0;
     let time_valid = unsafe {
@@ -76,7 +76,7 @@ impl NamedTimer {
     /// In an integration test, the `SET` event is reported immediately when this method is called,
     /// and `EXPIRED` is reported after `duration` elapses. Note `EXPIRED` is still reported even
     /// if the timer is dropped before `duration` elapses.
-    pub fn new(id: &DeadlineId<'_>, duration: zx::Duration) -> fasync::Timer {
+    pub fn new(id: &DeadlineId<'_>, duration: zx::MonotonicDuration) -> fasync::Timer {
         let deadline = create_named_deadline_rust(id, duration);
         fasync::Timer::new(deadline)
     }
@@ -96,7 +96,7 @@ pub trait NamedTimeoutExt: Future + Sized {
     fn on_timeout_named<OT>(
         self,
         id: &DeadlineId<'_>,
-        duration: zx::Duration,
+        duration: zx::MonotonicDuration,
         on_timeout: OT,
     ) -> fasync::OnTimeout<Self, OT>
     where
@@ -113,19 +113,21 @@ impl<F: Future + Sized> NamedTimeoutExt for F {}
 mod test {
     use super::*;
     use core::task::Poll;
+    use std::pin::pin;
+
     // When the fake-clock library is not linked in, these timers should behave identical to
     // fasync::Timer. These tests verify that the fake time utilities provided by
     // fasync::TestExecutor continue to work when fake-clock is NOT linked in. Behavior with
     // fake-clock linked in is verified by integration tests in fake-clock/examples.
 
-    const ONE_HOUR: zx::Duration = zx::Duration::from_hours(1);
+    const ONE_HOUR: zx::MonotonicDuration = zx::MonotonicDuration::from_hours(1);
     const DEADLINE_ID: DeadlineId<'static> = DeadlineId::new("component", "code");
 
     #[test]
     fn test_timer() {
         let mut executor = fasync::TestExecutor::new_with_fake_time();
         let start_time = executor.now();
-        let mut timer = NamedTimer::new(&DEADLINE_ID, ONE_HOUR);
+        let mut timer = pin!(NamedTimer::new(&DEADLINE_ID, ONE_HOUR));
         assert!(executor.run_until_stalled(&mut timer).is_pending());
 
         executor.set_fake_time(start_time + ONE_HOUR);
@@ -138,7 +140,8 @@ mod test {
         let mut executor = fasync::TestExecutor::new_with_fake_time();
 
         let mut ready_future =
-            futures::future::ready("ready").on_timeout_named(&DEADLINE_ID, ONE_HOUR, || "timeout");
+            pin!(futures::future::ready("ready")
+                .on_timeout_named(&DEADLINE_ID, ONE_HOUR, || "timeout"));
         assert_eq!(executor.run_until_stalled(&mut ready_future), Poll::Ready("ready"));
     }
 
@@ -148,7 +151,7 @@ mod test {
 
         let start_time = executor.now();
         let mut stalled_future =
-            futures::future::pending().on_timeout_named(&DEADLINE_ID, ONE_HOUR, || "timeout");
+            pin!(futures::future::pending().on_timeout_named(&DEADLINE_ID, ONE_HOUR, || "timeout"));
         assert!(executor.run_until_stalled(&mut stalled_future).is_pending());
         executor.set_fake_time(start_time + ONE_HOUR);
         assert_eq!(executor.wake_next_timer(), Some(start_time + ONE_HOUR));

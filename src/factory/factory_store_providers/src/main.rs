@@ -266,10 +266,7 @@ async fn open_factory_source(factory_config: FactoryConfig) -> Result<fio::Direc
             let ext4_server = fuchsia_component::client::connect_to_protocol::<Server_Marker>()?;
 
             tracing::info!("Mounting EXT4 VMO");
-            match ext4_server
-                .mount_vmo(vmo, fio::OpenFlags::RIGHT_READABLE, directory_server_end)
-                .await
-            {
+            match ext4_server.mount_vmo(vmo, directory_server_end).await {
                 Ok(MountVmoResult::Success(_)) => Ok(directory_proxy),
                 Ok(MountVmoResult::VmoReadFailure(status)) => {
                     Err(format_err!("Failed to read ext4 vmo: {}", status))

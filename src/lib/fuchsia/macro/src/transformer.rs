@@ -361,6 +361,16 @@ impl Finish for Transformer {
 
         let mut func_attrs = Vec::new();
 
+        let should_panic = attrs.iter().any(|attr| {
+            attr.path.segments.len() == 1
+                && attr.path.segments[0].ident.to_string() == "should_panic"
+        });
+        let maybe_disable_lsan = if should_panic {
+            quote! { ::fuchsia::disable_lsan_for_should_panic(); }
+        } else {
+            quote! {}
+        };
+
         // Initialize logging
         let init_logging = if !self.logging {
             quote! { func }
@@ -461,6 +471,7 @@ impl Finish for Transformer {
                 // TODO(https://fxbug.dev/42157203): Try to improve the Rust compiler to
                 // ease this restriction.
                 #asyncness fn #func(#inputs) #ret_type #block
+                #maybe_disable_lsan
                 let func = #adapt_main;
                 let func = #init_logging;
                 #run_executor

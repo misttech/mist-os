@@ -13,6 +13,12 @@ using fuchsia.net.interfaces;
 @available(added=HEAD)
 alias RuleSetPriority = uint32;
 
+/// A reserved rule set priority for the netstack.
+///
+/// This is used by the network stack for installing default rules.
+@available(added=HEAD)
+const DEFAULT_RULE_SET_PRIORITY RuleSetPriority = 0xffffffff;
+
 /// The index of a rule within a provided rule set.
 ///
 /// Rules within the same `RuleSet` are oredered based on the index. Rule at

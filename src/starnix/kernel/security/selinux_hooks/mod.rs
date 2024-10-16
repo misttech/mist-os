@@ -10,14 +10,16 @@ use crate::task::{CurrentTask, Task};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
     DirEntry, DirEntryHandle, FileSystem, FileSystemHandle, FsNode, FsStr, FsString, NamespaceNode,
-    ValueOrSize, XattrOp,
+    PathBuilder, ValueOrSize, XattrOp,
 };
+use bstr::BStr;
 use linux_uapi::XATTR_NAME_SELINUX;
 use selinux::permission_check::{PermissionCheck, PermissionCheckResult};
 use selinux::policy::FsUseType;
 use selinux::{
     ClassPermission, FileClass, FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions,
-    InitialSid, Permission, ProcessPermission, SecurityId, SecurityPermission, SecurityServer,
+    InitialSid, ObjectClass, Permission, ProcessPermission, SecurityId, SecurityPermission,
+    SecurityServer,
 };
 use starnix_logging::{log_debug, log_error, log_warn, track_stub};
 use starnix_sync::Mutex;
@@ -62,6 +64,18 @@ pub(super) fn sb_umount(
     Ok(())
 }
 
+/// Returns the relative path from the root of the file system containing this `DirEntry`.
+fn get_fs_relative_path(dir_entry: &DirEntryHandle) -> FsString {
+    let mut path_builder = PathBuilder::new();
+    let mut current_dir = dir_entry.clone();
+
+    while let Some(parent) = current_dir.parent() {
+        path_builder.prepend_element(&BStr::new(&current_dir.local_name()));
+        current_dir = parent;
+    }
+    path_builder.build_absolute()
+}
+
 /// Called by the VFS to initialize the security state for an `FsNode` that is being linked at
 /// `dir_entry`.
 pub(super) fn fs_node_init_with_dentry(
@@ -88,9 +102,6 @@ pub(super) fn fs_node_init_with_dentry(
         FileSystemLabelState::Labeled { label } => label.clone(),
     };
 
-    // TODO: https://fxbug.dev/349117435 - Determine the appropriate label for the node, whether
-    // by applying a static `genfscon` label, by reading a dynamic label from the node's extended
-    // attributes, etc. as appropriate for the file-system labeling scheme.
     let sid = match label.scheme {
         // mountpoint-labelling labels every node from the "context=" mount option.
         FileSystemLabelingScheme::Mountpoint => label.sid,
@@ -129,11 +140,36 @@ pub(super) fn fs_node_init_with_dentry(
                         // at run-time, and therefore labeled by `fs_node_init_on_create()`.
                         // If an unlabeled node is somehow encountered then log a warning and treat
                         // it in the same way as an "fs_use_xattr" node that is missing the xattr.
-                        log_warn!("Unlabeled node in {} ({:?}-labeled) filesystem", fs.name(), fs_use_type);
+                        log_warn!(
+                            "Unlabeled node in {} ({:?}-labeled) filesystem",
+                            fs.name(),
+                            fs_use_type
+                        );
                         def_sid
                     }
                 }
             }
+        }
+        FileSystemLabelingScheme::GenFsCon => {
+            let fs_type = fs_node.fs().name();
+            // This will give us the path of the node from the root node of the filesystem,
+            // excluding the path of the filesystem's mount point. For example, assuming that
+            // filesystem "proc" is mounted in "/proc" and if the actual full path to the
+            // fs_node is "/proc/bootconfig" then, get_fs_relative_path will return
+            // "/bootconfig". This matches the path definitions in the genfscon statements.
+            let sub_path = get_fs_relative_path(dir_entry);
+            let class_id = security_server
+                .class_id_by_name(
+                    ObjectClass::from(file_class_from_file_mode(fs_node.info().mode)?).name(),
+                )
+                .map_err(|_| errno!(EINVAL))?;
+            security_server
+                .genfscon_label_for_fs_and_path(
+                    fs_type.into(),
+                    sub_path.as_slice().into(),
+                    Some(class_id),
+                )
+                .unwrap_or(SecurityId::initial(InitialSid::Unlabeled))
         }
     };
 
@@ -156,21 +192,16 @@ fn make_fs_node_security_xattr(
         .ok_or_else(|| errno!(EINVAL))
 }
 
-fn file_class_from_file_mode(mode: FileMode) -> FileClass {
-    if mode.is_lnk() {
-        FileClass::Link
-    } else if mode.is_reg() || mode.is_dir() {
-        FileClass::File
-    } else if mode.is_chr() {
-        FileClass::Character
-    } else if mode.is_blk() {
-        FileClass::Block
-    } else if mode.is_fifo() {
-        FileClass::Fifo
-    } else if mode.is_sock() {
-        FileClass::Socket
-    } else {
-        panic!("Unrecognized file mode {:?}!", mode);
+fn file_class_from_file_mode(mode: FileMode) -> Result<FileClass, Errno> {
+    match mode.bits() & starnix_uapi::S_IFMT {
+        starnix_uapi::S_IFLNK => Ok(FileClass::Link),
+        starnix_uapi::S_IFREG => Ok(FileClass::File),
+        starnix_uapi::S_IFDIR => Ok(FileClass::Dir),
+        starnix_uapi::S_IFCHR => Ok(FileClass::Character),
+        starnix_uapi::S_IFBLK => Ok(FileClass::Block),
+        starnix_uapi::S_IFIFO => Ok(FileClass::Fifo),
+        starnix_uapi::S_IFSOCK => Ok(FileClass::Socket),
+        _ => error!(EINVAL),
     }
 }
 
@@ -186,11 +217,6 @@ pub(super) fn fs_node_init_on_create(
     // https://fxbug.dev/369067922).
     if new_node.info().security_state.label.is_initialized() {
         track_stub!(TODO("https://fxbug.dev/369067922"), "new FsNode already labeled");
-    }
-
-    // TODO: https://fxbug.dev/349117435 - Remove this workaround once "bpf" is correctly "genfscon"-labelled.
-    if new_node.fs().name() == "bpf" {
-        return Ok(None);
     }
 
     // If the creating task's "fscreate" attribute is set then it overrides the normal process
@@ -226,7 +252,7 @@ pub(super) fn fs_node_init_on_create(
                     .compute_new_file_sid(
                         current_task_sid,
                         parent_sid,
-                        file_class_from_file_mode(new_node.info().mode),
+                        file_class_from_file_mode(new_node.info().mode)?,
                     )
                     // TODO: https://fxbug.dev/355180447 - is EPERM right here? What does it mean
                     // for compute_new_file_sid to have failed?
@@ -236,6 +262,10 @@ pub(super) fn fs_node_init_on_create(
                     .transpose()?;
                 (sid, xattr)
             }
+        }
+        FileSystemLabelingScheme::GenFsCon => {
+            // The label in this case is decided in the `fs_node_init_with_dentry` hook.
+            return Ok(None);
         }
     };
 
@@ -427,7 +457,20 @@ pub(super) fn file_system_resolve_security(
         let (resolved_label, pending_entries) = match &mut *label_state {
             FileSystemLabelState::Labeled { .. } => return Ok(()),
             FileSystemLabelState::Unlabeled { name, mount_options, pending_entries } => (
-                security_server.resolve_fs_label((*name).into(), mount_options),
+                {
+                    // TODO: https://fxbug.dev/361297862 - Replace this workaround with more
+                    // general handling of these special Fuchsia filesystems.
+                    let effective_name = if *name == "remotefs" || *name == "remote_bundle" {
+                        track_stub!(
+                            TODO("https://fxbug.dev/361297862"),
+                            "Applying ext4 labeling configuration to remote filesystems"
+                        );
+                        "ext4".into()
+                    } else {
+                        *name
+                    };
+                    security_server.resolve_fs_label(effective_name.into(), mount_options)
+                },
                 std::mem::take(pending_entries),
             ),
         };
@@ -435,11 +478,8 @@ pub(super) fn file_system_resolve_security(
         pending_entries
     };
 
-    // TODO: https://fxbug.dev/369328835 - Attempting to label from xattr here can deadlock, with the "fuse" file-system.
-    if file_system.name() != "fuse" {
-        if let Some(root_dir_entry) = file_system.maybe_root() {
-            fs_node_init_with_dentry(security_server, current_task, root_dir_entry)?;
-        }
+    if let Some(root_dir_entry) = file_system.maybe_root() {
+        fs_node_init_with_dentry(security_server, current_task, root_dir_entry)?;
     }
 
     // Label the `FsNode`s for any `pending_entries`.
@@ -639,168 +679,210 @@ pub(super) fn get_cached_sid(fs_node: &FsNode) -> Option<SecurityId> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testing::create_kernel_task_and_unlocked_with_selinux;
+    use crate::testing::spawn_kernel_and_run;
     use crate::vfs::XattrOp;
     use starnix_uapi::errno;
+    use testing::{spawn_kernel_with_selinux_hooks_test_policy_and_run, TEST_FILE_NAME};
 
     const VALID_SECURITY_CONTEXT: &[u8] = b"u:object_r:test_valid_t:s0";
 
     #[fuchsia::test]
     async fn fs_node_resolved_and_effective_sids_for_missing_xattr() {
-        let security_server = testing::security_server_with_policy();
-        security_server.set_enforcing(true);
-        let (_kernel, current_task, mut locked) =
-            create_kernel_task_and_unlocked_with_selinux(security_server.clone());
-        let dir_entry = &testing::create_test_file(&mut locked, &current_task).entry;
-        let node = &dir_entry.node;
+        spawn_kernel_with_selinux_hooks_test_policy_and_run(
+            |locked, current_task, security_server| {
+                let dir_entry = &testing::create_test_file(locked, current_task).entry;
+                let node = &dir_entry.node;
 
-        // Remove the "security.selinux" label, if any.
-        let _ = node.ops().remove_xattr(node, &current_task, XATTR_NAME_SELINUX.to_bytes().into());
-        assert_eq!(
-            node.ops()
-                .get_xattr(node, &current_task, XATTR_NAME_SELINUX.to_bytes().into(), 4096)
-                .unwrap_err(),
-            errno!(ENODATA)
-        );
+                // Remove the "security.selinux" label, if any.
+                let _ = node.ops().remove_xattr(
+                    node,
+                    &current_task,
+                    XATTR_NAME_SELINUX.to_bytes().into(),
+                );
+                assert_eq!(
+                    node.ops()
+                        .get_xattr(node, &current_task, XATTR_NAME_SELINUX.to_bytes().into(), 4096)
+                        .unwrap_err(),
+                    errno!(ENODATA)
+                );
 
-        // Clear the cached SID and use `fs_node_init_with_dentry()` to re-resolve the label.
-        clear_cached_sid(node);
-        assert_eq!(None, get_cached_sid(node));
-        fs_node_init_with_dentry(&security_server, &current_task, dir_entry)
-            .expect("fs_node_init_with_dentry");
+                // Clear the cached SID and use `fs_node_init_with_dentry()` to re-resolve the label.
+                clear_cached_sid(node);
+                assert_eq!(None, get_cached_sid(node));
+                fs_node_init_with_dentry(&security_server, &current_task, dir_entry)
+                    .expect("fs_node_init_with_dentry");
 
-        // `fs_node_getsecurity()` should now fall-back to the policy's "file" Context.
-        let default_file_context = security_server
-            .sid_to_security_context(SecurityId::initial(InitialSid::File))
-            .unwrap()
-            .into();
-        let result = fs_node_getsecurity(
-            &security_server,
-            &current_task,
-            node,
-            XATTR_NAME_SELINUX.to_bytes().into(),
-            SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE,
+                // `fs_node_getsecurity()` should now fall-back to the policy's "file" Context.
+                let default_file_context = security_server
+                    .sid_to_security_context(SecurityId::initial(InitialSid::File))
+                    .unwrap()
+                    .into();
+                let result = fs_node_getsecurity(
+                    &security_server,
+                    &current_task,
+                    node,
+                    XATTR_NAME_SELINUX.to_bytes().into(),
+                    SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE,
+                )
+                .unwrap();
+                assert_eq!(result, ValueOrSize::Value(default_file_context));
+                assert!(get_cached_sid(node).is_some());
+            },
         )
-        .unwrap();
-        assert_eq!(result, ValueOrSize::Value(default_file_context));
-        assert!(get_cached_sid(node).is_some());
     }
 
     #[fuchsia::test]
     async fn fs_node_resolved_and_effective_sids_for_invalid_xattr() {
-        let security_server = testing::security_server_with_policy();
-        security_server.set_enforcing(true);
-        let (_kernel, current_task, mut locked) =
-            create_kernel_task_and_unlocked_with_selinux(security_server.clone());
-        let dir_entry = &testing::create_test_file(&mut locked, &current_task).entry;
-        let node = &dir_entry.node;
+        spawn_kernel_with_selinux_hooks_test_policy_and_run(
+            |locked, current_task, security_server| {
+                let dir_entry = &testing::create_test_file(locked, current_task).entry;
+                let node = &dir_entry.node;
 
-        const INVALID_CONTEXT: &[u8] = b"invalid context!";
+                const INVALID_CONTEXT: &[u8] = b"invalid context!";
 
-        // Set the security label to a value which is not a valid Security Context.
-        node.ops()
-            .set_xattr(
-                node,
-                &current_task,
-                XATTR_NAME_SELINUX.to_bytes().into(),
-                INVALID_CONTEXT.into(),
-                XattrOp::Set,
-            )
-            .expect("setxattr");
+                // Set the security label to a value which is not a valid Security Context.
+                node.ops()
+                    .set_xattr(
+                        node,
+                        &current_task,
+                        XATTR_NAME_SELINUX.to_bytes().into(),
+                        INVALID_CONTEXT.into(),
+                        XattrOp::Set,
+                    )
+                    .expect("setxattr");
 
-        // Clear the cached SID and use `fs_node_init_with_dentry()` to re-resolve the label.
-        clear_cached_sid(node);
-        assert_eq!(None, get_cached_sid(node));
-        fs_node_init_with_dentry(&security_server, &current_task, dir_entry)
-            .expect("fs_node_init_with_dentry");
+                // Clear the cached SID and use `fs_node_init_with_dentry()` to re-resolve the label.
+                clear_cached_sid(node);
+                assert_eq!(None, get_cached_sid(node));
+                fs_node_init_with_dentry(&security_server, &current_task, dir_entry)
+                    .expect("fs_node_init_with_dentry");
 
-        // `fs_node_getsecurity()` should report the same invalid string as is in the xattr.
-        let result = fs_node_getsecurity(
-            &security_server,
-            &current_task,
-            node,
-            XATTR_NAME_SELINUX.to_bytes().into(),
-            SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE,
+                // `fs_node_getsecurity()` should report the same invalid string as is in the xattr.
+                let result = fs_node_getsecurity(
+                    &security_server,
+                    &current_task,
+                    node,
+                    XATTR_NAME_SELINUX.to_bytes().into(),
+                    SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE,
+                )
+                .unwrap();
+                assert_eq!(result, ValueOrSize::Value(INVALID_CONTEXT.into()));
+
+                // The SID cached for the `node` should be "unlabeled".
+                assert_eq!(Some(SecurityId::initial(InitialSid::Unlabeled)), get_cached_sid(node));
+
+                // The effective SID of the node should be "unlabeled".
+                assert_eq!(SecurityId::initial(InitialSid::Unlabeled), fs_node_effective_sid(node));
+            },
         )
-        .unwrap();
-        assert_eq!(result, ValueOrSize::Value(INVALID_CONTEXT.into()));
-
-        // The SID cached for the `node` should be "unlabeled".
-        assert_eq!(Some(SecurityId::initial(InitialSid::Unlabeled)), get_cached_sid(node));
-
-        // The effective SID of the node should be "unlabeled".
-        assert_eq!(SecurityId::initial(InitialSid::Unlabeled), fs_node_effective_sid(node));
     }
 
     #[fuchsia::test]
     async fn fs_node_effective_sid_valid_xattr_stored() {
-        let security_server = testing::security_server_with_policy();
-        security_server.set_enforcing(true);
-        let (_kernel, current_task, mut locked) =
-            create_kernel_task_and_unlocked_with_selinux(security_server.clone());
-        let dir_entry = &testing::create_test_file(&mut locked, &current_task).entry;
-        let node = &dir_entry.node;
+        spawn_kernel_with_selinux_hooks_test_policy_and_run(
+            |locked, current_task, security_server| {
+                let dir_entry = &testing::create_test_file(locked, current_task).entry;
+                let node = &dir_entry.node;
 
-        // Store a valid Security Context in the attribute, and ensure any label cached on the `FsNode`
-        // is removed, to force the effective-SID query to resolve the label again.
-        node.ops()
-            .set_xattr(
-                node,
-                &current_task,
-                XATTR_NAME_SELINUX.to_bytes().into(),
-                VALID_SECURITY_CONTEXT.into(),
-                XattrOp::Set,
-            )
-            .expect("setxattr");
+                // Store a valid Security Context in the attribute, and ensure any label cached on the `FsNode`
+                // is removed, to force the effective-SID query to resolve the label again.
+                node.ops()
+                    .set_xattr(
+                        node,
+                        &current_task,
+                        XATTR_NAME_SELINUX.to_bytes().into(),
+                        VALID_SECURITY_CONTEXT.into(),
+                        XattrOp::Set,
+                    )
+                    .expect("setxattr");
 
-        // Clear the cached SID and use `fs_node_init_with_dentry()` to re-resolve the label.
-        clear_cached_sid(node);
-        assert_eq!(None, get_cached_sid(node));
-        fs_node_init_with_dentry(&security_server, &current_task, dir_entry)
-            .expect("fs_node_init_with_dentry");
+                // Clear the cached SID and use `fs_node_init_with_dentry()` to re-resolve the label.
+                clear_cached_sid(node);
+                assert_eq!(None, get_cached_sid(node));
+                fs_node_init_with_dentry(&security_server, &current_task, dir_entry)
+                    .expect("fs_node_init_with_dentry");
 
-        // `fs_node_getsecurity()` should report the same valid Security Context string as the xattr holds.
-        let result = fs_node_getsecurity(
-            &security_server,
-            &current_task,
-            node,
-            XATTR_NAME_SELINUX.to_bytes().into(),
-            SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE,
+                // `fs_node_getsecurity()` should report the same valid Security Context string as the xattr holds.
+                let result = fs_node_getsecurity(
+                    &security_server,
+                    &current_task,
+                    node,
+                    XATTR_NAME_SELINUX.to_bytes().into(),
+                    SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE,
+                )
+                .unwrap();
+                assert_eq!(result, ValueOrSize::Value(VALID_SECURITY_CONTEXT.into()));
+
+                // There should be a SID cached, and it should map to the valid Security Context.
+                let cached_sid = get_cached_sid(node).unwrap();
+                assert_eq!(
+                    security_server.sid_to_security_context(cached_sid).unwrap(),
+                    VALID_SECURITY_CONTEXT
+                );
+
+                // Requesting the effective SID should simply return the cached value.
+                assert_eq!(cached_sid, fs_node_effective_sid(node));
+            },
         )
-        .unwrap();
-        assert_eq!(result, ValueOrSize::Value(VALID_SECURITY_CONTEXT.into()));
-
-        // There should be a SID cached, and it should map to the valid Security Context.
-        let cached_sid = get_cached_sid(node).unwrap();
-        assert_eq!(
-            security_server.sid_to_security_context(cached_sid).unwrap(),
-            VALID_SECURITY_CONTEXT
-        );
-
-        // Requesting the effective SID should simply return the cached value.
-        assert_eq!(cached_sid, fs_node_effective_sid(node));
     }
 
     #[fuchsia::test]
     async fn setxattr_set_sid() {
-        let security_server = testing::security_server_with_policy();
-        let expected_sid = security_server
-            .security_context_to_sid(VALID_SECURITY_CONTEXT.into())
-            .expect("no SID for VALID_SECURITY_CONTEXT");
-        let (_kernel, current_task, mut locked) =
-            create_kernel_task_and_unlocked_with_selinux(security_server);
-        let node = &testing::create_unlabeled_test_file(&mut locked, &current_task).entry.node;
+        spawn_kernel_with_selinux_hooks_test_policy_and_run(
+            |locked, current_task, security_server| {
+                let expected_sid = security_server
+                    .security_context_to_sid(VALID_SECURITY_CONTEXT.into())
+                    .expect("no SID for VALID_SECURITY_CONTEXT");
+                let node = &testing::create_unlabeled_test_file(locked, current_task).entry.node;
 
-        node.set_xattr(
-            current_task.as_ref(),
-            &current_task.fs().root().mount,
-            XATTR_NAME_SELINUX.to_bytes().into(),
-            VALID_SECURITY_CONTEXT.into(),
-            XattrOp::Set,
+                node.set_xattr(
+                    current_task,
+                    &current_task.fs().root().mount,
+                    XATTR_NAME_SELINUX.to_bytes().into(),
+                    VALID_SECURITY_CONTEXT.into(),
+                    XattrOp::Set,
+                )
+                .expect("setxattr");
+
+                // Verify that the SID now cached on the node corresponds to VALID_SECURITY_CONTEXT.
+                assert_eq!(Some(expected_sid), get_cached_sid(node));
+            },
         )
-        .expect("setxattr");
+    }
 
-        // Verify that the SID now cached on the node corresponds to VALID_SECURITY_CONTEXT.
-        assert_eq!(Some(expected_sid), get_cached_sid(node));
+    #[fuchsia::test]
+    async fn get_fs_relative_path_root() {
+        // Verify the full path for the root entry.
+        spawn_kernel_and_run(|_, current_task| {
+            let dir_entry = current_task.fs().root().entry;
+
+            assert_eq!(BStr::new(b"/"), get_fs_relative_path(&dir_entry));
+        });
+    }
+
+    #[fuchsia::test]
+    async fn get_fs_relative_path_simple_file() {
+        // Verify the full path for a file directly under the root: "/" + [`TEST_FILE_NAME`].
+        spawn_kernel_and_run(|locked, current_task| {
+            let dir_entry = &testing::create_test_file(locked, current_task).entry;
+
+            let expected = format!("/{}", TEST_FILE_NAME);
+            assert_eq!(BStr::new(&expected), get_fs_relative_path(&dir_entry));
+        });
+    }
+
+    #[fuchsia::test]
+    async fn get_fs_relative_path_nested_dir() {
+        // Verify the full path for a nested directory: "/foo/bar".
+        spawn_kernel_and_run(|locked, current_task| {
+            let dir_entry = &testing::create_directory_with_parents(
+                vec![BStr::new(b"foo"), BStr::new(b"bar")],
+                locked,
+                &current_task,
+            )
+            .entry;
+
+            assert_eq!(BStr::new(b"/foo/bar"), get_fs_relative_path(&dir_entry));
+        });
     }
 }

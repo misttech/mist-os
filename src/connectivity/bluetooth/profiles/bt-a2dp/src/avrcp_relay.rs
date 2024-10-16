@@ -16,7 +16,7 @@ use fuchsia_inspect_derive::{AttachError, Inspect};
 use futures::{select, StreamExt};
 use std::fmt::Debug;
 use tracing::{debug, info, trace};
-use zx::Duration;
+use zx::MonotonicDuration;
 use {
     fidl_fuchsia_bluetooth_avrcp as avrcp, fidl_fuchsia_media as media,
     fidl_fuchsia_media_sessions2 as sessions2, fuchsia_async as fasync, zx,
@@ -24,7 +24,7 @@ use {
 
 // Typically, AVRCP peer responds to requests within 0.2s.
 // We wait for ~2x longer to give ample time for peer to respond.
-const INITIAL_AVRCP_RESPONSE_WAIT_TIME: Duration = Duration::from_millis(500);
+const INITIAL_AVRCP_RESPONSE_WAIT_TIME: MonotonicDuration = MonotonicDuration::from_millis(500);
 
 #[derive(Debug, Clone, ValidFidlTable, PartialEq)]
 #[fidl_table_src(sessions2::PlayerStatus)]
@@ -42,7 +42,8 @@ pub struct ValidPlayerStatus {
 }
 
 /// Interval to poll Get Play Status on the remote AVRCP peer.
-const AVRCP_GET_PLAY_STATUS_POLL_INTERVAL: zx::Duration = zx::Duration::from_seconds(2);
+const AVRCP_GET_PLAY_STATUS_POLL_INTERVAL: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_seconds(2);
 
 impl ValidPlayerStatus {
     /// Sets the `player_state` given a state from AVRCP.
@@ -69,7 +70,7 @@ impl ValidPlayerStatus {
             }
         };
         self.timeline_function = Some(media::TimelineFunction {
-            subject_time: zx::Duration::from_millis(position_millis).into_nanos(),
+            subject_time: zx::MonotonicDuration::from_millis(position_millis).into_nanos(),
             reference_time: fasync::MonotonicInstant::now().into_nanos(),
             subject_delta,
             reference_delta: 1,
@@ -378,7 +379,7 @@ async fn update_attributes(
 
     if let Some(playing_time) = attributes.playing_time {
         if let Ok(millis) = playing_time.parse::<i64>() {
-            status.duration = Some(zx::Duration::from_millis(millis).into_nanos());
+            status.duration = Some(zx::MonotonicDuration::from_millis(millis).into_nanos());
         }
     }
     Ok(())
@@ -394,7 +395,7 @@ async fn update_status(
         avrcp_status.playback_status.ok_or(format_err!("PlayStatus must have playback status"))?;
     status.set_state_from_avrcp(playback_status);
     status.duration =
-        avrcp_status.song_length.map(|m| zx::Duration::from_millis(m as i64).into_nanos());
+        avrcp_status.song_length.map(|m| zx::MonotonicDuration::from_millis(m as i64).into_nanos());
     let _ = avrcp_status.song_position.map(|m| status.set_position(m as i64));
     Ok(())
 }
@@ -666,7 +667,7 @@ mod tests {
         // Imitate peer ignoring our request.
         // Advance time past the max amount of time we would wait for a response back.
         exec.set_fake_time(
-            (INITIAL_AVRCP_RESPONSE_WAIT_TIME + Duration::from_micros(10)).after_now(),
+            (INITIAL_AVRCP_RESPONSE_WAIT_TIME + MonotonicDuration::from_micros(10)).after_now(),
         );
         let _ = exec.wake_expired_timers();
         assert!(exec.run_until_stalled(&mut relay_fut).is_pending());
@@ -681,7 +682,7 @@ mod tests {
         // Imitate peer ignoring our request.
         // Advance time past the max amount of time we would wait for a response back.
         exec.set_fake_time(
-            (INITIAL_AVRCP_RESPONSE_WAIT_TIME + Duration::from_micros(10)).after_now(),
+            (INITIAL_AVRCP_RESPONSE_WAIT_TIME + MonotonicDuration::from_micros(10)).after_now(),
         );
         let _ = exec.wake_expired_timers();
         assert!(exec.run_until_stalled(&mut relay_fut).is_pending());

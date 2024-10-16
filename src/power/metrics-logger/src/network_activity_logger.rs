@@ -264,7 +264,7 @@ pub struct NetworkActivityLogger {
     ports: Rc<RefCell<HashMap<u8, fhwnet::PortProxy>>>,
 
     last_sample: Option<NetworkActivitySample>,
-    interval: zx::Duration,
+    interval: zx::MonotonicDuration,
     client_id: String,
     inspect: InspectData,
     output_samples_to_syslog: bool,
@@ -289,7 +289,7 @@ impl NetworkActivityLogger {
     ) -> Self {
         let start_time = fasync::MonotonicInstant::now();
         let end_time = duration_ms.map_or(fasync::MonotonicInstant::INFINITE, |ms| {
-            fasync::MonotonicInstant::now() + zx::Duration::from_millis(ms as i64)
+            fasync::MonotonicInstant::now() + zx::MonotonicDuration::from_millis(ms as i64)
         });
 
         let inspect = InspectData::new(client_inspect);
@@ -297,7 +297,7 @@ impl NetworkActivityLogger {
         NetworkActivityLogger {
             ports,
             last_sample: None,
-            interval: zx::Duration::from_millis(interval_ms as i64),
+            interval: zx::MonotonicDuration::from_millis(interval_ms as i64),
             client_id,
             inspect,
             output_samples_to_syslog,

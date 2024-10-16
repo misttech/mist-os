@@ -147,9 +147,9 @@ pub fn send_scan_completion<'h, S>(
 where
     S: 'h,
 {
-    use zx::Duration;
+    use zx::MonotonicDuration;
 
-    const SCAN_COMPLETION_DELAY: Duration = Duration::from_seconds(2i64);
+    const SCAN_COMPLETION_DELAY: MonotonicDuration = MonotonicDuration::from_seconds(2i64);
 
     event::matched(move |_: &mut S, event: &fidl_tap::StartScanArgs| {
         tracing::info!(

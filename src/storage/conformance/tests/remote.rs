@@ -136,7 +136,7 @@ async fn open_remote_directory_right_escalation_test() {
 #[fuchsia::test]
 async fn open3_remote_directory_test() {
     let harness = TestHarness::new().await;
-    if !(harness.config.supports_remote_dir && harness.config.supports_open3) {
+    if !harness.config.supports_remote_dir {
         return;
     }
     let remote_name = "remote_directory";
@@ -166,7 +166,7 @@ async fn open3_remote_directory_test() {
 #[fuchsia::test]
 async fn open3_remote_file_test() {
     let harness = TestHarness::new().await;
-    if !(harness.config.supports_remote_dir && harness.config.supports_open3) {
+    if !harness.config.supports_remote_dir {
         return;
     }
 
@@ -223,7 +223,7 @@ async fn open3_remote_file_test() {
 #[fuchsia::test]
 async fn open3_remote_directory_right_escalation_test() {
     let harness = TestHarness::new().await;
-    if !(harness.config.supports_remote_dir && harness.config.supports_open3) {
+    if !harness.config.supports_remote_dir {
         return;
     }
 

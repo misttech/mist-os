@@ -522,7 +522,7 @@ mod testutil {
             _egress_proof: ProofOfEgressCheck,
         ) -> Result<(), netstack3_base::SendFrameError<S>>
         where
-            S: Serializer + netstack3_filter::IpPacket<I>,
+            S: Serializer,
             S::Buffer: BufferMut,
         {
             let dst = match destination {
@@ -536,7 +536,7 @@ mod testutil {
 
     impl<I: IpLayerIpExt, D: FakeStrongDeviceId> IpDeviceMtuContext<I> for FakeCoreCtx<I, D> {
         fn get_mtu(&mut self, _device_id: &Self::DeviceId) -> Mtu {
-            unimplemented!()
+            Mtu::max()
         }
     }
 

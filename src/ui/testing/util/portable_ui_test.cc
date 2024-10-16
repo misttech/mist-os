@@ -5,6 +5,7 @@
 
 #include "src/ui/testing/util/portable_ui_test.h"
 
+#include <fidl/fuchsia.input.virtualkeyboard/cpp/fidl.h>
 #include <fidl/fuchsia.logger/cpp/fidl.h>
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
@@ -76,6 +77,9 @@ void PortableUITest::SetUpRealmBase() {
               Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_test_input::Registry>},
               Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_test_scene::Controller>},
               Protocol{fidl::DiscoverableProtocolName<test_accessibility::Magnifier>},
+              Protocol{fidl::DiscoverableProtocolName<fuchsia_input_virtualkeyboard::Manager>},
+              Protocol{
+                  fidl::DiscoverableProtocolName<fuchsia_input_virtualkeyboard::ControllerCreator>},
           },
       .source = kTestUIStackRef,
       .targets = {ParentRef{}}});

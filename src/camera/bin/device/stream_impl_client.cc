@@ -145,21 +145,49 @@ void StreamImpl::Client::WatchResolution(WatchResolutionCallback callback) {
   }
 }
 
+void StreamImpl::Client::SetBufferCollection2(
+    fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token) {
+  SetBufferCollectionCommon(std::move(token));
+}
+
 void StreamImpl::Client::SetBufferCollection(
-    fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token_param) {
-  fuchsia::sysmem2::BufferCollectionTokenHandle token(token_param.TakeChannel());
+    fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token) {
+  SetBufferCollectionCommon(fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>(
+      std::move(token).TakeChannel()));
+}
+
+void StreamImpl::Client::SetBufferCollectionCommon(
+    fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token) {
   TRACE_DURATION("camera", "StreamImpl::Client::SetBufferCollection");
   FX_LOGS(INFO) << log_prefix_ << "called SetBufferCollection(koid = " << GetRelatedKoid(token)
                 << ")";
   stream_.SetBufferCollection(id_, std::move(token));
 }
 
+void StreamImpl::Client::WatchBufferCollection2(WatchBufferCollection2Callback callback) {
+  WatchBufferCollectionCommon(
+      [callback = std::move(callback)](
+          fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token) {
+        std::move(callback)(std::move(token));
+      });
+}
+
 void StreamImpl::Client::WatchBufferCollection(WatchBufferCollectionCallback callback) {
+  WatchBufferCollectionCommon(
+      [callback = std::move(callback)](
+          fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token) {
+        std::move(callback)(fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
+            std::move(token).TakeChannel()));
+      });
+}
+
+void StreamImpl::Client::WatchBufferCollectionCommon(
+    fit::function<void(fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>)> callback) {
   TRACE_DURATION("camera", "StreamImpl::Client::WatchBufferCollection");
   FX_LOGS(INFO) << log_prefix_ << "called WatchBufferCollection()";
   if (buffers_.Get(
           [callback = std::move(callback)](fuchsia::sysmem2::BufferCollectionTokenHandle token) {
-            callback(fuchsia::sysmem::BufferCollectionTokenHandle(token.TakeChannel()));
+            callback(std::move(token));
           })) {
     CloseConnection(ZX_ERR_BAD_STATE);
   }

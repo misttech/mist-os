@@ -86,7 +86,7 @@ impl<'test_refs> TestController<'test_refs> {
         // TODO: How to limit the execution time?  run_until_stalled() does not trigger timers, so
         // I can not do this:
         //
-        //   let timeout = zx::Duration::from_millis(300);
+        //   let timeout = zx::MonotonicDuration::from_millis(300);
         //   let client = self.client.on_timeout(
         //       timeout.after_now(),
         //       || panic!("Test did not finish in {}ms", timeout.millis()));

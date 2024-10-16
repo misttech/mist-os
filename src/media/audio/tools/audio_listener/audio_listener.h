@@ -14,12 +14,9 @@
 #include <lib/syslog/cpp/macros.h>
 #include <poll.h>
 
-#include <iostream>
 #include <memory>
-#include <ostream>
 
 #include "src/lib/fsl/tasks/fd_waiter.h"
-#include "src/lib/fxl/strings/string_printf.h"
 #include "src/media/audio/tools/audio_listener/escape_decoder.h"
 
 namespace media {
@@ -72,7 +69,7 @@ class UsageWatcherImpl : public fuchsia::media::UsageWatcher {
 
   const fuchsia::media::Usage& usage() const { return usage_; }
   const fuchsia::media::UsageState& usage_state() const { return usage_state_; }
-  const std::string usage_state_str() const;
+  std::string usage_state_str() const;
   void set_active(bool active) { active_ = active; }
   bool active() const { return active_; }
 
@@ -102,8 +99,8 @@ class AudioListener {
   void RefreshDisplay();
 
  private:
-  enum DisplayMode { UsageActive, UsageState, UsageVolume, UsageGain };
-  void DisplayHeader();
+  enum DisplayMode : uint8_t { UsageActive, UsageState, UsageVolume, UsageGain };
+  static void DisplayHeader();
 
   void WatchRenderActivity();
   void WatchCaptureActivity();
@@ -132,16 +129,19 @@ class AudioListener {
   fuchsia::media::ActivityReporterPtr activity_reporter_;
 
   fuchsia::media::UsageReporterPtr usage_reporter_;
+  // UsageWatchers are stored in alphabetical order of their usage.
   std::unique_ptr<UsageWatcherImpl> render_usage_watchers_[fuchsia::media::RENDER_USAGE_COUNT];
   std::unique_ptr<UsageWatcherImpl> capture_usage_watchers_[fuchsia::media::CAPTURE_USAGE_COUNT];
 
   fuchsia::media::AudioCorePtr audio_core_;
+  // VolumeControls, volumes and mutes are stored in alphabetical order of their usage.
   std::array<fuchsia::media::audio::VolumeControlPtr, fuchsia::media::RENDER_USAGE_COUNT>
       render_usage_volume_ctls_;
   std::array<float, fuchsia::media::RENDER_USAGE_COUNT> render_usage_volumes_;
   std::array<bool, fuchsia::media::RENDER_USAGE_COUNT> render_usage_mutes_;
 
   fuchsia::media::UsageGainReporterPtr usage_gain_reporter_;
+  // UsageGainListeners are stored in alphabetical order of their usage.
   std::unique_ptr<UsageGainListenerImpl>
       render_usage_gain_listeners_[fuchsia::media::RENDER_USAGE_COUNT];
   std::unique_ptr<UsageGainListenerImpl>

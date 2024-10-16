@@ -33,7 +33,7 @@ lazy_static::lazy_static! {
             Credential::NetworkKey(vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
 }
 
-const DEFAULT_TEST_TIMEOUT: Duration = Duration::from_seconds(45);
+const DEFAULT_TEST_TIMEOUT: MonotonicDuration = MonotonicDuration::from_seconds(45);
 
 /// This method is our test harness for all of our individual tests.
 /// It sets up a fake radio and fake network interface and allows

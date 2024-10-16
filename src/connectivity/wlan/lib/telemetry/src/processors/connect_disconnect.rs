@@ -16,7 +16,7 @@ use fuchsia_inspect_derive::Unit;
 use fuchsia_sync::Mutex;
 use std::sync::Arc;
 use strum_macros::{Display, EnumIter};
-use windowed_stats::experimental::clock::TimedSample;
+use windowed_stats::experimental::clock::Timed;
 use windowed_stats::experimental::series::interpolation::{Constant, LastSample};
 use windowed_stats::experimental::series::statistic::Union;
 use windowed_stats::experimental::series::{SamplingProfile, TimeMatrix};
@@ -142,7 +142,7 @@ impl From<&fidl_sme::DisconnectSource> for InspectDisconnectSource {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct DisconnectInfo {
-    pub connected_duration: zx::Duration,
+    pub connected_duration: zx::MonotonicDuration,
     pub is_sme_reconnecting: bool,
     pub disconnect_source: fidl_sme::DisconnectSource,
     pub original_bss_desc: Box<BssDescription>,
@@ -376,16 +376,16 @@ impl ConnectDisconnectTimeSeries {
     }
 
     fn log_wlan_connectivity_state(&self, data: u64) {
-        self.wlan_connectivity_states.fold_or_log_error(TimedSample::now(data));
+        self.wlan_connectivity_states.fold_or_log_error(Timed::now(data));
     }
     fn log_connected_networks(&self, data: u64) {
-        self.connected_networks.fold_or_log_error(TimedSample::now(data));
+        self.connected_networks.fold_or_log_error(Timed::now(data));
     }
     fn log_disconnected_networks(&self, data: u64) {
-        self.disconnected_networks.fold_or_log_error(TimedSample::now(data));
+        self.disconnected_networks.fold_or_log_error(Timed::now(data));
     }
     fn log_disconnect_sources(&self, data: u64) {
-        self.disconnect_sources.fold_or_log_error(TimedSample::now(data));
+        self.disconnect_sources.fold_or_log_error(Timed::now(data));
     }
 }
 
@@ -433,7 +433,7 @@ mod tests {
 
         assert_eq!(
             &time_series.wlan_connectivity_states.drain_calls()[..],
-            &[TimeMatrixCall::Fold(TimedSample::now(1 << 0))]
+            &[TimeMatrixCall::Fold(Timed::now(1 << 0))]
         );
     }
 
@@ -489,14 +489,11 @@ mod tests {
 
         assert_eq!(
             &time_series.wlan_connectivity_states.drain_calls()[..],
-            &[
-                TimeMatrixCall::Fold(TimedSample::now(1 << 0)),
-                TimeMatrixCall::Fold(TimedSample::now(1 << 2)),
-            ]
+            &[TimeMatrixCall::Fold(Timed::now(1 << 0)), TimeMatrixCall::Fold(Timed::now(1 << 2)),]
         );
         assert_eq!(
             &time_series.connected_networks.drain_calls()[..],
-            &[TimeMatrixCall::Fold(TimedSample::now(1 << 0)),]
+            &[TimeMatrixCall::Fold(Timed::now(1 << 0)),]
         );
     }
 
@@ -555,7 +552,7 @@ mod tests {
         let bss_description = fake_bss_description!(Open);
         let channel = bss_description.channel;
         let disconnect_info = DisconnectInfo {
-            connected_duration: zx::Duration::from_seconds(30),
+            connected_duration: zx::MonotonicDuration::from_seconds(30),
             is_sme_reconnecting: false,
             disconnect_source: fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
                 mlme_event_name: fidl_sme::DisconnectMlmeEventName::DeauthenticateIndication,
@@ -610,7 +607,7 @@ mod tests {
                 disconnect_events: {
                     "0": {
                         "@time": AnyNumericProperty,
-                        connected_duration: zx::Duration::from_seconds(30).into_nanos(),
+                        connected_duration: zx::MonotonicDuration::from_seconds(30).into_nanos(),
                         disconnect_source_id: 0u64,
                         network_id: 0u64,
                         rssi_dbm: -30i64,
@@ -622,18 +619,15 @@ mod tests {
         });
         assert_eq!(
             &time_series.wlan_connectivity_states.drain_calls()[..],
-            &[
-                TimeMatrixCall::Fold(TimedSample::now(1 << 0)),
-                TimeMatrixCall::Fold(TimedSample::now(1 << 1)),
-            ]
+            &[TimeMatrixCall::Fold(Timed::now(1 << 0)), TimeMatrixCall::Fold(Timed::now(1 << 1)),]
         );
         assert_eq!(
             &time_series.disconnected_networks.drain_calls()[..],
-            &[TimeMatrixCall::Fold(TimedSample::now(1 << 0)),]
+            &[TimeMatrixCall::Fold(Timed::now(1 << 0)),]
         );
         assert_eq!(
             &time_series.disconnect_sources.drain_calls()[..],
-            &[TimeMatrixCall::Fold(TimedSample::now(1 << 0)),]
+            &[TimeMatrixCall::Fold(Timed::now(1 << 0)),]
         );
     }
 

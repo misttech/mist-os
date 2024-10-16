@@ -806,5 +806,11 @@ func infraToolLogChecks() []FailureModeCheck {
 			AttributeToTest:    true,
 			AddTag:             true,
 		},
+		// For https://fxbug.dev/368375861.
+		&stringInLogCheck{
+			String:      "failed to merge profiles",
+			Type:        swarmingOutputType,
+			AlwaysFlake: true,
+		},
 	}
 }

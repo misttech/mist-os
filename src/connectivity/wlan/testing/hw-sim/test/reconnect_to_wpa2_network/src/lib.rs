@@ -158,7 +158,7 @@ async fn reconnect_to_wpa2_network() {
     ));
     helper
         .run_until_complete_or_timeout(
-            zx::Duration::from_seconds(30),
+            zx::MonotonicDuration::from_seconds(30),
             format!("connecting to {} ({})", AP_SSID.to_string_not_redactable(), bssid),
             scan_and_reassociate(
                 &phy,

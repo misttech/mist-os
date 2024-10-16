@@ -680,7 +680,7 @@ impl ResolverCapability {
     }
 }
 
-#[cfg(fuchsia_api_level_at_least = "NEXT")]
+#[cfg(fuchsia_api_level_at_least = "24")]
 impl Into<ftest::Capability> for ResolverCapability {
     fn into(self) -> ftest::Capability {
         ftest::Capability::Resolver(ftest::Resolver {
@@ -717,7 +717,7 @@ impl RunnerCapability {
     }
 }
 
-#[cfg(fuchsia_api_level_at_least = "NEXT")]
+#[cfg(fuchsia_api_level_at_least = "24")]
 impl Into<ftest::Capability> for RunnerCapability {
     fn into(self) -> ftest::Capability {
         ftest::Capability::Runner(ftest::Runner {

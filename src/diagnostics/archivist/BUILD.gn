@@ -251,6 +251,7 @@ fuchsia_package("archivist-for-embedding") {
     "//bundles/buildbot/*",
 
     # TODO(crbug.com/1408597): Remove once the Chromium tests package the fakes.
+    "//products/terminal:*",
     "//src/chromium:chromium_test_base_deps",
   ]
   deps = [ ":archivist-for-embedding-bundle" ]

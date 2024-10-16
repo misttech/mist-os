@@ -24,85 +24,20 @@ fuchsia_structured_config_rust_lib("recovery_ui_config") {
   cm_label = ":ui_config_manifest"
 }
 
-group("system") {
-  testonly = true
-  deps = [
-    ":system_recovery",
-    ":system_recovery_tests",
-  ]
-}
-
 group("fdr") {
   testonly = true
   deps = [
     ":fdr_lib_unittests",
     ":system_recovery_fdr",
-
-    # TODO(https://fxbug.dev/42054096): Handle FDR via integration tests.
-    # ":system_recovery_fdr_test",
-  ]
-}
-
-group("installer") {
-  testonly = true
-  deps = [
-    ":system_recovery_installer",
-    # TODO(https://fxbug.dev/42053153): This directive does not pick up any tests.
-    #":system_recovery_installer_tests",
-  ]
-}
-
-group("ota") {
-  testonly = true
-  deps = [
-    ":component_ota",
-    ":ota_lib_unittests",
-    ":ota_unittests",
   ]
 }
 
 group("tests") {
   testonly = true
   deps = [
-    ":fdr",
-    ":installer",
-    ":ota",
-    ":system",
+    ":fdr_lib_unittests",
+    ":ota_lib_unittests",
   ]
-}
-
-if (current_toolchain == default_toolchain) {
-  core_shard("system_recovery_core_shard") {
-    shard_file = "meta/core_shards/system_recovery.core_shard.cml"
-  }
-
-  core_shard("system_recovery_fdr_core_shard") {
-    shard_file = "meta/core_shards/system_recovery_fdr.core_shard.cml"
-  }
-
-  core_shard("system_recovery_installer_core_shard") {
-    shard_file = "meta/core_shards/system_recovery_installer.core_shard.cml"
-  }
-}
-
-resource("recovery_logo") {
-  sources = [ "//src/recovery/system/res/fuchsia-logo.riv" ]
-  outputs = [ "data/logo.riv" ]
-}
-
-resource("icons") {
-  sources = [ "//src/recovery/system/res/ota_icons.riv" ]
-  outputs = [ "data/ota_icons.riv" ]
-}
-
-resource("instructions") {
-  sources = [ "//src/recovery/system/res/instructions.txt" ]
-  outputs = [ "data/instructions.txt" ]
-}
-
-resource("qr_codes") {
-  sources = [ "//src/recovery/system/res/qr_codes.riv" ]
-  outputs = [ "data/qr_codes.riv" ]
 }
 
 resource("roboto_regular") {
@@ -136,6 +71,13 @@ fuchsia_unittest_package("fdr_lib_unittests") {
   deps = [ ":fdr_lib_test" ]
 }
 
+# This is used by system_recovery_fdr via the following path:
+#
+#  system_recovery_fdr ->
+#  //src/recovery/lib/recovery-ui  ->
+#  //src/recovery/lib/recovery-util  ->
+#  //src/recovery/system:ota_lib
+#
 rustc_library("ota_lib") {
   edition = "2021"
   with_unit_tests = true
@@ -193,131 +135,6 @@ fuchsia_unittest_package("ota_lib_unittests") {
   deps = [ ":ota_lib_test" ]
 }
 
-rustc_binary("bin") {
-  name = "system_recovery"
-  edition = "2021"
-  with_unit_tests = true
-  deps = [
-    ":fdr_lib",
-    ":ota_lib",
-    ":recovery_ui_config",
-    "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_rust",
-    "//sdk/fidl/fuchsia.recovery.policy:fuchsia.recovery.policy_rust",
-    "//sdk/fidl/fuchsia.recovery.ui:fuchsia.recovery.ui_rust",
-    "//sdk/fidl/fuchsia.wlan.policy:fuchsia.wlan.policy_rust",
-    "//sdk/rust/zx",
-    "//src/graphics/lib/compute/rive-rs",
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-component",
-    "//src/lib/fuchsia-runtime",
-    "//src/lib/ui/carnelian",
-    "//src/recovery/lib/recovery-ui",
-    "//src/recovery/lib/recovery-util",
-    "//src/sys/lib/stdout-to-debuglog/rust",
-    "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:async-channel",
-    "//third_party/rust_crates:euclid",
-    "//third_party/rust_crates:futures",
-  ]
-  test_deps = [
-    "//src/lib/fuchsia",
-    "//src/storage/testing:storage_driver_test_realm",
-    "//third_party/rust_crates:async-trait",
-  ]
-  features = [
-    "debug_console",
-    "http_setup_server",
-  ]
-  sources = [ "src/main.rs" ]
-  deps += [
-    ":icons",
-    ":qr_codes",
-  ]
-  features += [ "ota_ui" ]
-  sources += [ "src/ui_v2.rs" ]
-}
-
-rustc_binary("bin_ota") {
-  name = "system_recovery_ota"
-  edition = "2021"
-  with_unit_tests = true
-  source_root = "src/ota_main.rs"
-  deps = [
-    ":ota_lib",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//sdk/fidl/fuchsia.recovery.ui:fuchsia.recovery.ui_rust",
-    "//sdk/rust/zx",
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia",
-    "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-component",
-    "//src/lib/fuchsia-runtime",
-    "//src/storage/lib/vfs/rust:vfs",
-    "//src/sys/lib/stdout-to-debuglog/rust",
-    "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:futures",
-  ]
-  features = [
-    "http_setup_server",
-    "debug_console",
-  ]
-  test_deps = [ "//third_party/rust_crates:assert_matches" ]
-  sources = [ "src/ota_main.rs" ]
-}
-
-# Start system_recovery_ota component
-fuchsia_component_manifest("manifest_ota") {
-  component_name = "system_recovery_ota"
-  manifest = "meta/system_recovery_ota.cml"
-}
-
-fuchsia_component("component_ota") {
-  cm_label = ":manifest_ota"
-  deps = [
-    ":bin_ota",
-    "//src/storage/blobfs/bin:blobfs-component",
-    "//src/sys/pkg/lib/isolated-swd:pkg-component",
-  ]
-}
-
-fuchsia_unittest_package("ota_unittests") {
-  deps = [ ":bin_ota_test" ]
-}
-
-# End system_recovery_ota component
-
-# Start system_recovery component
-fuchsia_component_manifest("manifest") {
-  component_name = "system_recovery"
-  manifest = "meta/system_recovery.cml"
-}
-
-fuchsia_component("component") {
-  cm_label = ":manifest"
-  deps = [ ":bin" ]
-}
-
-fuchsia_structured_config_values("values_from_gn") {
-  cm_label = ":manifest"
-  values = {
-    display_rotation = board_display_rotation
-  }
-}
-
-fuchsia_package("system_recovery") {
-  deps = [
-    ":component",
-    ":component_ota",
-    ":instructions",
-    ":recovery_logo",
-    ":roboto_regular",
-    ":values_from_gn",
-  ]
-}
-
-# End system_recovery component
-
 rustc_binary("bin_fdr") {
   name = "system_recovery_fdr"
   edition = "2021"
@@ -353,130 +170,9 @@ fuchsia_component("component_fdr") {
   deps = [ ":bin_fdr" ]
 }
 
-fuchsia_structured_config_values("values_from_gn_fdr") {
-  cm_label = ":manifest_fdr"
-  values = {
-    display_rotation = board_display_rotation
-  }
-}
-
 fuchsia_package("system_recovery_fdr") {
   deps = [
     ":component_fdr",
     ":roboto_regular",
-    ":values_from_gn_fdr",
   ]
-}
-
-# End system_recovery_fdr component
-
-fuchsia_test_component("system_recovery_bin_test") {
-  deps = [ ":bin_test" ]
-  manifest = "meta/tests/system_recovery_bin_test.cml"
-}
-
-fuchsia_test_package("system_recovery_tests") {
-  test_components = [ ":system_recovery_bin_test" ]
-  deps = [
-    ":instructions",
-    ":recovery_logo",
-    ":roboto_regular",
-    "//src/sys/pkg/lib/fuchsia-pkg-testing/certs",
-    "//src/sys/pkg/tests/pkg-resolver:empty-repo",
-  ]
-  test_specs = {
-    environments = [
-      nuc7_env,
-      nuc11_env,
-    ]
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-}
-
-rustc_binary("bin_installer") {
-  name = "system_recovery_installer"
-  edition = "2021"
-  source_root = "installer/main.rs"
-  with_unit_tests = true
-  deps = [
-    ":recovery_ui_config",
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
-    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_rust",
-    "//sdk/rust/zx",
-    "//src/graphics/lib/compute/rive-rs",
-    "//src/lib/fuchsia",
-    "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-component",
-    "//src/lib/fuchsia-fs",
-    "//src/lib/ui/carnelian",
-    "//src/recovery/lib/installer",
-    "//src/recovery/lib/recovery-util-block",
-    "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:euclid",
-    "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:tracing",
-  ]
-  test_deps = [ "//src/storage/testing:storage_driver_test_realm" ]
-  sources = [
-    "installer/main.rs",
-    "installer/menu.rs",
-  ]
-}
-
-# Start system_recovery_installer component
-fuchsia_component_manifest("manifest_installer") {
-  component_name = "system_recovery_installer"
-  manifest = "meta/system_recovery_installer.cml"
-}
-
-fuchsia_component("component_installer") {
-  cm_label = ":manifest_installer"
-  deps = [ ":bin_installer" ]
-}
-
-fuchsia_structured_config_values("values_from_gn_installer") {
-  cm_label = ":manifest_installer"
-  values = {
-    display_rotation = board_display_rotation
-  }
-}
-
-fuchsia_package("system_recovery_installer") {
-  deps = [
-    ":component_installer",
-    ":instructions",
-    ":recovery_logo",
-    ":roboto_regular",
-    ":values_from_gn_installer",
-  ]
-}
-
-# End system_recovery_installer component
-
-fuchsia_component("system_recovery_installer_bin_test") {
-  testonly = true
-  deps = [ ":bin_installer_test" ]
-  manifest = "meta/tests/system_recovery_installer_bin_test.cml"
-}
-
-fuchsia_test_package("system_recovery_installer_tests") {
-  test_components = [ ":system_recovery_installer_bin_test" ]
-  deps = [
-    ":instructions",
-    ":recovery_logo",
-    ":roboto_regular",
-    "//src/sys/pkg/lib/fuchsia-pkg-testing/certs",
-    "//src/sys/pkg/tests/pkg-resolver:empty-repo",
-  ]
-  test_specs = {
-    environments = [
-      nuc7_env,
-      nuc11_env,
-    ]
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
 }

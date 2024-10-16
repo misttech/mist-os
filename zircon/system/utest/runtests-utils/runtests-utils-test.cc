@@ -28,6 +28,22 @@ namespace {
 
 constexpr size_t kOneMegabyte = 1 << 20;
 
+// Given a file, read its contents to the given string.
+// Returns the length of the output in bytes, or 0 on failure.
+size_t read_file_to_string(FILE* f, std::string* out_string) {
+  char buf[1024];
+  size_t total_len = 0;
+  size_t len = 0;
+  while ((len = fread(buf, sizeof(buf[0]), sizeof(buf), f)) > 0) {
+    total_len += len;
+    out_string->append(buf, len);
+  }
+
+  EXPECT_FALSE(ferror(f));
+
+  return total_len;
+}
+
 TEST(ParseTestNames, ParseTestNamesEmptyStr) {
   fbl::String input("");
   fbl::Vector<fbl::String> parsed;
@@ -410,17 +426,16 @@ TEST(DiscoverAndRunTests, DiscoverAndRunTestsWithOutput) {
   const fbl::String output_path = JoinPath(output_dir, "summary.json");
   FILE* output_file = fopen(output_path.c_str(), "r");
   ASSERT_TRUE(output_file);
-  char buf[2048];
-  memset(buf, 0, sizeof(buf));
-  EXPECT_LT(0, fread(buf, sizeof(buf[0]), sizeof(buf), output_file));
+  std::string contents;
+  EXPECT_LT(0, read_file_to_string(output_file, &contents));
   fclose(output_file);
 
   // The order of the tests in summary.json is not defined, so first check the
   // prefix, then be permissive about order of the actual tests.
-  EXPECT_EQ(0, strncmp(kExpectedJSONOutputPrefix, buf, kExpectedJSONOutputPrefixSize));
+  EXPECT_EQ(0, strncmp(kExpectedJSONOutputPrefix, contents.c_str(), kExpectedJSONOutputPrefixSize));
 
-  re2::StringPiece buf_for_pass(buf);
-  re2::StringPiece buf_for_fail(buf);
+  re2::StringPiece buf_for_pass(contents.c_str());
+  re2::StringPiece buf_for_fail(contents.c_str());
 
   EXPECT_TRUE(re2::RE2::FindAndConsume(&buf_for_pass, expected_pass_output_regex));
   EXPECT_TRUE(re2::RE2::FindAndConsume(&buf_for_fail, expected_fail_output_regex));
@@ -456,24 +471,17 @@ TEST(DiscoverAndRunTests, DiscoverAndRunTestsWithSyslogOutput) {
   const fbl::String output_path = JoinPath(output_dir, "summary.json");
   FILE* output_file = fopen(output_path.c_str(), "r");
   ASSERT_TRUE(output_file);
-  char buf[1024];
-  memset(buf, 0, sizeof(buf));
-  EXPECT_LT(0, fread(buf, sizeof(buf[0]), sizeof(buf), output_file));
+  std::string contents;
+  ASSERT_LT(0, read_file_to_string(output_file, &contents));
   fclose(output_file);
 
   // We don't actually care if the string is at the beginning or the end of
   // the JSON, so just search for it anywhere.
-  bool found_expected_outputs_str = false;
-  for (size_t buf_index = 0; buf[buf_index]; ++buf_index) {
-    if (!strncmp(kExpectedOutputsStr, &buf[buf_index], sizeof(kExpectedOutputsStr) - 1)) {
-      found_expected_outputs_str = true;
-      break;
-    }
+  size_t found_index = contents.find(kExpectedOutputsStr);
+  if (found_index == std::string::npos) {
+    printf("Unexpected buffer contents: %s\n", contents.c_str());
   }
-  if (!found_expected_outputs_str) {
-    printf("Unexpected buffer contents: %s\n", buf);
-  }
-  EXPECT_TRUE(found_expected_outputs_str, "Didn't find expected outputs str in buf");
+  EXPECT_GE(found_index, 0, "Didn't find expected outputs str in buf");
 }
 }  // namespace
 }  // namespace runtests

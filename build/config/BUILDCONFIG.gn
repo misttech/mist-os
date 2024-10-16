@@ -2547,13 +2547,6 @@ template("_fuchsia_binary") {
             configs + dynamic_rust_config - dynamic_rust_config != configs) {
           should_add_shared_rust_runtime = true
         }
-        bootfs_rust_config = [ "//build/config/rust:bootfs" ]
-        if (defined(configs) &&
-            configs + bootfs_rust_config - bootfs_rust_config != configs) {
-          # Never add dynamic stdlib for bootfs binaries.
-          # TODO(https://fxbug.dev/42163719): reconsider this.
-          should_add_shared_rust_runtime = false
-        }
         if (should_add_shared_rust_runtime) {
           data_deps += [ "//build/toolchain/runtime:shared-rust-libstd-deps" ]
 
@@ -3450,6 +3443,17 @@ _rust_auxiliary_variables_to_forward = [
 #     a target being built in ASan mode because it makes it too slow to
 #     run.
 #
+#   fuzzable (optional)
+#     [boolean] If present and true, indicates this target can be instrumented
+#     to provide code coverage to a multi-component fuzzing engine.
+#     Traditionally, on most platforms, coverage-guided fuzzing is performed in
+#     a single process, e.g. a library under test linked against a fuzzing
+#     engine. In addition to supporting such engines such as libFuzzer,
+#     Fuchsia also provides a fuzzing engine (in //src/sys/fuzzing/realmfuzzer)
+#     that can use coverage from multiple processes in a component topology
+#     under test. Set this flag to true to allow the executable to instrumented
+#     in such cases. Defaults to false.
+#
 template("executable") {
   _executable_name = target_name
   variant_shared_redirection = false
@@ -3481,6 +3485,7 @@ template("executable") {
     deps = []
     assert_no_deps = []
     target_name = _executable_name
+    exclude_toolchain_tags = []
 
     # NOTE: Zircon-specific toolchains don't need a syslog backend.
     # TODO(https://fxbug.dev/42138212): Clean up logging backends for executables.
@@ -3493,7 +3498,7 @@ template("executable") {
 
     # Explicitly forward applicable_licenses and visibility,
     # implicitly forward everything else
-    # (except metadata, handled below).
+    # (except `fuzzable` and `metadata`, handled below).
     # See comment in template("shared_library") above for details.
     forward_variables_from(invoker,
                            [
@@ -3505,6 +3510,7 @@ template("executable") {
                            "*",
                            [
                              "applicable_licenses",
+                             "fuzzable",
                              "metadata",
                              "pool",
                              "target_name",
@@ -3590,6 +3596,16 @@ template("executable") {
           rebase_path("$output_dir/$output_name.pdb", root_build_dir)
     } else {
       rebased_debug_file = rebased_link_output_file
+    }
+
+    if (!defined(invoker.fuzzable) || !invoker.fuzzable) {
+      # Executables must opt-in to fuzzing instrumentation.
+      exclude_toolchain_tags += [ "fuzzer" ]
+    } else if (!defined(variant_selector_target_type) ||
+               variant_selector_target_type != "fuzzer_engine") {
+      # If the executable is not a fuzzer engine, add the cross-process
+      # realmfuzzer target runtime.
+      deps += [ "//src/sys/fuzzing/realmfuzzer/target" ]
     }
 
     metadata = {

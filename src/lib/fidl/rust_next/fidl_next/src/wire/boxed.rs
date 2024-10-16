@@ -28,7 +28,7 @@ impl<T> Drop for WireBox<'_, T> {
     }
 }
 
-impl<'buf, T> WireBox<'buf, T> {
+impl<T> WireBox<'_, T> {
     /// Encodes that a value is present in a slot.
     pub fn encode_present(slot: Slot<'_, Self>) {
         munge!(let Self { ptr } = slot);

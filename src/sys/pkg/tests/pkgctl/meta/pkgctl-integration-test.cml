@@ -48,15 +48,6 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [
-                "#dns_resolver",
-                "#http_client",
-                "#netstack",
-            ],
-        },
-        {
             protocol: [ "fuchsia.net.routes.State" ],
             from: "#netstack",
             to: [ "#dns_resolver" ],

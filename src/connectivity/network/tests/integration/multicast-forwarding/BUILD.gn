@@ -17,19 +17,17 @@ rustc_test("multicast-forwarding") {
     "//src/connectivity/network/testing/netemul/rust:lib",
     "//src/connectivity/network/tests/integration/common:netstack_testing_common",
     "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",
-    "//src/connectivity/network/tests/integration/multicast-forwarding/macros:multicast-forwarding-macros",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
+    "//src/lib/network/fidl_fuchsia_net_multicast_ext",
     "//src/lib/test_util",
     "//src/sys/lib/fuchsia_backoff",
     "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:test-case",
-    "//third_party/rust_crates:thiserror",
   ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
   sources = [ "src/lib.rs" ]

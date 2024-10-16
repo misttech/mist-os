@@ -79,7 +79,7 @@ fn create_and_setup_index(boot_drivers: Vec<ResolvedDriver>, config: &Config) ->
         Session::new(
             sender,
             boot_drivers,
-            zx::Duration::from_millis(config.driver_load_fuzzer_max_delay_ms),
+            zx::MonotonicDuration::from_millis(config.driver_load_fuzzer_max_delay_ms),
             None,
         ),
     );
@@ -269,7 +269,9 @@ async fn run_index_server_with_timeout(
                         .send(match_result.as_ref().map_err(|e| *e))
                         .or_else(ignore_peer_closed);
 
-                    if let Err(fidl::Error::ServerResponseWrite(Status::OUT_OF_RANGE)) = send_result
+                    if let Err(fidl::Error::ServerResponseWrite(fidl::TransportError::Status(
+                        Status::OUT_OF_RANGE,
+                    ))) = &send_result
                     {
                         send_result.context(format!(
                             "error responding to MatchDriver. Match result was too big: {:?}",
@@ -754,7 +756,8 @@ mod tests {
         indexer: Rc<Indexer>,
         stream: DriverIndexRequestStream,
     ) -> Result<()> {
-        return run_index_server_with_timeout(indexer, stream, zx::Duration::INFINITE).await;
+        return run_index_server_with_timeout(indexer, stream, zx::MonotonicDuration::INFINITE)
+            .await;
     }
 
     async fn execute_driver_index_test(
@@ -793,9 +796,13 @@ mod tests {
         let (proxy, stream) =
             fidl::endpoints::create_proxy_and_stream::<fdi::DriverIndexMarker>().unwrap();
         let index = Rc::new(Indexer::new(vec![], BaseRepo::Resolved(std::vec![]), false));
-        run_index_server_with_timeout(index.clone(), stream, zx::Duration::from_millis(10))
-            .await
-            .unwrap();
+        run_index_server_with_timeout(
+            index.clone(),
+            stream,
+            zx::MonotonicDuration::from_millis(10),
+        )
+        .await
+        .unwrap();
 
         let result =
             proxy.add_composite_node_spec(&fdf::CompositeNodeSpec { ..Default::default() }).await;

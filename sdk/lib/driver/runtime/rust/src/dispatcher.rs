@@ -588,12 +588,12 @@ mod tests {
         mut tx: async_mpsc::Sender<u8>,
         mut rx: async_mpsc::Receiver<u8>,
     ) {
-        use zx::Duration;
+        use zx::MonotonicDuration;
         println!("starting pong!");
         while let Some(next) = rx.next().await {
             println!("pong! {next}");
             fuchsia_async::Timer::new(fuchsia_async::MonotonicInstant::after(
-                Duration::from_seconds(1),
+                MonotonicDuration::from_seconds(1),
             ))
             .await;
             if next > 10 {

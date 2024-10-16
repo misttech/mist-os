@@ -41,6 +41,9 @@
                 // Builtin service
                 "fuchsia.process.Launcher",
 
+                // Paver queries board name
+                "fuchsia.sysinfo.SysInfo",
+
                 // Paver queries system state transition
                 "fuchsia.system.state.SystemStateTransition",
             ],

@@ -11,6 +11,7 @@
 
 #include "lib/fit/function.h"
 #include "src/developer/debug/ipc/protocol.h"
+#include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/zxdb/client/client_object.h"
 #include "src/developer/debug/zxdb/client/map_setting_store.h"
 #include "src/lib/fxl/macros.h"
@@ -100,7 +101,8 @@ class Target : public ClientObject {
 
   // Attaches to the process with the given koid. The callback will be executed when the attach is
   // complete (or fails).
-  virtual void Attach(uint64_t koid, AttachMode mode, CallbackWithTimestamp callback) = 0;
+  virtual void Attach(uint64_t koid, debug_ipc::AttachConfig config,
+                      CallbackWithTimestamp callback) = 0;
 
   // Detaches from the process with the given koid. The callback will be executed when the detach is
   // complete (or fails).

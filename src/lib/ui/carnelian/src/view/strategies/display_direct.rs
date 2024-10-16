@@ -19,20 +19,31 @@ use display_utils::{
     INVALID_LAYER_ID,
 };
 use euclid::size2;
-use fidl_fuchsia_hardware_display::{CoordinatorListenerRequest, CoordinatorProxy};
-use fidl_fuchsia_hardware_display_types::{ImageBufferUsage, ImageMetadata, INVALID_DISP_ID};
-use fuchsia_async::{self as fasync, OnSignals};
+use fidl_fuchsia_hardware_display::{
+    CoordinatorApplyConfig3Request, CoordinatorListenerRequest, CoordinatorProxy,
+};
+use fidl_fuchsia_hardware_display_types::{
+    ConfigStamp, ImageBufferUsage, ImageMetadata, INVALID_CONFIG_STAMP_VALUE, INVALID_DISP_ID,
+};
+use fuchsia_async::{self as fasync};
 use fuchsia_framebuffer::sysmem::BufferCollectionAllocator;
 use fuchsia_framebuffer::{FrameSet, FrameUsage, ImageId};
 use fuchsia_trace::{duration, instant};
 use futures::channel::mpsc::UnboundedSender;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::atomic::{AtomicU64, Ordering};
 use zx::{
-    self as zx, AsHandleRef, Duration, Event, HandleBased, MonotonicInstant, Signals, Status,
+    self as zx, AsHandleRef, Event, HandleBased, MonotonicDuration, MonotonicInstant, Status,
 };
 
 type WaitEvents = BTreeMap<ImageId, (Event, EventId)>;
+
+struct BusyImage {
+    stamp: ConfigStamp,
+    view_key: ViewKey,
+    image_id: DisplayImageId,
+    collection_id: BufferCollectionId,
+}
 
 #[derive(Default)]
 struct CollectionIdGenerator {}
@@ -150,7 +161,7 @@ struct DisplayResources {
     pub image_indexes: BTreeMap<ImageId, u32>,
     pub context: RenderContext,
     pub wait_events: WaitEvents,
-    pub signal_events: WaitEvents,
+    pub busy_images: VecDeque<BusyImage>,
 }
 
 const RENDER_FRAME_COUNT: usize = 2;
@@ -164,10 +175,11 @@ pub(crate) struct DisplayDirectViewStrategy {
     drop_display_resources_task: Option<fasync::Task<()>>,
     display_resource_release_delay: std::time::Duration,
     vsync_phase: MonotonicInstant,
-    vsync_interval: Duration,
+    vsync_interval: MonotonicDuration,
     mouse_cursor_position: Option<IntPoint>,
     pub collection_id: BufferCollectionId,
     render_frame_count: usize,
+    last_config_stamp: u64,
     presented: Option<u64>,
 }
 
@@ -221,10 +233,11 @@ impl DisplayDirectViewStrategy {
             drop_display_resources_task: None,
             display_resource_release_delay: app_config.display_resource_release_delay,
             vsync_phase: MonotonicInstant::get(),
-            vsync_interval: Duration::from_millis(16),
+            vsync_interval: MonotonicDuration::from_millis(16),
             mouse_cursor_position: None,
             collection_id,
             render_frame_count,
+            last_config_stamp: INVALID_CONFIG_STAMP_VALUE,
             presented: None,
         }))
     }
@@ -237,13 +250,13 @@ impl DisplayDirectViewStrategy {
         let time_now = MonotonicInstant::get();
         // |interval_offset| is the offset from |time_now| to the next multiple
         // of vsync interval after vsync phase, possibly negative if in the past.
-        let mut interval_offset = Duration::from_nanos(
+        let mut interval_offset = MonotonicDuration::from_nanos(
             (self.vsync_phase.into_nanos() - time_now.into_nanos())
                 % self.vsync_interval.into_nanos(),
         );
         // Unless |time_now| is exactly on the interval, adjust forward to the next
         // vsync after |time_now|.
-        if interval_offset != Duration::from_nanos(0) && self.vsync_phase < time_now {
+        if interval_offset != MonotonicDuration::from_nanos(0) && self.vsync_phase < time_now {
             interval_offset += self.vsync_interval;
         }
 
@@ -383,7 +396,6 @@ impl DisplayDirectViewStrategy {
         let mut image_ids = BTreeSet::new();
         let mut image_indexes = BTreeMap::new();
         let mut wait_events = WaitEvents::new();
-        let mut signal_events = WaitEvents::new();
         let buffer_count = buffers.buffers.as_ref().unwrap().len();
         for index in 0..buffer_count as usize {
             let uindex = index as u32;
@@ -406,15 +418,19 @@ impl DisplayDirectViewStrategy {
 
             let (event, event_id) = create_and_import_event(&display.coordinator).await?;
             wait_events.insert(image_id as ImageId, (event, event_id));
-            let (event, event_id) = create_and_import_event(&display.coordinator).await?;
-            signal_events.insert(image_id as ImageId, (event, event_id));
         }
 
         let frame_set = FrameSet::new(collection_id, image_ids);
 
         display.coordinator.set_layer_primary_config(&display.layer_id.into(), &image_metadata)?;
 
-        Ok(DisplayResources { context, image_indexes, frame_set, wait_events, signal_events })
+        Ok(DisplayResources {
+            frame_set,
+            image_indexes,
+            context,
+            wait_events,
+            busy_images: VecDeque::new(),
+        })
     }
 
     async fn maybe_reallocate_display_resources(&mut self) -> Result<(), Error> {
@@ -467,16 +483,11 @@ impl DisplayDirectViewStrategy {
             .unwrap_or_else(|e| panic!("Update error: {:?}", e));
     }
 
-    fn duplicate_signal_event(&mut self, image_id: u64) -> Result<Event, Error> {
-        let (signal_event, _) =
-            self.display_resources().signal_events.get(&image_id).expect("signal event");
-        let local_event =
-            signal_event.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("duplicate_handle");
-        local_event.as_handle_ref().signal(Signals::EVENT_SIGNALED, Signals::NONE).expect("signal");
-        Ok(local_event)
-    }
-
-    fn handle_vsync_parameters_changed(&mut self, phase: MonotonicInstant, interval: Duration) {
+    fn handle_vsync_parameters_changed(
+        &mut self,
+        phase: MonotonicInstant,
+        interval: MonotonicDuration,
+    ) {
         self.vsync_phase = phase;
         self.vsync_interval = interval;
     }
@@ -555,6 +566,7 @@ impl ViewStrategy for DisplayDirectViewStrategy {
 
     fn present(&mut self, view_details: &ViewDetails) {
         duration!(c"gfx", c"DisplayDirectViewStrategy::present");
+
         if self.render_frame_count == 1 && self.presented.is_some() {
             return;
         }
@@ -565,7 +577,6 @@ impl ViewStrategy for DisplayDirectViewStrategy {
                 fuchsia_trace::Scope::Process,
                 "prepared" => format!("{}", prepared).as_str()
             );
-            let signal_sender = self.app_sender.clone();
             let collection_id = self.collection_id;
             let view_key = view_details.key;
             self.display
@@ -575,10 +586,9 @@ impl ViewStrategy for DisplayDirectViewStrategy {
                     &[self.display.layer_id.into()],
                 )
                 .expect("set_display_layers");
+
             let (_, wait_event_id) =
                 *self.display_resources().wait_events.get(&prepared).expect("wait event");
-            let (_, signal_event_id) =
-                *self.display_resources().signal_events.get(&prepared).expect("signal event");
 
             let image_id = DisplayImageId(prepared);
             self.display
@@ -587,24 +597,23 @@ impl ViewStrategy for DisplayDirectViewStrategy {
                     &self.display.layer_id.into(),
                     &image_id.into(),
                     &wait_event_id.into(),
-                    &signal_event_id.into(),
+                    &fidl_fuchsia_hardware_display::EventId { value: 0 },
                 )
                 .expect("Frame::present() set_layer_image");
-            self.display.coordinator.apply_config().expect("Frame::present() apply_config");
-            let local_event =
-                self.duplicate_signal_event(prepared).expect("duplicate_signal_event");
-            fasync::Task::local(async move {
-                let signals = OnSignals::new(&local_event, Signals::EVENT_SIGNALED);
-                signals.await.expect("to wait");
-                signal_sender
-                    .unbounded_send(MessageInternal::ImageFreed(
-                        view_key,
-                        image_id.0,
-                        collection_id.0 as u32,
-                    ))
-                    .expect("unbounded_send");
-            })
-            .detach();
+
+            self.last_config_stamp += 1;
+            let stamp = ConfigStamp { value: self.last_config_stamp };
+            let req = CoordinatorApplyConfig3Request { stamp: Some(stamp), ..Default::default() };
+
+            self.display.coordinator.apply_config3(req).expect("Frame::present() apply_config");
+
+            self.display_resources().busy_images.push_back(BusyImage {
+                stamp,
+                view_key,
+                image_id,
+                collection_id,
+            });
+
             self.display_resources().frame_set.mark_presented(prepared);
             self.presented = Some(prepared);
         }
@@ -692,9 +701,11 @@ impl ViewStrategy for DisplayDirectViewStrategy {
         event: CoordinatorListenerRequest,
     ) {
         match event {
-            CoordinatorListenerRequest::OnVsync { timestamp, cookie, .. } => {
+            CoordinatorListenerRequest::OnVsync {
+                timestamp, cookie, applied_config_stamp, ..
+            } => {
                 duration!(c"gfx", c"DisplayDirectViewStrategy::OnVsync");
-                let vsync_interval = Duration::from_nanos(
+                let vsync_interval = MonotonicDuration::from_nanos(
                     100_000_000_000 / self.display.info.modes[0].refresh_rate_e2 as i64,
                 );
                 self.handle_vsync_parameters_changed(
@@ -707,9 +718,43 @@ impl ViewStrategy for DisplayDirectViewStrategy {
                         .acknowledge_vsync(cookie.value)
                         .expect("acknowledge_vsync");
                 }
-                self.app_sender
+
+                let signal_sender = self.app_sender.clone();
+
+                // Busy images are stamped with monotonically increasing values (because the last
+                // stamp added to the deque is always greater than the previous).  So when we see a
+                // vsync stamp, all images with a *strictly-lesser* stamp are now available for
+                // reuse (images with an *equal* stamp are the ones currently displayed on-screen,
+                // so can't be reused yet).
+                if let Some(display_resources) = self.display_resources.as_mut() {
+                    let busy_images = &mut display_resources.busy_images;
+                    while !busy_images.is_empty() {
+                        let front = &busy_images.front().unwrap();
+                        if applied_config_stamp.value <= front.stamp.value {
+                            break;
+                        }
+
+                        signal_sender
+                            .unbounded_send(MessageInternal::ImageFreed(
+                                front.view_key,
+                                front.image_id.0,
+                                front.collection_id.0 as u32,
+                            ))
+                            .expect("unbounded_send");
+
+                        busy_images.pop_front();
+                    }
+                }
+
+                signal_sender
                     .unbounded_send(MessageInternal::Render(self.key))
                     .expect("unbounded_send");
+            }
+            CoordinatorListenerRequest::OnDisplaysChanged { .. } => {
+                eprintln!("Carnelian ignoring CoordinatorListenerRequest::OnDisplaysChanged");
+            }
+            CoordinatorListenerRequest::OnClientOwnershipChange { has_ownership, .. } => {
+                eprintln!("Carnelian ignoring CoordinatorListenerRequest::OnClientOwnershipChange (value: {})", has_ownership);
             }
             _ => (),
         }

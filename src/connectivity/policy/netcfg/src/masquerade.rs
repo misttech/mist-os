@@ -185,8 +185,10 @@ impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
                 Err(fnet_filter_deprecated::FilterUpdateNatRulesError::GenerationMismatch) => {
                     // We need to try again.
                     fuchsia_async::Timer::new(
-                        zx::Duration::from_millis(crate::filter::FILTER_CAS_RETRY_INTERVAL_MILLIS)
-                            .after_now(),
+                        zx::MonotonicDuration::from_millis(
+                            crate::filter::FILTER_CAS_RETRY_INTERVAL_MILLIS,
+                        )
+                        .after_now(),
                     )
                     .await;
                 }
@@ -500,7 +502,7 @@ pub mod test {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn enable_disable_masquerade() {
         let filter = MockFilter::default();
         let mut filter_enabled_state = FilterEnabledState::default();
@@ -563,7 +565,7 @@ pub mod test {
         Err(Error::InvalidArguments);
         "invalid subnet"
     )]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn masquerade(
         config: ValidatedConfig,
         fail_generations: Option<i32>,

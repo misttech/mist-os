@@ -372,8 +372,9 @@ where
         let dwell_time = std::time::Duration::from_millis(dwell_time_ms);
 
         let timeout = fasync::MonotonicInstant::after(
-            Duration::from_millis((dwell_time_ms * all_channels.len() as u64).try_into().unwrap())
-                + SCAN_EXTRA_TIMEOUT,
+            zx::MonotonicDuration::from_millis(
+                (dwell_time_ms * all_channels.len() as u64).try_into().unwrap(),
+            ) + SCAN_EXTRA_TIMEOUT,
         );
 
         use futures::channel::mpsc;
@@ -443,8 +444,9 @@ where
         let dwell_time = std::time::Duration::from_millis(dwell_time_ms);
 
         let timeout = fasync::MonotonicInstant::after(
-            Duration::from_millis((dwell_time_ms * all_channels.len() as u64).try_into().unwrap())
-                + SCAN_EXTRA_TIMEOUT,
+            zx::MonotonicDuration::from_millis(
+                (dwell_time_ms * all_channels.len() as u64).try_into().unwrap(),
+            ) + SCAN_EXTRA_TIMEOUT,
         );
 
         use futures::channel::mpsc;
@@ -532,7 +534,8 @@ where
     async fn send_mfg_command(&self, command: &str) -> ZxResult<String> {
         // For this method we are sending manufacturing commands to the normal
         // OpenThread CLI interface one at a time
-        const WAIT_FOR_RESPONSE_TIMEOUT: Duration = Duration::from_seconds(120);
+        const WAIT_FOR_RESPONSE_TIMEOUT: zx::MonotonicDuration =
+            zx::MonotonicDuration::from_seconds(120);
 
         info!(tag = "api", "CLI command: {:?}", command);
 
@@ -748,7 +751,7 @@ where
             .collect::<Vec<_>>())
     }
 
-    async fn make_joinable(&self, _duration: zx::Duration, _port: u16) -> ZxResult<()> {
+    async fn make_joinable(&self, _duration: zx::MonotonicDuration, _port: u16) -> ZxResult<()> {
         warn!(tag = "api", "make_joinable: NOT_SUPPORTED");
         return Err(ZxStatus::NOT_SUPPORTED);
     }

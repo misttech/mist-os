@@ -6,7 +6,7 @@
 /// MinFs is broken.
 use {
     fidl::endpoints::{Proxy, RequestStream, ServerEnd},
-    fidl_fuchsia_io as fio,
+    fidl_fuchsia_io::{self as fio},
     fidl_fuchsia_pkg_ext::RepositoryConfig,
     fidl_fuchsia_pkg_rewrite_ext::Rule,
     fuchsia_async as fasync,
@@ -21,6 +21,7 @@ use {
         atomic::{AtomicBool, AtomicU64},
         Arc,
     },
+    vfs::{ObjectRequest, ObjectRequestRef},
     zx::Status,
 };
 
@@ -33,6 +34,15 @@ trait OpenRequestHandler: Sized {
         control_handle: fio::DirectoryControlHandle,
         parent: Arc<DirectoryStreamHandler<Self>>,
     );
+
+    fn handle_open3_request(
+        &self,
+        _path: String,
+        _flags: fio::Flags,
+        _object_request: ObjectRequestRef<'_>,
+        _control_handle: fio::DirectoryControlHandle,
+        _parent: Arc<DirectoryStreamHandler<Self>>,
+    ) -> Result<(), Status>;
 }
 
 struct DirectoryStreamHandler<O: Sized> {
@@ -72,6 +82,23 @@ where
                         control_handle,
                         Arc::clone(&self),
                     ),
+                    fio::DirectoryRequest::Open3 {
+                        path,
+                        flags,
+                        options,
+                        object,
+                        control_handle,
+                    } => {
+                        ObjectRequest::new3(flags, &options, object).handle(|request| {
+                            self.open_handler.handle_open3_request(
+                                path,
+                                flags,
+                                request,
+                                control_handle,
+                                Arc::clone(&self),
+                            )
+                        });
+                    }
                     fio::DirectoryRequest::Close { .. } => (),
                     req => panic!("DirectoryStreamHandler unhandled request {:?}", req),
                 }
@@ -138,6 +165,53 @@ impl OpenRequestHandler for OpenFailOrTempFs {
             )
             .unwrap();
             tempdir_proxy.open(flags, fio::ModeType::empty(), &path, object).unwrap();
+        }
+    }
+
+    fn handle_open3_request(
+        &self,
+        path: String,
+        flags: fio::Flags,
+        object_request: ObjectRequestRef<'_>,
+        _control_handle: fio::DirectoryControlHandle,
+        parent: Arc<DirectoryStreamHandler<Self>>,
+    ) -> Result<(), Status> {
+        if self.should_fail() {
+            if path == "." {
+                let stream = fio::NodeRequestStream::from_channel(fasync::Channel::from_channel(
+                    object_request.take().into_channel(),
+                ));
+                if flags.intersects(fio::Flags::FLAG_SEND_REPRESENTATION) {
+                    let control_handle = stream.control_handle();
+                    let representation =
+                        fio::Representation::Directory(fio::DirectoryInfo::default());
+                    control_handle
+                        .send_on_representation(representation)
+                        .map_err(|_| Status::PEER_CLOSED)?;
+                }
+                fasync::Task::spawn(parent.handle_stream(stream.cast_stream())).detach();
+            } else {
+                self.fail_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            }
+            Ok(())
+        } else {
+            let (tempdir_proxy, server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                    .map_err(|_e| Status::INTERNAL)?;
+            fuchsia_fs::directory::open_channel_in_namespace(
+                self.tempdir.path().to_str().unwrap(),
+                fio::PERM_READABLE | fio::PERM_WRITABLE,
+                server_end,
+            )
+            .map_err(|_| Status::INTERNAL)?;
+            // The channel will be dropped and closed if the wire call fails.
+            let _ = tempdir_proxy.open3(
+                &path,
+                flags,
+                &object_request.options(),
+                object_request.take().into_channel(),
+            );
+            Ok(())
         }
     }
 }
@@ -248,6 +322,72 @@ impl OpenRequestHandler for WriteFailOrTempFs {
             send_onopen,
         ))
         .detach();
+    }
+
+    fn handle_open3_request(
+        &self,
+        path: String,
+        flags: fio::Flags,
+        object_request: ObjectRequestRef<'_>,
+        _control_handle: fio::DirectoryControlHandle,
+        parent: Arc<DirectoryStreamHandler<Self>>,
+    ) -> Result<(), Status> {
+        if path == "." && self.should_fail() {
+            let stream = fio::NodeRequestStream::from_channel(fasync::Channel::from_channel(
+                object_request.take().into_channel(),
+            ));
+            mock_filesystem::send_directory_representation(flags, &stream)?;
+            fasync::Task::spawn(parent.handle_stream(stream.cast_stream())).detach();
+            return Ok(());
+        }
+
+        if !self.files_to_fail_writes.contains(&path) {
+            // We don't want to intercept file operations, so just open the file normally.
+            let _ = self.tempdir_proxy.open3(
+                &path,
+                flags,
+                &object_request.options(),
+                object_request.take().into_channel(),
+            );
+            return Ok(());
+        }
+
+        // This file matched our configured set of paths to intercept operations for, so open a
+        // backing file and send all file operations which the client thinks it's sending
+        // to the backing file instead to our FailingWriteFileStreamHandler.
+        let (file_requests, file_control_handle) =
+            ServerEnd::<fio::FileMarker>::new(object_request.take().into_channel())
+                .into_stream_and_control_handle()
+                .map_err(|_| Status::INTERNAL)?;
+
+        // Create a proxy to the actual file we'll open to proxy to.
+        let (backing_node_proxy, backing_node_server_end) =
+            fidl::endpoints::create_proxy::<fio::NodeMarker>().map_err(|_| Status::INTERNAL)?;
+
+        self.tempdir_proxy
+            .open3(&path, flags, &object_request.options(), backing_node_server_end.into_channel())
+            .map_err(|_| Status::INTERNAL)?;
+
+        // All the things pkg-resolver attempts to open in these tests are files,
+        // not directories, so cast the NodeProxy to a FileProxy. If the pkg-resolver assumption
+        // changes, this code will have to support both.
+        let backing_file_proxy = fio::FileProxy::new(backing_node_proxy.into_channel().unwrap());
+        let send_onopen = flags.intersects(fio::Flags::FLAG_SEND_REPRESENTATION);
+
+        let file_handler = Arc::new(FailingWriteFileStreamHandler::new(
+            backing_file_proxy,
+            String::from(path),
+            Arc::clone(&self.should_fail),
+            Arc::clone(&self.fail_count),
+        ));
+
+        fasync::Task::spawn(file_handler.handle_stream(
+            file_requests,
+            file_control_handle,
+            send_onopen,
+        ))
+        .detach();
+        Ok(())
     }
 }
 
@@ -446,6 +586,23 @@ impl OpenRequestHandler for RenameFailOrTempFs {
                             Arc::clone(&parent.clone()),
                         );
                     }
+                    fio::DirectoryRequest::Open3 {
+                        path,
+                        flags,
+                        options,
+                        object,
+                        control_handle,
+                    } => {
+                        ObjectRequest::new3(flags, &options, object).handle(|request| {
+                            parent.open_handler.handle_open3_request(
+                                path,
+                                flags,
+                                request,
+                                control_handle,
+                                Arc::clone(&parent.clone()),
+                            )
+                        });
+                    }
                     other => {
                         panic!("unhandled request type for path {:?}: {:?}", path, other);
                     }
@@ -453,6 +610,108 @@ impl OpenRequestHandler for RenameFailOrTempFs {
             }
         })
         .detach();
+    }
+
+    fn handle_open3_request(
+        &self,
+        path: String,
+        flags: fio::Flags,
+        object_request: ObjectRequestRef<'_>,
+        _control_handle: fio::DirectoryControlHandle,
+        parent: Arc<DirectoryStreamHandler<Self>>,
+    ) -> Result<(), Status> {
+        // Set up proxy to tmpdir and delegate to it on success.
+        let (tempdir_proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+            .map_err(|_e| Status::INTERNAL)?;
+        fuchsia_fs::directory::open_channel_in_namespace(
+            self.tempdir.path().to_str().unwrap(),
+            fio::PERM_READABLE | fio::PERM_WRITABLE,
+            server_end,
+        )
+        .map_err(|_| Status::INTERNAL)?;
+        if !self.should_fail() || path != "." {
+            let _ = tempdir_proxy.open3(
+                &path,
+                flags,
+                &object_request.options(),
+                object_request.take().into_channel(),
+            );
+            return Ok(());
+        }
+
+        // Prepare to handle the directory requests.
+        let stream = fio::NodeRequestStream::from_channel(fasync::Channel::from_channel(
+            object_request.take().into_channel(),
+        ));
+        mock_filesystem::send_directory_representation(flags, &stream)?;
+        let fail_count = Arc::clone(&self.fail_count);
+        let files_to_fail_renames = Clone::clone(&self.files_to_fail_renames);
+
+        let mut requests = stream.cast_stream::<fio::DirectoryRequestStream>();
+
+        // Handle the directory requests.
+        fasync::Task::spawn(async move {
+            while let Some(req) = requests.next().await {
+                match req.unwrap() {
+                    fio::DirectoryRequest::GetAttr { responder } => {
+                        let (status, attrs) = tempdir_proxy.get_attr().await.unwrap();
+                        responder.send(status, &attrs).unwrap();
+                    }
+                    fio::DirectoryRequest::Close { responder } => {
+                        let result = tempdir_proxy.close().await.unwrap();
+                        responder.send(result).unwrap();
+                    }
+                    fio::DirectoryRequest::GetToken { responder } => {
+                        let (status, handle) = tempdir_proxy.get_token().await.unwrap();
+                        responder.send(status, handle).unwrap();
+                    }
+                    fio::DirectoryRequest::Rename { src, dst, responder, .. } => {
+                        if !files_to_fail_renames.contains(&src) {
+                            panic!("unsupported rename from {} to {}", src, dst);
+                        }
+                        fail_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                        responder.send(Err(Status::NOT_FOUND.into_raw())).unwrap();
+                    }
+                    fio::DirectoryRequest::Open {
+                        flags,
+                        mode: _,
+                        path,
+                        object,
+                        control_handle,
+                    } => {
+                        parent.open_handler.handle_open_request(
+                            flags,
+                            path,
+                            object,
+                            control_handle,
+                            Arc::clone(&parent.clone()),
+                        );
+                    }
+                    fio::DirectoryRequest::Open3 {
+                        path,
+                        flags,
+                        options,
+                        object,
+                        control_handle,
+                    } => {
+                        ObjectRequest::new3(flags, &options, object).handle(|request| {
+                            parent.open_handler.handle_open3_request(
+                                path,
+                                flags,
+                                request,
+                                control_handle,
+                                Arc::clone(&parent.clone()),
+                            )
+                        });
+                    }
+                    other => {
+                        panic!("unhandled request type for path {:?}: {:?}", path, other);
+                    }
+                }
+            }
+        })
+        .detach();
+        Ok(())
     }
 }
 

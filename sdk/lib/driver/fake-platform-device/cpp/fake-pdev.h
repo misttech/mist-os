@@ -81,6 +81,19 @@ class FakePDev : public fidl::WireServer<fuchsia_hardware_platform_device::Devic
 
   void set_metadata(MetadataMap metadata) { metadata_ = std::move(metadata); }
 
+  template <typename FidlType>
+  zx_status_t AddFidlMetadata(std::string metadata_id, const FidlType& metadata) {
+    static_assert(fidl::IsFidlType<FidlType>::value, "|FidlType| must be a FIDL domain object.");
+    static_assert(!fidl::IsResource<FidlType>::value,
+                  "|FidlType| cannot be a resource type. Resources cannot be persisted.");
+    fit::result encoded_metadata = fidl::Persist(metadata);
+    if (encoded_metadata.is_error()) {
+      return encoded_metadata.error_value().status();
+    }
+    metadata_.insert({std::move(metadata_id), std::move(encoded_metadata.value())});
+    return ZX_OK;
+  }
+
  private:
   void GetMmioById(GetMmioByIdRequestView request, GetMmioByIdCompleter::Sync& completer) override;
   void GetMmioByName(GetMmioByNameRequestView request,

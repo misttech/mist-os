@@ -21,7 +21,7 @@ fuchsia::logger::LogMessage BuildLogMessage(const int32_t severity, const std::s
                                             const zx::duration timestamp_offset = zx::nsec(0),
                                             const std::vector<std::string>& tags = {}) {
   fuchsia::logger::LogMessage msg{};
-  msg.time = (kLogMessageBaseTimestamp + timestamp_offset).get();
+  msg.time = zx::time_boot((kLogMessageBaseTimestamp + timestamp_offset).get());
   msg.pid = kLogMessageProcessId;
   msg.tid = kLogMessageThreadId;
   msg.tags = tags;

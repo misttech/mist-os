@@ -274,7 +274,8 @@ TEST(GpioImplVisitorTest, TestGpiosProperty) {
 
       // 4th parent is GPIO INIT.
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO)}},
+          {{fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+            fdf::MakeProperty(bind_fuchsia::GPIO_CONTROLLER, static_cast<uint32_t>(0))}},
           (*mgr_request.parents())[3].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
           {{fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
@@ -297,7 +298,8 @@ TEST(GpioImplVisitorTest, TestGpiosProperty) {
       // 1st parent is pdev. Skipping that.
       // 2nd and 3rd parents are GPIO INIT of different gpio controllers.
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO)}},
+          {{fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+            fdf::MakeProperty(bind_fuchsia::GPIO_CONTROLLER, static_cast<uint32_t>(0))}},
           (*mgr_request.parents())[1].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
           {{fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
@@ -306,7 +308,8 @@ TEST(GpioImplVisitorTest, TestGpiosProperty) {
           (*mgr_request.parents())[1].bind_rules(), false));
 
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO)}},
+          {{fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+            fdf::MakeProperty(bind_fuchsia::GPIO_CONTROLLER, static_cast<uint32_t>(1))}},
           (*mgr_request.parents())[2].properties(), false));
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
           {{fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,

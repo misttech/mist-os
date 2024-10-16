@@ -123,7 +123,6 @@ zx::result<std::unique_ptr<VolumeConnector>> BlockDevices::OpenPartition(
 
   struct dirent* de;
   while ((de = readdir(dir)) != nullptr) {
-    LOG("Entry %s\n", std::string(de->d_name).c_str());
     if (std::string_view{de->d_name} == ".") {
       continue;
     }
@@ -135,7 +134,7 @@ zx::result<std::unique_ptr<VolumeConnector>> BlockDevices::OpenPartition(
     }
     std::string filename(de->d_name, strnlen(de->d_name, sizeof(de->d_name)));
     if (partitions_root_) {
-      filename.append("/block");
+      filename.append("/svc/fuchsia.storagehost.PartitionService/volume");
     }
     if (zx_status_t status = fdio_service_connect_at(caller.borrow_channel(), filename.c_str(),
                                                      partition_remote.release());
@@ -197,7 +196,9 @@ zx::result<std::unique_ptr<VolumeConnector>> BlockDevices::WaitForPartition(
       return ZX_OK;
     }
     auto info = static_cast<CallbackInfo*>(cookie);
-    auto path = info->is_partitions_dir ? std::string(filename) + "/block" : std::string(filename);
+    auto path = info->is_partitions_dir
+                    ? std::string(filename) + "/svc/fuchsia.storagehost.PartitionService/volume"
+                    : std::string(filename);
     fdio_cpp::UnownedFdioCaller caller(dirfd);
 
     zx::channel partition_local, partition_remote;

@@ -1,6 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use crate::CapabilityBound;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use std::fmt::Debug;
 
@@ -18,6 +19,8 @@ impl From<Unit> for fsandbox::Capability {
         Self::Unit(unit.into())
     }
 }
+
+impl CapabilityBound for Unit {}
 
 #[cfg(test)]
 mod tests {

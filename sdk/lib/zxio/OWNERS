@@ -1,3 +1,1 @@
-abarth@google.com
-jamesr@google.com
-yifeit@google.com
+include /sdk/fidl/fuchsia.io/OWNERS

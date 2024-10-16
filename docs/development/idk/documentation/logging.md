@@ -12,4 +12,4 @@ When you work with the IDK, one of the main tools for working with logs is
 To learn more about logging on Fuchsia, see [Logging on Fuchsia][logs-concepts].
 
 [ffx-log-ref]: /reference/tools/sdk/ffx.md#ffx_log
-[logs-concepts]: /docs/concepts/components/diagnostics/logs/README.md
+[logs-concepts]: /docs/concepts/components/diagnostics/README.md

@@ -99,9 +99,9 @@ impl WindowedStats<SumAndCount> {
 /// `granularity`.
 fn get_start_bound(
     timestamp: fasync::MonotonicInstant,
-    granularity: zx::Duration,
+    granularity: zx::MonotonicDuration,
 ) -> fasync::MonotonicInstant {
-    timestamp - zx::Duration::from_nanos(timestamp.into_nanos() % granularity.into_nanos())
+    timestamp - zx::MonotonicDuration::from_nanos(timestamp.into_nanos() % granularity.into_nanos())
 }
 
 /// Given the `prev` and `current` timestamps, return how many windows need to be slided
@@ -109,7 +109,7 @@ fn get_start_bound(
 fn get_num_slides_needed(
     prev: fasync::MonotonicInstant,
     current: fasync::MonotonicInstant,
-    granularity: zx::Duration,
+    granularity: zx::MonotonicDuration,
 ) -> usize {
     let prev_start_bound = get_start_bound(prev, granularity);
     let current_start_bound = get_start_bound(current, granularity);
@@ -177,15 +177,23 @@ impl<T: Default> TimeSeries<T> {
     /// then slide windows as many times as required until the window encompasses the current time.
     pub fn update_windows(&mut self) {
         let now = fasync::MonotonicInstant::now();
-        for _i in 0..get_num_slides_needed(self.last_timestamp, now, zx::Duration::from_minutes(1))
-        {
+        for _i in 0..get_num_slides_needed(
+            self.last_timestamp,
+            now,
+            zx::MonotonicDuration::from_minutes(1),
+        ) {
             self.minutely.slide_window();
         }
-        for _i in 0..get_num_slides_needed(self.last_timestamp, now, zx::Duration::from_minutes(15))
-        {
+        for _i in 0..get_num_slides_needed(
+            self.last_timestamp,
+            now,
+            zx::MonotonicDuration::from_minutes(15),
+        ) {
             self.fifteen_minutely.slide_window();
         }
-        for _i in 0..get_num_slides_needed(self.last_timestamp, now, zx::Duration::from_hours(1)) {
+        for _i in
+            0..get_num_slides_needed(self.last_timestamp, now, zx::MonotonicDuration::from_hours(1))
+        {
             self.hourly.slide_window();
         }
         self.last_timestamp = now;

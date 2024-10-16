@@ -49,6 +49,9 @@ typedef struct buffer_descriptor {
   // descriptors VMO.
   //
   // |DESC_NO_INFO| describes no extra information.
+  // TODO(https://fxbug.dev/373642881): Drivers are currently not capable of
+  // consuming or generating extra frame metadata, so this is effectively
+  // unused. Removal is under consideration.
   uint32_t info_type;
 
   // Frame's device port identifier.

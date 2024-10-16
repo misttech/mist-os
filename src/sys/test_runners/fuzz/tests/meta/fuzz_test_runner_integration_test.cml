@@ -30,14 +30,6 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [
-                "#fuzz-manager",
-                "#fuzz-registry",
-            ],
-        },
-        {
             protocol: "fuchsia.component.Realm",
             from: "framework",
             to: "#test_manager",

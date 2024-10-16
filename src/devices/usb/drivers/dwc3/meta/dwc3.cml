@@ -16,6 +16,7 @@
         fallback: "false",
     },
     capabilities: [
+        { protocol: "fuchsia.hardware.usb.endpoint.Endpoint" },
         { service: "fuchsia.hardware.usb.dci.UsbDciService" },
     ],
     use: [
@@ -24,6 +25,10 @@
     expose: [
         {
             service: "fuchsia.hardware.usb.dci.UsbDciService",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.hardware.usb.endpoint.Endpoint",
             from: "self",
         },
     ],

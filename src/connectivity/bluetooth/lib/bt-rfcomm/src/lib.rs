@@ -13,12 +13,8 @@ pub use error::Error as RfcommError;
 /// The definitions for RFCOMM frames - the basic unit of data in RFCOMM.
 pub mod frame;
 
-/// Convenience helpers for profiles that request RFCOMM.
+/// Convenience helpers for the `bredr.Profile` API RFCOMM operations.
 pub mod profile;
-
-/// The largest frame size that this RFCOMM implementation accepts. Currently, the default
-/// max TX size of the underlying fuchsia_bluetooth::Channel.
-pub const MAX_RFCOMM_FRAME_SIZE: usize = fuchsia_bluetooth::types::Channel::DEFAULT_MAX_TX;
 
 /// The Role assigned to a device in an RFCOMM Session.
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -48,6 +44,12 @@ impl Role {
     pub fn is_multiplexer_started(&self) -> bool {
         *self == Role::Initiator || *self == Role::Responder
     }
+}
+
+/// Returns the maximum RFCOMM packet size that can be used for the provided L2CAP `mtu`.
+/// It is assumed that `mtu` is a valid L2CAP MTU.
+pub fn max_packet_size_from_l2cap_mtu(mtu: u16) -> u16 {
+    mtu - crate::frame::MAX_RFCOMM_HEADER_SIZE as u16
 }
 
 #[cfg(test)]

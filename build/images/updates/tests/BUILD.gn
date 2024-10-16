@@ -232,7 +232,7 @@ if (is_host) {
       "//tools/devshell/contrib/publish.py",
       "//tools/devshell/contrib/terminal.py",
     ]
-    deps = [ ":fx_publish_gn_test_data" ]
+    test_data_deps = [ ":fx_publish_gn_test_data" ]
     main_callable = "main"
     extra_args = [
       "--test-dir",
@@ -256,7 +256,7 @@ if (is_host) {
       "//tools/devshell/contrib/publish.py",
       "//tools/devshell/contrib/terminal.py",
     ]
-    deps = [ ":fx_publish_bazel_test_data" ]
+    test_data_deps = [ ":fx_publish_bazel_test_data" ]
     main_callable = "main"
     extra_args = [
       "--test-dir",

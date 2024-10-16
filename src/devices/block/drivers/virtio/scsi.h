@@ -6,9 +6,10 @@
 #define SRC_DEVICES_BLOCK_DRIVERS_VIRTIO_SCSI_H_
 
 #include <lib/dma-buffer/buffer.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/fzl/vmo-mapper.h>
-#include <lib/scsi/block-device-dfv1.h>
-#include <lib/scsi/controller-dfv1.h>
+#include <lib/scsi/block-device.h>
+#include <lib/scsi/controller.h>
 #include <lib/sync/completion.h>
 #include <lib/virtio/backends/backend.h>
 #include <lib/virtio/device.h>
@@ -22,7 +23,6 @@
 #include <memory>
 #include <optional>
 
-#include <ddktl/device.h>
 #include <fbl/auto_lock.h>
 #include <fbl/condition_variable.h>
 #include <virtio/scsi.h>
@@ -31,7 +31,9 @@ namespace virtio {
 
 constexpr int MAX_IOS = 16;
 
-class ScsiDevice : public virtio::Device, public scsi::Controller, public ddk::Device<ScsiDevice> {
+class ScsiDriver;
+
+class ScsiDevice : public virtio::Device {
  public:
   enum Queue {
     CONTROL = 0,
@@ -39,43 +41,30 @@ class ScsiDevice : public virtio::Device, public scsi::Controller, public ddk::D
     REQUEST = 2,
   };
 
-  ScsiDevice(zx_device_t* device, zx::bti bti, std::unique_ptr<Backend> backend)
-      : virtio::Device(std::move(bti), std::move(backend)),
-        ddk::Device<ScsiDevice>(device),
-        device_(device) {}
+  ScsiDevice(ScsiDriver* scsi_driver, zx::bti bti, std::unique_ptr<Backend> backend)
+      : virtio::Device(std::move(bti), std::move(backend)), scsi_driver_(scsi_driver) {}
 
   // virtio::Device overrides
   zx_status_t Init() override;
-  void DdkRelease();
   // Invoked for most device interrupts.
-  virtual void IrqRingUpdate() override;
+  void IrqRingUpdate() override;
   // Invoked on config change interrupts.
   void IrqConfigChange() override {}
-
-  // scsi::Controller overrides
-  size_t BlockOpSize() override {
-    // No additional metadata required for each command transaction.
-    return sizeof(scsi::DeviceOp);
-  }
-  zx_status_t ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
-                                 iovec data) override;
-  void ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
-                           uint32_t block_size_bytes, scsi::DeviceOp* device_op,
-                           iovec data) override;
-
   const char* tag() const override { return "virtio-scsi"; }
 
   static void FillLUNStructure(struct virtio_scsi_req_cmd* req, uint8_t target, uint16_t lun);
 
- private:
   void QueueCommand(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
                     zx::unowned_vmo data_vmo, zx_off_t vmo_offset_bytes, size_t transfer_bytes,
                     void (*cb)(void*, zx_status_t), void* cookie, void* data, bool vmar_mapped,
                     std::optional<zx::vmo> trim_data_vmo = std::nullopt);
 
-  zx_status_t WorkerThread();
-
   zx::result<> AllocatePages(zx::vmo& vmo, fzl::VmoMapper& mapper, size_t size);
+
+  zx_status_t ProbeLuns();
+
+ private:
+  ScsiDriver* const scsi_driver_;
 
   // Latched copy of virtio-scsi device configuration.
   struct virtio_scsi_config config_ TA_GUARDED(lock_) = {};
@@ -103,13 +92,8 @@ class ScsiDevice : public virtio::Device, public scsi::Controller, public ddk::D
   size_t request_buffers_size_;
   scsi_io_slot scsi_io_slot_table_[MAX_IOS] TA_GUARDED(lock_) = {};
 
-  zx_device_t* device_ = nullptr;
-
   Ring control_ring_ TA_GUARDED(lock_){this};
   Ring request_queue_{this};
-
-  thrd_t worker_thread_;
-  bool worker_thread_should_exit_ TA_GUARDED(lock_) = {};
 
   // Synchronizes virtio rings and worker thread control.
   fbl::Mutex lock_;
@@ -120,6 +104,42 @@ class ScsiDevice : public virtio::Device, public scsi::Controller, public ddk::D
   fbl::ConditionVariable desc_cv_ __TA_GUARDED(lock_);
   uint32_t active_ios_ __TA_GUARDED(lock_);
   uint64_t scsi_transport_tag_ __TA_GUARDED(lock_);
+};
+
+class ScsiDriver : public fdf::DriverBase, public scsi::Controller {
+ public:
+  static constexpr char kDriverName[] = "virtio-scsi";
+
+  ScsiDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
+      : fdf::DriverBase(kDriverName, std::move(start_args), std::move(dispatcher)) {}
+
+  zx::result<> Start() override;
+
+  void PrepareStop(fdf::PrepareStopCompleter completer) override;
+
+  // scsi::Controller overrides
+  fidl::WireSyncClient<fuchsia_driver_framework::Node>& root_node() override { return root_node_; }
+  std::string_view driver_name() const override { return name(); }
+  const std::shared_ptr<fdf::Namespace>& driver_incoming() const override { return incoming(); }
+  std::shared_ptr<fdf::OutgoingDirectory>& driver_outgoing() override { return outgoing(); }
+  const std::optional<std::string>& driver_node_name() const override { return node_name(); }
+  fdf::Logger& driver_logger() override { return logger(); }
+  size_t BlockOpSize() override {
+    // No additional metadata required for each command transaction.
+    return sizeof(scsi::DeviceOp);
+  }
+  zx_status_t ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
+                                 iovec data) override;
+  void ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
+                           uint32_t block_size_bytes, scsi::DeviceOp* device_op,
+                           iovec data) override;
+
+ private:
+  std::unique_ptr<ScsiDevice> scsi_device_;
+
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> root_node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> node_controller_;
 };
 
 }  // namespace virtio

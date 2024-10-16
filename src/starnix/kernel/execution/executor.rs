@@ -82,12 +82,16 @@ pub struct RestrictedState {
 }
 
 impl RestrictedState {
-    pub fn from_vmo(state_vmo: zx::Vmo) -> Result<Self, Error> {
+    pub fn from_vmo(state_vmo: zx::Vmo) -> Result<Self, zx::Status> {
         // Map the restricted state VMO and arrange for it to be unmapped later.
         let state_size = state_vmo.get_size()? as usize;
-        let state_address = fuchsia_runtime::vmar_root_self()
-            .map(0, &state_vmo, 0, state_size, zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE)
-            .unwrap();
+        let state_address = fuchsia_runtime::vmar_root_self().map(
+            0,
+            &state_vmo,
+            0,
+            state_size,
+            zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE,
+        )?;
         let bound_state =
             unsafe { std::slice::from_raw_parts_mut(state_address as *mut u8, state_size) };
         Ok(Self { state_size, bound_state })
@@ -187,11 +191,10 @@ struct RestrictedEnterContext<'a> {
 ///   4. Dispatch the system call.
 ///   5. Handle pending signals.
 ///   6. Goto 1.
-///
-/// TODO(https://fxbug.dev/42068497): Note, cross-process shared resources allocated in this function
-/// that aren't freed by the Zircon kernel upon thread and/or process termination (like mappings in
-/// the shared region) should be freed in `Task::destroy_do_not_use_outside_of_drop_if_possible()`.
-fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
+fn run_task(
+    current_task: &mut CurrentTask,
+    mut restricted_state: RestrictedState,
+) -> Result<ExitStatus, Error> {
     let mut profiling_guard = ProfileDuration::enter("TaskLoopSetup");
 
     set_zx_name(&fuchsia_runtime::thread_self(), current_task.command().as_bytes());
@@ -205,30 +208,6 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
 
     // This tracks the last failing system call for debugging purposes.
     let error_context = None;
-
-    // Allocate a VMO and bind it to this thread.
-    let mut out_vmo_handle = 0;
-    let status = zx::Status::from_raw(unsafe { zx_restricted_bind_state(0, &mut out_vmo_handle) });
-    match { status } {
-        zx::Status::OK => {
-            // We've successfully attached the VMO to the current thread. This VMO will be mapped
-            // and used for the kernel to store restricted mode register state as it enters and
-            // exits restricted mode.
-        }
-        _ => return Err(format_err!("failed restricted_bind_state: {:?}", status)),
-    }
-    let state_vmo = unsafe { zx::Vmo::from(zx::Handle::from_raw(out_vmo_handle)) };
-
-    // Unbind when we leave this scope to avoid unnecessarily retaining the VMO via this thread's
-    // binding.  Of course, we'll still have to remove any mappings and close any handles that refer
-    // to the VMO to ensure it will be destroyed.  See note about preventing resource leaks in this
-    // function's documentation.
-    scopeguard::defer! {
-        unsafe { zx_restricted_unbind_state(0); }
-    }
-
-    // Map the restricted state VMO and arrange for it to be unmapped later.
-    let mut restricted_state = RestrictedState::from_vmo(state_vmo)?;
 
     // We need to check for exit once, before the task starts executing, in case
     // the task has already been sent a signal that will cause it to exit.
@@ -505,6 +484,9 @@ where
     // `process_handle`.
     let (sender, receiver) = sync_channel::<TaskBuilder>(1);
     let result = std::thread::Builder::new().name("user-thread".to_string()).spawn(move || {
+        // Note, cross-process shared resources allocated in this function that aren't freed by the
+        // Zircon kernel upon thread and/or process termination (like mappings in the shared region)
+        // should be freed using the delayed finalizer mechanism and Task drop.
         let mut current_task: CurrentTask = receiver
             .recv()
             .expect("caller should always send task builder before disconnecting")
@@ -520,18 +502,45 @@ where
             // releasables.
             std::mem::drop(task_complete);
         } else {
-            let run_result = match run_task(&mut current_task) {
-                Err(error) => {
-                    log_warn!("Died unexpectedly from {error:?}! treating as SIGKILL");
-                    let exit_status = ExitStatus::Kill(SignalInfo::default(SIGKILL));
-
-                    current_task.write().set_exit_status(exit_status.clone());
-                    Ok(exit_status)
+            // Allocate a VMO and bind it to this thread.
+            let mut out_vmo_handle = 0;
+            let status =
+                zx::Status::from_raw(unsafe { zx_restricted_bind_state(0, &mut out_vmo_handle) });
+            match { status } {
+                zx::Status::OK => {
+                    // We've successfully attached the VMO to the current thread. This VMO will be
+                    // mapped and used for the kernel to store restricted mode register state as it
+                    // enters and exits restricted mode.
                 }
-                ok => ok,
+                _ => panic!("zx_restricted_bind_state failed with {status}!"),
+            }
+            let state_vmo = unsafe { zx::Vmo::from(zx::Handle::from_raw(out_vmo_handle)) };
+
+            // Unbind when we leave this scope to avoid unnecessarily retaining the VMO via this
+            // thread's binding.  Of course, we'll still have to remove any mappings and close any
+            // handles that refer to the VMO to ensure it will be destroyed.  See note about
+            // preventing resource leaks in this function's documentation.
+            scopeguard::defer! {
+                unsafe { zx_restricted_unbind_state(0); }
+            }
+
+            // Map the restricted state VMO and arrange for it to be unmapped later.
+            let exit_status = match RestrictedState::from_vmo(state_vmo) {
+                Ok(restricted_state) => match run_task(&mut current_task, restricted_state) {
+                    Ok(ok) => ok,
+                    Err(error) => {
+                        log_warn!("Died unexpectedly from {error:?}! treating as SIGKILL");
+                        ExitStatus::Kill(SignalInfo::default(SIGKILL))
+                    }
+                },
+                Err(error) => {
+                    log_error!("failed to map mode state vmo, {error:?}! treating as SIGKILL");
+                    ExitStatus::Kill(SignalInfo::default(SIGKILL))
+                }
             };
 
-            task_complete(run_result);
+            current_task.write().set_exit_status(exit_status.clone());
+            task_complete(Ok(exit_status));
         }
 
         // `release` must be called as the absolute last action on this thread to ensure that
@@ -705,6 +714,7 @@ pub fn interrupt_thread(thread: &zx::Thread) {
 ///
 /// When a task exits with a non-zero exit code, this context is logged to help debugging which
 /// system call may have triggered the failure.
+#[derive(Debug)]
 pub struct ErrorContext {
     /// The system call that failed.
     pub syscall: Syscall,

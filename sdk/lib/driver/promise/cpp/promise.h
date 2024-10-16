@@ -34,7 +34,7 @@ fpromise::result<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> OpenWith
     const fdf::Namespace& ns, async_dispatcher_t* dispatcher, const char* path,
     fuchsia_io::OpenFlags flags);
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(24)
 fpromise::result<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> OpenWithResult(
     const fdf::Namespace& ns, async_dispatcher_t* dispatcher, const char* path,
     fuchsia_io::Flags flags);
@@ -57,12 +57,12 @@ fpromise::promise<fidl::WireSharedClient<Protocol>, zx_status_t> Connect(
 inline fpromise::promise<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> Open(
     const fdf::Namespace& ns, async_dispatcher_t* dispatcher, const char* path,
     fuchsia_io::OpenFlags flags)
-    ZX_DEPRECATED_SINCE(1, NEXT, "Use new signature that takes fuchsia.io/Flags instead.") {
+    ZX_DEPRECATED_SINCE(1, 24, "Use new signature that takes fuchsia.io/Flags instead.") {
   return fpromise::make_result_promise(
       internal::OpenWithResultDeprecated(ns, dispatcher, path, flags));
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(24)
 // Opens the given `path` in `ns`, and returns a fpromise::promise containing a
 // fidl::WireSharedClient on success.
 inline fpromise::promise<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> Open(

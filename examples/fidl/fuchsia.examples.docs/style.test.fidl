@@ -46,17 +46,20 @@ protocol File {
     /// * [`fuchsia.io/OPEN_RIGHT_READABLE`] if `flags` includes
     ///   [`fuchsia.io/VMO_FLAG_READ`] or [`fuchsia.io/VMO_FLAG_EXEC`].
     ///
-    /// + request `flags` a bit field composing any of
-    ///     `VMO_FLAG_READ`, `VMO_FLAG_WRITE`, or `VMO_FLAG_EXEC`.
-    /// - response `buffer` the requested `fuchsia.mem/Buffer`, or
-    ///     null if there was an error, or the buffer does not exist.
-    /// * error a zx_status value indicating success or failure.
+    /// ## Error
+    ///
+    /// Returns ZX_ERR_INVALID_ARGS if `flags` contains an invalid VMO flag.
+    /// Returns ZX_ERR_NOT_FOUND if the requested buffer does not exist.
+    ///
     /// * see [`fuchsia.mem/Buffer`]
     /// [`fuchsia.mem/Buffer`]:
-    ///    https://fuchsia.googlesource.com/fuchsia/+/HEAD/sdk/fidl/fuchsia.io/
+    ///    https://fuchsia.googlesource.com/fuchsia/+/HEAD/sdk/fidl/fuchsia.mem/buffer.fidl
     GetBuffer(struct {
+        /// A bit field composing any of `VMO_FLAG_READ`, `VMO_FLAG_WRITE`, or
+        /// `VMO_FLAG_EXEC`.
         flags uint32;
     }) -> (resource struct {
+        /// The requested `fuchsia.mem/Buffer`.
         buffer box<fuchsia.mem.Buffer>;
     }) error zx.Status;
 };

@@ -17,7 +17,7 @@ impl Clock for Monotonic {
 }
 
 pub(crate) struct RateLimiter<C> {
-    delay: zx::Duration,
+    delay: zx::MonotonicDuration,
     last_time: Mutex<Option<zx::MonotonicInstant>>,
     clock: C,
 }
@@ -26,7 +26,7 @@ impl<C> RateLimiter<C>
 where
     C: Clock,
 {
-    pub fn from_delay_and_clock(delay: zx::Duration, clock: C) -> Self {
+    pub fn from_delay_and_clock(delay: zx::MonotonicDuration, clock: C) -> Self {
         Self { delay, last_time: Mutex::new(None), clock }
     }
 
@@ -57,7 +57,7 @@ where
 pub(crate) type RateLimiterMonotonic = RateLimiter<Monotonic>;
 
 impl RateLimiterMonotonic {
-    pub fn from_delay(delay: zx::Duration) -> Self {
+    pub fn from_delay(delay: zx::MonotonicDuration) -> Self {
         Self::from_delay_and_clock(delay, Monotonic)
     }
 }
@@ -90,7 +90,8 @@ mod tests {
     #[test]
     fn first_call_runs() {
         let (clock, _) = FakeClock::clock_and_setter(0);
-        let rate_limiter = RateLimiter::from_delay_and_clock(zx::Duration::from_nanos(2), clock);
+        let rate_limiter =
+            RateLimiter::from_delay_and_clock(zx::MonotonicDuration::from_nanos(2), clock);
         let mut val = false;
 
         rate_limiter.rate_limit(|| {
@@ -103,7 +104,8 @@ mod tests {
     #[test]
     fn second_call_runs_if_stale() {
         let (clock, clock_setter) = FakeClock::clock_and_setter(0);
-        let rate_limiter = RateLimiter::from_delay_and_clock(zx::Duration::from_nanos(2), clock);
+        let rate_limiter =
+            RateLimiter::from_delay_and_clock(zx::MonotonicDuration::from_nanos(2), clock);
         let mut val = 0;
 
         rate_limiter.rate_limit(|| {
@@ -121,7 +123,8 @@ mod tests {
     #[test]
     fn second_call_does_not_run_if_too_recent() {
         let (clock, clock_setter) = FakeClock::clock_and_setter(0);
-        let rate_limiter = RateLimiter::from_delay_and_clock(zx::Duration::from_nanos(2), clock);
+        let rate_limiter =
+            RateLimiter::from_delay_and_clock(zx::MonotonicDuration::from_nanos(2), clock);
         let mut val = 0;
 
         rate_limiter.rate_limit(|| {
@@ -139,7 +142,8 @@ mod tests {
     #[test]
     fn first_and_third_calls_run() {
         let (clock, clock_setter) = FakeClock::clock_and_setter(0);
-        let rate_limiter = RateLimiter::from_delay_and_clock(zx::Duration::from_nanos(2), clock);
+        let rate_limiter =
+            RateLimiter::from_delay_and_clock(zx::MonotonicDuration::from_nanos(2), clock);
         let mut val = 0;
 
         rate_limiter.rate_limit(|| {

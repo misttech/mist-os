@@ -228,7 +228,7 @@ mod test {
 
     const TEST_RESPONSE: &str = "success";
     /// Assumed time for which serving a proxy completes after the last client drops.
-    const STOP_DURATION: zx::Duration = zx::Duration::from_millis(100);
+    const STOP_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(100);
 
     /// Launches an http server that always responds with success. Returns the port the
     /// server is listening on.

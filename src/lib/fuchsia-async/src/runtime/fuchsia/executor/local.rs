@@ -250,7 +250,7 @@ impl TestExecutor {
     /// For example, here is how one could test that the Timer future fires after the given
     /// timeout:
     ///
-    ///     let deadline = zx::Duration::from_seconds(5).after_now();
+    ///     let deadline = zx::MonotonicDuration::from_seconds(5).after_now();
     ///     let mut future = Timer::<Never>::new(deadline);
     ///     assert_eq!(Poll::Pending, exec.run_until_stalled(&mut future));
     ///     assert_eq!(Some(deadline), exec.wake_next_timer());
@@ -429,7 +429,8 @@ mod tests {
     fn stepwise_timer() {
         let mut executor = TestExecutor::new_with_fake_time();
         executor.set_fake_time(MonotonicInstant::from_nanos(0));
-        let mut fut = pin!(Timer::new(MonotonicInstant::after(zx::Duration::from_nanos(1000))));
+        let mut fut =
+            pin!(Timer::new(MonotonicInstant::after(zx::MonotonicDuration::from_nanos(1000))));
 
         let _ = executor.run_until_stalled(&mut fut);
         assert_eq!(MonotonicInstant::now(), MonotonicInstant::from_nanos(0));
@@ -460,15 +461,15 @@ mod tests {
         let spawned_fut_completed = Arc::new(AtomicBool::new(false));
         let spawned_fut_completed_writer = spawned_fut_completed.clone();
         let spawned_fut = Box::pin(async move {
-            Timer::new(MonotonicInstant::after(zx::Duration::from_seconds(5))).await;
+            Timer::new(MonotonicInstant::after(zx::MonotonicDuration::from_seconds(5))).await;
             spawned_fut_completed_writer.store(true, Ordering::SeqCst);
         });
         let mut main_fut = pin!(async {
-            Timer::new(MonotonicInstant::after(zx::Duration::from_seconds(10))).await;
+            Timer::new(MonotonicInstant::after(zx::MonotonicDuration::from_seconds(10))).await;
         });
         spawn(spawned_fut);
         assert_eq!(executor.run_until_stalled(&mut main_fut), Poll::Pending);
-        executor.set_fake_time(MonotonicInstant::after(zx::Duration::from_seconds(15)));
+        executor.set_fake_time(MonotonicInstant::after(zx::MonotonicDuration::from_seconds(15)));
         // The timer in `spawned_fut` should fire first, then the
         // timer in `main_fut`.
         assert_eq!(executor.run_until_stalled(&mut main_fut), Poll::Ready(()));
@@ -523,9 +524,9 @@ mod tests {
     #[test]
     fn time_now_real_time() {
         let _executor = LocalExecutor::new();
-        let t1 = zx::MonotonicInstant::after(zx::Duration::from_seconds(0));
+        let t1 = zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(0));
         let t2 = MonotonicInstant::now().into_zx();
-        let t3 = zx::MonotonicInstant::after(zx::Duration::from_seconds(0));
+        let t3 = zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(0));
         assert!(t1 <= t2);
         assert!(t2 <= t3);
     }
@@ -546,15 +547,17 @@ mod tests {
     fn time_after_overflow() {
         let executor = TestExecutor::new_with_fake_time();
 
-        executor.set_fake_time(MonotonicInstant::INFINITE - zx::Duration::from_nanos(100));
+        executor.set_fake_time(MonotonicInstant::INFINITE - zx::MonotonicDuration::from_nanos(100));
         assert_eq!(
-            MonotonicInstant::after(zx::Duration::from_seconds(200)),
+            MonotonicInstant::after(zx::MonotonicDuration::from_seconds(200)),
             MonotonicInstant::INFINITE
         );
 
-        executor.set_fake_time(MonotonicInstant::INFINITE_PAST + zx::Duration::from_nanos(100));
+        executor.set_fake_time(
+            MonotonicInstant::INFINITE_PAST + zx::MonotonicDuration::from_nanos(100),
+        );
         assert_eq!(
-            MonotonicInstant::after(zx::Duration::from_seconds(-200)),
+            MonotonicInstant::after(zx::MonotonicDuration::from_seconds(-200)),
             MonotonicInstant::INFINITE_PAST
         );
     }
@@ -592,12 +595,12 @@ mod tests {
             let timer_fired = Arc::new(AtomicBool::new(false));
             futures::join!(
                 async {
-                    Timer::new(zx::Duration::from_seconds(1)).await;
+                    Timer::new(zx::MonotonicDuration::from_seconds(1)).await;
                     timer_fired.store(true, Ordering::SeqCst);
                 },
                 async {
                     let mut fired = 0;
-                    let mut interval = Interval::new(zx::Duration::from_seconds(1));
+                    let mut interval = pin!(Interval::new(zx::MonotonicDuration::from_seconds(1)));
                     while let Some(_) = interval.next().await {
                         fired += 1;
                         if fired == 3 {
@@ -608,24 +611,24 @@ mod tests {
                 },
                 async {
                     assert!(!timer_fired.load(Ordering::SeqCst));
-                    TestExecutor::advance_to(MonotonicInstant::after(zx::Duration::from_millis(
-                        500,
-                    )))
+                    TestExecutor::advance_to(MonotonicInstant::after(
+                        zx::MonotonicDuration::from_millis(500),
+                    ))
                     .await;
                     // Timer still shouldn't be fired.
                     assert!(!timer_fired.load(Ordering::SeqCst));
-                    TestExecutor::advance_to(MonotonicInstant::after(zx::Duration::from_millis(
-                        500,
-                    )))
+                    TestExecutor::advance_to(MonotonicInstant::after(
+                        zx::MonotonicDuration::from_millis(500),
+                    ))
                     .await;
 
                     // The timer should have fired.
                     assert!(timer_fired.load(Ordering::SeqCst));
 
                     // The interval timer should have fired once.  Make it fire twice more.
-                    TestExecutor::advance_to(MonotonicInstant::after(zx::Duration::from_seconds(
-                        2,
-                    )))
+                    TestExecutor::advance_to(MonotonicInstant::after(
+                        zx::MonotonicDuration::from_seconds(2),
+                    ))
                     .await;
                 }
             )

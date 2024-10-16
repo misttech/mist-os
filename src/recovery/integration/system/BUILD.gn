@@ -35,8 +35,7 @@ fuchsia_test_component("recovery_integration_test_component") {
   manifest = "meta/recovery_integration_test.cml"
   deps = [
     ":bin",
-    "//src/recovery/system:component",
-    "//src/recovery/system:values_from_gn",
+    "//src/recovery/system:component_fdr",
   ]
 }
 

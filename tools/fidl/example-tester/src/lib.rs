@@ -403,6 +403,9 @@ Please copy the output between the '===' bounds into the golden file at {} in th
             );
             assert_eq!(logs, golden_logs)
         }
-        fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_millis(500))).await;
+        fasync::Timer::new(fasync::MonotonicInstant::after(zx::MonotonicDuration::from_millis(
+            500,
+        )))
+        .await;
     }
 }

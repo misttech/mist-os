@@ -563,7 +563,7 @@ impl KeyboardBinding {
                     // we pull them apart artificially. A 1ns increment will likely
                     // be enough of a difference that it is recognizable but that it
                     // does not introduce confusion.
-                    event_time = event_time + zx::Duration::from_nanos(1);
+                    event_time = event_time + zx::MonotonicDuration::from_nanos(1);
                 }
             })
             .detach();

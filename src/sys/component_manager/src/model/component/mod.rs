@@ -623,15 +623,16 @@ impl ComponentInstance {
         let stop_result = {
             if let Some(started) = started {
                 let started_timestamp = started.timestamp;
+                let started_timestamp_monotonic = started.timestamp_monotonic;
                 let stop_timer = Box::pin(async move {
                     let timer = fasync::Timer::new(fasync::MonotonicInstant::after(
-                        zx::Duration::from(self.environment.stop_timeout()),
+                        zx::MonotonicDuration::from(self.environment.stop_timeout()),
                     ));
                     timer.await;
                 });
                 let kill_timer = Box::pin(async move {
                     let timer = fasync::Timer::new(fasync::MonotonicInstant::after(
-                        zx::Duration::from(DEFAULT_KILL_TIMEOUT),
+                        zx::MonotonicDuration::from(DEFAULT_KILL_TIMEOUT),
                     ));
                     timer.await;
                 });
@@ -660,7 +661,7 @@ impl ComponentInstance {
                         .map_err(|_| StopActionError::GetTopInstanceFailed)?;
                     top_instance.trigger_reboot();
                 }
-                Some((ret, started_timestamp))
+                Some((ret, started_timestamp, started_timestamp_monotonic))
             } else {
                 None
             }
@@ -679,7 +680,12 @@ impl ComponentInstance {
             .await
             .map_err(|err| StopActionError::DestroyDynamicChildrenFailed { err: Box::new(err) })?;
 
-        if let Some((StopConclusion { disposition, escrow_request }, start_time)) = stop_result {
+        if let Some((
+            StopConclusion { disposition, escrow_request },
+            _start_time,
+            start_time_monotonic,
+        )) = stop_result
+        {
             let requested_escrow = escrow_request.is_some();
 
             // Store any escrowed state.
@@ -692,12 +698,14 @@ impl ComponentInstance {
                 };
             }
 
-            let stop_time = zx::MonotonicInstant::get();
+            let stop_time = zx::BootInstant::get();
+            let stop_time_monotonic = zx::MonotonicInstant::get();
             let event = self.new_event(EventPayload::Stopped {
                 status: disposition.stop_info().termination_status,
                 exit_code: disposition.stop_info().exit_code,
                 stop_time,
-                execution_duration: stop_time - start_time,
+                stop_time_monotonic,
+                execution_duration: stop_time_monotonic - start_time_monotonic,
                 requested_escrow,
             });
             self.hooks.dispatch(&event).await;
@@ -980,39 +988,13 @@ impl ComponentInstance {
         Ok(self.lock_resolved_state().await?.sandbox.program_output_dict.clone())
     }
 
-    /// Returns a router that delegates to the program output dict.
-    ///
-    /// This is helpful in breaking up reference cycles. For example, you can insert an item into
-    /// the program output dict that references another item in the same dict, by indirecting
-    /// through this router.
-    pub fn program_output(self: &Arc<Self>) -> Router {
-        #[derive(Debug)]
-        struct ProgramOutput {
-            component: WeakComponentInstance,
-        }
-
-        #[async_trait]
-        impl Routable for ProgramOutput {
-            async fn route(
-                &self,
-                request: Option<Request>,
-                debug: bool,
-            ) -> Result<Capability, RouterError> {
-                let component = self.component.upgrade().map_err(RoutingError::from)?;
-                component.get_program_output_dict().await?.route(request, debug).await
-            }
-        }
-
-        Router::new(ProgramOutput { component: self.as_weak() })
-    }
-
     /// Obtains the component output dict.
     pub async fn get_component_output_dict(self: &Arc<Self>) -> Result<Dict, RouterError> {
         Ok(self.lock_resolved_state().await?.sandbox.component_output_dict.clone())
     }
 
     /// Returns a router that delegates to the component output dict.
-    pub fn component_output(self: &Arc<Self>) -> Router {
+    pub(super) fn component_output(self: &Arc<Self>) -> Router {
         #[derive(Debug)]
         struct ComponentOutput {
             component: WeakComponentInstance,
@@ -1278,13 +1260,13 @@ impl ComponentInstance {
     }
 
     pub fn new_event(&self, payload: EventPayload) -> Event {
-        self.new_event_with_timestamp(payload, zx::MonotonicInstant::get())
+        self.new_event_with_timestamp(payload, zx::BootInstant::get())
     }
 
     pub fn new_event_with_timestamp(
         &self,
         payload: EventPayload,
-        timestamp: zx::MonotonicInstant,
+        timestamp: zx::BootInstant,
     ) -> Event {
         Event {
             target_moniker: self.moniker.clone().into(),
@@ -1507,7 +1489,7 @@ pub mod testing {
     pub async fn wait_until_event_get_timestamp(
         event_stream: &mut EventStream,
         event_type: EventType,
-    ) -> zx::MonotonicInstant {
+    ) -> zx::BootInstant {
         event_stream.wait_until(event_type, Moniker::root()).await.unwrap().event.timestamp.clone()
     }
 }
@@ -2722,7 +2704,7 @@ pub mod tests {
         test_topology.runner.add_host_fn("test:///root_resolved", root_out_dir.host_fn());
 
         // Configure the component runner to take 3 seconds to stop the component.
-        let response_delay = zx::Duration::from_seconds(3);
+        let response_delay = zx::MonotonicDuration::from_seconds(3);
         test_topology.runner.add_controller_response(
             "test:///root_resolved",
             Box::new(move || ControllerActionResponse {

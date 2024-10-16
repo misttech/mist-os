@@ -15,7 +15,9 @@
                 "epoll_wait02",
                 "futex_wait05",
 
-                // Times out on certain bots.
+                // TODO: b/364235635 - reënable this test (probably after
+                // addressing compute_new_file_sid performance:
+                // https://issues.fuchsia.dev/issues/372449586).
                 "inotify11",
 
                 // This test only runs on x86_64.

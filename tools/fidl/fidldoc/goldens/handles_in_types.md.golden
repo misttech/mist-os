@@ -29,7 +29,7 @@
         <tr id="HandlesInTypes.handle_in_vec">
             <td><code>handle_in_vec</code></td>
             <td>
-                <code>vector&lt;vmo&gt;</code>
+                <code>vector&lt;handle&lt;vmo&gt;&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -37,7 +37,7 @@
         <tr id="HandlesInTypes.handle_in_array">
             <td><code>handle_in_array</code></td>
             <td>
-                <code>vmo[5]</code>
+                <code>array&lt;handle&lt;vmo&gt;,&nbsp;5&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -45,7 +45,7 @@
         <tr id="HandlesInTypes.handle_in_mixed_vec_array">
             <td><code>handle_in_mixed_vec_array</code></td>
             <td>
-                <code>vector&lt;array&gt;</code>
+                <code>vector&lt;array&lt;handle&lt;vmo&gt;,&nbsp;5&gt;&gt;</code>
             </td>
             <td></td>
             <td>No default</td>

@@ -236,7 +236,6 @@ impl<'a> VfsWatchMsg<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::OpenFlags;
     use assert_matches::assert_matches;
     use fuchsia_async::{DurationExt, TimeoutExt};
 
@@ -261,7 +260,7 @@ mod tests {
         ERR: Debug,
     {
         let f = s.next();
-        let f = f.on_timeout(zx::Duration::from_millis(500).after_now(), || {
+        let f = f.on_timeout(zx::MonotonicDuration::from_millis(500).after_now(), || {
             panic!("timeout waiting for watcher")
         });
         f.map(|next| {
@@ -275,9 +274,9 @@ mod tests {
         let tmp_dir = tempdir().unwrap();
         let _ = File::create(tmp_dir.path().join("file1")).unwrap();
 
-        let dir = crate::directory::open_in_namespace_deprecated(
+        let dir = crate::directory::open_in_namespace(
             tmp_dir.path().to_str().unwrap(),
-            OpenFlags::RIGHT_READABLE,
+            fio::PERM_READABLE,
         )
         .unwrap();
         let mut w = Watcher::new(&dir).await.unwrap();
@@ -298,9 +297,9 @@ mod tests {
     async fn test_add() {
         let tmp_dir = tempdir().unwrap();
 
-        let dir = crate::directory::open_in_namespace_deprecated(
+        let dir = crate::directory::open_in_namespace(
             tmp_dir.path().to_str().unwrap(),
-            OpenFlags::RIGHT_READABLE,
+            fio::PERM_READABLE,
         )
         .unwrap();
         let mut w = Watcher::new(&dir).await.unwrap();
@@ -328,9 +327,9 @@ mod tests {
         let filepath = tmp_dir.path().join(filename);
         let _ = File::create(&filepath).unwrap();
 
-        let dir = crate::directory::open_in_namespace_deprecated(
+        let dir = crate::directory::open_in_namespace(
             tmp_dir.path().to_str().unwrap(),
-            OpenFlags::RIGHT_READABLE,
+            fio::PERM_READABLE,
         )
         .unwrap();
         let mut w = Watcher::new(&dir).await.unwrap();

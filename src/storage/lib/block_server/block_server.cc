@@ -54,6 +54,12 @@ void Session::SendReply(RequestId request_id, zx::result<> result) {
   block_server_send_reply(session_, request_id, result.status_value());
 }
 
+BlockServer::BlockServer(BlockServer&& other)
+    : interface_(other.interface_), server_(other.server_) {
+  other.interface_ = nullptr;
+  other.server_ = nullptr;
+}
+
 BlockServer::~BlockServer() {
   if (server_) {
     block_server_delete(server_);

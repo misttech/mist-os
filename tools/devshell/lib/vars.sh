@@ -55,6 +55,19 @@ if [[ "${FUCHSIA_DEVSHELL_VERBOSITY:-0}" -eq 1 ]]; then
   set -x
 fi
 
+# If build profiling is enabled, collect system stats during build,
+# including CPU, memory, disk I/O...
+BUILD_PROFILE_ENABLED=0
+readonly fx_build_profile_config="${FUCHSIA_DIR}/.fx-build-profile-config"
+if [[ -f "$fx_build_profile_config" ]]
+then source "$fx_build_profile_config"
+  # This sets BUILD_PROFILE_ENABLED to 0 or 1.
+fi
+
+# This wrapper script collects system CPU/mem/IO info while
+# another process is running.
+readonly vmstat_wrap="${FUCHSIA_DIR}/build/profile/vmstat_wrap.sh"
+
 # For commands whose subprocesses may use reclient for RBE, prefix those
 # commands conditioned on 'if fx-rbe-enabled' (function).
 # This could not be made into a shell-function because it is used
@@ -990,7 +1003,7 @@ function fx-run-ninja {
   local user_rbe_env=()
   if fx-rbe-enabled
   then
-    rbe_wrapper=("FUCHSIA_BUILD_DIR=${FUCHSIA_BUILD_DIR}" "${RBE_WRAPPER[@]}")
+    rbe_wrapper=(env "FUCHSIA_BUILD_DIR=${FUCHSIA_BUILD_DIR}" "${RBE_WRAPPER[@]}")
     [[ "${USER-NOT_SET}" != "NOT_SET" ]] || {
       echo "Error: USER is not set"
       exit 1
@@ -1013,7 +1026,7 @@ function fx-run-ninja {
     "TERM=${TERM}"
     "PATH=${PATH}"
     # By default, also show the number of actively running actions.
-    "NINJA_STATUS=${NINJA_STATUS:-"[%f/%t](%r) "}"
+    "NINJA_STATUS=${NINJA_STATUS:-"[%f/%t][%p/%w](%r) "}"
     # By default, print the 4 oldest commands that are still running.
     "NINJA_STATUS_MAX_COMMANDS=${NINJA_STATUS_MAX_COMMANDS:-4}"
     "NINJA_STATUS_REFRESH_MILLIS=${NINJA_STATUS_REFRESH_MILLIS:-100}"
@@ -1035,8 +1048,21 @@ function fx-run-ninja {
     envs+=("FUCHSIA_BAZEL_JOB_COUNT=${concurrency}")
   fi
 
+  local profile_wrap=()
+  if [[ "$BUILD_PROFILE_ENABLED" == 1 ]]
+  then
+    # Collect system profile data while build is running.
+    local date="$(date +%Y%m%d-%H%M%S)"
+    # Note: this profile dir will get cleaned by 'fx clean'
+    local profile_dir="${FUCHSIA_BUILD_DIR}/.build_profile"
+    mkdir -p "$profile_dir"
+    local profile_log="$(env TMPDIR="$profile_dir" mktemp -t "vmstat.$date.XXXX.log")"
+    local profile_wrap=( "$vmstat_wrap" -o "$profile_log" -t 2 -- )
+  fi
+
   full_cmdline=(
     env -i "${envs[@]}"
+    "${profile_wrap[@]}"
     "${rbe_wrapper[@]}"
     "$cmd"
     "${args[@]}"

@@ -19,7 +19,7 @@ struct RateLimiter<C: Clock> {
 // Each period, we reset tokens to tokens_per_period.
 struct TokenBucket<C: Clock> {
     last_update: zx::MonotonicInstant,
-    period: zx::Duration,
+    period: zx::MonotonicDuration,
     tokens_per_period: i64,
     tokens: i64,
     clock: C,
@@ -30,7 +30,7 @@ trait Clock {
 }
 
 impl<C: Clock> RateLimiter<C> {
-    fn new(clock: C, tokens_per_period: i64, period: zx::Duration) -> Self {
+    fn new(clock: C, tokens_per_period: i64, period: zx::MonotonicDuration) -> Self {
         RateLimiter {
             inner: Mutex::new(TokenBucket {
                 last_update: clock.now(),
@@ -73,7 +73,7 @@ impl Clock for Monotonic {
 
 // Allow bursts of up to 30 log messages, but throttle to 1 log/s on average.
 static LIMITER: Lazy<RateLimiter<Monotonic>> =
-    Lazy::new(|| RateLimiter::new(Monotonic, 30, zx::Duration::from_seconds(30)));
+    Lazy::new(|| RateLimiter::new(Monotonic, 30, zx::MonotonicDuration::from_seconds(30)));
 
 // Log everything in tests.
 #[cfg(test)]
@@ -152,7 +152,8 @@ mod tests {
     #[fuchsia::test]
     fn test() {
         let clock = FakeClock::new(zx::MonotonicInstant::from_nanos(0));
-        let limiter = RateLimiter::<FakeClock>::new(clock.clone(), 2, zx::Duration::from_nanos(2));
+        let limiter =
+            RateLimiter::<FakeClock>::new(clock.clone(), 2, zx::MonotonicDuration::from_nanos(2));
 
         // Starts empty.
         assert!(!limiter.acquire_one());

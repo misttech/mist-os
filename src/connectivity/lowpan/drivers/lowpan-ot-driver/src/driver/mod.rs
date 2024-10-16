@@ -6,7 +6,7 @@
 use super::prelude::*;
 
 use openthread::ot;
-use zx::Duration;
+use zx::MonotonicDuration;
 
 mod api;
 mod border_agent;
@@ -42,16 +42,16 @@ pub use srp_proxy::*;
 const DEFAULT_SCAN_DWELL_TIME_MS: u32 = 200;
 
 #[cfg(not(test))]
-const DEFAULT_TIMEOUT: Duration = Duration::from_seconds(5);
+const DEFAULT_TIMEOUT: MonotonicDuration = MonotonicDuration::from_seconds(5);
 
 #[cfg(test)]
-const DEFAULT_TIMEOUT: Duration = Duration::from_seconds(90);
+const DEFAULT_TIMEOUT: MonotonicDuration = MonotonicDuration::from_seconds(90);
 
 #[allow(unused)]
-const JOIN_TIMEOUT: Duration = Duration::from_seconds(120);
+const JOIN_TIMEOUT: MonotonicDuration = MonotonicDuration::from_seconds(120);
 
 /// Extra time that is added to the network/energy scans, in addition to the calculated timeout.
-const SCAN_EXTRA_TIMEOUT: Duration = Duration::from_seconds(10);
+const SCAN_EXTRA_TIMEOUT: MonotonicDuration = MonotonicDuration::from_seconds(10);
 
 #[allow(unused)]
 const STD_IPV6_NET_PREFIX_LEN: u8 = 64;

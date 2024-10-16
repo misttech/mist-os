@@ -152,6 +152,7 @@ class DriverOnlyService final {
     static constexpr char Name[] = "member";
     static constexpr char ServiceName[] = "test.driverservice.DriverOnlyService";
     using ProtocolType = ::test_driverservice::SomeDriverProtocol;
+    using ServiceType = DriverOnlyService;
   };
 
   // Client protocol for connecting to member protocols of a service instance.

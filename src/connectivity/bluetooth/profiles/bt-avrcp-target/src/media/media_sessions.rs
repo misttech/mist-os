@@ -364,7 +364,7 @@ impl MediaSessionsInner {
                 let current_values = active_session.session_info().into();
                 let response_timeout =
                     active_session.session_info().get_playback_rate().map_or(None, |r| {
-                        r.reference_deadline(zx::Duration::from_seconds(interval as i64))
+                        r.reference_deadline(zx::MonotonicDuration::from_seconds(interval as i64))
                     });
                 (current_values, response_timeout)
             }

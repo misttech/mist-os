@@ -19,6 +19,7 @@ rustc_binary("trigger_bin") {
   source_root = "trigger.rs"
   deps = [
     "//examples/components/routing/fidl:echo_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",

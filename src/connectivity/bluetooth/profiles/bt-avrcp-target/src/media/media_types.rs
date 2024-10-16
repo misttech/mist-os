@@ -10,7 +10,7 @@ use {fidl_fuchsia_media_sessions2 as fidl_media, fuchsia_async as fasync, zx};
 
 /// Converts time (i64, in nanoseconds) to milliseconds (u32).
 fn time_nanos_to_millis(t: i64) -> u32 {
-    zx::Duration::from_nanos(t).into_millis() as u32
+    zx::MonotonicDuration::from_nanos(t).into_millis() as u32
 }
 
 /// Returns the current position of playing media in milliseconds.
@@ -139,7 +139,7 @@ impl ValidPlayStatus {
 }
 
 /// The time, in nanos, that a notification must be resolved by.
-pub type NotificationTimeout = zx::Duration;
+pub type NotificationTimeout = zx::MonotonicDuration;
 
 /// The current playback rate of media.
 #[derive(Debug, Clone, Copy)]
@@ -171,14 +171,17 @@ impl PlaybackRate {
     ///
     /// If the current playback rate is stopped (i.e 0), `None` is returned as
     /// there is no response deadline.
-    pub(crate) fn reference_deadline(&self, change: zx::Duration) -> Option<NotificationTimeout> {
+    pub(crate) fn reference_deadline(
+        &self,
+        change: zx::MonotonicDuration,
+    ) -> Option<NotificationTimeout> {
         let rate = self.rate();
         if rate == 0.0 {
             return None;
         }
 
         let timeout = ((change.into_nanos() as f64) * (1.0 / rate)) as i64;
-        Some(zx::Duration::from_nanos(timeout))
+        Some(zx::MonotonicDuration::from_nanos(timeout))
     }
 }
 
@@ -579,8 +582,8 @@ mod tests {
             subject_delta: 10,
             reference_delta: 4,
         });
-        let deadline = ff_rate.reference_deadline(zx::Duration::from_nanos(1000000000));
-        let expected = zx::Duration::from_nanos(400000000);
+        let deadline = ff_rate.reference_deadline(zx::MonotonicDuration::from_nanos(1000000000));
+        let expected = zx::MonotonicDuration::from_nanos(400000000);
         assert_eq!(Some(expected), deadline);
 
         // Normal playback,
@@ -590,8 +593,8 @@ mod tests {
             subject_delta: 1,
             reference_delta: 1,
         });
-        let deadline = play_rate.reference_deadline(zx::Duration::from_nanos(5000000000));
-        let expected = zx::Duration::from_nanos(5000000000);
+        let deadline = play_rate.reference_deadline(zx::MonotonicDuration::from_nanos(5000000000));
+        let expected = zx::MonotonicDuration::from_nanos(5000000000);
         assert_eq!(Some(expected), deadline);
 
         // Slow motion.
@@ -601,13 +604,13 @@ mod tests {
             subject_delta: 3,
             reference_delta: 4,
         });
-        let deadline = slow_rate.reference_deadline(zx::Duration::from_nanos(9000000));
-        let expected = zx::Duration::from_nanos(12000000);
+        let deadline = slow_rate.reference_deadline(zx::MonotonicDuration::from_nanos(9000000));
+        let expected = zx::MonotonicDuration::from_nanos(12000000);
         assert_eq!(Some(expected), deadline);
 
         // Stopped playback - no deadline.
         let stop_rate = PlaybackRate(stopped_timeline_function());
-        let deadline = stop_rate.reference_deadline(zx::Duration::from_nanos(900000000));
+        let deadline = stop_rate.reference_deadline(zx::MonotonicDuration::from_nanos(900000000));
         assert_eq!(None, deadline);
     }
 

@@ -56,8 +56,12 @@ void SetupCommandLineOptions(const CommandLineOptions& options, zxdb::MapSetting
     settings.SetList(Settings::System::kSymbolIndexFiles, options.symbol_index_files);
   }
 
-  if (!options.symbol_servers.empty()) {
-    settings.SetList(Settings::System::kSymbolServers, options.symbol_servers);
+  if (!options.private_symbol_servers.empty()) {
+    settings.SetList(Settings::System::kPrivateSymbolServers, options.private_symbol_servers);
+  }
+
+  if (!options.public_symbol_servers.empty()) {
+    settings.SetList(Settings::System::kPublicSymbolServers, options.public_symbol_servers);
   }
 
   if (!options.symbol_paths.empty()) {

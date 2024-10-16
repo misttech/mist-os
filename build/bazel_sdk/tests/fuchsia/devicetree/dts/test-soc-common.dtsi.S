@@ -28,5 +28,13 @@
 				output-high;
 			};
 		};
+
+		gic: interrupt-controller@ffc01000 {
+			compatible = "test-gic";
+			reg = <0x0 0xffc01000 0 0x1000>;
+            interrupt-controller;
+            #interrupt-cells = <3>;
+            #address-cells = <0>;
+		};
 	};
 };

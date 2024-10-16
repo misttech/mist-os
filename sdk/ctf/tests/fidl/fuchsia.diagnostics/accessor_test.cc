@@ -30,7 +30,7 @@ const char EXPECTED[] = R"JSON({
     "data_source": "Inspect",
     "metadata": {
         "component_url": "COMPONENT_URL",
-        "name": "inspect-publisher",
+        "name": "root",
         "timestamp": TIMESTAMP
     },
     "moniker": "MONIKER",

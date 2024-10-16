@@ -18,7 +18,6 @@
         {
             protocol: [
                 "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.logger.LogSink",
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.tracing.provider.Registry",
             ],

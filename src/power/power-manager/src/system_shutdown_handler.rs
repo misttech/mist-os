@@ -376,7 +376,7 @@ impl SystemShutdownHandler {
         request: ShutdownRequest,
         timeout: Seconds,
     ) -> Result<(), Error> {
-        let deadline = zx::Duration::from_seconds(timeout.0 as i64).after_now();
+        let deadline = zx::MonotonicDuration::from_seconds(timeout.0 as i64).after_now();
         self.shutdown(request).on_timeout(deadline, || Err(format_err!("Shutdown timed out"))).await
     }
 

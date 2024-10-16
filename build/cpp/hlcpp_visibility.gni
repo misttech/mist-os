@@ -7,6 +7,9 @@ declare_args() {
   vendor_hlcpp_visibility = []
 }
 
+# Are there any vendor HLCPP visibility overrides defined?
+vendor_hlcpp_included = vendor_hlcpp_visibility != []
+
 hlcpp_visibility = [
   # Dependencies between SDK FIDL libraries.
   "//sdk/fidl/*",
@@ -153,6 +156,7 @@ hlcpp_visibility = [
   "//src/developer/forensics/snapshot/*",
   "//src/developer/forensics/testing/*",
   "//src/developer/forensics/utils/*",
+  "//src/developer/memory/pressure_signaler/*",
   "//src/developer/memory/monitor/*",
   "//src/developer/process_explorer/*",
   "//src/devices/bin/driver_host:*",

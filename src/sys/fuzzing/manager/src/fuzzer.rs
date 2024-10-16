@@ -185,7 +185,10 @@ impl Fuzzer {
     /// Returns an error if the `max_wait_time` elapses without the output forwarding task
     /// completing.
     ///
-    pub async fn stop(&mut self, max_wait_time: Option<zx::Duration>) -> Result<(), zx::Status> {
+    pub async fn stop(
+        &mut self,
+        max_wait_time: Option<zx::MonotonicDuration>,
+    ) -> Result<(), zx::Status> {
         if let (Some(task), Some(max_wait_time)) = (self.task.take(), max_wait_time) {
             // TODO(https://fxbug.dev/42063642): Extend the test fixtures and add tests for the timeout case.
             let stop_fut = task.fuse();

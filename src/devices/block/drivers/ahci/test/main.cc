@@ -2,27 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <byteswap.h>
-#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/component/cpp/driver_export.h>
-#include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
-#include <lib/driver/testing/cpp/internal/test_environment.h>
+#include <lib/driver/testing/cpp/driver_test.h>
+#include <lib/driver/testing/cpp/minimal_compat_environment.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
-#include <lib/driver/testing/cpp/test_node.h>
-#include <lib/inspect/testing/cpp/zxtest/inspect.h>
+#include <lib/fpromise/single_threaded_executor.h>
+#include <lib/inspect/testing/cpp/inspect.h>
 #include <lib/zx/clock.h>
 
-#include <thread>
-
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "../controller.h"
 #include "fake-bus.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace ahci {
 
-class PortTest : public zxtest::Test {
+class PortTest : public ::testing::Test {
  protected:
   void TearDown() override { fake_bus_.reset(); }
 
@@ -64,23 +60,23 @@ TEST(SataTest, SataStringFixTest) {
   // Zero length, no swapping happens.
   uint16_t a = 0x1234;
   SataStringFix(&a, 0);
-  ASSERT_EQ(a, 0x1234, "unexpected string result");
+  ZX_ASSERT_MSG(a == 0x1234, "unexpected string result");
 
   // One character, only swap to even lengths.
   a = 0x1234;
   SataStringFix(&a, 1);
-  ASSERT_EQ(a, 0x1234, "unexpected string result");
+  ZX_ASSERT_MSG(a == 0x1234, "unexpected string result");
 
   // Swap A.
   a = 0x1234;
   SataStringFix(&a, sizeof(a));
-  ASSERT_EQ(a, 0x3412, "unexpected string result");
+  ZX_ASSERT_MSG(a == 0x3412, "unexpected string result");
 
   // Swap a group of values.
   uint16_t b[] = {0x0102, 0x0304, 0x0506};
   SataStringFix(b, sizeof(b));
   const uint16_t b_rev[] = {0x0201, 0x0403, 0x0605};
-  ASSERT_EQ(memcmp(b, b_rev, sizeof(b)), 0, "unexpected string result");
+  ZX_ASSERT_MSG(memcmp(b, b_rev, sizeof(b)) == 0, "unexpected string result");
 
   // Swap a string.
   const char* qemu_model_id = "EQUMH RADDSI K";
@@ -94,12 +90,12 @@ TEST(SataTest, SataStringFixTest) {
 
   memcpy(str.byte, qemu_model_id, qsize);
   SataStringFix(str.word, qsize);
-  ASSERT_EQ(memcmp(str.byte, qemu_rev, qsize), 0, "unexpected string result");
+  ZX_ASSERT_MSG(memcmp(str.byte, qemu_rev, qsize) == 0, "unexpected string result");
 
   const char* sin = "abcdefghijklmnoprstu";  // 20 chars
   const size_t slen = strlen(sin);
-  ASSERT_EQ(slen, 20, "bad string length");
-  ASSERT_EQ(slen & 1, 0, "string length must be even");
+  ZX_ASSERT_MSG(slen == 20, "bad string length");
+  ZX_ASSERT_MSG((slen & 1) == 0, "string length must be even");
   char sout[22];
   memset(sout, 0, sizeof(sout));
   memcpy(sout, sin, slen);
@@ -108,8 +104,8 @@ TEST(SataTest, SataStringFixTest) {
   for (size_t i = 0; i <= slen; i += 2) {
     memcpy(str.byte, sin, slen);
     SataStringFix(str.word, i);
-    ASSERT_EQ(memcmp(str.byte, sout, slen), 0, "unexpected string result");
-    ASSERT_EQ(sout[slen], 0, "buffer overrun");
+    ZX_ASSERT_MSG(memcmp(str.byte, sout, slen) == 0, "unexpected string result");
+    ZX_ASSERT_MSG(sout[slen] == 0, "buffer overrun");
     char c = sout[i];
     sout[i] = sout[i + 1];
     sout[i + 1] = c;
@@ -223,7 +219,7 @@ TEST_F(PortTest, PortCompleteTimeout) {
   // False means no more running commands.
   EXPECT_FALSE(port.Complete());
   // Set by completion callback.
-  EXPECT_NOT_OK(status);
+  EXPECT_NE(status, ZX_OK);
 }
 
 TEST_F(PortTest, FlushWhenCommandQueueEmpty) {
@@ -402,7 +398,7 @@ class TestController : public Controller {
         if (command != nullptr) {
           break;
         }
-        // Wait until IDENTIFY DEVICE command is issued.
+        // Wait until IDENTIFY DEVICE command is processed by the worker dispatcher thread.
         zx::nanosleep(zx::deadline_after(zx::msec(1)));
       }
       ASSERT_EQ(command->cmd, SATA_CMD_IDENTIFY_DEVICE);
@@ -445,76 +441,55 @@ class TestController : public Controller {
 
 bool TestController::support_native_command_queuing_;
 
-struct IncomingNamespace {
-  fdf_testing::TestNode node{"root"};
-  fdf_testing::internal::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
+class TestConfig final {
+ public:
+  using DriverType = TestController;
+  using EnvironmentType = fdf_testing::MinimalCompatEnvironment;
 };
 
-// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
-// library.
-class AhciTest : public inspect::InspectTestHelper, public zxtest::TestWithParam<bool> {
+class AhciTest : public ::testing::TestWithParam<bool> {
  public:
-  AhciTest()
-      : env_dispatcher_(runtime_.StartBackgroundDispatcher()),
-        incoming_(env_dispatcher_->async_dispatcher(), std::in_place) {}
-
   void SetUp() override {
     TestController::support_native_command_queuing_ = GetParam();
 
-    // Initialize driver test environment.
-    fuchsia_driver_framework::DriverStartArgs start_args;
-    fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client;
-    incoming_.SyncCall([&](IncomingNamespace* incoming) mutable {
-      auto start_args_result = incoming->node.CreateStartArgsAndServe();
-      ASSERT_TRUE(start_args_result.is_ok());
-      start_args = std::move(start_args_result->start_args);
-      outgoing_directory_client = std::move(start_args_result->outgoing_directory_client);
+    zx::result<> result = driver_test().StartDriver();
+    ASSERT_OK(result);
 
-      ASSERT_OK(incoming->env.Initialize(std::move(start_args_result->incoming_directory_server)));
-    });
+    fake_bus_ = static_cast<FakeBus*>(driver_test().driver()->bus());
+    ASSERT_NE(fake_bus_, nullptr);
 
-    // Start dut_.
-    ASSERT_OK(runtime_.RunToCompletion(dut_.Start(std::move(start_args))));
-
-    fake_bus_ = static_cast<FakeBus*>(dut_->bus());
-    ASSERT_NOT_NULL(fake_bus_);
-
-    ASSERT_GT(dut_->sata_devices().size(), 0);
-    sata_device_ = dut_->sata_devices()[0].get();
-    ASSERT_NOT_NULL(sata_device_);
+    ASSERT_GT(driver_test().driver()->sata_devices().size(), size_t{0});
+    sata_device_ = driver_test().driver()->sata_devices()[0].get();
+    ASSERT_NE(sata_device_, nullptr);
   }
 
   void TearDown() override {
-    zx::result prepare_stop_result = runtime_.RunToCompletion(dut_.PrepareStop());
-    EXPECT_OK(prepare_stop_result);
-
-    incoming_.reset();
-    runtime_.ShutdownAllDispatchers(fdf::Dispatcher::GetCurrent()->get());
-
-    EXPECT_OK(dut_.Stop());
+    zx::result<> result = driver_test().StopDriver();
+    ASSERT_OK(result);
   }
 
+  fdf_testing::ForegroundDriverTest<TestConfig>& driver_test() { return driver_test_; }
+
  protected:
-  fdf_testing::DriverRuntime runtime_;
-  fdf::UnownedSynchronizedDispatcher env_dispatcher_;
-  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_;
-  fdf_testing::internal::DriverUnderTest<TestController> dut_;
+  fdf_testing::ForegroundDriverTest<TestConfig> driver_test_;
   FakeBus* fake_bus_;
   SataDevice* sata_device_;
 };
 
 TEST_P(AhciTest, SataDeviceRead) {
-  ASSERT_NO_FATAL_FAILURE(ReadInspect(dut_->inspect()));
-  const auto* ahci = hierarchy().GetByPath({"ahci"});
-  ASSERT_NOT_NULL(ahci);
+  fpromise::result<inspect::Hierarchy> hierarchy =
+      fpromise::run_single_threaded(inspect::ReadFromInspector(driver_test().driver()->inspect()));
+  ASSERT_TRUE(hierarchy.is_ok());
+  const auto* ahci = hierarchy.value().GetByPath({"ahci"});
+  ASSERT_NE(ahci, nullptr);
   const auto* ncq = ahci->node().get_property<inspect::BoolPropertyValue>("native_command_queuing");
-  ASSERT_NOT_NULL(ncq);
+  ASSERT_NE(ncq, nullptr);
   EXPECT_EQ(ncq->value(), TestController::support_native_command_queuing_);
 
   block_info_t info;
   uint64_t op_size;
   sata_device_->BlockImplQuery(&info, &op_size);
-  EXPECT_EQ(info.block_size, 512);
+  EXPECT_EQ(info.block_size, uint32_t{512});
   EXPECT_EQ(info.block_count, TestController::kTestLogicalBlockCount);
   if (TestController::support_native_command_queuing_) {
     EXPECT_TRUE(info.flags & FLAG_FUA_SUPPORT);
@@ -541,14 +516,14 @@ TEST_P(AhciTest, SataDeviceRead) {
          }};
   sata_device_->BlockImplQueue(op, callback, &done);
 
-  Port* port = dut_->port(FakeBus::kTestPortNumber);
+  Port* port = driver_test().driver()->port(FakeBus::kTestPortNumber);
   const SataTransaction* command;
   while (true) {
     command = port->TestGetRunning(0);
     if (command != nullptr) {
       break;
     }
-    // Wait until read command is issued.
+    // Wait until read command is processed by the worker dispatcher thread.
     zx::nanosleep(zx::deadline_after(zx::msec(1)));
   }
   if (TestController::support_native_command_queuing_) {
@@ -573,7 +548,7 @@ TEST_P(AhciTest, ShutdownWaitsForTransactionsInFlight) {
   block_info_t info;
   uint64_t op_size;
   sata_device_->BlockImplQuery(&info, &op_size);
-  EXPECT_EQ(info.block_size, 512);
+  EXPECT_EQ(info.block_size, uint32_t{512});
   EXPECT_EQ(info.block_count, TestController::kTestLogicalBlockCount);
 
   sync_completion_t done;
@@ -596,19 +571,19 @@ TEST_P(AhciTest, ShutdownWaitsForTransactionsInFlight) {
          }};
   sata_device_->BlockImplQueue(op, callback, &done);
 
-  Port* port = dut_->port(FakeBus::kTestPortNumber);
+  Port* port = driver_test().driver()->port(FakeBus::kTestPortNumber);
   const SataTransaction* command;
   while (true) {
     command = port->TestGetRunning(0);
     if (command != nullptr) {
       break;
     }
-    // Wait until read command is issued.
+    // Wait until read command is processed by the worker dispatcher thread.
     zx::nanosleep(zx::deadline_after(zx::msec(1)));
   }
 
   zx::time time = zx::clock::get_monotonic();
-  dut_->Shutdown();
+  driver_test().driver()->Shutdown();
   zx::duration shutdown_duration = zx::clock::get_monotonic() - time;
 
   // The shutdown duration should be around 5 seconds (+/-). Conservatively check for > 2.5 seconds.
@@ -617,7 +592,7 @@ TEST_P(AhciTest, ShutdownWaitsForTransactionsInFlight) {
   sync_completion_wait(&done, ZX_TIME_INFINITE);
 }
 
-INSTANTIATE_TEST_SUITE_P(NativeCommandQueuingSupportTest, AhciTest, zxtest::Bool());
+INSTANTIATE_TEST_SUITE_P(NativeCommandQueuingSupportTest, AhciTest, ::testing::Bool());
 
 }  // namespace ahci
 

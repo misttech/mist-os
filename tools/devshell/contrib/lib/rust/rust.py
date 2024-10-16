@@ -63,6 +63,13 @@ class GnTarget:
             str(self.label_path) + ":" + self.label_name + self.toolchain_suffix
         )
 
+    def __actual_ninja_target(self):
+        """The canonical GN label of the ".actual" target, minus the leading '//'."""
+        label_name = self.label_name
+        if not label_name.endswith(".actual"):
+            label_name += ".actual"
+        return str(self.label_path) + ":" + label_name + self.toolchain_suffix
+
     @property
     def gn_target(self):
         """The canonical GN label of this target, including the leading '//'."""
@@ -101,7 +108,7 @@ class GnTarget:
             build_dir = FUCHSIA_BUILD_DIR
 
         hashed_gn_path = hashlib.sha1(
-            self.ninja_target.encode("utf-8")
+            self.__actual_ninja_target().encode("utf-8")
         ).hexdigest()
         return Path(build_dir) / "cargo" / hashed_gn_path / "Cargo.toml"
 

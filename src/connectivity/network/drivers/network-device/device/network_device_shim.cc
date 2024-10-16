@@ -215,8 +215,6 @@ void NetworkDeviceShim::QueueTx(netdriver::wire::NetworkDeviceImplQueueTxRequest
         .meta =
             {
                 .port = fidl_buffer.meta.port,
-                .info = {.no_info = {fidl_buffer.meta.info.no_info().nothing}},
-                .info_type = static_cast<uint32_t>(fidl_buffer.meta.info_type),
                 .flags = fidl_buffer.meta.flags,
                 .frame_type = static_cast<uint8_t>(fidl_buffer.meta.frame_type),
             },
@@ -379,9 +377,6 @@ void NetworkDeviceShim::NetworkDeviceIfcCompleteRx(const rx_buffer_t* rx_list, s
         .meta =
             {
                 .port = rx.meta.port,
-                .info = netdriver::wire::FrameInfo::WithNoInfo(
-                    netdriver::wire::NoInfo{.nothing = rx.meta.info.no_info.nothing}),
-                .info_type = static_cast<fuchsia_hardware_network::InfoType>(rx.meta.info_type),
                 .flags = rx.meta.flags,
                 .frame_type = static_cast<fuchsia_hardware_network::FrameType>(rx.meta.frame_type),
             },

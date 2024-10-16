@@ -221,10 +221,13 @@ def get_cfgs(rustflags):
             if match.group(1) != "__rust_toolchain":
                 cfgs.append(f"{match.group(1)}={match.group(2)}")
         elif flag.startswith("@"):
-            with open(flag[1:]) as f:
-                for line in f:
-                    if line.startswith("--cfg="):
-                        cfgs.append(line[len("--cfg=") :])
+            try:
+                with open(flag[1:]) as f:
+                    for line in f:
+                        if line.startswith("--cfg="):
+                            cfgs.append(line[len("--cfg=") :])
+            except FileNotFoundError:
+                print(f"Warning: Could not find response file {flag[1:]}")
         elif flag.startswith("--cfg="):
             cfgs.append(flag[len("--cfg=") :])
     return cfgs

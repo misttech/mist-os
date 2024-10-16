@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![recursion_limit = "512"]
+
 use bitflags::bitflags;
 use fsverity_merkle::{FsVerityHasher, FsVerityHasherOptions};
 use linux_uapi::DM_UUID_LEN;

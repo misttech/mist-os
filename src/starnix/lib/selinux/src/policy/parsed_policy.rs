@@ -74,6 +74,8 @@ pub struct ParsedPolicy<PS: ParseStrategy> {
     ipv6_nodes: SimpleArray<PS, IPv6Nodes<PS>>,
     infinitiband_partition_keys: Option<SimpleArray<PS, InfinitiBandPartitionKeys<PS>>>,
     infinitiband_end_ports: Option<SimpleArray<PS, InfinitiBandEndPorts<PS>>>,
+    /// A set of labeling statements to apply to given filesystems and/or their subdirectories.
+    /// Corresponds to the `genfscon` labeling statement in the policy.
     generic_fs_contexts: SimpleArray<PS, GenericFsContexts<PS>>,
     range_transitions: SimpleArray<PS, RangeTransitions<PS>>,
     /// Extensible bitmaps that encode associations between types and attributes.
@@ -341,6 +343,10 @@ impl<PS: ParseStrategy> ParsedPolicy<PS> {
 
     pub(super) fn fs_uses(&self) -> &FsUses<PS> {
         &self.fs_uses.data
+    }
+
+    pub(super) fn generic_fs_contexts(&self) -> &GenericFsContexts<PS> {
+        &self.generic_fs_contexts.data
     }
 
     #[allow(dead_code)]

@@ -153,7 +153,7 @@ func (c *compiler) compileForwardDecl(name string, typ fidlgen.Type) forwardDecl
 		if !ok {
 			panic(fmt.Sprintf("identifier not in decl map: %s", typ.Identifier))
 		}
-		if info.Type != fidlgen.ProtocolDeclType && !(info.Type == fidlgen.StructDeclType && typ.Nullable) {
+		if info.Type != fidlgen.StructDeclType || !typ.Nullable {
 			if typ.Identifier.LibraryName() == c.library {
 				storage = ""
 			} else {
@@ -369,7 +369,7 @@ func (c *compiler) compileType(name string, typ fidlgen.Type) {
 		c.out.Vectors = append(c.out.Vectors, c.compileVector(name, typ))
 	case fidlgen.StringType:
 		c.out.Strings = append(c.out.Strings, c.compileString(name, typ))
-	case fidlgen.HandleType, fidlgen.RequestType:
+	case fidlgen.HandleType, fidlgen.EndpointType:
 		c.out.Handles = append(c.out.Handles, c.compileHandle(name, typ))
 	case fidlgen.IdentifierType:
 		info, ok := c.decls[typ.Identifier]
@@ -383,8 +383,6 @@ func (c *compiler) compileType(name string, typ fidlgen.Type) {
 			}
 		case fidlgen.BitsDeclType, fidlgen.EnumDeclType, fidlgen.TableDeclType, fidlgen.UnionDeclType:
 			// Do nothing. All we need for these is the forward declaration above.
-		case fidlgen.ProtocolDeclType:
-			c.out.Handles = append(c.out.Handles, c.compileHandle(name, typ))
 		default:
 			panic(fmt.Sprintf("identifier type refers to unexpected decl type: %s", info.Type))
 		}
@@ -515,7 +513,7 @@ func forwardDeclCType(typ fidlgen.Type, decls fidlgen.DeclInfoMap) string {
 		return "FidlCodedVector"
 	case fidlgen.StringType:
 		return "FidlCodedString"
-	case fidlgen.HandleType, fidlgen.RequestType:
+	case fidlgen.HandleType, fidlgen.EndpointType:
 		return "FidlCodedHandle"
 	case fidlgen.IdentifierType:
 		info, ok := decls[typ.Identifier]
@@ -536,8 +534,6 @@ func forwardDeclCType(typ fidlgen.Type, decls fidlgen.DeclInfoMap) string {
 			return "FidlCodedTable"
 		case fidlgen.UnionDeclType:
 			return "FidlCodedUnion"
-		case fidlgen.ProtocolDeclType:
-			return "FidlCodedHandle"
 		default:
 			panic(fmt.Sprintf("identifier type refers to unexpected decl type: %s", info.Type))
 		}
@@ -560,8 +556,18 @@ func nameType(typ fidlgen.Type, decls fidlgen.DeclInfoMap) string {
 		return fmt.Sprintf("String%s%s", nameSize(typ.ElementCount), nameNullability(typ.Nullable))
 	case fidlgen.HandleType:
 		return fmt.Sprintf("Handle%s%d%s", typ.HandleSubtype, typ.HandleRights, nameNullability(typ.Nullable))
-	case fidlgen.RequestType:
-		return fmt.Sprintf("Request%s%s", lengthPrefixed(nameDecl(typ.Identifier)), nameNullability(typ.Nullable))
+	case fidlgen.EndpointType:
+		switch typ.Role {
+		case fidlgen.ClientRole:
+			return fmt.Sprintf("Protocol%s%s", lengthPrefixed(nameDecl(typ.Protocol)), nameNullability(typ.Nullable))
+		case fidlgen.ServerRole:
+			// TODO(https://fxbug.dev/42149402): This reimplements a bug from a
+			// previous implementation - the name of the protocol isn't actually
+			// included in the `Request` type. Fix this separately.
+			return fmt.Sprintf("Request0%s", nameNullability(typ.Nullable))
+		default:
+			panic(fmt.Sprintf("unexpected fidlgen.EndpointRole: %#v", typ.Role))
+		}
 	case fidlgen.PrimitiveType:
 		return fmt.Sprintf("fidl_internal_k%s", namePrimitiveSubtype(typ.PrimitiveSubtype))
 	case fidlgen.InternalType:
@@ -577,6 +583,8 @@ func nameType(typ fidlgen.Type, decls fidlgen.DeclInfoMap) string {
 			// bindings, so treat them as such in coding tables as well.
 			case "zx/ObjType", "zx/Rights":
 				return nameType(fidlgen.Type{Kind: fidlgen.PrimitiveType, PrimitiveSubtype: fidlgen.Uint32}, decls)
+			case "zx/InstantMono", "zx/InstantBoot":
+				return nameType(fidlgen.Type{Kind: fidlgen.PrimitiveType, PrimitiveSubtype: fidlgen.Int64}, decls)
 			default:
 				panic(fmt.Sprintf("unexpected zx type: %s", typ.Identifier))
 			}
@@ -594,8 +602,6 @@ func nameType(typ fidlgen.Type, decls fidlgen.DeclInfoMap) string {
 				return fmt.Sprintf("%sNullableRef", nameDecl(typ.Identifier))
 			}
 			return nameDecl(typ.Identifier)
-		case fidlgen.ProtocolDeclType:
-			return fmt.Sprintf("Protocol%s%s", lengthPrefixed(nameDecl(typ.Identifier)), nameNullability(typ.Nullable))
 		default:
 			panic(fmt.Sprintf("identifier type refers to unexpected decl type: %s", info.Type))
 		}

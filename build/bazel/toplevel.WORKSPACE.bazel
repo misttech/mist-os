@@ -286,6 +286,8 @@ fuchsia_sdk_repository(
 
 register_toolchains("@fuchsia_sdk//:fuchsia_toolchain_sdk")
 
+register_toolchains("//:fuchsia_sdk_devicetree_toolchain")
+
 # buildifier: disable=load-on-top
 load("@bazel_skylib//lib:paths.bzl", "paths")
 

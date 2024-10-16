@@ -8,6 +8,7 @@
 #include <lib/zx/process.h>
 #include <zircon/syscalls/exception.h>
 
+#include <optional>
 #include <utility>
 
 #include "src/developer/debug/debug_agent/exception_handle.h"
@@ -19,21 +20,28 @@ namespace debug_agent {
 // class.
 class ZirconExceptionHandle : public ExceptionHandle {
  public:
-  ZirconExceptionHandle(zx::exception exception, const zx_exception_info_t& info)
-      : exception_(std::move(exception)), info_(info) {}
+  // This is used for normal exceptions as well as thread start and stop events (delivered as
+  // exceptions) so the exception report (which is used only for what you would normally think of as
+  // "exceptions") will be nullopt in those cases.
+  ZirconExceptionHandle(zx::exception exception, const zx_exception_info_t& info,
+                        std::optional<zx_exception_report_t> report)
+      : exception_(std::move(exception)), info_(info), report_(report) {}
 
   ~ZirconExceptionHandle() = default;
 
   std::unique_ptr<ThreadHandle> GetThreadHandle() const override;
+  std::unique_ptr<ProcessHandle> GetProcessHandle() const override;
   debug_ipc::ExceptionType GetType(const ThreadHandle& thread) const override;
   fit::result<debug::Status, Resolution> GetResolution() const override;
   debug::Status SetResolution(Resolution state) override;
   fit::result<debug::Status, debug_ipc::ExceptionStrategy> GetStrategy() const override;
   debug::Status SetStrategy(debug_ipc::ExceptionStrategy strategy) override;
+  debug_ipc::ExceptionRecord GetRecord() const override;
 
  private:
   zx::exception exception_;
   zx_exception_info_t info_;
+  std::optional<zx_exception_report_t> report_;
 
   FXL_DISALLOW_COPY_ASSIGN_AND_MOVE(ZirconExceptionHandle);
 };

@@ -10,7 +10,7 @@ use ::routing::capability_source::{
     BuiltinSource, CapabilitySource, CapabilityToCapabilitySource, ComponentCapability,
     ComponentSource, FrameworkSource, InternalCapability, NamespaceSource,
 };
-use ::routing::component_instance::{ComponentInstanceInterface, WeakComponentInstanceInterface};
+use ::routing::component_instance::WeakComponentInstanceInterface;
 use ::routing::environment::RunnerRegistry;
 use ::routing::error::RoutingError;
 use ::routing::policy::GlobalPolicyChecker;
@@ -186,29 +186,6 @@ pub fn new_outgoing_dir_router(
         capability: ComponentCapability::from(capability.clone()),
         moniker: component.moniker().clone(),
     }))
-}
-
-pub(crate) fn program_output_router(component: &Arc<ComponentInstanceForAnalyzer>) -> Router {
-    struct ProgramOutputRouter {
-        weak_component: WeakComponentInstanceInterface<ComponentInstanceForAnalyzer>,
-    }
-    #[async_trait]
-    impl Routable for ProgramOutputRouter {
-        async fn route(
-            &self,
-            _request: Option<Request>,
-            _debug: bool,
-        ) -> Result<Capability, RouterError> {
-            let component =
-                self.weak_component.upgrade().expect("part of component tree was dropped");
-            let sandbox =
-                component.component_sandbox().await.expect("getting sandbox should be infallible");
-            Ok(sandbox.program_output_dict.clone().into())
-        }
-    }
-
-    let weak_component = WeakComponentInstanceInterface::new(component);
-    Router::new(ProgramOutputRouter { weak_component })
 }
 
 pub(crate) fn static_children_component_output_dictionary_routers(

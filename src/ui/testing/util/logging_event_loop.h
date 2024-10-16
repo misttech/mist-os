@@ -30,14 +30,16 @@ class LoggingEventLoop : private loop_fixture::RealLoop {
   LoggingEventLoop() = default;
   ~LoggingEventLoop() = default;
 
+  void RunLoop(cpp20::source_location caller = cpp20::source_location::current());
+
   void RunLoopUntil(fit::function<bool()> condition,
                     cpp20::source_location caller = cpp20::source_location::current());
 
- protected:
   bool RunLoopWithTimeout(zx::duration timeout,
                           cpp20::source_location caller = cpp20::source_location::current());
 
   bool RunLoopWithTimeoutOrUntil(fit::function<bool()> condition, zx::duration timeout,
+                                 zx::duration step = zx::msec(10),
                                  cpp20::source_location caller = cpp20::source_location::current());
 
   void RunLoopUntilIdle(cpp20::source_location caller = cpp20::source_location::current());

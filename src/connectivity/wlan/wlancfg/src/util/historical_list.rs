@@ -78,7 +78,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use zx::Duration;
+    use zx::MonotonicDuration;
 
     impl Timestamped for fasync::MonotonicInstant {
         fn time(&self) -> fasync::MonotonicInstant {
@@ -93,9 +93,9 @@ mod tests {
     ) -> HistoricalList<fasync::MonotonicInstant> {
         HistoricalList(VecDeque::from_iter([
             earlist_time,
-            earlist_time + Duration::from_seconds(1),
-            earlist_time + Duration::from_seconds(3),
-            earlist_time + Duration::from_seconds(5),
+            earlist_time + MonotonicDuration::from_seconds(1),
+            earlist_time + MonotonicDuration::from_seconds(3),
+            earlist_time + MonotonicDuration::from_seconds(5),
         ]))
     }
 
@@ -104,7 +104,7 @@ mod tests {
         let mut historical_list = create_test_list(EARLIEST_TIME);
 
         // Verify that the list did not exceed capacity, and purged the oldest entry.
-        historical_list.add(EARLIEST_TIME + Duration::from_seconds(10));
+        historical_list.add(EARLIEST_TIME + MonotonicDuration::from_seconds(10));
         assert_eq!(historical_list.0.len(), 4);
         assert!(!historical_list.0.contains(&EARLIEST_TIME));
 
@@ -119,17 +119,20 @@ mod tests {
         let historical_list = create_test_list(EARLIEST_TIME);
 
         assert_eq!(
-            historical_list.get_recent(EARLIEST_TIME + Duration::from_seconds(1)),
+            historical_list.get_recent(EARLIEST_TIME + MonotonicDuration::from_seconds(1)),
             vec![
-                EARLIEST_TIME + Duration::from_seconds(1),
-                EARLIEST_TIME + Duration::from_seconds(3),
-                EARLIEST_TIME + Duration::from_seconds(5)
+                EARLIEST_TIME + MonotonicDuration::from_seconds(1),
+                EARLIEST_TIME + MonotonicDuration::from_seconds(3),
+                EARLIEST_TIME + MonotonicDuration::from_seconds(5)
             ]
         );
 
         assert_eq!(
-            historical_list
-                .get_recent(EARLIEST_TIME + Duration::from_seconds(5) + Duration::from_millis(1)),
+            historical_list.get_recent(
+                EARLIEST_TIME
+                    + MonotonicDuration::from_seconds(5)
+                    + MonotonicDuration::from_millis(1)
+            ),
             vec![]
         );
     }
@@ -139,15 +142,18 @@ mod tests {
         let historical_list = create_test_list(EARLIEST_TIME);
 
         assert_eq!(
-            historical_list.get_before(EARLIEST_TIME + Duration::from_seconds(3)),
+            historical_list.get_before(EARLIEST_TIME + MonotonicDuration::from_seconds(3)),
             vec![
                 EARLIEST_TIME,
-                EARLIEST_TIME + Duration::from_seconds(1),
-                EARLIEST_TIME + Duration::from_seconds(3),
+                EARLIEST_TIME + MonotonicDuration::from_seconds(1),
+                EARLIEST_TIME + MonotonicDuration::from_seconds(3),
             ]
         );
 
-        assert_eq!(historical_list.get_before(EARLIEST_TIME - Duration::from_millis(1)), vec![]);
+        assert_eq!(
+            historical_list.get_before(EARLIEST_TIME - MonotonicDuration::from_millis(1)),
+            vec![]
+        );
     }
 
     #[fuchsia::test]
@@ -156,13 +162,13 @@ mod tests {
 
         assert_eq!(
             historical_list.get_between(
-                EARLIEST_TIME + Duration::from_seconds(1),
-                EARLIEST_TIME + Duration::from_seconds(5)
+                EARLIEST_TIME + MonotonicDuration::from_seconds(1),
+                EARLIEST_TIME + MonotonicDuration::from_seconds(5)
             ),
             vec![
-                EARLIEST_TIME + Duration::from_seconds(1),
-                EARLIEST_TIME + Duration::from_seconds(3),
-                EARLIEST_TIME + Duration::from_seconds(5),
+                EARLIEST_TIME + MonotonicDuration::from_seconds(1),
+                EARLIEST_TIME + MonotonicDuration::from_seconds(3),
+                EARLIEST_TIME + MonotonicDuration::from_seconds(5),
             ]
         );
 
@@ -170,15 +176,16 @@ mod tests {
 
         assert_eq!(
             historical_list.get_between(
-                EARLIEST_TIME + Duration::from_seconds(10),
-                EARLIEST_TIME + Duration::from_seconds(11)
+                EARLIEST_TIME + MonotonicDuration::from_seconds(10),
+                EARLIEST_TIME + MonotonicDuration::from_seconds(11)
             ),
             vec![]
         );
 
         // Verify that an empty list is returned for invalid time bounds.
         assert_eq!(
-            historical_list.get_between(EARLIEST_TIME + Duration::from_seconds(3), EARLIEST_TIME),
+            historical_list
+                .get_between(EARLIEST_TIME + MonotonicDuration::from_seconds(3), EARLIEST_TIME),
             vec![]
         )
     }

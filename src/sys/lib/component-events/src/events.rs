@@ -113,7 +113,7 @@ pub trait Event: TryFrom<fcomponent::Event, Error = anyhow::Error> {
 
     fn target_moniker(&self) -> &str;
     fn component_url(&self) -> &str;
-    fn timestamp(&self) -> zx::MonotonicInstant;
+    fn timestamp(&self) -> zx::BootInstant;
     fn is_ok(&self) -> bool;
     fn is_err(&self) -> bool;
 }
@@ -140,7 +140,7 @@ struct EventHeader {
     event_type: fcomponent::EventType,
     component_url: String,
     moniker: String,
-    timestamp: zx::MonotonicInstant,
+    timestamp: zx::BootInstant,
 }
 
 impl TryFrom<fcomponent::EventHeader> for EventHeader {
@@ -150,9 +150,8 @@ impl TryFrom<fcomponent::EventHeader> for EventHeader {
         let event_type = header.event_type.ok_or(format_err!("No event type"))?;
         let component_url = header.component_url.ok_or(format_err!("No component url"))?;
         let moniker = header.moniker.ok_or(format_err!("No moniker"))?;
-        let timestamp = zx::MonotonicInstant::from_nanos(
-            header.timestamp.ok_or(format_err!("Missing timestamp from the Event object"))?,
-        );
+        let timestamp =
+            header.timestamp.ok_or(format_err!("Missing timestamp from the Event object"))?;
         Ok(EventHeader { event_type, component_url, moniker, timestamp })
     }
 }
@@ -267,7 +266,7 @@ macro_rules! create_event {
                     &self.header.component_url
                 }
 
-                fn timestamp(&self) -> zx::MonotonicInstant {
+                fn timestamp(&self) -> zx::BootInstant {
                     self.header.timestamp
                 }
 

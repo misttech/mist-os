@@ -179,32 +179,58 @@ impl Default for ObservationTime {
     }
 }
 
-/// A sample associated with a [point in time][`Timestamp`].
+/// Data associated with a [point in time][`Timestamp`], such as a sample or event.
 ///
 /// [`Timestamp`]: crate::experimental::clock::Timestamp
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct TimedSample<T> {
+pub struct Timed<T> {
     timestamp: Timestamp,
-    sample: T,
+    inner: T,
 }
 
-impl<T> TimedSample<T> {
-    /// Constructs a `TimedSample` from a sample at the [current time][`Timestamp::now`].
+impl<T> Timed<T> {
+    /// Constructs a `Timed` from data at the [current time][`Timestamp::now`].
     ///
     /// [`Timestamp::now`]: crate::experimental::clock::Timestamp::now
-    pub fn now(sample: T) -> Self {
-        TimedSample { timestamp: Timestamp::now(), sample }
+    pub fn now(inner: T) -> Self {
+        Timed { timestamp: Timestamp::now(), inner }
     }
 
-    /// Constructs a `TimedSample` from a sample at the given point in time.
-    pub fn at(sample: T, timestamp: impl Into<Timestamp>) -> Self {
-        TimedSample { timestamp: timestamp.into(), sample }
+    /// Constructs a `Timed` from data at the given point in time.
+    pub fn at(inner: T, timestamp: impl Into<Timestamp>) -> Self {
+        Timed { timestamp: timestamp.into(), inner }
+    }
+
+    /// Maps a `Timed<T>` to a `Timed<T>` by applying the given function to the inner data.
+    pub fn map<U, F>(self, f: F) -> Timed<U>
+    where
+        F: FnOnce(T) -> U,
+    {
+        let Timed { timestamp, inner } = self;
+        Timed { timestamp, inner: f(inner) }
+    }
+
+    /// Gets the point in time associated with the data.
+    pub fn timestamp(&self) -> &Timestamp {
+        &self.timestamp
+    }
+
+    /// Gets the inner data.
+    pub fn inner(&self) -> &T {
+        &self.inner
     }
 }
 
-impl<T> From<TimedSample<T>> for (Timestamp, T) {
-    fn from(timed: TimedSample<T>) -> Self {
-        let TimedSample { timestamp, sample } = timed;
+impl<T> Timed<Option<T>> {
+    pub fn transpose(self) -> Option<Timed<T>> {
+        let Timed { timestamp, inner } = self;
+        inner.map(|inner| Timed { timestamp, inner })
+    }
+}
+
+impl<T> From<Timed<T>> for (Timestamp, T) {
+    fn from(timed: Timed<T>) -> Self {
+        let Timed { timestamp, inner: sample } = timed;
         (timestamp, sample)
     }
 }
@@ -213,7 +239,7 @@ impl<T> From<TimedSample<T>> for (Timestamp, T) {
 mod tests {
     use crate::experimental::clock::{
         Duration, DurationExt as _, MonotonicityError, ObservationTime, QuantaExt as _, Tick,
-        TimedSample, Timestamp, TimestampExt as _,
+        Timed, Timestamp, TimestampExt as _,
     };
     use fuchsia_async as fasync;
 
@@ -291,20 +317,38 @@ mod tests {
     }
 
     #[test]
-    fn timed_sample_now() {
-        let exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(3_000_000_000));
-        let timed_sample = TimedSample::now(1u64);
-        let (timestamp, sample) = timed_sample.into();
-        assert_eq!(timestamp, Timestamp::from_nanos(3_000_000_000));
-        assert_eq!(sample, 1u64);
+    fn timed_now_then_timestamp_eq_executor_now() {
+        const NOW: i64 = 3_000_000_000;
+
+        let executor = fasync::TestExecutor::new_with_fake_time();
+        executor.set_fake_time(fasync::MonotonicInstant::from_nanos(NOW));
+
+        let timed = Timed::now(());
+        let (timestamp, _) = timed.into();
+        assert_eq!(timestamp, Timestamp::from_nanos(NOW));
     }
 
     #[test]
-    fn timed_sample_at() {
-        let timed_sample = TimedSample::at(1u64, Timestamp::from_nanos(3_000_000_000));
-        let (timestamp, sample) = timed_sample.into();
-        assert_eq!(timestamp, Timestamp::from_nanos(3_000_000_000));
-        assert_eq!(sample, 1u64);
+    fn timed_at_point_then_timestamp_eq_point() {
+        const AT: Timestamp = Timestamp::from_nanos(1);
+
+        let timed = Timed::at((), AT);
+        let (timestamp, _) = timed.into();
+        assert_eq!(timestamp, AT);
+    }
+
+    #[test]
+    fn map_timed_then_data_eq_output() {
+        let timed = Timed::at(9i64, Timestamp::from_nanos(1)).map(|n| n * 7);
+        let (_, n) = timed.into();
+        assert_eq!(n, 63);
+    }
+
+    #[test]
+    fn transpose_timed_then_output_is_congruent() {
+        const AT: Timestamp = Timestamp::from_nanos(1);
+
+        assert!(Timed::at(None::<()>, AT).transpose().is_none());
+        assert!(Timed::at(Some(()), AT).transpose().is_some());
     }
 }

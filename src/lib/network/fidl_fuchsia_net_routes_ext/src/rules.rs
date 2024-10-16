@@ -383,6 +383,11 @@ pub enum RuleFidlConversionError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RuleSetPriority(u32);
 
+/// The priority for the default rule set, where the default rule that points
+/// to the main table lives.
+pub const DEFAULT_RULE_SET_PRIORITY: RuleSetPriority =
+    RuleSetPriority(fnet_routes::DEFAULT_RULE_SET_PRIORITY);
+
 /// The index of a rule within a provided rule set.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct RuleIndex(u32);

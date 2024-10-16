@@ -37,36 +37,6 @@ group("tests") {
   ]
 }
 
-# Allows userdebug configs to be used on eng builds. Note, this build target
-# cannot be used on non-eng builds because multiple targets will provide the
-# config data file and cause the build to fail.
-#
-# TODO(https://fxbug.dev/312749175): Remove this target once configs can be
-# overridden on eng builds.
-group("userdebug_configs_for_eng") {
-  deps = [ ":feedback_userdebug_config_for_eng" ]
-}
-
-# Allows user configs to be used on eng builds. Note, this build target cannot
-# be used on non-eng builds because multiple targets will provide the config
-# data file and cause the build to fail.
-#
-# TODO(https://fxbug.dev/312749175): Remove this target once configs can be
-# overridden on eng builds.
-group("user_configs_for_eng") {
-  deps = [ ":feedback_user_config_for_eng" ]
-}
-
-# Enables uploads on eng builds. Note, this build target cannot be used on
-# non-eng builds because multiple targets will provide the config data file and
-# cause the build to fail.
-#
-# TODO(https://fxbug.dev/312749175): Remove this target once configs can be
-# overridden on eng builds.
-group("upload_configs_for_eng") {
-  deps = [ ":feedback_upload_config_for_eng" ]
-}
-
 ###############################################################################
 # PACKAGES
 ###############################################################################
@@ -214,36 +184,6 @@ config_data("exceptions_enable_jitd_on_startup") {
   sources = [ "exceptions/configs/jitd_on_startup.json" ]
 
   outputs = [ "exceptions/enable_jitd_on_startup.json" ]
-}
-
-# TODO(https://fxbug.dev/312749175): Remove this target once configs can be
-# overridden on eng builds.
-config_data("feedback_user_config_for_eng") {
-  for_pkg = "forensics"
-
-  sources = [ "feedback/configs/build_type/user.json" ]
-
-  outputs = [ "build_type/override_config.json" ]
-}
-
-# TODO(https://fxbug.dev/312749175): Remove this target once configs can be
-# overridden on eng builds.
-config_data("feedback_userdebug_config_for_eng") {
-  for_pkg = "forensics"
-
-  sources = [ "feedback/configs/build_type/userdebug.json" ]
-
-  outputs = [ "build_type/override_config.json" ]
-}
-
-# TODO(https://fxbug.dev/312749175): Remove this target once configs can be
-# overridden on eng builds.
-config_data("feedback_upload_config_for_eng") {
-  for_pkg = "forensics"
-
-  sources = [ "feedback/configs/build_type/eng_with_upload.json" ]
-
-  outputs = [ "build_type/override_config.json" ]
 }
 
 fuchsia_structured_config_cpp_elf_lib("exceptions_config") {

@@ -16,7 +16,7 @@ use async_trait::async_trait;
 use async_utils::hanging_get::client::HangingGetStream;
 use display_utils::BufferCollectionId as DisplayBufferCollectionId;
 use euclid::size2;
-use fidl::endpoints::{create_endpoints, create_proxy, create_request_stream, ClientEnd};
+use fidl::endpoints::{create_endpoints, create_proxy, create_request_stream};
 use fidl_fuchsia_images2::PixelFormat;
 use fidl_fuchsia_ui_composition as flatland;
 use fidl_fuchsia_ui_views::ViewRef;
@@ -124,11 +124,7 @@ impl Plumber {
             export_token: Some(buffer_tokens.export_token),
             // A sysmem token channel serves both sysmem(1) and sysmem2, so we can convert here
             // until flatland has a field for a sysmem2 token.
-            buffer_collection_token: Some(ClientEnd::<
-                fidl_fuchsia_sysmem::BufferCollectionTokenMarker,
-            >::new(
-                sysmem_buffer_collection_token.into_channel()
-            )),
+            buffer_collection_token2: Some(sysmem_buffer_collection_token),
             ..Default::default()
         };
 

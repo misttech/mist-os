@@ -45,11 +45,6 @@ using allocation::BufferCollectionUsage;
 // BufferCollectionImporter interface is how Flatland instances communicate with the
 // DisplayCompositor, providing it with the necessary data to render without exposing to Flatland
 // the DisplayCoordinator or other dependencies.
-//
-// TODO(https://fxbug.dev/42157427): we use a weak ptr to safely post a task that might outlive this
-// DisplayCompositor, see RenderFrame().  This task simulates a vsync callback that we aren't yet
-// receiving because the display coordinator doesn't yet implement the ApplyConfig2() method. It's
-// likely that shared_from_this will become unnecessary at that time.
 class DisplayCompositor final : public allocation::BufferCollectionImporter,
                                 public std::enable_shared_from_this<DisplayCompositor> {
  public:

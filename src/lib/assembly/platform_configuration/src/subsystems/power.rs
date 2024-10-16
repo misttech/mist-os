@@ -63,6 +63,14 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
                 ensure!(*context.build_type != BuildType::User);
                 builder.platform_bundle("power_framework");
 
+                builder.set_config_capability(
+                    "fuchsia.power.WaitForSuspendingToken",
+                    Config::new(
+                        ConfigValueType::Bool,
+                        context.board_info.provides_feature("fuchsia::suspending_token").into(),
+                    ),
+                )?;
+
                 match context.feature_set_level {
                     FeatureSupportLevel::Embeddable | FeatureSupportLevel::Bootstrap => {}
                     FeatureSupportLevel::Utility | FeatureSupportLevel::Standard => {

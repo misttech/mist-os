@@ -20086,12 +20086,6 @@ impl Default for fuse_bpf_args {
     }
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
-pub struct fuse_entry_out_extended {
-    pub arg: fuse_entry_out,
-    pub bpf_arg: fuse_entry_bpf_out,
-}
-#[repr(C)]
 #[repr(align(8))]
 #[derive(Debug, Default)]
 pub struct StdAtomicI64 {
@@ -20189,6 +20183,7 @@ pub const _REMOTE_BINDER_START: __u32 = 2148028929;
 pub const REMOTE_BINDER_START: __u32 = 2148028929;
 pub const _REMOTE_BINDER_WAIT: __u32 = 1073828354;
 pub const REMOTE_BINDER_WAIT: __u32 = 1073828354;
+pub const FIGETBSZ: __u32 = 2;
 pub const FS_IOC_FSGETXATTR: __u32 = 2149341215;
 pub const FS_IOC_FSSETXATTR: __u32 = 1075599392;
 pub const FS_IOC_GETFLAGS: __u32 = 2148034049;

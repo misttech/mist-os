@@ -57,13 +57,13 @@ type NodeAttributes = struct {
 const MAX_FS_NAME_BUFFER uint64 = 32;
 
 @discoverable
-closed(removed=NEXT) open(added=NEXT) protocol Node {
+closed(removed=24) open(added=24) protocol Node {
     compose Node1;
     compose Node2;
 };
 
 /// Node defines the minimal interface for entities which can be accessed in a filesystem.
-closed(removed=NEXT) open(added=NEXT) protocol Node1 {
+closed(removed=24) open(added=24) protocol Node1 {
     /// Create another connection to the same remote object.
     ///
     /// `flags` may be any of:

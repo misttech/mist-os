@@ -10,7 +10,7 @@ use named_timer::NamedTimeoutExt;
 use tracing::warn;
 use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_name as fnet_name, zx};
 
-const DNS_FIDL_TIMEOUT: zx::Duration = zx::Duration::from_seconds(90);
+const DNS_FIDL_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(90);
 
 async fn dig<F: Fn() -> anyhow::Result<fnet_name::LookupProxy>>(
     name_lookup_connector: &F,

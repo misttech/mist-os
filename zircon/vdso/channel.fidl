@@ -691,7 +691,7 @@ closed protocol Channel {
     strict CallNoretry(resource struct {
         handle Handle:CHANNEL;
         options uint32;
-        deadline Time;
+        deadline InstantMono;
         args ChannelCallArgs;
     }) -> (struct {
         actual_bytes uint32;
@@ -700,7 +700,7 @@ closed protocol Channel {
 
     @internal
     strict CallFinish(resource struct {
-        deadline Time;
+        deadline InstantMono;
         args ChannelCallArgs;
     }) -> (struct {
         actual_bytes uint32;
@@ -719,7 +719,7 @@ closed protocol Channel {
     ///
     /// zx_status_t zx_channel_call(zx_handle_t handle,
     ///                             uint32_t options,
-    ///                             zx_time_t deadline,
+    ///                             zx_instant_mono_t deadline,
     ///                             const zx_channel_call_args_t* args,
     ///                             uint32_t* actual_bytes,
     ///                             uint32_t* actual_handles);
@@ -887,7 +887,7 @@ closed protocol Channel {
     strict Call(resource struct {
         handle Handle:CHANNEL;
         options uint32;
-        deadline Time;
+        deadline InstantMono;
         args ChannelCallArgs;
     }) -> (struct {
         actual_bytes uint32;
@@ -898,7 +898,7 @@ closed protocol Channel {
     strict CallEtcNoretry(resource struct {
         handle Handle:CHANNEL;
         options uint32;
-        deadline Time;
+        deadline InstantMono;
         @inout
         args ChannelCallEtcArgs;
     }) -> (struct {
@@ -908,7 +908,7 @@ closed protocol Channel {
 
     @internal
     strict CallEtcFinish(resource struct {
-        deadline Time;
+        deadline InstantMono;
         @inout
         args ChannelCallEtcArgs;
     }) -> (struct {
@@ -927,7 +927,7 @@ closed protocol Channel {
     ///
     /// zx_status_t zx_channel_call_etc(zx_handle_t handle,
     ///                                 uint32_t options,
-    ///                                 zx_time_t deadline,
+    ///                                 zx_instant_mono_t deadline,
     ///                                 zx_channel_call_etc_args_t* args,
     ///                                 uint32_t* actual_bytes,
     ///                                 uint32_t* actual_handles);
@@ -1054,7 +1054,7 @@ closed protocol Channel {
     strict CallEtc(resource struct {
         handle Handle:CHANNEL;
         options uint32;
-        deadline Time;
+        deadline InstantMono;
         @inout
         args ChannelCallEtcArgs;
     }) -> (struct {

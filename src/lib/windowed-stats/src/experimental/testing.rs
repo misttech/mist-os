@@ -6,7 +6,7 @@ use derivative::Derivative;
 use fuchsia_sync::Mutex;
 use std::sync::Arc;
 
-use crate::experimental::clock::{TimedSample, Timestamp};
+use crate::experimental::clock::{Timed, Timestamp};
 use crate::experimental::series::{
     FoldError, Interpolator, MatrixSampler, Sampler, SerializedBuffer,
 };
@@ -15,7 +15,7 @@ use crate::experimental::serve::InspectedTimeMatrix;
 #[derive(Derivative)]
 #[derivative(Debug, PartialEq)]
 pub enum TimeMatrixCall<T> {
-    Fold(TimedSample<T>),
+    Fold(Timed<T>),
     Interpolate(Timestamp),
 }
 
@@ -37,9 +37,9 @@ impl<T: Send + 'static> MockTimeMatrix<T> {
     }
 }
 
-impl<T> Sampler<TimedSample<T>> for MockTimeMatrix<T> {
+impl<T> Sampler<Timed<T>> for MockTimeMatrix<T> {
     type Error = FoldError;
-    fn fold(&mut self, sample: TimedSample<T>) -> Result<(), Self::Error> {
+    fn fold(&mut self, sample: Timed<T>) -> Result<(), Self::Error> {
         self.calls.lock().push(TimeMatrixCall::Fold(sample));
         Ok(())
     }

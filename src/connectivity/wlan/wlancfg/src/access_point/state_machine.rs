@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::access_point::types;
+use crate::mode_management::iface_manager_api::SmeForApStateMachine;
 use crate::mode_management::{Defect, IfaceFailure};
 use crate::telemetry::{TelemetryEvent, TelemetrySender};
 use crate::util::listener::Message::NotifyListeners;
@@ -24,6 +25,7 @@ use futures::select;
 use futures::stream::{self, Fuse, FuturesUnordered, StreamExt, TryStreamExt};
 use std::convert::Infallible;
 use std::fmt::Debug;
+use std::pin::pin;
 use std::sync::Arc;
 use tracing::{info, warn};
 use wlan_common::channel::{Cbw, Channel};
@@ -263,7 +265,7 @@ impl ApStateTracker {
 
 struct CommonStateDependencies {
     iface_id: u16,
-    proxy: fidl_sme::ApSmeProxy,
+    proxy: SmeForApStateMachine,
     req_stream: ReqStream,
     state_tracker: Arc<ApStateTracker>,
     telemetry_sender: TelemetrySender,
@@ -273,7 +275,7 @@ struct CommonStateDependencies {
 
 pub async fn serve(
     iface_id: u16,
-    proxy: fidl_sme::ApSmeProxy,
+    proxy: SmeForApStateMachine,
     sme_event_stream: fidl_sme::ApSmeEventStream,
     req_stream: Fuse<mpsc::Receiver<ManualRequest>>,
     message_sender: ApListenerMessageSender,
@@ -445,10 +447,9 @@ async fn starting_state(
             // PHY associated with this AP interface is busy scanning.  A future attempt to start
             // may succeed.
             if remaining_retries > 0 {
-                let retry_timer = fasync::Timer::new(
-                    zx::Duration::from_seconds(AP_START_RETRY_INTERVAL).after_now(),
-                );
-                let mut retry_timer = retry_timer.fuse();
+                let mut retry_timer = pin!(fasync::Timer::new(
+                    zx::MonotonicDuration::from_seconds(AP_START_RETRY_INTERVAL).after_now(),
+                ));
 
                 // To ensure that the state machine remains responsive, process any incoming
                 // requests while waiting for the timer to expire.
@@ -565,10 +566,11 @@ async fn started_state(
 
     // Holds a pending status request.  Request status immediately upon entering the started state.
     let mut pending_status_req = FuturesUnordered::new();
-    pending_status_req.push(deps.proxy.status());
+    let status_proxy = deps.proxy.clone();
+    pending_status_req.push(async move { status_proxy.status().await }.boxed());
 
     let mut status_timer =
-        fasync::Interval::new(zx::Duration::from_seconds(AP_STATUS_INTERVAL_SEC));
+        fasync::Interval::new(zx::MonotonicDuration::from_seconds(AP_STATUS_INTERVAL_SEC));
 
     // Channel bandwidth is required for frequency computation when reporting state updates.
     let cbw = req.radio_config.channel.cbw;
@@ -584,7 +586,7 @@ async fn started_state(
                         deps.state_tracker.update_operating_state(types::OperatingState::Failed)
                             .map_err(|e| { ExitReason(Err(e)) })?;
 
-                        return Err(ExitReason(Err(anyhow::Error::from(e))));
+                        return Err(ExitReason(Err(e)));
                     }
                 };
 
@@ -610,7 +612,10 @@ async fn started_state(
             },
             _ = status_timer.select_next_some() => {
                 if pending_status_req.is_empty() {
-                    pending_status_req.push(deps.proxy.clone().status());
+                    let status_proxy = deps.proxy.clone();
+                    pending_status_req.push(async move {
+                        status_proxy.status().await
+                    }.boxed());
                 }
             },
             manual_req = deps.req_stream.next() => {
@@ -649,13 +654,14 @@ mod tests {
     fn test_setup() -> TestValues {
         let (ap_req_sender, ap_req_stream) = mpsc::channel(1);
         let (update_sender, update_receiver) = mpsc::unbounded();
-        let (sme_proxy, sme_server) =
-            create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create an sme channel");
-        let sme_req_stream = sme_server.into_stream().expect("could not create SME request stream");
         let (telemetry_sender, telemetry_receiver) = mpsc::channel(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
         let (defect_sender, defect_receiver) = mpsc::unbounded();
         let (status_publisher, status_reader) = status_publisher_and_reader::<Status>();
+        let (sme_proxy, sme_server) =
+            create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create an sme channel");
+        let sme_req_stream = sme_server.into_stream().expect("could not create SME request stream");
+        let sme_proxy = SmeForApStateMachine::new(sme_proxy, 123, defect_sender.clone());
 
         let deps = CommonStateDependencies {
             iface_id: 123,
@@ -1471,12 +1477,6 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(exec.run_until_stalled(&mut start_receiver), Poll::Ready(Ok(())));
 
-        // When state machine goes to started state, it issues a status request. Ignore it.
-        let _status_responder = assert_variant!(
-            poll_sme_req(&mut exec, &mut sme_fut),
-            Poll::Ready(fidl_sme::ApSmeRequest::Status{ responder }) => responder
-        );
-
         // Stop request should be issued now to SME
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
@@ -1567,18 +1567,6 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
         assert_variant!(exec.run_until_stalled(&mut start_receiver), Poll::Ready(Ok(())));
         assert_variant!(exec.run_until_stalled(&mut second_start_receiver), Poll::Pending);
-
-        // The state machine checks for status to make sure AP is started
-        assert_variant!(
-            poll_sme_req(&mut exec, &mut sme_fut),
-            Poll::Ready(fidl_sme::ApSmeRequest::Status{ responder }) => {
-                let ap_info = fidl_sme::Ap { ssid: vec![], channel: 0, num_clients: 0 };
-                let response = fidl_sme::ApStatusResponse {
-                    running_ap: Some(Box::new(ap_info))
-                };
-                responder.send(&response).expect("could not send AP status response");
-            }
-        );
 
         // The state machine should transition back into the starting state and issue a stop
         // request, due to the second start request.

@@ -24,10 +24,7 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.logger.Log",
-                "fuchsia.logger.LogSink",
-            ],
+            protocol: [ "fuchsia.logger.Log" ],
             from: "parent",
             to: [ "#fake_vulkan_loader" ],
         },

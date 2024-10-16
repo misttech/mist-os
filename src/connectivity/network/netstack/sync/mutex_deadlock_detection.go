@@ -6,7 +6,15 @@
 
 package sync
 
-import deadlock "github.com/sasha-s/go-deadlock"
+import (
+	"time"
+
+	deadlock "github.com/sasha-s/go-deadlock"
+)
 
 type Mutex = deadlock.Mutex
 type RWMutex = deadlock.RWMutex
+
+func init() {
+	deadlock.Opts.DeadlockTimeout = 60 * time.Second
+}

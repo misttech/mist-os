@@ -21,7 +21,7 @@ use self::stub as implementation;
 pub use implementation::executor::{
     Duration, LocalExecutor, MonotonicInstant, SendExecutor, TestExecutor,
 };
-pub use implementation::task::{unblock, Task};
+pub use implementation::task::{unblock, JoinHandle, Task};
 pub use implementation::timer::Timer;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -45,18 +45,14 @@ pub mod scope {
     pub use super::implementation::scope::Join;
 }
 
-// TODO(https://fxbug.dex/328306129): Remove after whole repo rename
-#[allow(missing_docs)]
-pub type Time = MonotonicInstant;
-
 pub use scope::Scope;
 
 use futures::prelude::*;
 use pin_project_lite::pin_project;
 use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::task::{ready, Context, Poll};
 
-/// An extension trait to provide `after_now` on `zx::Duration`.
+/// An extension trait to provide `after_now` on `zx::MonotonicDuration`.
 pub trait DurationExt {
     /// Return a `MonotonicInstant` which is a `Duration` after the current time.
     /// `duration.after_now()` is equivalent to `MonotonicInstant::after(duration)`.
@@ -128,6 +124,7 @@ pin_project! {
     #[derive(Debug)]
     #[must_use = "futures do nothing unless polled"]
     pub struct OnTimeout<F, OT> {
+        #[pin]
         timer: Timer,
         #[pin]
         future: F,
@@ -146,7 +143,7 @@ where
         if let Poll::Ready(item) = this.future.poll(cx) {
             return Poll::Ready(item);
         }
-        if let Poll::Ready(()) = this.timer.poll_unpin(cx) {
+        if let Poll::Ready(()) = this.timer.poll(cx) {
             let ot = this.on_timeout.take().expect("polled withtimeout after completion");
             let item = (ot)();
             return Poll::Ready(item);
@@ -161,6 +158,7 @@ pin_project! {
     #[derive(Debug)]
     #[must_use = "futures do nothing unless polled"]
     pub struct OnStalled<F, OS> {
+        #[pin]
         timer: Timer,
         #[pin]
         future: F,
@@ -176,19 +174,18 @@ where
     type Output = F::Output;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.project();
+        let mut this = self.project();
         if let Poll::Ready(item) = this.future.poll(cx) {
             return Poll::Ready(item);
         }
-        match this.timer.poll_unpin(cx) {
-            Poll::Ready(()) => {
-                Poll::Ready((this.on_stalled.take().expect("polled after completion"))())
-            }
+        match this.timer.as_mut().poll(cx) {
+            Poll::Ready(()) => {}
             Poll::Pending => {
-                *this.timer = Timer::new(*this.timeout);
-                Poll::Pending
+                this.timer.set(Timer::new(*this.timeout));
+                ready!(this.timer.as_mut().poll(cx));
             }
         }
+        Poll::Ready((this.on_stalled.take().expect("polled after completion"))())
     }
 }
 
@@ -288,14 +285,15 @@ mod task_tests {
 mod timer_tests {
     use super::*;
     use futures::future::Either;
+    use std::pin::pin;
 
     #[test]
     fn shorter_fires_first_instant() {
         use std::time::{Duration, Instant};
         let mut exec = LocalExecutor::new();
         let now = Instant::now();
-        let shorter = Timer::new(now + Duration::from_millis(100));
-        let longer = Timer::new(now + Duration::from_secs(1));
+        let shorter = pin!(Timer::new(now + Duration::from_millis(100)));
+        let longer = pin!(Timer::new(now + Duration::from_secs(1)));
         match exec.run_singlethreaded(future::select(shorter, longer)) {
             Either::Left((_, _)) => {}
             Either::Right((_, _)) => panic!("wrong timer fired"),

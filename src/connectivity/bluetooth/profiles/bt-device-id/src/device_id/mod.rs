@@ -8,6 +8,7 @@ pub use server::DeviceIdServer;
 
 /// Local type for the BR/EDR Device Identification service record.
 mod service_record;
+pub use service_record::DIRecord;
 
 /// Local type for a FIDL client's request.
 mod token;

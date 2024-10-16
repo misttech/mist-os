@@ -17,7 +17,8 @@ TEST(CommandLineOptionsTest, ValidOptions) {
   setenv("DEBUGINFOD_URLS", "", 1);
   const Error error = ParseCommandLine(sizeof(argv) / sizeof(char*), argv, &options);
   ASSERT_TRUE(error.empty());
-  ASSERT_TRUE(options.symbol_servers.empty());
+  ASSERT_TRUE(options.public_symbol_servers.empty());
+  ASSERT_TRUE(options.private_symbol_servers.empty());
   ASSERT_EQ(options.ids_txts.size(), 1UL);
   ASSERT_EQ(options.ids_txts[0], "path/to/ids.txt");
   ASSERT_EQ(options.symbol_paths.size(), 1UL);
@@ -31,8 +32,9 @@ TEST(CommandLineOptionsTest, SingleServerFromEnv) {
   setenv("DEBUGINFOD_URLS", "gs://foo", 1);
   const Error error = ParseCommandLine(sizeof(argv) / sizeof(char*), argv, &options);
   ASSERT_TRUE(error.empty());
-  ASSERT_EQ(options.symbol_servers.size(), 1UL);
-  ASSERT_EQ(options.symbol_servers[0], "gs://foo");
+  ASSERT_EQ(options.public_symbol_servers.size(), 1UL);
+  ASSERT_EQ(options.private_symbol_servers.size(), 0UL);
+  ASSERT_EQ(options.public_symbol_servers[0], "gs://foo");
 }
 
 TEST(CommandLineOptionsTest, MultipleServersFromEnv) {
@@ -42,20 +44,23 @@ TEST(CommandLineOptionsTest, MultipleServersFromEnv) {
   setenv("DEBUGINFOD_URLS", "gs://foo gs://bar", 1);
   const Error error = ParseCommandLine(sizeof(argv) / sizeof(char*), argv, &options);
   ASSERT_TRUE(error.empty());
-  ASSERT_EQ(options.symbol_servers.size(), 2UL);
-  ASSERT_EQ(options.symbol_servers[0], "gs://foo");
-  ASSERT_EQ(options.symbol_servers[1], "gs://bar");
+  ASSERT_EQ(options.public_symbol_servers.size(), 2UL);
+  ASSERT_EQ(options.private_symbol_servers.size(), 0UL);
+  ASSERT_EQ(options.public_symbol_servers[0], "gs://foo");
+  ASSERT_EQ(options.public_symbol_servers[1], "gs://bar");
 }
 
 TEST(CommandLineOptionsTest, DuplicateServerInEnvAndArgs) {
   CommandLineOptions options;
-  const char* argv[] = {"", "--symbol-server", "gs://foo"};
+  // Servers specified with DEBUGINFOD_URLS will only ever conflict with public servers.
+  const char* argv[] = {"", "--public-symbol-server", "gs://foo"};
 
   setenv("DEBUGINFOD_URLS", "gs://foo", 1);
   const Error error = ParseCommandLine(sizeof(argv) / sizeof(char*), argv, &options);
   ASSERT_TRUE(error.empty());
-  ASSERT_EQ(options.symbol_servers.size(), 1UL);
-  ASSERT_EQ(options.symbol_servers[0], "gs://foo");
+  ASSERT_EQ(options.private_symbol_servers.size(), 0UL);
+  ASSERT_EQ(options.public_symbol_servers.size(), 1UL);
+  ASSERT_EQ(options.public_symbol_servers[0], "gs://foo");
 }
 
 TEST(CommandLineOptionsTest, NoServerInEnvVar) {
@@ -65,7 +70,8 @@ TEST(CommandLineOptionsTest, NoServerInEnvVar) {
   unsetenv("DEBUGINFOD_URLS");
   const Error error = ParseCommandLine(sizeof(argv) / sizeof(char*), argv, &options);
   ASSERT_TRUE(error.empty());
-  ASSERT_TRUE(options.symbol_servers.empty());
+  ASSERT_TRUE(options.public_symbol_servers.empty());
+  ASSERT_TRUE(options.private_symbol_servers.empty());
 }
 
 TEST(CommandLineOptionsTest, InvalidOptions) {

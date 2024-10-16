@@ -11,7 +11,7 @@ use fidl_fuchsia_net_ext::IntoExt as _;
 use fidl_fuchsia_net_multicast_admin::{self as fnet_multicast_admin, TableControllerCloseReason};
 use futures::stream::TryStream;
 use futures::{Stream, StreamExt, TryFutureExt};
-use net_types::ip::{Ip, Ipv4, Ipv6};
+use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
 
 /// A type capable of responding to FIDL requests.
 pub trait FidlResponder<R> {
@@ -46,8 +46,16 @@ pub trait TableControllerProxy<I: FidlMulticastAdminIpExt> {
         addresses: UnicastSourceAndMulticastDestination<I>,
     ) -> impl futures::Future<Output = Result<Result<(), DelRouteError>, fidl::Error>>;
 
-    // TODO(https://fxbug.dev/361052435): Expand to include `GetRouteStats` and
-    // `WatchRoutingEvents`.
+    fn get_route_stats(
+        &self,
+        addresses: UnicastSourceAndMulticastDestination<I>,
+    ) -> impl futures::Future<
+        Output = Result<Result<fnet_multicast_admin::RouteStats, GetRouteStatsError>, fidl::Error>,
+    >;
+
+    fn watch_routing_events(
+        &self,
+    ) -> impl futures::Future<Output = Result<WatchRoutingEventsResponse<I>, fidl::Error>>;
 }
 
 /// An IP extension providing functionality for `fuchsia_net_multicast_admin`.
@@ -79,7 +87,7 @@ pub trait FidlMulticastAdminIpExt: Ip {
     >;
     /// A [`FidlResponder`] for multicast routing table WatchRoutingEvents
     /// requests.
-    type WatchRoutingEventsResponder: for<'a> FidlResponder<WatchRoutingEventsResponse<'a, Self>>;
+    type WatchRoutingEventsResponder: FidlResponder<WatchRoutingEventsResponse<Self>>;
 }
 
 impl FidlMulticastAdminIpExt for Ipv4 {
@@ -158,6 +166,29 @@ impl TableControllerProxy<Ipv4> for fnet_multicast_admin::Ipv4RoutingTableContro
     ) -> impl futures::Future<Output = Result<Result<(), DelRouteError>, fidl::Error>> {
         self.del_route(&addresses.into()).map_ok(|inner| inner.map_err(DelRouteError::from))
     }
+
+    fn get_route_stats(
+        &self,
+        addresses: UnicastSourceAndMulticastDestination<Ipv4>,
+    ) -> impl futures::Future<
+        Output = Result<Result<fnet_multicast_admin::RouteStats, GetRouteStatsError>, fidl::Error>,
+    > {
+        self.get_route_stats(&addresses.into())
+            .map_ok(|inner| inner.map_err(GetRouteStatsError::from))
+    }
+
+    fn watch_routing_events(
+        &self,
+    ) -> impl futures::Future<Output = Result<WatchRoutingEventsResponse<Ipv4>, fidl::Error>> {
+        self.watch_routing_events().map_ok(|(dropped_events, addresses, input_interface, event)| {
+            WatchRoutingEventsResponse {
+                dropped_events,
+                addresses: addresses.into(),
+                input_interface,
+                event,
+            }
+        })
+    }
 }
 
 impl TableControllerProxy<Ipv6> for fnet_multicast_admin::Ipv6RoutingTableControllerProxy {
@@ -185,6 +216,29 @@ impl TableControllerProxy<Ipv6> for fnet_multicast_admin::Ipv6RoutingTableContro
         addresses: UnicastSourceAndMulticastDestination<Ipv6>,
     ) -> impl futures::Future<Output = Result<Result<(), DelRouteError>, fidl::Error>> {
         self.del_route(&addresses.into()).map_ok(|inner| inner.map_err(DelRouteError::from))
+    }
+
+    fn get_route_stats(
+        &self,
+        addresses: UnicastSourceAndMulticastDestination<Ipv6>,
+    ) -> impl futures::Future<
+        Output = Result<Result<fnet_multicast_admin::RouteStats, GetRouteStatsError>, fidl::Error>,
+    > {
+        self.get_route_stats(&addresses.into())
+            .map_ok(|inner| inner.map_err(GetRouteStatsError::from))
+    }
+
+    fn watch_routing_events(
+        &self,
+    ) -> impl futures::Future<Output = Result<WatchRoutingEventsResponse<Ipv6>, fidl::Error>> {
+        self.watch_routing_events().map_ok(|(dropped_events, addresses, input_interface, event)| {
+            WatchRoutingEventsResponse {
+                dropped_events,
+                addresses: addresses.into(),
+                input_interface,
+                event,
+            }
+        })
     }
 }
 
@@ -258,7 +312,8 @@ impl From<fnet_multicast_admin::Ipv6RoutingTableControllerRequest>
 /// An IP generic version of
 /// [`fnet_multicast_admin::Ipv4UnicastSourceAndMulticastDestination`] and
 /// [`fnet_multicast_admin::Ipv6UnicastSourceAndMulticastDestination`].
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, GenericOverIp, PartialEq)]
+#[generic_over_ip(I, Ip)]
 pub struct UnicastSourceAndMulticastDestination<I: Ip> {
     pub unicast_source: I::Addr,
     pub multicast_destination: I::Addr,
@@ -486,6 +541,18 @@ impl From<GetRouteStatsError>
     }
 }
 
+impl From<fnet_multicast_admin::Ipv4RoutingTableControllerGetRouteStatsError>
+    for GetRouteStatsError
+{
+    fn from(error: fnet_multicast_admin::Ipv4RoutingTableControllerGetRouteStatsError) -> Self {
+        use fnet_multicast_admin::Ipv4RoutingTableControllerGetRouteStatsError as E;
+        match error {
+            E::InvalidAddress => GetRouteStatsError::InvalidAddress,
+            E::NotFound => GetRouteStatsError::NotFound,
+        }
+    }
+}
+
 impl From<GetRouteStatsError>
     for fnet_multicast_admin::Ipv6RoutingTableControllerGetRouteStatsError
 {
@@ -494,6 +561,18 @@ impl From<GetRouteStatsError>
         match error {
             GetRouteStatsError::InvalidAddress => E::InvalidAddress,
             GetRouteStatsError::NotFound => E::NotFound,
+        }
+    }
+}
+
+impl From<fnet_multicast_admin::Ipv6RoutingTableControllerGetRouteStatsError>
+    for GetRouteStatsError
+{
+    fn from(error: fnet_multicast_admin::Ipv6RoutingTableControllerGetRouteStatsError) -> Self {
+        use fnet_multicast_admin::Ipv6RoutingTableControllerGetRouteStatsError as E;
+        match error {
+            E::InvalidAddress => GetRouteStatsError::InvalidAddress,
+            E::NotFound => GetRouteStatsError::NotFound,
         }
     }
 }
@@ -524,32 +603,32 @@ impl FidlResponder<Result<&fnet_multicast_admin::RouteStats, GetRouteStatsError>
 /// [`fnet_multicast_admin::Ipv4RoutingTableControllerWatchRoutingEventsResponder`] and
 /// [`fnet_multicast_admin::Ipv6RoutingTableControllerWatchRoutingEventsResponder`].
 #[derive(Debug)]
-pub struct WatchRoutingEventsResponse<'a, I: FidlMulticastAdminIpExt> {
+pub struct WatchRoutingEventsResponse<I: FidlMulticastAdminIpExt> {
     pub dropped_events: u64,
-    pub addresses: &'a UnicastSourceAndMulticastDestination<I>,
+    pub addresses: UnicastSourceAndMulticastDestination<I>,
     pub input_interface: u64,
-    pub event: &'a fnet_multicast_admin::RoutingEvent,
+    pub event: fnet_multicast_admin::RoutingEvent,
 }
 
-impl<'a> FidlResponder<WatchRoutingEventsResponse<'a, Ipv4>>
+impl FidlResponder<WatchRoutingEventsResponse<Ipv4>>
     for fnet_multicast_admin::Ipv4RoutingTableControllerWatchRoutingEventsResponder
 {
-    fn try_send(self, response: WatchRoutingEventsResponse<'a, Ipv4>) -> Result<(), fidl::Error> {
+    fn try_send(self, response: WatchRoutingEventsResponse<Ipv4>) -> Result<(), fidl::Error> {
         let WatchRoutingEventsResponse { dropped_events, addresses, input_interface, event } =
             response;
-        let addresses = addresses.clone().into();
-        self.send(dropped_events, &addresses, input_interface, event)
+        let addresses = addresses.into();
+        self.send(dropped_events, &addresses, input_interface, &event)
     }
 }
 
-impl<'a> FidlResponder<WatchRoutingEventsResponse<'a, Ipv6>>
+impl FidlResponder<WatchRoutingEventsResponse<Ipv6>>
     for fnet_multicast_admin::Ipv6RoutingTableControllerWatchRoutingEventsResponder
 {
-    fn try_send(self, response: WatchRoutingEventsResponse<'a, Ipv6>) -> Result<(), fidl::Error> {
+    fn try_send(self, response: WatchRoutingEventsResponse<Ipv6>) -> Result<(), fidl::Error> {
         let WatchRoutingEventsResponse { dropped_events, addresses, input_interface, event } =
             response;
-        let addresses = addresses.clone().into();
-        self.send(dropped_events, &addresses, input_interface, event)
+        let addresses = addresses.into();
+        self.send(dropped_events, &addresses, input_interface, &event)
     }
 }
 

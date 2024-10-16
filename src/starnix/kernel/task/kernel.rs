@@ -337,6 +337,7 @@ impl Kernel {
 
         let crash_reporter = CrashReporter::new(&inspect_node, crash_reporter_proxy);
         let network_manager = NetworkManagerHandle::new_with_inspect(&inspect_node);
+        let hrtimer_manager = HrTimerManager::new(&inspect_node);
 
         let this = Arc::new_cyclic(|kernel| Kernel {
             kthreads: KernelThreads::new(kernel.clone()),
@@ -395,7 +396,7 @@ impl Kernel {
             role_manager,
             syslog: Default::default(),
             mounts: Mounts::new(),
-            hrtimer_manager: HrTimerManager::new(),
+            hrtimer_manager,
             memory_attribution_manager: MemoryAttributionManager::new(kernel.clone()),
             crash_reporter,
         });

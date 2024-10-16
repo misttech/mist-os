@@ -172,10 +172,10 @@ mod tests {
 
         // Run the PHY service to pick up the new PHY.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        match exec.run_until_stalled(&mut phy_events.next().expect_within(
-            zx::Duration::from_seconds(60),
+        match exec.run_until_stalled(&mut pin!(phy_events.next().expect_within(
+            zx::MonotonicDuration::from_seconds(60),
             "phy_watcher did not observe device addition",
-        )) {
+        ))) {
             Poll::Ready(Some(event)) => match event {
                 watchable_map::MapEvent::KeyInserted(key) => {
                     assert_eq!(key, 0)
@@ -190,10 +190,10 @@ mod tests {
         // Now drop the other end of the PHY and observe that the PHY is removed from the map.
         drop(phy_server);
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
-        match exec.run_until_stalled(&mut phy_events.next().expect_within(
-            zx::Duration::from_seconds(60),
+        match exec.run_until_stalled(&mut pin!(phy_events.next().expect_within(
+            zx::MonotonicDuration::from_seconds(60),
             "phy_watcher did not observe device removal",
-        )) {
+        ))) {
             Poll::Ready(Some(event)) => match event {
                 watchable_map::MapEvent::KeyRemoved(key) => {
                     assert_eq!(key, 0)

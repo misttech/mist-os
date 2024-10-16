@@ -31,11 +31,13 @@ class LinuxExceptionHandle : public ExceptionHandle {
 
   // ExceptionHandle implementation:
   std::unique_ptr<ThreadHandle> GetThreadHandle() const override;
+  std::unique_ptr<ProcessHandle> GetProcessHandle() const override;
   debug_ipc::ExceptionType GetType(const ThreadHandle& thread) const override;
   fit::result<debug::Status, Resolution> GetResolution() const override;
   debug::Status SetResolution(Resolution resolution) override;
   fit::result<debug::Status, debug_ipc::ExceptionStrategy> GetStrategy() const override;
   debug::Status SetStrategy(debug_ipc::ExceptionStrategy strategy) override;
+  debug_ipc::ExceptionRecord GetRecord() const override;
 
  private:
   // Moveable but not copyable.

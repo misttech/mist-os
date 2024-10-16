@@ -14,10 +14,14 @@
     },
     capabilities: [
         { service: "fuchsia.hardware.ramdisk.Service" },
+        { service: "fuchsia.hardware.block.volume.Service" },
     ],
     expose: [
         {
-            service: "fuchsia.hardware.ramdisk.Service",
+            service: [
+                "fuchsia.hardware.block.volume.Service",
+                "fuchsia.hardware.ramdisk.Service",
+            ],
             from: "self",
         },
     ],

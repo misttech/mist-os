@@ -50,6 +50,19 @@ static void debugmsg(const char*, ...);
 static zx_status_t get_library_vmo(const char* name, zx_handle_t* vmo);
 static void loader_svc_config(const char* config);
 
+// These are used for undefined weak definitions.  The value slot contains just
+// the addend; the first entry-point ignores the addend and is cheaper for a
+// zero addend (the most common case), while the second supports an addend.
+// The implementation returns the addend minus the thread pointer, such that
+// adding the thread pointer back to this offset produces zero with a zero
+// addend, and thus nullptr.
+//
+// These entry-points have a custom calling convention, and are just an
+// assembly entry-point address used in the TLSDESC ABI and not a typical
+// function pointer. cf </lib/ld/tlsdesc.h> in //sdk/lib/ld
+extern ptrdiff_t _ld_tlsdesc_runtime_undefined_weak(void);
+extern ptrdiff_t _ld_tlsdesc_runtime_undefined_weak_addend(void);
+
 #define MAXP2(a, b) (-(-(a) & -(b)))
 
 #define VMO_NAME_DL_ALLOC "ld.so.1-internal-heap"
@@ -615,7 +628,7 @@ LIBC_NO_SAFESTACK NO_ASAN static void do_relocs(struct dso* dso, size_t* rel, si
         reloc_addr[1] = def.sym ? (size_t)def.dso->got : 0;
         break;
       case REL_DTPMOD:
-        *reloc_addr = def.dso->tls_id;
+        *reloc_addr = def.dso ? def.dso->tls_id : 0;
         break;
       case REL_DTPOFF:
         *reloc_addr = tls_val + addend - DTP_OFFSET;
@@ -635,7 +648,10 @@ LIBC_NO_SAFESTACK NO_ASAN static void do_relocs(struct dso* dso, size_t* rel, si
       case REL_TLSDESC:
         if (stride < 3)
           addend = reloc_addr[1];
-        if (runtime && def.dso->tls_id >= static_tls_cnt) {
+        if (!def.dso) {
+          *reloc_addr = (uintptr_t)(addend == 0 ? _ld_tlsdesc_runtime_undefined_weak
+                                                : _ld_tlsdesc_runtime_undefined_weak_addend);
+        } else if (runtime && def.dso->tls_id >= static_tls_cnt) {
           size_t* new = dl_alloc(2 * sizeof(size_t));
           if (!new) {
             error("Error relocating %s: cannot allocate TLSDESC for %s", dso->l_map.l_name, name);

@@ -37,7 +37,7 @@ PreviousBootLog::PreviousBootLog(async_dispatcher_t* dispatcher, timekeeper::Clo
       },
       // The previous boot logs are deleted after |delete_previous_boot_log_at| of device uptime,
       // not component uptime.
-      *delete_previous_boot_log_at - zx::nsec(clock_->Now().get()));
+      *delete_previous_boot_log_at - zx::nsec(clock_->MonotonicNow().get()));
 }
 
 ::fpromise::promise<AttachmentValue> PreviousBootLog::Get(const uint64_t ticket) {

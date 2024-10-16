@@ -10,16 +10,17 @@ import("//build/rust/rustc_library.gni")
 rustc_library("lib") {
   edition = "2021"
   deps = [
-    "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
+    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
     "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
+    "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
     "//src/storage/gpt/rust",
     "//src/storage/lib/block_client/rust",
     "//src/storage/lib/block_server",
-    "//src/storage/lib/fs_management/rust:fs_management",
+    "//src/storage/lib/block_server",
     "//src/storage/lib/vfs/rust:vfs",
     "//src/storage/storage-host/fidl/fuchsia.storagehost:fuchsia.storagehost_rust",
     "//third_party/rust_crates:anyhow",
@@ -27,12 +28,12 @@ rustc_library("lib") {
     "//third_party/rust_crates:tracing",
   ]
   test_deps = [
+    "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_rust",
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/storage/gpt/rust:gpt_testing",
     "//src/storage/lib/block_server:fake_block_server",
-    "//third_party/rust_crates:event-listener",
   ]
   sources = [
     "src/gpt.rs",

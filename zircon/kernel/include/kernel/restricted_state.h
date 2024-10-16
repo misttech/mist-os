@@ -40,7 +40,6 @@ class RestrictedState {
   bool in_restricted() const { return in_restricted_; }
   uintptr_t vector_ptr() const { return vector_ptr_; }
   uintptr_t context() const { return context_; }
-  bool in_thread_exceptions_enabled() const { return in_thread_exceptions_enabled_; }
   const ArchSavedNormalState& arch_normal_state() const { return arch_; }
   ArchSavedNormalState& arch_normal_state() { return arch_; }
   template <typename T>
@@ -55,7 +54,6 @@ class RestrictedState {
   void set_in_restricted(bool r) { in_restricted_ = r; }
   void set_vector_ptr(uintptr_t v) { vector_ptr_ = v; }
   void set_context(uintptr_t c) { context_ = c; }
-  void set_in_thread_exceptions_enabled(bool enable) { in_thread_exceptions_enabled_ = enable; }
 
   // Each arch must fill out the following routines prefixed with Arch:
   //
@@ -102,7 +100,6 @@ class RestrictedState {
   RestrictedState(fbl::RefPtr<VmObjectPaged> state_vmo, fbl::RefPtr<VmMapping> state_mapping);
 
   bool in_restricted_ = false;
-  bool in_thread_exceptions_enabled_ = false;
   uintptr_t vector_ptr_ = 0;
   uintptr_t context_ = 0;
 

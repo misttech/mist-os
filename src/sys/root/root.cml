@@ -83,6 +83,7 @@
                 "fuchsia.platform.bus.SoftwareDeviceIds",
                 "fuchsia.platform.bus.SoftwareDeviceNames",
                 "fuchsia.power.SuspendEnabled",
+                "fuchsia.power.WaitForSuspendingToken",
                 "fuchsia.usb.PeripheralConfig.Functions",
             ],
             from: "#config",

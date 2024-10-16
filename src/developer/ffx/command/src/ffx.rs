@@ -295,17 +295,17 @@ enum StrictCheckError {
 enum StrictCheckErrorEnum {
     #[error("ffx strict requires that the machine writer be specified")]
     MustHaveMachineSpecified,
-    #[error("ffx strict requries that the target be explicitly specified")]
+    #[error("ffx strict requires that the target be explicitly specified")]
     MustHaveTarget,
-    #[error("ffx strict requries that the Target be specified by address. Actually passed: \"{}\"", .0)]
+    #[error("ffx strict requires that the Target be specified by address. Actually passed: \"{}\"", .0)]
     TargetMustBeAddress(String),
-    #[error("ffx strict requries that the Target be a valid IP address. Invalid ID: \"{}\"", .0)]
+    #[error("ffx strict requires that the Target be a valid IP address. Invalid ID: \"{}\"", .0)]
     TargetAddressMustHaveValidScopeId(String),
     #[error("When running in strict mode, config flags must be list of Key Value Pairs or valid JSON. Passed: \"{}\"", .0)]
     ConfigArgMustBeJsonOrKeyValuePair(String),
     #[error("Specifying strict mode and isolate dir are mutually exclusive. specify one or the other. Isolate Dir Passed: {}", .0.display())]
     StrictAndIsolateMutuallyExclusive(PathBuf),
-    #[error("ffx strict requries that the Log Destination be explicitly specified")]
+    #[error("ffx strict requires that the Log Destination be explicitly specified")]
     MustHaveLogDestination,
     #[error("When running in strict mode, Log Destination must be a file. \"{}\" is not a file", .0)]
     LogDestinationMustBeFile(LogDestination),

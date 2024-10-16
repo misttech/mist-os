@@ -257,9 +257,9 @@ class VmObjectPaged final : public VmObject {
   // this VMO and is intended as a debugging aid. A return value of false indicates that the VMO
   // hierarchy is corrupt and the system should probably panic as soon as possible. As a result,
   // if false is returned this may write various additional information to the debuglog.
-  bool DebugValidatePageSplits() const {
+  bool DebugValidatePageSharing() const {
     Guard<CriticalMutex> guard{lock()};
-    return cow_pages_locked()->DebugValidatePageSplitsLocked();
+    return cow_pages_locked()->DebugValidatePageSharingLocked();
   }
 
   // Used to cache the memory attribution counts for this VMO. Also tracks the hierarchy

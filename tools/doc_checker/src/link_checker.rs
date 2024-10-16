@@ -672,7 +672,7 @@ fn handle_shortcut_unknown(
             ele.doc_line().file_name.clone(),
             &format!("unescaped [{}] not treating this as a shortcut link.", link_url),
             &format!(
-                "escape brackets \\[{}\\] or make a link [{}](/docs/{})",
+                "escaping \\[{}\\] or make a link [{}](/docs/{})",
                 link_title, link_url, link_url
             ),
         ));

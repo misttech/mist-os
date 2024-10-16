@@ -384,7 +384,7 @@ mod tests {
         queue.queue.push(non_matching_req);
 
         // Advance mock time
-        let scan_duration = zx::Duration::from_seconds(6);
+        let scan_duration = zx::MonotonicDuration::from_seconds(6);
 
         let scan_results = Err(types::ScanError::GeneralError);
         queue.handle_completed_sme_scan(

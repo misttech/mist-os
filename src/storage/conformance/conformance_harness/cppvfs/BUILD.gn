@@ -16,6 +16,7 @@ executable("bin") {
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/storage/lib/vfs/cpp",
+    "//src/testing/fidl:placeholders_cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]

@@ -4,10 +4,10 @@
 
 library fuchsia.hardware.light;
 
-/// Identifies the [`fuchsia.hardware.light/Metadata`] instance provided by the light platform
-/// device.
+// Name of the FIDL type [`fuchsia.hardware.light/Metadata`]. Also used as the ID for metadata
+// stored within the light platform device.
 @available(added=HEAD)
-const PDEV_METADATA_TYPE_IDENTIFIER uint32 = 0x5448474C;
+const METADATA_TYPE_NAME string = "fuchsia.hardware.light.Metadata";
 
 @available(added=HEAD)
 type Config = table {

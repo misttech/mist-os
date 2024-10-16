@@ -2,6 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+load(
+    "@fuchsia_sdk//fuchsia:defs.bzl",
+    "fuchsia_devicetree_toolchain_info",
+)
+
 test_suite(
     name = "tests",
     tags = ["all"],
@@ -34,6 +39,7 @@ test_suite(
         "//fuchsia/assembly:partitions_config_golden_test",
         "//fuchsia/assembly:prebuilt_product_config_golden_test",
         "//fuchsia/assembly:product_config_golden_test",
+        "//fuchsia/assembly:product_config_relative_golden_test",
         "//fuchsia/assembly:product_config_with_labels_golden_test",
         "//fuchsia/assembly:product_ota_config_golden_test",
         "//fuchsia/assembly:product_ota_config_golden_test_channel_config",
@@ -71,4 +77,15 @@ filegroup(
         "//examples/hello_world_cpp:pkg",
         "//examples/hello_world_cpp:test_pkg",
     ],
+)
+
+fuchsia_devicetree_toolchain_info(
+    name = "fuchsia_devicetree_toolchain_info",
+    dtc = "//tools:dtc",
+)
+
+toolchain(
+    name = "fuchsia_sdk_devicetree_toolchain",
+    toolchain = ":fuchsia_devicetree_toolchain_info",
+    toolchain_type = "@fuchsia_sdk//fuchsia:devicetree_toolchain_type",
 )

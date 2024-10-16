@@ -57,7 +57,7 @@ const char* excp_type_to_string(uint type) {
 
 bool HasRestrictedInThreadHandler() {
   RestrictedState* rs = Thread::Current::restricted_state();
-  return rs != nullptr && rs->in_restricted() && rs->in_thread_exceptions_enabled();
+  return rs != nullptr && rs->in_restricted();
 }
 }  // namespace
 

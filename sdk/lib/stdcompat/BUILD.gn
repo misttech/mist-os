@@ -49,10 +49,8 @@ zx_library("stdcompat") {
     "lib/stdcompat/internal/linkage.h",
     "lib/stdcompat/internal/span.h",
     "lib/stdcompat/internal/storage.h",
-    "lib/stdcompat/internal/tuple.h",
     "lib/stdcompat/internal/type_traits.h",
     "lib/stdcompat/internal/utility.h",
-    "lib/stdcompat/internal/variant.h",
   ]
 
   friend = [ "test:*" ]

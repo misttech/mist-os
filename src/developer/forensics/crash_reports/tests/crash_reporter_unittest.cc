@@ -497,7 +497,7 @@ TEST_F(CrashReporterTest, ResetsQuota) {
   }
 
   RunLoopFor(zx::hour(24) + kResetOffset);
-  clock_.Set(clock_.Now() + zx::hour(24) + kResetOffset);
+  clock_.Set(clock_.MonotonicNow() + zx::hour(24) + kResetOffset);
 
   for (size_t i = 0; i < kDailyPerProductQuota; ++i) {
     ASSERT_TRUE(FileOneCrashReport().is_response());

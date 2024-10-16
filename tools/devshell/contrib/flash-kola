@@ -32,25 +32,28 @@ fi
 
 # Get serial console path to device.
 readonly SERIAL_PATH=${1:-'/dev/ttyUSB0'}
-if [[ $# -eq 0 ]]; then
-  echo "The user's public SSH key will be installed onto the device using the serial console at" \
-      "${SERIAL_PATH}."
-  echo "Alternatively, you can supply the serial console path to be used, e.g.:"
-  echo "  fx flash-kola /tmp/pontis/serial-10c4-ea60"
-  read -r -p "Press enter to continue..."
-fi
+
 if [[ ! -e "${SERIAL_PATH}" ]]; then
-  fx-error "${SERIAL_PATH} not found."
-  exit 1
-fi
-
-if [[ "${SERIAL_PATH}" =~ (pontis)|(/dev/pts/) ]]; then
-  echo "If the serial console is over pontis, it must be an unused connection."
-  echo "Else, disconnect and reconnect it at http://pontis/ on your laptop."
+  echo "Serial device ${SERIAL_PATH} not detected, skipping SSH key deployment."
   read -r -p "Press enter to continue..."
+else
+  if [[ $# -eq 0 ]]; then
+    echo "The user's public SSH key will be installed onto the device using the serial console at" \
+        "${SERIAL_PATH}."
+    echo "Alternatively, you can supply the serial console path to be used, e.g.:"
+    echo "  fx flash-kola /tmp/pontis/serial-10c4-ea60"
+    read -r -p "Press enter to continue..."
+  fi
+
+  if [[ "${SERIAL_PATH}" =~ (pontis)|(/dev/pts/) ]]; then
+    echo "If the serial console is over pontis, it must be an unused connection."
+    echo "Else, disconnect and reconnect it at http://pontis/ on your laptop."
+    read -r -p "Press enter to continue..."
+  fi
+
+  stty -F "${SERIAL_PATH}" 115200 raw -echo
 fi
 
-stty -F "${SERIAL_PATH}" 115200 raw -echo
 
 ${FASTBOOT} flash boot_a "$ZBI_PATH"
 ${FASTBOOT} flash boot_b "$ZBI_PATH"
@@ -58,11 +61,15 @@ ${FASTBOOT} flash super "$FVM_PATH"
 
 ${FASTBOOT} reboot
 
-# Wait until device has completed bootup.
-sleep 60
 
-# Install user's public SSH key (the first one in $AUTHKEYS_PATH).
-AUTHKEYS_PATH="$(get-ssh-authkeys)"
-readonly AUTHKEYS_PATH
-echo "echo \"$(head -n 1 "${AUTHKEYS_PATH}")\" > /data/ssh/authorized_keys" > "${SERIAL_PATH}"
+if [[ -e "${SERIAL_PATH}" ]]; then
+  # Wait until device has completed bootup.
+  sleep 60
+
+  # Install user's public SSH key (the first one in $AUTHKEYS_PATH).
+  AUTHKEYS_PATH="$(get-ssh-authkeys)"
+  readonly AUTHKEYS_PATH
+  echo "echo \"$(head -n 1 "${AUTHKEYS_PATH}")\" > /data/ssh/authorized_keys" > "${SERIAL_PATH}"
+fi
+
 echo "Done flashing Kola device."

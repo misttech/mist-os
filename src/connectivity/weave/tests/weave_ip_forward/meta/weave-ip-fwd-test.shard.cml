@@ -103,21 +103,6 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#fuchsia-netstack",
-                "#fuchsia-node",
-                "#sync-manager",
-                "#weave-netstack",
-                "#weave-node",
-                "#wlan-netstack",
-                "#wlan-node",
-                "#wpan-netstack",
-                "#wpan-node",
-            ],
-        },
-        {
             protocol: "fuchsia.netemul.sync.SyncManager",
             from: "#sync-manager",
             to: [

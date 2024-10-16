@@ -1,16 +1,18 @@
 # Introduction
 
-Carnelian is a prototype framework for writing Fuchsia modules in Rust.
-It can run either directly on the frame buffer or with Scenic.
+Carnelian is a prototype framework for writing interactive Fuchsia components in
+Rust.  It can display graphics either via Scenic's `fuchsia.ui.composition.*`
+APIs, or by communicating directly with `fuchsia.hardware.display.Coordinator`.
 
-# Scenic mode
-
-## Building
+# Building
 
 To build the included samples, use the fx set line below to build the
 workbench version of Fuchsia with the necessary additional packages to run
 with Scenic.
 
+```
+    # Can also use `core.x64`, etc.  Not all products will support running in
+    # Scenic and/or direct-display mode; see below.
     fx set workbench_eng.x64 \
         --with //src/lib/ui/carnelian:examples \
         --with //src/lib/ui/carnelian:carnelian-integration-test \
@@ -21,74 +23,73 @@ with Scenic.
         --auto-dir \
         --args=rust_cap_lints='"warn"' \
         --cargo-toml-gen
+```
 
-## Running
+## Configuring View Mode
+
+Carnelian apps are configured to run in one of three view modes:
+- `direct`: avoid Scenic and talk directly to the display coordinator
+- `hosted`: display via `Flatland` API.
+- `auto`: try `direct` first and fall back to `hosted`
+  - this is the default
+
+To use `direct` instead of `auto`, set the global build argument
+`use_direct_for_carnelian_examples`.  If you're writing your own Carnelian app,
+then you can add a dependency on `//src/lib/ui/carnelian:direct_config` (or do
+something similar, but customized to your needs).
+
+# Running using Scenic mode
 
 To run the examples, use `ffx session add`.
+
+Important: this requires a product that *has* a session.  For example, this
+won't work with a `core.x64` build.
 
 The basic workflow is:
 
 1. `fx serve`
 2. `ffx session add fuchsia-pkg://fuchsia.com/spinning-square-rs#meta/spinning-square-rs.cm`
 
-To run another example, replace the Fuchsia package url with the desired example below.
+To run a different example, replace the Fuchsia package URL with the desired
+example; see the list of available examples below.
 
-# Virtcon mode
+# Running using Direct Display mode
 
-## Building
-
-To build the included samples, use the fx set line below to build the
-core version of Fuchsia with the necessary additional packages to run
-directly on the frame buffer.
-
-    fx set core.x64 \
-        --with //src/lib/ui/carnelian:examples \
-        --with //src/lib/ui/carnelian:carnelian-integration-test \
-        --with //src/lib/ui/carnelian:carnelian-fb-integration-test \
-        --with //src/lib/ui/carnelian:carnelian-tests \
-        --with //src/lib/ui/carnelian:carnelian-layout-tests \
-        --release \
-        --auto-dir \
-        --args=rust_cap_lints='"warn"' \
-        --args='core_realm_shards += [ "//src/lib/ui/carnelian:carnelian_examples_shard" ]'
-        --cargo-toml-gen
-
-To disable virtcon, add
-
-        --assembly-override `//build/images/fuchsia/*=//local:disable_virtcon'
-
-and define a `//local/BUILD.gn` file as follows:
-
-```
-import("//build/assembly/developer_overrides.gni")
-
-assembly_developer_overrides("disable_virtcon") {
-  platform = {
-    graphics = {
-      enable_virtual_console = false
-    }
-  }
-}
-```
-
-## Running
-
-To run the examples, use `ffx component`. The `core_realm_shard` added above
-installs a collection into the `/core` realm that can be used to launch examples.
+To run in direct display mode, the examples must be run in a realm that routes
+the necessary capabilities (e.g. the `dev-display-coordinator` directory).  The
+correct way to do this seems to change every month, but currently one way that
+works is to run it as a "system test", as described below.
 
 The basic workflow is:
+1. If your product includes a session, you must first stop the session and
+Scenic: `ffx session stop; ffx component stop core/ui/scenic`.
+2. `ffx component create /core/test_manager/system-tests:carnelian-square-rs fuchsia-pkg://fuchsia.com/spinning-square-rs#meta/spinning-square-rs.cm`
+3. `ffx component start /core/test_manager/system-tests:carnelian-square-rs`
 
-1. `ffx component create /core/carnelian-examples:square-rs fuchsia-pkg://fuchsia.com/spinning-square-rs#meta/spinning-square-rs.cm`
-2. `ffx component start /core/carnelian-examples:square-rs`
+In `system-tests:carnelian-square-rs`, `system-tests` specifies the collection
+where the component will be created, and therefore specifies which capabilities
+will be routed.  `carnelian-square-rs` is an arbitrary name; if calling it
+`foobar` makes you happier, do that.
 
-Note that `carnelian-examples` is the collection name and *must* be typed.
-However, the name of the created component, `square-rs` above, is user-defined
-when invoking `ffx component create`. To run another example, replace
-`spinning-square-rs` with the desired example below.
+To run a different example, replace the Fuchsia package URL with the desired
+example; see the list of available examples below.
 
-# Examples
+## Troubleshooting
 
-The examples directory contains a set of Carnelian example programs.
+If `/core/test_manager/system-tests` is unavailable, you're probably not running
+on an eng build.  This collection is provided by `//src/sys/testing`, which is
+included in `//bundles/assembly:testing_support`, which is included in eng builds.
+
+The display coordinator only supports a single client.  If another client
+is already connected, the Carnelian example will not be able to.  This is
+typically because Scenic is running, but it is possible that your configuration
+has another client that has claimed the display.  For example, you cannot run
+a second Carnelian example without first killing the existing one.
+
+# List of Examples
+
+The examples directory contains a set of Carnelian example programs.  These are
+described below, along with the the URLs that can be used to run them.
 
 ## Layout-based Examples
 

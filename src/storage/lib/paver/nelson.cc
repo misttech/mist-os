@@ -27,7 +27,7 @@ using uuid::Uuid;
 zx::result<std::unique_ptr<DevicePartitioner>> NelsonPartitioner::Initialize(
     const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     fidl::ClientEnd<fuchsia_device::Controller> block_device) {
-  auto status = IsBoard(devices.devfs_root(), "nelson");
+  auto status = IsBoard(svc_root, "nelson");
   if (status.is_error()) {
     return status.take_error();
   }

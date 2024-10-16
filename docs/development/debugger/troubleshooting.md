@@ -69,8 +69,8 @@ necessary options.
 
 * {set `build-id-dirs`}
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] set build-id-dirs += some/other_location/.build-id
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  set build-id-dirs += some/other_location/.build-id
   ```
 
 * {`--build-id-dir` flag}
@@ -111,8 +111,8 @@ expectations.
 
 To see the status of symbols, run `sym-stat`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] sym-stat
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+sym-stat
 Symbol index status
 
   Indexed  Source path
@@ -143,8 +143,8 @@ then become unavailable.
 For example, you can see the valid ranges for the `my_variable` variable with
 the `sym-info` command:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] sym-info my_variable
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+sym-info my_variable
 Variable: my_variable
   Type: int
   DWARF tag: 0x05
@@ -195,8 +195,8 @@ file, but it only prints the warning the first time the file is displayed.
 Some users have multiple checkouts. Use the `-f` option with the `list` command
 to check the file name of the file that zxdb found. For example:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] list -f
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+list -f
 /home/alice/fuchsia/out/x64/../../src/foo/bar.cc
  ... <source code> ...
 ```
@@ -212,8 +212,8 @@ paths. When this setting is set to `true`:
 
 To set `show-file-paths` to `true`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] set show-file-paths true
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+set show-file-paths true
 ```
 
 #### When setting breakpoints
@@ -224,8 +224,8 @@ typed. In most cases, this is because this symbols did not identify any code on
 the specified line so zxdb used the next line. This can happen even in
 unoptimized builds, and is most common for variable declarations.
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] b file.cc:138
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+b file.cc:138
 Breakpoint 1 (Software) @ file.cc:138
    138   int my_value = 0;          <- Breakpoint was requested here.
  ◉ 139   DoSomething(&my_value);    <- But ended up here.

@@ -795,9 +795,6 @@ def main() -> int:
 
     # These options must appear for commands that act on the configure graph (i.e. all except `bazel query`
     bazel_config_args += [
-        # TODO: b/321637402 - Enable platform-based toolchain resolution in
-        # these tests.
-        "--incompatible_enable_cc_toolchain_resolution=false",
         # Ensure binaries are generated for the right Fuchsia CPU architecture.
         # Without this, @fuchsia_sdk rules assume that target_cpu == host_cpu,
         # and will use an incorrect output path prefix (i.e.

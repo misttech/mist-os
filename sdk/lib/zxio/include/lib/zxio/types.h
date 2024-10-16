@@ -222,6 +222,8 @@ typedef struct zxio_verification_options {
   zxio_hash_algorithm_t hash_alg;
 } zxio_verification_options_t;
 
+#define ZXIO_WRAPPING_KEY_ID_LENGTH 16
+
 // Objective information about a node.
 //
 // Each field has a corresponding presence indicator. When creating
@@ -278,6 +280,8 @@ typedef struct zxio_node_attr {
   // The type of the zxio object if known. If the type is unknown or non
   // standard, the value will be ZXIO_OBJECT_TYPE_NONE.
   zxio_object_type_t object_type;
+  // fscrypt attribute.
+  uint8_t wrapping_key_id[ZXIO_WRAPPING_KEY_ID_LENGTH];
 
   // Presence indicator for these fields.
   //
@@ -305,6 +309,7 @@ typedef struct zxio_node_attr {
     bool fsverity_enabled;
     bool object_type;
     bool casefold;
+    bool wrapping_key_id;
 
 #ifdef __cplusplus
     constexpr bool operator==(const zxio_node_attr_has_t& other) const {
@@ -315,7 +320,7 @@ typedef struct zxio_node_attr {
              access_time == other.access_time && mode == other.mode && uid == other.uid &&
              gid == other.gid && rdev == other.rdev && fsverity_options == other.fsverity_options &&
              fsverity_root_hash == other.fsverity_root_hash &&
-             fsverity_enabled == other.fsverity_enabled;
+             fsverity_enabled == other.fsverity_enabled && wrapping_key_id == other.wrapping_key_id;
     }
     constexpr bool operator!=(const zxio_node_attr_has_t& other) const { return !(*this == other); }
 #endif  // _cplusplus
@@ -387,6 +392,10 @@ typedef struct zxio_node_attr {
       return false;
     }
     if (has.casefold && casefold != other.casefold) {
+      return false;
+    }
+    if (has.wrapping_key_id &&
+        memcmp(wrapping_key_id, other.wrapping_key_id, ZXIO_WRAPPING_KEY_ID_LENGTH) != 0) {
       return false;
     }
     return true;

@@ -450,11 +450,7 @@ impl VulkanRenderer {
                 export_token: Some(import_export_tokens.export_token),
                 // Sysmem token channels serve both sysmem(1) and sysmem2 token protocols, so we can
                 // convert here until flatland has a sysmem2 token field.
-                buffer_collection_token: Some(ClientEnd::<
-                    fidl_fuchsia_sysmem::BufferCollectionTokenMarker,
-                >::new(
-                    buffer_collection_token.into_channel()
-                )),
+                buffer_collection_token2: Some(buffer_collection_token),
                 ..Default::default()
             };
             // Two possible errors here:

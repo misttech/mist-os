@@ -1,7 +1,7 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use zx::Duration;
+use zx::MonotonicDuration;
 
 pub const DEV_DIR: &str = "/dev";
 pub const HOST_DEVICE_DIR: &str = "class/bt-host";
@@ -21,4 +21,4 @@ pub const BT_HOST_URL: &str = "bt-host#meta/bt-host.cm";
 //      fail
 //   c) short enough to fail before the overall infra-imposed test timeout (currently 5 minutes),
 //      so that we can produce specific test-relevant information in the case of failure.
-pub const INTEGRATION_TIMEOUT: Duration = Duration::from_minutes(4);
+pub const INTEGRATION_TIMEOUT: MonotonicDuration = MonotonicDuration::from_minutes(4);

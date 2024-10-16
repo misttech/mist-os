@@ -977,11 +977,10 @@ impl Ink {
         scene.select_tools(&vec![color, COLORS.len() + pencil]);
 
         let stylus_device = StylusDevice::create().ok();
-        let flower_start = MonotonicInstant::from_nanos(
-            MonotonicInstant::get()
-                .into_nanos()
-                .saturating_add(zx::Duration::from_seconds(FLOWER_DELAY_SECONDS).into_nanos()),
-        );
+        let flower_start =
+            MonotonicInstant::from_nanos(MonotonicInstant::get().into_nanos().saturating_add(
+                zx::MonotonicDuration::from_seconds(FLOWER_DELAY_SECONDS).into_nanos(),
+            ));
 
         Self {
             scene,
@@ -1110,7 +1109,7 @@ impl Ink {
             if distance >= MIN_CLEAR_SWIPE_DISTANCE {
                 self.flower_start =
                     MonotonicInstant::from_nanos(time_now.into_nanos().saturating_add(
-                        zx::Duration::from_seconds(FLOWER_DELAY_SECONDS).into_nanos(),
+                        zx::MonotonicDuration::from_seconds(FLOWER_DELAY_SECONDS).into_nanos(),
                     ));
                 self.flower = None;
                 self.scene.clear_strokes();

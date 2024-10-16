@@ -21,8 +21,8 @@ const SAMPLES_RECORDED: usize = 5;
 const EMPTY_SAMPLE: HttpsSample = HttpsSample {
     utc: zx::MonotonicInstant::ZERO,
     monotonic: zx::MonotonicInstant::ZERO,
-    standard_deviation: zx::Duration::from_nanos(0),
-    final_bound_size: zx::Duration::from_nanos(0),
+    standard_deviation: zx::MonotonicDuration::from_nanos(0),
+    final_bound_size: zx::MonotonicDuration::from_nanos(0),
     polls: vec![],
 };
 
@@ -201,15 +201,15 @@ mod test {
             zx::MonotonicInstant::from_nanos(550_000_000_000);
     }
 
-    const TEST_STANDARD_DEVIATION: zx::Duration = zx::Duration::from_millis(211);
+    const TEST_STANDARD_DEVIATION: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(211);
 
-    const TEST_ROUND_TRIP_1: zx::Duration = zx::Duration::from_millis(100);
-    const TEST_ROUND_TRIP_2: zx::Duration = zx::Duration::from_millis(150);
-    const TEST_ROUND_TRIP_3: zx::Duration = zx::Duration::from_millis(200);
+    const TEST_ROUND_TRIP_1: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(100);
+    const TEST_ROUND_TRIP_2: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(150);
+    const TEST_ROUND_TRIP_3: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(200);
 
-    const TEST_BOUND_SIZE: zx::Duration = zx::Duration::from_millis(75);
+    const TEST_BOUND_SIZE: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(75);
 
-    fn sample_with_rtts(round_trip_times: &[zx::Duration]) -> HttpsSample {
+    fn sample_with_rtts(round_trip_times: &[zx::MonotonicDuration]) -> HttpsSample {
         HttpsSample {
             utc: *TEST_UTC,
             monotonic: *TEST_MONOTONIC,

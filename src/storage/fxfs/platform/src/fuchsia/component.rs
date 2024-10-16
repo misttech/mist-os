@@ -520,7 +520,7 @@ mod tests {
             let fs = FxFilesystem::new_empty(DeviceHolder::new(
                 BlockDevice::new(
                     Box::new(
-                        new_block_client(ramdisk.open().await.expect("Unable to open ramdisk"))
+                        new_block_client(ramdisk.open().expect("Unable to open ramdisk"))
                             .await
                             .expect("Unable to create block client"),
                     ),
@@ -559,7 +559,7 @@ mod tests {
         let task = async {
             startup_proxy
                 .start(
-                    ramdisk.open().await.expect("Unable to open ramdisk").into(),
+                    ramdisk.open().expect("Unable to open ramdisk").into(),
                     StartOptions {
                         read_only: false,
                         verbose: false,

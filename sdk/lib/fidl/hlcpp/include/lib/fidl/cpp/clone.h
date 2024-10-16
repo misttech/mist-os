@@ -82,7 +82,14 @@ zx_status_t Clone(const zx::object<T>& value, zx::object<T>* result) {
   }
   return internal::CloneKernelObject(value, result);
 }
+
 #endif  // __Fuchsia__
+
+template <zx_clock_t kClockId>
+zx_status_t Clone(const fidl::basic_time<kClockId>& value, fidl::basic_time<kClockId>* result) {
+  *result = value;
+  return ZX_OK;
+}
 
 zx_status_t Clone(const StringPtr& value, StringPtr* result);
 zx_status_t Clone(const ::std::string& value, std::string* result);

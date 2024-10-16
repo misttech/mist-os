@@ -19,8 +19,6 @@ load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
 
 bazel_skylib_workspace()
 
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-
 http_archive(
     name = "platforms",
     sha256 = "218efe8ee736d26a3572663b374a253c012b716d8af0c07e842e82f238a0a7ee",
@@ -54,6 +52,8 @@ fuchsia_sdk_repository(
 )
 
 register_toolchains("@fuchsia_sdk//:fuchsia_toolchain_sdk")
+
+register_toolchains("//:fuchsia_sdk_devicetree_toolchain")
 
 # Create the @fuchsia_build_config information to get host_tag information.
 load("@fuchsia_sdk_common//common:fuchsia_platform_build.bzl", "fuchsia_build_config_repository")
@@ -91,6 +91,19 @@ compact_python_runtime_repository(
 )
 
 register_toolchains("@prebuilt_python//:py_toolchain")
+
+# Register an empty C++ host toolchain, because thiss test suite
+# needs to run on CI bots without GCC or Clang installed.
+load(
+    "@fuchsia_sdk_common//common:toolchains/clang/repository_utils.bzl",
+    "empty_host_cpp_toolchain_repository",
+)
+
+empty_host_cpp_toolchain_repository(
+    name = "host_no_cpp",
+)
+
+register_toolchains("@host_no_cpp//:empty_cpp_toolchain")
 
 fuchsia_sdk_repository(
     name = "fuchsia_sdk_x64_only",

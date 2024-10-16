@@ -70,18 +70,4 @@
             from: "framework",
         },
     ],
-    offer: [
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [
-                "#fake_alpha",
-                "#fake_cast",
-                "#fake_misc",
-                "#fake_playready",
-                "#fake_weave",
-                "#fake_widevine",
-            ],
-        },
-    ],
 }

@@ -147,10 +147,6 @@ async fn exec_env_set<W: Write>(
     mut writer: W,
     s: &EnvSetCommand,
 ) -> Result<()> {
-    let build_dir = match (s.level, s.build_dir.as_deref()) {
-        (ConfigLevel::Build, Some(build_dir)) => Some(build_dir),
-        _ => None,
-    };
     let env_file = env_context.env_file_path().context("Getting ffx environment file path")?;
 
     if !env_file.exists() {
@@ -169,7 +165,7 @@ async fn exec_env_set<W: Write>(
 
     match &s.level {
         ConfigLevel::User => env.set_user(Some(&s.file)),
-        ConfigLevel::Build => env.set_build(&s.file, build_dir)?,
+        ConfigLevel::Build => env.set_build(&s.file)?,
         ConfigLevel::Global => env.set_global(Some(&s.file)),
         _ => ffx_bail!("This configuration is not stored in the environment."),
     }
@@ -269,8 +265,7 @@ mod test {
     async fn test_exec_env_set_set_values() -> Result<()> {
         let test_env = test_init().await?;
         let writer = Vec::<u8>::new();
-        let cmd =
-            EnvSetCommand { file: "test.json".into(), level: ConfigLevel::User, build_dir: None };
+        let cmd = EnvSetCommand { file: "test.json".into(), level: ConfigLevel::User };
         exec_env_set(&test_env.context, writer, &cmd).await?;
         assert_eq!(cmd.file, test_env.load().get_user().unwrap());
         Ok(())
@@ -291,7 +286,6 @@ mod test {
             name: Some("some-key".into()),
             process: MappingMode::Substitute,
             select: ffx_config::SelectMode::First,
-            build_dir: None,
         };
 
         let mut writer = Vec::<u8>::new();
@@ -310,14 +304,12 @@ mod test {
             .await
             .expect("setting value");
 
-        let remove_cmd =
-            RemoveCommand { name: "some-key".into(), level: ConfigLevel::User, build_dir: None };
+        let remove_cmd = RemoveCommand { name: "some-key".into() };
 
         let get_cmd = GetCommand {
             name: Some("some-key".into()),
             process: MappingMode::Substitute,
             select: ffx_config::SelectMode::First,
-            build_dir: None,
         };
 
         exec_remove(&test_env.context, &remove_cmd).await.expect("remove");
@@ -333,8 +325,7 @@ mod test {
     async fn test_remove_nonexistant_key() {
         let test_env = test_init().await.expect("test env initialized");
 
-        let remove_cmd =
-            RemoveCommand { name: "some-key".into(), level: ConfigLevel::User, build_dir: None };
+        let remove_cmd = RemoveCommand { name: "some-key".into() };
 
         match exec_remove(&test_env.context, &remove_cmd).await {
             Ok(_) => panic!("Expected error getting removed key"),
@@ -375,7 +366,6 @@ mod test {
                 name: Some("ssh.priv".into()),
                 process: MappingMode::Raw,
                 select: SelectMode::First,
-                build_dir: None,
             },
             &mut writer,
         )
@@ -418,7 +408,6 @@ mod test {
                 name: Some("ssh.priv".into()),
                 process: MappingMode::Substitute,
                 select: SelectMode::First,
-                build_dir: None,
             },
             &mut writer,
         )
@@ -462,7 +451,6 @@ mod test {
                 name: Some("ssh.priv".into()),
                 process: MappingMode::Substitute,
                 select: SelectMode::First,
-                build_dir: None,
             },
             &mut writer,
         )
@@ -496,7 +484,6 @@ mod test {
                 name: Some("ssh.priv".into()),
                 process: MappingMode::File,
                 select: SelectMode::First,
-                build_dir: None,
             },
             &mut writer,
         )
@@ -533,7 +520,6 @@ mod test {
                 name: Some("ssh.priv".into()),
                 process: MappingMode::File,
                 select: SelectMode::First,
-                build_dir: None,
             },
             &mut writer,
         )
@@ -573,7 +559,6 @@ mod test {
                 name: Some("ssh.priv".into()),
                 process: MappingMode::File,
                 select: SelectMode::First,
-                build_dir: None,
             },
             &mut writer,
         )

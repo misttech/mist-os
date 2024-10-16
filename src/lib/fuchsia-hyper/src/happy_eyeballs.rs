@@ -13,6 +13,7 @@ use std::cmp::{max, min};
 use std::io;
 use std::iter::Peekable;
 use std::net::SocketAddr;
+use std::ops::{Deref, DerefMut};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::vec::IntoIter;
@@ -38,24 +39,26 @@ impl SocketConnector for RealSocketConnector {
 /// version 2 §5p3.
 ///
 /// [RFC8305]: https://tools.ietf.org/html/rfc8305#section-5
-pub(crate) const RECOMMENDED_MIN_CONN_ATT_DELAY: zx::Duration = zx::Duration::from_millis(100);
+pub(crate) const RECOMMENDED_MIN_CONN_ATT_DELAY: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_millis(100);
 
 /// Recommended time between connection attempts according to [RFC8305] Happy Eyeballs
 /// version 2 §5p2.
 ///
 /// [RFC8305]: https://tools.ietf.org/html/rfc8305#section-5
-pub(crate) const RECOMMENDED_CONN_ATT_DELAY: zx::Duration = zx::Duration::from_millis(250);
+pub(crate) const RECOMMENDED_CONN_ATT_DELAY: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_millis(250);
 
 /// Minimum time between connection attempts according to [RFC8305] Happy Eyeballs version 2 §5p3.
 ///
 /// [RFC8305]: https://tools.ietf.org/html/rfc8305#section-5
-const ABS_MIN_CONN_ATT_DELAY: zx::Duration = zx::Duration::from_millis(10);
+const ABS_MIN_CONN_ATT_DELAY: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(10);
 
 /// Recommended maximum time between connection attempts according to [RFC8305] Happy Eyeballs
 /// version 2 §5p3.
 ///
 /// [RFC8305]: https://tools.ietf.org/html/rfc8305#section-5
-const ABS_MAX_CONN_ATT_DELAY: zx::Duration = zx::Duration::from_seconds(2);
+const ABS_MAX_CONN_ATT_DELAY: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(2);
 
 /// happy_eyeballs supplies a partial implementation of [RFC8305] Happy Eyeballs version 2,
 /// including §4p4 and the "simple implementation" described in §5p2.
@@ -73,8 +76,8 @@ const ABS_MAX_CONN_ATT_DELAY: zx::Duration = zx::Duration::from_seconds(2);
 pub(crate) fn happy_eyeballs<A, C>(
     addrs: A,
     connector: C,
-    min_conn_att_delay: zx::Duration,
-    conn_att_delay: zx::Duration,
+    min_conn_att_delay: zx::MonotonicDuration,
+    conn_att_delay: zx::MonotonicDuration,
     bind_device: Option<&str>,
 ) -> HappyEyeballs<C>
 where
@@ -139,26 +142,23 @@ struct Inner<C>
 where
     C: SocketConnector,
 {
-    addrs: Peekable<Interleave<std::vec::IntoIter<SocketAddr>, std::vec::IntoIter<SocketAddr>>>,
-    connector: C,
+    addrs: Addrs<C>,
     #[pin]
     connection_futs: FuturesUnordered<C::Fut>,
     #[pin]
-    timer: Fuse<Timer>,
-    min_conn_att_delay: zx::Duration,
-    conn_att_delay: zx::Duration,
+    timer: Timer,
+    min_conn_att_delay: zx::MonotonicDuration,
+    conn_att_delay: zx::MonotonicDuration,
     last_wake: MonotonicInstant,
     next_wake: MonotonicInstant,
-    err: Option<io::Error>,
-    bind_device: Option<String>,
 }
 
 impl<C: SocketConnector> Inner<C> {
     fn new(
         addrs: Peekable<Interleave<IntoIter<SocketAddr>, IntoIter<SocketAddr>>>,
         connector: C,
-        min_conn_att_delay: zx::Duration,
-        conn_att_delay: zx::Duration,
+        min_conn_att_delay: zx::MonotonicDuration,
+        conn_att_delay: zx::MonotonicDuration,
         bind_device: Option<&str>,
     ) -> Self {
         let last_wake = MonotonicInstant::now();
@@ -167,41 +167,26 @@ impl<C: SocketConnector> Inner<C> {
         );
 
         let mut inner = Inner {
-            addrs,
-            connector,
+            addrs: Addrs {
+                addrs,
+                connector,
+                bind_device: bind_device.map(str::to_string),
+                err: None,
+            },
             connection_futs: FuturesUnordered::new(),
             min_conn_att_delay,
             conn_att_delay,
             last_wake,
             next_wake: first_deadline,
-            timer: Timer::new(first_deadline).fuse(),
-            err: None,
-            bind_device: bind_device.map(str::to_string),
+            timer: Timer::new(first_deadline),
         };
 
         // Ensure that we've enqueued something to do when we're first polled.
-        if let Some(conn_fut) = inner.next_conn() {
+        if let Some(conn_fut) = inner.addrs.next_conn() {
             inner.connection_futs.push(conn_fut);
         }
 
         inner
-    }
-
-    // Try to connect to the address, or cache a possible error to return after exhausting the
-    // entire address list.
-    fn next_conn(&mut self) -> Option<C::Fut> {
-        while let Some(addr) = self.addrs.next() {
-            match self.connector.connect(addr, self.bind_device.as_deref()) {
-                Ok(c) => {
-                    return Some(c);
-                }
-                Err(err) => {
-                    self.err = Some(err);
-                }
-            }
-        }
-
-        None
     }
 
     // This is logically part of the Future implementation on this type; it polls the
@@ -210,11 +195,12 @@ impl<C: SocketConnector> Inner<C> {
     // successful connection. The loop only proceeds when a future was ready and yielded an error
     // instead of a connection. This is done to drain our ready futures in a single poll cycle.
     fn drain_ready_futures(
-        mut self: Pin<&mut Self>,
+        self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Result<C::Connection, io::Error>> {
+        let mut this = self.project();
         loop {
-            let r = self.as_mut().project().connection_futs.poll_next(cx);
+            let r = this.connection_futs.as_mut().poll_next(cx);
             match r {
                 // Return the successful connection.
                 Poll::Ready(Some(Ok(conn))) => {
@@ -226,7 +212,7 @@ impl<C: SocketConnector> Inner<C> {
                 // poll again after this to consume all futures that have reached some final
                 // disposition.
                 Poll::Ready(Some(Err(err))) => {
-                    self.err = Some(err);
+                    this.addrs.err = Some(err);
                 }
 
                 // No managed connection futures are ready; there's nothing more to poll.
@@ -236,13 +222,13 @@ impl<C: SocketConnector> Inner<C> {
 
                 // No connection futures are being managed.
                 Poll::Ready(None) => {
-                    match self.addrs.peek() {
+                    match this.addrs.peek() {
                         None => {
                             // We don't have any more addresses to try to connect to, and we
                             // aren't waiting on any additional addresses. Return the last
                             // error; if it doesn't exist, we were supplied an empty address
                             // list.
-                            break Poll::Ready(Err(self.err.take().unwrap_or_else(|| {
+                            break Poll::Ready(Err(this.addrs.err.take().unwrap_or_else(|| {
                                 io::Error::new(io::ErrorKind::InvalidInput, "no addresses supplied")
                             })));
                         }
@@ -252,16 +238,16 @@ impl<C: SocketConnector> Inner<C> {
                             // earliest allowable moment by constraining our timer to fire
                             // after the minimum interval past its last fire time.
                             let next_deadline = MonotonicInstant::from_nanos(
-                                self.last_wake
+                                this.last_wake
                                     .into_nanos()
-                                    .saturating_add(self.min_conn_att_delay.into_nanos()),
+                                    .saturating_add(this.min_conn_att_delay.into_nanos()),
                             );
-                            if next_deadline < self.next_wake {
-                                self.next_wake = next_deadline;
+                            if next_deadline < *this.next_wake {
+                                *this.next_wake = next_deadline;
 
                                 // N.B. This timer change is safe because the timer is
                                 // unconditionally polled when we exit the match.
-                                self.timer = Timer::new(next_deadline).fuse();
+                                this.timer.reset(next_deadline);
                             }
 
                             break Poll::Pending;
@@ -290,32 +276,33 @@ impl<C: SocketConnector> Future for Inner<C> {
                 Poll::Pending => {}
             }
 
-            match self.as_mut().project().timer.poll(cx) {
+            let mut this = self.as_mut().project();
+            match this.timer.as_mut().poll(cx) {
                 // On this arm, there were no requests to handle, and the poll has guaranteed
                 // any timer mutation is registered with the executor. We're pending.
                 Poll::Pending => {
                     break Poll::Pending;
                 }
                 Poll::Ready(()) => {
-                    if let Some(conn_fut) = self.next_conn() {
+                    if let Some(conn_fut) = this.addrs.next_conn() {
                         // The timer fired and new connections are available. Schedule this
                         // connection to be tried and re-arm the timer to fire again after the
                         // provided connection attempt interval. The timer requires polling, but
                         // since we continue the loop in this arm, we're guaranteed that the
                         // re-armed timer will be polled if there's not a success communicated
                         // through the connection_futs first.
-                        self.connection_futs.push(conn_fut);
+                        this.connection_futs.push(conn_fut);
 
                         // Only re-arm the timer if we have another address to try.
-                        if self.addrs.peek().is_some() {
-                            self.last_wake = MonotonicInstant::now();
+                        if this.addrs.peek().is_some() {
+                            *this.last_wake = MonotonicInstant::now();
                             let next_deadline = MonotonicInstant::from_nanos(
-                                self.last_wake
+                                this.last_wake
                                     .into_nanos()
-                                    .saturating_add(self.conn_att_delay.into_nanos()),
+                                    .saturating_add(this.conn_att_delay.into_nanos()),
                             );
-                            self.next_wake = next_deadline;
-                            self.timer = Timer::new(next_deadline).fuse();
+                            *this.next_wake = next_deadline;
+                            this.timer.reset(next_deadline);
                         }
                     } else {
                         break Poll::Pending;
@@ -323,6 +310,48 @@ impl<C: SocketConnector> Future for Inner<C> {
                 }
             }
         }
+    }
+}
+
+type RawAddrs =
+    Peekable<Interleave<std::vec::IntoIter<SocketAddr>, std::vec::IntoIter<SocketAddr>>>;
+
+struct Addrs<C> {
+    addrs: RawAddrs,
+    connector: C,
+    bind_device: Option<String>,
+    err: Option<io::Error>,
+}
+
+impl<C: SocketConnector> Addrs<C> {
+    // Try to connect to the address, or cache a possible error to return after exhausting the
+    // entire address list.
+    fn next_conn(&mut self) -> Option<C::Fut> {
+        while let Some(addr) = self.addrs.next() {
+            match self.connector.connect(addr, self.bind_device.as_deref()) {
+                Ok(c) => {
+                    return Some(c);
+                }
+                Err(err) => {
+                    self.err = Some(err);
+                }
+            }
+        }
+
+        None
+    }
+}
+
+impl<C> Deref for Addrs<C> {
+    type Target = RawAddrs;
+    fn deref(&self) -> &Self::Target {
+        &self.addrs
+    }
+}
+
+impl<C> DerefMut for Addrs<C> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.addrs
     }
 }
 
@@ -338,13 +367,14 @@ mod test {
     use std::io::{Error, ErrorKind};
     use std::iter::once;
     use std::net::{Ipv4Addr, Ipv6Addr};
+    use std::pin::pin;
     use std::sync::Arc;
     use test_case::test_case;
 
     #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
     enum Class {
         Connectable,
-        DelayedConnectable { delay: zx::Duration },
+        DelayedConnectable { delay: zx::MonotonicDuration },
         NotListening,
         Blackholed,
     }
@@ -455,23 +485,23 @@ mod test {
     fn next_event<F>(
         executor: &mut fasync::TestExecutor,
         fut: &mut F,
-        duration: zx::Duration,
+        duration: zx::MonotonicDuration,
     ) -> Poll<F::Output>
     where
         F: Future + Unpin,
         <F as Future>::Output: Debug,
     {
-        if duration == zx::Duration::from_millis(0) {
+        if duration == zx::MonotonicDuration::from_millis(0) {
             assert!(!executor.wake_expired_timers());
         } else {
             // Advance time right before the timer is supposed to fire, and make sure it does not.
-            let () =
-                executor.set_fake_time(executor.now() + duration - zx::Duration::from_millis(1));
+            let () = executor
+                .set_fake_time(executor.now() + duration - zx::MonotonicDuration::from_millis(1));
             assert!(!executor.wake_expired_timers());
             assert_matches!(executor.run_until_stalled(fut), Poll::Pending);
 
             // Advance time to when the timer should fire and make sure it does.
-            let () = executor.set_fake_time(executor.now() + zx::Duration::from_millis(1));
+            let () = executor.set_fake_time(executor.now() + zx::MonotonicDuration::from_millis(1));
             assert!(executor.wake_expired_timers());
         }
 
@@ -484,13 +514,13 @@ mod test {
         let mut executor = fasync::TestExecutor::new_with_fake_time();
         let mut connector = TestEnvConnector::new(None);
 
-        let mut fut = happy_eyeballs(
+        let mut fut = pin!(happy_eyeballs(
             vec![],
             connector.clone(),
             RECOMMENDED_MIN_CONN_ATT_DELAY,
             RECOMMENDED_CONN_ATT_DELAY,
             None,
-        );
+        ));
 
         // Connect to the service. This should fail on the first poll cycle.
         assert_matches!(
@@ -522,13 +552,13 @@ mod test {
         let mut connector = TestEnvConnector::new(None)
             .add_classified_addrs(Class::NotListening, fail_addrs.clone());
 
-        let mut fut = happy_eyeballs(
+        let mut fut = pin!(happy_eyeballs(
             fail_addrs.clone(),
             connector.clone(),
             RECOMMENDED_MIN_CONN_ATT_DELAY,
             RECOMMENDED_CONN_ATT_DELAY,
             Some("expected_device"),
-        );
+        ));
 
         let mut fail_addrs = fail_addrs.into_iter();
 
@@ -537,8 +567,11 @@ mod test {
 
         // Trigger all the failing polls.
         for (delay, expected_event) in fail_addrs.enumerate().map(|(i, addr)| {
-            let delay =
-                if i == 0 { zx::Duration::from_millis(0) } else { RECOMMENDED_MIN_CONN_ATT_DELAY };
+            let delay = if i == 0 {
+                zx::MonotonicDuration::from_millis(0)
+            } else {
+                RECOMMENDED_MIN_CONN_ATT_DELAY
+            };
             (
                 delay,
                 Event::Connecting {
@@ -594,18 +627,21 @@ mod test {
         let mut connector =
             TestEnvConnector::new(None).add_classified_addrs(Class::Blackholed, fail_addrs.clone());
 
-        let mut fut = happy_eyeballs(
+        let mut fut = pin!(happy_eyeballs(
             fail_addrs.clone(),
             connector.clone(),
             RECOMMENDED_MIN_CONN_ATT_DELAY,
             RECOMMENDED_CONN_ATT_DELAY,
             Some("bind_device"),
-        );
+        ));
 
         // Trigger all the failing polls.
         for (delay, expected_event) in fail_addrs.iter().enumerate().map(|(i, addr)| {
-            let delay =
-                if i == 0 { zx::Duration::from_millis(0) } else { RECOMMENDED_CONN_ATT_DELAY };
+            let delay = if i == 0 {
+                zx::MonotonicDuration::from_millis(0)
+            } else {
+                RECOMMENDED_CONN_ATT_DELAY
+            };
             (
                 delay,
                 Event::Connecting {
@@ -640,13 +676,13 @@ mod test {
         let mut connector = TestEnvConnector::new(Some(server_addr))
             .add_classified_addrs(Class::Connectable, vec![server_addr]);
 
-        let mut fut = happy_eyeballs(
+        let mut fut = pin!(happy_eyeballs(
             vec![server_addr],
             connector.clone(),
             RECOMMENDED_MIN_CONN_ATT_DELAY,
             RECOMMENDED_CONN_ATT_DELAY,
             Some("single_valid"),
-        );
+        ));
 
         // Connect to the service. This succeeds because the address is good.
         assert_matches::assert_matches!(
@@ -679,13 +715,13 @@ mod test {
             .add_classified_addrs(Class::Blackholed, vec![blackhole_addr]);
 
         // Try to connect to each address. Only the first should be checked.
-        let mut fut = happy_eyeballs(
+        let mut fut = pin!(happy_eyeballs(
             vec![server_addr, nonlistening_addr, blackhole_addr],
             connector.clone(),
             RECOMMENDED_MIN_CONN_ATT_DELAY,
             RECOMMENDED_CONN_ATT_DELAY,
             Some("bad_network"),
-        );
+        ));
 
         // Connect to the service. This succeeds because the first address is good.
         assert_matches::assert_matches!(
@@ -752,7 +788,7 @@ mod test {
         server_addr: SA,
         fail_class: Class,
         fail_addrs: Vec<FA>,
-        delay: zx::Duration,
+        delay: zx::MonotonicDuration,
     ) where
         SA: Into<SocketAddr>,
         FA: Into<SocketAddr>,
@@ -766,17 +802,17 @@ mod test {
             .add_classified_addrs(Class::Connectable, vec![server_addr])
             .add_classified_addrs(fail_class, fail_addrs.clone());
 
-        let mut fut = happy_eyeballs(
+        let mut fut = pin!(happy_eyeballs(
             fail_addrs.iter().cloned().chain(once(server_addr)),
             connector.clone(),
             RECOMMENDED_MIN_CONN_ATT_DELAY,
             RECOMMENDED_CONN_ATT_DELAY,
             Some("test_fallback"),
-        );
+        ));
 
         // Trigger all the failing polls.
         for (delay, expected_event) in fail_addrs.iter().enumerate().map(|(i, addr)| {
-            let delay = if i == 0 { zx::Duration::from_millis(0) } else { delay };
+            let delay = if i == 0 { zx::MonotonicDuration::from_millis(0) } else { delay };
             (
                 delay,
                 Event::Connecting {
@@ -836,18 +872,21 @@ mod test {
             .add_classified_addrs(Class::Connectable, vec![server_addr])
             .add_classified_addrs(Class::Blackholed, fail_addrs.clone());
 
-        let mut fut = happy_eyeballs(
+        let mut fut = pin!(happy_eyeballs(
             fail_addrs.iter().cloned().chain(once(server_addr)),
             connector.clone(),
             RECOMMENDED_MIN_CONN_ATT_DELAY,
             RECOMMENDED_CONN_ATT_DELAY,
             Some("blackhole"),
-        );
+        ));
 
         // Trigger all the failing polls.
         for (delay, expected_event) in fail_addrs.iter().enumerate().map(|(i, addr)| {
-            let delay =
-                if i == 0 { zx::Duration::from_millis(0) } else { RECOMMENDED_CONN_ATT_DELAY };
+            let delay = if i == 0 {
+                zx::MonotonicDuration::from_millis(0)
+            } else {
+                RECOMMENDED_CONN_ATT_DELAY
+            };
             (
                 delay,
                 Event::Connecting {
@@ -897,18 +936,18 @@ mod test {
             .add_classified_addrs(Class::NotListening, vec![nl_v4, nl_v6])
             .add_classified_addrs(Class::Blackholed, vec![bh_v4, bh_v6]);
 
-        let mut fut = happy_eyeballs(
+        let mut fut = pin!(happy_eyeballs(
             vec![nl_v4, bh_v6, bh_v4, nl_v6, server_addr],
             connector.clone(),
             RECOMMENDED_MIN_CONN_ATT_DELAY,
             RECOMMENDED_CONN_ATT_DELAY,
             Some("crossproto"),
-        );
+        ));
 
         // Trigger all the failing polls.
         for (delay, expected_event) in vec![
             (
-                zx::Duration::from_millis(0),
+                zx::MonotonicDuration::from_millis(0),
                 Event::Connecting {
                     addr: nl_v4,
                     class: Class::NotListening,
@@ -980,7 +1019,7 @@ mod test {
             conn_addrs = vec![nl_v4, bh_v4, bh_v6, nl_v6];
             expected_events = vec![
                 (
-                    zx::Duration::from_millis(0),
+                    zx::MonotonicDuration::from_millis(0),
                     Event::Connecting {
                         addr: nl_v4,
                         class: Class::NotListening,
@@ -1016,7 +1055,7 @@ mod test {
             conn_addrs = vec![nl_v6, bh_v6, bh_v4, nl_v4];
             expected_events = vec![
                 (
-                    zx::Duration::from_millis(0),
+                    zx::MonotonicDuration::from_millis(0),
                     Event::Connecting {
                         addr: nl_v6,
                         class: Class::NotListening,
@@ -1059,13 +1098,13 @@ mod test {
             .add_classified_addrs(Class::NotListening, vec![nl_v4, nl_v6])
             .add_classified_addrs(Class::Blackholed, vec![bh_v4, bh_v6]);
 
-        let mut fut = happy_eyeballs(
+        let mut fut = pin!(happy_eyeballs(
             conn_addrs.iter().cloned().chain(once(server_addr)),
             connector.clone(),
             RECOMMENDED_MIN_CONN_ATT_DELAY,
             RECOMMENDED_CONN_ATT_DELAY,
             Some("rfc8305s4p4"),
-        );
+        ));
 
         // Trigger all the failing polls.
         for (delay, expected_event) in expected_events {
@@ -1100,24 +1139,24 @@ mod test {
         let mut executor = fasync::TestExecutor::new_with_fake_time();
         let () = executor.set_fake_time(MonotonicInstant::from_nanos(0));
 
-        let delay = RECOMMENDED_CONN_ATT_DELAY + zx::Duration::from_millis(5);
+        let delay = RECOMMENDED_CONN_ATT_DELAY + zx::MonotonicDuration::from_millis(5);
 
         let mut connector = TestEnvConnector::new(Some(server_addr))
             .add_classified_addrs(Class::DelayedConnectable { delay }, vec![server_addr])
             .add_classified_addrs(Class::Blackholed, vec![bh_addr]);
 
-        let mut fut = happy_eyeballs(
+        let mut fut = pin!(happy_eyeballs(
             vec![server_addr, bh_addr],
             connector.clone(),
             RECOMMENDED_MIN_CONN_ATT_DELAY,
             RECOMMENDED_CONN_ATT_DELAY,
             Some("latent_endpoint"),
-        );
+        ));
 
         // Trigger all the failing polls.
         for (delay, expected_event) in vec![
             (
-                zx::Duration::from_millis(0),
+                zx::MonotonicDuration::from_millis(0),
                 Event::Connecting {
                     addr: server_addr,
                     class: Class::DelayedConnectable { delay },
@@ -1142,7 +1181,7 @@ mod test {
 
         // Sleep to when the server should eventually respond.
         assert_matches::assert_matches!(
-            next_event(&mut executor, &mut fut, zx::Duration::from_millis(5)),
+            next_event(&mut executor, &mut fut, zx::MonotonicDuration::from_millis(5)),
             Poll::Ready(Ok(a)) if a == server_addr
         );
         assert_eq!(connector.take_events(), vec![Event::DelayFinished { addr: server_addr }]);
@@ -1173,18 +1212,18 @@ mod test {
         //  * After 10ms, the blackhole address is scheduled (and we rushed that),
         //  * After 250ms, nothing has happened, and
         //  * After 2s, our good connection is tried (so the 5s interval was clamped).
-        let mut fut = happy_eyeballs(
+        let mut fut = pin!(happy_eyeballs(
             vec![nl_addr, bh_addr, server_addr],
             connector.clone(),
-            zx::Duration::from_millis(1),
-            zx::Duration::from_seconds(5),
+            zx::MonotonicDuration::from_millis(1),
+            zx::MonotonicDuration::from_seconds(5),
             Some("timer_behavior"),
-        );
+        ));
 
         // Walk through all the events that should occur in this setup.
         for (abstime, woke, done, optional_event) in vec![
             (
-                zx::Duration::from_millis(0),
+                zx::MonotonicDuration::from_millis(0),
                 false,
                 false,
                 Some(Event::Connecting {
@@ -1194,7 +1233,7 @@ mod test {
                 }),
             ),
             (
-                zx::Duration::from_millis(10),
+                zx::MonotonicDuration::from_millis(10),
                 true,
                 false,
                 Some(Event::Connecting {
@@ -1203,11 +1242,11 @@ mod test {
                     bind_device: Some("timer_behavior".into()),
                 }),
             ),
-            (zx::Duration::from_millis(250), false, false, None),
+            (zx::MonotonicDuration::from_millis(250), false, false, None),
             (
                 // N.B. 2010ms is the absolute time for the successful connection because it was
                 // scheduled 2s out from the 10ms clamp where the blackholed connection was queued.
-                zx::Duration::from_millis(2010),
+                zx::MonotonicDuration::from_millis(2010),
                 true,
                 true,
                 Some(Event::Connecting {

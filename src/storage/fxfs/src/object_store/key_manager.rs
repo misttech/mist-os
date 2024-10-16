@@ -465,7 +465,7 @@ mod tests {
         });
         let task3 = fasync::Task::spawn(async move {
             // Make sure this starts after the get_or_inserts.
-            fasync::Timer::new(zx::Duration::from_millis(500)).await;
+            fasync::Timer::new(zx::MonotonicDuration::from_millis(500)).await;
             let mut buf = cipher_text(0);
             manager3
                 .get(1)
@@ -477,7 +477,8 @@ mod tests {
             assert_eq!(&buf, PLAIN_TEXT);
         });
 
-        TestExecutor::advance_to(MonotonicInstant::after(zx::Duration::from_millis(1500))).await;
+        TestExecutor::advance_to(MonotonicInstant::after(zx::MonotonicDuration::from_millis(1500)))
+            .await;
 
         task1.await;
         task2.await;
@@ -586,7 +587,8 @@ mod tests {
                 .is_err());
         });
 
-        TestExecutor::advance_to(MonotonicInstant::after(zx::Duration::from_seconds(1))).await;
+        TestExecutor::advance_to(MonotonicInstant::after(zx::MonotonicDuration::from_seconds(1)))
+            .await;
 
         task1.await;
         task2.await;

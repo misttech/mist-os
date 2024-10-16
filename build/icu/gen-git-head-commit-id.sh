@@ -5,13 +5,19 @@
 
 set -eu
 
-# Shows the current git commit ID for the given git path.
-# A single invocation takes about 7ms to complete.
-#
-# Args:
-#   - ${1}: format ("json"|"bzl");
-#   - ${2}, ${3}: the directories to examine, in
-#      order: default, latest.
+## Shows the current git commit ID for the given git ICU library sub-paths.
+## A single invocation takes about 7ms to complete.
+##
+## Usage:
+##   $0 <format> <dir1> <dir2>
+##
+## This script is not really meant to be used outside of the Fuchsia GN build.
+## Do you really want to run it manually?
+##
+## Args:
+##   - ${1}: <format> ("json"|"bzl");
+##   - ${2}, ${3}: <dir1> <dir2> the directories to examine, in
+##      order: default, latest.
 
 
 # Obtains the commit ID of the current branch for the provided repository
@@ -27,6 +33,13 @@ function get_git_commit_id() {
     git --no-optional-locks --git-dir="${_git_path}/.git" rev-parse HEAD \
       || echo "not_found/${_git_path}"
 }
+
+# Make sure to adjust the number of arguments if changing the script.
+if [[ "$#" != 3 ]]; then
+  # Self-documenting code.
+  cat "${0}" | grep "##" | grep -v grep | sed -e 's/^##\s\?//'
+  exit 1
+fi
 
 readonly format="${1}"
 shift

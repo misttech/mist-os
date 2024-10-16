@@ -98,7 +98,7 @@ async fn query_total_time(
 
 pub struct GpuUsageLogger {
     drivers: Rc<Vec<GpuDriver>>,
-    interval: zx::Duration,
+    interval: zx::MonotonicDuration,
     last_samples: Vec<Option<magma_total_time_query_result>>,
     client_id: String,
     inspect: InspectData,
@@ -135,14 +135,14 @@ impl GpuUsageLogger {
         let driver_names: Vec<String> = drivers.iter().map(|c| c.name().to_string()).collect();
         let start_time = fasync::MonotonicInstant::now();
         let end_time = duration_ms.map_or(fasync::MonotonicInstant::INFINITE, |ms| {
-            fasync::MonotonicInstant::now() + zx::Duration::from_millis(ms as i64)
+            fasync::MonotonicInstant::now() + zx::MonotonicDuration::from_millis(ms as i64)
         });
         let inspect = InspectData::new(client_inspect, driver_names);
 
         Ok(GpuUsageLogger {
             last_samples: vec![None; drivers.len()],
             drivers,
-            interval: zx::Duration::from_millis(interval_ms as i64),
+            interval: zx::MonotonicDuration::from_millis(interval_ms as i64),
             client_id,
             inspect,
             output_samples_to_syslog,

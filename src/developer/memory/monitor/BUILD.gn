@@ -8,8 +8,6 @@ import("//third_party/cobalt/metrics_registry.gni")
 
 source_set("lib") {
   sources = [
-    "debugger.cc",
-    "debugger.h",
     "high_water.cc",
     "high_water.h",
     "logger.cc",
@@ -18,10 +16,6 @@ source_set("lib") {
     "metrics.h",
     "monitor.cc",
     "monitor.h",
-    "pressure_notifier.cc",
-    "pressure_notifier.h",
-    "pressure_observer.cc",
-    "pressure_observer.h",
   ]
   public_deps = [
     ":memory_monitor_config",
@@ -44,6 +38,7 @@ source_set("lib") {
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/component/incoming/cpp",
+    "//src/developer/memory/pressure_signaler:lib",
     "//src/devices/lib/amlogic",
     "//src/lib/cobalt/cpp:metric_event_builder",
     "//src/lib/fsl",

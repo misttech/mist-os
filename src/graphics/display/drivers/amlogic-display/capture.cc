@@ -29,7 +29,7 @@ zx::result<std::unique_ptr<Capture>> Capture::Create(
   ZX_DEBUG_ASSERT(platform_device.is_valid());
 
   zx::result<zx::interrupt> capture_interrupt_result =
-      GetInterrupt(InterruptResourceIndex::kVid1Write, platform_device);
+      GetInterrupt(kInterruptNameVdin1WriteDone, platform_device);
   if (capture_interrupt_result.is_error()) {
     return capture_interrupt_result.take_error();
   }

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::CapabilityBound;
 use fidl::handle::{self, HandleBased};
 
 /// A capability that wraps a single Zircon handle.
@@ -20,6 +21,8 @@ impl From<handle::Handle> for Handle {
         Handle(handle)
     }
 }
+
+impl CapabilityBound for Handle {}
 
 impl Handle {
     pub fn try_clone(&self) -> Result<Self, ()> {

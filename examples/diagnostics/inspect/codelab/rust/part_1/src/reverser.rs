@@ -36,8 +36,10 @@ impl ReverserServer {
                 let ReverserRequest::Reverse { input, responder: _ } = request;
                 let _result = input.chars().rev().collect::<String>();
                 // Yes, this is silly. Just for codelab purposes.
-                fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_hours(10)))
-                    .await
+                fasync::Timer::new(fasync::MonotonicInstant::after(
+                    zx::MonotonicDuration::from_hours(10),
+                ))
+                .await
             }
         })
         .detach();

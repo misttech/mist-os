@@ -832,8 +832,7 @@ void VirtioWl::HandleNewDmabuf(const virtio_wl_ctrl_vfd_new_t* request,
   args.set_export_token(std::move(export_token));
   // Sysmem token channels serve both sysmem(1) and sysmem2 protocols, so we can convert here until
   // this protocol has a sysmem2 token field.
-  args.set_buffer_collection_token(fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
-      scenic_token.Unbind().TakeChannel()));
+  args.set_buffer_collection_token2(std::move(scenic_token));
   scenic_allocator_->RegisterBufferCollection(
       std::move(args),
       [](fuchsia::ui::composition::Allocator_RegisterBufferCollection_Result result) {

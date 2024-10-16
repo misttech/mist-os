@@ -58,7 +58,7 @@ fn create_pkgfs(kernel: &Arc<Kernel>) -> FileSystemHandle {
 /// the test on the spawned task.
 pub fn create_kernel_task_and_unlocked_with_pkgfs<'l>(
 ) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
-    create_kernel_task_and_unlocked_with_fs_and_selinux(create_pkgfs, None)
+    create_kernel_task_and_unlocked_with_fs(create_pkgfs)
 }
 
 /// An old way of creating a task for testing
@@ -75,23 +75,6 @@ pub fn create_kernel_and_task() -> (Arc<Kernel>, AutoReleasableTask) {
     (kernel, task)
 }
 
-/// An old way of creating a task for testing
-///
-/// This way of creating a task has problems because the test isn't actually run with that task
-/// being current, which means that functions that expect a CurrentTask to actually be mapped into
-/// memory can operate incorrectly.
-///
-/// Please use `spawn_kernel_and_run` instead. If there isn't a variant of `spawn_kernel_and_run`
-/// for this use case, please consider adding one that follows the new pattern of actually running
-/// the test on the spawned task.
-pub fn create_kernel_and_task_with_selinux(
-    security_server: Arc<SecurityServer>,
-) -> (Arc<Kernel>, AutoReleasableTask) {
-    let (kernel, task, _) =
-        create_kernel_task_and_unlocked_with_fs_and_selinux(TmpFs::new_fs, Some(security_server));
-    (kernel, task)
-}
-
 /// Create a Kernel object and run the given callback in the init process for that kernel.
 ///
 /// This function is useful if you want to test code that requires a CurrentTask because
@@ -100,8 +83,39 @@ pub fn spawn_kernel_and_run<F>(callback: F)
 where
     F: FnOnce(&mut Locked<'_, Unlocked>, &mut CurrentTask) + Send + Sync + 'static,
 {
+    spawn_kernel_and_run_internal(callback, None)
+}
+
+/// Variant of `spawn_kernel_and_run()` that configures the kernel with SELinux enabled.
+/// The supplied `callback` is invoked with an additional argument providing test access to the
+/// SELinux security-server.
+// TODO: https://fxbug.dev/335397745 - Only provide an admin/test API to the test, so that tests
+// must generally exercise hooks via public entrypoints.
+pub fn spawn_kernel_with_selinux_and_run<F>(callback: F)
+where
+    F: FnOnce(&mut Locked<'_, Unlocked>, &mut CurrentTask, &Arc<SecurityServer>)
+        + Send
+        + Sync
+        + 'static,
+{
+    let security_server = SecurityServer::new();
+    let security_server_for_callback = security_server.clone();
+    spawn_kernel_and_run_internal(
+        move |unlocked, current_task| {
+            callback(unlocked, current_task, &security_server_for_callback)
+        },
+        Some(security_server),
+    )
+}
+
+/// Create a Kernel object, with the optional caller-supplied `security_server`, and run the given
+/// callback in the init process for that kernel.
+fn spawn_kernel_and_run_internal<F>(callback: F, security_server: Option<Arc<SecurityServer>>)
+where
+    F: FnOnce(&mut Locked<'_, Unlocked>, &mut CurrentTask) + Send + Sync + 'static,
+{
     let mut locked = Unlocked::new();
-    let kernel = create_test_kernel(&mut locked, None);
+    let kernel = create_test_kernel(&mut locked, security_server);
     let fs = create_test_fs_context(&mut locked, &kernel, TmpFs::new_fs);
     let init_task = create_test_init_task(&mut locked, &kernel, fs);
     let (sender, receiver) = mpsc::channel();
@@ -132,22 +146,7 @@ where
 /// the test on the spawned task.
 pub fn create_kernel_task_and_unlocked<'l>(
 ) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
-    create_kernel_task_and_unlocked_with_fs_and_selinux(TmpFs::new_fs, None)
-}
-
-/// An old way of creating a task for testing
-///
-/// This way of creating a task has problems because the test isn't actually run with that task
-/// being current, which means that functions that expect a CurrentTask to actually be mapped into
-/// memory can operate incorrectly.
-///
-/// Please use `spawn_kernel_and_run` instead. If there isn't a variant of `spawn_kernel_and_run`
-/// for this use case, please consider adding one that follows the new pattern of actually running
-/// the test on the spawned task.
-pub fn create_kernel_task_and_unlocked_with_selinux<'l>(
-    security_server: Arc<SecurityServer>,
-) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
-    create_kernel_task_and_unlocked_with_fs_and_selinux(TmpFs::new_fs, Some(security_server))
+    create_kernel_task_and_unlocked_with_fs(TmpFs::new_fs)
 }
 
 fn create_test_kernel(
@@ -211,17 +210,14 @@ fn create_test_init_task(
     init_task
 }
 
-fn create_kernel_task_and_unlocked_with_fs_and_selinux<'l>(
+fn create_kernel_task_and_unlocked_with_fs<'l>(
     create_fs: impl FnOnce(&Arc<Kernel>) -> FileSystemHandle,
-    security_server: Option<Arc<SecurityServer>>,
 ) -> (Arc<Kernel>, AutoReleasableTask, Locked<'l, Unlocked>) {
     let mut locked = Unlocked::new();
-    let kernel = create_test_kernel(&mut locked, security_server);
+    let kernel = create_test_kernel(&mut locked, None);
     let fs = create_fs(&kernel);
     let fs_context = create_test_fs_context(&mut locked, &kernel, |_| fs.clone());
-    let init_task = create_test_init_task(&mut locked, &kernel, fs_context).into();
-    security::file_system_resolve_security(&init_task, &fs)
-        .expect("Failed to resolve root filesystem labeling");
+    let init_task = create_test_init_task(&mut locked, &kernel, fs_context);
     (kernel, init_task.into(), locked)
 }
 

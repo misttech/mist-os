@@ -24,7 +24,6 @@
 pub use munge::munge;
 pub use rend::{f32_le, f64_le, i16_le, i32_le, i64_le, u16_le, u32_le, u64_le};
 
-pub use self::bytes::*;
 pub use self::chunk::*;
 pub use self::decode::*;
 pub use self::decoder::{Decoder, DecoderExt};
@@ -36,12 +35,12 @@ pub use self::owned::*;
 pub use self::slot::*;
 pub use self::take::*;
 pub use self::wire::*;
+pub use zerocopy::{FromBytes, IntoBytes};
 
 #[cfg(test)]
 #[macro_use]
 mod test_util;
 
-mod bytes;
 mod chunk;
 pub mod decode;
 pub mod decoder;

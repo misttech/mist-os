@@ -68,7 +68,7 @@ async fn list_device(
     let device_desc_buf = device
         .get_device_descriptor()
         .on_timeout(std::time::Duration::from_millis(200), || {
-            Err(fidl::Error::ClientRead(zx::Status::TIMED_OUT))
+            Err(fidl::Error::ClientRead(zx::Status::TIMED_OUT.into()))
         })
         .await
         .context(format!("DeviceGetDeviceDescriptor failed for {}", devname))?;
@@ -88,7 +88,7 @@ async fn list_device(
     let speed = device
         .get_device_speed()
         .on_timeout(std::time::Duration::from_millis(200), || {
-            Err(fidl::Error::ClientRead(zx::Status::TIMED_OUT))
+            Err(fidl::Error::ClientRead(zx::Status::TIMED_OUT.into()))
         })
         .await
         .context(format!("DeviceGetDeviceSpeed failed for {}", devname))?;
@@ -153,7 +153,7 @@ async fn list_device(
                 device
                     .get_configuration()
                     .on_timeout(std::time::Duration::from_millis(200), || {
-                        Err(fidl::Error::ClientRead(zx::Status::TIMED_OUT))
+                        Err(fidl::Error::ClientRead(zx::Status::TIMED_OUT.into()))
                     })
                     .await
                     .context(format!("DeviceGetConfiguration failed for {}", devname))?,
@@ -163,7 +163,7 @@ async fn list_device(
         let (status, config_desc_data) = device
             .get_configuration_descriptor(config.unwrap())
             .on_timeout(std::time::Duration::from_millis(200), || {
-                Err(fidl::Error::ClientRead(zx::Status::TIMED_OUT))
+                Err(fidl::Error::ClientRead(zx::Status::TIMED_OUT.into()))
             })
             .await
             .context(format!("DeviceGetConfigurationDescriptor failed for {}", devname))?;

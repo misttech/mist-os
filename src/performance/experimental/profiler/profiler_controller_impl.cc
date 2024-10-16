@@ -10,6 +10,7 @@
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fit/result.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/trace/event.h>
 #include <lib/zx/handle.h>
 #include <lib/zx/job.h>
 #include <lib/zx/process.h>
@@ -49,7 +50,9 @@ constexpr bool kSamplerKernelSupport = EXPERIMENTAL_THREAD_SAMPLER_ENABLED;
 #endif
 
 zx::result<> PopulateTargets(profiler::TargetTree& tree, TaskFinder::FoundTasks&& tasks) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   for (auto&& [koid, job] : tasks.jobs) {
+    TRACE_DURATION("cpu_profiler", "PopulateTargets/EachJob");
     zx::result<profiler::JobTarget> job_target = profiler::MakeJobTarget(std::move(job));
     if (job_target.is_error()) {
       // A job might exit in the time between us walking the tree and attempting to find its
@@ -63,6 +66,7 @@ zx::result<> PopulateTargets(profiler::TargetTree& tree, TaskFinder::FoundTasks&
   }
 
   for (auto&& [koid, process] : tasks.processes) {
+    TRACE_DURATION("cpu_profiler", "PopulateTargets/EachProcess");
     zx_info_handle_basic_t handle_info;
     if (process.get_info(ZX_INFO_HANDLE_BASIC, &handle_info, sizeof(handle_info), nullptr,
                          nullptr) != ZX_OK) {
@@ -82,6 +86,7 @@ zx::result<> PopulateTargets(profiler::TargetTree& tree, TaskFinder::FoundTasks&
     }
   }
   for (auto&& [koid, thread] : tasks.threads) {
+    TRACE_DURATION("cpu_profiler", "PopulateTargets/EachThread");
     zx_info_handle_basic_t handle_info;
     if (thread.get_info(ZX_INFO_HANDLE_BASIC, &handle_info, sizeof(handle_info), nullptr,
                         nullptr) != ZX_OK) {
@@ -130,6 +135,7 @@ zx::result<> PopulateTargets(profiler::TargetTree& tree, TaskFinder::FoundTasks&
 }
 
 zx::result<zx_koid_t> ReadElfJobId(const fidl::SyncClient<fuchsia_io::Directory>& directory) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   zx::result<fidl::Endpoints<fuchsia_io::File>> endpoints =
       fidl::CreateEndpoints<fuchsia_io::File>();
   if (endpoints.is_error()) {
@@ -162,6 +168,7 @@ zx::result<zx_koid_t> ReadElfJobId(const fidl::SyncClient<fuchsia_io::Directory>
 }
 
 zx::result<zx_koid_t> MonikerToJobId(const std::string& moniker) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   zx::result<fidl::ClientEnd<fuchsia_sys2::RealmQuery>> client_end =
       component::Connect<fuchsia_sys2::RealmQuery>("/svc/fuchsia.sys2.RealmQuery.root");
   if (client_end.is_error()) {
@@ -199,6 +206,7 @@ zx::result<zx_koid_t> MonikerToJobId(const std::string& moniker) {
 
 void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
                                                  ConfigureCompleter::Sync& completer) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   if (state_ != ProfilingState::Unconfigured) {
     completer.Reply(fit::error(fuchsia_cpu_profiler::SessionConfigureError::kBadState));
     return;
@@ -230,6 +238,7 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
   // targets in order to suspend them and read their memory. We'll walk the root job tree looking
   // for anything that has a koid that matches the ones we've been given.
   TaskFinder finder;
+  std::optional<std::pair<zx_koid_t, zx::job>> root_job_info;
   switch (request.config()->target()->Which()) {
     case fuchsia_cpu_profiler::TargetConfig::Tag::kTasks: {
       for (auto& t : request.config()->target()->tasks().value()) {
@@ -243,6 +252,42 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
           case fuchsia_cpu_profiler::Task::Tag::kJob:
             finder.AddJob(t.job().value());
             break;
+          case fuchsia_cpu_profiler::Task::Tag::kSystemWide: {
+            // We treat the root job like any other job we are asked for:
+            //
+            // Once we get the handle, we query it for its koid and add it to the list.
+            auto client_end = component::Connect<fuchsia_kernel::RootJob>();
+            if (client_end.is_error()) {
+              completer.Reply(
+                  fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
+              FX_PLOGS(ERROR, client_end.error_value())
+                  << "System wide profiling was requested, but the "
+                     "profiler could not obtain the root job";
+              return;
+            }
+            auto result = fidl::SyncClient(std::move(*client_end))->Get();
+            if (result.is_error()) {
+              FX_PLOGS(ERROR, result.error_value().status())
+                  << "System wide profiling was requested, but the "
+                     "profiler could not obtain the root job";
+              completer.Reply(
+                  fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
+              return;
+            }
+            zx::job root_job = std::move(result->job());
+            zx_info_handle_basic_t handle_info;
+            if (zx_status_t res = root_job.get_info(ZX_INFO_HANDLE_BASIC, &handle_info,
+                                                    sizeof(handle_info), nullptr, nullptr);
+                res != ZX_OK) {
+              FX_PLOGS(ERROR, res) << "System wide profiling was requested, but the "
+                                   << "profiler could not obtain the root job's koid";
+              completer.Reply(
+                  fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
+              return;
+            }
+            root_job_info = std::make_pair(handle_info.koid, std::move(root_job));
+            break;
+          }
           default:
             FX_LOGS(ERROR) << "Invalid task!";
             completer.Reply(
@@ -356,7 +401,18 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
       return;
   }
 
-  if (!finder.Empty()) {
+  targets_.Clear();
+  if (root_job_info.has_value()) {
+    TaskFinder::FoundTasks tasks;
+    tasks.jobs.push_back(std::move(*root_job_info));
+
+    if (auto res = PopulateTargets(targets_, std::move(tasks)); res.is_error()) {
+      FX_PLOGS(ERROR, res.error_value()) << "Populate Targets failed";
+      completer.Reply(
+          fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
+      return;
+    }
+  } else if (!finder.Empty()) {
     zx::result<TaskFinder::FoundTasks> handles_result = finder.FindHandles();
     if (handles_result.is_error()) {
       FX_PLOGS(ERROR, handles_result.error_value()) << "Failed to walk job tree";
@@ -371,8 +427,8 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
       return;
     }
 
-    targets_.Clear();
-    if (PopulateTargets(targets_, std::move(*handles_result)).is_error()) {
+    if (auto res = PopulateTargets(targets_, std::move(*handles_result)); res.is_error()) {
+      FX_PLOGS(ERROR, res.error_value()) << "Populate Targets failed";
       completer.Reply(
           fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
       return;
@@ -385,6 +441,7 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
 
 void profiler::ProfilerControllerImpl::Start(StartRequest& request,
                                              StartCompleter::Sync& completer) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   if (state_ != ProfilingState::Stopped) {
     completer.Reply(fit::error(fuchsia_cpu_profiler::SessionStartError::kBadState));
     return;
@@ -455,6 +512,7 @@ void profiler::ProfilerControllerImpl::Start(StartRequest& request,
 }
 
 void profiler::ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   zx::result<profiler::SymbolizationContext> modules = sampler_->GetContexts();
   if (modules.is_error()) {
     FX_PLOGS(ERROR, modules.status_value()) << "Failed to get modules";
@@ -481,19 +539,33 @@ void profiler::ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
     }
   }
 
+  const auto samples = sampler_->GetSamples();
   std::vector<zx::ticks> inspecting_durations = sampler_->SamplingDurations();
-  fuchsia_cpu_profiler::SessionStopResponse stats;
-  stats.samples_collected() = inspecting_durations.size();
+
+  fuchsia_cpu_profiler::SessionStopResponse stats{{
+      .samples_collected = inspecting_durations.size(),
+      .missing_process_mappings = std::vector<zx_koid_t>(),
+  }};
+
+  // Verify that we were able to grab module information for each process we sampled. If we find any
+  // processes without associated modules, report them back to the caller.
+  std::set<zx_koid_t> pids_with_missing_modules;
+  for (const auto& [pid, _] : samples) {
+    if (!modules->process_contexts.contains(pid) && !pids_with_missing_modules.contains(pid)) {
+      stats.missing_process_mappings()->push_back(pid);
+      pids_with_missing_modules.insert(pid);
+    }
+  }
+
   if (!inspecting_durations.empty()) {
     auto ticks_per_second = zx::ticks::per_second();
-    auto ticks_per_us = ticks_per_second / 1000000;
+    auto ticks_per_us = ticks_per_second / 1'000'000;
 
     zx::ticks total_ticks_inspecting;
     for (zx::ticks ticks : inspecting_durations) {
       total_ticks_inspecting += ticks;
     }
-    std::sort(inspecting_durations.begin(), inspecting_durations.end(),
-              [](zx::ticks a, zx::ticks b) { return a < b; });
+    std::ranges::sort(inspecting_durations, [](zx::ticks a, zx::ticks b) { return a < b; });
     zx::ticks mean_inspecting = total_ticks_inspecting / inspecting_durations.size();
 
     stats.mean_sample_time() = mean_inspecting / ticks_per_us;
@@ -532,16 +604,19 @@ void profiler::ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
 }
 
 void profiler::ProfilerControllerImpl::Reset(ResetCompleter::Sync& completer) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   Reset();
   completer.Reply();
 }
 
 void profiler::ProfilerControllerImpl::OnUnbound(
     fidl::UnbindInfo info, fidl::ServerEnd<fuchsia_cpu_profiler::Session> server_end) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   Reset();
 }
 
 void profiler::ProfilerControllerImpl::Reset() {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   sampler_.reset();
   socket_.reset();
   targets_.Clear();

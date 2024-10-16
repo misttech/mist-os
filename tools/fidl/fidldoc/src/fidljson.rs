@@ -29,7 +29,7 @@ pub fn wrap_non_struct_payload(payloads: &mut HashMap<String, Value>, name: Stri
                 json!({
                     "name": "payload",
                     "type": json!({
-                        "kind": "identifier",
+                        "kind_v2": "identifier",
                         "identifier": &name,
                     }),
                 }),

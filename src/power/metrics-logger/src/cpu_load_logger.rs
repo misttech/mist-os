@@ -118,7 +118,7 @@ fn calculate_cpu_usage(
             &current_sample.cpu_stats.per_cpu_stats.as_ref().unwrap()[cpu_index as usize];
         let last_per_cpu_stats =
             &last_sample.cpu_stats.per_cpu_stats.as_ref().unwrap()[cpu_index as usize];
-        let delta_idle_time = zx::Duration::from_nanos(
+        let delta_idle_time = zx::MonotonicDuration::from_nanos(
             current_per_cpu_stats.idle_time.unwrap() - last_per_cpu_stats.idle_time.unwrap(),
         );
         let busy_time = elapsed - delta_idle_time;
@@ -129,7 +129,7 @@ fn calculate_cpu_usage(
 }
 
 pub struct CpuLoadLogger {
-    interval: zx::Duration,
+    interval: zx::MonotonicDuration,
     last_sample: Option<CpuLoadSample>,
     cpu_stats_driver: Rc<CpuStatsDriver>,
     client_id: String,
@@ -163,13 +163,13 @@ impl CpuLoadLogger {
 
         let start_time = fasync::MonotonicInstant::now();
         let end_time = duration_ms.map_or(fasync::MonotonicInstant::INFINITE, |ms| {
-            fasync::MonotonicInstant::now() + zx::Duration::from_millis(ms as i64)
+            fasync::MonotonicInstant::now() + zx::MonotonicDuration::from_millis(ms as i64)
         });
         let inspect = InspectData::new(client_inspect, cpu_stats_driver.topology.clone());
 
         Ok(CpuLoadLogger {
             cpu_stats_driver,
-            interval: zx::Duration::from_millis(interval_ms as i64),
+            interval: zx::MonotonicDuration::from_millis(interval_ms as i64),
             last_sample: None,
             client_id,
             inspect,

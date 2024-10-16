@@ -16,7 +16,7 @@
         <tr id="ArrayInt16Int8.arr">
             <td><code>arr</code></td>
             <td>
-                <code>[3]</code>
+                <code>array&lt;<a class='link' href='#Int16Int8'>Int16Int8</a>,&nbsp;3&gt;</code>
             </td>
             <td></td>
             <td>No default</td>

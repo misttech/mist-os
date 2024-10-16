@@ -51,8 +51,13 @@ struct ClientSettings {
     static const char* kSymbolPaths;
     static const char* kBuildIdDirs;
     static const char* kIdsTxts;
-    static const char* kSymbolServers;
     static const char* kSymbolCache;
+
+    // Symbol servers added from the command line or environment variables are naturally ambiguous
+    // to which bucket they belong in. Command line arguments are split into clear options,
+    // environment variables are assumed to be public.
+    static const char* kPrivateSymbolServers;
+    static const char* kPublicSymbolServers;
 
     static const char* kEnableAnalytics;
 
@@ -142,6 +147,9 @@ struct ClientSettings {
 
     static const char* kWeak;
     static const char* kWeakDescription;
+
+    static const char* kRecursive;
+    static const char* kRecursiveDescription;
   };
 };
 

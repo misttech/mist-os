@@ -316,7 +316,8 @@ mod tests {
         // after asking the server to hand out the modified settings.  So, we loop with an
         // expectation that at some point the settings get applied.  To avoid a long timeout
         // we quit the loop if nothing happened after a generous amount of time.
-        let deadline = fuchsia_async::MonotonicInstant::after(zx::Duration::from_seconds(5));
+        let deadline =
+            fuchsia_async::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(5));
         let autorepeat: autorepeater::Settings = Default::default();
         loop {
             let result = handler.clone().handle_unhandled_input_event(unhandled_key_event()).await;
@@ -324,14 +325,14 @@ mod tests {
                 Some("FR_AZERTY".to_owned()),
                 autorepeat
                     .clone()
-                    .into_with_delay(zx::Duration::from_nanos(43))
-                    .into_with_period(zx::Duration::from_nanos(44)),
+                    .into_with_delay(zx::MonotonicDuration::from_nanos(43))
+                    .into_with_period(zx::MonotonicDuration::from_nanos(44)),
             );
             if vec![expected] == result {
                 break;
             }
             fuchsia_async::Timer::new(fuchsia_async::MonotonicInstant::after(
-                zx::Duration::from_millis(10),
+                zx::MonotonicDuration::from_millis(10),
             ))
             .await;
             let now = fuchsia_async::MonotonicInstant::now();

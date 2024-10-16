@@ -15,7 +15,7 @@ use tracing::{info, warn};
 use {fuchsia_async as fasync, fuchsia_runtime as runtime, zx};
 
 /// Delay between polls of system and userspace clocks.
-const POLL_DELAY: zx::Duration = zx::Duration::from_seconds(2);
+const POLL_DELAY: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(2);
 
 lazy_static! {
    /// Rights to request when duplicating handles to userspace clocks.

@@ -10,7 +10,7 @@ use crate::message::base::{
 use crate::message::beacon::{Beacon, BeaconBuilder};
 use crate::message::receptor::Receptor;
 
-use zx::Duration;
+use zx::MonotonicDuration;
 
 /// MessengerClient is a wrapper around a messenger with a fuse.
 #[derive(Clone, Debug)]
@@ -36,7 +36,7 @@ impl MessengerClient {
         &self,
         payload: crate::Payload,
         audience: Audience,
-        duration: Option<Duration>,
+        duration: Option<MonotonicDuration>,
     ) -> Receptor {
         let (beacon, receptor) =
             BeaconBuilder::new(self.messenger.clone()).set_timeout(duration).build();

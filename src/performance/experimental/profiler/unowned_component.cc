@@ -6,6 +6,7 @@
 
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/trace/event.h>
 
 #include "component.h"
 
@@ -21,6 +22,7 @@ zx::result<std::unique_ptr<profiler::Component>> profiler::UnownedComponent::Cre
 
 zx::result<> profiler::UnownedComponent::Attach(
     const fidl::SyncClient<fuchsia_sys2::RealmQuery>& client, std::string moniker) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__, "moniker", moniker);
   fidl::Result<fuchsia_sys2::RealmQuery::GetInstance> result = client->GetInstance(moniker);
   if (result.is_error()) {
     FX_LOGS(WARNING) << "Failed to find moniker: " << moniker << ". " << result.error_value();
@@ -44,6 +46,7 @@ zx::result<> profiler::UnownedComponent::Attach(
 }
 
 zx::result<> profiler::UnownedComponent::Start(ComponentWatcher::ComponentEventHandler on_start) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   if (!on_start) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }

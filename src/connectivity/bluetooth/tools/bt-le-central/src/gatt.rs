@@ -797,7 +797,8 @@ mod tests {
         let read_fut = do_read_by_type(&args, &gatt_client);
 
         let (service_proxy, mut service_mock) =
-            RemoteServiceMock::new(zx::Duration::from_seconds(20)).expect("failed to create mock");
+            RemoteServiceMock::new(zx::MonotonicDuration::from_seconds(20))
+                .expect("failed to create mock");
 
         gatt_client.write().active_service = Some(ActiveService::new(service_proxy));
 
@@ -813,7 +814,8 @@ mod tests {
     #[fuchsia::test]
     async fn test_connect_and_enable_notify() {
         let (client_proxy, mut client_mock) =
-            ClientMock::new(zx::Duration::from_seconds(20)).expect("failed to create mock");
+            ClientMock::new(zx::MonotonicDuration::from_seconds(20))
+                .expect("failed to create mock");
         let gatt_client = GattClient::new(client_proxy);
 
         let services =
@@ -832,7 +834,7 @@ mod tests {
         let service_stream =
             service_server.into_stream().expect("failed to turn server into stream");
         let mut service_mock =
-            RemoteServiceMock::from_stream(service_stream, zx::Duration::from_seconds(20));
+            RemoteServiceMock::from_stream(service_stream, zx::MonotonicDuration::from_seconds(20));
 
         let characteristics = Vec::new();
         let expect_discover_fut = service_mock.expect_discover_characteristics(&characteristics);

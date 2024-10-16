@@ -299,7 +299,7 @@ mod tests {
             },
         });
 
-        exec.set_fake_time(zx::Duration::from_seconds(1).after_now());
+        exec.set_fake_time(zx::MonotonicDuration::from_seconds(1).after_now());
         // An inbound transfer should have no impact on the outbound stats.
         stream.record_inbound_transfer(500, fasync::MonotonicInstant::now());
         assert_data_tree!(inspect, root: {
@@ -317,7 +317,7 @@ mod tests {
             },
         });
 
-        exec.set_fake_time(zx::Duration::from_seconds(1).after_now());
+        exec.set_fake_time(zx::MonotonicDuration::from_seconds(1).after_now());
         stream.record_outbound_transfer(250, fasync::MonotonicInstant::now());
         assert_data_tree!(inspect, root: {
             inbound_stream: {

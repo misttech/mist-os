@@ -24,6 +24,7 @@ common_board_configuration = {
     "fuchsia::pmm_checker",
     "fuchsia::real_time_clock",
     "fuchsia::realtek_8211f",
+    "fuchsia::suspending_token",
     "fuchsia::usb_peripheral_support",
     "fuchsia::wlan_fullmac",
     "fuchsia::xhci",

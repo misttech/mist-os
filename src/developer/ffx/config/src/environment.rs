@@ -192,13 +192,13 @@ impl Environment {
         }
     }
 
-    pub fn set_build(&mut self, to: &Path, build_override: Option<&Path>) -> Result<()> {
+    pub fn set_build(&mut self, to: &Path) -> Result<()> {
         assert!(
             !self.context.no_environment,
             "Cannot set build configuration with --no-environment"
         );
         let build_dir = self
-            .override_build_dir(build_override)
+            .override_build_dir(None)
             .context("Tried to set unknown build directory")?
             .to_owned();
         let build_dirs = match &mut self.files.build {

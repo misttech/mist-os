@@ -163,9 +163,10 @@ impl TargetAddr {
     }
 
     pub fn optional_port_str(&self) -> String {
-        match self.0.port() {
-            0 | 22 => format!("{self}"),
-            p => format!("{self}:{p}"),
+        match (self.0.ip(), self.0.port()) {
+            (_, 0) | (_, 22) => format!("{self}"),
+            (IpAddr::V6(_), p) => format!("[{self}]:{p}"),
+            (_, p) => format!("{self}:{p}"),
         }
     }
 }
@@ -184,5 +185,24 @@ impl std::fmt::Display for TargetAddr {
             }
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[fuchsia::test]
+    fn test_port_str_with_ipv6_bracket() {
+        let v6addr: std::net::SocketAddr = std::net::SocketAddrV6::new(
+            std::net::Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1),
+            8080,
+            0,
+            1,
+        )
+        .into();
+        let addr: TargetAddr = v6addr.into();
+        let s = addr.optional_port_str();
+        assert_eq!(&s, "[2001:db8::1]:8080");
     }
 }

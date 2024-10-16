@@ -1,4 +1,4 @@
-// Copyr, ExtendedMoniker::ComponentManageright 2019 The Fuchsia Authors. All rights reserved.
+// Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -209,14 +209,17 @@ impl BuiltinEnvironmentBuilder {
             .ok_or(format_err!("Runtime config should be set to add builtin runner."))?;
 
         let top_instance = self.top_instance.clone().unwrap();
+
+        let elf_runner_resources = ElfRunnerResources {
+            security_policy: runtime_config.security_policy.clone(),
+            utc_clock: self.utc_clock.clone(),
+            crash_records: self.crash_records.clone(),
+            instance_registry: self.instance_registry.clone(),
+        };
         let runner = Arc::new(BuiltinRunner::new(
+            fuchsia_runtime::job_default(),
             top_instance.task_group(),
-            ElfRunnerResources {
-                security_policy: runtime_config.security_policy.clone(),
-                utc_clock: self.utc_clock.clone(),
-                crash_records: self.crash_records.clone(),
-                instance_registry: self.instance_registry.clone(),
-            },
+            BuiltinRunner::get_builtin_programs(Arc::new(elf_runner_resources)),
         ));
         Ok(self.add_runner("builtin".parse().unwrap(), runner))
     }
@@ -458,9 +461,9 @@ impl RootComponentInputBuilder {
             Arc::new(move |server_end, _| {
                 let path = path.clone();
                 let fut = async move {
-                    fuchsia_fs::node::open_channel_in_namespace_deprecated(
+                    fuchsia_fs::node::open_channel_in_namespace(
                         &path,
-                        fio::OpenFlags::empty(),
+                        fio::Flags::empty(),
                         ServerEnd::new(server_end),
                     )
                     .map_err(|e| {
@@ -733,10 +736,7 @@ impl BuiltinEnvironment {
         // If capability passthrough is enabled, add capabilities offered from
         // the parent to the input dictionary of the root component.
         if capability_passthrough {
-            match fuchsia_fs::directory::open_in_namespace_deprecated(
-                "/parent-offered",
-                fio::OpenFlags::empty(),
-            ) {
+            match fuchsia_fs::directory::open_in_namespace("/parent-offered", fio::Flags::empty()) {
                 Ok(passthrough_dir) => match fuchsia_fs::directory::readdir(&passthrough_dir).await
                 {
                     Ok(entries) => {

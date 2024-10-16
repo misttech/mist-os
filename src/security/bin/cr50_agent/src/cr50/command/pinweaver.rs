@@ -282,15 +282,15 @@ impl Serializable for PinweaverInsertLeaf {
     }
 }
 
-fn delay_seconds_from_duration(duration: zx::Duration) -> Result<u32, PinWeaverError> {
-    if duration == zx::Duration::INFINITE {
+fn delay_seconds_from_duration(duration: zx::MonotonicDuration) -> Result<u32, PinWeaverError> {
+    if duration == zx::MonotonicDuration::INFINITE {
         // Treat an infinite duration as PW_BLOCK_ATTEMPTS, which is the max u32
         Ok(std::u32::MAX)
     } else {
-        if duration <= zx::Duration::from_nanos(0) {
+        if duration <= zx::MonotonicDuration::from_nanos(0) {
             // Negative and zero delay are invalid
             Err(PinWeaverError::DelayScheudleInvalid)
-        } else if duration < zx::Duration::from_seconds(1) {
+        } else if duration < zx::MonotonicDuration::from_seconds(1) {
             // Round any duration less than a second up to a second
             Ok(1u32)
         } else {
@@ -317,7 +317,7 @@ impl PinweaverInsertLeaf {
             for item in schedule.into_iter() {
                 data.delay_schedule[i] = DelayScheduleEntry {
                     attempt_count: item.attempt_count,
-                    time_diff: delay_seconds_from_duration(zx::Duration::from_nanos(
+                    time_diff: delay_seconds_from_duration(zx::MonotonicDuration::from_nanos(
                         item.time_delay,
                     ))?,
                 };
@@ -656,18 +656,21 @@ mod tests {
 
     #[fuchsia::test]
     fn test_delay_seconds_from_duration() {
-        let cases: Vec<(zx::Duration, Result<u32, PinWeaverError>)> = vec![
-            (zx::Duration::INFINITE_PAST, Err(PinWeaverError::DelayScheudleInvalid)),
-            (zx::Duration::from_seconds(-1), Err(PinWeaverError::DelayScheudleInvalid)),
-            (zx::Duration::from_seconds(0), Err(PinWeaverError::DelayScheudleInvalid)),
-            (zx::Duration::from_millis(500), Ok(1u32)),
-            (zx::Duration::from_seconds(1), Ok(1u32)),
-            (zx::Duration::from_millis(1500), Ok(1u32)),
-            (zx::Duration::from_seconds(2), Ok(2u32)),
-            (zx::Duration::from_seconds(20), Ok(20u32)),
-            (zx::Duration::from_seconds(0xffffffff), Ok(0xffffffffu32)),
-            (zx::Duration::from_seconds(0x100000000), Err(PinWeaverError::DelayScheudleInvalid)),
-            (zx::Duration::INFINITE, Ok(0xffffffffu32)),
+        let cases: Vec<(zx::MonotonicDuration, Result<u32, PinWeaverError>)> = vec![
+            (zx::MonotonicDuration::INFINITE_PAST, Err(PinWeaverError::DelayScheudleInvalid)),
+            (zx::MonotonicDuration::from_seconds(-1), Err(PinWeaverError::DelayScheudleInvalid)),
+            (zx::MonotonicDuration::from_seconds(0), Err(PinWeaverError::DelayScheudleInvalid)),
+            (zx::MonotonicDuration::from_millis(500), Ok(1u32)),
+            (zx::MonotonicDuration::from_seconds(1), Ok(1u32)),
+            (zx::MonotonicDuration::from_millis(1500), Ok(1u32)),
+            (zx::MonotonicDuration::from_seconds(2), Ok(2u32)),
+            (zx::MonotonicDuration::from_seconds(20), Ok(20u32)),
+            (zx::MonotonicDuration::from_seconds(0xffffffff), Ok(0xffffffffu32)),
+            (
+                zx::MonotonicDuration::from_seconds(0x100000000),
+                Err(PinWeaverError::DelayScheudleInvalid),
+            ),
+            (zx::MonotonicDuration::INFINITE, Ok(0xffffffffu32)),
         ];
 
         for case in cases.iter() {

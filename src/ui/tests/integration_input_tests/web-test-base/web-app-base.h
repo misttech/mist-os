@@ -15,6 +15,7 @@
 #include <string>
 
 #include <src/lib/json_parser/json_parser.h>
+#include <src/ui/testing/util/logging_event_loop.h>
 
 namespace integration_tests {
 
@@ -41,7 +42,7 @@ class NavListener : public fidl::Server<fuchsia_web::NavigationEventListener> {
 // application running within a Fuchsia web frame. It allows sub-class to
 // inject JavaScript, and use message port communication between this class and
 // the web app.
-class WebAppBase {
+class WebAppBase : public ui_testing::LoggingEventLoop {
  public:
   WebAppBase();
 
@@ -57,12 +58,8 @@ class WebAppBase {
                  fuchsia_web::ContextFeatureFlags::kVulkan |
                  fuchsia_web::ContextFeatureFlags::kNetwork);
 
-  template <typename PredicateT>
-  void RunLoopUntil(PredicateT predicate) {
-    while (!predicate()) {
-      loop_.Run(zx::time::infinite(), true);
-    }
-  }
+  void SendMessageToWebPage(fidl::ServerEnd<fuchsia_web::MessagePort> message_port,
+                            const std::string& message);
 
   NavListener nav_listener_;
   // message_port used for JS send message to this class.
@@ -73,10 +70,7 @@ class WebAppBase {
                       fuchsia_web::ContextFeatureFlags context_feature_flags);
   void PresentView();
   void SetupWebPage(const std::string& js_code);
-  void SendMessageToWebPage(fidl::ServerEnd<fuchsia_web::MessagePort> message_port,
-                            const std::string& message);
 
-  async::Loop loop_;
   component::OutgoingDirectory outgoing_directory_;
   fidl::ServerBindingGroup<fuchsia_web::NavigationEventListener> nav_listener_bindings_;
   fidl::SyncClient<fuchsia_web::ContextProvider> web_context_provider_;

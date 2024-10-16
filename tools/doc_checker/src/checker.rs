@@ -109,7 +109,7 @@ impl fmt::Display for DocCheckError {
         let suggestion = self
             .help_suggestion
             .as_ref()
-            .map(|suggestion| format!("\nConsider using {}", suggestion))
+            .map(|suggestion| format!("\nConsider {}", suggestion))
             .unwrap_or(String::new());
 
         f.write_fmt(format_args!(

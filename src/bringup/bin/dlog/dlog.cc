@@ -113,9 +113,9 @@ int main(int argc, char** argv) {
     char buf[cap];
     size_t len = 0;
     if (!plain) {
-      const zx_time_t millis = rec.timestamp / 1000000;
-      const zx_time_t secs = millis / 1000;
-      const zx_time_t ms = millis % 1000;
+      const zx_instant_boot_t millis = rec.timestamp / 1000000;
+      const zx_instant_boot_t secs = millis / 1000;
+      const zx_instant_boot_t ms = millis % 1000;
       int ret = snprintf(&buf[len], sizeof(buf) - len, "[%05ld.%03ld] ", secs, ms);
       ZX_ASSERT_MSG(ret >= 0, "snprintf failed: %d", ret);
       size_t n = static_cast<size_t>(ret);

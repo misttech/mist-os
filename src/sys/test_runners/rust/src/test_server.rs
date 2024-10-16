@@ -378,7 +378,10 @@ impl TestServer {
         let process_info = process.info().map_err(RunTestError::ProcessInfo)?;
 
         match process_info.return_code {
-            TR_OK => {
+            // Successful rust tests usually exit with TR_OK, which is non-zero. But a test may
+            // also exit with 0 (by std::process::exit, for example), so count this as success
+            // too.
+            TR_OK | 0 => {
                 Ok(ftest::Result_ { status: Some(ftest::Status::Passed), ..Default::default() })
             }
             TR_FAILED | ABORTED => {
@@ -605,6 +608,10 @@ mod tests {
             TestCaseInfo { name: "my_tests::ignored_failing_test".to_string(), enabled: false },
             TestCaseInfo { name: "my_tests::ignored_passing_test".to_string(), enabled: false },
             TestCaseInfo { name: "my_tests::passing_test".to_string(), enabled: true },
+            TestCaseInfo {
+                name: "my_tests::passing_test_with_zero_exit".to_string(),
+                enabled: true,
+            },
             TestCaseInfo { name: "my_tests::failing_test".to_string(), enabled: true },
             TestCaseInfo { name: "my_tests::sample_test_two".to_string(), enabled: true },
             TestCaseInfo { name: "my_tests::test_custom_arguments".to_string(), enabled: true },
@@ -752,6 +759,7 @@ mod tests {
             names_to_invocation(vec![
                 "my_tests::sample_test_one",
                 "my_tests::passing_test",
+                "my_tests::passing_test_with_zero_exit",
                 "my_tests::failing_test",
                 "my_tests::sample_test_two",
                 "my_tests::ignored_passing_test",
@@ -778,6 +786,11 @@ mod tests {
             ListenerEvent::start_test("my_tests::passing_test"),
             ListenerEvent::finish_test(
                 "my_tests::passing_test",
+                TestResult { status: Some(Status::Passed), ..Default::default() },
+            ),
+            ListenerEvent::start_test("my_tests::passing_test_with_zero_exit"),
+            ListenerEvent::finish_test(
+                "my_tests::passing_test_with_zero_exit",
                 TestResult { status: Some(Status::Passed), ..Default::default() },
             ),
             ListenerEvent::start_test("my_tests::failing_test"),
@@ -827,6 +840,7 @@ mod tests {
             names_to_invocation(vec![
                 "my_tests::sample_test_one",
                 "my_tests::passing_test",
+                "my_tests::passing_test_with_zero_exit",
                 "my_tests::failing_test",
                 "my_tests::sample_test_two",
                 "my_tests::ignored_passing_test",
@@ -851,6 +865,11 @@ mod tests {
             ListenerEvent::start_test("my_tests::passing_test"),
             ListenerEvent::finish_test(
                 "my_tests::passing_test",
+                TestResult { status: Some(Status::Passed), ..Default::default() },
+            ),
+            ListenerEvent::start_test("my_tests::passing_test_with_zero_exit"),
+            ListenerEvent::finish_test(
+                "my_tests::passing_test_with_zero_exit",
                 TestResult { status: Some(Status::Passed), ..Default::default() },
             ),
             ListenerEvent::start_test("my_tests::failing_test"),

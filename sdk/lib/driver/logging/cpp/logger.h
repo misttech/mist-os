@@ -33,7 +33,7 @@ class Logger final {
   // supplied.
   //
   // If we fail to connect to LogSink, or if there's any error the returned logger will be no-op.
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(24)
   static std::unique_ptr<Logger> Create2(const Namespace& ns, async_dispatcher_t* dispatcher,
                                          std::string_view name,
                                          FuchsiaLogSeverity min_severity = FUCHSIA_LOG_INFO,
@@ -43,8 +43,7 @@ class Logger final {
   static zx::result<std::unique_ptr<Logger>> Create(
       const Namespace& ns, async_dispatcher_t* dispatcher, std::string_view name,
       FuchsiaLogSeverity min_severity = FUCHSIA_LOG_INFO, bool wait_for_initial_interest = true)
-      ZX_DEPRECATED_SINCE(1, NEXT,
-                          "Use Create2 which will return a no-op logger instead of failing");
+      ZX_DEPRECATED_SINCE(1, 24, "Use Create2 which will return a no-op logger instead of failing");
 
   static Logger* GlobalInstance();
   static void SetGlobalInstance(Logger*);
@@ -84,7 +83,7 @@ class Logger final {
   // on LogBuffer directly.
   bool FlushRecord(fuchsia_syslog::LogBuffer& buffer, uint32_t dropped);
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(24)
   bool IsNoOp() { return !socket_.is_valid(); }
 #endif
 

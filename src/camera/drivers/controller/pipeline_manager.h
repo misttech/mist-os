@@ -122,7 +122,7 @@ class PipelineManager {
   void GetImageFormats(const std::vector<uint8_t>& origin,
                        fuchsia::camera2::Stream::GetImageFormatsCallback callback);
   void GetBuffers(const std::vector<uint8_t>& origin,
-                  fuchsia::camera2::Stream::GetBuffersCallback callback);
+                  fuchsia::camera2::Stream::GetBuffers2Callback callback);
 
   async_dispatcher_t* dispatcher_;
   const ddk::IspProtocolClient& isp_;

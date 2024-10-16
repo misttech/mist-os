@@ -159,7 +159,7 @@ impl ChromebookKeyboardHandler {
     fn next_event_time(self: &Rc<Self>, event_time: zx::MonotonicInstant) -> zx::MonotonicInstant {
         let proposed = self.state.borrow().next_event_time;
         let returned = if event_time < proposed { proposed } else { event_time };
-        self.state.borrow_mut().next_event_time = returned + zx::Duration::from_nanos(1);
+        self.state.borrow_mut().next_event_time = returned + zx::MonotonicDuration::from_nanos(1);
         returned
     }
 
@@ -475,7 +475,7 @@ mod tests {
         let mut ret = vec![];
         for (k, t) in keys {
             ret.push(create_input_event(KeyboardEvent::new(k, t), descriptor, event_time, handled));
-            event_time = event_time + zx::Duration::from_nanos(1);
+            event_time = event_time + zx::MonotonicDuration::from_nanos(1);
         }
         ret
     }

@@ -3,10 +3,10 @@
 # found in the LICENSE file.
 
 # buildifier: disable=module-docstring
-load(":fuchsia_task_ffx.bzl", "fuchsia_task_ffx")
-load(":fuchsia_task_flash.bzl", "fuchsia_task_flash")
 load(":fuchsia_task_download.bzl", "fuchsia_task_download")
 load(":fuchsia_task_emu.bzl", "fuchsia_task_emu")
+load(":fuchsia_task_ffx.bzl", "fuchsia_task_ffx")
+load(":fuchsia_task_flash.bzl", "fuchsia_task_flash")
 load(":fuchsia_task_repo_add.bzl", "fuchsia_task_repo_add")
 load(":fuchsia_task_verbs.bzl", "make_help_executable", "verbs")
 load(":fuchsia_workflow.bzl", "fuchsia_workflow")

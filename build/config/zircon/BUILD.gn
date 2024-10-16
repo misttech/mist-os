@@ -71,6 +71,7 @@ config("compiler") {
   configs += [
     "//build/config:color_diagnostics",
     "//build/config:crash_diagnostics",
+    "//build/config:stack-size-section",
 
     # TODO: "$current_os:compiler",
   ]

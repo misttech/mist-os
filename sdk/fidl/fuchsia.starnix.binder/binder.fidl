@@ -29,6 +29,8 @@ type FileFlags = flexible bits : uint64 {
     DIRECTORY = 0b1000000000000;
 };
 
+/// The representation of an open file that can be transferred between the
+/// binder device driver and the client.
 type FileHandle = resource table {
     /// The handle connecting to the file protocol. If not present, the file
     /// should behave as it is was a null file: all read must succeed with empty
@@ -38,8 +40,6 @@ type FileHandle = resource table {
     /// The flags associated with the opened file.
     3: flags FileFlags;
 };
-
-alias FileHandle2 = FileHandle;
 
 /// Protocol that gives the binder driver access to the client process'
 /// resources.
@@ -65,12 +65,10 @@ open protocol ProcessAccessor {
         /// The list of open file the client must add to its fd table, returning
         /// the new minted file descriptors.
         3: add_requests vector<FileHandle>:MAX_REQUEST_COUNT;
-        4: add_requests2 vector<FileHandle2>:MAX_REQUEST_COUNT;
     }) -> (@generated_name("FileResponse") resource table {
         // (No ordinal 1 since there is no response for the close operation.)
         /// The list of open file retriever for the `get_requests`.
         2: get_responses vector<FileHandle>:MAX_REQUEST_COUNT;
-        4: get_responses2 vector<FileHandle2>:MAX_REQUEST_COUNT;
         /// The list of file descriptors minted for the `add_requests`.
         3: add_responses vector<Fd>:MAX_REQUEST_COUNT;
     }) error fuchsia.posix.Errno;

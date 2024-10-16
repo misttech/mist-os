@@ -5,8 +5,8 @@ the `break` command and give it a location to break.
 
 For example, to create a breakpoint on the `main` function:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] break main
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+break main
 Breakpoint 3 (Software) on Global, Enabled, stop=All, @ main
    180
  ◉ 181 int main(int argc, char**argv) {
@@ -20,8 +20,8 @@ There are several ways to express a breakpoint in zxdb. For example:
     You can specific a function name which matches functions with the name in
     any namespace:
 
-    ```none {:.devsite-disable-click-to-copy}
-    [zxdb] break main
+    ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+    break main
     ```
 
   * {Member function}
@@ -29,8 +29,8 @@ There are several ways to express a breakpoint in zxdb. For example:
     You can specify a member function or functions inside a specific namespace
     or class:
 
-    ```none {:.devsite-disable-click-to-copy}
-    [zxdb] break {{"<var>my_namespace</var>"}}::{{"<var>MyClass</var>"}}::{{"<var>MyFunction</var>"}}
+    ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+    break {{"<var>my_namespace</var>"}}::{{"<var>MyClass</var>"}}::{{"<var>MyFunction</var>"}}
     [zxdb] break ::{{"<var>OtherFunction</var>"}}
     ```
 
@@ -40,8 +40,8 @@ There are several ways to express a breakpoint in zxdb. For example:
 
     Note: Make sure to separate the source file name and line number with a colon.
 
-    ```none {:.devsite-disable-click-to-copy}
-    [zxdb] break mymain.cc:22
+    ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+    break mymain.cc:22
     ```
 
   * {Line number}
@@ -49,16 +49,16 @@ There are several ways to express a breakpoint in zxdb. For example:
     You can specify a line number within the current frame’s current source
     file. This is useful when you are stepping through code:
 
-    ```none {:.devsite-disable-click-to-copy}
-    [zxdb] break 23
+    ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+    break 23
     ```
 
   * {Memory address}
 
     You can specify a memory address:
 
-    ```none {:.devsite-disable-click-to-copy}
-    [zxdb] break 0xf72419a01
+    ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+    break 0xf72419a01
     ```
 
   * {Expression}
@@ -68,8 +68,8 @@ There are several ways to express a breakpoint in zxdb. For example:
     input that follows as an expression that evaluates to a specific address.
     This is useful when you work with hardware breakpoints.
 
-    ```none {:.devsite-disable-click-to-copy}
-    [zxdb] break --type=write *&foo
+    ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+    break --type=write *&foo
     ```
 
 ## List breakpoints
@@ -79,8 +79,8 @@ To view all of the breakpoints, use `breakpoint`:
 Note: This is the `breakpoint` noun. You can also use `bp` to express
 `breakpoint`.
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] breakpoint
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+breakpoint
   # scope  stop enabled type     #addrs hit-count location
 ▶ 3 global all  false   software      1         0 machine.h:7
 ```
@@ -92,8 +92,8 @@ the `breakpoint <index> rm`.
 
 For example, to clear `breakpoint 3`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] breakpoint 3 rm
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+breakpoint 3 rm
 Removed Breakpoint 3 enabled=false @ machine.h:7
 ```
 
@@ -104,8 +104,8 @@ Key Point: **GDB users:** `delete <index>` is mapped to `breakpoint <index> rm`.
 To remove all breakpoints at a particular location, you do not need to specify
 an index:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] clear
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+clear
 ```
 
 When you create or stop on a breakpoint, that breakpoint becomes the default
@@ -122,8 +122,8 @@ Key Point: **GDB users:** `clear <number>` behaves the same in GDB and zxdb.
 
 For example, to disable breakpoint `3`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] breakpoint 3 disable
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+breakpoint 3 disable
 Disabled Breakpoint 3 enabled=false @ machine.h:7
    35   static constexpr SizeType InitialStackPointer(SizeType base, SizeType size) {
    36     // Stacks grow down on most machines.
@@ -137,8 +137,8 @@ is used.
 
 To disable the current breakpoint:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] disable
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+disable
 Disabled Breakpoint 2 enabled=false @ main.rs:5
    24
    25 enum Services {
@@ -154,8 +154,8 @@ disabled breakpoint.
 
 For example, to enable breakpoint `3`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] breakpoint 3 enable
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+breakpoint 3 enable
 Enabled Breakpoint 3 @ machine.h:7
    35   static constexpr SizeType InitialStackPointer(SizeType base, SizeType size) {
    36     // Stacks grow down on most machines.
@@ -170,8 +170,8 @@ You can also modify breakpoint properties with the `get` and `set` commands.
 
 For example, to retrieve the `location` property from breakpoint `4`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] breakpoint 4 get location
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+breakpoint 4 get location
 location (locations)
 
   The location (symbol, line number, address, or expression) where this
@@ -182,8 +182,8 @@ location = machine.h:7
 
 For example, to set the `location` property from breakpoint `4` to `machine.h:8`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] breakpoint 4 set location = machine.h:8
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+breakpoint 4 set location = machine.h:8
 Set breakpoint 4 location = machine.h:8
 ```
 
@@ -224,8 +224,8 @@ for the `type` property of a `break` command.
 
 For example, to set a breakpoint of type `execution`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] break --type=execution myfile.rs:123
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+break --type=execution myfile.rs:123
 ```
 
 A `watch` is the same as using `break --type=read-write`. See
@@ -239,8 +239,8 @@ result of an expression and set a data write breakpoint over its range:
 Note: CPUs only support a limited number of hardware watchpoints, typically
 around 4.
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] watch i
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+watch i
 [zxdb] watch foo[5]->bar
 ```
 

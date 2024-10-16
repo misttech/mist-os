@@ -76,6 +76,7 @@ group("sanitizer") {
   deps = [
     ":hwasan-ctor-order-bootfs-test",
     ":lsan-bootfs-test",
+    ":sanitizer-allocator-bootfs-test",
     ":sanitizer-utils-bootfs-test",
   ]
 }
@@ -266,4 +267,17 @@ bootfs_test("sanitizer-utils-bootfs-test") {
 bootfs_test("lsan-bootfs-test") {
   name = "lsan-test"
   deps = [ ":lsan-test" ]
+}
+
+bootfs_test("sanitizer-allocator-bootfs-test") {
+  name = "sanitizer-allocator-test"
+  deps = [ ":sanitizer-allocator-test" ]
+}
+
+test("sanitizer-allocator-test") {
+  deps = [
+    "//sdk/lib/tbi",
+    "//zircon/system/ulib/zxtest",
+  ]
+  sources = [ "sanitizer-allocator-test.cc" ]
 }

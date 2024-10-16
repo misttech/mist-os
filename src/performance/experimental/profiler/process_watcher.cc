@@ -7,6 +7,7 @@
 #include <lib/async/cpp/wait.h>
 #include <lib/async/dispatcher.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/trace/event.h>
 #include <lib/zx/exception.h>
 #include <lib/zx/result.h>
 #include <lib/zx/thread.h>
@@ -18,6 +19,7 @@
 #include <utility>
 
 zx::result<> profiler::ProcessWatcher::Watch(async_dispatcher_t* dispatcher) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   zx_status_t status =
       process_->create_exception_channel(ZX_EXCEPTION_CHANNEL_DEBUGGER, &exception_channel_);
 
@@ -34,6 +36,7 @@ zx::result<> profiler::ProcessWatcher::Watch(async_dispatcher_t* dispatcher) {
 void profiler::ProcessWatcher::HandleException(async_dispatcher_t* dispatcher,
                                                async::WaitBase* wait, zx_status_t status,
                                                const zx_packet_signal_t* signal) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   if (status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Failed to wait on exception";
     return;

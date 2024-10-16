@@ -55,7 +55,7 @@ impl Time for FuchsiaTime {
         future: F,
     ) -> Result<F::Output, io::Error> {
         let nanos = i64::try_from(duration.as_nanos()).expect("failed to cast the input into i64 ");
-        let zx_duration = zx::Duration::from_nanos(nanos);
+        let zx_duration = zx::MonotonicDuration::from_nanos(nanos);
 
         future
             .map(|output| Ok(output))
@@ -67,7 +67,7 @@ impl Time for FuchsiaTime {
 
     async fn delay_for(duration: Duration) -> () {
         let nanos = i64::try_from(duration.as_nanos()).expect("failed to cast the input into i64");
-        let zx_duration = zx::Duration::from_nanos(nanos);
+        let zx_duration = zx::MonotonicDuration::from_nanos(nanos);
         fasync::Timer::new(fasync::MonotonicInstant::after(zx_duration)).await
     }
 }

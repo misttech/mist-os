@@ -12,7 +12,7 @@ use std::pin::Pin;
 use std::sync::{Arc, RwLock, Weak};
 use std::task::{Context, Poll};
 use tracing::warn;
-use zx::{Duration, Status};
+use zx::{MonotonicDuration, Status};
 
 use crate::types::{
     EndpointType, Error, ErrorCode, MediaCodecType, MediaType, Result as AvdtpResult,
@@ -225,7 +225,7 @@ impl StreamEndpoint {
 
     // 100 milliseconds chosen based on end of range testing, to allow for recovery after normal
     // packet delivery continues.
-    const SRC_FLUSH_TIMEOUT: Duration = Duration::from_millis(100);
+    const SRC_FLUSH_TIMEOUT: MonotonicDuration = MonotonicDuration::from_millis(100);
 
     /// When a L2CAP channel is received after an Open command is accepted, it should be
     /// delivered via receive_channel.
@@ -273,7 +273,7 @@ impl StreamEndpoint {
     }
 
     /// Attempts to set the flush timeout for the MediaTransport channel, for source endpoints.
-    pub fn try_flush_timeout(&self, timeout: Duration) {
+    pub fn try_flush_timeout(&self, timeout: MonotonicDuration) {
         if self.endpoint_type != EndpointType::Source {
             return;
         }
@@ -312,7 +312,9 @@ impl StreamEndpoint {
                 };
                 let closed_fut = transport
                     .closed()
-                    .on_timeout(Duration::from_seconds(3).after_now(), || Err(Status::TIMED_OUT));
+                    .on_timeout(MonotonicDuration::from_seconds(3).after_now(), || {
+                        Err(Status::TIMED_OUT)
+                    });
                 if let Err(Status::TIMED_OUT) = closed_fut.await {
                     let _ = peer.abort(&seid).await;
                     *state.lock() = StreamState::Aborting;

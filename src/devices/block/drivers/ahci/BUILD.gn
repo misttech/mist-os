@@ -58,14 +58,12 @@ test("ahci-unittest-bin") {
   deps = [
     ":shared",
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
-    "//sdk/lib/async_patterns/testing/cpp",
-    "//sdk/lib/driver/testing/cpp:cpp",
+    "//sdk/lib/driver/testing/cpp",
+    "//sdk/lib/driver/testing/cpp:minimal_compat_environment",
     "//sdk/lib/driver/testing/cpp:scoped_global_logger",
-    "//sdk/lib/inspect/testing/cpp:zxtest",
-    "//src/devices/lib/mmio",
-    "//src/devices/testing/fake-bti",
-    "//zircon/system/ulib/sync:sync-cpp",
-    "//zircon/system/ulib/zxtest",
+    "//sdk/lib/inspect/testing/cpp",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
   ]
 }
 

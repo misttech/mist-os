@@ -3,43 +3,65 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+import("//build/rust/rustc_library.gni")
 
 group("devfs") {
   deps = [ ":package" ]
 }
 
-executable("bin") {
-  output_name = "devfs"
+rustc_library("lib") {
+  name = "devfs"
+  edition = "2021"
 
-  sources = [ "main.cc" ]
+  sources = [ "src/lib.rs" ]
 
   deps = [
-    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp",
-    "//sdk/lib/async-loop:async-loop-cpp",
-    "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/syslog/cpp",
-    "//src/lib/fxl",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
+    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-component",
+    "//src/storage/lib/vfs/rust:vfs",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:tracing",
+  ]
+}
+
+rustc_binary("bin") {
+  output_name = "devfs"
+  edition = "2021"
+
+  configs += [ "//build/config/rust:bootfs" ]
+
+  sources = [ "src/main.rs" ]
+  deps = [
+    ":lib",
+    "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
+    "//src/lib/fdio/rust:fdio",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-runtime",
+    "//third_party/rust_crates:tracing",
   ]
 }
 
 fuchsia_component("component") {
   component_name = "devfs"
   manifest = "meta/devfs.cml"
-  deps = [ ":bin" ]
 }
 
 # Used for /bootstrap/devfs-with-pkg since that component should not be marked
 # `main_process_critical`
 fuchsia_component("component-non-critical") {
   component_name = "devfs-pkg"
-  manifest = "meta/devfs-base.shard.cml"
-  deps = [ ":bin" ]
+  manifest = "meta/devfs-pkg.cml"
 }
 
 fuchsia_component("component-for-test") {
+  # This would be testonly but driver_test_realm is not
   component_name = "devfs"
-  manifest = "meta/devfs-base.shard.cml"
+  manifest = "meta/devfs-test.cml"
   deps = [ ":bin" ]
 }
 

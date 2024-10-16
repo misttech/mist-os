@@ -4,21 +4,16 @@
 
 #include "../usb-mass-storage.h"
 
-#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/component/cpp/driver_export.h>
-#include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
-#include <lib/driver/testing/cpp/internal/test_environment.h>
-#include <lib/driver/testing/cpp/test_node.h>
-#include <zircon/process.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 
 #include <variant>
 
 #include <fbl/array.h>
 #include <fbl/intrusive_double_list.h>
-#include <fbl/ref_ptr.h>
-#include <fbl/string.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
+
+#include "src/lib/testing/predicates/status.h"
 
 namespace {
 
@@ -488,7 +483,8 @@ class UsbBanjoServer : public ddk::UsbProtocol<UsbBanjoServer> {
             break;
           }
           default:
-            ADD_FAILURE("Unexpected SCSI command: %02Xh", cbw.CBWCB[0]);
+            // Unexpected SCSI command
+            ADD_FAILURE();
         }
         break;
       }
@@ -559,13 +555,6 @@ static void CompletionCallback(void* ctx, zx_status_t status, block_op_t* op) {
   sync_completion_signal(&context->completion);
 }
 
-struct IncomingNamespace {
-  fdf_testing::TestNode node{"root"};
-  fdf_testing::internal::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
-  compat::DeviceServer device_server;
-  UsbBanjoServer usb_banjo_server;
-};
-
 class TestUsbMassStorageDevice : public ums::UsbMassStorageDevice {
  public:
   TestUsbMassStorageDevice(fdf::DriverStartArgs start_args,
@@ -593,78 +582,67 @@ class TestUsbMassStorageDevice : public ums::UsbMassStorageDevice {
   bool has_zero_duration_ = false;
 };
 
-// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
-// library.
-class UmsTest : public zxtest::Test {
+class Environment : public fdf_testing::Environment {
  public:
-  UmsTest()
-      : env_dispatcher_(runtime_.StartBackgroundDispatcher()),
-        incoming_(env_dispatcher_->async_dispatcher(), std::in_place) {}
-
-  void SetUp() override {
-    context_.pending_write = 0;
-    context_.csw.dCSWSignature = htole32(CSW_SIGNATURE);
-    context_.csw.bmCSWStatus = CSW_SUCCESS;
-    context_.descs = kDescriptors;
-    context_.desc_length = sizeof(kDescriptors);
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
+    usb_banjo_server_.SetContext(&context_);
+    device_server_.Init(component::kDefaultInstance, "root", std::nullopt,
+                        usb_banjo_server_.GetBanjoConfig());
+    return zx::make_result(
+        device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs));
   }
 
+  Context& context() { return context_; }
+
+ private:
+  Context context_;
+  UsbBanjoServer usb_banjo_server_;
+  compat::DeviceServer device_server_;
+};
+
+class TestConfig final {
+ public:
+  using DriverType = TestUsbMassStorageDevice;
+  using EnvironmentType = Environment;
+};
+
+class UmsTest : public ::testing::Test {
+ public:
+  void SetUp() override {
+    driver_test().RunInEnvironmentTypeContext([&](Environment& env) {
+      env.context().pending_write = 0;
+      env.context().csw.dCSWSignature = htole32(CSW_SIGNATURE);
+      env.context().csw.bmCSWStatus = CSW_SUCCESS;
+      env.context().descs = kDescriptors;
+      env.context().desc_length = sizeof(kDescriptors);
+    });
+  }
+
+  fdf_testing::ForegroundDriverTest<TestConfig>& driver_test() { return driver_test_; }
+
   void TearDown() override {
-    zx::result prepare_stop_result = runtime_.RunToCompletion(dut_.PrepareStop());
-    EXPECT_OK(prepare_stop_result.status_value());
-
-    incoming_.reset();
-    runtime_.ShutdownAllDispatchers(fdf::Dispatcher::GetCurrent()->get());
-
-    EXPECT_OK(dut_.Stop());
+    zx::result<> result = driver_test().StopDriver();
+    ASSERT_OK(result);
   }
 
  protected:
-  Context context_;
-
-  fdf_testing::DriverRuntime runtime_;
-  fdf::UnownedSynchronizedDispatcher env_dispatcher_;
-  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_;
-  fdf_testing::internal::DriverUnderTest<TestUsbMassStorageDevice> dut_;
+  fdf_testing::ForegroundDriverTest<TestConfig> driver_test_;
 
   void StartDriver(ErrorInjection inject_failure = NoFault) {
-    // Device parameters for physical (parent) device
-    context_.failure_mode = inject_failure;
-
-    // Initialize driver test environment.
-    fuchsia_driver_framework::DriverStartArgs start_args;
-    fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client;
-    incoming_.SyncCall([&](IncomingNamespace* incoming) mutable {
-      auto start_args_result = incoming->node.CreateStartArgsAndServe();
-      ASSERT_TRUE(start_args_result.is_ok());
-      start_args = std::move(start_args_result->start_args);
-      outgoing_directory_client = std::move(start_args_result->outgoing_directory_client);
-
-      ASSERT_OK(incoming->env.Initialize(std::move(start_args_result->incoming_directory_server)));
-
-      // Serve USB Banjo protocol.
-      incoming->usb_banjo_server.SetContext(&context_);
-      incoming->device_server.Init("default", "", std::nullopt,
-                                   incoming->usb_banjo_server.GetBanjoConfig());
-      ZX_ASSERT(incoming->device_server.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                              &incoming->env.incoming_directory()) == ZX_OK);
+    driver_test().RunInEnvironmentTypeContext([&](Environment& env) {
+      // Device parameters for physical (parent) device
+      env.context().failure_mode = inject_failure;
     });
 
-    // Start dut_.
-    ASSERT_OK(runtime_.RunToCompletion(dut_.Start(std::move(start_args))));
+    zx::result<> result = driver_test().StartDriver();
+    ASSERT_OK(result);
 
-    while (true) {
-      if (dut_->block_devs().size() >= 2) {
-        break;
-      }
-      usleep(10);
-    }
+    ASSERT_GE(driver_test().driver()->block_devs().size(), size_t{2});
   }
 };
 
 // UMS read test
-// This test validates the read functionality on multiple LUNS
-// of a USB mass storage device.
+// This test validates the read functionality on multiple LUNS of a USB mass storage device.
 TEST_F(UmsTest, TestRead) {
   StartDriver();
   zx_handle_t vmo;
@@ -672,13 +650,14 @@ TEST_F(UmsTest, TestRead) {
   zx_vaddr_t mapped;
 
   // VMO creation to read data into
-  EXPECT_EQ(ZX_OK, zx_vmo_create(1000 * 1000 * 10, 0, &vmo), "Failed to create VMO");
-  EXPECT_EQ(ZX_OK, zx_vmo_get_size(vmo, &size), "Failed to get size of VMO");
-  EXPECT_EQ(ZX_OK, zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ, 0, vmo, 0, size, &mapped),
-            "Failed to map VMO");
+  ZX_ASSERT_MSG(ZX_OK == zx_vmo_create(1000 * 1000 * 10, 0, &vmo), "Failed to create VMO");
+  ZX_ASSERT_MSG(ZX_OK == zx_vmo_get_size(vmo, &size), "Failed to get size of VMO");
+  ZX_ASSERT_MSG(
+      ZX_OK == zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ, 0, vmo, 0, size, &mapped),
+      "Failed to map VMO");
   // Perform read transactions
   uint32_t lun = 0;
-  for (auto const& block_dev : dut_->block_devs()) {
+  for (auto const& block_dev : driver_test().driver()->block_devs()) {
     ZX_ASSERT(block_dev);
     block_info_t info;
     size_t block_op_size;
@@ -693,20 +672,21 @@ TEST_F(UmsTest, TestRead) {
     op.rw.offset_vmo = 0;
     op.rw.vmo = vmo;
 
-    block_dev->BlockImplQueue(&op, CompletionCallback, &context_);
-    sync_completion_wait(&context_.completion, ZX_TIME_INFINITE);
-    sync_completion_reset(&context_.completion);
-    scsi::Opcode xfer_type = lun == 1 ? scsi::Opcode::READ_16 : scsi::Opcode::READ_10;
-    EXPECT_EQ(lun, context_.transfer_lun);
-    EXPECT_EQ(xfer_type, context_.transfer_type);
-    EXPECT_EQ(0, memcmp(reinterpret_cast<void*>(mapped), context_.last_transfer->data.data(),
-                        context_.last_transfer->data.size()));
+    driver_test().RunInEnvironmentTypeContext([&](Environment& env) {
+      block_dev->BlockImplQueue(&op, CompletionCallback, &env.context());
+      sync_completion_wait(&env.context().completion, ZX_TIME_INFINITE);
+      sync_completion_reset(&env.context().completion);
+      EXPECT_EQ(lun, env.context().transfer_lun);
+      const scsi::Opcode xfer_type = lun == 1 ? scsi::Opcode::READ_16 : scsi::Opcode::READ_10;
+      EXPECT_EQ(xfer_type, env.context().transfer_type);
+      EXPECT_EQ(0, memcmp(reinterpret_cast<void*>(mapped), env.context().last_transfer->data.data(),
+                          env.context().last_transfer->data.size()));
+    });
     ++lun;
   }
 }
 
-// This test validates the write functionality on multiple LUNS
-// of a USB mass storage device.
+// This test validates the write functionality on multiple LUNS of a USB mass storage device.
 TEST_F(UmsTest, TestWrite) {
   StartDriver();
   zx_handle_t vmo;
@@ -714,19 +694,18 @@ TEST_F(UmsTest, TestWrite) {
   zx_vaddr_t mapped;
 
   // VMO creation to transfer from
-  EXPECT_EQ(ZX_OK, zx_vmo_create(1000 * 1000 * 10, 0, &vmo), "Failed to create VMO");
-  EXPECT_EQ(ZX_OK, zx_vmo_get_size(vmo, &size), "Failed to get size of VMO");
-  EXPECT_EQ(ZX_OK,
-            zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, size,
-                        &mapped),
-            "Failed to map VMO");
+  ZX_ASSERT_MSG(ZX_OK == zx_vmo_create(1000 * 1000 * 10, 0, &vmo), "Failed to create VMO");
+  ZX_ASSERT_MSG(ZX_OK == zx_vmo_get_size(vmo, &size), "Failed to get size of VMO");
+  ZX_ASSERT_MSG(ZX_OK == zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0,
+                                     vmo, 0, size, &mapped),
+                "Failed to map VMO");
   // Add "entropy" for write operation
   for (size_t i = 0; i < size / sizeof(size_t); i++) {
     reinterpret_cast<size_t*>(mapped)[i] = i;
   }
   // Perform write transactions
   uint32_t lun = 0;
-  for (auto const& block_dev : dut_->block_devs()) {
+  for (auto const& block_dev : driver_test().driver()->block_devs()) {
     ZX_ASSERT(block_dev);
     block_info_t info;
     size_t block_op_size;
@@ -741,26 +720,27 @@ TEST_F(UmsTest, TestWrite) {
     op.rw.offset_vmo = 0;
     op.rw.vmo = vmo;
 
-    block_dev->BlockImplQueue(&op, CompletionCallback, &context_);
-    sync_completion_wait(&context_.completion, ZX_TIME_INFINITE);
-    sync_completion_reset(&context_.completion);
-    scsi::Opcode xfer_type = lun == 1 ? scsi::Opcode::WRITE_16 : scsi::Opcode::WRITE_10;
-    EXPECT_EQ(lun, context_.transfer_lun);
-    EXPECT_EQ(xfer_type, context_.transfer_type);
-    EXPECT_EQ(0, memcmp(reinterpret_cast<void*>(mapped), context_.last_transfer->data.data(),
-                        op.rw.length * kBlockSize));
+    driver_test().RunInEnvironmentTypeContext([&](Environment& env) {
+      block_dev->BlockImplQueue(&op, CompletionCallback, &env.context());
+      sync_completion_wait(&env.context().completion, ZX_TIME_INFINITE);
+      sync_completion_reset(&env.context().completion);
+      EXPECT_EQ(lun, env.context().transfer_lun);
+      const scsi::Opcode xfer_type = lun == 1 ? scsi::Opcode::WRITE_16 : scsi::Opcode::WRITE_10;
+      EXPECT_EQ(xfer_type, env.context().transfer_type);
+      EXPECT_EQ(0, memcmp(reinterpret_cast<void*>(mapped), env.context().last_transfer->data.data(),
+                          op.rw.length * kBlockSize));
+    });
     ++lun;
   }
 }
 
-// This test validates the flush functionality on multiple LUNS
-// of a USB mass storage device.
+// This test validates the flush functionality on multiple LUNS of a USB mass storage device.
 TEST_F(UmsTest, TestFlush) {
   StartDriver();
 
   // Perform flush transactions
   uint32_t lun = 0;
-  for (auto const& block_dev : dut_->block_devs()) {
+  for (auto const& block_dev : driver_test().driver()->block_devs()) {
     ZX_ASSERT(block_dev);
     block_info_t info;
     size_t block_op_size;
@@ -771,24 +751,24 @@ TEST_F(UmsTest, TestFlush) {
     op = {};
     op.command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0};
 
-    block_dev->BlockImplQueue(&op, CompletionCallback, &context_);
-    sync_completion_wait(&context_.completion, ZX_TIME_INFINITE);
-    sync_completion_reset(&context_.completion);
-    scsi::Opcode xfer_type = scsi::Opcode::SYNCHRONIZE_CACHE_10;
-    EXPECT_EQ(lun, context_.transfer_lun);
-    EXPECT_EQ(xfer_type, context_.transfer_type);
+    driver_test().RunInEnvironmentTypeContext([&](Environment& env) {
+      block_dev->BlockImplQueue(&op, CompletionCallback, &env.context());
+      sync_completion_wait(&env.context().completion, ZX_TIME_INFINITE);
+      sync_completion_reset(&env.context().completion);
+      EXPECT_EQ(lun, env.context().transfer_lun);
+      EXPECT_EQ(scsi::Opcode::SYNCHRONIZE_CACHE_10, env.context().transfer_type);
+    });
     ++lun;
   }
 }
 
-// This test validates the trim functionality on multiple LUNS
-// of a USB mass storage device.
+// This test validates the trim functionality on multiple LUNS of a USB mass storage device.
 TEST_F(UmsTest, TestTrim) {
   StartDriver();
 
   // Perform trim transactions
   uint32_t lun = 0;
-  for (auto const& block_dev : dut_->block_devs()) {
+  for (auto const& block_dev : driver_test().driver()->block_devs()) {
     ZX_ASSERT(block_dev);
     block_info_t info;
     size_t block_op_size;
@@ -801,12 +781,13 @@ TEST_F(UmsTest, TestTrim) {
     op.trim.offset_dev = 0;
     op.trim.length = 1;
 
-    block_dev->BlockImplQueue(&op, CompletionCallback, &context_);
-    sync_completion_wait(&context_.completion, ZX_TIME_INFINITE);
-    sync_completion_reset(&context_.completion);
-    scsi::Opcode xfer_type = scsi::Opcode::UNMAP;
-    EXPECT_EQ(lun, context_.transfer_lun);
-    EXPECT_EQ(xfer_type, context_.transfer_type);
+    driver_test().RunInEnvironmentTypeContext([&](Environment& env) {
+      block_dev->BlockImplQueue(&op, CompletionCallback, &env.context());
+      sync_completion_wait(&env.context().completion, ZX_TIME_INFINITE);
+      sync_completion_reset(&env.context().completion);
+      EXPECT_EQ(lun, env.context().transfer_lun);
+      EXPECT_EQ(scsi::Opcode::UNMAP, env.context().transfer_type);
+    });
     ++lun;
   }
 }

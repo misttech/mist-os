@@ -9,21 +9,17 @@ use ffx_e2e_emu::IsolatedEmulator;
 async fn taking_lease_adds_lease_to_broker_inspect() {
     let emu = IsolatedEmulator::start("application-activity-test").await.unwrap();
 
-    emu.ffx(&["power", "system-activity", "application-activity", "start"]).await.unwrap();
-
-    let increased_lease_count = loop {
-        std::thread::sleep(std::time::Duration::from_secs(1));
-        let increased_lease_count = dbg!(get_active_leases(&emu).await);
-        if !increased_lease_count.is_empty() {
-            break increased_lease_count;
-        }
-    };
-
+    // Start SAG. "stop" is a no-op since no application-activity lease exists at this point.
     emu.ffx(&["power", "system-activity", "application-activity", "stop"]).await.unwrap();
 
-    // Wait until the command exiting results in fewer leases being held.
+    std::thread::sleep(std::time::Duration::from_secs(1));
+    let lease_count = dbg!(get_active_leases(&emu).await);
+
+    emu.ffx(&["power", "system-activity", "application-activity", "start"]).await.unwrap();
+
+    // Wait until the command exiting results in more leases being held.
     loop {
-        if dbg!(get_active_leases(&emu).await).len() < increased_lease_count.len() {
+        if dbg!(get_active_leases(&emu).await).len() > lease_count.len() {
             break;
         }
         std::thread::sleep(std::time::Duration::from_secs(1));

@@ -5,6 +5,7 @@
 use fidl::client::QueryResponseFut;
 use futures::future::Future;
 use futures::io::{AsyncRead, AsyncSeek, SeekFrom};
+use futures::FutureExt;
 use std::cmp::min;
 use std::convert::TryInto as _;
 use std::io;
@@ -75,7 +76,9 @@ impl<R: AsyncGetSize + ?Sized + Unpin> Future for GetSize<'_, R> {
 pub struct AsyncFile {
     file: fio::FileProxy,
     read_at_state: ReadAtState,
-    get_attr_fut: Option<QueryResponseFut<(i32, fio::NodeAttributes)>>,
+    get_attributes_fut: Option<
+        QueryResponseFut<Result<(fio::MutableNodeAttributes, fio::ImmutableNodeAttributes), i32>>,
+    >,
 }
 
 #[derive(Debug)]
@@ -94,7 +97,7 @@ enum ReadAtState {
 
 impl AsyncFile {
     pub fn from_proxy(file: fio::FileProxy) -> Self {
-        Self { file, read_at_state: ReadAtState::Empty, get_attr_fut: None }
+        Self { file, read_at_state: ReadAtState::Empty, get_attributes_fut: None }
     }
 }
 
@@ -183,20 +186,25 @@ impl AsyncReadAt for AsyncFile {
 
 impl AsyncGetSize for AsyncFile {
     fn poll_get_size(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<u64>> {
-        if self.get_attr_fut.is_none() {
-            self.get_attr_fut = Some(self.file.get_attr());
+        if self.get_attributes_fut.is_none() {
+            self.get_attributes_fut =
+                Some(self.file.get_attributes(fio::NodeAttributesQuery::CONTENT_SIZE));
         }
-        let fut = self.get_attr_fut.as_mut().unwrap();
-        let result = futures::ready!(Pin::new(fut).poll(cx));
-        self.get_attr_fut = None;
-        match result {
-            Ok((status, attr)) => {
-                if let Err(e) = zx_status::Status::ok(status) {
-                    return Poll::Ready(Err(e.into_io_error()));
+        let fut = self.get_attributes_fut.as_mut().unwrap();
+        let get_attributes_fut_result = futures::ready!(fut.poll_unpin(cx));
+        self.get_attributes_fut = None;
+        match get_attributes_fut_result {
+            Ok(get_attributes_response) => match get_attributes_response {
+                Ok((_mutable_attr, immutable_attr)) => {
+                    if let Some(content_size) = immutable_attr.content_size {
+                        return Poll::Ready(Ok(content_size));
+                    }
+                    return Poll::Ready(Err(zx_status::Status::NOT_SUPPORTED.into_io_error()));
                 }
-
-                return Poll::Ready(Ok(attr.content_size));
-            }
+                Err(status) => {
+                    return Poll::Ready(Err(zx_status::Status::from_raw(status).into_io_error()));
+                }
+            },
             Err(e) => {
                 return Poll::Ready(Err(std::io::Error::new(std::io::ErrorKind::Other, e)));
             }
@@ -611,8 +619,7 @@ mod tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("get_size_file_with_contents").to_str().unwrap().to_owned();
         let () = file::write_in_namespace(&path, contents).await.unwrap();
-        let file =
-            file::open_in_namespace_deprecated(&path, fio::OpenFlags::RIGHT_READABLE).unwrap();
+        let file = file::open_in_namespace(&path, fio::PERM_READABLE).unwrap();
 
         let mut reader = AsyncFile::from_proxy(file);
 
@@ -633,11 +640,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn get_size_changing_size() {
         let (mut file, path) = NamedTempFile::new().unwrap().into_parts();
-        let proxy = file::open_in_namespace_deprecated(
-            path.to_str().unwrap(),
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .unwrap();
+        let proxy = file::open_in_namespace(path.to_str().unwrap(), fio::PERM_READABLE).unwrap();
 
         let mut reader = AsyncFile::from_proxy(proxy);
 

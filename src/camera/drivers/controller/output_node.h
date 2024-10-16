@@ -42,7 +42,7 @@ class OutputNode : public ProcessNode, public fuchsia::camera2::Stream {
     // Invoked when the client calls fuchsia::camera2::Stream.GetImageFormats
     fit::function<void(GetImageFormatsCallback)> get_image_formats;
     // Invoked when the client calls fuchsia::camera2::Stream.GetBuffers
-    fit::function<void(GetBuffersCallback)> get_buffers;
+    fit::function<void(GetBuffers2Callback)> get_buffers;
   };
 
   // Creates an |OutputNode| object.
@@ -65,6 +65,7 @@ class OutputNode : public ProcessNode, public fuchsia::camera2::Stream {
                            SetRegionOfInterestCallback callback) override;
   void SetImageFormat(uint32_t image_format_index, SetImageFormatCallback callback) override;
   void GetImageFormats(GetImageFormatsCallback callback) override;
+  void GetBuffers2(GetBuffers2Callback callback) override;
   void GetBuffers(GetBuffersCallback callback) override;
 
  private:

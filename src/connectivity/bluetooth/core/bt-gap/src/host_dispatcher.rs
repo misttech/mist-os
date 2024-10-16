@@ -34,7 +34,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Weak};
 use std::task::{Context, Poll, Waker};
 use tracing::{debug, error, info, trace, warn};
-use zx::{self as zx, AsHandleRef, Duration};
+use zx::{self as zx, AsHandleRef, MonotonicDuration};
 
 use crate::host_device::{HostDevice, HostDiscoverableSession, HostListener};
 use crate::services::pairing::pairing_dispatcher::{PairingDispatcher, PairingDispatcherHandle};
@@ -1194,7 +1194,7 @@ impl WhenHostsFound {
     // Constructs an WhenHostsFound that completes at the latest after HOST_INIT_TIMEOUT seconds.
     fn new(hd: HostDispatcher) -> impl Future<Output = HostDispatcher> {
         WhenHostsFound { hd: hd.clone(), waker_key: None }.on_timeout(
-            Duration::from_seconds(HOST_INIT_TIMEOUT).after_now(),
+            MonotonicDuration::from_seconds(HOST_INIT_TIMEOUT).after_now(),
             move || {
                 {
                     let mut inner = hd.state.write();

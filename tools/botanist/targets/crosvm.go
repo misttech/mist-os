@@ -1,0 +1,103 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+package targets
+
+import (
+	"context"
+	"fmt"
+	"os"
+
+	"go.fuchsia.dev/fuchsia/tools/qemu"
+)
+
+type Crosvm struct {
+	emulator
+}
+
+func NewCrosvm(ctx context.Context, config EmulatorConfig, opts Options) (*Crosvm, error) {
+	emu, err := newEmulator(ctx, "crosvm", config, opts, &crosvmCommandBuilder{})
+	if err != nil {
+		return nil, err
+	}
+	return &Crosvm{*emu}, nil
+}
+
+type crosvmCommandBuilder struct {
+	binary     string
+	kernel     string
+	kernelArgs []string
+	cmd        []string
+}
+
+func (b *crosvmCommandBuilder) SetBinary(binary string) {
+	b.binary = binary
+}
+
+func (b *crosvmCommandBuilder) SetKernel(kernel string) {
+	b.kernel = kernel
+}
+
+func (b *crosvmCommandBuilder) SetInitrd(zbi string) {
+	b.cmd = append(b.cmd, "--initrd", zbi)
+}
+
+func (b *crosvmCommandBuilder) SetUEFIVolumes(string, string, string) {}
+
+func (b *crosvmCommandBuilder) SetTarget(_ Target, kvm bool) {
+	if !kvm {
+		panic("crosvm requires KVM")
+	}
+}
+
+func (b *crosvmCommandBuilder) SetMemory(mb int) {
+	b.cmd = append(b.cmd, "--mem", fmt.Sprintf("size=%d", mb))
+}
+
+func (b *crosvmCommandBuilder) SetCPUCount(count int) {
+	b.cmd = append(b.cmd, "--cpus", fmt.Sprintf("num-cores=%d", count))
+}
+
+func (b *crosvmCommandBuilder) AddSerial() {
+	b.cmd = append(b.cmd, "--serial", "type=stdout")
+}
+
+func (b *crosvmCommandBuilder) AddBlockDevice(blk BlockDevice) {
+	b.cmd = append(b.cmd, "--block", fmt.Sprintf("path=%s,id=%s", blk.File, blk.ID))
+}
+
+func (b *crosvmCommandBuilder) AddTapNetwork(mac string, interfaceName string) {
+	b.cmd = append(b.cmd, "--net", fmt.Sprintf("tap-name=%s,mac=%s", interfaceName, mac))
+}
+
+func (b *crosvmCommandBuilder) AddKernelArg(arg string) {
+	b.kernelArgs = append(b.kernelArgs, arg)
+}
+
+func (b *crosvmCommandBuilder) HasFFXSupport() bool { return false }
+
+func (b *crosvmCommandBuilder) BuildFFXConfig() (*qemu.Config, error) {
+	return nil, nil
+}
+
+func (b *crosvmCommandBuilder) BuildInvocation() ([]string, error) {
+	// An empty directory where crosvm can do chroot for jailing each virtio
+	// device.
+	pivotRoot, err := os.MkdirTemp("", "crosvm-pivot-root")
+	if err != nil {
+		return nil, fmt.Errorf("unable to make crosvm pivot root: %w", err)
+	}
+
+	cmd := []string{
+		b.binary,
+		"run",
+		"--pivot-root", pivotRoot,
+	}
+	cmd = append(cmd, b.cmd...)
+	for _, arg := range b.kernelArgs {
+		cmd = append(cmd, "--params", arg)
+	}
+	cmd = append(cmd, b.kernel)
+	return cmd, nil
+}

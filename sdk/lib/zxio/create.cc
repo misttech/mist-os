@@ -85,7 +85,7 @@ class ZxioCreateOnOpenEventHandler final : public fidl::WireSyncEventHandler<fio
   void OnRepresentation(fidl::WireEvent<fio::Node::OnRepresentation>* event) final {
     status_ = ZX_ERR_NOT_SUPPORTED;
   }
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(24)
   void handle_unknown_event(fidl::UnknownEventMetadata<fio::Node> metadata) override {}
 #endif
 
@@ -108,7 +108,7 @@ class ZxioCreateOnRepresentationEventHandler final : public fidl::WireSyncEventH
   void OnRepresentation(fidl::WireEvent<fio::Node::OnRepresentation>* event) final {
     status_ = zxio_create_with_representation(std::move(node_), *event, attr_, storage_);
   }
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(24)
   void handle_unknown_event(fidl::UnknownEventMetadata<fio::Node> metadata) override {}
 #endif
 

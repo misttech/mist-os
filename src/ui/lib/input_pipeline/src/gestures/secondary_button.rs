@@ -28,7 +28,7 @@ pub(super) struct InitialContender {
 
     /// The timeout of the edge of contact-button down, button down-button up,
     /// The recognizer will leave edge state either timeout or motion detected.
-    pub(super) button_change_state_timeout: zx::Duration,
+    pub(super) button_change_state_timeout: zx::MonotonicDuration,
 }
 
 /// The state when this recognizer has detected a single finger down.
@@ -47,7 +47,7 @@ struct OneFingerContactContender {
 
     /// The timeout of the edge of contact-button down, button down-button up,
     /// The recognizer will leave edge state either timeout or motion detected.
-    button_change_state_timeout: zx::Duration,
+    button_change_state_timeout: zx::MonotonicDuration,
 }
 
 /// The state when this recognizer has detected two fingers down.
@@ -66,7 +66,7 @@ struct TwoFingerContactContender {
 
     /// The timeout of the edge of contact-button down, button down-button up,
     /// The recognizer will leave edge state either timeout or motion detected.
-    button_change_state_timeout: zx::Duration,
+    button_change_state_timeout: zx::MonotonicDuration,
 }
 
 /// The state when this recognizer has detected a secondary button down, but the
@@ -86,7 +86,7 @@ struct MatchedContender {
 
     /// The timeout of the edge of contact-button down, button down-button up,
     /// The recognizer will leave edge state either timeout or motion detected.
-    button_change_state_timeout: zx::Duration,
+    button_change_state_timeout: zx::MonotonicDuration,
 }
 
 /// The state when this recognizer has won the contest.
@@ -104,7 +104,7 @@ struct ButtonDownWinner {
 
     /// The timeout of the edge of contact-button down, button down-button up,
     /// The recognizer will leave edge state either timeout or motion detected.
-    button_change_state_timeout: zx::Duration,
+    button_change_state_timeout: zx::MonotonicDuration,
 }
 
 /// The state when ButtonDownWinner got motion more than threshold to recognize as
@@ -120,7 +120,7 @@ struct DragWinner {
 
     /// The timeout of the edge of contact-button down, button down-button up,
     /// The recognizer will leave edge state either timeout or motion detected.
-    button_change_state_timeout: zx::Duration,
+    button_change_state_timeout: zx::MonotonicDuration,
 }
 
 /// The state when ButtonDownWinner / DragWinner got button up, this winner is
@@ -136,7 +136,7 @@ struct ButtonUpWinner {
 
     /// The timeout of the edge of contact-button down, button down-button up,
     /// The recognizer will leave edge state either timeout or motion detected.
-    button_change_state_timeout: zx::Duration,
+    button_change_state_timeout: zx::MonotonicDuration,
 }
 
 impl InitialContender {
@@ -627,7 +627,8 @@ mod test {
 
     const SPURIOUS_TO_INTENTIONAL_MOTION_THRESHOLD_MM: f32 = 10.0;
     const SPURIOUS_TO_INTENTIONAL_MOTION_THRESHOLD_BUTTON_CHANGE_MM: f32 = 20.0;
-    const BUTTON_CHANGE_STATE_TIMEOUT: zx::Duration = zx::Duration::from_seconds(1);
+    const BUTTON_CHANGE_STATE_TIMEOUT: zx::MonotonicDuration =
+        zx::MonotonicDuration::from_seconds(1);
 
     #[test_case(TouchpadEvent{
         timestamp: zx::MonotonicInstant::ZERO,
@@ -1101,7 +1102,7 @@ mod test {
         filtered_palm_contacts: vec![],
     };"move less than threshold in button change state")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::MonotonicInstant::ZERO + zx::Duration::from_millis(1500),
+        timestamp: zx::MonotonicInstant::ZERO + zx::MonotonicDuration::from_millis(1500),
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 9.0, y: 1.0}),
@@ -1119,7 +1120,7 @@ mod test {
         filtered_palm_contacts: vec![],
     };"move more than threshold in button change state")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::MonotonicInstant::ZERO + zx::Duration::from_millis(1500),
+        timestamp: zx::MonotonicInstant::ZERO + zx::MonotonicDuration::from_millis(1500),
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 11.0, y: 1.0}),
@@ -1173,7 +1174,7 @@ mod test {
         filtered_palm_contacts: vec![],
     };"move less than threshold in button change state")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::MonotonicInstant::ZERO + zx::Duration::from_millis(1500),
+        timestamp: zx::MonotonicInstant::ZERO + zx::MonotonicDuration::from_millis(1500),
         pressed_buttons: vec![1],
         contacts: vec![
             make_touch_contact(1, Position{x: 10.0, y: 1.0}),
@@ -1216,7 +1217,7 @@ mod test {
         filtered_palm_contacts: vec![],
     };"move more than threshold in button change state")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::MonotonicInstant::ZERO + zx::Duration::from_millis(1500),
+        timestamp: zx::MonotonicInstant::ZERO + zx::MonotonicDuration::from_millis(1500),
         pressed_buttons: vec![1],
         contacts: vec![
             make_touch_contact(1, Position{x: 11.0, y: 1.0}),
@@ -1395,7 +1396,7 @@ mod test {
     }
 
     #[test_case(TouchpadEvent{
-        timestamp: zx::MonotonicInstant::ZERO + zx::Duration::from_millis(1_001),
+        timestamp: zx::MonotonicInstant::ZERO + zx::MonotonicDuration::from_millis(1_001),
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 0.0, y: 0.0}),

@@ -238,6 +238,11 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             builder.set_config_capability(config.0, config.1)?;
         }
 
+        // Include SDHCI driver through a platform AIB.
+        if context.board_info.provides_feature("fuchsia::sdhci") {
+            builder.platform_bundle("sdhci_driver");
+        }
+
         Ok(())
     }
 }

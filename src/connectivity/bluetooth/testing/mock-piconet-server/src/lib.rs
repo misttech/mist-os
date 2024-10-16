@@ -15,7 +15,7 @@ use fuchsia_component_test::{
 use futures::stream::StreamExt;
 use futures::{TryFutureExt, TryStreamExt};
 use tracing::info;
-use zx::{self as zx, Duration};
+use zx::{self as zx, MonotonicDuration};
 use {
     fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_bredr_test as bredr_test,
     fidl_fuchsia_component_test as ftest,
@@ -30,8 +30,8 @@ use {
 ///   c) short enough to fail before the overall infra-imposed test timeout (currently 5 minutes)
 const TIMEOUT_SECONDS: i64 = 2 * 60;
 
-pub fn peer_observer_timeout() -> Duration {
-    Duration::from_seconds(TIMEOUT_SECONDS)
+pub fn peer_observer_timeout() -> MonotonicDuration {
+    MonotonicDuration::from_seconds(TIMEOUT_SECONDS)
 }
 
 static MOCK_PICONET_SERVER_URL: &str = "#meta/mock-piconet-server.cm";

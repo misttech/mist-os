@@ -42,7 +42,7 @@ impl StreamConfigOrTask {
 /// Number of frames within the duration.  This includes frames that end at exactly the duration.
 pub(crate) fn frames_from_duration(frames_per_second: usize, duration: fasync::Duration) -> usize {
     assert!(
-        duration >= zx::Duration::from_nanos(0),
+        duration >= zx::MonotonicDuration::from_nanos(0),
         "frames_from_duration is not defined for negative durations"
     );
     let mut frames = duration.into_seconds() * frames_per_second as i64;
@@ -94,7 +94,7 @@ pub struct SoftStreamConfig {
     frame_vmo: Arc<Mutex<frame_vmo::FrameVmo>>,
 
     /// The current delay that has been communicated exists after the audio is retrieved.
-    external_delay: zx::Duration,
+    external_delay: zx::MonotonicDuration,
 
     /// Replied to plugged state watch.
     plug_state_replied: bool,
@@ -145,8 +145,8 @@ impl SoftStreamConfig {
         product: &str,
         clock_domain: u32,
         pcm_format: fidl_fuchsia_media::PcmFormat,
-        packet_duration: zx::Duration,
-        initial_external_delay: zx::Duration,
+        packet_duration: zx::MonotonicDuration,
+        initial_external_delay: zx::MonotonicDuration,
     ) -> Result<(ClientEnd<StreamConfigMarker>, AudioFrameStream)> {
         let (client, soft_stream_config) = SoftStreamConfig::build(
             unique_id,
@@ -167,7 +167,7 @@ impl SoftStreamConfig {
         product: &str,
         clock_domain: u32,
         pcm_format: fidl_fuchsia_media::PcmFormat,
-        buffer: zx::Duration,
+        buffer: zx::MonotonicDuration,
     ) -> Result<(ClientEnd<StreamConfigMarker>, AudioFrameSink)> {
         let (client, soft_stream_config) = SoftStreamConfig::build(
             unique_id,
@@ -177,7 +177,7 @@ impl SoftStreamConfig {
             false,
             pcm_format,
             buffer,
-            zx::Duration::from_nanos(0),
+            zx::MonotonicDuration::from_nanos(0),
         )?;
         Ok((client, AudioFrameSink::new(soft_stream_config)))
     }
@@ -189,8 +189,8 @@ impl SoftStreamConfig {
         clock_domain: u32,
         is_output: bool,
         pcm_format: fidl_fuchsia_media::PcmFormat,
-        packet_duration: zx::Duration,
-        initial_external_delay: zx::Duration,
+        packet_duration: zx::MonotonicDuration,
+        initial_external_delay: zx::MonotonicDuration,
     ) -> Result<(ClientEnd<StreamConfigMarker>, SoftStreamConfig)> {
         if pcm_format.bits_per_sample % 8 != 0 {
             // Non-byte-aligned format not allowed.
@@ -251,14 +251,14 @@ impl SoftStreamConfig {
 
     /// Delay that is reported to the audio subsystem.
     /// Includes the buffered packets if this is an output, and the current external delay.
-    fn current_delay(&self) -> zx::Duration {
+    fn current_delay(&self) -> zx::MonotonicDuration {
         let packet_delay_nanos = if self.is_output {
             (i64::try_from(self.packet_frames).unwrap() * 1_000_000_000)
                 / self.frames_per_second() as i64
         } else {
             0
         };
-        zx::Duration::from_nanos(packet_delay_nanos) + self.external_delay
+        zx::MonotonicDuration::from_nanos(packet_delay_nanos) + self.external_delay
     }
 
     async fn process_requests(mut self) -> Result<()> {
@@ -530,8 +530,8 @@ pub(crate) mod tests {
             "UnitTest",
             TEST_CLOCK_DOMAIN,
             format,
-            zx::Duration::from_millis(100),
-            zx::Duration::from_millis(50),
+            zx::MonotonicDuration::from_millis(100),
+            zx::MonotonicDuration::from_millis(50),
         )
         .expect("should always build");
         test(exec, client.into_proxy().expect("channel should be available"), frame_stream)
@@ -545,21 +545,36 @@ pub(crate) mod tests {
         const ONE_FRAME_NANOS: i64 = 20833 + 1;
         const THREE_FRAME_NANOS: i64 = 20833 * 3 + 1;
 
-        assert_eq!(0, frames_from_duration(FPS, zx::Duration::from_nanos(0)));
+        assert_eq!(0, frames_from_duration(FPS, zx::MonotonicDuration::from_nanos(0)));
 
-        assert_eq!(0, frames_from_duration(FPS, zx::Duration::from_nanos(ONE_FRAME_NANOS - 1)));
-        assert_eq!(1, frames_from_duration(FPS, zx::Duration::from_nanos(ONE_FRAME_NANOS)));
+        assert_eq!(
+            0,
+            frames_from_duration(FPS, zx::MonotonicDuration::from_nanos(ONE_FRAME_NANOS - 1))
+        );
+        assert_eq!(
+            1,
+            frames_from_duration(FPS, zx::MonotonicDuration::from_nanos(ONE_FRAME_NANOS))
+        );
 
         // Three frames is an exact number of nanoseconds, we should be able to get an exact number
         // of frames from the duration.
-        assert_eq!(2, frames_from_duration(FPS, zx::Duration::from_nanos(THREE_FRAME_NANOS - 1)));
-        assert_eq!(3, frames_from_duration(FPS, zx::Duration::from_nanos(THREE_FRAME_NANOS)));
-        assert_eq!(3, frames_from_duration(FPS, zx::Duration::from_nanos(THREE_FRAME_NANOS + 1)));
+        assert_eq!(
+            2,
+            frames_from_duration(FPS, zx::MonotonicDuration::from_nanos(THREE_FRAME_NANOS - 1))
+        );
+        assert_eq!(
+            3,
+            frames_from_duration(FPS, zx::MonotonicDuration::from_nanos(THREE_FRAME_NANOS))
+        );
+        assert_eq!(
+            3,
+            frames_from_duration(FPS, zx::MonotonicDuration::from_nanos(THREE_FRAME_NANOS + 1))
+        );
 
-        assert_eq!(FPS, frames_from_duration(FPS, zx::Duration::from_seconds(1)));
-        assert_eq!(72000, frames_from_duration(FPS, zx::Duration::from_millis(1500)));
+        assert_eq!(FPS, frames_from_duration(FPS, zx::MonotonicDuration::from_seconds(1)));
+        assert_eq!(72000, frames_from_duration(FPS, zx::MonotonicDuration::from_millis(1500)));
 
-        assert_eq!(10660, frames_from_duration(FPS, zx::Duration::from_nanos(222084000)));
+        assert_eq!(10660, frames_from_duration(FPS, zx::MonotonicDuration::from_nanos(222084000)));
     }
 
     #[fuchsia::test]
@@ -579,8 +594,8 @@ pub(crate) mod tests {
             TEST_CLOCK_DOMAIN,
             true,
             format,
-            zx::Duration::from_millis(100),
-            zx::Duration::from_millis(50),
+            zx::MonotonicDuration::from_millis(100),
+            zx::MonotonicDuration::from_millis(50),
         )
         .expect("should always build");
 
@@ -662,7 +677,9 @@ pub(crate) mod tests {
 
         // Now advance in between notifications, with a 2 seconds total in the ring buffer
         // and 10 notifications per ring we can get watch notifications every 200 msecs.
-        exec.set_fake_time(fasync::MonotonicInstant::after(zx::Duration::from_millis(201)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(zx::MonotonicDuration::from_millis(
+            201,
+        )));
         let _ = exec.wake_expired_timers();
         // Each frame is 100ms, there should be two of them ready now.
         assert_eq!(2, frames_ready(&mut exec, &mut frame_stream));
@@ -673,7 +690,9 @@ pub(crate) mod tests {
         let mut position_info = ring_buffer.watch_clock_recovery_position_info();
         let result = exec.run_until_stalled(&mut position_info);
         assert!(!result.is_ready());
-        exec.set_fake_time(fasync::MonotonicInstant::after(zx::Duration::from_millis(201)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(zx::MonotonicDuration::from_millis(
+            201,
+        )));
         let _ = exec.wake_expired_timers();
         assert_eq!(2, frames_ready(&mut exec, &mut frame_stream));
         let result = exec.run_until_stalled(&mut position_info);
@@ -683,7 +702,9 @@ pub(crate) mod tests {
         let mut position_info = ring_buffer.watch_clock_recovery_position_info();
         let result = exec.run_until_stalled(&mut position_info);
         assert!(!result.is_ready());
-        exec.set_fake_time(fasync::MonotonicInstant::after(zx::Duration::from_millis(201)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(zx::MonotonicDuration::from_millis(
+            201,
+        )));
         let _ = exec.wake_expired_timers();
         assert_eq!(2, frames_ready(&mut exec, &mut frame_stream));
         let result = exec.run_until_stalled(&mut position_info);
@@ -728,7 +749,7 @@ pub(crate) mod tests {
         // Should account for the external_delay here.
         match result {
             Poll::Ready(Ok(DelayInfo { internal_delay: Some(x), .. })) => {
-                assert_eq!(zx::Duration::from_millis(150).into_nanos(), x)
+                assert_eq!(zx::MonotonicDuration::from_millis(150).into_nanos(), x)
             }
             other => panic!("Expected the correct delay info, got {other:?}"),
         }

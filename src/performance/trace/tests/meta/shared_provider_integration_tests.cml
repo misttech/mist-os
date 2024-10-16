@@ -33,11 +33,4 @@
             protocol: [ "fuchsia.process.Launcher" ],
         },
     ],
-    offer: [
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: "#trace_manager",
-        },
-    ],
 }

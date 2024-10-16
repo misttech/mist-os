@@ -11,12 +11,16 @@ use {fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio};
 
 #[fuchsia::main]
 async fn main() -> Result<()> {
-    let ramdisk =
+    let dtr_exposes = vec![
         fidl_fuchsia_component_test::Capability::Service(fidl_fuchsia_component_test::Service {
             name: Some("fuchsia.hardware.ramdisk.Service".to_owned()),
             ..Default::default()
-        });
-    let dtr_exposes = vec![ramdisk];
+        }),
+        fidl_fuchsia_component_test::Capability::Service(fidl_fuchsia_component_test::Service {
+            name: Some("fuchsia.hardware.block.volume.Service".to_owned()),
+            ..Default::default()
+        }),
+    ];
 
     // Create the RealmBuilder.
     let builder = RealmBuilder::new().await?;

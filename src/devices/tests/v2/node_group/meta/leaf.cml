@@ -10,6 +10,7 @@
         runner: "driver",
         binary: "driver/nodegroup_leaf.so",
         bind: "meta/bind/leaf.bindbc",
+        service_connect_validation: "true",
     },
     use: [
         { protocol: "fuchsia.nodegroup.test.Waiter" },

@@ -340,26 +340,42 @@ fxl::RefPtr<AsyncOutputBuffer> FormatScopeJoin(const ExprValue& task_runner,
                                                const FormatFutureOptions& options,
                                                const fxl::RefPtr<EvalContext>& context,
                                                int indent) {
-  ErrOrValue arc_inner_ptr = ResolveNonstaticMember(context, task_runner, {"scope", "inner", "inner", "ptr", "pointer"});
+  ErrOrValue arc_inner_ptr =
+      ResolveNonstaticMember(context, task_runner, {"scope", "inner", "inner", "ptr", "pointer"});
   if (arc_inner_ptr.has_error())
     return FormatError("Invalid scope::Join", arc_inner_ptr.err());
   auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
   out->Append("fuchsia_async::scope::Join(", TextForegroundColor::kGray);
-  out->Append(to_hex_string(arc_inner_ptr.value().GetAs<TargetPointer>()), TextForegroundColor::kGray);
+  out->Append(to_hex_string(arc_inner_ptr.value().GetAs<TargetPointer>()),
+              TextForegroundColor::kGray);
   out->Complete(")\n", TextForegroundColor::kGray);
   return out;
 }
 
 fxl::RefPtr<AsyncOutputBuffer> FormatTask(const ExprValue& task_runner,
                                           const FormatFutureOptions& options,
-                                          const fxl::RefPtr<EvalContext>& context,
-                                          int indent) {
-  ErrOrValue id = ResolveNonstaticMember(context, task_runner, {"task_id"});
+                                          const fxl::RefPtr<EvalContext>& context, int indent) {
+  ErrOrValue id = ResolveNonstaticMember(context, task_runner, {"__0", "task_id"});
   uint64_t task_id = 0;
   if (id.has_error() || id.value().PromoteTo64(&task_id).has_error())
     return FormatError("Invalid Task handle", id.err());
   auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
-  out->Complete("fuchsia_async::Task(id = " + std::to_string(task_id) + ")\n", TextForegroundColor::kGray);
+  out->Complete("fuchsia_async::Task(id = " + std::to_string(task_id) + ")\n",
+                TextForegroundColor::kGray);
+  return out;
+}
+
+fxl::RefPtr<AsyncOutputBuffer> FormatJoinHandle(const ExprValue& task_runner,
+                                                const FormatFutureOptions& options,
+                                                const fxl::RefPtr<EvalContext>& context,
+                                                int indent) {
+  ErrOrValue id = ResolveNonstaticMember(context, task_runner, {"task_id"});
+  uint64_t task_id = 0;
+  if (id.has_error() || id.value().PromoteTo64(&task_id).has_error())
+    return FormatError("Invalid JoinHandle", id.err());
+  auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
+  out->Complete("fuchsia_async::JoinHandle(id = " + std::to_string(task_id) + ")\n",
+                TextForegroundColor::kGray);
   return out;
 }
 
@@ -396,6 +412,8 @@ fxl::RefPtr<AsyncOutputBuffer> FormatFuture(const ExprValue& future,
     return FormatScopeJoin(future, options, context, indent);
   if (type == "fuchsia_async::runtime::fuchsia::task::Task")
     return FormatTask(future, options, context, indent);
+  if (type == "fuchsia_async::runtime::fuchsia::task::JoinHandle")
+    return FormatJoinHandle(future, options, context, indent);
   if (type == "futures_util::future::future::fuse::Fuse")
     return FormatFuse(future, options, context, indent);
   if (type == "futures_util::future::maybe_done::MaybeDone")
@@ -529,13 +547,11 @@ void FormatActiveTasksHashMapTuple(
 }
 
 // Iterate over items in a hashbrown HashMap of any type.
-template<typename Val>
-void IterateHashMap(const ExprValue& hashmap,
-                    const fxl::RefPtr<EvalContext>& context,
+template <typename Val>
+void IterateHashMap(const ExprValue& hashmap, const fxl::RefPtr<EvalContext>& context,
                     fit::function<void(const ExprValue&, fit::callback<void(Val)>)> each_cb,
                     fit::callback<void(ErrOr<std::vector<Val>>)> done_cb) {
-  if (StripTemplate(hashmap.type()->GetFullName()) !=
-      "hashbrown::map::HashMap") {
+  if (StripTemplate(hashmap.type()->GetFullName()) != "hashbrown::map::HashMap") {
     return done_cb(MakeError("Expect a HashMap, got " + hashmap.type()->GetFullName()));
   }
   // See |StdHashMapSyntheticProvider| in .../rustlib/etc/lldb_providers.py for the layout.
@@ -583,7 +599,8 @@ void IterateHashMap(const ExprValue& hashmap,
   uint64_t total_buckets_size = tuple_type->byte_size() * capacity;
   context->GetDataProvider()->GetMemoryAsync(
       ctrl - total_buckets_size, total_buckets_size + capacity,
-      [=, done_cb = std::move(done_cb), each_cb = std::move(each_cb)](const Err& err, std::vector<uint8_t> data) mutable {
+      [=, done_cb = std::move(done_cb), each_cb = std::move(each_cb)](
+          const Err& err, std::vector<uint8_t> data) mutable {
         if (err.has_error()) {
           return done_cb(MakeError("Invalid HashMap (8)", err));
         }
@@ -598,7 +615,8 @@ void IterateHashMap(const ExprValue& hashmap,
                           ExprValueSource(ctrl - (idx + 1) * tuple_type->byte_size()));
           each_cb(tuple, joiner->AddCallback());
         }
-        joiner->Ready([done_cb = std::move(done_cb)](std::vector<Val> val) mutable { done_cb(val); });
+        joiner->Ready(
+            [done_cb = std::move(done_cb)](std::vector<Val> val) mutable { done_cb(val); });
       });
 }
 
@@ -612,11 +630,10 @@ fxl::RefPtr<AsyncOutputBuffer> FormatActiveTasksHashMap(const ErrOrValue& hashma
   IterateHashMap<CallbackDataType>(
       hashmap.value(), context,
       [=](auto tuple, auto cb) {
-        FormatActiveTasksHashMapTuple(
-            tuple, options, context, indent,
-            [cb = std::move(cb)](auto task_id, auto output) mutable {
-              cb(std::make_pair(task_id, std::move(output)));
-            });
+        FormatActiveTasksHashMapTuple(tuple, options, context, indent,
+                                      [cb = std::move(cb)](auto task_id, auto output) mutable {
+                                        cb(std::make_pair(task_id, std::move(output)));
+                                      });
       },
       [out](ErrOr<std::vector<CallbackDataType>> value) {
         if (value.has_error()) {
@@ -635,8 +652,7 @@ fxl::RefPtr<AsyncOutputBuffer> FormatActiveTasksHashMap(const ErrOrValue& hashma
 
 fxl::RefPtr<AsyncOutputBuffer> FormatScope(const ErrOrValue& scope_state,
                                            const FormatFutureOptions& options,
-                                           const fxl::RefPtr<EvalContext>& context,
-                                           int indent) {
+                                           const fxl::RefPtr<EvalContext>& context, int indent) {
   if (scope_state.has_error()) {
     return FormatError("Cannot locate scope state", scope_state.err());
   }
@@ -647,49 +663,52 @@ fxl::RefPtr<AsyncOutputBuffer> FormatScope(const ErrOrValue& scope_state,
   auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
   out->Append(FormatActiveTasksHashMap(hashmap.value(), options, context, indent));
 
-  ErrOrValue children = ResolveNonstaticMember(context, scope_state.value(), {"children", "base", "map"});
+  ErrOrValue children =
+      ResolveNonstaticMember(context, scope_state.value(), {"children", "base", "map"});
   if (children.has_error()) {
     return FormatError("Cannot locate scope children", children.err());
   }
   IterateHashMap<fxl::RefPtr<AsyncOutputBuffer>>(
       children.value(), context,
       [=](auto tuple, auto cb) mutable {
-        ErrOrValue arc_inner_ptr = ResolveNonstaticMember(context, tuple, {"__0", "inner", "ptr", "pointer"});
+        ErrOrValue arc_inner_ptr =
+            ResolveNonstaticMember(context, tuple, {"__0", "inner", "ptr", "pointer"});
         if (arc_inner_ptr.has_error())
           return cb(FormatError("Invalid children tuple (1)", arc_inner_ptr.err()));
-        ResolvePointer(
-            context, arc_inner_ptr.value(), [=, cb = std::move(cb)](ErrOrValue arc_inner) mutable {
-              // TODO: Check strong count.
-              if (arc_inner.has_error())
-                return cb(FormatError("Invalid children tuple (2)", arc_inner.err()));
-              ErrOrValue child_state = ResolveNonstaticMember(context, arc_inner.value(), {"data", "state", "data", "value"});
-              if (child_state.has_error())
-                return cb(FormatError("Invalid children tuple (3)", child_state.err()));
+        ResolvePointer(context, arc_inner_ptr.value(),
+                       [=, cb = std::move(cb)](ErrOrValue arc_inner) mutable {
+                         // TODO: Check strong count.
+                         if (arc_inner.has_error())
+                           return cb(FormatError("Invalid children tuple (2)", arc_inner.err()));
+                         ErrOrValue child_state = ResolveNonstaticMember(
+                             context, arc_inner.value(), {"data", "state", "data", "value"});
+                         if (child_state.has_error())
+                           return cb(FormatError("Invalid children tuple (3)", child_state.err()));
 
-              auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
-              if (indent >= 3) {
-                out->Append(kAwaiteeMarker);
-                out->Append(std::string(indent - 3, ' '));
-              }
-              out->Append(Syntax::kStringBold, "Scope");
-              out->Append(Syntax::kNumberDim, "(");
-              out->Append(Syntax::kNumberDim, to_hex_string(arc_inner_ptr.value().GetAs<TargetPointer>()));
-              out->Append(Syntax::kNumberDim, ")\n");
-              out->Append(FormatScope(child_state, options, context, 3 + indent));
-              out->Complete();
-              cb(out);
-            });
+                         auto out = fxl::MakeRefCounted<AsyncOutputBuffer>();
+                         if (indent >= 3) {
+                           out->Append(kAwaiteeMarker);
+                           out->Append(std::string(indent - 3, ' '));
+                         }
+                         out->Append(Syntax::kStringBold, "Scope");
+                         out->Append(Syntax::kNumberDim, "(");
+                         out->Append(Syntax::kNumberDim,
+                                     to_hex_string(arc_inner_ptr.value().GetAs<TargetPointer>()));
+                         out->Append(Syntax::kNumberDim, ")\n");
+                         out->Append(FormatScope(child_state, options, context, 3 + indent));
+                         out->Complete();
+                         cb(out);
+                       });
       },
       [=](auto values) {
         if (values.has_error()) {
           return out->Complete(FormatError("Failed to iterate children", values.err()));
         }
-        for (auto& buf: values.value()) {
+        for (auto& buf : values.value()) {
           out->Append(buf);
         }
         out->Complete();
-      }
-  );
+      });
 
   return out;
 }

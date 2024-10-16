@@ -14,7 +14,7 @@ use futures::future::{abortable, select, Either};
 use futures::{pin_mut, select, stream, FutureExt, StreamExt, TryStreamExt};
 use std::sync::Arc;
 use tracing::warn;
-use zx::{Duration, MonotonicInstant, Status};
+use zx::{MonotonicDuration, MonotonicInstant, Status};
 use {
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_diagnostics as fdiagnostics,
     fidl_fuchsia_io as fio, fidl_fuchsia_test as ftest, fuchsia_async as fasync,
@@ -105,7 +105,8 @@ impl TestServer {
             }
         };
 
-        let end_time = MonotonicInstant::get() + Duration::from_seconds(spec.timeout_seconds);
+        let end_time =
+            MonotonicInstant::get() + MonotonicDuration::from_seconds(spec.timeout_seconds);
 
         while end_time > MonotonicInstant::get() {
             let start_time = MonotonicInstant::get();
@@ -147,9 +148,9 @@ impl TestServer {
                 }
             }
 
-            let sleep_time = Duration::from_seconds(1);
+            let sleep_time = MonotonicDuration::from_seconds(1);
 
-            if end_time - MonotonicInstant::get() >= Duration::from_seconds(0) {
+            if end_time - MonotonicInstant::get() >= MonotonicDuration::from_seconds(0) {
                 test_stdout!(
                     logs,
                     "Retrying after {}s, timeout after {}s",

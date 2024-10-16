@@ -22,6 +22,7 @@ sdk_shared_library("vfs_internal") {
   # should only be a transitive dependency of clients. This allows for easier iteration to this
   # library while still complying with Fuchsia API guidelines and versioning requirements.
   category = "partner"
+  sdk_name = "vfs_internal"
   symbols_api = "vfs_internal.ifs"
   include_base = "//sdk"
   libcxx_linkage = "static"

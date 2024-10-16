@@ -32,7 +32,7 @@ zx::result<std::unique_ptr<VsyncReceiver>> VsyncReceiver::Create(
   ZX_DEBUG_ASSERT(platform_device.is_valid());
 
   zx::result<zx::interrupt> vsync_irq_result =
-      GetInterrupt(InterruptResourceIndex::kViu1Vsync, platform_device);
+      GetInterrupt(kInterruptNameViu1Vsync, platform_device);
   if (vsync_irq_result.is_error()) {
     return vsync_irq_result.take_error();
   }

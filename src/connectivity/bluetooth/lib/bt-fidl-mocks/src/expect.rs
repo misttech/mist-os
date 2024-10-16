@@ -6,7 +6,7 @@ use anyhow::{format_err, Error};
 use fidl::endpoints::RequestStream;
 use fuchsia_async::{DurationExt, TimeoutExt};
 use futures::{TryStream, TryStreamExt};
-use zx::Duration;
+use zx::MonotonicDuration;
 
 /// Represents the status of an expectation over a FIDL request stream.
 pub(crate) enum Status<T> {
@@ -18,7 +18,7 @@ pub(crate) enum Status<T> {
 /// until the handler is satisfied or the provided timeout expires.
 pub(crate) async fn expect_call<H, T, R, S>(
     stream: &mut S,
-    timeout: Duration,
+    timeout: MonotonicDuration,
     mut handler: H,
 ) -> Result<T, Error>
 where
@@ -58,7 +58,7 @@ mod tests {
         mut stream: AccessRequestStream,
         expected_name: String,
     ) -> Result<(), Error> {
-        expect_call(&mut stream, zx::Duration::from_millis(500), move |req| match req {
+        expect_call(&mut stream, zx::MonotonicDuration::from_millis(500), move |req| match req {
             AccessRequest::SetLocalName { name, control_handle: _ } => {
                 if name == expected_name {
                     Ok(Status::Satisfied(()))

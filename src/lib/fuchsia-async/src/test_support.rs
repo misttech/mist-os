@@ -46,6 +46,9 @@ pub trait TestResult: Sized {
         test: F,
         cfg: Config,
     ) -> Poll<Self>;
+
+    /// Whether the result is successful.
+    fn is_ok(&self) -> bool;
 }
 
 /// Defines how to compose multiple test runs for a kind of test result in a multithreaded executor.
@@ -56,6 +59,9 @@ pub trait MultithreadedTestResult: Sized {
         threads: usize,
         cfg: Config,
     ) -> Self;
+
+    /// Whether the result is successful.
+    fn is_ok(&self) -> bool;
 }
 
 impl<E: 'static + std::fmt::Debug> TestResult for Result<(), E> {
@@ -91,6 +97,10 @@ impl<E: 'static + std::fmt::Debug> TestResult for Result<(), E> {
                 .try_for_each_concurrent(cfg.max_concurrency, apply_timeout!(cfg, test)),
         )
     }
+
+    fn is_ok(&self) -> bool {
+        Result::is_ok(self)
+    }
 }
 
 impl<E: 'static + Send> MultithreadedTestResult for Result<(), E> {
@@ -104,6 +114,10 @@ impl<E: 'static + Send> MultithreadedTestResult for Result<(), E> {
                 .map(Ok)
                 .try_for_each_concurrent(cfg.max_concurrency, apply_timeout!(cfg, test)),
         )
+    }
+
+    fn is_ok(&self) -> bool {
+        Result::is_ok(self)
     }
 }
 
@@ -142,6 +156,10 @@ impl TestResult for () {
             )
         }
     }
+
+    fn is_ok(&self) -> bool {
+        true
+    }
 }
 
 impl MultithreadedTestResult for () {
@@ -154,6 +172,10 @@ impl MultithreadedTestResult for () {
             stream::iter(0..cfg.repeat_count)
                 .for_each_concurrent(cfg.max_concurrency, apply_timeout!(cfg, test)),
         )
+    }
+
+    fn is_ok(&self) -> bool {
+        true
     }
 }
 

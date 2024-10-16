@@ -235,6 +235,17 @@ impl<PS: ParseStrategy> Policy<PS> {
         self.0.fs_use_label_and_type(fs_type)
     }
 
+    /// If there is a genfscon statement for the given filesystem type, returns the associated
+    /// [`SecurityContext`].
+    pub fn genfscon_label_for_fs_and_path(
+        &self,
+        fs_type: NullessByteStr<'_>,
+        node_path: NullessByteStr<'_>,
+        class_id: Option<ClassId>,
+    ) -> Option<SecurityContext> {
+        self.0.genfscon_label_for_fs_and_path(fs_type, node_path, class_id)
+    }
+
     /// Returns the [`SecurityContext`] defined by this policy for the specified
     /// well-known (or "initial") Id.
     pub fn initial_context(&self, id: sc::InitialSid) -> security_context::SecurityContext {

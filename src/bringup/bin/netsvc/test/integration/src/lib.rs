@@ -111,7 +111,8 @@ where
                         let messages_gen = (1..).map(|v| fidl_fuchsia_logger::LogMessage {
                             pid: LOG_MSG_PID,
                             tid: LOG_MSG_TID,
-                            time: zx::Duration::from_seconds(v).into_nanos(),
+                            time: zx::BootInstant::from_nanos(
+                                zx::BootDuration::from_seconds(v).into_nanos()),
                             severity: fidl_fuchsia_logger::LOG_LEVEL_DEFAULT.into_primitive().into(),
                             dropped_logs: 0,
                             tags: vec![LOG_MSG_TAG.to_string()],
@@ -584,7 +585,7 @@ async fn discover(sock: &fuchsia_async::net::UdpSocket, scope_id: u32) -> std::n
     // the socket set up. The safe way is to send queries periodically in case
     // netsvc misses our first query to prevent flakes.
     let mut send_interval = futures::stream::once(futures::future::ready(()))
-        .chain(fuchsia_async::Interval::new(zx::Duration::from_seconds(1)));
+        .chain(fuchsia_async::Interval::new(zx::MonotonicDuration::from_seconds(1)));
 
     let mut buf = [0; BUFFER_SIZE];
 
@@ -1098,7 +1099,7 @@ async fn pave(image_name: &str, sock: fuchsia_async::net::UdpSocket, scope_id: u
                 assert_eq!(e.error(), tftp::TftpError::Busy, "unexpected error {:?}", e);
                 println!("paver is busy...");
                 let () = fuchsia_async::Timer::new(fuchsia_async::MonotonicInstant::after(
-                    zx::Duration::from_millis(10),
+                    zx::MonotonicDuration::from_millis(10),
                 ))
                 .await;
             }
@@ -1337,7 +1338,7 @@ async fn retransmits_acks(name: &str) {
             })
             .collect::<()>();
 
-        fuchsia_async::Interval::new(zx::Duration::from_millis(200))
+        fuchsia_async::Interval::new(zx::MonotonicDuration::from_millis(200))
             .then(|()| async {
                 let contents = pave_image_contents(BLOCK_SIZE);
                 let contents = contents.into_iter().take(WINDOW_SIZE.into());

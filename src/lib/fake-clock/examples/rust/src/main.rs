@@ -42,7 +42,7 @@ async fn handle_requests_for_stream(stream: ExampleRequestStream) -> Result<(), 
                 ExampleRequest::WaitFor { duration, responder } => {
                     let () = named_timer::NamedTimer::new(
                         &DEADLINE_NAME,
-                        zx::Duration::from_nanos(duration),
+                        zx::MonotonicDuration::from_nanos(duration),
                     )
                     .await;
                     responder.send()

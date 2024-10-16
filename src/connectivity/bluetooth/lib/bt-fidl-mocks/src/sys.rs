@@ -10,16 +10,16 @@ use fidl_fuchsia_bluetooth_sys::{
     InputCapability, OutputCapability, PairingDelegateProxy, PairingMarker, PairingOptions,
     PairingProxy, PairingRequest, PairingRequestStream,
 };
-use zx::Duration;
+use zx::MonotonicDuration;
 
 /// Provides a simple mock implementation of `fuchsia.bluetooth.sys.Pairing`.
 pub struct PairingMock {
     stream: PairingRequestStream,
-    timeout: Duration,
+    timeout: MonotonicDuration,
 }
 
 impl PairingMock {
-    pub fn new(timeout: Duration) -> Result<(PairingProxy, PairingMock), Error> {
+    pub fn new(timeout: MonotonicDuration) -> Result<(PairingProxy, PairingMock), Error> {
         let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<PairingMarker>()?;
         Ok((proxy, PairingMock { stream, timeout }))
     }
@@ -44,11 +44,11 @@ impl PairingMock {
 /// Provides a simple mock implementation of `fuchsia.bluetooth.sys.Access`.
 pub struct AccessMock {
     stream: AccessRequestStream,
-    timeout: Duration,
+    timeout: MonotonicDuration,
 }
 
 impl AccessMock {
-    pub fn new(timeout: Duration) -> Result<(AccessProxy, AccessMock), Error> {
+    pub fn new(timeout: MonotonicDuration) -> Result<(AccessProxy, AccessMock), Error> {
         let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<AccessMarker>()?;
         Ok((proxy, AccessMock { stream, timeout }))
     }

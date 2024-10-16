@@ -29,7 +29,7 @@ use vfs::name::Name;
 use vfs::path::Path;
 use vfs::remote::remote_dir;
 use vfs::service::endpoint;
-use zx::Duration;
+use zx::MonotonicDuration;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
 
 mod service;
@@ -653,7 +653,10 @@ impl<ServiceObjTy: ServiceObjTrait> ServiceFs<ServiceObjTy> {
     /// of FIDL connection requests in a typical component. By contrast, [`StallableServiceFs`]
     /// yields an enum of either the request, or the unbound outgoing directory endpoint,
     /// allowing you to escrow it back to `component_manager` before exiting the component.
-    pub fn until_stalled(self, debounce_interval: Duration) -> StallableServiceFs<ServiceObjTy> {
+    pub fn until_stalled(
+        self,
+        debounce_interval: MonotonicDuration,
+    ) -> StallableServiceFs<ServiceObjTy> {
         StallableServiceFs::<ServiceObjTy>::new(self, debounce_interval)
     }
 }

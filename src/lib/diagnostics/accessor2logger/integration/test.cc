@@ -83,7 +83,7 @@ TEST(Accessor2Logger, ConversionWorks) {
 
   ASSERT_EQ(logs.size(), EXPECTED_LOGS);
 
-  EXPECT_GT(logs[0].time, 0u);
+  EXPECT_GT(logs[0].time.get(), 0u);
   EXPECT_GT(logs[0].pid, 0u);
   EXPECT_GT(logs[0].tid, 0u);
   EXPECT_EQ(logs[0].msg, "[test.cc(25)] Hello info");
@@ -91,7 +91,7 @@ TEST(Accessor2Logger, ConversionWorks) {
   EXPECT_EQ(logs[0].tags[0], TAG);
   EXPECT_EQ(logs[0].severity, static_cast<int8_t>(fuchsia::logger::LogLevelFilter::INFO));
 
-  EXPECT_GT(logs[1].time, 0u);
+  EXPECT_GT(logs[1].time.get(), 0u);
   EXPECT_GT(logs[1].pid, 0u);
   EXPECT_GT(logs[1].tid, 0u);
   EXPECT_EQ(logs[1].msg,
@@ -100,7 +100,7 @@ TEST(Accessor2Logger, ConversionWorks) {
   EXPECT_EQ(logs[1].tags[0], TAG);
   EXPECT_EQ(logs[1].severity, static_cast<int8_t>(fuchsia::logger::LogLevelFilter::WARN));
 
-  EXPECT_GT(logs[2].time, 0u);
+  EXPECT_GT(logs[2].time.get(), 0u);
   EXPECT_GT(logs[2].pid, 0u);
   EXPECT_GT(logs[2].tid, 0u);
   EXPECT_EQ(logs[2].msg,

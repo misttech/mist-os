@@ -5,12 +5,6 @@
 library fuchsia.io.test;
 
 using fuchsia.io;
-using zx;
-
-// TODO(https://fxbug.dev/42109125): Implement full testing framework. For now, we are
-// hard-coding the desired directory layout manually in separate "Get"
-// functions. In the next step, we would want to have a protocol to describe
-// the intended directory layout setup, and integrate io2 connections.
 
 /// Conformance test harnesses will implement this protocol to setup its
 /// associated filesystem servers with the described directory layout,
@@ -30,12 +24,12 @@ using zx;
 /// See `src/storage/conformance/README.md` for an overview of io conformance
 /// testing.
 ///
-/// `Io1Config` lets the test harness modulate the set of expected outcomes and
+/// `HarnessConfig` lets the test harness modulate the set of expected outcomes and
 /// behaviors validated by the test suite, by declaring specific properties
 /// about the filesystem implementation. For example, setting [`ImmutableFile`]
 /// to true informs the test suites that files hosted by this harness do not
 /// support mutation.
-type Io1Config = struct {
+type HarnessConfig = struct {
     /// ExecutableFile objects are supported.
     supports_executable_file bool;
 
@@ -51,9 +45,6 @@ type Io1Config = struct {
     /// GetToken is supported.
     supports_get_token bool;
 
-    /// Directories support [`fuchsia.io/Directory.Open3`].
-    supports_open3 bool;
-
     /// Supports fuchsia.io's LinkInto method.
     supports_link_into bool;
 
@@ -66,21 +57,24 @@ type Io1Config = struct {
 
     /// Directories support creating files, Rename, Link, and Unlink.
     supports_modify_directory bool;
+
+    /// Supports services.
+    supports_services bool;
 };
 
 /// Directory entries should support opening with any combination of read/write/execute rights.
 type Directory = resource struct {
     /// Name not required for root directory.
-    name string;
+    name string:fuchsia.io.MAX_NAME_LENGTH;
 
     /// Nullable to sidestep recursion rules. Don't actually supply nulls.
-    entries vector<DirectoryEntry:optional>;
+    entries vector<DirectoryEntry:optional>:MAX;
 };
 
 /// Remote directory which forwards FIDL requests from the server to the specified directory.
 type RemoteDirectory = resource struct {
     /// Name not required for root directory.
-    name string;
+    name string:fuchsia.io.MAX_NAME_LENGTH;
 
     /// Remote client to forward Directory requests to.
     remote_client client_end:fuchsia.io.Directory;
@@ -93,7 +87,7 @@ type RemoteDirectory = resource struct {
 ///
 /// If executable files are required, use ExecutableFile instead.
 type File = struct {
-    name string;
+    name string:fuchsia.io.MAX_NAME_LENGTH;
     contents vector<uint8>:MAX;
 };
 
@@ -106,7 +100,7 @@ type File = struct {
 /// As the conformance tests verify W^X enforcement, opening an ExecutableFile with RIGHT_WRITABLE
 /// should fail with ACCESS_DENIED. If writable files are required, use File instead.
 type ExecutableFile = struct {
-    name string;
+    name string:fuchsia.io.MAX_NAME_LENGTH;
 };
 
 type DirectoryEntry = strict resource union {
@@ -117,10 +111,10 @@ type DirectoryEntry = strict resource union {
 };
 
 @discoverable
-closed protocol Io1Harness {
+closed protocol TestHarness {
     /// Returns the list of properties of the filesystem.
     strict GetConfig() -> (struct {
-        config Io1Config;
+        config HarnessConfig;
     });
 
     /// Serves a directory with the given contents.
@@ -129,35 +123,17 @@ closed protocol Io1Harness {
     /// used for the test case. The root directory that is served (returned via
     /// `directory_request`) will have the equivalent contents, served with the
     /// given `flags`.
+    // TODO(https://fxbug.dev/324081103): Transition `flags` from `OpenFlags` to `Flags`.
     strict GetDirectory(resource struct {
         root Directory;
         flags fuchsia.io.OpenFlags;
         directory_request server_end:fuchsia.io.Directory;
     });
-};
 
-/// Stub harness api for the io2.fidl protocol.
-/// TODO(https://fxbug.dev/42122678): Add separate io2 test harness api once we come up with a
-/// good enough set of functions that we have enough flexibility to create
-/// variable directory structures to with explicit permission settings for tests.
-@discoverable
-closed protocol Io2Harness {
-    /// Prepares a test case with an empty directory. The directory metadata
-    /// and directory entires should be read-only.
-    ///
-    /// + `directory_request` the server end of the root directory connection.
-    ///
-    /// This connection should have the following rights:
-    ///
-    ///     * [`fuchsia.io/Rights.CONNECT`].
-    ///     * [`fuchsia.io/Rights.ENUMERATE`].
-    ///     * [`fuchsia.io/Rights.TRAVERSE`].
-    ///     * [`fuchsia.io/Rights.READ_BYTES`].
-    ///     * [`fuchsia.io/Rights.WRITE_BYTES`].
-    ///     * [`fuchsia.io/Rights.GET_ATTRIBUTES`].
-    ///     * [`fuchsia.io/Rights.UPDATE_ATTRIBUTES`].
-    ///
-    strict GetEmptyDirectory(resource struct {
-        directory_request zx.Handle:CHANNEL;
+    /// Serves a service directory that contains a fuchsia.test.placeholders/Echo instance.
+    /// The test harness must have `supports_services` reported in it's config to use this method,
+    /// and the service instance should match the discoverable protocol name.
+    strict GetServiceDir() -> (resource struct {
+        svc_dir client_end:fuchsia.io.Directory;
     });
 };

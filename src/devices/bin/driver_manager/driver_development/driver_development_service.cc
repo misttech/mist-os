@@ -109,15 +109,24 @@ zx::result<fdd::wire::NodeInfo> CreateDeviceInfo(fidl::AnyArena& allocator,
   }
 
   // Copy over the offers.
-  auto offers = node->offers();
+  const auto& offers = node->offers();
   if (!offers.empty()) {
-    fidl::VectorView<fuchsia_component_decl::wire::Offer> node_offers(allocator, offers.count());
-    for (size_t i = 0; i < offers.count(); i++) {
-      node_offers[i] = fidl::ToWire(allocator, fidl::ToNatural(offers[i]));
+    fidl::VectorView<fuchsia_component_decl::wire::Offer> node_offers(allocator, offers.size());
+    for (size_t i = 0; i < offers.size(); i++) {
+      const auto& offer = offers[i];
+      zx::result get_offer_result = GetInnerOffer(offer);
+      if (get_offer_result.is_error()) {
+        node_offers[i] = {};
+        continue;
+      }
+
+      auto [inner_offer, _] = get_offer_result.value();
+      node_offers[i] = fidl::ToWire(allocator, fidl::ToNatural(inner_offer));
     }
+
+    v2_info_builder.offer_list(node_offers);
+    device_info.offer_list(node_offers);
   }
-  v2_info_builder.offer_list(offers);
-  device_info.offer_list(offers);
 
   auto versioned_info = fuchsia_driver_development::wire::VersionedNodeInfo::WithV2(
       allocator, v2_info_builder.Build());

@@ -55,7 +55,7 @@ async fn verify_auth_resp(helper: &mut test_utils::TestHelper) {
     let (sender, receiver) = oneshot::channel::<()>();
     helper
         .run_until_complete_or_timeout(
-            zx::Duration::from_seconds(5),
+            zx::MonotonicDuration::from_seconds(5),
             "waiting for authentication response",
             event::on_transmit(event::extract(|frame: Buffered<AuthFrame>| {
                 let frame = frame.get();
@@ -75,7 +75,7 @@ async fn verify_assoc_resp(helper: &mut test_utils::TestHelper) {
     let (sender, receiver) = oneshot::channel::<()>();
     helper
         .run_until_complete_or_timeout(
-            zx::Duration::from_seconds(5),
+            zx::MonotonicDuration::from_seconds(5),
             "waiting for association response",
             event::on_transmit(branch::or((
                 event::extract(|_: Buffered<ActionFrame<false>>| {}),

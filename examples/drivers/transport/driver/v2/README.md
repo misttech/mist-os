@@ -1,13 +1,13 @@
 # Driver Transport Example
 
-Reviewed on: 2024-03-20
+Reviewed on: 2024-10-14
 
 This example demonstrates a parent driver that implements and serves the driver transport FIDL protocol, fuchsia.hardware.i2cimpl, and a child driver that connects
 to the protocol to interact with the parent.
 
 ## Building
 
-To include the driver to your build, append `--with //examples/drivers/transport:driver` to your `fx
+To include the driver to your build, append `--with //examples/drivers/transport/driver:drivers` to your `fx
 set` command. For example:
 
 ```bash

@@ -132,7 +132,7 @@ mod tests {
                 .map(|m| m.parse(&KERNEL_IDENTITY).unwrap())
                 .collect::<Vec<_>>(),
             vec![LogsDataBuilder::new(BuilderArgs {
-                timestamp: klog.record.timestamp.into(),
+                timestamp: klog.record.timestamp,
                 component_url: Some(KERNEL_IDENTITY.url.clone()),
                 moniker: KERNEL_IDENTITY.moniker.clone(),
                 severity: Severity::Info,

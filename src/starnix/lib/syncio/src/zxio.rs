@@ -576,8 +576,9 @@ pub struct zxio_node_attr {
     pub casefold: bool,
     pub __bindgen_padding_1: [u8; 2usize],
     pub object_type: zxio_object_type_t,
+    pub wrapping_key_id: [u8; 16usize],
     pub has: zxio_node_attr_zxio_node_attr_has_t,
-    pub __bindgen_padding_2: [u8; 5usize],
+    pub __bindgen_padding_2: [u8; 4usize],
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone)]
@@ -601,6 +602,7 @@ pub struct zxio_node_attr_zxio_node_attr_has_t {
     pub fsverity_enabled: bool,
     pub object_type: bool,
     pub casefold: bool,
+    pub wrapping_key_id: bool,
 }
 impl Default for zxio_node_attr {
     fn default() -> Self {

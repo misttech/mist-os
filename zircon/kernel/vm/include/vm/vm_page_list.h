@@ -84,7 +84,7 @@ class VmPageOrMarker {
   }
   ReferenceValue Reference() const {
     DEBUG_ASSERT(IsReference());
-    return ReferenceValue(raw_ & ~BIT_MASK(kReferenceBits));
+    return ReferenceValue(raw_ & ~BIT_MASK(ReferenceValue::kAlignBits));
   }
 
   // If this is a page, moves the underlying vm_page* out and returns it. After this IsPage will
@@ -99,86 +99,33 @@ class VmPageOrMarker {
 
   [[nodiscard]] ReferenceValue ReleaseReference() {
     DEBUG_ASSERT(IsReference());
-    return ReferenceValue(Release() & ~BIT_MASK(kReferenceBits));
+    return ReferenceValue(Release() & ~BIT_MASK(ReferenceValue::kAlignBits));
   }
 
-  // Convenience wrappers for getting and setting split bits on both pages and references.
-  bool PageOrRefLeftSplit() const {
-    DEBUG_ASSERT(IsPageOrRef());
-    if (IsPage()) {
-      return Page()->object.cow_left_split;
-    }
-    return raw_ & kReferenceLeftSplit;
-  }
-  bool PageOrRefRightSplit() const {
-    DEBUG_ASSERT(IsPageOrRef());
-    if (IsPage()) {
-      return Page()->object.cow_right_split;
-    }
-    return raw_ & kReferenceRightSplit;
-  }
-  void SetPageOrRefLeftSplit(bool value) {
-    DEBUG_ASSERT(IsPageOrRef());
-    if (IsPage()) {
-      Page()->object.cow_left_split = value;
-    } else {
-      if (value) {
-        raw_ |= kReferenceLeftSplit;
-      } else {
-        raw_ &= ~kReferenceLeftSplit;
-      }
-    }
-  }
-  void SetPageOrRefRightSplit(bool value) {
-    DEBUG_ASSERT(IsPageOrRef());
-    if (IsPage()) {
-      Page()->object.cow_right_split = value;
-    } else {
-      if (value) {
-        raw_ |= kReferenceRightSplit;
-      } else {
-        raw_ &= ~kReferenceRightSplit;
-      }
-    }
-  }
-
-  // Changes the content from a reference to a page, moving over the split bits and returning the
-  // original reference.
+  // Changes the content from a reference to a page and returns the original reference.
   [[nodiscard]] VmPageOrMarker::ReferenceValue SwapReferenceForPage(vm_page_t* p) {
     DEBUG_ASSERT(p);
-    // Ensure no split bits were already set.
-    DEBUG_ASSERT(p->object.cow_left_split == 0);
-    DEBUG_ASSERT(p->object.cow_right_split == 0);
-    p->object.cow_left_split = PageOrRefLeftSplit();
-    p->object.cow_right_split = PageOrRefRightSplit();
+
     VmPageOrMarker::ReferenceValue ref = ReleaseReference();
     *this = VmPageOrMarker::Page(p);
-    // The ReferenceValue that we return, unlike a page, has no split bit information and so at this
-    // point the bits have been fully moved.
+
     return ref;
   }
-  // Changes the content from a page to a reference, moving over the split bits and returning the
-  // original page.
+
+  // Changes the content from a page to a reference and returns the original page.
   [[nodiscard]] vm_page_t* SwapPageForReference(VmPageOrMarker::ReferenceValue ref) {
-    const bool left_split = PageOrRefLeftSplit();
-    const bool right_split = PageOrRefRightSplit();
     vm_page_t* page = ReleasePage();
-    // Clear the page split bits before returning it, as these are moved to the reference.
-    page->object.cow_left_split = 0;
-    page->object.cow_right_split = 0;
-    *this = VmPageOrMarker::Reference(ref, left_split, right_split);
+    *this = VmPageOrMarker::Reference(ref);
+
     return page;
   }
-  // Changes the content from one reference to a different one, moving over the split bits and
-  // returning the original reference.
-  [[nodiscard]] VmPageOrMarker::ReferenceValue ChangeReferenceValue(
+
+  // Changes the content from one reference to a different one and returns the original reference.
+  [[nodiscard]] VmPageOrMarker::ReferenceValue SwapReferenceForReference(
       VmPageOrMarker::ReferenceValue ref) {
-    const bool left_split = PageOrRefLeftSplit();
-    const bool right_split = PageOrRefRightSplit();
     const VmPageOrMarker::ReferenceValue old = ReleaseReference();
-    *this = VmPageOrMarker::Reference(ref, left_split, right_split);
-    // The ReferenceValue that we return, unlike a page, has no split bit information and so at this
-    // point the bits have been fully moved.
+    *this = VmPageOrMarker::Reference(ref);
+
     return old;
   }
 
@@ -225,10 +172,8 @@ class VmPageOrMarker {
     return VmPageOrMarker{raw | kPageType};
   }
 
-  [[nodiscard]] static VmPageOrMarker Reference(ReferenceValue ref, bool left_split,
-                                                bool right_split) {
-    return VmPageOrMarker(ref.value() | (left_split ? kReferenceLeftSplit : 0) |
-                          (right_split ? kReferenceRightSplit : 0) | kReferenceType);
+  [[nodiscard]] static VmPageOrMarker Reference(ReferenceValue ref) {
+    return VmPageOrMarker(ref.value() | kReferenceType);
   }
 
   // The types of sparse page interval types that are supported.
@@ -370,19 +315,10 @@ class VmPageOrMarker {
   static constexpr uint64_t kReferenceType = 0b10;
   static constexpr uint64_t kIntervalType = 0b11;
 
-  // In addition to storing the type, a reference needs to track two additional pieces of data,
-  // these being the left and right split bits. The split bits are normally stored in the vm_page_t
-  // and are used for copy-on-write tracking in hidden VMOs. Having the ability to store the split
-  // bits here allows these pages to be candidates for compression. The remaining bits are then
-  // available for the actual reference value being stored. Unlike the page type, which does not
-  // allow the 0 value to be stored, a reference has no restrictions and a ref value of 0 is valid
-  // and may be stored.
-  static constexpr uint64_t kReferenceBits = kTypeBits + 2;
-  // Due to ordering and public/private visibility ReferenceValue::kAlignBits is declared
-  // separately, but it should match kReferenceBits.
-  static_assert(ReferenceValue::kAlignBits == kReferenceBits);
-  static constexpr uint64_t kReferenceLeftSplit = 0b10 << kTypeBits;
-  static constexpr uint64_t kReferenceRightSplit = 0b01 << kTypeBits;
+  // Ensure two additional bits are available for storing metadata inside of references. The
+  // remaining bits are available for the actual ref value being stored. Unlike the page type, which
+  // does not allow the 0 value to be stored, a ref value of 0 is valid and may be stored.
+  static_assert(ReferenceValue::kAlignBits == (kTypeBits + 2));
 
   // In addition to storing the type for an interval, we also need to track the type of interval
   // sentinel: the start, the end, or a single slot marker.
@@ -484,16 +420,6 @@ class VmPageOrMarkerRef {
 
   explicit operator bool() const { return !!page_or_marker_; }
 
-  // Forward split bit modifications as an allowed mutation.
-  void SetPageOrRefLeftSplit(bool value) {
-    DEBUG_ASSERT(page_or_marker_);
-    page_or_marker_->SetPageOrRefLeftSplit(value);
-  }
-  void SetPageOrRefRightSplit(bool value) {
-    DEBUG_ASSERT(page_or_marker_);
-    page_or_marker_->SetPageOrRefRightSplit(value);
-  }
-
   // Changing the kind of content is an allowed mutation and this takes ownership of the provided
   // page and returns ownership of the previous reference.
   [[nodiscard]] VmPageOrMarker::ReferenceValue SwapReferenceForPage(vm_page_t* p) {
@@ -507,10 +433,10 @@ class VmPageOrMarkerRef {
     return page_or_marker_->SwapPageForReference(ref);
   }
   // Similar to SwapReferenceForPage, but changes one reference for another.
-  [[nodiscard]] VmPageOrMarker::ReferenceValue ChangeReferenceValue(
+  [[nodiscard]] VmPageOrMarker::ReferenceValue SwapReferenceForReference(
       VmPageOrMarker::ReferenceValue ref) {
     DEBUG_ASSERT(page_or_marker_);
-    return page_or_marker_->ChangeReferenceValue(ref);
+    return page_or_marker_->SwapReferenceForReference(ref);
   }
 
   // Replaces the contents of this VmPageOrMarker with some non-empty contents, and returns what was
@@ -1011,9 +937,9 @@ class VmPageList final {
   // underlying pages any intermediate data structures can be checked and potentially freed if no
   // longer needed.
   template <typename T>
-  void RemovePages(T per_page_fn, uint64_t start_offset, uint64_t end_offset) {
-    ForEveryPageInRange<VmPageOrMarker*, NodeCheck::CleanupEmpty>(this, per_page_fn, start_offset,
-                                                                  end_offset);
+  zx_status_t RemovePages(T per_page_fn, uint64_t start_offset, uint64_t end_offset) {
+    return ForEveryPageInRange<VmPageOrMarker*, NodeCheck::CleanupEmpty>(this, per_page_fn,
+                                                                         start_offset, end_offset);
   }
 
   // Similar to RemovePages but also takes a |per_gap_fn| callback to allow for iterating over any
@@ -1049,8 +975,8 @@ class VmPageList final {
   // **NOTE** unlike MergeOnto, |other| will be empty at the end of this method.
   void MergeFrom(
       VmPageList& other, uint64_t offset, uint64_t end_offset,
-      fit::inline_function<void(VmPageOrMarker&&, uint64_t offset), 3 * sizeof(void*)> release_fn,
-      fit::inline_function<void(VmPageOrMarker*, uint64_t offset)> migrate_fn);
+      fit::inline_function<void(VmPageOrMarker&& p, uint64_t offset), 3 * sizeof(void*)> release_fn,
+      fit::inline_function<void(VmPageOrMarker* p, uint64_t offset)> migrate_fn);
 
   // Merges this pages in |this| onto |other|.
   //
@@ -1059,7 +985,8 @@ class VmPageList final {
   // marker) and gives ownership to |release_fn|.
   //
   // **NOTE** unlike MergeFrom, |this| will be empty at the end of this method.
-  void MergeOnto(VmPageList& other, fit::inline_function<void(VmPageOrMarker&&)> release_fn);
+  void MergeOnto(VmPageList& other,
+                 fit::inline_function<void(VmPageOrMarker&& p, uint64_t offset)> release_fn);
 
   // Takes the pages, references and markers in the range [offset, length) out of this page list.
   // This method calls `Finalize` on the splice list prior to returning it, meaning that no more

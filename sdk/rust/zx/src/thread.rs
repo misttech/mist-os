@@ -5,8 +5,8 @@
 //! Type-safe bindings for Zircon threads.
 
 use crate::{
-    object_get_info_single, ok, sys, AsHandleRef, Handle, HandleBased, HandleRef, ObjectQuery,
-    Profile, Status, Task, Topic,
+    object_get_info_single, ok, sys, AsHandleRef, ExceptionReport, Handle, HandleBased, HandleRef,
+    MonotonicDuration, ObjectQuery, Profile, Status, Task, Topic,
 };
 use bitflags::bitflags;
 
@@ -82,15 +82,18 @@ impl Thread {
     /// Wraps the
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_THREAD_EXCEPTION_REPORT topic.
-    pub fn get_exception_report(&self) -> Result<sys::zx_exception_report_t, Status> {
-        object_get_info_single::<ThreadExceptionReport>(self.as_handle_ref())
+    pub fn get_exception_report(&self) -> Result<ExceptionReport, Status> {
+        let raw = object_get_info_single::<ThreadExceptionReport>(self.as_handle_ref())?;
+
+        // SAFETY: this value was provided by the kernel, the union is valid.
+        Ok(unsafe { ExceptionReport::from_raw(raw) })
     }
 
     /// Wraps the
     /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
     /// syscall for the ZX_INFO_THREAD_STATS topic.
-    pub fn get_stats(&self) -> Result<sys::zx_info_thread_stats_t, Status> {
-        object_get_info_single::<ThreadStatsQuery>(self.as_handle_ref())
+    pub fn get_stats(&self) -> Result<ThreadStats, Status> {
+        Ok(ThreadStats::from_raw(object_get_info_single::<ThreadStatsQuery>(self.as_handle_ref())?))
     }
 
     pub fn read_state_general_regs(&self) -> Result<sys::zx_thread_state_general_regs_t, Status> {
@@ -123,16 +126,9 @@ impl Thread {
         ok(status)
     }
 
-    pub fn raise_exception(
-        options: RaiseExceptionOptions,
-        exception_type: sys::zx_excp_type_t,
-        context: sys::zx_exception_context_t,
-    ) -> Result<(), Status> {
-        let status =
-            unsafe { sys::zx_thread_raise_exception(options.bits(), exception_type, &context) };
-        ok(status)
-    }
-
+    /// Wraps the `zx_thread_raise_exception` syscall.
+    ///
+    /// See https://fuchsia.dev/reference/syscalls/thread_raise_exception?hl=en for details.
     pub fn raise_user_exception(
         options: RaiseExceptionOptions,
         synth_code: u32,
@@ -140,7 +136,9 @@ impl Thread {
     ) -> Result<(), Status> {
         let arch = unsafe { std::mem::zeroed::<sys::zx_exception_header_arch_t>() };
         let context = sys::zx_exception_context_t { arch, synth_code, synth_data };
-        Self::raise_exception(options, sys::ZX_EXCP_USER, context)
+
+        // SAFETY: basic FFI call. `&context` is a valid pointer.
+        ok(unsafe { sys::zx_thread_raise_exception(options.bits(), sys::ZX_EXCP_USER, &context) })
     }
 }
 
@@ -159,6 +157,20 @@ unsafe_handle_properties!(object: Thread,
         {query_ty: REGISTER_FS, tag: RegisterFsTag, prop_ty: usize, set: set_register_fs},
     ]
 );
+
+#[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+pub struct ThreadStats {
+    pub total_runtime: MonotonicDuration,
+    pub last_scheduled_cpu: u32,
+}
+
+impl ThreadStats {
+    fn from_raw(
+        sys::zx_info_thread_stats_t { total_runtime, last_scheduled_cpu }: sys::zx_info_thread_stats_t,
+    ) -> Self {
+        Self { total_runtime: MonotonicDuration::from_nanos(total_runtime), last_scheduled_cpu }
+    }
+}
 
 #[cfg(test)]
 mod tests {

@@ -24,7 +24,6 @@ def add_inputs_from_packages(
     package_paths: set[FilePath],
     all_manifest_paths: set[FilePath],
     inputs: list[FilePath],
-    include_blobs: bool,
     in_subpackage: bool = False,
 ) -> None:
     anonymous_subpackages: set[FilePath] = set()
@@ -34,18 +33,13 @@ def add_inputs_from_packages(
         with open(manifest_path, "r") as f:
             package_manifest = json_load(PackageManifest, f)
 
-        # Loading file-relative subpackages ends up statting blobs in the
-        # subpackages, so we need to also mark that they get accessed.
-        if include_blobs or (
-            in_subpackage and package_manifest.blob_sources_relative == "file"
-        ):
-            for blob in package_manifest.blobs:
-                blob_source = blob.source_path
+        for blob in package_manifest.blobs:
+            blob_source = blob.source_path
 
-                if package_manifest.blob_sources_relative == "file":
-                    blob_source = get_relative_path(blob_source, manifest_path)
+            if package_manifest.blob_sources_relative == "file":
+                blob_source = get_relative_path(blob_source, manifest_path)
 
-                inputs.append(blob_source)
+            inputs.append(blob_source)
 
         for subpackage in package_manifest.subpackages:
             subpackage_path = subpackage.manifest_path
@@ -64,7 +58,6 @@ def add_inputs_from_packages(
             anonymous_subpackages,
             all_manifest_paths,
             inputs,
-            include_blobs,
             in_subpackage=True,
         )
 
@@ -83,12 +76,6 @@ def main() -> int:
         "--output",
         required=True,
         help="The location to write the hermetic inputs file",
-    )
-    # TODO(https://fxbug.dev/42062288): Avoid including transitive dependencies (blobs).
-    parser.add_argument(
-        "--include-blobs",
-        action="store_true",
-        help="Whether to include packages and blobs",
     )
     parser.add_argument(
         "--system",
@@ -145,7 +132,6 @@ def main() -> int:
         package_manifest_paths,
         all_manifest_paths,
         inputs,
-        include_blobs=args.include_blobs,
     )
 
     # Write the hermetic inputs file.

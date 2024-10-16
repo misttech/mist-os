@@ -45,7 +45,7 @@ use {
 pub struct TemperatureHandlerBuilder<'a> {
     sensor_name: Option<String>,
     driver_proxy: Option<ftemperature::DeviceProxy>,
-    cache_duration: Option<zx::Duration>,
+    cache_duration: Option<zx::MonotonicDuration>,
     inspect_root: Option<&'a inspect::Node>,
 }
 
@@ -67,7 +67,7 @@ impl<'a> TemperatureHandlerBuilder<'a> {
     }
 
     #[cfg(test)]
-    pub fn cache_duration(mut self, duration: zx::Duration) -> Self {
+    pub fn cache_duration(mut self, duration: zx::MonotonicDuration) -> Self {
         self.cache_duration = Some(duration);
         self
     }
@@ -94,7 +94,9 @@ impl<'a> TemperatureHandlerBuilder<'a> {
         Self {
             sensor_name: Some(data.config.sensor_name),
             driver_proxy: None,
-            cache_duration: Some(zx::Duration::from_millis(data.config.cache_duration_ms as i64)),
+            cache_duration: Some(zx::MonotonicDuration::from_millis(
+                data.config.cache_duration_ms as i64,
+            )),
             inspect_root: None,
         }
     }
@@ -103,7 +105,7 @@ impl<'a> TemperatureHandlerBuilder<'a> {
         let sensor_name = ok_or_default_err!(self.sensor_name).or_debug_panic()?;
 
         // Default `cache_duration`: 0
-        let cache_duration = self.cache_duration.unwrap_or(zx::Duration::from_millis(0));
+        let cache_duration = self.cache_duration.unwrap_or(zx::MonotonicDuration::from_millis(0));
 
         let mutable_inner = MutableInner {
             last_temperature: Celsius(std::f64::NAN),
@@ -148,7 +150,7 @@ pub struct TemperatureHandler {
 
     /// Duration for which a polled temperature is cached. This prevents excessive polling of the
     /// sensor.
-    cache_duration: zx::Duration,
+    cache_duration: zx::MonotonicDuration,
 
     /// A struct for managing Component Inspection data
     inspect: InspectData,
@@ -447,13 +449,14 @@ pub mod tests {
             .run_until_stalled(&mut Box::pin(
                 TemperatureHandlerBuilder::new()
                     .driver_proxy(fake_temperature_driver(get_temperature))
-                    .cache_duration(zx::Duration::from_millis(500))
+                    .cache_duration(zx::MonotonicDuration::from_millis(500))
                     .build_and_init(),
             ))
             .unwrap();
 
         let run = move |executor: &mut fasync::TestExecutor, duration_ms: i64| {
-            executor.set_fake_time(executor.now() + zx::Duration::from_millis(duration_ms));
+            executor
+                .set_fake_time(executor.now() + zx::MonotonicDuration::from_millis(duration_ms));
 
             let poll =
                 executor.run_until_stalled(&mut node.handle_message(&Message::ReadTemperature));

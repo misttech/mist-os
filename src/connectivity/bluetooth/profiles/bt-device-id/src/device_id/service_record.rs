@@ -23,6 +23,10 @@ const DEVICE_IDENTIFICATION_PROFILE_VERSION: u16 = 0x0103;
 /// URL string representing the generic landing page of Fuchsia.
 const FUCHSIA_DOCUMENTATION_URL: &str = "https://fuchsia.dev";
 
+/// VendorID that is reserved by the Bluetooth SIG. Indicates there is no Device ID service record.
+/// Defined in DI v1.3, Section 5.2.
+const RESERVED_VENDOR_ID: u16 = 0xffff;
+
 /// Builds and returns human-readable Information using the provided `description`.
 fn service_information(description: &String) -> Vec<bredr::Information> {
     let info = bredr::Information {
@@ -72,14 +76,24 @@ impl TryFrom<&di::DeviceReleaseNumber> for Version {
     }
 }
 
-/// A validly formatted Device Identification record.
+/// A Device Identification record with fields defined in the DI v1.3 specification.
+/// See DI v1.3 Section 5.
 #[derive(Clone, Debug, PartialEq)]
-struct DIRecord {
+pub struct DIRecord {
+    /// Uniquely identifies the vendor of the device.
     vendor_id: di::VendorId,
+    /// Distinguishes between products made by the aforementioned vendor.
     product_id: u16,
+    /// Identifies the device release number.
     version: Version,
+    /// Designates this record as the main entry - typically used for UI purposes.
     primary: bool,
+    /// A human-readable description of the device. Optional.
     service_description: Option<String>,
+    // `SpecificationId` is not stored. Always `DEVICE_IDENTIFICATION_PROFILE_VERSION` (v1.3).
+    // `VendorIDSource` is not stored and is derived from `self.vendor_id`.
+    // `ClientExecutableURL` is not stored. Optional attribute and is currently not supported.
+    // `DocumentationURL` is not stored and is always configured to `FUCHSIA_DOCUMENTATION_URL`.
 }
 
 impl DIRecord {
@@ -102,6 +116,27 @@ impl DIRecord {
 
     fn version(&self) -> u16 {
         self.version.0
+    }
+}
+
+impl TryFrom<bt_device_id_profile_config::Config> for DIRecord {
+    type Error = ();
+
+    fn try_from(config: bt_device_id_profile_config::Config) -> Result<DIRecord, Self::Error> {
+        // The `RESERVED_VENDOR_ID` is invalid and reserved by the Bluetooth SIG.
+        if config.vendor_id == RESERVED_VENDOR_ID {
+            return Err(());
+        }
+
+        let service_description =
+            (!config.service_description.is_empty()).then_some(config.service_description);
+        Ok(DIRecord {
+            vendor_id: di::VendorId::BluetoothSigId(config.vendor_id),
+            product_id: config.product_id,
+            version: Version(config.version),
+            primary: config.primary,
+            service_description,
+        })
     }
 }
 
@@ -257,7 +292,7 @@ pub(crate) mod tests {
 
     /// Defines a valid DI service record.
     pub(crate) fn minimal_record(primary: bool) -> DeviceIdentificationRecord {
-        let primary = if primary { Some(true) } else { None };
+        let primary = primary.then_some(true);
         DeviceIdentificationRecord {
             vendor_id: Some(di::VendorId::BluetoothSigId(9)),
             product_id: Some(1),

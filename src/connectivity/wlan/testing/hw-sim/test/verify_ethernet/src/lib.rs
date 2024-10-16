@@ -33,8 +33,9 @@ async fn verify_ethernet() {
         test_utils::TestHelper::begin_test_with_context(ctx, default_wlantap_config_client()).await;
     let () = loop_until_iface_is_found(&mut helper).await;
 
-    let mut retry =
-        test_utils::RetryWithBackoff::infinite_with_max_interval(zx::Duration::from_seconds(5));
+    let mut retry = test_utils::RetryWithBackoff::infinite_with_max_interval(
+        zx::MonotonicDuration::from_seconds(5),
+    );
     loop {
         let client = netdevice_helper::create_client(
             helper.devfs(),

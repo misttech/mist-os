@@ -7,6 +7,7 @@
 
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
+use fidl::encoding::ProxyChannelBox;
 use fidl::endpoints::{ControlHandle as _, Responder as _};
 use futures::future::{self, MaybeDone, TryFutureExt};
 use zx_status;
@@ -64,7 +65,7 @@ pub struct ExampleOfUseOfAliases {
     pub field_of_nullable_client_end: Option<fidl::Channel>,
 }
 
-impl fidl::Standalone for ExampleOfUseOfAliases {}
+impl fidl::Standalone<fidl::encoding::DefaultFuchsiaResourceDialect> for ExampleOfUseOfAliases {}
 
 mod internal {
     use super::*;

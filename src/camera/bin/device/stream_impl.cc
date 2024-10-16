@@ -225,41 +225,41 @@ void StreamImpl::SetBufferCollection(
     legacy_stream_needs_start = true;
   }
 
-  legacy_stream_->GetBuffers(
-      [this, legacy_stream_needs_start](fuchsia::sysmem::BufferCollectionTokenHandle token_handle) {
-        // Duplicate and send each client a token.
-        std::map<uint64_t, fuchsia::sysmem2::BufferCollectionTokenHandle> client_tokens;
-        fuchsia::sysmem2::BufferCollectionTokenPtr token =
-            fuchsia::sysmem2::BufferCollectionTokenHandle(token_handle.TakeChannel()).Bind();
-        for (auto& client_i : clients_) {
-          if (client_i.second->Participant()) {
-            fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest dup_request;
-            dup_request.set_rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
-            dup_request.set_token_request(client_tokens[client_i.first].NewRequest());
-            token->Duplicate(std::move(dup_request));
-          }
+  legacy_stream_->GetBuffers2([this, legacy_stream_needs_start](
+                                  fuchsia::sysmem2::BufferCollectionTokenHandle token_handle) {
+    // Duplicate and send each client a token.
+    std::map<uint64_t, fuchsia::sysmem2::BufferCollectionTokenHandle> client_tokens;
+    fuchsia::sysmem2::BufferCollectionTokenPtr token =
+        fuchsia::sysmem2::BufferCollectionTokenHandle(token_handle.TakeChannel()).Bind();
+    for (auto& client_i : clients_) {
+      if (client_i.second->Participant()) {
+        fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest dup_request;
+        dup_request.set_rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
+        dup_request.set_token_request(client_tokens[client_i.first].NewRequest());
+        token->Duplicate(std::move(dup_request));
+      }
+    }
+    token->Sync([this, token = std::move(token), client_tokens = std::move(client_tokens),
+                 legacy_stream_needs_start](fuchsia::sysmem2::Node_Sync_Result result) mutable {
+      for (auto& [id, token] : client_tokens) {
+        auto it = clients_.find(id);
+        if (it == clients_.end()) {
+          token.BindSync()->Release();
+        } else {
+          it->second->ReceiveBufferCollection(std::move(token));
         }
-        token->Sync([this, token = std::move(token), client_tokens = std::move(client_tokens),
-                     legacy_stream_needs_start](fuchsia::sysmem2::Node_Sync_Result result) mutable {
-          for (auto& [id, token] : client_tokens) {
-            auto it = clients_.find(id);
-            if (it == clients_.end()) {
-              token.BindSync()->Release();
-            } else {
-              it->second->ReceiveBufferCollection(std::move(token));
-            }
-          }
-          on_buffers_requested_(std::move(token), [this](uint32_t max_camping_buffers) {
-            FX_LOGS(INFO) << description_ << ": max camping buffers = " << max_camping_buffers;
-            max_camping_buffers_ = max_camping_buffers;
-          });
-          RestoreLegacyStreamState();
-          if (legacy_stream_needs_start) {
-            legacy_stream_->Start();
-            streaming_failure_tracker_.Reset();
-          }
-        });
+      }
+      on_buffers_requested_(std::move(token), [this](uint32_t max_camping_buffers) {
+        FX_LOGS(INFO) << description_ << ": max camping buffers = " << max_camping_buffers;
+        max_camping_buffers_ = max_camping_buffers;
       });
+      RestoreLegacyStreamState();
+      if (legacy_stream_needs_start) {
+        legacy_stream_->Start();
+        streaming_failure_tracker_.Reset();
+      }
+    });
+  });
 }
 
 void StreamImpl::SetResolution(uint64_t id, fuchsia::math::Size coded_size) {

@@ -107,8 +107,8 @@ impl Backlight {
         Self::with_display_power_internal(
             backlight_proxy,
             display_power_proxy,
-            zx::Duration::from_millis(power_off_delay_millis as i64),
-            zx::Duration::from_millis(power_on_delay_millis as i64),
+            zx::MonotonicDuration::from_millis(power_off_delay_millis as i64),
+            zx::MonotonicDuration::from_millis(power_on_delay_millis as i64),
         )
         .await
     }
@@ -116,8 +116,8 @@ impl Backlight {
     async fn with_display_power_internal(
         backlight_proxy: BacklightProxy,
         display_power_proxy: DisplayPowerProxy,
-        power_off_delay: impl Into<zx::Duration>,
-        power_on_delay: impl Into<zx::Duration>,
+        power_off_delay: impl Into<zx::MonotonicDuration>,
+        power_on_delay: impl Into<zx::MonotonicDuration>,
     ) -> Result<Self, Error> {
         let display_power = DisplayPower::new(
             &backlight_proxy,
@@ -240,7 +240,7 @@ impl Backlight {
         }
     }
 
-    fn make_scheduled_updates_task(&self, delay: zx::Duration) -> fasync::Task<()> {
+    fn make_scheduled_updates_task(&self, delay: zx::MonotonicDuration) -> fasync::Task<()> {
         let time = fasync::MonotonicInstant::after(delay);
         tracing::trace!("Setting timer for {:?}", &time);
         let timer = fasync::Timer::new(time);
@@ -356,16 +356,16 @@ impl Backlight {
 struct DisplayPower {
     proxy: DisplayPowerProxy,
     power_state: Arc<Mutex<PowerState>>,
-    power_off_delay: zx::Duration,
-    power_on_delay: zx::Duration,
+    power_off_delay: zx::MonotonicDuration,
+    power_on_delay: zx::MonotonicDuration,
 }
 
 impl DisplayPower {
     async fn new(
         backlight_proxy: &BacklightProxy,
         display_power_proxy: DisplayPowerProxy,
-        power_off_delay: impl Into<zx::Duration>,
-        power_on_delay: impl Into<zx::Duration>,
+        power_off_delay: impl Into<zx::MonotonicDuration>,
+        power_on_delay: impl Into<zx::MonotonicDuration>,
     ) -> Result<Self, Error> {
         // There is no direct way to retrieve the power state of the DDIC, so we infer it from the
         // backlight's state on startup.
@@ -790,8 +790,8 @@ mod dual_state_tests {
                     Backlight::with_display_power_internal(
                         backlight_proxy.clone(),
                         display_power_proxy.clone(),
-                        zx::Duration::from_millis(power_off_delay_ms),
-                        zx::Duration::from_millis(power_on_delay_ms),
+                        zx::MonotonicDuration::from_millis(power_off_delay_ms),
+                        zx::MonotonicDuration::from_millis(power_on_delay_ms),
                     )
                     .await
                     .unwrap()
@@ -861,7 +861,9 @@ mod dual_state_tests {
 
         // Right before the power-off delay
         exec.set_fake_time(
-            (zx::MonotonicInstant::ZERO + zx::Duration::from_millis(power_off_delay_ms - 1)).into(),
+            (zx::MonotonicInstant::ZERO
+                + zx::MonotonicDuration::from_millis(power_off_delay_ms - 1))
+            .into(),
         );
         assert_eq!(exec.wake_timers_and_run_until_stalled(), false);
 
@@ -872,7 +874,9 @@ mod dual_state_tests {
 
         // Right after the power-off delay.
         exec.set_fake_time(
-            (zx::MonotonicInstant::ZERO + zx::Duration::from_millis(power_off_delay_ms + 1)).into(),
+            (zx::MonotonicInstant::ZERO
+                + zx::MonotonicDuration::from_millis(power_off_delay_ms + 1))
+            .into(),
         );
         assert_eq!(exec.wake_timers_and_run_until_stalled(), true);
 
@@ -919,7 +923,9 @@ mod dual_state_tests {
         .unwrap();
 
         exec.set_fake_time(
-            (zx::MonotonicInstant::ZERO + zx::Duration::from_millis(power_on_delay_ms - 1)).into(),
+            (zx::MonotonicInstant::ZERO
+                + zx::MonotonicDuration::from_millis(power_on_delay_ms - 1))
+            .into(),
         );
         assert_eq!(exec.wake_timers_and_run_until_stalled(), false);
         assert_matches!(exec.run_until_stalled(&mut turn_on_backlight_fut), Poll::Pending);
@@ -929,7 +935,9 @@ mod dual_state_tests {
         .unwrap();
 
         exec.set_fake_time(
-            (zx::MonotonicInstant::ZERO + zx::Duration::from_millis(power_on_delay_ms + 1)).into(),
+            (zx::MonotonicInstant::ZERO
+                + zx::MonotonicDuration::from_millis(power_on_delay_ms + 1))
+            .into(),
         );
         assert_eq!(exec.wake_timers_and_run_until_stalled(), true);
         assert_matches!(exec.run_until_stalled(&mut turn_on_backlight_fut), Poll::Ready(()));
@@ -984,8 +992,9 @@ mod dual_state_tests {
 
         // Right before the power-off delay
         exec.set_fake_time(
-            (zx::MonotonicInstant::ZERO + zx::Duration::from_millis(power_off_delay_ms - 10))
-                .into(),
+            (zx::MonotonicInstant::ZERO
+                + zx::MonotonicDuration::from_millis(power_off_delay_ms - 10))
+            .into(),
         );
         assert_eq!(exec.wake_timers_and_run_until_stalled(), false);
 
@@ -1003,8 +1012,9 @@ mod dual_state_tests {
 
         // Right after the power-off delay.
         exec.set_fake_time(
-            (zx::MonotonicInstant::ZERO + zx::Duration::from_millis(power_off_delay_ms + 10))
-                .into(),
+            (zx::MonotonicInstant::ZERO
+                + zx::MonotonicDuration::from_millis(power_off_delay_ms + 10))
+            .into(),
         );
         // The timer task should have been canceled (dropped).
         assert_eq!(exec.wake_timers_and_run_until_stalled(), false);
@@ -1032,7 +1042,9 @@ mod dual_state_tests {
         assert_matches!(exec.run_until_stalled(&mut turn_on_backlight_2_fut), Poll::Pending);
 
         exec.set_fake_time(
-            (zx::MonotonicInstant::ZERO + zx::Duration::from_millis(power_on_delay_ms - 1)).into(),
+            (zx::MonotonicInstant::ZERO
+                + zx::MonotonicDuration::from_millis(power_on_delay_ms - 1))
+            .into(),
         );
         assert_eq!(exec.wake_timers_and_run_until_stalled(), false);
         assert_matches!(exec.run_until_stalled(&mut turn_on_backlight_1_fut), Poll::Pending);
@@ -1056,7 +1068,9 @@ mod dual_state_tests {
         .unwrap();
 
         exec.set_fake_time(
-            (zx::MonotonicInstant::ZERO + zx::Duration::from_millis(power_on_delay_ms + 1)).into(),
+            (zx::MonotonicInstant::ZERO
+                + zx::MonotonicDuration::from_millis(power_on_delay_ms + 1))
+            .into(),
         );
         assert_eq!(exec.wake_timers_and_run_until_stalled(), false);
 
@@ -1092,7 +1106,9 @@ mod dual_state_tests {
         .unwrap();
 
         exec.set_fake_time(
-            (zx::MonotonicInstant::ZERO + zx::Duration::from_millis(power_off_delay_ms + 1)).into(),
+            (zx::MonotonicInstant::ZERO
+                + zx::MonotonicDuration::from_millis(power_off_delay_ms + 1))
+            .into(),
         );
         assert_eq!(exec.wake_timers_and_run_until_stalled(), true);
 
@@ -1133,7 +1149,9 @@ mod dual_state_tests {
         assert_matches!(exec.run_until_stalled(&mut retry_fut), Poll::Pending);
 
         exec.set_fake_time(
-            (zx::MonotonicInstant::ZERO + zx::Duration::from_millis(power_on_delay_ms + 1)).into(),
+            (zx::MonotonicInstant::ZERO
+                + zx::MonotonicDuration::from_millis(power_on_delay_ms + 1))
+            .into(),
         );
         assert_eq!(exec.wake_timers_and_run_until_stalled(), true);
 
@@ -1160,7 +1178,9 @@ mod dual_state_tests {
         .unwrap();
 
         exec.set_fake_time(
-            (zx::MonotonicInstant::ZERO + zx::Duration::from_millis(power_off_delay_ms + 1)).into(),
+            (zx::MonotonicInstant::ZERO
+                + zx::MonotonicDuration::from_millis(power_off_delay_ms + 1))
+            .into(),
         );
         assert_eq!(exec.wake_timers_and_run_until_stalled(), false);
 

@@ -9,7 +9,7 @@ use futures::stream::FilterMap;
 use futures::{future, Stream, StreamExt};
 use packet_encoding::{Decodable, Encodable};
 use tracing::{info, trace};
-use zx::Duration;
+use zx::MonotonicDuration;
 
 #[cfg(test)]
 mod tests;
@@ -196,9 +196,9 @@ impl Peer {
     }
 
     /// The maximum amount of time we will wait for a response to a command packet.
-    fn passthrough_command_timeout() -> Duration {
+    fn passthrough_command_timeout() -> MonotonicDuration {
         const CMD_TIMER_MS: i64 = 1000;
-        Duration::from_millis(CMD_TIMER_MS)
+        MonotonicDuration::from_millis(CMD_TIMER_MS)
     }
 
     /// Sends a vendor specific command to the remote peer. Returns a CommandResponseStream to poll

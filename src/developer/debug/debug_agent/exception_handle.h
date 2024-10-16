@@ -14,6 +14,7 @@
 
 namespace debug_agent {
 
+class ProcessHandle;
 class ThreadHandle;
 
 // ExceptionHandle abstracts zx::exception, allowing for a more straightforward implementation in
@@ -28,6 +29,8 @@ class ExceptionHandle {
 
   // Returns a handle to the excepting thread. Will return a null pointer on failure.
   virtual std::unique_ptr<ThreadHandle> GetThreadHandle() const = 0;
+
+  virtual std::unique_ptr<ProcessHandle> GetProcessHandle() const = 0;
 
   // Returns the type of the exception for this and the current thread state.
   //
@@ -46,6 +49,13 @@ class ExceptionHandle {
 
   // Sets the handling strategy.
   virtual debug::Status SetStrategy(debug_ipc::ExceptionStrategy strategy) = 0;
+
+  // Returns this exception info for IPC.
+  //
+  // Race conditions or other errors can conspire to mean the exception records are not valid. In
+  // order to differentiate this case from "0" addresses, ExceptionRecord.valid will be set to
+  // false on failure.
+  virtual debug_ipc::ExceptionRecord GetRecord() const = 0;
 };
 
 }  // namespace debug_agent

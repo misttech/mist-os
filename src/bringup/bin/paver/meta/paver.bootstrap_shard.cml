@@ -44,6 +44,11 @@
             to: "#paver",
         },
         {
+            protocol: [ "fuchsia.sysinfo.SysInfo" ],
+            from: "#sysinfo",
+            to: "#paver",
+        },
+        {
             protocol: [
                 "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",

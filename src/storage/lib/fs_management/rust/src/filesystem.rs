@@ -36,29 +36,27 @@ pub trait BlockConnector: Send + Sync {
     }
 }
 
-/// Implements `BlockConnector` based on a path in the local namespace to a service node
-/// implementing the relevant Block protocols.
-// TODO(https://fxbug.dev/339491886): Use fuchsia.io Node when we get rid of get_topological_path.
+/// Implements `BlockConnector` via a service dir.  Wraps `connect_to_named_protocol_at_dir_root`.
 #[derive(Clone, Debug)]
-pub struct PathBasedBlockConnector(String);
+pub struct DirBasedBlockConnector(fio::DirectoryProxy, String);
 
-impl PathBasedBlockConnector {
-    pub fn new(path: String) -> Self {
-        Self(path)
+impl DirBasedBlockConnector {
+    pub fn new(dir: fio::DirectoryProxy, path: String) -> Self {
+        Self(dir, path)
     }
 
     pub fn path(&self) -> &str {
-        &self.0
+        &self.1
     }
 }
 
-impl BlockConnector for PathBasedBlockConnector {
+impl BlockConnector for DirBasedBlockConnector {
     fn connect_volume(
         &self,
     ) -> Result<ClientEnd<fidl_fuchsia_hardware_block_volume::VolumeMarker>, Error> {
-        fuchsia_component::client::connect_to_protocol_at_path::<
+        fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
             fidl_fuchsia_hardware_block_volume::VolumeMarker,
-        >(&self.0)
+        >(&self.0, &self.1)
         .map(|p| p.into_client_end().unwrap())
     }
 }

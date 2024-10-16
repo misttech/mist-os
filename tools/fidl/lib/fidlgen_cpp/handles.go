@@ -23,25 +23,11 @@ func FieldHandleInformation(val fidlgen.Type, decls fidlgen.DeclInfoMap) *Handle
 	for val.ElementType != nil {
 		val = *val.ElementType
 	}
-	if val.Kind == fidlgen.RequestType {
+	if val.Kind == fidlgen.EndpointType {
 		return &HandleInformation{
 			ObjectType: "ZX_OBJ_TYPE_CHANNEL",
 			Rights:     "ZX_DEFAULT_CHANNEL_RIGHTS",
 		}
-	}
-	if val.Kind == fidlgen.IdentifierType {
-		declInfo, ok := decls[val.Identifier]
-		if !ok {
-			panic(fmt.Sprintf("unknown identifier: %v", val.Identifier))
-		}
-		if declInfo.Type == fidlgen.ProtocolDeclType {
-			return &HandleInformation{
-				ObjectType: "ZX_OBJ_TYPE_CHANNEL",
-				Rights:     "ZX_DEFAULT_CHANNEL_RIGHTS",
-			}
-		}
-		// Handle rights are only attached to handle fields or vector/arrays thereof.
-		return nil
 	}
 	if val.Kind == fidlgen.HandleType {
 		subtype, ok := handleSubtypeConsts[val.HandleSubtype]

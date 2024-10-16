@@ -9,16 +9,17 @@ use crate::mm::{
 };
 use crate::signals::{SignalDetail, SignalInfo};
 use crate::task::{CurrentTask, ExceptionResult, PageFaultExceptionReport, Task};
-
+use crate::vfs::aio::AioContext;
 use crate::vfs::{
-    ActiveNamespaceNode, AioContexts, DynamicFile, DynamicFileBuf, FileWriteGuardRef, FsNodeOps,
-    FsStr, FsString, NamespaceNode, SequenceFileSource,
+    ActiveNamespaceNode, DynamicFile, DynamicFileBuf, FileWriteGuardRef, FsNodeOps, FsStr,
+    FsString, NamespaceNode, SequenceFileSource,
 };
 use anyhow::{anyhow, Error};
 use bitflags::bitflags;
 use fuchsia_inspect_contrib::{profile_duration, ProfileDuration};
 
 use once_cell::sync::Lazy;
+use rand::{thread_rng, Rng};
 use range_map::RangeMap;
 use smallvec::SmallVec;
 use starnix_logging::{
@@ -134,15 +135,16 @@ pub static PAGE_SIZE: Lazy<u64> = Lazy::new(|| zx::system_get_page_size() as u64
 bitflags! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub struct MappingOptions: u32 {
-      const SHARED = 1;
-      const ANONYMOUS = 2;
-      const LOWER_32BIT = 4;
-      const GROWSDOWN = 8;
-      const ELF_BINARY = 16;
-      const DONTFORK = 32;
-      const WIPEONFORK = 64;
-      const DONT_SPLIT = 128;
-      const POPULATE = 256;
+      const SHARED      = 1 << 0;
+      const ANONYMOUS   = 1 << 1;
+      const LOWER_32BIT = 1 << 2;
+      const GROWSDOWN   = 1 << 3;
+      const ELF_BINARY  = 1 << 4;
+      const DONTFORK    = 1 << 5;
+      const WIPEONFORK  = 1 << 6;
+      const DONT_SPLIT  = 1 << 7;
+      const DONT_EXPAND = 1 << 8;
+      const POPULATE    = 1 << 9;
     }
 }
 
@@ -200,6 +202,7 @@ bitflags! {
         const DONTFORK    = 1 <<  8;
         const WIPEONFORK  = 1 <<  9;
         const DONT_SPLIT  = 1 << 10;
+        const DONT_EXPAND = 1 << 11;
     }
 }
 
@@ -217,6 +220,7 @@ const_assert_eq!(MappingFlags::ELF_BINARY.bits(), MappingOptions::ELF_BINARY.bit
 const_assert_eq!(MappingFlags::DONTFORK.bits(), MappingOptions::DONTFORK.bits() << 3);
 const_assert_eq!(MappingFlags::WIPEONFORK.bits(), MappingOptions::WIPEONFORK.bits() << 3);
 const_assert_eq!(MappingFlags::DONT_SPLIT.bits(), MappingOptions::DONT_SPLIT.bits() << 3);
+const_assert_eq!(MappingFlags::DONT_EXPAND.bits(), MappingOptions::DONT_EXPAND.bits() << 3);
 
 impl MappingFlags {
     fn prot_flags(&self) -> ProtectionFlags {
@@ -271,6 +275,9 @@ pub enum MappingName {
     /// The name associated with the mapping of an ashmem region.  Set by ioctl(fd, ASHMEM_SET_NAME, ...).
     /// By default "dev/ashmem".
     Ashmem(FsString),
+
+    /// This mapping is a context for asynchronous I/O.
+    AioContext(Arc<AioContext>),
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -474,9 +481,6 @@ pub struct MemoryManagerState {
     private_anonymous: PrivateAnonymousMemoryManager,
 
     forkable_state: MemoryManagerForkableState,
-
-    /// Asynchronous I/O contexts.
-    pub aio_contexts: AioContexts,
 }
 
 #[cfg(feature = "alternate_anon_allocs")]
@@ -626,11 +630,6 @@ fn map_in_vmar(
 
     let base_addr = UserAddress::from_ptr(vmar_info.base);
     let (vmar_offset, vmar_extra_flags) = match addr {
-        DesiredAddress::Any if flags.contains(MappingFlags::LOWER_32BIT) => {
-            // MAP_32BIT specifies that the memory allocated will
-            // be within the first 2 GB of the process address space.
-            (0x80000000 - base_addr.ptr(), zx::VmarFlags::OFFSET_IS_UPPER_LIMIT)
-        }
         DesiredAddress::Hint(_) | DesiredAddress::Any => unreachable!(),
         DesiredAddress::Fixed(addr) => (addr - base_addr, zx::VmarFlags::SPECIFIC),
         DesiredAddress::FixedOverwrite(addr) => (addr - base_addr, ZX_VM_SPECIFIC_OVERWRITE),
@@ -669,8 +668,81 @@ fn map_in_vmar(
 }
 
 impl MemoryManagerState {
+    fn count_possible_placements(
+        &self,
+        length: usize,
+        subrange: &Range<UserAddress>,
+    ) -> Option<usize> {
+        let mut mappings_in_range = self.mappings.intersection(subrange);
+        let mut possible_placements = 0;
+        // If the allocation is placed at the first available address, every page that is left
+        // before the next mapping or the end of subrange is +1 potential placement.
+        let mut first_fill_end = subrange.start.checked_add(length)?;
+        while first_fill_end <= subrange.end {
+            let Some((mapping, _)) = mappings_in_range.next() else {
+                possible_placements += (subrange.end - first_fill_end) / (*PAGE_SIZE as usize) + 1;
+                break;
+            };
+            if mapping.start >= first_fill_end {
+                possible_placements += (mapping.start - first_fill_end) / (*PAGE_SIZE as usize) + 1;
+            }
+            first_fill_end = mapping.end.checked_add(length)?;
+        }
+        Some(possible_placements)
+    }
+
+    fn pick_placement(
+        &self,
+        length: usize,
+        mut chosen_placement_idx: usize,
+        subrange: &Range<UserAddress>,
+    ) -> Option<UserAddress> {
+        let mut candidate =
+            Range { start: subrange.start, end: subrange.start.checked_add(length)? };
+        let mut mappings_in_range = self.mappings.intersection(subrange);
+        loop {
+            let Some((mapping, _)) = mappings_in_range.next() else {
+                // No more mappings: treat the rest of the index as an offset.
+                let res =
+                    candidate.start.checked_add(chosen_placement_idx * *PAGE_SIZE as usize)?;
+                debug_assert!(res.checked_add(length)? <= subrange.end);
+                return Some(res);
+            };
+            if mapping.start < candidate.end {
+                // doesn't fit, skip
+                candidate = Range { start: mapping.end, end: mapping.end.checked_add(length)? };
+                continue;
+            }
+            let unused_space =
+                (mapping.start.ptr() - candidate.end.ptr()) / (*PAGE_SIZE as usize) + 1;
+            if unused_space > chosen_placement_idx {
+                // Chosen placement is within the range; treat the rest of the index as an offset.
+                let res =
+                    candidate.start.checked_add(chosen_placement_idx * *PAGE_SIZE as usize)?;
+                return Some(res);
+            }
+
+            // chosen address is further up, skip
+            chosen_placement_idx -= unused_space;
+            candidate = Range { start: mapping.end, end: mapping.end.checked_add(length)? };
+        }
+    }
+
+    fn find_random_unused_range(
+        &self,
+        length: usize,
+        subrange: &Range<UserAddress>,
+    ) -> Option<UserAddress> {
+        let possible_placements = self.count_possible_placements(length, subrange)?;
+        if possible_placements == 0 {
+            return None;
+        }
+        let chosen_placement_idx = thread_rng().gen_range(0..possible_placements);
+        self.pick_placement(length, chosen_placement_idx, subrange)
+    }
+
     // Find the first unused range of addresses that fits a mapping of `length` bytes, searching
-    // from `RESTRICTED_ASPACE_HIGHEST_ADDRESS` downwards.
+    // from `mmap_top` downwards.
     pub fn find_next_unused_range(&self, length: usize) -> Option<UserAddress> {
         // Iterate over existing mappings within range, in descending order
         let mut map_iter = self.mappings.iter_ending_at(&self.mmap_top);
@@ -724,13 +796,23 @@ impl MemoryManagerState {
             };
         }
 
-        // If the address is not known at this point, choose an available one. If LOWER_32BIT is
-        // set, defer the decision to Zircon.
-        if addr == DesiredAddress::Any && !flags.contains(MappingFlags::LOWER_32BIT) {
+        // If the address is not known at this point, choose one. If LOWER_32BIT is set, choose at
+        // random, otherwise choose the highest available gap.
+        if addr == DesiredAddress::Any {
             profile_duration!("FindAddressForMmap");
-            let new_addr = self
-                .find_next_unused_range(round_up_to_system_page_size(length)?)
-                .ok_or_else(|| errno!(ENOMEM))?;
+            let new_addr = if flags.contains(MappingFlags::LOWER_32BIT) {
+                // MAP_32BIT specifies that the memory allocated will
+                // be within the first 2 GB of the process address space.
+                self.find_random_unused_range(
+                    adjusted_length,
+                    &(UserAddress::from_ptr(RESTRICTED_ASPACE_BASE)
+                        ..UserAddress::from_ptr(0x80000000)),
+                )
+                .ok_or_else(|| errno!(ENOMEM))?
+            } else {
+                self.find_next_unused_range(adjusted_length).ok_or_else(|| errno!(ENOMEM))?
+            };
+
             addr = DesiredAddress::Fixed(new_addr)
         }
         map_in_vmar(
@@ -1111,6 +1193,12 @@ impl MemoryManagerState {
                 DesiredAddress::Fixed(dst_addr)
             }
         };
+
+        // According to gVisor's aio_test, Linux checks for DONT_EXPAND after unmapping the dst
+        // range.
+        if dst_length > src_length && src_mapping.flags.contains(MappingFlags::DONT_EXPAND) {
+            return error!(EFAULT);
+        }
 
         if src_range.end > original_range.end {
             // The source range is not one contiguous mapping. This check must be done only after
@@ -1991,6 +2079,19 @@ impl MemoryManagerState {
             MappingBacking::PrivateAnonymous => self.private_anonymous.zero(addr, length),
         }
     }
+
+    fn get_aio_context(&self, addr: UserAddress) -> Option<(Range<UserAddress>, Arc<AioContext>)> {
+        let Some((range, mapping)) = self.mappings.get(&addr) else {
+            return None;
+        };
+        let MappingName::AioContext(ref aio_context) = mapping.name else {
+            return None;
+        };
+        if !mapping.can_read() {
+            return None;
+        }
+        Some((range.clone(), aio_context.clone()))
+    }
 }
 
 fn create_user_vmar(vmar: &zx::Vmar, vmar_info: &zx::VmarInfo) -> Result<zx::Vmar, zx::Status> {
@@ -2073,6 +2174,66 @@ pub trait MemoryAccessor {
 pub trait TaskMemoryAccessor: MemoryAccessor {
     /// Returns the maximum valid address for this memory accessor.
     fn maximum_valid_address(&self) -> UserAddress;
+}
+
+/// A memory manager for another thread.
+///
+/// When accessing memory through this object, we use less efficient codepaths that work across
+/// address spaces.
+pub struct RemoteMemoryManager {
+    mm: Arc<MemoryManager>,
+}
+
+impl RemoteMemoryManager {
+    fn new(mm: Arc<MemoryManager>) -> Self {
+        Self { mm }
+    }
+}
+
+// If we just have a MemoryManager, we cannot assume that its address space is current, which means
+// we need to use the slower "syscall" mechanism to access its memory.
+impl MemoryAccessor for RemoteMemoryManager {
+    fn read_memory<'a>(
+        &self,
+        addr: UserAddress,
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
+        self.mm.syscall_read_memory(addr, bytes)
+    }
+
+    fn read_memory_partial_until_null_byte<'a>(
+        &self,
+        addr: UserAddress,
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
+        self.mm.syscall_read_memory_partial_until_null_byte(addr, bytes)
+    }
+
+    fn read_memory_partial<'a>(
+        &self,
+        addr: UserAddress,
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
+        self.mm.syscall_read_memory_partial(addr, bytes)
+    }
+
+    fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        self.mm.syscall_write_memory(addr, bytes)
+    }
+
+    fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
+        self.mm.syscall_write_memory_partial(addr, bytes)
+    }
+
+    fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
+        self.mm.syscall_zero(addr, length)
+    }
+}
+
+impl TaskMemoryAccessor for RemoteMemoryManager {
+    fn maximum_valid_address(&self) -> UserAddress {
+        self.mm.maximum_valid_user_address
+    }
 }
 
 // TODO(https://fxbug.dev/42079727): replace this with MaybeUninit::as_bytes_mut.
@@ -2692,6 +2853,11 @@ impl MemoryManager {
     pub fn syscall_zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
         self.state.read().zero(addr, length)
     }
+
+    /// Obtain a reference to this memory manager that can be used from another thread.
+    pub fn as_remote(self: &Arc<Self>) -> RemoteMemoryManager {
+        RemoteMemoryManager::new(self.clone())
+    }
 }
 
 impl MemoryAccessorExt for dyn MemoryAccessor + '_ {}
@@ -2767,7 +2933,6 @@ impl MemoryManager {
                 #[cfg(feature = "alternate_anon_allocs")]
                 private_anonymous: PrivateAnonymousMemoryManager::new(backing_size),
                 forkable_state: Default::default(),
-                aio_contexts: Default::default(),
             }),
             // TODO(security): Reset to DISABLE, or the value in the fs.suid_dumpable sysctl, under
             // certain conditions as specified in the prctl(2) man page.
@@ -3614,6 +3779,39 @@ impl MemoryManager {
         error!(EFAULT)
     }
 
+    pub fn get_aio_context(&self, addr: UserAddress) -> Option<Arc<AioContext>> {
+        let state = self.state.read();
+        state.get_aio_context(addr).map(|(_, aio_context)| aio_context)
+    }
+
+    pub fn destroy_aio_context(
+        self: &Arc<Self>,
+        addr: UserAddress,
+    ) -> Result<Arc<AioContext>, Errno> {
+        let mut released_mappings = vec![];
+
+        // Hold the lock throughout the operation to uphold memory manager's invariants.
+        // See mm/README.md.
+        let mut state = self.state.write();
+
+        // Validate that this address actually has an AioContext. We need to hold the state lock
+        // until we actually remove the mappings to ensure that another thread does not manipulate
+        // the mappings after we've validated that they contain an AioContext.
+        let Some((range, aio_context)) = state.get_aio_context(addr) else {
+            return error!(EINVAL);
+        };
+
+        let length = range.end - range.start;
+        let result = state.unmap(self, range.start, length, &mut released_mappings);
+
+        // Drop the state before the unmapped mappings, since dropping a mapping may acquire a lock
+        // in `DirEntry`'s `drop`.
+        std::mem::drop(state);
+        std::mem::drop(released_mappings);
+
+        result.map(|_| aio_context)
+    }
+
     #[cfg(test)]
     pub fn get_mapping_name(&self, addr: UserAddress) -> Result<Option<FsString>, Errno> {
         let state = self.state.read();
@@ -3779,7 +3977,7 @@ fn write_map(
         }
     };
     match &map.name {
-        MappingName::None => {
+        MappingName::None | MappingName::AioContext(_) => {
             if map.flags.contains(MappingFlags::SHARED)
                 && map.flags.contains(MappingFlags::ANONYMOUS)
             {
@@ -4560,6 +4758,100 @@ mod tests {
 
         // Searching for more memory than available should fail.
         assert_eq!(mm.state.read().find_next_unused_range(mmap_top), None);
+    }
+
+    #[::fuchsia::test]
+    async fn test_count_placements() {
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let mm = current_task.mm();
+
+        // ten-page range
+        let page_size = *PAGE_SIZE as usize;
+        let subrange_ten = UserAddress::from_ptr(RESTRICTED_ASPACE_BASE)
+            ..UserAddress::from_ptr(RESTRICTED_ASPACE_BASE + 10 * page_size);
+
+        assert_eq!(
+            mm.state.read().count_possible_placements(11 * page_size, &subrange_ten),
+            Some(0)
+        );
+        assert_eq!(
+            mm.state.read().count_possible_placements(10 * page_size, &subrange_ten),
+            Some(1)
+        );
+        assert_eq!(
+            mm.state.read().count_possible_placements(9 * page_size, &subrange_ten),
+            Some(2)
+        );
+        assert_eq!(mm.state.read().count_possible_placements(page_size, &subrange_ten), Some(10));
+
+        // map 6th page
+        let addr = UserAddress::from_ptr(RESTRICTED_ASPACE_BASE + 5 * page_size);
+        assert_eq!(map_memory(&mut locked, &current_task, addr, *PAGE_SIZE), addr);
+
+        assert_eq!(
+            mm.state.read().count_possible_placements(10 * page_size, &subrange_ten),
+            Some(0)
+        );
+        assert_eq!(
+            mm.state.read().count_possible_placements(5 * page_size, &subrange_ten),
+            Some(1)
+        );
+        assert_eq!(
+            mm.state.read().count_possible_placements(4 * page_size, &subrange_ten),
+            Some(3)
+        );
+        assert_eq!(mm.state.read().count_possible_placements(page_size, &subrange_ten), Some(9));
+    }
+
+    #[::fuchsia::test]
+    async fn test_pick_placement() {
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let mm = current_task.mm();
+
+        let page_size = *PAGE_SIZE as usize;
+        let subrange_ten = UserAddress::from_ptr(RESTRICTED_ASPACE_BASE)
+            ..UserAddress::from_ptr(RESTRICTED_ASPACE_BASE + 10 * page_size);
+
+        let addr = UserAddress::from_ptr(RESTRICTED_ASPACE_BASE + 5 * page_size);
+        assert_eq!(map_memory(&mut locked, &current_task, addr, *PAGE_SIZE), addr);
+        assert_eq!(
+            mm.state.read().count_possible_placements(4 * page_size, &subrange_ten),
+            Some(3)
+        );
+
+        assert_eq!(
+            mm.state.read().pick_placement(4 * page_size, 0, &subrange_ten),
+            Some(UserAddress::from_ptr(RESTRICTED_ASPACE_BASE))
+        );
+        assert_eq!(
+            mm.state.read().pick_placement(4 * page_size, 1, &subrange_ten),
+            Some(UserAddress::from_ptr(RESTRICTED_ASPACE_BASE + page_size))
+        );
+        assert_eq!(
+            mm.state.read().pick_placement(4 * page_size, 2, &subrange_ten),
+            Some(UserAddress::from_ptr(RESTRICTED_ASPACE_BASE + 6 * page_size))
+        );
+    }
+
+    #[::fuchsia::test]
+    async fn test_find_random_unused_range() {
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let mm = current_task.mm();
+
+        // ten-page range
+        let page_size = *PAGE_SIZE as usize;
+        let subrange_ten = UserAddress::from_ptr(RESTRICTED_ASPACE_BASE)
+            ..UserAddress::from_ptr(RESTRICTED_ASPACE_BASE + 10 * page_size);
+
+        for _ in 0..10 {
+            let addr = mm.state.read().find_random_unused_range(page_size, &subrange_ten);
+            assert!(addr.is_some());
+            assert_eq!(
+                map_memory(&mut locked, &current_task, addr.unwrap(), *PAGE_SIZE),
+                addr.unwrap()
+            );
+        }
+        assert_eq!(mm.state.read().find_random_unused_range(page_size, &subrange_ten), None);
     }
 
     #[::fuchsia::test]

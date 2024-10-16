@@ -76,6 +76,7 @@ async fn create_realm(options: RealmOptions) -> Result<SagRealm, Error> {
     info!("building the realm");
 
     let use_fake_sag = options.use_fake_sag.unwrap_or(false);
+    let wait_for_suspending_token = options.wait_for_suspending_token.unwrap_or(false);
 
     let builder = RealmBuilder::new().await?;
 
@@ -148,10 +149,17 @@ async fn create_realm(options: RealmOptions) -> Result<SagRealm, Error> {
         .await?;
 
     builder
+        .add_capability(cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
+            name: "fuchsia.power.WaitForSuspendingToken".parse()?,
+            value: wait_for_suspending_token.into(),
+        }))
+        .await?;
+
+    builder
         .add_route(
             Route::new()
                 .capability(Capability::configuration("fuchsia.power.WaitForSuspendingToken"))
-                .from(Ref::void())
+                .from(Ref::self_())
                 .to(&component_ref),
         )
         .await?;
@@ -162,6 +170,7 @@ async fn create_realm(options: RealmOptions) -> Result<SagRealm, Error> {
             Route::new()
                 .capability(Capability::protocol_by_name("fuchsia.power.suspend.Stats"))
                 .capability(Capability::protocol_by_name("fuchsia.power.system.ActivityGovernor"))
+                .capability(Capability::protocol_by_name("fuchsia.power.system.CpuElementManager"))
                 .capability(Capability::service_by_name(
                     "fuchsia.power.broker.ElementInfoProviderService",
                 ))

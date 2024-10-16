@@ -71,6 +71,7 @@ fuchsia_elf_sizes = rule(
         "product": attr.label(
             doc = "The fuchsia product to check the size of.",
             providers = [FuchsiaProductImageInfo],
+            mandatory = True,
         ),
         "_elf_sizes_py": attr.label(
             default = "//fuchsia/tools:elf_sizes",

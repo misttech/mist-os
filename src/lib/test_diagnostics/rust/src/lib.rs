@@ -321,7 +321,7 @@ mod tests {
             assert_eq!(executor.run_until_stalled(&mut timeout_task), Poll::Pending);
             assert_eq!(*output.lock(), b"");
 
-            executor.set_fake_time(executor.now().add(zx::Duration::from_seconds(6)));
+            executor.set_fake_time(executor.now().add(zx::MonotonicDuration::from_seconds(6)));
             executor.wake_next_timer();
             assert_eq!(executor.run_until_stalled(&mut timeout_task), Poll::Ready(()));
             assert_eq!(*output.lock(), b"message1message2");

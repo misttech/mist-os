@@ -12,7 +12,7 @@ namespace forensics {
 namespace testing {
 namespace {
 
-constexpr zx::duration kLogMessageBaseTimestamp = zx::sec(15604);
+constexpr zx::time_boot kLogMessageBaseTimestamp = zx::time_boot(zx::sec(15604).to_nsecs());
 constexpr uint64_t kLogMessageProcessId = 7559;
 constexpr uint64_t kLogMessageThreadId = 7687;
 
@@ -22,7 +22,7 @@ fuchsia::logger::LogMessage BuildLogMessage(const int32_t severity, const std::s
                                             const zx::duration timestamp_offset,
                                             const std::vector<std::string>& tags) {
   fuchsia::logger::LogMessage msg{};
-  msg.time = (kLogMessageBaseTimestamp + timestamp_offset).get();
+  msg.time = kLogMessageBaseTimestamp + timestamp_offset;
   msg.pid = kLogMessageProcessId;
   msg.tid = kLogMessageThreadId;
   msg.tags = tags;

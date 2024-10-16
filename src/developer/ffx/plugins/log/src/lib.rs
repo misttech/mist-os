@@ -55,7 +55,7 @@ impl FfxMain for LogTool {
     type Writer = MachineWriter<LogEntry>;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
-        log_impl(writer, self.cmd, self.rcs_connector).await?;
+        log_impl(writer, self.cmd, self.rcs_connector, true).await?;
         Ok(())
     }
 }
@@ -65,6 +65,7 @@ pub async fn log_impl(
     writer: impl ToolIO<OutputItem = LogEntry> + Write + 'static,
     cmd: LogCommand,
     rcs_connector: Connector<RemoteControlProxy>,
+    include_timestamp: bool,
 ) -> Result<(), LogError> {
     let rcs_proxy = connect_to_rcs(&rcs_connector).await?;
     let instance_getter = rcs::root_realm_query(&rcs_proxy, TIMEOUT).await?;
@@ -84,6 +85,7 @@ pub async fn log_impl(
         },
         instance_getter,
         rcs_connector,
+        include_timestamp,
     )
     .await
 }
@@ -95,12 +97,14 @@ async fn log_main<W>(
     symbolizer: Option<impl Symbolize>,
     instance_getter: impl InstanceGetter,
     rcs_connector: Connector<RemoteControlProxy>,
+    include_timestamp: bool,
 ) -> Result<(), LogError>
 where
     W: ToolIO<OutputItem = LogEntry> + Write + 'static,
 {
     let formatter = DefaultLogFormatter::<W>::new_from_args(&cmd, writer);
-    log_loop(cmd, formatter, symbolizer, &instance_getter, rcs_connector).await?;
+    log_loop(cmd, formatter, symbolizer, &instance_getter, rcs_connector, include_timestamp)
+        .await?;
     Ok(())
 }
 
@@ -189,6 +193,7 @@ async fn log_loop<W>(
     symbolizer: Option<impl Symbolize>,
     realm_query: &impl InstanceGetter,
     rcs_connector: Connector<RemoteControlProxy>,
+    include_timestamp: bool,
 ) -> Result<(), LogError>
 where
     W: ToolIO<OutputItem = LogEntry> + Write,
@@ -252,6 +257,7 @@ where
             connection.log_socket,
             &mut formatter,
             symbolizer_channel.as_ref(),
+            include_timestamp,
         )
         .await;
         if stream_mode == fidl_fuchsia_diagnostics::StreamMode::Snapshot {
@@ -318,6 +324,16 @@ mod tests {
         }
     }
 
+    impl LogTool {
+        async fn main_no_timestamp(
+            self,
+            writer: <LogTool as fho::FfxMain>::Writer,
+        ) -> fho::Result<()> {
+            log_impl(writer, self.cmd, self.rcs_connector, false).await?;
+            Ok(())
+        }
+    }
+
     #[fuchsia::test]
     async fn json_logger_test() {
         let environment = TestEnvironment::new(TestEnvironmentConfig::default());
@@ -331,7 +347,7 @@ mod tests {
         let buffers = TestBuffers::default();
         let writer = MachineWriter::<LogEntry>::new_test(Some(Format::Json), &buffers);
 
-        assert_matches!(tool.main(writer).await, Ok(()));
+        assert_matches!(tool.main_no_timestamp(writer).await, Ok(()));
         let output = buffers.into_stdout_str();
 
         assert_eq!(
@@ -375,7 +391,7 @@ mod tests {
         let buffers = TestBuffers::default();
         let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
 
-        let error = format!("{}", tool.main(writer).await.unwrap_err());
+        let error = format!("{}", tool.main_no_timestamp(writer).await.unwrap_err());
 
         const EXPECTED_INTEREST_ERROR: &str = r#"WARN: One or more of your selectors appears to be ambiguous
 and may not match any components on your system.
@@ -393,11 +409,8 @@ ffx log --force-set-severity.
         assert_eq!(error, EXPECTED_INTEREST_ERROR);
     }
 
-    async fn logger_dump_test(
-        config: TestEnvironmentConfig,
-        cmd: LogCommand,
-        expected_output: &str,
-    ) {
+    async fn logger_dump_string(config: TestEnvironmentConfig, cmd: LogCommand) -> String {
+        let show_initial_timestamp = config.show_initial_timestamp;
         let mut environment = TestEnvironment::new(config);
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
@@ -410,10 +423,21 @@ ffx log --force-set-severity.
         let buffers = TestBuffers::default();
         let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
         let mut event_stream = environment.take_event_stream().unwrap();
-
-        assert_matches!(tool.main(writer).await, Ok(()));
-        assert_eq!(buffers.into_stdout_str(), expected_output);
+        if show_initial_timestamp {
+            assert_matches!(tool.main(writer).await, Ok(()));
+        } else {
+            assert_matches!(tool.main_no_timestamp(writer).await, Ok(()));
+        }
         assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
+        buffers.into_stdout_str()
+    }
+
+    async fn logger_dump_test(
+        config: TestEnvironmentConfig,
+        cmd: LogCommand,
+        expected_output: &str,
+    ) {
+        assert_eq!(logger_dump_string(config, cmd).await, expected_output);
     }
 
     #[fuchsia::test]
@@ -435,7 +459,7 @@ ffx log --force-set-severity.
         let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
         let mut event_stream = environment.take_event_stream().unwrap();
 
-        assert_matches!(tool.main(writer).await, Ok(()));
+        assert_matches!(tool.main_no_timestamp(writer).await, Ok(()));
         assert_eq!(event_stream.next().await, Some(TestEvent::SetInterest(selectors)));
     }
 
@@ -453,7 +477,7 @@ ffx log --force-set-severity.
         let buffers = TestBuffers::default();
         let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
 
-        let result = tool.main(writer).await;
+        let result = tool.main_no_timestamp(writer).await;
         assert_matches!(result, Err(fho::Error::User(err)) => {
             assert_matches!(err.downcast_ref::<LogError>(), Some(LogError::DumpWithSinceNow));
         });
@@ -473,7 +497,7 @@ ffx log --force-set-severity.
         let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
         let mut event_stream = environment.take_event_stream().unwrap();
 
-        assert_matches!(tool.main(writer).await, Ok(()));
+        assert_matches!(tool.main_no_timestamp(writer).await, Ok(()));
         assert_eq!(buffers.into_stdout_str(), "[00000.000000][ffx] INFO: Hello world!\u{1b}[m\n",);
         // ffx log keeps this connection always open. If it exits, it means that ffx log exits.
         assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
@@ -487,6 +511,23 @@ ffx log --force-set-severity.
             "[00000.000000][ffx] INFO: Hello world!\n",
         )
         .await;
+    }
+
+    #[fuchsia::test]
+    async fn logger_prints_initial_timestamp() {
+        let start_text = "[00000.000000][ffx] INFO: UTC time now: ";
+        let output = logger_dump_string(
+            TestEnvironmentConfig {
+                show_initial_timestamp: true,
+                messages: vec![],
+                ..Default::default()
+            },
+            LogCommand { no_color: true, ..LogCommand::default() },
+        )
+        .await;
+        assert_eq!(output.starts_with(start_text), true);
+        // Ensure the end has a valid timestamp
+        chrono::DateTime::parse_from_rfc3339(&output[start_text.len()..output.len() - 1]).unwrap();
     }
 
     #[fuchsia::test]
@@ -558,7 +599,7 @@ ffx log --force-set-severity.
         let mut event_stream = environment.take_event_stream().unwrap();
 
         // Intentionally unused. When in streaming mode, this should never return a value.
-        let _result = fasync::Task::local(tool.main(writer));
+        let _result = fasync::Task::local(tool.main_no_timestamp(writer));
 
         // Run the stream until we get the expected message.
         check_for_message(&buffers, TEST_STR).await;
@@ -620,7 +661,7 @@ ffx log --force-set-severity.
         let mut event_stream = environment.take_event_stream().unwrap();
 
         // Intentionally unused. When in streaming mode, this should never return a value.
-        let _result = fasync::Task::local(tool.main(writer));
+        let _result = fasync::Task::local(tool.main_no_timestamp(writer));
 
         // Run the stream until we get the expected message.
         check_for_message(&buffers, TEST_STR).await;
@@ -660,7 +701,7 @@ ffx log --force-set-severity.
         let mut event_stream = environment.take_event_stream().unwrap();
 
         // Intentionally unused. When in streaming mode, this should never return a value.
-        let _result = fasync::Task::local(tool.main(writer));
+        let _result = fasync::Task::local(tool.main_no_timestamp(writer));
 
         // Run the stream until we get the expected message.
         check_for_message(&buffers, TEST_STR).await;
@@ -831,7 +872,7 @@ ffx log --force-set-severity.
         let buffers = TestBuffers::default();
         let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
 
-        assert_matches!(tool.main(writer).await, Ok(()));
+        assert_matches!(tool.main_no_timestamp(writer).await, Ok(()));
         assert_eq!(buffers.into_stdout_str(), "[00000.000000][ffx] INFO: Hello world!\u{1b}[m\n");
         assert_matches!(
             event_stream.next().await,

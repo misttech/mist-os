@@ -2,10 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "inspect/offer.shard.cml" ],
+    include: [
+        "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
+    ],
     collections: [
         {
             name: "fxfs-crypt",
+            durability: "transient",
+        },
+        {
+            name: "storage-host",
             durability: "transient",
         },
     ],
@@ -24,6 +31,14 @@
             path: "/fs/blob/root",
         },
         {
+            directory: "partitions",
+            rights: [
+                "execute",
+                "rw*",
+            ],
+            path: "/partitions",
+        },
+        {
             protocol: [ "fuchsia.update.verify.BlobfsVerifier" ],
         },
         {
@@ -40,16 +55,6 @@
     ],
     use: [
         {
-            protocol: "fuchsia.storagehost.StorageHost",
-            from: "#storage_host",
-        },
-        {
-            directory: "partitions",
-            from: "#storage_host",
-            rights: [ "rw*" ],
-            path: "/partitions",
-        },
-        {
             protocol: "fuchsia.fs.startup.Startup",
             from: "#fxfs",
             path: "/fxfs/svc/fuchsia.fs.startup.Startup",
@@ -58,23 +63,20 @@
             protocol: "fuchsia.component.Realm",
             from: "framework",
         },
-    ],
-    offer: [
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [
-                "#fxfs",
-                "#fxfs-crypt",
-                "#storage_host",
+            service: [
+                "fuchsia.hardware.block.volume.Service",
+                "fuchsia.hardware.ramdisk.Service",
             ],
         },
+    ],
+    offer: [
         {
             protocol: [ "fuchsia.tracing.provider.Registry" ],
             from: "parent",
             to: [
                 "#fxfs",
-                "#storage_host",
+                "#storage-host",
             ],
             availability: "optional",
         },
@@ -97,10 +99,6 @@
                 "blob-exec",
             ],
             from: "self",
-        },
-        {
-            directory: "partitions",
-            from: "#storage_host",
         },
         {
             directory: "volumes",

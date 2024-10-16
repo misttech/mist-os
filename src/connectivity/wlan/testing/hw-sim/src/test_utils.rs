@@ -298,7 +298,7 @@ impl TestHelper {
     async fn wait_for_wlan_softmac_start(&mut self) {
         let (sender, receiver) = oneshot::channel::<()>();
         self.run_until_complete_or_timeout(
-            zx::Duration::from_seconds(120),
+            zx::MonotonicDuration::from_seconds(120),
             "receive a WlanSoftmacStart event",
             event::on_start_mac(event::once(|_, _| sender.send(()))),
             receiver,
@@ -343,7 +343,7 @@ impl TestHelper {
     /// the event handler, the main future may not be able to complete in time.
     pub async fn run_until_complete_or_timeout<H, F>(
         &mut self,
-        timeout: zx::Duration,
+        timeout: zx::MonotonicDuration,
         context: impl Display,
         handler: H,
         future: F,
@@ -423,42 +423,42 @@ impl Drop for TestHelper {
 
 pub struct RetryWithBackoff {
     deadline: MonotonicInstant,
-    prev_delay: zx::Duration,
-    next_delay: zx::Duration,
-    max_delay: zx::Duration,
+    prev_delay: zx::MonotonicDuration,
+    next_delay: zx::MonotonicDuration,
+    max_delay: zx::MonotonicDuration,
 }
 impl RetryWithBackoff {
-    pub fn new(timeout: zx::Duration) -> Self {
+    pub fn new(timeout: zx::MonotonicDuration) -> Self {
         RetryWithBackoff {
             deadline: MonotonicInstant::after(timeout),
-            prev_delay: zx::Duration::from_millis(0),
-            next_delay: zx::Duration::from_millis(1),
-            max_delay: zx::Duration::INFINITE,
+            prev_delay: zx::MonotonicDuration::from_millis(0),
+            next_delay: zx::MonotonicDuration::from_millis(1),
+            max_delay: zx::MonotonicDuration::INFINITE,
         }
     }
-    pub fn infinite_with_max_interval(max_delay: zx::Duration) -> Self {
+    pub fn infinite_with_max_interval(max_delay: zx::MonotonicDuration) -> Self {
         Self {
             deadline: MonotonicInstant::INFINITE,
             max_delay,
-            ..Self::new(zx::Duration::from_nanos(0))
+            ..Self::new(zx::MonotonicDuration::from_nanos(0))
         }
     }
 
     /// Return Err if the deadline was exceeded when this function was called.
     /// Otherwise, sleep for a little longer (following Fibonacci series) or up
     /// to the deadline, whichever is soonest. If a sleep occurred, this function
-    /// returns Ok. The value contained in both Ok and Err is the zx::Duration
+    /// returns Ok. The value contained in both Ok and Err is the zx::MonotonicDuration
     /// until or after the deadline when the function returns.
     async fn sleep_unless_after_deadline_(
         &mut self,
         verbose: bool,
-    ) -> Result<zx::Duration, zx::Duration> {
+    ) -> Result<zx::MonotonicDuration, zx::MonotonicDuration> {
         // Add an inner scope up to just after Timer::new to ensure all
         // time assignments are dropped after the sleep occurs. This
         // prevents misusing them after the sleep since they are all
         // no longer correct after the clock moves.
         {
-            if MonotonicInstant::after(zx::Duration::from_millis(0)) > self.deadline {
+            if MonotonicInstant::after(zx::MonotonicDuration::from_millis(0)) > self.deadline {
                 if verbose {
                     info!("Skipping sleep. Deadline exceeded.");
                 }
@@ -480,7 +480,7 @@ impl RetryWithBackoff {
         if self.next_delay < self.max_delay {
             let next_delay = std::cmp::min(
                 self.max_delay,
-                zx::Duration::from_nanos(
+                zx::MonotonicDuration::from_nanos(
                     self.prev_delay.into_nanos().saturating_add(self.next_delay.into_nanos()),
                 ),
             );
@@ -491,13 +491,15 @@ impl RetryWithBackoff {
         Ok(self.deadline - MonotonicInstant::now())
     }
 
-    pub async fn sleep_unless_after_deadline(&mut self) -> Result<zx::Duration, zx::Duration> {
+    pub async fn sleep_unless_after_deadline(
+        &mut self,
+    ) -> Result<zx::MonotonicDuration, zx::MonotonicDuration> {
         self.sleep_unless_after_deadline_(false).await
     }
 
     pub async fn sleep_unless_after_deadline_verbose(
         &mut self,
-    ) -> Result<zx::Duration, zx::Duration> {
+    ) -> Result<zx::MonotonicDuration, zx::MonotonicDuration> {
         self.sleep_unless_after_deadline_(true).await
     }
 }
@@ -561,7 +563,7 @@ pub async fn policy_scan_for_networks<'a>(
 /// This function returns `Ok(r)`, where `r` is the return value from `main_future`,
 /// if `main_future` completes before the `timeout` duration. Otherwise, `Err(())` is returned.
 pub async fn timeout_after<R, F: Future<Output = R> + Unpin>(
-    timeout: zx::Duration,
+    timeout: zx::MonotonicDuration,
     main_future: &mut F,
 ) -> Result<R, ()> {
     async { Ok(main_future.await) }.on_timeout(timeout.after_now(), || Err(())).await

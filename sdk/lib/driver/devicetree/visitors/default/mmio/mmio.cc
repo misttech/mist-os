@@ -20,28 +20,28 @@ constexpr const char kMmioNamesProp[] = "reg-names";
 zx::result<> MmioVisitor::Visit(Node& node, const devicetree::PropertyDecoder& decoder) {
   auto property = node.properties().find(kMmioProp);
   if (property == node.properties().end()) {
-    FDF_LOG(DEBUG, "Node '%s' has no mmio properties.", node.name().c_str());
+    FDF_LOG(DEBUG, "Node '%s' has no reg properties.", node.name().c_str());
     return zx::ok();
   }
 
   // Make sure value is a register array.
   auto reg_props = property->second.AsReg(decoder);
   if (reg_props == std::nullopt) {
-    FDF_SLOG(WARNING, "Node has invalid mmio property", KV("node_name", node.name()));
+    FDF_SLOG(WARNING, "Node has invalid reg property", KV("node_name", node.name()));
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   devicetree::StringList<> names_list = [&] {
     auto names_property_it = node.properties().find(kMmioNamesProp);
     if (names_property_it == node.properties().end()) {
-      FDF_LOG(DEBUG, "Node '%s' has no MMIO names properties.", node.name().c_str());
+      FDF_LOG(DEBUG, "Node '%s' has no reg names properties.", node.name().c_str());
       return devicetree::StringList<>({});
     }
 
     std::optional<devicetree::StringList<>> names_property =
         names_property_it->second.AsStringList();
     if (names_property == std::nullopt) {
-      FDF_LOG(DEBUG, "Node '%s' has invalid MMIO names properties.", node.name().c_str());
+      FDF_LOG(DEBUG, "Node '%s' has invalid reg names properties.", node.name().c_str());
       return devicetree::StringList<>({});
     }
 
@@ -54,7 +54,7 @@ zx::result<> MmioVisitor::Visit(Node& node, const devicetree::PropertyDecoder& d
   }
 
   if (!mmio_names.empty() && mmio_names.size() != reg_props->size()) {
-    FDF_LOG(ERROR, "Node '%s' has %zu MMIO regions but has %zu MMIO names.", node.name().c_str(),
+    FDF_LOG(ERROR, "Node '%s' has %zu reg entries but has %zu reg names.", node.name().c_str(),
             reg_props->size(), mmio_names.size());
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
@@ -67,13 +67,26 @@ zx::result<> MmioVisitor::Visit(Node& node, const devicetree::PropertyDecoder& d
       if (!mmio_names.empty()) {
         mmio.name() = std::move(mmio_names[i]);
       }
-      node.AddMmio(std::move(mmio));
-      FDF_LOG(DEBUG, "MMIO [0x%0lx, 0x%lx) added to node '%s'.", *mmio.base(),
-              *mmio.base() + *mmio.length(), node.name().data());
+      node_mmios_[node.id()].push_back(std::move(mmio));
     } else {
       FDF_LOG(DEBUG, "Node '%s' reg is not mmio.", node.name().data());
       break;
     }
+  }
+
+  return zx::ok();
+}
+
+zx::result<> MmioVisitor::FinalizeNode(Node& node) {
+  if (node.register_type() != RegisterType::kMmio ||
+      node_mmios_.find(node.id()) == node_mmios_.end()) {
+    return zx::ok();
+  }
+
+  for (auto&& mmio : node_mmios_[node.id()]) {
+    FDF_LOG(DEBUG, "MMIO [0x%0lx, 0x%lx) added to node '%s'.", *mmio.base(),
+            *mmio.base() + *mmio.length(), node.name().data());
+    node.AddMmio(std::move(mmio));
   }
 
   return zx::ok();

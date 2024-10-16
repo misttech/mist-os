@@ -294,9 +294,12 @@ async def args_gn_collector() -> list[data.Result]:
 
     # Parse the import names into pairs of (type, value).
     # For instance, `import("//boards/x64.gni")` would be parsed into
-    # type="boards", value="x64".
+    # type="boards", value="x64", and
+    # `import("//foo/bar/boards/x64-fb.gni")` would be parsed into
+    # type="boards", value="x64-fb"
     # Types are filtered against ARGS_TITLE_MAP for inclusion.
-    import_regex = re.compile(r"\/\/(\w+)\/(\w+)\.gni")
+    # Types are "boards" and "products"
+    import_regex = re.compile(r".*(boards|products)\/([a-zA-Z0-9-_]+).gni")
     for import_name in imports:
         if (match := import_regex.match(import_name)) is not None:
             key = match.group(1)

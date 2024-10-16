@@ -611,7 +611,6 @@ void DWMacDevice::ProcRxBuffer(uint32_t int_status) {
     };
     rx_buffer[num_rx_completed] = rx_buffer_t{
         .meta = {.port = kPortId,
-                 .info_type = 0,
                  .flags = 0,
                  .frame_type =
                      static_cast<uint8_t>(fuchsia_hardware_network::FrameType::kEthernet)},

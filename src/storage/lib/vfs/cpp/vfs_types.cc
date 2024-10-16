@@ -219,11 +219,9 @@ zx::result<VnodeProtocol> NegotiateProtocol(fio::Flags flags, fio::NodeProtocolK
     }
   } else {
     // Remove protocols that were not requested from the set of supported protocols. If no protocols
-    // were requested, all *node* protocols are acceptable.
+    // were requested, any protocol is acceptable.
     if (requested) {
       supported = supported & requested;
-    } else {
-      supported &= ~NodeProtocolKinds::kConnector;
     }
     // Attempt to negotiate a protocol for the connection based on the following order. The
     // fuchsia.io protocol does not enforce a particular order for resolution, and when callers

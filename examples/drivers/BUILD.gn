@@ -11,6 +11,7 @@ group("drivers") {
     "metadata:drivers",
     "simple/dfv1:pkg",
     "simple/dfv2:bazel_package",
+    "simple/rust:pkg",
     "skeleton:pkg",
     "template:bazel_package",
     "transport",

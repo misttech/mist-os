@@ -90,8 +90,8 @@ async fn echo_impl(
         loop {
             match rcs_proxy.echo_string(&echo_text).await {
                 Ok(r) => {
-                    let message = format!("SUCCESS: received {r:?}");
-                    writer.machine_or(&EchoMessage::Message(message.clone()), message)?;
+                    let user_out = format!("SUCCESS: received {r:?}");
+                    writer.machine_or(&EchoMessage::Message(r), user_out)?;
                 }
                 Err(e) => {
                     let message = format!("ERROR: {e:?}");
@@ -207,7 +207,7 @@ mod test {
         let err = format!("json must adhere to schema: {json}");
         <EchoTool as FfxMain>::Writer::verify_schema(&json).expect(&err);
 
-        let want = EchoMessage::Message("SUCCESS: received \"test\"".into());
+        let want = EchoMessage::Message("test".into());
         assert_eq!(json, json!(want));
         Ok(())
     }

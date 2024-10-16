@@ -233,7 +233,7 @@ impl Peer {
 
     /// How long to wait after a non-local establishment of a stream to start the stream.
     /// Chosen to produce reasonably quick startup while allowing for peer start.
-    const STREAM_DWELL: zx::Duration = zx::Duration::from_millis(500);
+    const STREAM_DWELL: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(500);
 
     /// Receive a channel from the peer that was initiated remotely.
     /// This function should be called whenever the peer associated with this opens an L2CAP channel.
@@ -2584,7 +2584,7 @@ mod tests {
         assert!(exec.run_until_stalled(&mut next_remote_request_fut).is_pending());
 
         // After the timeout has passed..
-        exec.set_fake_time(zx::Duration::from_seconds(3).after_now());
+        exec.set_fake_time(zx::MonotonicDuration::from_seconds(3).after_now());
         let _ = exec.wake_expired_timers();
 
         let stream_ids = match exec.run_until_stalled(&mut next_remote_request_fut) {

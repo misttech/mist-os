@@ -224,7 +224,7 @@ async fn test_fetch_http(behavior: &str) {
 async fn test_fetch_past_deadline(behavior: &str) {
     run(behavior, |loader, addr| async move {
         // Deadline expired 10 minutes ago!
-        let deadline = Some(zx::MonotonicInstant::after(zx::Duration::from_minutes(-10)));
+        let deadline = Some(zx::MonotonicInstant::after(zx::MonotonicDuration::from_minutes(-10)));
         let http::Response { error, body, .. } = loader
             .fetch(make_request("GET", format!("http://{}", addr), deadline))
             .await
@@ -242,7 +242,7 @@ async fn test_fetch_past_deadline(behavior: &str) {
 async fn test_fetch_response_too_slow(behavior: &str) {
     run(behavior, |loader, addr| async move {
         // Deadline expires 100ms from now.
-        let deadline = Some(zx::MonotonicInstant::after(zx::Duration::from_millis(100)));
+        let deadline = Some(zx::MonotonicInstant::after(zx::MonotonicDuration::from_millis(100)));
         let http::Response { error, body, .. } = loader
             .fetch(make_request("GET", format!("http://{}{}", addr, PENDING), deadline))
             .await

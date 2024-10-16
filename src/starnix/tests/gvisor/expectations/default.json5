@@ -153,13 +153,6 @@
                 "AffinityTest.NewThread",
                 "AffinityTest.Sanity",
 
-                // aio_test
-                "AIOTest.MremapExpansion",
-                "AIOTest.Mprotect",
-                "AIOTest.Mremap",
-                "AIOTest.Timeout",
-                "AIOTest.CloneVm",
-
                 // cgroup_test
                 "CPUAcctCgroup.CPUAcctStat",
                 "CPUAcctCgroup.CPUAcctUsage",
@@ -953,9 +946,6 @@
                 // TODO(https://fxbug.dev/329684663): Re-enable once falke is resolved.
                 "AllFamilies/SocketMultiProtocolInetLoopbackIsolatedTest.V4MappedEphemeralPortReservedReuseAddr/*",
 
-                // Crashes due to assuming the aio context is a pointer.
-                "AIOTest.BasicWrite",
-
                 // This hangs on debug builds.
                 //
                 // See https://fxbug.dev/42084731.
@@ -991,11 +981,6 @@
 
                 // Times out.
                 "ItimerTest.DeliversSIGPROFToThreadsRoughlyFairlyIdle",
-
-                // Flaky b/352233059. We generate the error asynchronously, which means the
-                // test passes or fails depending on whether we generate the error before the
-                // test calls GetEvents.
-                "AIOTest.BadWrite",
 
                 // https://fxbug.dev/42085936
                 "AllSocketPairTest.RecvTimeoutRecvmsgOneSecondSucceeds/*",

@@ -194,14 +194,30 @@ class FakeLegacyStreamImpl : public FakeLegacyStream, public fuchsia::camera2::S
     callback({kFakeImageFormats.begin(), kFakeImageFormats.end()});
   }
 
+  void GetBuffers2(GetBuffers2Callback callback) override {
+    GetBuffersCommon(
+        [callback = std::move(callback)](fuchsia::sysmem2::BufferCollectionTokenHandle token) {
+          std::move(callback)(std::move(token));
+        });
+  }
+
   void GetBuffers(GetBuffersCallback callback) override {
+    GetBuffersCommon(
+        [callback = std::move(callback)](fuchsia::sysmem2::BufferCollectionTokenHandle token) {
+          std::move(callback)(
+              fuchsia::sysmem::BufferCollectionTokenHandle(std::move(token).TakeChannel()));
+        });
+  }
+
+  void GetBuffersCommon(
+      fit::function<void(fuchsia::sysmem2::BufferCollectionTokenHandle)> callback) {
     fuchsia::sysmem2::BufferCollectionTokenHandle token;
 
     fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest allocate_shared_request;
     allocate_shared_request.set_token_request(token.NewRequest());
     allocator_->AllocateSharedCollection(std::move(allocate_shared_request));
 
-    callback(fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(token.TakeChannel()));
+    callback(std::move(token));
   }
 
   fidl::Binding<fuchsia::camera2::Stream> binding_;

@@ -39,9 +39,9 @@ pub struct DhcpV6PdInner {
 fn convert_zx_time_into_seconds_until(time: zx::MonotonicInstant) -> u32 {
     let duration = time - zx::MonotonicInstant::get();
 
-    if duration == zx::Duration::INFINITE {
+    if duration == zx::MonotonicDuration::INFINITE {
         u32::MAX
-    } else if duration <= zx::Duration::ZERO {
+    } else if duration <= zx::MonotonicDuration::ZERO {
         u32::MIN
     } else {
         duration.into_seconds().try_into().unwrap_or(u32::MAX)

@@ -336,6 +336,7 @@
             protocol: "fuchsia.lightsensor.Sensor",
             from: "#ui",
             to: "#session-manager",
+            source_availability: "unknown",
         },
         {
             protocol: "fuchsia.ultrasound.Factory",

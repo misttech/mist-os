@@ -219,6 +219,71 @@ async fn open_exposed_directory(
     Ok(directory_proxy)
 }
 
+async fn suspend_container(
+    payload: fstarnixrunner::ManagerSuspendContainerRequest,
+    suspend_context: &Arc<SuspendContext>,
+    kernels: &Kernels,
+) -> Result<
+    Result<fstarnixrunner::ManagerSuspendContainerResponse, fstarnixrunner::SuspendError>,
+    Error,
+> {
+    let Some(container_job) = payload.container_job else {
+        return Ok(Err(fstarnixrunner::SuspendError::SuspendFailure));
+    };
+
+    // These handles need to kept alive until the end of the block, as they will
+    // resume the kernel when dropped.
+    let _suspend_handles = match suspend_kernel(&container_job).await {
+        Ok(handles) => handles,
+        Err(e) => {
+            warn!("error suspending container {:?}", e);
+            return Ok(Err(fstarnixrunner::SuspendError::SuspendFailure));
+        }
+    };
+
+    let suspend_start = zx::BootInstant::get();
+
+    if let Some(wake_locks) = payload.wake_locks {
+        match wake_locks.wait_handle(zx::Signals::EVENT_SIGNALED, zx::MonotonicInstant::ZERO) {
+            Ok(_) => {
+                // There were wake locks active after suspending all processes, resume
+                // and fail the suspend call.
+                return Ok(Err(fstarnixrunner::SuspendError::WakeLocksExist));
+            }
+            Err(_) => {}
+        };
+    }
+
+    kernels.drop_wake_lease(&container_job)?;
+
+    let resume_events = suspend_context.resume_events.lock();
+    let mut wait_items: Vec<zx::WaitItem<'_>> = resume_events
+        .iter()
+        .map(|e: &zx::EventPair| zx::WaitItem {
+            handle: e.as_handle_ref(),
+            waitfor: RUNNER_SIGNAL,
+            pending: zx::Signals::empty(),
+        })
+        .collect();
+
+    // TODO: We will likely have to handle a larger number of wake sources in the
+    // future, at which point we may want to consider a Port-based approach. This
+    // would also allow us to unblock this thread.
+    match zx::object_wait_many(&mut wait_items, zx::MonotonicInstant::INFINITE) {
+        Ok(_) => {}
+        Err(e) => {
+            warn!("error waiting for wake event {:?}", e);
+        }
+    };
+
+    kernels.acquire_wake_lease(&container_job).await?;
+
+    Ok(Ok(fstarnixrunner::ManagerSuspendContainerResponse {
+        suspend_time: Some((zx::BootInstant::get() - suspend_start).into_nanos()),
+        ..Default::default()
+    }))
+}
+
 pub async fn serve_starnix_manager(
     mut stream: fstarnixrunner::ManagerRequestStream,
     suspend_context: Arc<SuspendContext>,
@@ -233,80 +298,12 @@ pub async fn serve_starnix_manager(
                 }
             }
             fstarnixrunner::ManagerRequest::SuspendContainer { payload, responder, .. } => {
-                let Some(container_job) = payload.container_job else {
-                    if let Err(e) =
-                        responder.send(Err(fstarnixrunner::SuspendError::SuspendFailure))
-                    {
-                        warn!("error responding to suspend request {:?}", e);
-                    }
-                    continue;
-                };
-
-                // These handles need to kept alive until the end of the block, as they will
-                // resume the kernel when dropped.
-                let _suspend_handles = match suspend_kernel(&container_job).await {
-                    Ok(handles) => handles,
-                    Err(e) => {
-                        warn!("error suspending container {:?}", e);
-                        if let Err(e) =
-                            responder.send(Err(fstarnixrunner::SuspendError::SuspendFailure))
-                        {
-                            warn!("error responding to suspend request {:?}", e);
-                        }
-                        continue;
-                    }
-                };
-
-                let suspend_start = zx::BootInstant::get();
-
-                if let Some(wake_locks) = payload.wake_locks {
-                    match wake_locks
-                        .wait_handle(zx::Signals::EVENT_SIGNALED, zx::MonotonicInstant::ZERO)
-                    {
-                        Ok(_) => {
-                            // There were wake locks active after suspending all processes, resume
-                            // and fail the suspend call.
-                            if let Err(e) =
-                                responder.send(Err(fstarnixrunner::SuspendError::WakeLocksExist))
-                            {
-                                warn!("error responding to suspend request {:?}", e);
-                            }
-                            continue;
-                        }
-                        Err(_) => {}
-                    };
-                }
-
-                kernels.drop_wake_lease(&container_job)?;
-
-                let resume_events = suspend_context.resume_events.lock();
-                let mut wait_items: Vec<zx::WaitItem<'_>> = resume_events
-                    .iter()
-                    .map(|e: &zx::EventPair| zx::WaitItem {
-                        handle: e.as_handle_ref(),
-                        waitfor: RUNNER_SIGNAL,
-                        pending: zx::Signals::empty(),
-                    })
-                    .collect();
-
-                // TODO: We will likely have to handle a larger number of wake sources in the
-                // future, at which point we may want to consider a Port-based approach. This
-                // would also allow us to unblock this thread.
-                match zx::object_wait_many(&mut wait_items, zx::MonotonicInstant::INFINITE) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        warn!("error waiting for wake event {:?}", e);
-                    }
-                };
-
-                kernels.acquire_wake_lease(&container_job).await?;
-
-                let response = fstarnixrunner::ManagerSuspendContainerResponse {
-                    suspend_time: Some((zx::BootInstant::get() - suspend_start).into_nanos()),
-                    ..Default::default()
-                };
-                if let Err(e) = responder.send(Ok(&response)) {
-                    warn!("error responding to suspend request {:?}", e);
+                let response = suspend_container(payload, &suspend_context, kernels).await?;
+                if let Err(e) = match response {
+                    Ok(o) => responder.send(Ok(&o)),
+                    Err(e) => responder.send(Err(e)),
+                } {
+                    warn!("error replying to suspend request: {e}");
                 }
             }
             fstarnixrunner::ManagerRequest::ProxyWakeChannel { payload, .. } => {
@@ -441,14 +438,17 @@ fn forward_message(
             zx::ChannelReadResult::Ok(r) => r,
             _ => return Err(anyhow!("Failed to read from channel")),
         };
-        write_channel.write(actual_bytes, actual_handles)?;
 
         if let Some(event) = event {
             // Signal event with `RUNNER_SIGNAL`, indicating that an event is being sent to
             // the kernel.
             let (clear_mask, set_mask) = (KERNEL_SIGNAL, RUNNER_SIGNAL);
             event.signal_handle(clear_mask, set_mask)?;
+        }
 
+        write_channel.write(actual_bytes, actual_handles)?;
+
+        if let Some(event) = event {
             // Wait for the kernel endpoint to signal that the event has been handled, and
             // that it is now safe to suspend the container again.
             match event.wait_handle(KERNEL_SIGNAL, zx::MonotonicInstant::INFINITE) {
@@ -459,12 +459,17 @@ fn forward_message(
                 }
             };
 
-            // Clear any remaining signals from the event before continuing the proxy.
-            let (clear_mask, set_mask) = (KERNEL_SIGNAL | RUNNER_SIGNAL, zx::Signals::NONE);
+            // Clear the kernel signal for this message before continuing.
+            let (clear_mask, set_mask) = (KERNEL_SIGNAL, zx::Signals::NONE);
             event.signal_handle(clear_mask, set_mask)?;
         }
     }
-    Ok(())
+
+    if wait_item.pending.contains(zx::Signals::CHANNEL_PEER_CLOSED) {
+        Err(anyhow!("Proxy peer was closed"))
+    } else {
+        Ok(())
+    }
 }
 
 async fn suspend_kernels(kernels: &Kernels, suspended_processes: &Mutex<Vec<zx::Handle>>) {
@@ -501,8 +506,7 @@ async fn suspend_kernel(kernel_job: &zx::Job) -> Result<Vec<zx::Handle>, Error> 
 
             found_new_process = true;
 
-            if let Ok(process_handle) =
-                kernel_job.get_child(&process_koid, zx::Rights::SAME_RIGHTS.bits())
+            if let Ok(process_handle) = kernel_job.get_child(&process_koid, zx::Rights::SAME_RIGHTS)
             {
                 let process = zx::Process::from_handle(process_handle);
                 match process.suspend() {
@@ -525,13 +529,10 @@ async fn suspend_kernel(kernel_job: &zx::Job) -> Result<Vec<zx::Handle>, Error> 
         for process in processes {
             let threads = process.threads().expect("failed to get threads");
             for thread_koid in &threads {
-                if let Ok(thread_handle) =
-                    process.get_child(&thread_koid, zx::Rights::SAME_RIGHTS.bits())
-                {
-                    let thread = zx::Thread::from_handle(thread_handle);
+                if let Ok(thread) = process.get_child(&thread_koid, zx::Rights::SAME_RIGHTS) {
                     match thread.wait_handle(
                         zx::Signals::THREAD_SUSPENDED,
-                        zx::MonotonicInstant::after(zx::Duration::INFINITE),
+                        zx::MonotonicInstant::after(zx::MonotonicDuration::INFINITE),
                     ) {
                         Err(e) => {
                             tracing::warn!("Error waiting for task suspension: {:?}", e);
@@ -549,4 +550,51 @@ async fn suspend_kernel(kernel_job: &zx::Job) -> Result<Vec<zx::Handle>, Error> 
     }
 
     Ok(handles.into_values().collect())
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::{start_proxy, ChannelProxy};
+    use fidl::AsHandleRef;
+
+    #[fuchsia::test]
+    async fn test_peer_closed_kernel() {
+        let (local_client, local_server) = zx::Channel::create();
+        let (remote_client, remote_server) = zx::Channel::create();
+        let (resume_event, _local_resume_event) = zx::EventPair::create();
+
+        let channel_proxy = ChannelProxy {
+            container_channel: local_server,
+            remote_channel: remote_client,
+            resume_event,
+        };
+        start_proxy(channel_proxy, Default::default());
+
+        std::mem::drop(local_client);
+
+        assert!(remote_server
+            .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::MonotonicInstant::INFINITE)
+            .is_ok());
+    }
+
+    #[fuchsia::test]
+    async fn test_peer_closed_remote() {
+        let (local_client, local_server) = zx::Channel::create();
+        let (remote_client, remote_server) = zx::Channel::create();
+        let (resume_event, _local_resume_event) = zx::EventPair::create();
+
+        let channel_proxy = ChannelProxy {
+            container_channel: local_server,
+            remote_channel: remote_client,
+            resume_event,
+        };
+        start_proxy(channel_proxy, Default::default());
+
+        std::mem::drop(remote_server);
+
+        assert!(local_client
+            .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::MonotonicInstant::INFINITE)
+            .is_ok());
+    }
 }

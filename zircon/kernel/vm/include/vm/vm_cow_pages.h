@@ -444,6 +444,9 @@ class VmCowPages final : public VmHierarchyBase,
   using AttributionCounts = VmObject::AttributionCounts;
   AttributionCounts GetAttributedMemoryInRangeLocked(uint64_t offset_bytes,
                                                      uint64_t len_bytes) const TA_REQ(lock());
+  AttributionCounts GetAttributedMemoryInRangeUsingSplitsLocked(uint64_t offset_bytes,
+                                                                uint64_t len_bytes) const
+      TA_REQ(lock());
 
   enum class EvictionHintAction : uint8_t {
     Follow,
@@ -511,11 +514,12 @@ class VmCowPages final : public VmHierarchyBase,
   uint32_t DebugLookupDepthLocked() const TA_REQ(lock());
 
   // VMO_VALIDATION
+  bool DebugValidatePageSharingLocked() const TA_REQ(lock());
   bool DebugValidatePageSplitsLocked() const TA_REQ(lock());
   bool DebugValidateBacklinksLocked() const TA_REQ(lock());
-  // Calls DebugValidatePageSplitsLocked on this and every parent in the chain, returning true if
-  // all return true.  Also calls DebugValidateBacklinksLocked() on every node in the hierarchy.
-  bool DebugValidatePageSplitsHierarchyLocked() const TA_REQ(lock());
+  // Calls DebugValidatePageSharesLocked on this and every parent in the chain, returning true if
+  // all return true. Also calls DebugValidateBacklinksLocked on every node in the hierarchy.
+  bool DebugValidateHierarchyLocked() const TA_REQ(lock());
   bool DebugValidateZeroIntervalsLocked() const TA_REQ(lock());
 
   // VMO_FRUGAL_VALIDATION
@@ -873,7 +877,7 @@ class VmCowPages final : public VmHierarchyBase,
   // The caller provides:
   //  * `self`: Node to begin the iteration from. It must be a visible node.
   //  * `func`: Callback function invoked for each non-empty entry.
-  //  * `offset`: Offset relative to `self` to being iterating at.
+  //  * `offset`: Offset relative to `self` to begin iterating at.
   //  * `size`: Size of the range to iterate.
   //
   // The type `S` must be implicitly convertible to a `VmCowPages` or a `const VmCowPages`.
@@ -1089,6 +1093,11 @@ class VmCowPages final : public VmHierarchyBase,
                                  vm_page_t* page, uint64_t owner_offset,
                                  AnonymousPageRequest* page_request, vm_page_t** out_page)
       TA_REQ(lock());
+  zx_status_t CloneCowPageUsingSplitsLocked(uint64_t offset, list_node_t* alloc_list,
+                                            VmCowPages* page_owner, vm_page_t* page,
+                                            uint64_t owner_offset,
+                                            AnonymousPageRequest* page_request,
+                                            vm_page_t** out_page) TA_REQ(lock());
 
   // This is an optimized wrapper around CloneCowPageLocked for when an initial content page needs
   // to be forked to preserve the COW invariant, but you know you are immediately going to overwrite
@@ -1100,6 +1109,11 @@ class VmCowPages final : public VmHierarchyBase,
   zx_status_t CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* freed_list,
                                        VmCowPages* page_owner, vm_page_t* page,
                                        uint64_t owner_offset, AnonymousPageRequest* page_request)
+      TA_REQ(lock());
+  zx_status_t CloneCowPageAsZeroUsingSplitsLocked(uint64_t offset, list_node_t* freed_list,
+                                                  VmCowPages* page_owner, vm_page_t* page,
+                                                  uint64_t owner_offset,
+                                                  AnonymousPageRequest* page_request)
       TA_REQ(lock());
 
   // Helper struct which encapsulates a parent node along with a range and limit relative to it.
@@ -1141,6 +1155,9 @@ class VmCowPages final : public VmHierarchyBase,
   // left child and the right child becomes the snapshot.
   zx_status_t CloneBidirectionalLocked(uint64_t offset, uint64_t size,
                                        fbl::RefPtr<VmCowPages>* cow_child) TA_REQ(lock());
+  zx_status_t CloneBidirectionalUsingSplitsLocked(uint64_t offset, uint64_t size,
+                                                  fbl::RefPtr<VmCowPages>* cow_child)
+      TA_REQ(lock());
 
   // Helper function for CreateCloneLocked. Performs unidirectional clone operation where this VMO
   // is cloned and the child clone is then hung in an appropriate position of the COW pages chain.
@@ -1159,6 +1176,8 @@ class VmCowPages final : public VmHierarchyBase,
   // not accessible by the sibling vmo.
   void ReleaseCowParentPagesLocked(uint64_t start, uint64_t end, BatchPQRemove* page_remover)
       TA_REQ(lock());
+  void ReleaseCowParentPagesUsingSplitsLocked(uint64_t start, uint64_t end,
+                                              BatchPQRemove* page_remover) TA_REQ(lock());
 
   // Helper function for ReleaseCowParentPagesLocked that processes pages which are visible
   // to at least this VMO, and possibly its sibling, as well as updates parent_(offset_)limit_.
@@ -1168,6 +1187,8 @@ class VmCowPages final : public VmHierarchyBase,
   // When cleaning up a hidden vmo, merges the hidden vmo's content (e.g. page list, view
   // of the parent) into the remaining child.
   void MergeContentWithChildLocked(VmCowPages* removed, bool removed_left) TA_REQ(lock());
+  void MergeContentWithChildUsingSplitsLocked(VmCowPages* removed, bool removed_left)
+      TA_REQ(lock());
 
   // Moves an existing page to the wired queue as a consequence of the page being pinned.
   void MoveToPinnedLocked(vm_page_t* page, uint64_t offset) TA_REQ(lock());
@@ -1220,36 +1241,11 @@ class VmCowPages final : public VmHierarchyBase,
   // clarity, whichever child is first in the list is the 'left' child, and whichever
   // child is second is the 'right' child. Children of a paged vmo will always be paged
   // vmos themselves.
-  VmCowPages& left_child_locked() TA_REQ(lock()) TA_ASSERT(left_child_locked().lock()) {
-    DEBUG_ASSERT(is_hidden_locked());
-    DEBUG_ASSERT(children_list_len_ == 2);
-
-    auto& ret = children_list_.front();
-    AssertHeld(ret.lock_ref());
-    return ret;
-  }
-  VmCowPages& right_child_locked() TA_REQ(lock()) TA_ASSERT(right_child_locked().lock()) {
-    DEBUG_ASSERT(is_hidden_locked());
-    DEBUG_ASSERT(children_list_len_ == 2);
-    auto& ret = children_list_.back();
-    AssertHeld(ret.lock_ref());
-    return ret;
-  }
-  const VmCowPages& left_child_locked() const TA_REQ(lock()) TA_ASSERT(left_child_locked().lock()) {
-    DEBUG_ASSERT(is_hidden_locked());
-    DEBUG_ASSERT(children_list_len_ == 2);
-    const auto& ret = children_list_.front();
-    AssertHeld(ret.lock_ref());
-    return ret;
-  }
+  VmCowPages& left_child_locked() TA_REQ(lock()) TA_ASSERT(left_child_locked().lock());
+  VmCowPages& right_child_locked() TA_REQ(lock()) TA_ASSERT(right_child_locked().lock());
+  const VmCowPages& left_child_locked() const TA_REQ(lock()) TA_ASSERT(left_child_locked().lock());
   const VmCowPages& right_child_locked() const TA_REQ(lock())
-      TA_ASSERT(right_child_locked().lock()) {
-    DEBUG_ASSERT(is_hidden_locked());
-    DEBUG_ASSERT(children_list_len_ == 2);
-    const auto& ret = children_list_.back();
-    AssertHeld(ret.lock_ref());
-    return ret;
-  }
+      TA_ASSERT(right_child_locked().lock());
 
   // Helpers to give convenience locked access to the parent_. Only valid to be called if there is a
   // parent.

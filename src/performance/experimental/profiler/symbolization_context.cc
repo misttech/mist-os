@@ -5,15 +5,18 @@
 #include "symbolization_context.h"
 
 #include <elf-search.h>
+#include <lib/trace/event.h>
 
 #include <algorithm>
 #include <iterator>
 
 zx::result<std::vector<profiler::Module>> profiler::GetProcessModules(
     const zx::unowned_process& process) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   std::vector<profiler::Module> modules;
   zx_status_t search_result = elf_search::ForEachModule(
       *process, [&modules, count = 0u](const elf_search::ModuleInfo& info) mutable {
+        TRACE_DURATION("cpu_profiler", "GetProcessModules/ForEachModule");
         profiler::Module& mod = modules.emplace_back();
         mod.module_id = count++;
         mod.module_name = info.name;

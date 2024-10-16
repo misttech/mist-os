@@ -4,10 +4,10 @@
 
 //! Type-safe bindings for Zircon jobs.
 
-use crate::sys::{self, zx_handle_t, zx_rights_t};
 use crate::{
-    object_get_info_single, object_get_info_vec, ok, AsHandleRef, Duration, Handle, HandleBased,
-    HandleRef, Koid, ObjectQuery, Process, ProcessOptions, Status, Task, Topic, Vmar,
+    object_get_info_single, object_get_info_vec, ok, sys, AsHandleRef, Handle, HandleBased,
+    HandleRef, Koid, MonotonicDuration, ObjectQuery, Process, ProcessOptions, Rights, Status, Task,
+    Topic, Vmar,
 };
 use bitflags::bitflags;
 
@@ -198,13 +198,13 @@ impl Job {
     /// Wraps the
     /// [zx_object_get_child](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_child.md)
     /// syscall.
-    pub fn get_child(&self, koid: &Koid, rights: zx_rights_t) -> Result<Handle, Status> {
-        let mut handle: zx_handle_t = Default::default();
+    pub fn get_child(&self, koid: &Koid, rights: Rights) -> Result<Handle, Status> {
+        let mut handle: sys::zx_handle_t = Default::default();
         let status = unsafe {
             sys::zx_object_get_child(
                 self.raw_handle(),
                 Koid::from(*koid).raw_koid(),
-                rights,
+                rights.bits(),
                 std::ptr::from_mut(&mut handle),
             )
         };
@@ -235,7 +235,7 @@ impl Into<u32> for JobPolicyOption {
 #[derive(Debug, Clone, PartialEq)]
 pub enum JobPolicy {
     Basic(JobPolicyOption, Vec<(JobCondition, JobAction)>),
-    TimerSlack(Duration, JobDefaultTimerMode),
+    TimerSlack(MonotonicDuration, JobDefaultTimerMode),
 }
 
 /// Represents the [ZX_POL_*](//docs/reference/syscalls/job_set_policy.md) constants
@@ -337,13 +337,13 @@ bitflags! {
 mod tests {
     // The unit tests are built with a different crate name, but fuchsia_runtime returns a "real"
     // zx::Job that we need to use.
-    use crate::sys::ZX_RIGHT_SAME_RIGHTS;
     use crate::INFO_VEC_SIZE_INITIAL;
     use std::collections::HashSet;
     use std::ffi::CString;
     use zx::{
-        sys, AsHandleRef, Duration, Instant, Job, JobAction, JobCondition, JobCriticalOptions,
-        JobDefaultTimerMode, JobInfo, JobPolicy, JobPolicyOption, Koid, Signals, Task,
+        sys, AsHandleRef, Instant, Job, JobAction, JobCondition, JobCriticalOptions,
+        JobDefaultTimerMode, JobInfo, JobPolicy, JobPolicyOption, Koid, MonotonicDuration, Signals,
+        Task,
     };
 
     #[test]
@@ -405,7 +405,7 @@ mod tests {
             .expect("failed to set job basic policy");
         child_job
             .set_policy(JobPolicy::TimerSlack(
-                Duration::from_millis(10),
+                MonotonicDuration::from_millis(10),
                 JobDefaultTimerMode::Early,
             ))
             .expect("failed to set job timer slack policy");
@@ -492,7 +492,7 @@ mod tests {
         assert_eq!(reported_job_koids.len(), 1);
         let reported_job_koid = reported_job_koids.remove(0);
         let reported_job_handle =
-            Job::from(fresh_job.get_child(&reported_job_koid, ZX_RIGHT_SAME_RIGHTS).unwrap());
+            Job::from(fresh_job.get_child(&reported_job_koid, zx::Rights::SAME_RIGHTS).unwrap());
         assert_eq!(reported_job_handle.get_koid(), created_job.get_koid());
 
         // We can even create a process on the handle we got back, and test ProcessKoid
@@ -504,7 +504,7 @@ mod tests {
         assert_eq!(reported_process_koids.len(), 1);
         let reported_process_koid = reported_process_koids.remove(0);
         let reported_process_handle =
-            reported_job_handle.get_child(&reported_process_koid, ZX_RIGHT_SAME_RIGHTS).unwrap();
+            reported_job_handle.get_child(&reported_process_koid, zx::Rights::SAME_RIGHTS).unwrap();
         assert_eq!(reported_process_handle.get_koid(), created_process.get_koid());
     }
 }

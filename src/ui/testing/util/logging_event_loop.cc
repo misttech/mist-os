@@ -20,6 +20,11 @@ static std::string ToString(const cpp20::source_location& location) {
 }
 }  // namespace
 
+void LoggingEventLoop::RunLoop(cpp20::source_location caller) {
+  FX_LOGS(INFO) << "Running loop (from " << ToString(caller) << ")";
+  RealLoop::RunLoop();
+}
+
 bool LoggingEventLoop::RunLoopWithTimeout(zx::duration timeout, cpp20::source_location caller) {
   FX_LOGS(INFO) << "Running until timeout (from " << ToString(caller) << ")";
   return RealLoop::RunLoopWithTimeout(timeout);
@@ -32,7 +37,7 @@ void LoggingEventLoop::RunLoopUntil(fit::function<bool()> condition,
 }
 
 bool LoggingEventLoop::RunLoopWithTimeoutOrUntil(fit::function<bool()> condition,
-                                                 zx::duration timeout,
+                                                 zx::duration timeout, zx::duration step,
                                                  cpp20::source_location caller) {
   FX_LOGS(INFO) << "Waiting for condition or timeout from " << ToString(caller);
   return RealLoop::RunLoopWithTimeoutOrUntil(std::move(condition), timeout);

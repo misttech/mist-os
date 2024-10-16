@@ -131,7 +131,7 @@ void LogListener::PendingMessage::Complete() {
 
 void LogListener::PushLogMessage(const fuchsia_logger::wire::LogMessage& message) {
   std::stringstream ss;
-  zx::duration timestamp(message.time);
+  zx::duration timestamp(message.time.get());
   // Add time in format [secs.millis].
   ss << '[' << std::setw(5) << std::setfill('0') << (timestamp.to_secs());
   ss << '.' << std::setw(3) << std::setfill('0') << (timestamp.to_msecs() % 1000ULL) << ']';

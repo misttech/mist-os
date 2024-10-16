@@ -50,21 +50,6 @@ std::vector<std::string_view> GetRegNames(const fdf_devicetree::ChildNode& node)
   return reg_names;
 }
 
-// Returns the hexadecimal number following '@' in a devicetree node name.
-zx::result<uint64_t> GetAddressSuffix(const std::string& name) {
-  const size_t at_position = name.rfind('@');
-  if (at_position == std::string::npos) {
-    return zx::error(ZX_ERR_NOT_FOUND);
-  }
-
-  char* endptr = nullptr;
-  const uint64_t value = strtoul(name.data() + at_position + 1, &endptr, 16);
-  if (*endptr == '\0') {
-    return zx::ok(value);
-  }
-  return zx::error(ZX_ERR_INVALID_ARGS);
-}
-
 }  // namespace
 
 namespace spmi_dt {
@@ -154,13 +139,7 @@ zx::result<> SpmiVisitor::ParseController(fdf_devicetree::Node& node) {
   fuchsia_hardware_spmi::ControllerInfo controller{{.id = controller_id}};
 
   uint16_t used_target_ids = 0;
-  for (const fdf_devicetree::ChildNode& child : node.children()) {
-    zx::result<uint64_t> address_suffix = GetAddressSuffix(child.name());
-    if (address_suffix.is_error()) {
-      FDF_LOG(ERROR, "SPMI target \"%s\" address suffix is invalid", child.name().c_str());
-      return address_suffix.take_error();
-    }
-
+  for (fdf_devicetree::ChildNode& child : node.children()) {
     auto reg_property = child.properties().find("reg");
     if (reg_property == child.properties().end()) {
       FDF_LOG(ERROR, "SPMI target \"%s\" has no reg property", child.name().c_str());
@@ -184,11 +163,6 @@ zx::result<> SpmiVisitor::ParseController(fdf_devicetree::Node& node) {
     if (target_type != SPMI_USID) {
       FDF_LOG(ERROR, "Unsupported SPMI target type %u for \"%s\"", target_id, node.name().c_str());
       return zx::error(ZX_ERR_NOT_SUPPORTED);
-    }
-    if (target_id != address_suffix) {
-      FDF_LOG(ERROR, "SPMI target \"%s\" has mismatched reg and address suffix",
-              node.name().c_str());
-      return zx::error(ZX_ERR_ALREADY_EXISTS);
     }
 
     if (used_target_ids & (1 << target_id)) {
@@ -227,13 +201,15 @@ zx::result<> SpmiVisitor::ParseController(fdf_devicetree::Node& node) {
 }
 
 zx::result<fuchsia_hardware_spmi::TargetInfo> SpmiVisitor::ParseTarget(
-    uint32_t controller_id, uint32_t target_id, const fdf_devicetree::ChildNode& node) {
+    uint32_t controller_id, uint32_t target_id, fdf_devicetree::ChildNode& node) {
   std::vector<std::string_view> reg_names = GetRegNames(node);
   if (reg_names.size() > 1) {
     FDF_LOG(ERROR, "SPMI target \"%s\" has mismatched reg and reg-names properties",
             node.name().c_str());
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
+
+  node.set_register_type(fdf_devicetree::RegisterType::kSpmi);
 
   fuchsia_hardware_spmi::TargetInfo target{{.id = target_id}};
   if (!reg_names.empty()) {
@@ -275,7 +251,7 @@ zx::result<fuchsia_hardware_spmi::TargetInfo> SpmiVisitor::ParseTarget(
   }
 
   std::vector<fuchsia_hardware_spmi::SubTargetInfo> sub_targets_info;
-  for (const fdf_devicetree::ChildNode& child : node.GetNode()->children()) {
+  for (fdf_devicetree::ChildNode& child : node.GetNode()->children()) {
     zx::result<std::vector<fuchsia_hardware_spmi::SubTargetInfo>> sub_target_regions =
         ParseSubTarget(controller_id, target, child);
     if (sub_target_regions.is_error()) {
@@ -291,14 +267,10 @@ zx::result<fuchsia_hardware_spmi::TargetInfo> SpmiVisitor::ParseTarget(
 
 zx::result<std::vector<fuchsia_hardware_spmi::SubTargetInfo>> SpmiVisitor::ParseSubTarget(
     uint32_t controller_id, const fuchsia_hardware_spmi::TargetInfo& parent,
-    const fdf_devicetree::ChildNode& node) {
+    fdf_devicetree::ChildNode& node) {
   ZX_DEBUG_ASSERT(parent.id());
 
-  zx::result<uint64_t> address_suffix = GetAddressSuffix(node.name());
-  if (address_suffix.is_error()) {
-    FDF_LOG(ERROR, "SPMI sub-target \"%s\" address suffix is invalid", node.name().c_str());
-    return address_suffix.take_error();
-  }
+  node.set_register_type(fdf_devicetree::RegisterType::kSpmi);
 
   auto reg_property = node.properties().find("reg");
   if (reg_property == node.properties().end()) {
@@ -311,11 +283,6 @@ zx::result<std::vector<fuchsia_hardware_spmi::SubTargetInfo>> SpmiVisitor::Parse
     FDF_LOG(ERROR, "SPMI sub-target \"%s\" has invalid reg size %zu", node.name().c_str(),
             reg_array.size());
     return zx::error(ZX_ERR_INVALID_ARGS);
-  }
-  if (reg_array[0] != *address_suffix) {
-    FDF_LOG(ERROR, "SPMI sub-target \"%s\" has mismatched reg and address suffix",
-            node.name().c_str());
-    return address_suffix.take_error();
   }
 
   std::vector<std::string_view> reg_names = GetRegNames(node);

@@ -31,7 +31,6 @@ def main():
     )
     parser.add_argument("--out-dir", help="Path to the Fuchsia build directory")
     args = parser.parse_args()
-    args.gn_target.label_name += ".actual"
 
     build_dir = os.path.abspath(args.out_dir)
 

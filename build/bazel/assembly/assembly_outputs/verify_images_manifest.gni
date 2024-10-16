@@ -22,10 +22,11 @@ import("//build/bazel/bazel_workspace.gni")
 #    This should be defined by a GN `assembled_system()` template invocation.
 #    Type: string (GN label)
 #
-#  bazel_assembled_system_target (required)
-#    The Bazel target generating the assembled system used in comparison.
-#    This should defined by a Bazel `fuchsia_assembled_system()` rule.
-#    Type: string (Bazel label)
+#  bazel_product_bundle_target (required)
+#    The Bazel product bundle target generating the assembled system used in
+#    comparison.
+#    This should defined by a GN `bazel_product_bundle()` rule.
+#    Type: string (GN label)
 #
 #  exclude_packages (optional)
 #    List of packages to ignore in the diff.
@@ -42,8 +43,8 @@ import("//build/bazel/bazel_workspace.gni")
 template("verify_images_manifest") {
   assert(defined(invoker.gn_assembled_system_target),
          "gn_assembled_system_target is required")
-  assert(defined(invoker.bazel_assembled_system_target),
-         "bazel_assembled_system_target is required")
+  assert(defined(invoker.bazel_product_bundle_target),
+         "bazel_product_bundle_target is required")
 
   action(target_name) {
     forward_variables_from(invoker,
@@ -52,12 +53,21 @@ template("verify_images_manifest") {
                              "visibility",
                            ])
 
+    _bazel_assembled_system_target =
+        "${invoker.bazel_product_bundle_target}_create_system"
     _bazel_assembled_system_out_dir =
-        get_label_info(invoker.bazel_assembled_system_target, "target_out_dir")
+        get_label_info(_bazel_assembled_system_target, "target_out_dir")
     _bazel_assembled_system_name =
-        get_label_info(invoker.bazel_assembled_system_target, "name")
+        get_label_info(_bazel_assembled_system_target, "name")
     _bazel_assembled_system_file = "${_bazel_assembled_system_out_dir}/${_bazel_assembled_system_name}/images.json"
-    _bazel_assembled_system_path_mapping = "${_bazel_assembled_system_out_dir}/${_bazel_assembled_system_name}.path_mapping"
+
+    _bazel_build_group_target =
+        "${invoker.bazel_product_bundle_target}_bazel_build_group"
+    _bazel_build_group_out_dir =
+        get_label_info(_bazel_build_group_target, "target_out_dir")
+    _bazel_build_group_name = get_label_info(_bazel_build_group_target, "name")
+    _bazel_build_group_path_mapping =
+        "${_bazel_build_group_out_dir}/${_bazel_build_group_name}.path_mapping"
 
     _gn_assembled_system_out_dir =
         get_label_info(invoker.gn_assembled_system_target, "target_out_dir")
@@ -73,7 +83,7 @@ template("verify_images_manifest") {
       python_exe_src,
       _avbtool_path,
       _bazel_assembled_system_file,
-      _bazel_assembled_system_path_mapping,
+      _bazel_build_group_path_mapping,
       _gn_assembled_system_file,
     ]
 
@@ -85,7 +95,8 @@ template("verify_images_manifest") {
     ]
 
     deps = [
-      invoker.bazel_assembled_system_target,
+      _bazel_assembled_system_target,
+      _bazel_build_group_target,
       invoker.gn_assembled_system_target,
     ]
     if (defined(invoker.deps)) {
@@ -99,7 +110,7 @@ template("verify_images_manifest") {
       "--images_manifest_bzl",
       rebase_path(_bazel_assembled_system_file, root_build_dir),
       "--path-mapping",
-      rebase_path(_bazel_assembled_system_path_mapping, root_build_dir),
+      rebase_path(_bazel_build_group_path_mapping, root_build_dir),
       "--python-path",
       rebase_path(python_exe_src, root_build_dir),
       "--avbtool-path",

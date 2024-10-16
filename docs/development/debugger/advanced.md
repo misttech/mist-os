@@ -39,8 +39,8 @@ The servers that appear are used to download symbol files and load them to
 the debugger asynchronously. For particularly large debug info files, you may
 see output like this from `sym-stat` in zxdb:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] sym-stat
+```none{: .devsite-terminal data-terminal-prefix="[zxdb]" }
+sym-stat
 ...
     Base: 0xc37e9000
     Build ID: ba17ef8c43bccf5fb6bf84f9a8d83d9cf3be8976 (Downloading...)
@@ -78,8 +78,8 @@ ffx component debug core/starnix_runner
 Once the debugger is connected, you can run `ps` to see a listing of all of the
 active processes on the Fuchsia device or emulator:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] ps
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+ps
  j: 1033 root
    p: 1102 bin/component_manager
    j: 1662
@@ -114,8 +114,8 @@ The number that follows the job or process is the object's KOID. You can then:
 From the zxdb console, you can attach to a specific process. For example,
 to attach to the `starnix_kernel.cm` process which is listed with a KOID of `66797`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] attach 66797
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+attach 66797
 Attached Process 2 state=Running koid=66797 name=starnix_kernel.cm component=starnix_kernel.cm
 Loading 15 modules for starnix_kernel.cm ....
 [zxdb]
@@ -127,8 +127,8 @@ From the zxdb console, you can attach to all the processes that are part of a
 job. For example, to attach to the `core/starnix_kernels:RW3JlbU` job which is
 listed with a KOID of `66764`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] attach -j 66764
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+attach -j 66764
 Waiting for process matching "job 66764".
 Type "filter" to see the current filters.
 Attached Process 2 state=Running koid=66797 name=starnix_kernel.cm component=starnix_kernel.cm
@@ -143,8 +143,8 @@ From the zxdb console, you can attach to a specific process that is part of a
 job. For example, to attach to the `starnix_kernel.cm` process which is part of
 the job with a KOID of `66764`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] attach -j 66764 starnix_kernel.cm
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+attach -j 66764 starnix_kernel.cm
 Waiting for process matching "starnix_kernel.cm".
 Type "filter" to see the current filters.
 Attached Process 2 state=Running koid=66797 name=starnix_kernel.cm component=starnix_kernel.cm

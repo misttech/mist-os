@@ -92,11 +92,6 @@
             to: [ "#lowpan-ot-driver" ],
         },
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [ "#lowpan-ot-driver" ],
-        },
-        {
             directory: "dev-class",
             from: "parent",
             as: "dev-class-ot-radio",
@@ -119,11 +114,6 @@
             protocol: [ "fuchsia.component.Binder" ],
             from: "#lowpan-ot-driver",
             to: "#lowpan-monitor",
-        },
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [ "#lowpan-monitor" ],
         },
     ],
 }

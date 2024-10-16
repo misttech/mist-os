@@ -9,7 +9,21 @@
 #include <stdio.h>
 #include <zircon/status.h>
 
+#include <filesystem>
+
 #include "src/sys/lib/stdout-to-debuglog/cpp/stdout-to-debuglog.h"
+
+namespace {
+const std::string kSysinfoServiceDir = "/svc/fuchsia.sysinfo.Service";
+std::string FindFirstInstance() {
+  for (const auto& entry : std::filesystem::directory_iterator(kSysinfoServiceDir)) {
+    if (entry.path().string() != ".") {
+      return entry.path().string();
+    }
+  };
+  return "";
+}
+}  // namespace
 
 int main(int argc, const char** argv) {
   if (const zx_status_t status = StdoutToDebuglog::Init(); status != ZX_OK) {
@@ -22,12 +36,16 @@ int main(int argc, const char** argv) {
   component::OutgoingDirectory outgoing = component::OutgoingDirectory(loop.dispatcher());
   if (const zx::result status = outgoing.AddUnmanagedProtocol<fuchsia_sysinfo::SysInfo>(
           [](fidl::ServerEnd<fuchsia_sysinfo::SysInfo> server_end) {
-            constexpr char kSysInfoPath[] = "/dev/sys/platform";
+            std::string first_instance = FindFirstInstance();
+            if (first_instance == "") {
+              fprintf(stderr, "sysinfo: no instances found");
+            }
+            std::string path = first_instance + "/device";
 
-            if (const zx::result status = component::Connect<fuchsia_sysinfo::SysInfo>(
-                    std::move(server_end), kSysInfoPath);
+            if (const zx::result status =
+                    component::Connect<fuchsia_sysinfo::SysInfo>(std::move(server_end), path);
                 status.is_error()) {
-              fprintf(stderr, "sysinfo: component::Connect(\"%s\") = %s\n", kSysInfoPath,
+              fprintf(stderr, "sysinfo: component::Connect(\"%s\") = %s\n", path.c_str(),
                       status.status_string());
             }
           });

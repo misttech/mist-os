@@ -23,15 +23,10 @@ type AEMU struct {
 var _ FuchsiaTarget = (*AEMU)(nil)
 
 // NewAEMU returns a new AEMU target with a given configuration.
-func NewAEMU(ctx context.Context, config QEMUConfig, opts Options) (*AEMU, error) {
-	target, err := NewQEMU(ctx, config, opts)
+func NewAEMU(ctx context.Context, config EmulatorConfig, opts Options) (*AEMU, error) {
+	qemu, err := newQEMU(ctx, aemuBinaryName, qemu.NewAEMUCommandBuilder(), config, opts)
 	if err != nil {
 		return nil, err
 	}
-
-	target.binary = aemuBinaryName
-	target.builder = qemu.NewAEMUCommandBuilder()
-	target.isQEMU = false
-
-	return &AEMU{QEMU: *target}, nil
+	return &AEMU{QEMU: *qemu}, nil
 }

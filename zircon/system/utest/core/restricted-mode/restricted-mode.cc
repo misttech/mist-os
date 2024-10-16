@@ -706,39 +706,6 @@ TEST(RestrictedMode, Bench) {
              t / iter * ZX_SEC(1) / zx::ticks::per_second(), t.get(), iter);
     }
 
-    // Perform channel-based exception handling.
-    {
-      zx::ticks t;
-      int iter = 0;
-      zx_restricted_reason_t reason_code;
-
-      zx::channel exception_channel;
-      ZX_ASSERT(zx::process::self()->create_exception_channel(0, &exception_channel) == ZX_OK);
-      std::thread exception_handler([&]() {
-        t = zx::ticks::now();
-        auto deadline = t + zx::ticks::per_second();
-        bool done;
-        do {
-          auto now = zx::ticks::now();
-          done = now > deadline;
-          zx_thread_state_general_regs_t general_regs = {};
-          ReadExceptionFromChannel(exception_channel, general_regs, done);
-          iter++;
-        } while (!done);
-        t = zx::ticks::now() - t;
-      });
-      state.set_pc(reinterpret_cast<uintptr_t>(exception_bounce_exception_address));
-      ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
-      // Iteration happens in the handler thread; we only have a single restricted_enter
-      // when using channel-based exception handling.
-      ASSERT_OK(restricted_enter_wrapper(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)vectab,
-                                         &reason_code));
-      exception_handler.join();
-
-      printf("channel-based exceptions %ld ns per round trip (%ld raw ticks) %d iters\n",
-             t / iter * ZX_SEC(1) / zx::ticks::per_second(), t.get(), iter);
-    }
-
     // In-thread exception handling
     auto t = zx::ticks::now();
     auto deadline = t + zx::ticks::per_second();
@@ -755,46 +722,6 @@ TEST(RestrictedMode, Bench) {
     printf("in-thread exceptions %ld ns per round trip (%ld raw ticks) %d iters\n",
            t / iter * ZX_SEC(1) / zx::ticks::per_second(), t.get(), iter);
   }
-}
-
-// Verify we can receive restricted exceptions via exception channels.
-TEST(RestrictedMode, ExceptionChannel) {
-  NEEDS_NEXT_SKIP(zx_restricted_bind_state);
-
-  zx::vmo vmo;
-  ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
-  auto cleanup = fit::defer([]() { EXPECT_OK(zx_restricted_unbind_state(0)); });
-
-  // Configure the state for x86.
-  ArchRegisterState state;
-  state.InitializeRegisters();
-  state.set_pc(reinterpret_cast<uint64_t>(exception_bounce));
-
-  // Spawn a thread to receive exceptions.
-  zx::channel exception_channel;
-  ZX_ASSERT(zx::process::self()->create_exception_channel(0, &exception_channel) == ZX_OK);
-
-  auto restricted_thread = zx::thread::self();
-
-  bool exception_handled = false;
-  std::thread exception_thread([&]() {
-    zx_thread_state_general_regs_t general_regs = {};
-    ReadExceptionFromChannel(exception_channel, general_regs, true /* kick */);
-
-    state.InitializeFromThreadState(general_regs);
-    state.VerifyTwiddledRestrictedState(RegisterMutation::kFromException);
-    exception_handled = true;
-  });
-
-  // Enter restricted mode. The restricted code will twiddle some registers
-  // and generate an exception.
-  ASSERT_OK(vmo.write(&state.restricted_state(), 0, sizeof(state.restricted_state())));
-  zx_restricted_reason_t reason_code = 99;
-  ASSERT_OK(restricted_enter_wrapper(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)vectab,
-                                     &reason_code));
-  exception_thread.join();
-  ASSERT_TRUE(exception_handled);
-  EXPECT_EQ(reason_code, ZX_RESTRICTED_REASON_KICK);
 }
 
 // Verify we can receive restricted exceptions using in-thread exception handlers.
@@ -913,8 +840,7 @@ TEST(RestrictedMode, KickBeforeEnter) {
   // Enter restricted mode with reasonable args, expect it to return due to kick and not run any
   // restricted mode code.
   uint64_t reason_code = 99;
-  ASSERT_OK(restricted_enter_wrapper(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)vectab,
-                                     &reason_code));
+  ASSERT_OK(restricted_enter_wrapper(0, (uintptr_t)vectab, &reason_code));
   EXPECT_EQ(reason_code, ZX_RESTRICTED_REASON_KICK);
 
   // Read the state out of the thread.
@@ -934,8 +860,7 @@ TEST(RestrictedMode, KickBeforeEnter) {
 #endif                      // defined(__riscv)
 
   // Check that the kicked state is cleared
-  ASSERT_OK(restricted_enter_wrapper(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)vectab,
-                                     &reason_code));
+  ASSERT_OK(restricted_enter_wrapper(0, (uintptr_t)vectab, &reason_code));
   EXPECT_EQ(reason_code, ZX_RESTRICTED_REASON_SYSCALL);
 
   // Read the state out of the thread.
@@ -1050,8 +975,7 @@ TEST(RestrictedMode, KickWhileStartingAndExiting) {
 
     // Attempting to enter restricted mode should return immediately with a kick.
     uint64_t reason_code = 99;
-    ASSERT_OK(restricted_enter_wrapper(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)&vectab,
-                                       &reason_code));
+    ASSERT_OK(restricted_enter_wrapper(0, (uintptr_t)&vectab, &reason_code));
     EXPECT_EQ(reason_code, ZX_RESTRICTED_REASON_KICK);
   });
 
@@ -1118,8 +1042,7 @@ TEST(RestrictedMode, KickWhileRunning) {
 
   // Enter restricted mode and expect to tell us that it was kicked out.
   uint64_t reason_code = 99;
-  ASSERT_OK(restricted_enter_wrapper(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)vectab,
-                                     &reason_code));
+  ASSERT_OK(restricted_enter_wrapper(0, (uintptr_t)vectab, &reason_code));
   EXPECT_EQ(reason_code, ZX_RESTRICTED_REASON_KICK);
 
   kicker.join();
@@ -1193,8 +1116,7 @@ TEST(RestrictedMode, KickJustBeforeSyscall) {
     signal.store(1);
   });
   uint64_t reason_code = 99;
-  ASSERT_OK(restricted_enter_wrapper(ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL, (uintptr_t)vectab,
-                                     &reason_code));
+  ASSERT_OK(restricted_enter_wrapper(0, (uintptr_t)vectab, &reason_code));
   EXPECT_EQ(ZX_RESTRICTED_REASON_KICK, reason_code);
   kicker.join();
 }

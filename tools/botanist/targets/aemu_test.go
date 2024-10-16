@@ -13,7 +13,7 @@ func TestNewAEMU(t *testing.T) {
 	ctx := context.Background()
 	a, err := NewAEMU(
 		ctx,
-		QEMUConfig{
+		EmulatorConfig{
 			Target: "x64",
 		},
 		Options{},

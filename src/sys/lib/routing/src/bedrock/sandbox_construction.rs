@@ -193,7 +193,6 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
     component_input: ComponentInput,
     program_input_dict_additions: &Dict,
     program_output_dict: Dict,
-    program_output_router: Router,
     framework_dict: Dict,
     capability_sourced_capabilities_dict: Dict,
     declared_dictionaries: Dict,
@@ -215,7 +214,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                     &component_input,
                     environment_decl,
                     program_input_dict_additions,
-                    &program_output_router,
+                    &program_output_dict,
                 ),
             )
             .ok();
@@ -257,7 +256,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
             &component_input,
             &program_input,
             program_input_dict_additions,
-            &program_output_router,
+            &program_output_dict,
             &framework_dict,
             &capability_sourced_capabilities_dict,
             use_,
@@ -276,7 +275,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                 &component_input,
                 &program_input,
                 program_input_dict_additions,
-                &program_output_router,
+                &program_output_dict,
                 &framework_dict,
                 &capability_sourced_capabilities_dict,
                 &cm_rust::UseDecl::Runner(cm_rust::UseRunnerDecl {
@@ -336,7 +335,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
             component,
             &child_component_output_dictionary_routers,
             &component_input,
-            &program_output_router,
+            &program_output_dict,
             &framework_dict,
             &capability_sourced_capabilities_dict,
             offer,
@@ -349,7 +348,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
         extend_dict_with_expose(
             component,
             &child_component_output_dictionary_routers,
-            &program_output_router,
+            &program_output_dict,
             &framework_dict,
             &capability_sourced_capabilities_dict,
             expose,
@@ -377,7 +376,7 @@ fn build_environment(
     component_input: &ComponentInput,
     environment_decl: &cm_rust::EnvironmentDecl,
     program_input_dict_additions: &Dict,
-    program_output_router: &Router,
+    program_output_dict: &Dict,
 ) -> ComponentEnvironment {
     let mut environment = ComponentEnvironment::new();
     if environment_decl.extends == fdecl::EnvironmentExtends::Realm {
@@ -418,10 +417,9 @@ fn build_environment(
                 program_input_dict_additions,
             )
             .with_porcelain_type(cap_type, moniker.clone()),
-            cm_rust::RegistrationSource::Self_ => program_output_router
-                .clone()
-                .lazy_get(
-                    source_path.clone(),
+            cm_rust::RegistrationSource::Self_ => program_output_dict
+                .get_router_or_not_found(
+                    &source_path,
                     RoutingError::use_from_self_not_found(
                         moniker,
                         source_path.iter_segments().join("/"),
@@ -469,7 +467,7 @@ pub fn extend_dict_with_offers<C: ComponentInstanceInterface + 'static>(
     child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
     component_input: &ComponentInput,
     dynamic_offers: &Vec<cm_rust::OfferDecl>,
-    program_output_router: &Router,
+    program_output_dict: &Dict,
     framework_dict: &Dict,
     capability_sourced_capabilities_dict: &Dict,
     target_input: &ComponentInput,
@@ -480,7 +478,7 @@ pub fn extend_dict_with_offers<C: ComponentInstanceInterface + 'static>(
             component,
             &child_component_output_dictionary_routers,
             component_input,
-            program_output_router,
+            program_output_dict,
             framework_dict,
             capability_sourced_capabilities_dict,
             offer,
@@ -505,7 +503,7 @@ fn extend_dict_with_config_use<C: ComponentInstanceInterface + 'static>(
     component_input: &ComponentInput,
     program_input: &ProgramInput,
     program_input_dict_additions: &Dict,
-    program_output_router: &Router,
+    program_output_dict: &Dict,
     config_use: &cm_rust::UseConfigurationDecl,
     error_reporter: impl ErrorReporter,
 ) {
@@ -520,10 +518,9 @@ fn extend_dict_with_config_use<C: ComponentInstanceInterface + 'static>(
             program_input_dict_additions,
         )
         .with_porcelain_type(porcelain_type, moniker.clone()),
-        cm_rust::UseSource::Self_ => program_output_router
-            .clone()
-            .lazy_get(
-                source_path.to_owned(),
+        cm_rust::UseSource::Self_ => program_output_dict
+            .get_router_or_not_found(
+                &source_path,
                 RoutingError::use_from_self_not_found(
                     moniker,
                     source_path.iter_segments().join("/"),
@@ -586,7 +583,7 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
     component_input: &ComponentInput,
     program_input: &ProgramInput,
     program_input_dict_additions: &Dict,
-    program_output_router: &Router,
+    program_output_dict: &Dict,
     framework_dict: &Dict,
     capability_sourced_capabilities_dict: &Dict,
     use_: &cm_rust::UseDecl,
@@ -603,7 +600,7 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
             component_input,
             program_input,
             program_input_dict_additions,
-            program_output_router,
+            program_output_dict,
             config,
             error_reporter,
         );
@@ -619,10 +616,9 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
             program_input_dict_additions,
         )
         .with_porcelain_type(porcelain_type, moniker.clone()),
-        cm_rust::UseSource::Self_ => program_output_router
-            .clone()
-            .lazy_get(
-                source_path.to_owned(),
+        cm_rust::UseSource::Self_ => program_output_dict
+            .get_router_or_not_found(
+                &source_path,
                 RoutingError::use_from_self_not_found(
                     moniker,
                     source_path.iter_segments().join("/"),
@@ -791,7 +787,7 @@ fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
     component: &Arc<C>,
     child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
     component_input: &ComponentInput,
-    program_output_router: &Router,
+    program_output_dict: &Dict,
     framework_dict: &Dict,
     capability_sourced_capabilities_dict: &Dict,
     offer: &cm_rust::OfferDecl,
@@ -827,16 +823,15 @@ fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
             let router = component_input.capabilities().lazy_get(source_path.to_owned(), err);
             router.with_porcelain_type(porcelain_type, component.moniker().clone())
         }
-        cm_rust::OfferSource::Self_ => {
-            let router = program_output_router.clone().lazy_get(
-                source_path.to_owned(),
+        cm_rust::OfferSource::Self_ => program_output_dict
+            .get_router_or_not_found(
+                &source_path,
                 RoutingError::offer_from_self_not_found(
                     &component.moniker(),
                     source_path.iter_segments().join("/"),
                 ),
-            );
-            router.with_porcelain_type(porcelain_type, component.moniker().clone())
-        }
+            )
+            .with_porcelain_type(porcelain_type, component.moniker().clone()),
         cm_rust::OfferSource::Child(child_ref) => {
             let child_name: ChildName = child_ref.clone().try_into().expect("invalid child ref");
             match child_component_output_dictionary_routers.get(&child_name) {
@@ -940,7 +935,7 @@ pub fn is_supported_expose(expose: &cm_rust::ExposeDecl) -> bool {
 fn extend_dict_with_expose<C: ComponentInstanceInterface + 'static>(
     component: &Arc<C>,
     child_component_output_dictionary_routers: &HashMap<ChildName, Router>,
-    program_output_router: &Router,
+    program_output_dict: &Dict,
     framework_dict: &Dict,
     capability_sourced_capabilities_dict: &Dict,
     expose: &cm_rust::ExposeDecl,
@@ -959,10 +954,9 @@ fn extend_dict_with_expose<C: ComponentInstanceInterface + 'static>(
 
     let porcelain_type = CapabilityTypeName::from(expose);
     let router = match expose.source() {
-        cm_rust::ExposeSource::Self_ => program_output_router
-            .clone()
-            .lazy_get(
-                source_path.to_owned(),
+        cm_rust::ExposeSource::Self_ => program_output_dict
+            .get_router_or_not_found(
+                &source_path,
                 RoutingError::expose_from_self_not_found(
                     &component.moniker(),
                     source_path.iter_segments().join("/"),

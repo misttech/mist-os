@@ -11,7 +11,7 @@ use fho::{daemon_protocol, deferred, moniker, FfxMain, FfxTool, MachineWriter, T
 use fidl_fuchsia_developer_ffx::{self as ffx, RecordingError, TracingProxy};
 use fidl_fuchsia_tracing::{BufferingMode, KnownCategory};
 use fidl_fuchsia_tracing_controller::{
-    ControllerProxy, ProviderInfo, ProviderSpec, ProviderStats, TraceConfig,
+    ProviderInfo, ProviderSpec, ProviderStats, ProvisionerProxy, TraceConfig,
 };
 use flyweights::FlyStr;
 use futures::future::{BoxFuture, FutureExt};
@@ -441,7 +441,7 @@ pub struct TraceTool {
     #[with(daemon_protocol())]
     proxy: TracingProxy,
     #[with(deferred(moniker("/core/trace_manager")))]
-    controller: fho::Deferred<ControllerProxy>,
+    provisioner: fho::Deferred<ProvisionerProxy>,
     #[command]
     cmd: TraceCommand,
     context: EnvironmentContext,
@@ -454,21 +454,23 @@ impl FfxMain for TraceTool {
     type Writer = Writer;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
-        trace(self.context, self.proxy, self.controller, writer, self.cmd).await.map_err(Into::into)
+        trace(self.context, self.proxy, self.provisioner, writer, self.cmd)
+            .await
+            .map_err(Into::into)
     }
 }
 
 pub async fn trace(
     context: EnvironmentContext,
     proxy: TracingProxy,
-    controller: fho::Deferred<ControllerProxy>,
+    provisioner: fho::Deferred<ProvisionerProxy>,
     mut writer: Writer,
     cmd: TraceCommand,
 ) -> Result<()> {
     let target_spec: Option<String> = get_target_specifier(&context).await?;
     match cmd.sub_cmd {
         TraceSubCommand::ListCategories(_) => {
-            let controller = controller.await?;
+            let controller = provisioner.await?;
             let mut categories = handle_fidl_error(controller.get_known_categories().await)?;
             categories.sort_unstable();
             if writer.is_machine() {
@@ -486,8 +488,8 @@ pub async fn trace(
             }
         }
         TraceSubCommand::ListProviders(_) => {
-            let controller = controller.await?;
-            let mut providers = handle_fidl_error(controller.get_providers().await)?
+            let provisioner = provisioner.await?;
+            let mut providers = handle_fidl_error(provisioner.get_providers().await)?
                 .into_iter()
                 .map(TraceProviderInfo::from)
                 .collect::<Vec<TraceProviderInfo>>();
@@ -674,8 +676,8 @@ async fn stop_tracing(
 ) -> Result<()> {
     let res = proxy.stop_recording(&output).await?;
     let (target, output_file) = match res {
-        Ok((target, output_file, terminate_result)) => {
-            for stat in terminate_result.provider_stats.unwrap_or_default() {
+        Ok((target, output_file, stop_result)) => {
+            for stat in stop_result.provider_stats.unwrap_or_default() {
                 for stat_output in stats_to_print(stat, verbose) {
                     writer.line(stat_output)?;
                 }
@@ -941,12 +943,12 @@ mod tests {
         })
     }
 
-    fn setup_fake_controller_proxy() -> fho::Deferred<ControllerProxy> {
+    fn setup_fake_controller_proxy() -> fho::Deferred<ProvisionerProxy> {
         fho::Deferred::from_output(Ok(fho::testing::fake_proxy(|req| match req {
-            tracing_controller::ControllerRequest::GetKnownCategories { responder, .. } => {
+            tracing_controller::ProvisionerRequest::GetKnownCategories { responder, .. } => {
                 responder.send(&fake_known_categories()).expect("should respond");
             }
-            tracing_controller::ControllerRequest::GetProviders { responder, .. } => {
+            tracing_controller::ProvisionerRequest::GetProviders { responder, .. } => {
                 responder.send(&fake_provider_infos()).expect("should respond");
             }
             r => panic!("unsupported req: {:?}", r),
@@ -998,12 +1000,12 @@ mod tests {
         infos
     }
 
-    fn setup_closed_fake_controller_proxy() -> fho::Deferred<ControllerProxy> {
+    fn setup_closed_fake_controller_proxy() -> fho::Deferred<ProvisionerProxy> {
         fho::Deferred::from_output(Ok(fho::testing::fake_proxy(|req| match req {
-            tracing_controller::ControllerRequest::GetKnownCategories { responder, .. } => {
+            tracing_controller::ProvisionerRequest::GetKnownCategories { responder, .. } => {
                 responder.control_handle().shutdown();
             }
-            tracing_controller::ControllerRequest::GetProviders { responder, .. } => {
+            tracing_controller::ProvisionerRequest::GetProviders { responder, .. } => {
                 responder.control_handle().shutdown();
             }
             r => panic!("unsupported req: {:?}", r),

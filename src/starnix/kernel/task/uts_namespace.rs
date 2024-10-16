@@ -21,6 +21,12 @@ pub struct UtsNamespace {
     pub domainname: FsString,
 }
 
+impl UtsNamespace {
+    pub fn fork(&self) -> UtsNamespaceHandle {
+        Arc::new(RwLock::new(self.clone()))
+    }
+}
+
 impl Default for UtsNamespace {
     fn default() -> Self {
         Self { hostname: DEFAULT_HOST_NAME.into(), domainname: DEFAULT_DOMAIN_NAME.into() }

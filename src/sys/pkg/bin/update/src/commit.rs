@@ -7,6 +7,7 @@ use fidl_fuchsia_update::{CommitStatusProviderMarker, CommitStatusProviderProxy}
 use fuchsia_component::client::connect_to_protocol;
 use futures::future::FusedFuture;
 use futures::prelude::*;
+use std::pin::pin;
 use std::time::Duration;
 use {fuchsia_async as fasync, zx};
 
@@ -70,7 +71,7 @@ async fn handle_wait_for_commit_impl(
 
     let commit_fut = wait_for_commit(proxy).fuse();
     futures::pin_mut!(commit_fut);
-    let mut timer_fut = fasync::Timer::new(WARNING_DURATION).fuse();
+    let mut timer_fut = pin!(fasync::Timer::new(WARNING_DURATION).fuse());
 
     // Send a warning after the WARNING_DURATION.
     let () = futures::select! {
@@ -154,7 +155,8 @@ mod tests {
         observer.assert_events(&[CommitEvent::Begin]);
 
         // Once we hit the warning duration, we should get a warning event.
-        executor.set_fake_time(fasync::MonotonicInstant::after(zx::Duration::from_seconds(1)));
+        executor
+            .set_fake_time(fasync::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(1)));
         assert!(executor.wake_expired_timers());
         match executor.run_until_stalled(&mut fut) {
             Poll::Ready(res) => panic!("future unexpectedly completed with: {res:?}"),

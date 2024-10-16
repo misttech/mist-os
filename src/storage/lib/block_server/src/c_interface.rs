@@ -9,6 +9,7 @@ use fidl::endpoints::RequestStream;
 use fuchsia_async::{self as fasync, EHandle};
 use futures::stream::{AbortHandle, Abortable};
 use futures::TryStreamExt;
+use std::borrow::Cow;
 use std::collections::{HashMap, VecDeque};
 use std::ffi::{c_char, c_void, CStr};
 use std::mem::MaybeUninit;
@@ -21,6 +22,7 @@ pub struct SessionManager {
     open_sessions: Mutex<HashMap<usize, Weak<Session>>>,
     condvar: Condvar,
     mbox: ExecutorMailbox,
+    info: super::PartitionInfo,
 }
 
 unsafe impl Send for SessionManager {}
@@ -87,6 +89,10 @@ impl super::SessionManager for SessionManager {
         let _ = session.fifo.signal_handle(zx::Signals::empty(), zx::Signals::USER_0);
 
         result
+    }
+
+    async fn get_info(&self) -> Result<Cow<'_, super::PartitionInfo>, zx::Status> {
+        Ok(Cow::Borrowed(&self.info))
     }
 }
 
@@ -301,17 +307,22 @@ pub struct BlockServer {
 struct ExecutorMailbox(Mutex<Mail>, Condvar);
 
 impl ExecutorMailbox {
-    fn post(&self, mail: Mail) {
-        *self.0.lock().unwrap() = mail;
+    /// Returns the old mail.
+    fn post(&self, mail: Mail) -> Mail {
+        let old = std::mem::replace(&mut *self.0.lock().unwrap(), mail);
         self.1.notify_all();
+        old
     }
 }
+
+type ShutdownCallback = unsafe extern "C" fn(*mut c_void);
 
 #[derive(Default)]
 enum Mail {
     #[default]
     None,
     Initialized(EHandle, AbortHandle),
+    AsyncShutdown(Box<BlockServer>, ShutdownCallback, *mut c_void),
     Finished,
 }
 
@@ -333,6 +344,7 @@ pub struct PartitionInfo {
     pub type_guid: [u8; 16],
     pub instance_guid: [u8; 16],
     pub name: *const c_char,
+    pub flags: u64,
 }
 
 /// cbindgen:no-export
@@ -347,14 +359,14 @@ impl PartitionInfo {
     unsafe fn to_rust(&self) -> super::PartitionInfo {
         super::PartitionInfo {
             block_count: self.block_count,
-            block_size: self.block_size,
             type_guid: self.type_guid,
             instance_guid: self.instance_guid,
             name: if self.name.is_null() {
-                String::new()
+                None
             } else {
-                String::from_utf8_lossy(CStr::from_ptr(self.name).to_bytes()).to_string()
+                Some(String::from_utf8_lossy(CStr::from_ptr(self.name).to_bytes()).to_string())
             },
+            flags: self.flags,
         }
     }
 }
@@ -372,6 +384,7 @@ pub unsafe extern "C" fn block_server_new(
         open_sessions: Mutex::default(),
         condvar: Condvar::new(),
         mbox: ExecutorMailbox::default(),
+        info: partition_info.to_rust(),
     });
 
     (session_manager.callbacks.start_thread)(
@@ -388,14 +401,15 @@ pub unsafe extern "C" fn block_server_new(
         )
     };
 
+    let block_size = partition_info.block_size;
     match mail {
         Mail::Initialized(ehandle, abort_handle) => Box::into_raw(Box::new(BlockServer {
-            server: super::BlockServer::new(partition_info.to_rust(), session_manager),
+            server: super::BlockServer::new(block_size, session_manager),
             ehandle,
             abort_handle,
         })),
         Mail::Finished => std::ptr::null_mut(),
-        Mail::None => unreachable!(),
+        _ => unreachable!(),
     }
 }
 
@@ -422,9 +436,19 @@ pub unsafe extern "C" fn block_server_thread(arg: *const c_void) {
 /// `arg` must be the value passed to the `start_thread` callback.
 #[no_mangle]
 pub unsafe extern "C" fn block_server_thread_delete(arg: *const c_void) {
-    let session_manager = Arc::from_raw(arg as *const SessionManager);
-    session_manager.mbox.post(Mail::Finished);
-    debug_assert!(Arc::strong_count(&session_manager) > 0);
+    let mail = {
+        let session_manager = Arc::from_raw(arg as *const SessionManager);
+        debug_assert!(Arc::strong_count(&session_manager) > 0);
+        session_manager.mbox.post(Mail::Finished)
+    };
+
+    if let Mail::AsyncShutdown(server, callback, arg) = mail {
+        std::mem::drop(server);
+        // SAFETY: Whoever supplied the callback must guarantee it's safe.
+        unsafe {
+            callback(arg);
+        }
+    }
 }
 
 /// # Safety
@@ -433,6 +457,22 @@ pub unsafe extern "C" fn block_server_thread_delete(arg: *const c_void) {
 #[no_mangle]
 pub unsafe extern "C" fn block_server_delete(block_server: *mut BlockServer) {
     let _ = Box::from_raw(block_server);
+}
+
+/// # Safety
+///
+/// `block_server` must be valid.
+#[no_mangle]
+pub unsafe extern "C" fn block_server_delete_async(
+    block_server: *mut BlockServer,
+    callback: ShutdownCallback,
+    arg: *mut c_void,
+) {
+    let block_server = Box::from_raw(block_server);
+    let session_manager = block_server.server.session_manager.clone();
+    let abort_handle = block_server.abort_handle.clone();
+    session_manager.mbox.post(Mail::AsyncShutdown(block_server, callback, arg));
+    abort_handle.abort();
 }
 
 /// Serves the Volume protocol for this server.  `handle` is consumed.
@@ -445,17 +485,14 @@ pub unsafe extern "C" fn block_server_serve(block_server: *const BlockServer, ha
     let block_server = &*block_server;
     let ehandle = &block_server.ehandle;
     let handle = zx::Handle::from_raw(handle);
-    ehandle
-        .root_scope()
-        .spawn(async move {
-            let _ = block_server
-                .server
-                .handle_requests(fvolume::VolumeRequestStream::from_channel(
-                    fasync::Channel::from_channel(handle.into()),
-                ))
-                .await;
-        })
-        .detach();
+    ehandle.root_scope().spawn(async move {
+        let _ = block_server
+            .server
+            .handle_requests(fvolume::VolumeRequestStream::from_channel(
+                fasync::Channel::from_channel(handle.into()),
+            ))
+            .await;
+    });
 }
 
 /// # Safety

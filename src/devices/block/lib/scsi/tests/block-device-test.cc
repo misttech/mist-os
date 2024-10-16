@@ -3,9 +3,12 @@
 // found in the LICENSE file.
 
 #include <endian.h>
+#include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/testing/cpp/driver_test.h>
+#include <lib/driver/testing/cpp/minimal_compat_environment.h>
 #include <lib/fit/function.h>
-#include <lib/scsi/block-device-dfv1.h>
-#include <lib/scsi/controller-dfv1.h>
+#include <lib/scsi/block-device.h>
+#include <lib/scsi/controller.h>
 #include <sys/types.h>
 #include <zircon/listnode.h>
 
@@ -13,18 +16,47 @@
 
 #include <fbl/auto_lock.h>
 #include <fbl/condition_variable.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
-#include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace scsi {
 
 // Controller for test; allows us to set expectations and fakes command responses.
-class ControllerForTest : public Controller {
+class TestController : public fdf::DriverBase, public Controller {
  public:
   using IOCallbackType = fit::function<zx_status_t(uint8_t, uint16_t, iovec, bool, iovec)>;
+  static constexpr char kDriverName[] = "scsi-test";
 
-  ~ControllerForTest() { ASSERT_EQ(times_, 0); }
+  TestController(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
+      : fdf::DriverBase(kDriverName, std::move(start_args), std::move(dispatcher)) {}
+
+  zx::result<> Start() override {
+    parent_node_.Bind(std::move(node()));
+
+    auto [controller_client_end, controller_server_end] =
+        fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
+    auto [node_client_end, node_server_end] =
+        fidl::Endpoints<fuchsia_driver_framework::Node>::Create();
+
+    node_controller_.Bind(std::move(controller_client_end));
+    root_node_.Bind(std::move(node_client_end));
+
+    fidl::Arena arena;
+
+    const auto args =
+        fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena).name(arena, name()).Build();
+
+    fidl::WireResult result =
+        parent_node_->AddChild(args, std::move(controller_server_end), std::move(node_server_end));
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "Failed to add child: %s", result.status_string());
+      return zx::error(result.status());
+    }
+    return zx::ok();
+  }
+
+  ~TestController() { ZX_ASSERT(times_ == 0); }
 
   // Init the state required for testing async IOs.
   zx_status_t AsyncIoInit() {
@@ -33,7 +65,7 @@ class ControllerForTest : public Controller {
       list_initialize(&queued_ios_);
       worker_thread_exit_ = false;
     }
-    auto cb = [](void* arg) -> int { return static_cast<ControllerForTest*>(arg)->WorkerThread(); };
+    auto cb = [](void* arg) -> int { return static_cast<TestController*>(arg)->WorkerThread(); };
     if (thrd_create_with_name(&worker_thread_, cb, this, "scsi-test-controller") != thrd_success) {
       printf("%s: Failed to create worker thread\n", __FILE__);
       return ZX_ERR_INTERNAL;
@@ -58,6 +90,14 @@ class ControllerForTest : public Controller {
       free(io);
     }
   }
+
+  fidl::WireSyncClient<fuchsia_driver_framework::Node>& root_node() override { return root_node_; }
+  std::string_view driver_name() const override { return name(); }
+  const std::shared_ptr<fdf::Namespace>& driver_incoming() const override { return incoming(); }
+  std::shared_ptr<fdf::OutgoingDirectory>& driver_outgoing() override { return outgoing(); }
+  async_dispatcher_t* driver_async_dispatcher() const { return dispatcher(); }
+  const std::optional<std::string>& driver_node_name() const override { return node_name(); }
+  fdf::Logger& driver_logger() override { return logger(); }
 
   size_t BlockOpSize() override {
     // No additional metadata required for each command transaction.
@@ -183,9 +223,19 @@ class ControllerForTest : public Controller {
   thrd_t worker_thread_;
   bool worker_thread_exit_ __TA_GUARDED(lock_);
   list_node_t queued_ios_ __TA_GUARDED(lock_);
+
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> root_node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> node_controller_;
 };
 
-class BlockDeviceTest : public zxtest::Test {
+class TestConfig final {
+ public:
+  using DriverType = TestController;
+  using EnvironmentType = fdf_testing::MinimalCompatEnvironment;
+};
+
+class BlockDeviceTest : public ::testing::Test {
  public:
   static constexpr uint8_t kTarget = 5;
   static constexpr uint16_t kLun = 1;
@@ -196,15 +246,26 @@ class BlockDeviceTest : public zxtest::Test {
   using DiskBlock = unsigned char[kBlockSize];
 
   void SetUp() override {
+    zx::result<> result = driver_test().StartDriver();
+    ASSERT_OK(result);
+    SetUpCommands();
+  }
+  void TearDown() override {
+    zx::result<> result = driver_test().StopDriver();
+    ASSERT_OK(result);
+  }
+  fdf_testing::ForegroundDriverTest<TestConfig>& driver_test() { return driver_test_; }
+
+  void SetUpCommands() {
     // Set up default command expectations.
-    controller_.ExpectCall(
+    driver_test().driver()->ExpectCall(
         [this](uint8_t target, uint16_t lun, iovec cdb, bool is_write, iovec data) -> auto {
           EXPECT_EQ(target, kTarget);
           EXPECT_EQ(lun, kLun);
 
           switch (default_seq_) {
             case 0: {
-              EXPECT_EQ(cdb.iov_len, 6);
+              EXPECT_EQ(cdb.iov_len, size_t{6});
               InquiryCDB decoded_cdb = {};
               memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
               EXPECT_EQ(decoded_cdb.opcode, Opcode::INQUIRY);
@@ -212,7 +273,7 @@ class BlockDeviceTest : public zxtest::Test {
               break;
             }
             case 1: {
-              EXPECT_EQ(cdb.iov_len, 6);
+              EXPECT_EQ(cdb.iov_len, size_t{6});
               InquiryCDB decoded_cdb = {};
               memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
               EXPECT_EQ(decoded_cdb.opcode, Opcode::TEST_UNIT_READY);
@@ -230,7 +291,7 @@ class BlockDeviceTest : public zxtest::Test {
                 Mode6ParameterHeader header = {};
                 memcpy(data.iov_base, reinterpret_cast<char*>(&header), sizeof(header));
               } else {
-                EXPECT_EQ(cdb.iov_len, 10);
+                EXPECT_EQ(cdb.iov_len, size_t{10});
                 ModeSense10CDB decoded_cdb = {};
                 memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
                 EXPECT_EQ(decoded_cdb.opcode, Opcode::MODE_SENSE_10);
@@ -257,7 +318,7 @@ class BlockDeviceTest : public zxtest::Test {
                 memcpy(static_cast<char*>(data.iov_base) + sizeof(header),
                        reinterpret_cast<char*>(&response), sizeof(response));
               } else {
-                EXPECT_EQ(cdb.iov_len, 10);
+                EXPECT_EQ(cdb.iov_len, size_t{10});
                 ModeSense10CDB decoded_cdb = {};
                 memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
                 EXPECT_EQ(decoded_cdb.opcode, Opcode::MODE_SENSE_10);
@@ -274,7 +335,7 @@ class BlockDeviceTest : public zxtest::Test {
               break;
             }
             case 4: {
-              EXPECT_EQ(cdb.iov_len, 10);
+              EXPECT_EQ(cdb.iov_len, size_t{10});
               ReadCapacity10CDB decoded_cdb = {};
               memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
               EXPECT_EQ(decoded_cdb.opcode, Opcode::READ_CAPACITY_10);
@@ -286,7 +347,7 @@ class BlockDeviceTest : public zxtest::Test {
               break;
             }
             case 5: {
-              EXPECT_EQ(cdb.iov_len, 16);
+              EXPECT_EQ(cdb.iov_len, size_t{16});
               ReadCapacity16CDB decoded_cdb = {};
               memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
               EXPECT_EQ(decoded_cdb.opcode, Opcode::READ_CAPACITY_16);
@@ -299,7 +360,7 @@ class BlockDeviceTest : public zxtest::Test {
               break;
             }
             case 6: {
-              EXPECT_EQ(cdb.iov_len, 6);
+              EXPECT_EQ(cdb.iov_len, size_t{6});
               InquiryCDB decoded_cdb = {};
               memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
               EXPECT_EQ(decoded_cdb.opcode, Opcode::INQUIRY);
@@ -315,7 +376,7 @@ class BlockDeviceTest : public zxtest::Test {
               break;
             }
             case 7: {
-              EXPECT_EQ(cdb.iov_len, 6);
+              EXPECT_EQ(cdb.iov_len, size_t{6});
               InquiryCDB decoded_cdb = {};
               memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
               EXPECT_EQ(decoded_cdb.opcode, Opcode::INQUIRY);
@@ -328,7 +389,7 @@ class BlockDeviceTest : public zxtest::Test {
               break;
             }
             case 8: {
-              EXPECT_EQ(cdb.iov_len, 6);
+              EXPECT_EQ(cdb.iov_len, size_t{6});
               InquiryCDB decoded_cdb = {};
               memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
               EXPECT_EQ(decoded_cdb.opcode, Opcode::INQUIRY);
@@ -344,7 +405,7 @@ class BlockDeviceTest : public zxtest::Test {
               break;
             }
             case 9: {
-              EXPECT_EQ(cdb.iov_len, 6);
+              EXPECT_EQ(cdb.iov_len, size_t{6});
               InquiryCDB decoded_cdb = {};
               memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
               EXPECT_EQ(decoded_cdb.opcode, Opcode::INQUIRY);
@@ -365,37 +426,39 @@ class BlockDeviceTest : public zxtest::Test {
         /*times=*/10);
   }
 
-  ControllerForTest controller_;
+ private:
+  fdf_testing::ForegroundDriverTest<TestConfig> driver_test_;
   int default_seq_ = 0;
 };
 
 // Test that we can create a block device when the underlying controller successfully executes CDBs.
 TEST_F(BlockDeviceTest, TestCreateDestroy) {
-  std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();
-  ASSERT_OK(BlockDevice::Bind(fake_parent.get(), &controller_, kTarget, kLun, kTransferSize,
-                              DeviceOptions(/*check_unmap_support=*/true, /*use_mode_sense_6*/ true,
-                                            /*use_read_write_12*/ true)));
-  ASSERT_EQ(1, fake_parent->child_count());
+  ASSERT_OK(BlockDevice::Bind(driver_test().driver(), kTarget, kLun, kTransferSize,
+                              DeviceOptions(/*check_unmap_support=*/true, /*use_mode_sense_6=*/true,
+                                            /*use_read_write_12=*/true)));
+  driver_test().RunInNodeContext(
+      [](fdf_testing::TestNode& node) { ASSERT_EQ(size_t{1}, node.children().size()); });
 }
 
 // Test that we can create a block device when the underlying controller successfully executes CDBs.
 TEST_F(BlockDeviceTest, TestCreateDestroyWithModeSense10) {
-  std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();
   ASSERT_OK(
-      BlockDevice::Bind(fake_parent.get(), &controller_, kTarget, kLun, kTransferSize,
-                        DeviceOptions(/*check_unmap_support=*/true, /*use_mode_sense_6*/ false,
-                                      /*use_read_write_12*/ true)));
-  ASSERT_EQ(1, fake_parent->child_count());
+      BlockDevice::Bind(driver_test().driver(), kTarget, kLun, kTransferSize,
+                        DeviceOptions(/*check_unmap_support=*/true, /*use_mode_sense_6=*/false,
+                                      /*use_read_write_12=*/true)));
+  driver_test().RunInNodeContext(
+      [](fdf_testing::TestNode& node) { ASSERT_EQ(size_t{1}, node.children().size()); });
 }
 
 // Test creating a block device and executing read commands.
 TEST_F(BlockDeviceTest, TestCreateReadDestroy) {
-  std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();
-  ASSERT_OK(BlockDevice::Bind(fake_parent.get(), &controller_, kTarget, kLun, kTransferSize,
-                              DeviceOptions(/*check_unmap_support=*/true, /*use_mode_sense_6*/ true,
-                                            /*use_read_write_12*/ true)));
-  ASSERT_EQ(1, fake_parent->child_count());
-  auto* dev = fake_parent->GetLatestChild()->GetDeviceContext<BlockDevice>();
+  auto dev =
+      BlockDevice::Bind(driver_test().driver(), kTarget, kLun, kTransferSize,
+                        DeviceOptions(/*check_unmap_support=*/true, /*use_mode_sense_6=*/true,
+                                      /*use_read_write_12=*/true));
+  ASSERT_OK(dev);
+  driver_test().RunInNodeContext(
+      [](fdf_testing::TestNode& node) { ASSERT_EQ(size_t{1}, node.children().size()); });
   block_info_t info;
   size_t op_size;
   dev->BlockImplQuery(&info, &op_size);
@@ -406,16 +469,16 @@ TEST_F(BlockDeviceTest, TestCreateReadDestroy) {
   DiskBlock& test_block_1 = blocks[1];
   memset(test_block_1, 0x01, sizeof(DiskBlock));
 
-  controller_.ExpectCall(
+  driver_test().driver()->ExpectCall(
       [&blocks](uint8_t target, uint16_t lun, iovec cdb, bool is_write, iovec data) -> auto {
-        EXPECT_EQ(cdb.iov_len, 16);
+        EXPECT_EQ(cdb.iov_len, size_t{16});
         Read16CDB decoded_cdb = {};
         memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
         EXPECT_EQ(decoded_cdb.opcode, Opcode::READ_16);
         EXPECT_FALSE(is_write);
 
         // Support reading one block.
-        EXPECT_EQ(be32toh(decoded_cdb.transfer_length), 1);
+        EXPECT_EQ(be32toh(decoded_cdb.transfer_length), uint32_t{1});
         uint64_t block_to_read = be64toh(decoded_cdb.logical_block_address);
         const DiskBlock& data_to_return = blocks.at(block_to_read);
         memcpy(data.iov_base, data_to_return, sizeof(DiskBlock));
@@ -443,10 +506,9 @@ TEST_F(BlockDeviceTest, TestCreateReadDestroy) {
   read.rw.offset_dev = 1;  // Read logical block 1
   read.rw.offset_vmo = 0;
   EXPECT_OK(zx_vmo_create(zx_system_get_page_size(), 0, &read.rw.vmo));
-  controller_.AsyncIoInit();
+  driver_test().driver()->AsyncIoInit();
   {
     fbl::AutoLock lock(&iowait_.lock_);
-    auto* dev = fake_parent->GetLatestChild()->GetDeviceContext<BlockDevice>();
     dev->BlockImplQueue(&read, done, &iowait_);  // NOTE: Assumes asynchronous controller
     iowait_.cv_.Wait(&iowait_.lock_);
   }
@@ -456,7 +518,9 @@ TEST_F(BlockDeviceTest, TestCreateReadDestroy) {
   for (uint i = 0; i < sizeof(DiskBlock); i++) {
     EXPECT_EQ(check_buffer[i], 0x01);
   }
-  controller_.AsyncIoRelease();
+  driver_test().driver()->AsyncIoRelease();
 }
 
 }  // namespace scsi
+
+FUCHSIA_DRIVER_EXPORT(scsi::TestController);

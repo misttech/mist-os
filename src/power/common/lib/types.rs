@@ -173,9 +173,9 @@ impl From<Nanoseconds> for Milliseconds {
     }
 }
 
-impl From<Seconds> for zx::Duration {
-    fn from(seconds: Seconds) -> zx::Duration {
-        zx::Duration::from_nanos(Nanoseconds::from(seconds).0)
+impl From<Seconds> for zx::MonotonicDuration {
+    fn from(seconds: Seconds) -> zx::MonotonicDuration {
+        zx::MonotonicDuration::from_nanos(Nanoseconds::from(seconds).0)
     }
 }
 

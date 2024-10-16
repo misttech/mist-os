@@ -39,6 +39,23 @@ _all_named_fuchsia_envs += [
   },
 ]
 
+crosvm_env = {
+  dimensions = {
+    device_type = "crosvm"
+  }
+}
+
+# TODO(https://fxbug.dev/371274109): Unconditionally add when arm64 crosvm
+# support is present.
+if (target_cpu == "x64") {
+  _all_named_fuchsia_envs += [
+    {
+      name = "crosvm"
+      env = crosvm_env
+    },
+  ]
+}
+
 bt_lacewing_sherlock_env = {
   dimensions = {
     device_type = "Sherlock"
@@ -128,6 +145,18 @@ _all_named_host_envs += [
   {
     name = "mac"
     env = mac_env
+  },
+]
+
+kola_env = {
+  dimensions = {
+    device_type = "Kola"
+  }
+}
+_all_named_fuchsia_envs += [
+  {
+    name = "kola"
+    env = kola_env
   },
 ]
 
@@ -294,6 +323,12 @@ guest_envs = all_fuchsia_envs - [
                aemu_env,
                qemu_env,
              ]
+
+# TODO(https://fxbug.dev/371274109): Unconditionally remove when
+# unconditionally added.
+if (target_cpu == "x64") {
+  guest_envs -= [ crosvm_env ]
+}
 
 # Set of environments where both virtualization and vulkan are available.
 guest_vulkan_envs = guest_envs - [

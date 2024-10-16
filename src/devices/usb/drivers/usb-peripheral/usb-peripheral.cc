@@ -117,17 +117,17 @@ void UsbPeripheral::UsbPeripheralRequestQueue(usb_request_t* usb_request,
 }
 
 zx_status_t UsbPeripheral::Init() {
-  // Parent must support DCI protocol. USB Mode Switch is optional.
-  if (!dci_.is_valid()) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
   auto client = DdkConnectFidlProtocol<fuchsia_hardware_usb_dci::UsbDciService::Device>();
   if (client.is_error()) {
     zxlogf(ERROR, "Failed to connect fidl protocol");
     return client.error_value();
   }
   dci_new_.Bind(std::move(*client));
+
+  if (!dci_.is_valid() && !dci_new_.is_valid()) {
+    zxlogf(ERROR, "No banjo/FIDL UsbDci protocol served by parent");
+    return ZX_ERR_NOT_SUPPORTED;
+  }
 
   // Starting USB mode is determined from device metadata.
   // We read initial value and store it in dev->usb_mode, but do not actually
@@ -144,7 +144,10 @@ zx_status_t UsbPeripheral::Init() {
     return status;
   }
 
-  parent_request_size_ = usb::BorrowedRequest<void>::RequestSize(dci_.GetRequestSize());
+  if (dci_.is_valid()) {
+    // This field is only applicable to the banjo protocol.
+    parent_request_size_ = usb::BorrowedRequest<void>::RequestSize(dci_.GetRequestSize());
+  }
 
   status = DdkAdd("usb-peripheral", DEVICE_ADD_NON_BINDABLE);
   if (status != ZX_OK) {

@@ -63,7 +63,10 @@ pub fn open_fuse_device(
     Ok(Box::new(DevFuse { connection }))
 }
 
-fn attr_valid_to_duration(attr_valid: u64, attr_valid_nsec: u32) -> Result<zx::Duration, Errno> {
+fn attr_valid_to_duration(
+    attr_valid: u64,
+    attr_valid_nsec: u32,
+) -> Result<zx::MonotonicDuration, Errno> {
     duration_from_timespec(uapi::timespec {
         tv_sec: i64::try_from(attr_valid).unwrap_or(std::i64::MAX),
         tv_nsec: attr_valid_nsec.into(),
@@ -594,7 +597,7 @@ impl FuseNode {
     fn set_node_info(
         info: &mut FsNodeInfo,
         attributes: uapi::fuse_attr,
-        attr_valid_duration: zx::Duration,
+        attr_valid_duration: zx::MonotonicDuration,
         node_attributes_valid_until: &AtomicMonotonicInstant,
     ) -> Result<(), Errno> {
         info.ino = attributes.ino as uapi::ino_t;
@@ -1016,14 +1019,18 @@ impl DirEntryOps for FuseDirEntry {
         let parent = dir_entry.parent().expect("non-root nodes always has a parent");
         let parent = FuseNode::from_node(&parent.node);
         let name = dir_entry.local_name();
-        let uapi::fuse_entry_out {
-            nodeid,
-            generation,
-            entry_valid,
-            entry_valid_nsec,
-            attr,
-            attr_valid,
-            attr_valid_nsec,
+        let FuseEntryOutExtended {
+            arg:
+                uapi::fuse_entry_out {
+                    nodeid,
+                    generation,
+                    entry_valid,
+                    entry_valid_nsec,
+                    attr,
+                    attr_valid,
+                    attr_valid_nsec,
+                },
+            ..
         } = match parent.connection.lock().execute_operation(
             current_task,
             parent.nodeid,
@@ -2187,7 +2194,7 @@ impl RunningOperationKind {
                 Ok(FuseResponse::Init(Self::to_response::<uapi::fuse_init_out>(&buffer)))
             }
             Self::Lookup | Self::Mkdir | Self::Mknod | Self::Link | Self::Symlink => {
-                Ok(FuseResponse::Entry(Self::to_response::<uapi::fuse_entry_out>(&buffer)))
+                Ok(FuseResponse::Entry(Self::to_response::<FuseEntryOutExtended>(&buffer)))
             }
             Self::Open { .. } => {
                 Ok(FuseResponse::Open(Self::to_response::<uapi::fuse_open_out>(&buffer)))
@@ -2399,7 +2406,7 @@ enum FuseResponse {
     Access(Result<(), Errno>),
     Attr(uapi::fuse_attr_out),
     Create(CreateResponse),
-    Entry(uapi::fuse_entry_out),
+    Entry(FuseEntryOutExtended),
     GetXAttr(ValueOrSize<FsString>),
     Init(uapi::fuse_init_out),
     Open(uapi::fuse_open_out),
@@ -2418,7 +2425,7 @@ enum FuseResponse {
 impl FuseResponse {
     fn entry(&self) -> Option<&uapi::fuse_entry_out> {
         if let Self::Entry(entry) = self {
-            Some(entry)
+            Some(&entry.arg)
         } else {
             None
         }
@@ -2427,10 +2434,27 @@ impl FuseResponse {
 
 #[repr(C)]
 #[derive(Clone, Debug, KnownLayout, FromBytes, IntoBytes, Immutable)]
-pub struct CreateResponse {
+struct CreateResponse {
     entry: uapi::fuse_entry_out,
     open: uapi::fuse_open_out,
 }
+
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(CreateResponse, open),
+    std::mem::size_of::<uapi::fuse_entry_out>()
+);
+
+#[repr(C)]
+#[derive(Clone, Debug, KnownLayout, FromBytes, IntoBytes, Immutable)]
+struct FuseEntryOutExtended {
+    arg: uapi::fuse_entry_out,
+    bpf_arg: uapi::fuse_entry_bpf_out,
+}
+
+static_assertions::const_assert_eq!(
+    std::mem::offset_of!(FuseEntryOutExtended, bpf_arg),
+    std::mem::size_of::<uapi::fuse_entry_out>()
+);
 
 impl FuseOperation {
     fn serialize(&self, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::Receiver;
+use crate::{CapabilityBound, Receiver};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use futures::channel::mpsc;
 use std::any::Any;
@@ -43,6 +43,8 @@ pub struct Connector {
     // Any.
     _receiver_task: Option<Arc<dyn Any + Send + Sync>>,
 }
+
+impl CapabilityBound for Connector {}
 
 impl Connector {
     pub fn new() -> (Receiver, Self) {

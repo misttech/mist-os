@@ -196,7 +196,8 @@ impl<'a> CommandAssertion<'a> {
                     let now = zx::MonotonicInstant::get().into_nanos();
                     if now
                         >= started
-                            + zx::Duration::from_seconds(self.max_retry_time_seconds).into_nanos()
+                            + zx::MonotonicDuration::from_seconds(self.max_retry_time_seconds)
+                                .into_nanos()
                     {
                         self.assert_result(&result, &self.expected);
                         break;
@@ -209,14 +210,17 @@ impl<'a> CommandAssertion<'a> {
                     let now = zx::MonotonicInstant::get().into_nanos();
                     if now
                         >= started
-                            + zx::Duration::from_seconds(self.max_retry_time_seconds).into_nanos()
+                            + zx::MonotonicDuration::from_seconds(self.max_retry_time_seconds)
+                                .into_nanos()
                     {
                         assert!(false, "Error: {:?}", e);
                     }
                 }
             }
-            fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_millis(100)))
-                .await;
+            fasync::Timer::new(fasync::MonotonicInstant::after(
+                zx::MonotonicDuration::from_millis(100),
+            ))
+            .await;
         }
     }
 

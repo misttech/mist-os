@@ -59,7 +59,7 @@ TEST_F(UtcTimeProviderTest, Check_CurrentUtcMonotonicDifference) {
   SignalLoggingQualityClock();
   RunLoopUntilIdle();
 
-  zx::time monotonic = clock_.Now();
+  zx::time monotonic = clock_.MonotonicNow();
   timekeeper::time_utc utc;
   ASSERT_EQ(clock_.UtcNow(&utc), ZX_OK);
 

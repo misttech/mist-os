@@ -122,9 +122,7 @@ TEST_F(CpuRendererIntegrationTest, RenderSmokeTest) {
       allocation::BufferCollectionImportExportTokens::New();
   fuchsia::ui::composition::RegisterBufferCollectionArgs rbc_args = {};
   rbc_args.set_export_token(std::move(bc_tokens.export_token));
-  rbc_args.set_buffer_collection_token(
-      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
-          scenic_token.Unbind().TakeChannel()));
+  rbc_args.set_buffer_collection_token2(std::move(scenic_token));
   fuchsia::ui::composition::Allocator_RegisterBufferCollection_Result result;
   flatland_allocator_->RegisterBufferCollection(std::move(rbc_args), &result);
   ASSERT_FALSE(result.is_err());
@@ -168,9 +166,7 @@ TEST_P(CpuRendererIntegrationTestWithFormat, RendersImage) {
       allocation::BufferCollectionImportExportTokens::New();
   fuchsia::ui::composition::RegisterBufferCollectionArgs rbc_args = {};
   rbc_args.set_export_token(std::move(bc_tokens.export_token));
-  rbc_args.set_buffer_collection_token(
-      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
-          scenic_token.Unbind().TakeChannel()));
+  rbc_args.set_buffer_collection_token2(std::move(scenic_token));
   fuchsia::ui::composition::Allocator_RegisterBufferCollection_Result result;
   flatland_allocator_->RegisterBufferCollection(std::move(rbc_args), &result);
   ASSERT_FALSE(result.is_err());

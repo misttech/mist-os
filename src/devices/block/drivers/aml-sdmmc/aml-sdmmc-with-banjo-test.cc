@@ -2312,8 +2312,7 @@ TEST_F(AmlSdmmcWithBanjoTest, ConsecutiveErrorLogging) {
   EXPECT_EQ(ZX_ERR_TIMED_OUT, dut_->SdmmcRequest(&request, unused_response));
 }
 
-// TODO(b/368636358): Re-enable actual hardware power state manipulation.
-TEST_F(AmlSdmmcWithBanjoTest, DISABLED_PowerSuspendResume) {
+TEST_F(AmlSdmmcWithBanjoTest, PowerSuspendResume) {
   StartDriver(/*create_fake_bti_with_paddrs=*/false, /*supply_power_framework=*/true);
 
   auto clock = AmlSdmmcClock::Get().FromValue(0).WriteTo(&*mmio_);

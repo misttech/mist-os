@@ -24,6 +24,7 @@ struct PartitionInfo {
   uint8_t type_guid[16];
   uint8_t instance_guid[16];
   const char* name;
+  uint64_t flags;
 };
 
 // Represents a session.  New sessions appear via `OnNewSession`.
@@ -95,6 +96,8 @@ class BlockServer {
   BlockServer(const PartitionInfo&, Interface*);
   BlockServer(const BlockServer&) = delete;
   BlockServer& operator=(const BlockServer&) = delete;
+  BlockServer(BlockServer&&);
+  BlockServer& operator=(BlockServer&&) = delete;
 
   // Destroys the server.  This will trigger termination and then block until:
   //
@@ -104,6 +107,25 @@ class BlockServer {
   //
   // Once this returns, there will be no subsequent calls via `Interface`.
   ~BlockServer();
+
+  // Destroys the server asynchronously and calls `callback` when complete.
+  template <typename Callback>
+  void DestroyAsync(Callback callback) && {
+    if (server_) {
+      auto owned_callback = std::make_unique<Callback>(std::move(callback));
+      internal::BlockServer* server = server_;
+      server_ = nullptr;
+      block_server_delete_async(
+          server,
+          [](void* arg) {
+            auto owned_callback = std::unique_ptr<Callback>(reinterpret_cast<Callback*>(arg));
+            (*owned_callback)();
+          },
+          owned_callback.release());
+    } else {
+      callback();
+    }
+  }
 
   // Serves a new connection.  The FIDL handling is multiplexed onto a single per-server thread.
   void Serve(fidl::ServerEnd<fuchsia_hardware_block_volume::Volume>);

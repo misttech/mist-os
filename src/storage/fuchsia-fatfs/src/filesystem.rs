@@ -13,7 +13,7 @@ use fuchsia_async::{MonotonicInstant, Task, Timer};
 use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::sync::{Arc, LockResult, Mutex, MutexGuard};
-use zx::{AsHandleRef, Duration, Event, Status};
+use zx::{AsHandleRef, Event, MonotonicDuration, Status};
 
 pub struct FatFilesystemInner {
     filesystem: Option<FileSystem>,
@@ -126,7 +126,7 @@ impl FatFilesystem {
     /// Mark the filesystem as dirty. This will cause the disk to automatically be flushed after
     /// one second, and cancel any previous pending flushes.
     pub fn mark_dirty(self: &Pin<Arc<Self>>) {
-        let deadline = MonotonicInstant::after(Duration::from_seconds(1));
+        let deadline = MonotonicInstant::after(MonotonicDuration::from_seconds(1));
         match &mut *self.dirty_task.lock().unwrap() {
             Some((time, _)) => *time = deadline,
             x @ None => {
@@ -222,7 +222,7 @@ mod tests {
         }
         // Wait some time for the flush to happen. Don't hold the lock while waiting, otherwise
         // the flush will get stuck waiting on the lock.
-        Timer::new(MonotonicInstant::after(Duration::from_millis(1500))).await;
+        Timer::new(MonotonicInstant::after(MonotonicDuration::from_millis(1500))).await;
         {
             let fs_lock = fs.filesystem().lock().unwrap();
             assert_eq!(fs_lock.filesystem.as_ref().unwrap().is_dirty(), false);

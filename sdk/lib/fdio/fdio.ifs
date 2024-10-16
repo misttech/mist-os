@@ -82,6 +82,7 @@ Symbols:
   - { Name: fdio_spawn, Type: Func }
   - { Name: fdio_spawn_etc, Type: Func }
   - { Name: fdio_spawn_vmo, Type: Func }
+  - { Name: fdio_transferable_fd, Type: Func }
   - { Name: fdio_unbind_from_fd, Type: Func }
   - { Name: fdio_unsafe_borrow_channel, Type: Func }
   - { Name: fdio_unsafe_fd_to_io, Type: Func }

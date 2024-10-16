@@ -17,7 +17,7 @@ use futures::channel::mpsc;
 use futures::stream::once;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use itertools::Itertools;
-use zx::{Duration, Vmo};
+use zx::{MonotonicDuration, Vmo};
 
 const CRASH_PRODUCT_NAME: &str = "FuchsiaHeapProfile";
 const CRASH_PROGRAM_NAME: &str = "memory_sampler";
@@ -114,7 +114,7 @@ pub async fn register_crash_product() -> Result<(), Error> {
 /// when it is full will cause an error.
 pub fn setup_crash_reporter() -> (mpsc::Sender<ProfileReport>, Task<Result<(), Error>>) {
     let throttler_stream = once(std::future::ready(()))
-        .chain(Interval::new(Duration::from_hours(MAX_SNAPSHOT_RATE_PER_HOUR)));
+        .chain(Interval::new(MonotonicDuration::from_hours(MAX_SNAPSHOT_RATE_PER_HOUR)));
     let (tx, rx) = mpsc::channel::<ProfileReport>(MAX_CONCURRENT_PROFILES);
     let crash_reporter_task = Task::spawn({
         rx.ready_chunks(MAX_NUM_ATTACHMENTS_PER_CRASH_REPORT as usize)

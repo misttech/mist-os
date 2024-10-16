@@ -34,7 +34,7 @@ async fn call_write_data_file(admin: &AdminProxy) -> AdminWriteDataFileResult {
 async fn unformatted() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("ramdisk_image", true);
-    builder.with_disk().format_volumes(volumes_spec());
+    builder.with_disk().with_gpt().format_volumes(volumes_spec());
     builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 
     let fixture = builder.build().await;
@@ -107,7 +107,7 @@ async fn no_existing_data_partition() {
 async fn unformatted_netboot() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("netboot", true);
-    builder.with_disk().format_volumes(volumes_spec());
+    builder.with_disk().with_gpt().format_volumes(volumes_spec());
     let fixture = builder.build().await;
 
     let admin =
@@ -145,6 +145,7 @@ async fn unformatted_small_disk() {
     builder.fshost().set_config_value("ramdisk_image", true);
     builder
         .with_disk()
+        .with_gpt()
         .format_volumes(volumes_spec())
         .size(SMALL_DISK_SIZE)
         .data_volume_size(SMALL_DISK_SIZE / 2);
@@ -190,7 +191,7 @@ async fn unformatted_small_disk() {
 async fn formatted() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("ramdisk_image", true);
-    builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
+    builder.with_disk().with_gpt().format_volumes(volumes_spec()).format_data(data_fs_spec());
     builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 
     let fixture = builder.build().await;
@@ -230,7 +231,7 @@ async fn formatted() {
 async fn formatted_file_in_root() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("ramdisk_image", true);
-    builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
+    builder.with_disk().with_gpt().format_volumes(volumes_spec()).format_data(data_fs_spec());
     builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 
     let fixture = builder.build().await;
@@ -279,7 +280,7 @@ async fn formatted_file_in_root() {
 async fn formatted_netboot() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("netboot", true);
-    builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
+    builder.with_disk().with_gpt().format_volumes(volumes_spec()).format_data(data_fs_spec());
     let fixture = builder.build().await;
 
     let admin =

@@ -82,6 +82,10 @@
             "23": {
                 "abi_revision": "0x4C444771E8DDABE1",
                 "status": "supported"
+            },
+            "24": {
+                "abi_revision": "0x2C1497665AFD4223",
+                "status": "supported"
             }
         },
         "special_api_levels": {

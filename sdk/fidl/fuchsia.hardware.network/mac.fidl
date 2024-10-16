@@ -9,7 +9,7 @@ using fuchsia.net;
 /// The address filtering mode supported by MAC devices.
 // LINT.IfChange
 @available(added=HEAD)
-type MacFilterMode = strict enum {
+type MacFilterMode = flexible enum {
     /// Device accepts only unicast frames addressed to its own unicast address,
     /// or multicast frames that are part of the multicast address filter list.
     MULTICAST_FILTER = 0;

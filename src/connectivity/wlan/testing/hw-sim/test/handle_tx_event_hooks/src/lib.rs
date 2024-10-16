@@ -119,7 +119,7 @@ async fn handle_tx_event_hooks() {
     });
     helper
         .run_until_complete_or_timeout(
-            zx::Duration::from_seconds(30),
+            zx::MonotonicDuration::from_seconds(30),
             format!("connecting to {} ({:02X?})", AP_SSID.to_string_not_redactable(), bssid),
             scan_and_connect(
                 &phy,

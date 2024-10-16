@@ -136,7 +136,7 @@ impl<T: FidlEndpoint<RunBuilderMarker>> Manager<T> {
             _ => unreachable!("invalid fuzzer state"),
         };
         // Now connect the controller via the registry.
-        let timeout = zx::Duration::from_seconds(DEFAULT_TIMEOUT_IN_SECONDS).into_nanos();
+        let timeout = zx::MonotonicDuration::from_seconds(DEFAULT_TIMEOUT_IN_SECONDS).into_nanos();
         let result = self
             .registry
             .connect(url.as_str(), controller, timeout)
@@ -191,7 +191,7 @@ impl<T: FidlEndpoint<RunBuilderMarker>> Manager<T> {
             return Err(zx::Status::from_raw(e));
         }
         if let Some(mut fuzzer) = fuzzer {
-            let timeout = zx::Duration::from_seconds(DEFAULT_TIMEOUT_IN_SECONDS);
+            let timeout = zx::MonotonicDuration::from_seconds(DEFAULT_TIMEOUT_IN_SECONDS);
             if let Err(e) = fuzzer.stop(Some(timeout)).await {
                 warn!("killing fuzzer after stop returned ZX_ERR_{}", e);
                 fuzzer.kill().await?;

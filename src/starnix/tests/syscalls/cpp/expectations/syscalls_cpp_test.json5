@@ -88,6 +88,9 @@
                 // TODO(https://fxbug.dev/365540067)
                 // TODO(https://fxbug.dev/365971179): deflake and re-enable
                 "PidFdTest.PollWaitsForSecondaryThreadsToo",
+
+                // TODO(https://fxbug.dev/372236700): Fails with new toolchain.
+                "PtraceTest.InterruptAfterListen",
             ],
         },
     ],

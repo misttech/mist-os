@@ -3,17 +3,20 @@
 // found in the LICENSE file.
 
 use assert_matches::assert_matches;
-use fidl::endpoints::{create_proxy, ServerEnd};
+use fidl::endpoints::{create_proxy, ServerEnd, ServiceMarker as _};
 use fidl_fuchsia_fxfs::BlobReaderMarker;
 use fuchsia_component::client::connect_to_protocol_at_dir_root;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use futures::channel::mpsc::{self};
 use futures::{FutureExt as _, StreamExt as _};
 use ramdevice_client::{RamdiskClient, RamdiskClientBuilder};
+use std::pin::pin;
 use std::time::Duration;
 use {
-    fidl_fuchsia_boot as fboot, fidl_fuchsia_feedback as ffeedback, fidl_fuchsia_io as fio,
-    fidl_fuchsia_logger as flogger, fidl_fuchsia_process as fprocess, fuchsia_async as fasync, zx,
+    fidl_fuchsia_boot as fboot, fidl_fuchsia_feedback as ffeedback,
+    fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_hardware_ramdisk as framdisk,
+    fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger, fidl_fuchsia_process as fprocess,
+    fuchsia_async as fasync,
 };
 
 pub mod disk_builder;
@@ -39,16 +42,18 @@ pub struct TestFixtureBuilder {
     disk: Option<disk_builder::Disk>,
     fshost: fshost_builder::FshostBuilder,
     zbi_ramdisk: Option<disk_builder::DiskBuilder>,
+    storage_host: bool,
 }
 
 impl TestFixtureBuilder {
-    pub fn new(fshost_component_name: &'static str) -> Self {
+    pub fn new(fshost_component_name: &'static str, storage_host: bool) -> Self {
         Self {
             netboot: false,
             no_fuchsia_boot: false,
             disk: None,
             fshost: fshost_builder::FshostBuilder::new(fshost_component_name),
             zbi_ramdisk: None,
+            storage_host,
         }
     }
 
@@ -160,6 +165,25 @@ impl TestFixtureBuilder {
             )
             .await
             .unwrap();
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::service::<framdisk::ServiceMarker>())
+                    .from(&drivers)
+                    .to(Ref::parent())
+                    .to(&fshost),
+            )
+            .await
+            .unwrap();
+        builder
+            .add_route(
+                Route::new()
+                    .capability(Capability::service::<fvolume::ServiceMarker>())
+                    .from(&drivers)
+                    .to(&fshost),
+            )
+            .await
+            .unwrap();
 
         let mut fixture = TestFixture {
             realm: builder.build().await.unwrap(),
@@ -168,6 +192,7 @@ impl TestFixtureBuilder {
             crash_reports,
             torn_down: TornDown(false),
             ignore_crash_reports: false,
+            storage_host: self.storage_host,
         };
 
         tracing::info!(
@@ -207,6 +232,7 @@ pub struct TestFixture {
     pub crash_reports: mpsc::Receiver<ffeedback::CrashReport>,
     torn_down: TornDown,
     ignore_crash_reports: bool,
+    storage_host: bool,
 }
 
 impl TestFixture {
@@ -347,12 +373,19 @@ impl TestFixture {
     }
 
     pub async fn add_ramdisk(&mut self, vmo: zx::Vmo) {
-        let dev = self.dir("dev-topological", fio::OpenFlags::empty());
+        let mut ramdisk = pin!(if self.storage_host {
+            RamdiskClientBuilder::new_with_vmo(vmo, Some(512)).use_v2().publish().ramdisk_service(
+                self.dir(framdisk::ServiceMarker::SERVICE_NAME, fio::OpenFlags::empty()),
+            )
+        } else {
+            RamdiskClientBuilder::new_with_vmo(vmo, Some(512))
+                .dev_root(self.dir("dev-topological", fio::OpenFlags::empty()))
+        }
+        .build()
+        .fuse());
+
         let ramdisk = futures::select_biased!(
-            res = RamdiskClientBuilder::new_with_vmo(vmo, Some(512))
-                .dev_root(dev)
-                .build()
-                .fuse() => res,
+            res = ramdisk => res,
             _ = fasync::Timer::new(Duration::from_secs(120))
                 .fuse() => panic!("Timed out waiting for RamdiskClient"),
         )

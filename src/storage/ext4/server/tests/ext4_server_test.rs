@@ -27,7 +27,7 @@ const RAMDISK_BLOCK_COUNT: u64 = 16 * 1024;
 async fn make_ramdisk() -> (RamdiskClient, RemoteBlockClient) {
     let client = RamdiskClient::builder(RAMDISK_BLOCK_SIZE, RAMDISK_BLOCK_COUNT);
     let ramdisk = client.build().await.expect("RamdiskClientBuilder.build() failed");
-    let client_end = ramdisk.open().await.expect("ramdisk.open failed");
+    let client_end = ramdisk.open().expect("ramdisk.open failed");
     let proxy = client_end.into_proxy().expect("into_proxy failed");
     let block_client = RemoteBlockClient::new(proxy).await.expect("new failed");
 
@@ -89,7 +89,7 @@ async fn ext4_server_mounts_block_device(
             SpawnAction::add_handle(HandleType::DirectoryRequest.into(), dir_server.into()),
             SpawnAction::add_handle(
                 HandleInfo::new(HandleType::User0, 1),
-                ramdisk.open().await.expect("ramdisk.open").into(),
+                ramdisk.open().expect("ramdisk.open").into(),
             ),
         ],
     )
@@ -136,7 +136,7 @@ async fn ext4_server_mounts_block_device_and_dies_on_close() -> Result<(), Error
             SpawnAction::add_handle(HandleType::DirectoryRequest.into(), dir_server.into()),
             SpawnAction::add_handle(
                 HandleInfo::new(HandleType::User0, 1),
-                ramdisk.open().await.expect("ramdisk.open").into(),
+                ramdisk.open().expect("ramdisk.open").into(),
             ),
         ],
     )
@@ -145,7 +145,7 @@ async fn ext4_server_mounts_block_device_and_dies_on_close() -> Result<(), Error
     std::mem::drop(dir_proxy);
     process.wait_handle(
         zx::Signals::TASK_TERMINATED,
-        zx::MonotonicInstant::after(zx::Duration::from_seconds(5)),
+        zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(5)),
     )?;
     Ok(())
 }
@@ -166,7 +166,7 @@ async fn ext4_server_mounts_vmo_one_file() -> Result<(), Error> {
     vmo.write(&temp_buf, 0)?;
 
     let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
-    let result = ext4.mount_vmo(vmo, fio::OpenFlags::RIGHT_READABLE, dir_server).await;
+    let result = ext4.mount_vmo(vmo, dir_server).await;
     assert_matches!(result, Ok(MountVmoResult::Success(Success {})));
 
     let file = fuchsia_fs::directory::open_file_no_describe_deprecated(
@@ -194,7 +194,7 @@ async fn ext4_server_mounts_vmo_nested_dirs() -> Result<(), Error> {
     vmo.write(&temp_buf, 0)?;
 
     let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
-    let result = ext4.mount_vmo(vmo, fio::OpenFlags::RIGHT_READABLE, dir_server).await;
+    let result = ext4.mount_vmo(vmo, dir_server).await;
     assert_matches!(result, Ok(MountVmoResult::Success(Success {})));
 
     let file1 = fuchsia_fs::directory::open_file_no_describe_deprecated(
@@ -230,7 +230,7 @@ async fn ext4_unified_service_mounts_vmo() -> Result<(), Error> {
     vmo.write(&temp_buf, 0)?;
 
     let (dir_proxy, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
-    let result = ext4.mount_vmo(vmo, fio::OpenFlags::RIGHT_READABLE, dir_server).await;
+    let result = ext4.mount_vmo(vmo, dir_server).await;
     assert_matches!(result, Ok(MountVmoResult::Success(Success {})));
 
     let file1 = fuchsia_fs::directory::open_file_no_describe_deprecated(

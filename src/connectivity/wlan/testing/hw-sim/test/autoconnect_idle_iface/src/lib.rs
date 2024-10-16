@@ -66,7 +66,7 @@ async fn autoconnect_idle_iface() {
 
     connect_or_timeout_with(
         &mut helper,
-        zx::Duration::from_seconds(30),
+        zx::MonotonicDuration::from_seconds(30),
         &AP_SSID,
         &AP_MAC_ADDR,
         &Protection::Open,

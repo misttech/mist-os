@@ -146,5 +146,5 @@ This RFC proposes an extension to a feature described in [RFC-0069].
 
 [ELF runner]: /docs/concepts/components/v2/elf_runner.md
 [RFC-0069]: /docs/contribute/governance/rfcs/0069_stdio_in_elf_runner.md
-[logsink]: /docs/concepts/components/diagnostics/logs/README.md
+[logsink]: /docs/concepts/components/diagnostics/README.md#logs
 [test runners]: /docs/development/testing/components/test_runner_framework.md

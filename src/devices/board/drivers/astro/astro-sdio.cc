@@ -172,14 +172,23 @@ zx_status_t Astro::SdEmmcConfigurePortB() {
   gpio_base->SetBits32(AML_SDIO_PORTB_PERIPHS_PINMUX2_VAL,
                        kGpioBaseOffset + (S905D2_PERIPHS_PIN_MUX_2 << 2));
 
+  auto sdio_pin = [](uint32_t pin) {
+    return fuchsia_hardware_pinimpl::InitStep::WithCall({{
+        .pin = pin,
+        .call = fuchsia_hardware_pinimpl::InitCall::WithPinConfig({{
+            .function = 0,
+            .drive_strength_ua = 4'000,
+        }}),
+    }});
+  };
+
   // Clear GPIO_X
-  gpio_init_steps_.push_back(GpioFunction(S905D2_WIFI_SDIO_D0, 0));
-  gpio_init_steps_.push_back(GpioFunction(S905D2_WIFI_SDIO_D1, 0));
-  gpio_init_steps_.push_back(GpioFunction(S905D2_WIFI_SDIO_D2, 0));
-  gpio_init_steps_.push_back(GpioFunction(S905D2_WIFI_SDIO_D3, 0));
-  gpio_init_steps_.push_back(GpioFunction(S905D2_WIFI_SDIO_CLK, 0));
-  gpio_init_steps_.push_back(GpioFunction(S905D2_WIFI_SDIO_CMD, 0));
-  gpio_init_steps_.push_back(GpioFunction(S905D2_WIFI_SDIO_WAKE_HOST, 0));
+  gpio_init_steps_.push_back(sdio_pin(S905D2_WIFI_SDIO_D0));
+  gpio_init_steps_.push_back(sdio_pin(S905D2_WIFI_SDIO_D1));
+  gpio_init_steps_.push_back(sdio_pin(S905D2_WIFI_SDIO_D2));
+  gpio_init_steps_.push_back(sdio_pin(S905D2_WIFI_SDIO_D3));
+  gpio_init_steps_.push_back(sdio_pin(S905D2_WIFI_SDIO_CLK));
+  gpio_init_steps_.push_back(sdio_pin(S905D2_WIFI_SDIO_CMD));
 
   // Clear GPIO_C
   gpio_init_steps_.push_back(GpioFunction(S905D2_GPIOC(0), 0));
@@ -192,12 +201,7 @@ zx_status_t Astro::SdEmmcConfigurePortB() {
   // Enable output from SDMMC port B on GPIOX_4.
   gpio_init_steps_.push_back(GpioOutput(S905D2_WIFI_SDIO_CLK, true));
 
-  gpio_init_steps_.push_back(GpioDriveStrength(S905D2_WIFI_SDIO_D0, 4'000));
-  gpio_init_steps_.push_back(GpioDriveStrength(S905D2_WIFI_SDIO_D1, 4'000));
-  gpio_init_steps_.push_back(GpioDriveStrength(S905D2_WIFI_SDIO_D2, 4'000));
-  gpio_init_steps_.push_back(GpioDriveStrength(S905D2_WIFI_SDIO_D3, 4'000));
-  gpio_init_steps_.push_back(GpioDriveStrength(S905D2_WIFI_SDIO_CLK, 4'000));
-  gpio_init_steps_.push_back(GpioDriveStrength(S905D2_WIFI_SDIO_CMD, 4'000));
+  gpio_init_steps_.push_back(GpioFunction(S905D2_WIFI_SDIO_WAKE_HOST, 0));
 
   // Configure clock settings
   status = zx::vmo::create_physical(*resource, S905D2_HIU_BASE, S905D2_HIU_LENGTH, &vmo);

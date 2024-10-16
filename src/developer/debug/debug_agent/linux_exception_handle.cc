@@ -40,6 +40,11 @@ std::unique_ptr<ThreadHandle> LinuxExceptionHandle::GetThreadHandle() const {
   return std::make_unique<LinuxThreadHandle>(task_);
 }
 
+std::unique_ptr<ProcessHandle> LinuxExceptionHandle::GetProcessHandle() const {
+  // not implemented yet.
+  return nullptr;
+}
+
 debug_ipc::ExceptionType LinuxExceptionHandle::GetType(const ThreadHandle& thread) const {
   return type_;
 }
@@ -61,6 +66,11 @@ fit::result<debug::Status, debug_ipc::ExceptionStrategy> LinuxExceptionHandle::G
 
 debug::Status LinuxExceptionHandle::SetStrategy(debug_ipc::ExceptionStrategy strategy) {
   return debug::Status("Linux does not support exception strategies.");
+}
+
+debug_ipc::ExceptionRecord LinuxExceptionHandle::GetRecord() const {
+  // TODO(brettw) implement this.
+  return debug_ipc::ExceptionRecord();
 }
 
 }  // namespace debug_agent

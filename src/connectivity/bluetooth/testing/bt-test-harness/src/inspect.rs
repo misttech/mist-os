@@ -15,7 +15,7 @@ use futures::FutureExt;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use test_harness::{SharedState, TestHarness, SHARED_STATE_TEST_COMPONENT_INDEX};
-use zx::Duration;
+use zx::MonotonicDuration;
 
 use crate::core_realm::{CoreRealm, SHARED_STATE_INDEX};
 use crate::host_watcher::ActivatedFakeHost;
@@ -23,7 +23,7 @@ use crate::timeout_duration;
 
 // Controls the rate at which to snapshot the inspect tree (i.e. update InspectState). Arbitrarily
 // set to snapshot the inspect tree every 1 second.
-const SNAPSHOT_INSPECT_EVERY_N_SECONDS: Duration = Duration::from_seconds(1);
+const SNAPSHOT_INSPECT_EVERY_N_SECONDS: MonotonicDuration = MonotonicDuration::from_seconds(1);
 
 #[derive(Clone)]
 pub struct InspectState {

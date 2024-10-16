@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/lib/testing/expectation/meta/common.shard.cml" ],
+    include: [
+        "//src/lib/testing/expectation/meta/common.shard.cml",
+        "syslog/client.shard.cml",
+    ],
     children: [
         {
             name: "enumeration-test-adapter",
@@ -20,14 +23,6 @@
         },
     ],
     offer: [
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [
-                "#enumeration-test-adapter",
-                "#test_collection",
-            ],
-        },
         {
             protocol: "fuchsia.component.Realm",
             from: "framework",

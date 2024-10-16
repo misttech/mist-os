@@ -228,7 +228,7 @@ mod test {
             pcm_audio: pcm_audio.clone(),
             encoder_settings: DUMMY_ENCODER_SETTINGS,
             frames_per_packet: (0..).map(|_| 50),
-            timebase: Some(zx::Duration::from_seconds(1).into_nanos() as u64),
+            timebase: Some(zx::MonotonicDuration::from_seconds(1).into_nanos() as u64),
         };
 
         let mut chunks = stream.stream();
@@ -236,7 +236,7 @@ mod test {
         assert_eq!(chunks.next().and_then(|chunk| chunk.timestamp), Some(0));
         assert_eq!(
             chunks.next().and_then(|chunk| chunk.timestamp),
-            Some(zx::Duration::from_seconds(1).into_nanos() as u64)
+            Some(zx::MonotonicDuration::from_seconds(1).into_nanos() as u64)
         );
     }
 }

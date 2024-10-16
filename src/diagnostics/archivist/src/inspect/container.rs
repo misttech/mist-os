@@ -264,7 +264,7 @@ impl SnapshotData {
     async fn new(
         name: Option<InspectHandleName>,
         data: InspectData,
-        lazy_child_timeout: zx::Duration,
+        lazy_child_timeout: zx::MonotonicDuration,
         identity: &ComponentIdentity,
         parent_trace_id: ftrace::Id,
     ) -> SnapshotData {
@@ -390,8 +390,8 @@ enum Status {
 struct State {
     status: Status,
     unpopulated: Arc<UnpopulatedInspectDataContainer>,
-    batch_timeout: zx::Duration,
-    elapsed_time: zx::Duration,
+    batch_timeout: zx::MonotonicDuration,
+    elapsed_time: zx::MonotonicDuration,
     global_stats: Arc<GlobalConnectionStats>,
     trace_guard: Arc<Option<ftrace::AsyncScope>>,
     trace_id: ftrace::Id,
@@ -498,9 +498,9 @@ impl UnpopulatedInspectDataContainer {
         let state = State {
             status: Status::Begin,
             unpopulated: this,
-            batch_timeout: zx::Duration::from_seconds(timeout),
+            batch_timeout: zx::MonotonicDuration::from_seconds(timeout),
             global_stats,
-            elapsed_time: zx::Duration::ZERO,
+            elapsed_time: zx::MonotonicDuration::ZERO,
             trace_guard: Arc::new(trace_guard),
             trace_id,
         };
@@ -568,9 +568,9 @@ mod test {
             fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
         fasync::Task::spawn(async move {
             while stream.next().await.is_some() {
-                fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_seconds(
-                    100000,
-                )))
+                fasync::Timer::new(fasync::MonotonicInstant::after(
+                    zx::MonotonicDuration::from_seconds(100000),
+                ))
                 .await;
             }
         })

@@ -42,7 +42,7 @@ type Config = struct {
 /// This is the interface to the camera driver
 /// which allows setting up a given configuration
 /// and setting up a stream.
-@discoverable
+@discoverable(client="platform,external", server="platform")
 closed protocol Controller {
     /// Returns the next available configuration which the camera driver supports.
     /// Returns ZX_ERR_STOP if no new configurations are available.

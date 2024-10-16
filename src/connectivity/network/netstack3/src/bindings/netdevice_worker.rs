@@ -8,7 +8,7 @@ use std::num::TryFromIntError;
 use std::sync::Arc;
 
 use assert_matches::assert_matches;
-use fidl_fuchsia_hardware_network::{self as fhardware_network, FrameType};
+use fidl_fuchsia_hardware_network::{self as fhardware_network};
 use futures::lock::Mutex;
 use futures::{FutureExt as _, StreamExt, TryStreamExt as _};
 use log::{debug, error, info, warn};
@@ -97,12 +97,35 @@ pub(crate) enum Error {
     #[error("interface named {0} already exists")]
     DuplicateName(String),
     #[error("{port_class:?} port received unexpected frame type: {frame_type:?}")]
-    MismatchedRxFrameType { port_class: PortWireFormat, frame_type: fhardware_network::FrameType },
+    MismatchedRxFrameType { port_class: PortWireFormat, frame_type: FrameType },
     #[error("invalid port class: {0}")]
     InvalidPortClass(fnet_interfaces_ext::UnknownHardwareNetworkPortClassError),
+    #[error("received unsupported frame type: {0:?}")]
+    UnsupportedFrameType(fhardware_network::FrameType),
 }
 
 const DEFAULT_BUFFER_LENGTH: usize = 2048;
+
+#[derive(Debug)]
+pub(crate) enum FrameType {
+    Ethernet,
+    Ipv4,
+    Ipv6,
+}
+
+impl TryFrom<fhardware_network::FrameType> for FrameType {
+    type Error = Error;
+    fn try_from(value: fhardware_network::FrameType) -> Result<Self, Self::Error> {
+        match value {
+            fhardware_network::FrameType::Ethernet => Ok(Self::Ethernet),
+            fhardware_network::FrameType::Ipv4 => Ok(Self::Ipv4),
+            fhardware_network::FrameType::Ipv6 => Ok(Self::Ipv6),
+            x @ fhardware_network::FrameType::__SourceBreaking { .. } => {
+                Err(Error::UnsupportedFrameType(x))
+            }
+        }
+    }
+}
 
 impl NetdeviceWorker {
     pub(crate) async fn new(
@@ -212,7 +235,7 @@ impl NetdeviceWorker {
             };
 
             let buf = packet::Buf::new(&mut buff[..frame_length], ..);
-            let frame_type = rx.frame_type().map_err(Error::Client)?;
+            let frame_type = rx.frame_type().map_err(Error::Client)?.try_into()?;
             match id {
                 NetdeviceId::Ethernet(id) => {
                     match frame_type {
@@ -319,6 +342,7 @@ impl PortWireFormat {
                         fhardware_network::FrameType::Ethernet => sf.ethernet = true,
                         fhardware_network::FrameType::Ipv4 => sf.ipv4 = true,
                         fhardware_network::FrameType::Ipv6 => sf.ipv6 = true,
+                        fhardware_network::FrameType::__SourceBreaking { .. } => (),
                     }
                     sf
                 },

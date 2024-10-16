@@ -24,10 +24,10 @@ pub struct SuspendStats {
     pub last_resume_reason: Option<String>,
     /// The amount of time spent in the previous suspend state.
     /// May not be available on all platforms.
-    pub last_time_in_sleep: zx::Duration,
+    pub last_time_in_sleep: zx::BootDuration,
     /// The amount of time spent performing suspend and resume operations for
     /// the previous suspend state.
     /// Suspend and resume operations are those actions taken by the platform in
     /// order to enter and exit, respectively, a suspended state.
-    pub last_time_in_suspend_operations: zx::Duration,
+    pub last_time_in_suspend_operations: zx::BootDuration,
 }

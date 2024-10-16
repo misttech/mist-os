@@ -88,7 +88,7 @@
         <tr id="StructWithNullableProtocol.val">
             <td><code>val</code></td>
             <td>
-                <code><a class='link' href='#SimpleProtocol'>SimpleProtocol</a>?</code>
+                <code>client_end:<a class='link' href='#SimpleProtocol'>SimpleProtocol</a>?</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -103,7 +103,7 @@
         <tr id="StructWithNullableRequest.val">
             <td><code>val</code></td>
             <td>
-                <code>server_end&lt;<a class='link' href='#SimpleProtocol'>SimpleProtocol</a>&gt;?</code>
+                <code>server_end:<a class='link' href='#SimpleProtocol'>SimpleProtocol</a>?</code>
             </td>
             <td></td>
             <td>No default</td>

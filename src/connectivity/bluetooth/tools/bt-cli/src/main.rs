@@ -779,7 +779,7 @@ mod tests {
     use fuchsia_bluetooth::types::Address;
     use futures::join;
     use std::task::Poll;
-    use zx::Duration;
+    use zx::MonotonicDuration;
     use {fidl_fuchsia_bluetooth as fbt, fidl_fuchsia_bluetooth_sys as fsys};
 
     fn peer(connected: bool, bonded: bool) -> Peer {
@@ -1208,8 +1208,8 @@ mod tests {
         parse_pair(args, state)
     }
 
-    fn timeout() -> Duration {
-        Duration::from_seconds(20)
+    fn timeout() -> MonotonicDuration {
+        MonotonicDuration::from_seconds(20)
     }
 
     #[fuchsia::test(allow_stalls = false)]
@@ -1252,7 +1252,7 @@ mod tests {
 
         let args = vec![];
         let (proxy, mut mock) =
-            PairingMock::new(Duration::from_seconds(1)).expect("failed to create mock");
+            PairingMock::new(MonotonicDuration::from_seconds(1)).expect("failed to create mock");
         let pair = allow_pairing(args.as_slice(), &proxy);
         let mut pair = pin!(pair);
 
@@ -1269,7 +1269,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let (proxy, mut mock) =
-            PairingMock::new(Duration::from_seconds(1)).expect("failed to create mock");
+            PairingMock::new(MonotonicDuration::from_seconds(1)).expect("failed to create mock");
 
         // Enable pairing with confirmation input cap and display output cap.
         let args = vec!["confirmation", "display"];
@@ -1300,14 +1300,14 @@ mod tests {
         // Arguments that don't correspond to any capabilities.
         let args = vec!["nonsense", "fake"];
         let (proxy, _mock) =
-            PairingMock::new(Duration::from_seconds(1)).expect("failed to create mock");
+            PairingMock::new(MonotonicDuration::from_seconds(1)).expect("failed to create mock");
 
         assert!(allow_pairing(args.as_slice(), &proxy).await.is_err());
 
         // Incorrect number of arguments.
         let args = vec!["none"];
         let (proxy, _mock) =
-            PairingMock::new(Duration::from_seconds(1)).expect("failed to create mock");
+            PairingMock::new(MonotonicDuration::from_seconds(1)).expect("failed to create mock");
 
         assert!(allow_pairing(args.as_slice(), &proxy).await.is_err());
     }
@@ -1320,7 +1320,7 @@ mod tests {
         let args = vec![peer_id_string.as_str()];
         let state = Mutex::new(state_with(peer));
         let (proxy, mut mock) =
-            AccessMock::new(Duration::from_seconds(1)).expect("failed to create mock");
+            AccessMock::new(MonotonicDuration::from_seconds(1)).expect("failed to create mock");
 
         let cmd = forget(args.as_slice(), &state, &proxy);
         let mock_expect = mock.expect_forget(peer_id.into(), Ok(()));
@@ -1338,7 +1338,7 @@ mod tests {
         let args = vec![peer_id_string.as_str()];
         let state = Mutex::new(state_with(peer));
         let (proxy, mut mock) =
-            AccessMock::new(Duration::from_seconds(1)).expect("failed to create mock");
+            AccessMock::new(MonotonicDuration::from_seconds(1)).expect("failed to create mock");
 
         let cmd = forget(args.as_slice(), &state, &proxy);
         let mock_expect = mock.expect_forget(peer_id.into(), Err(fsys::Error::Failed));
@@ -1364,7 +1364,7 @@ mod tests {
         let args = vec![peer_id_string.as_str(), "ENC", "T"];
         let state = Mutex::new(state_with(peer));
         let (proxy, mut mock) =
-            AccessMock::new(Duration::from_seconds(1)).expect("failed to create mock");
+            AccessMock::new(MonotonicDuration::from_seconds(1)).expect("failed to create mock");
 
         let cmd = pair(args.as_slice(), &state, &proxy);
         let mock_expect = mock.expect_pair(peer_id.into(), pairing_options, Ok(()));
@@ -1390,7 +1390,7 @@ mod tests {
         let args = vec![peer_id_string.as_str(), "ENC", "T"];
         let state = Mutex::new(state_with(peer));
         let (proxy, mut mock) =
-            AccessMock::new(Duration::from_seconds(1)).expect("failed to create mock");
+            AccessMock::new(MonotonicDuration::from_seconds(1)).expect("failed to create mock");
 
         let cmd = pair(args.as_slice(), &state, &proxy);
         let mock_expect =

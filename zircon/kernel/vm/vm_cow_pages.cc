@@ -19,17 +19,24 @@
 #include <vm/compression.h>
 #include <vm/discardable_vmo_tracker.h>
 #include <vm/fault.h>
+#include <vm/page.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
 #include <vm/stack_owned_loaned_pages_interval.h>
-#include <vm/vm_cow_pages.h>
 #include <vm/vm_object.h>
 #include <vm/vm_object_paged.h>
 #include <vm/vm_page_list.h>
 
+#include "ktl/optional.h"
 #include "vm_priv.h"
 
 #include <ktl/enforce.h>
+
+// This flag enables usage of split bits instead of share counts when tracking COW pages.
+//
+// TODO(https://fxbug.dev/issues/338300808): Remove this flag when the new attribution code (and
+// thus share counts) are the default.
+#define ENABLE_COW_SPLIT_BITS true
 
 #define LOCAL_TRACE VM_GLOBAL_TRACE(0)
 
@@ -70,6 +77,61 @@ KCOUNTER(vm_vmo_discardable_failed_reclaim, "vm.vmo.discardable_failed_reclaim")
 KCOUNTER(vm_vmo_range_update_from_parent_skipped, "vm.vmo.range_updated_from_parent.skipped")
 KCOUNTER(vm_vmo_range_update_from_parent_performed, "vm.vmo.range_updated_from_parent.performed")
 
+template <typename T>
+uint32_t GetShareCount(T p) {
+  DEBUG_ASSERT(p->IsPageOrRef());
+
+  uint32_t share_count = 0;
+  if (p->IsPage()) {
+    share_count = p->Page()->object.share_count;
+  } else if (p->IsReference()) {
+    share_count = pmm_page_compression()->GetMetadata(p->Reference());
+  }
+
+  return share_count;
+}
+
+template <>
+uint32_t GetShareCount(vm_page_t* p) {
+  return p->object.share_count;
+}
+
+template <typename T>
+void SetShareCount(T p, uint32_t count) {
+  DEBUG_ASSERT(p->IsPageOrRef());
+
+  if (p->IsPage()) {
+    p->Page()->object.share_count = count;
+  } else if (p->IsReference()) {
+    pmm_page_compression()->SetMetadata(p->Reference(), count);
+  }
+}
+
+template <>
+void SetShareCount(vm_page_t* p, uint32_t count) {
+  p->object.share_count = count;
+}
+
+enum class SplitDir : uint8_t {
+  Left = 1,
+  Right = 2,
+};
+
+template <typename T>
+bool IsSplit(SplitDir dir, T p) {
+  return (GetShareCount(p) & static_cast<uint32_t>(dir)) != 0;
+}
+
+template <typename T>
+void SetSplit(SplitDir dir, T p) {
+  SetShareCount(p, GetShareCount(p) | static_cast<uint32_t>(dir));
+}
+
+template <typename T>
+void ClearSplits(T p) {
+  SetShareCount(p, 0);
+}
+
 void ZeroPage(paddr_t pa) {
   void* ptr = paddr_to_physmap(pa);
   DEBUG_ASSERT(ptr);
@@ -92,11 +154,15 @@ bool IsZeroPage(vm_page_t* p) {
 }
 
 void InitializeVmPage(vm_page_t* p) {
+  DEBUG_ASSERT(p);
+  DEBUG_ASSERT(!list_in_list(&p->queue_node));
+  // Page should be in the ALLOC state so we can transition it to the OBJECT state.
   DEBUG_ASSERT(p->state() == vm_page_state::ALLOC);
   p->set_state(vm_page_state::OBJECT);
+  // When split bits are in use, the share_count will actually encode the split bits according to
+  // |IsSplit| and |SetSplit| above.
+  p->object.share_count = 0;
   p->object.pin_count = 0;
-  p->object.cow_left_split = 0;
-  p->object.cow_right_split = 0;
   p->object.always_need = 0;
   p->object.dirty_state = uint8_t(VmCowPages::DirtyState::Untracked);
 }
@@ -117,6 +183,19 @@ inline uint64_t ClampedLimit(uint64_t offset, uint64_t limit, uint64_t max_limit
   // beyond what it could before the resize or move operation.
   uint64_t offset_limit = CheckedAdd(offset, limit);
   return ktl::max(ktl::min(offset_limit, max_limit), offset) - offset;
+}
+
+ktl::optional<vm_page_t*> MaybeDecompressReference(VmCompression* compression,
+                                                   VmCompression::CompressedRef ref) {
+  if (auto maybe_page_and_metadata = compression->MoveReference(ref)) {
+    InitializeVmPage(maybe_page_and_metadata->page);
+    // Ensure the share count is propagated from the compressed page.
+    SetShareCount(maybe_page_and_metadata->page, maybe_page_and_metadata->metadata);
+
+    return maybe_page_and_metadata->page;
+  }
+
+  return ktl::nullopt;
 }
 
 void FreeReference(VmPageOrMarker::ReferenceValue content) {
@@ -362,13 +441,20 @@ zx_status_t VmCowPages::MakePageFromReference(VmPageOrMarkerRef page_or_mark,
   DEBUG_ASSERT(page_or_mark->IsReference());
   VmCompression* compression = pmm_page_compression();
   DEBUG_ASSERT(compression);
+
   vm_page_t* p;
   zx_status_t status = AllocPage(&p, page_request);
   if (status != ZX_OK) {
     return status;
   }
+
   const auto ref = page_or_mark.SwapReferenceForPage(p);
-  compression->Decompress(ref, paddr_to_physmap(p->paddr()));
+  void* page_data = paddr_to_physmap(p->paddr());
+  uint32_t page_metadata;
+  compression->Decompress(ref, page_data, &page_metadata);
+  // Ensure the share count is propagated from the compressed page.
+  SetShareCount(p, page_metadata);
+
   return ZX_OK;
 }
 
@@ -430,7 +516,7 @@ void VmCowPages::DeadTransition(Guard<CriticalMutex>& guard) {
   // At the point of destruction we should no longer have any mappings or children still
   // referencing us, and by extension our priority count must therefore be back to zero.
   DEBUG_ASSERT(high_priority_count_ == 0);
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
   // If we're not a hidden vmo, then we need to remove ourself from our parent. This needs
@@ -562,99 +648,120 @@ zx_status_t VmCowPages::ForEveryOwnedHierarchyPageInRange(S* self, T func, uint6
   DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
   DEBUG_ASSERT(!self->is_hidden_locked());
 
-  const uint64_t end_offset = CheckedAdd(offset, size);
-  uint64_t cur_offset = offset;
-  uint64_t cur_end_offset = end_offset;
+  uint64_t start_in_self = offset;
+  uint64_t end_in_self = CheckedAdd(offset, size);
+  uint64_t start_in_cur = start_in_self;
+  uint64_t end_in_cur = end_in_self;
   S* cur = self;
-  while (offset < end_offset) {
+
+  while (start_in_self < end_in_self) {
     AssertHeld(cur->lock_ref());
 
-    // Treat an interval's "empty" entries as starting at the lower bound of iteration if iteration
-    // begins part-way through an interval. This allows us to skip these "partial" intervals.
-    uint64_t interval_start_offset = cur_offset;
-    zx_status_t user_status = ZX_ERR_NEXT;
-    auto page_callback = [&](auto p, uint64_t page_offset) {
-      if (p->IsIntervalStart()) {
-        // We should only find intervals in a pager-backed root node. This function won't traverse
-        // upwards from a gap into such a node, so if we find an interval then `cur` must be both
-        // pager-backed and the initial visible node we invoked this function on.
-        DEBUG_ASSERT(cur->is_source_preserving_page_content() && cur == self);
-
-        // The underlying `page_list_` iterator guarantees we weren't inside of an interval here.
-        //
-        // Set the offset to the entry after this IntervalStart, as the IntervalStart itself is
-        // accounted for in the additions at the end of this function.
-        interval_start_offset = CheckedAdd(page_offset, PAGE_SIZE);
-      } else if (p->IsIntervalEnd()) {
-        // We should only find intervals in a pager-backed root node. This function won't traverse
-        // upwards from a gap into such a node, so if we find an interval then `cur` must be both
-        // pager-backed and the initial visible node we invoked this function on.
-        DEBUG_ASSERT(cur->is_source_preserving_page_content() && cur == self);
-
-        // The underlying `page_list_` iterator guarantees we were inside of an interval here.
-        //
-        // Compute the length of the empty entries inside of the interval to "skip ahead" over it.
-        // The IntervalStart and IntervalEnd entries are accounted for in the additions after we
-        // invoke `func` below.
-        const uint64_t interval_length = page_offset - interval_start_offset;
-        DEBUG_ASSERT(interval_length <= page_offset);  // Shouldn't overflow.
-        offset += interval_length;
-        cur_offset += interval_length;
+    // Early out if the current node is empty.
+    // TODO(https://fxbug.dev/338300943): This early out shouldn't be necessary as long as the
+    // VmPageList iterator functions like `ForEveryPageInRange` early out instead. Microbenchmarks
+    // slightly regressed when we attempted this though. Investigate adding the `IsEmpty` early-out
+    // to the VMPageList methods and removing this block.
+    if (cur->page_list_.IsEmpty()) {
+      if (cur->is_parent_hidden_locked() && start_in_cur < cur->parent_limit_) {
+        // Some of this range within the parent node is still owned by `self`, so walk up and
+        // process the range from within the parent instead.
+        start_in_cur = start_in_cur + cur->parent_offset_;
+        end_in_cur = ktl::min(end_in_cur, cur->parent_limit_) + cur->parent_offset_;
+        cur = cur->parent_.get();
+      } else {
+        // The range within the current node is owned by `self`, but the same range is not owned by
+        // `self` within the parent node. Either:
+        //  1. The parent is a visible node and owns all its pages, so `self` cannot own them.
+        //  2. This range within the parent is not visible to `self` due to the `parent_limit_`, and
+        //     thus it cannot be owned by `self` either.
+        // Mark the range as processed and restart another walk up from `self`.
+        start_in_self += end_in_cur - start_in_cur;
+        start_in_cur = start_in_self;
+        end_in_cur = end_in_self;
+        cur = self;
       }
-      DEBUG_ASSERT(page_offset == cur_offset);
 
+      continue;
+    }
+
+    // We attempt to always inline these lambdas, as its a huge performance benefit and has minimal
+    // impact on code size.
+    bool stopped_early = false;
+    bool walk_up = false;
+    auto page_callback = [func, cur, cur_to_self = start_in_cur - start_in_self, &stopped_early](
+                             auto p, uint64_t page_offset) __ALWAYS_INLINE {
       // Always provide a constant owner node to the callback - it should only ever be able to
       // modify the passed in entry.
-      user_status = func(p, static_cast<const S*>(cur), offset, cur_offset);
-
-      offset += PAGE_SIZE;
-      cur_offset += PAGE_SIZE;
-      return user_status;
+      zx_status_t status =
+          func(p, static_cast<const S*>(cur), page_offset - cur_to_self, page_offset);
+      if (status == ZX_ERR_STOP) {
+        stopped_early = true;
+      }
+      return status;
     };
-    auto gap_callback = [&](uint64_t gap_start_offset, uint64_t gap_end_offset) {
+    auto gap_callback = [&cur, &start_in_self, &start_in_cur, &end_in_cur, &walk_up](
+                            uint64_t gap_start_offset, uint64_t gap_end_offset) __ALWAYS_INLINE {
       AssertHeld(cur->lock_ref());
-      DEBUG_ASSERT(gap_start_offset == cur_offset);
 
-      // Stop iterating if parent is a visible node. Non-leaf visible nodes represent cases of
-      // unidirectional cloning, and in these cases the parent owns any pages in the gap.
-      if (cur->parent_ && cur_offset < cur->parent_limit_ &&
-          cur->parent_locked().is_hidden_locked()) {
-        // Trim the operating range to the parent and walk up.
-        cur_offset += cur->parent_offset_;
-        cur_end_offset = ktl::min(gap_end_offset, cur->parent_limit_) + cur->parent_offset_;
+      // The gap is empty, so walk up if the parent is accessible from any part of it.
+      // Mark the range immediately preceding the gap as processed.
+      if (gap_start_offset < cur->parent_limit_) {
+        start_in_self += gap_start_offset - start_in_cur;
+        start_in_cur = gap_start_offset + cur->parent_offset_;
+        end_in_cur = ktl::min(gap_end_offset, cur->parent_limit_) + cur->parent_offset_;
         cur = cur->parent_.get();
+        walk_up = true;
         return ZX_ERR_STOP;
       }
 
-      offset += (gap_end_offset - gap_start_offset);
-      cur_offset = gap_end_offset;
       return ZX_ERR_NEXT;
     };
 
-    zx_status_t status;
-    if constexpr (MUTABLE) {
-      status = cur->page_list_.RemovePagesAndIterateGaps(page_callback, gap_callback, cur_offset,
-                                                         cur_end_offset);
-    } else {
-      status = cur->page_list_.ForEveryPageAndGapInRange(page_callback, gap_callback, cur_offset,
-                                                         cur_end_offset);
-    }
-
-    // If the callback wanted to stop or generate an error, then propagate that.
-    if (user_status != ZX_OK && user_status != ZX_ERR_NEXT) {
-      if (user_status == ZX_ERR_STOP) {
-        return ZX_OK;
+    zx_status_t status = ZX_OK;
+    if (cur->is_parent_hidden_locked()) {
+      // We know the parent is hidden here, so we may need to walk up into it if it's accessible
+      // from any empty offset within the range.
+      //
+      // Otherwise process pages within the range directly owned by `cur`.
+      if constexpr (MUTABLE) {
+        status = cur->page_list_.RemovePagesAndIterateGaps(page_callback, gap_callback,
+                                                           start_in_cur, end_in_cur);
+      } else {
+        status = cur->page_list_.ForEveryPageAndGapInRange(page_callback, gap_callback,
+                                                           start_in_cur, end_in_cur);
       }
-      return user_status;
+    } else {
+      // There is either no parent here, or the parent is visible.
+      //
+      // Visible parents represent cases of unidirectional cloning where the parent owns its pages
+      // exclusively, so we don't walk up into them and thus don't need to process any gaps.
+      //
+      // Processing gaps is expensive due to additional per-page overhead involved in tracking the
+      // gaps and intervals, so save time by avoiding that and only processing pages directly owned
+      // by `cur`.
+      if constexpr (MUTABLE) {
+        status = cur->page_list_.RemovePages(page_callback, start_in_cur, end_in_cur);
+      } else {
+        status = cur->page_list_.ForEveryPageInRange(page_callback, start_in_cur, end_in_cur);
+      }
     }
-    DEBUG_ASSERT(status == ZX_OK);  // No other reason for there to be an error.
+    if (status != ZX_OK) {
+      return status;
+    }
 
-    // If the operating range is empty, then no further progress can be made by walking up.
-    // Restart a new upward walk from the initial node to continue making progress.
-    if (cur_offset == cur_end_offset) {
+    // If the page callback wanted to stop early, then do so.
+    if (stopped_early) {
+      return ZX_OK;
+    }
+
+    // If we didn't walk up, then mark the entire range as processed and begin another walk up from
+    // `self`.
+    if (!walk_up) {
+      start_in_self += end_in_cur - start_in_cur;
+      start_in_cur = start_in_self;
+      end_in_cur = end_in_self;
       cur = self;
-      cur_offset = offset;
-      cur_end_offset = end_offset;
     }
   }
 
@@ -723,7 +830,7 @@ bool VmCowPages::DedupZeroPage(vm_page_t* page, uint64_t offset) {
 
     reclamation_event_count_++;
     IncrementHierarchyGenerationCountLocked();
-    VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+    VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
     VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
     return true;
   }
@@ -763,6 +870,43 @@ zx_status_t VmCowPages::CreateExternal(fbl::RefPtr<PageSource> src, VmCowPagesOp
 
   *cow_pages = ktl::move(cow);
   return ZX_OK;
+}
+
+VmCowPages& VmCowPages::left_child_locked() {
+  DEBUG_ASSERT(ENABLE_COW_SPLIT_BITS);
+  DEBUG_ASSERT(is_hidden_locked());
+  DEBUG_ASSERT(children_list_len_ == 2);
+
+  auto& ret = children_list_.front();
+  AssertHeld(ret.lock_ref());
+  return ret;
+}
+
+VmCowPages& VmCowPages::right_child_locked() {
+  DEBUG_ASSERT(ENABLE_COW_SPLIT_BITS);
+  DEBUG_ASSERT(is_hidden_locked());
+  DEBUG_ASSERT(children_list_len_ == 2);
+  auto& ret = children_list_.back();
+  AssertHeld(ret.lock_ref());
+  return ret;
+}
+
+const VmCowPages& VmCowPages::left_child_locked() const {
+  DEBUG_ASSERT(ENABLE_COW_SPLIT_BITS);
+  DEBUG_ASSERT(is_hidden_locked());
+  DEBUG_ASSERT(children_list_len_ == 2);
+  const auto& ret = children_list_.front();
+  AssertHeld(ret.lock_ref());
+  return ret;
+}
+
+const VmCowPages& VmCowPages::right_child_locked() const {
+  DEBUG_ASSERT(ENABLE_COW_SPLIT_BITS);
+  DEBUG_ASSERT(is_hidden_locked());
+  DEBUG_ASSERT(children_list_len_ == 2);
+  const auto& ret = children_list_.back();
+  AssertHeld(ret.lock_ref());
+  return ret;
 }
 
 void VmCowPages::ReplaceChildLocked(VmCowPages* old, VmCowPages* new_child) {
@@ -855,10 +999,10 @@ zx_status_t VmCowPages::CreateChildSliceLocked(uint64_t offset, uint64_t size,
   AddChildLocked(slice.get(), offset, size);
 
   // Checking this node's hierarchy will also check the parent's hierarchy.
-  // It will not check the child's hierarchy, so check that independently.
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  // It will not check the child's page sharing however, so check that independently.
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
-  VMO_VALIDATION_ASSERT(slice->DebugValidatePageSplitsLocked());
+  VMO_VALIDATION_ASSERT(slice->DebugValidatePageSharingLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(slice->DebugValidateVmoPageBorrowingLocked());
 
   *cow_slice = slice;
@@ -961,6 +1105,15 @@ zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t size,
                                                  fbl::RefPtr<VmCowPages>* cow_child) {
   canary_.Assert();
 
+  if constexpr (ENABLE_COW_SPLIT_BITS) {
+    return CloneBidirectionalUsingSplitsLocked(offset, size, cow_child);
+  }
+}
+
+zx_status_t VmCowPages::CloneBidirectionalUsingSplitsLocked(uint64_t offset, uint64_t size,
+                                                            fbl::RefPtr<VmCowPages>* cow_child) {
+  canary_.Assert();
+
   // The parent must be `this` node.
   // TODO(b/42058561): After switching to share counts, allow walking the hierarchy to select a
   // parent further up.
@@ -1012,14 +1165,14 @@ zx_status_t VmCowPages::CloneBidirectionalLocked(uint64_t offset, uint64_t size,
   parent->AddChildLocked(cow_clone.get(), child_range.parent_offset, child_range.parent_limit);
 
   // Checking this node's hierarchy will also check the parent's hierarchy.
-  // It will not check either child's hierarchies, so check those independently.
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  // It will not check either child's page sharing however, so check those independently.
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(parent->DebugValidateVmoPageBorrowingLocked());
-  VMO_VALIDATION_ASSERT(cow_clone->DebugValidatePageSplitsLocked());
+  VMO_VALIDATION_ASSERT(cow_clone->DebugValidatePageSharingLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(cow_clone->DebugValidateVmoPageBorrowingLocked());
   if (parent_clone) {
     AssertHeld(parent_clone->lock_ref());
-    VMO_VALIDATION_ASSERT(parent_clone->DebugValidatePageSplitsLocked());
+    VMO_VALIDATION_ASSERT(parent_clone->DebugValidatePageSharingLocked());
     VMO_FRUGAL_VALIDATION_ASSERT(parent_clone->DebugValidateVmoPageBorrowingLocked());
   }
 
@@ -1050,10 +1203,10 @@ zx_status_t VmCowPages::CloneUnidirectionalLocked(uint64_t offset, uint64_t size
   parent->AddChildLocked(cow_clone.get(), child_range.parent_offset, child_range.parent_limit);
 
   // Checking this node's hierarchy will also check the parent's hierarchy.
-  // It will not check the child's hierarchy, so check that independently.
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  // It will not check the child's page sharing however, so check that independently.
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(parent->DebugValidateVmoPageBorrowingLocked());
-  VMO_VALIDATION_ASSERT(cow_clone->DebugValidatePageSplitsLocked());
+  VMO_VALIDATION_ASSERT(cow_clone->DebugValidatePageSharingLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(cow_clone->DebugValidateVmoPageBorrowingLocked());
 
   *cow_child = ktl::move(cow_clone);
@@ -1070,7 +1223,7 @@ zx_status_t VmCowPages::CreateCloneLocked(CloneType type, uint64_t offset, uint6
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
   DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
   DEBUG_ASSERT(!is_hidden_locked());
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
   // Upgrade clone type, if possible.
@@ -1173,13 +1326,13 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
   canary_.Assert();
 
   AssertHeld(removed->lock_ref());
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
   if (!is_hidden_locked()) {
     DropChildLocked(removed);
     // Things should be consistent after dropping the child.
-    VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+    VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
     VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
     return;
   }
@@ -1281,13 +1434,22 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed) {
   parent_offset_ = parent_limit_ = parent_start_limit_ = 0;
 
   // Things should be consistent after dropping one child and merging with the other.
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
-  VMO_VALIDATION_ASSERT(child->DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
+  VMO_VALIDATION_ASSERT(child->DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(child->DebugValidateVmoPageBorrowingLocked());
 }
 
 void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_left) {
+  canary_.Assert();
+
+  if constexpr (ENABLE_COW_SPLIT_BITS) {
+    MergeContentWithChildUsingSplitsLocked(removed, removed_left);
+    return;
+  }
+}
+
+void VmCowPages::MergeContentWithChildUsingSplitsLocked(VmCowPages* removed, bool removed_left) {
   canary_.Assert();
 
   DEBUG_ASSERT(children_list_len_ == 1);
@@ -1393,9 +1555,9 @@ void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_l
           if (page_or_mark && page_or_mark->IsPageOrRef()) {
             // The page was definitely forked into |removed|, but
             // shouldn't be forked twice.
-            DEBUG_ASSERT(page_or_mark->PageOrRefLeftSplit() ^ page_or_mark->PageOrRefRightSplit());
-            page_or_mark.SetPageOrRefLeftSplit(false);
-            page_or_mark.SetPageOrRefRightSplit(false);
+            DEBUG_ASSERT(IsSplit(SplitDir::Left, page_or_mark) ^
+                         IsSplit(SplitDir::Right, page_or_mark));
+            ClearSplits(page_or_mark);
           }
           return ZX_ERR_NEXT;
         },
@@ -1424,13 +1586,12 @@ void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_l
           // its page so we can move it. To determine if we have a temporary reference we can
           // just attempt to move it, and if it was a temporary reference we will get a page
           // returned.
-          if (auto page = state.compression->MoveReference(p->Reference())) {
-            InitializeVmPage(*page);
+          if (auto maybe_page = MaybeDecompressReference(state.compression, p->Reference())) {
             // For simplicity, since this is a very uncommon edge case, just update the page in
             // place in this page list, then move it as a regular page.
             AssertHeld(lock_ref());
-            SetNotPinnedLocked(*page, off);
-            VmPageOrMarker::ReferenceValue ref = p.SwapReferenceForPage(*page);
+            SetNotPinnedLocked(*maybe_page, off);
+            VmPageOrMarker::ReferenceValue ref = p.SwapReferenceForPage(*maybe_page);
             ASSERT(state.compression->IsTempReference(ref));
           }
         }
@@ -1454,8 +1615,9 @@ void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_l
     // have a source that was handling frees, which would require more work that simply freeing
     // pages to the PMM.
     DEBUG_ASSERT(!child.is_source_handling_free_locked());
-    child.page_list_.MergeOnto(
-        page_list_, [&covered_remover](VmPageOrMarker&& p) { covered_remover.PushContent(&p); });
+    child.page_list_.MergeOnto(page_list_, [&covered_remover](VmPageOrMarker&& p, uint64_t offset) {
+      covered_remover.PushContent(&p);
+    });
     child.page_list_ = ktl::move(page_list_);
 
     vm_page_t* p;
@@ -1463,7 +1625,7 @@ void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_l
     list_for_every_entry (&covered_pages, p, vm_page_t, queue_node) {
       // The page was already present in |child|, so it should be split at least
       // once. And being split twice is obviously bad.
-      ASSERT(p->object.cow_left_split ^ p->object.cow_right_split);
+      ASSERT(IsSplit(SplitDir::Left, p) ^ IsSplit(SplitDir::Right, p));
       ASSERT(p->object.pin_count == 0);
     }
     list_splice_after(&covered_pages, &freed_pages);
@@ -1486,29 +1648,28 @@ void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_l
           DEBUG_ASSERT(page_or_marker->IsReference() ||
                        page_or_marker->Page()->object.pin_count == 0);
 
-          if (state.removed_left ? page_or_marker->PageOrRefRightSplit()
-                                 : page_or_marker->PageOrRefLeftSplit()) {
+          if (state.removed_left ? IsSplit(SplitDir::Right, page_or_marker)
+                                 : IsSplit(SplitDir::Left, page_or_marker)) {
             // This happens when the pages was already migrated into child but then
             // was migrated further into child's descendants. The page can be freed.
             state.page_remover->PushContent(page_or_marker);
           } else {
             // Since we recursively fork on write, if the child doesn't have the
             // page, then neither of its children do.
-            page_or_marker->SetPageOrRefLeftSplit(false);
-            page_or_marker->SetPageOrRefRightSplit(false);
+            ClearSplits(page_or_marker);
             if (page_or_marker->IsReference()) {
               // A regular reference we can move, a temporary reference we need to turn back into
               // its page so we can move it. To determine if we have a temporary reference we can
               // just attempt to move it, and if it was a temporary reference we will get a page
               // returned.
-              if (auto page = state.compression->MoveReference(page_or_marker->Reference())) {
-                InitializeVmPage(*page);
+              if (auto maybe_page =
+                      MaybeDecompressReference(state.compression, page_or_marker->Reference())) {
                 // For simplicity, since this is a very uncommon edge case, just update the page in
                 // place in this page list, then move it as a regular page.
                 AssertHeld(lock_ref());
-                SetNotPinnedLocked(*page, offset);
+                SetNotPinnedLocked(*maybe_page, offset);
                 VmPageOrMarker::ReferenceValue ref =
-                    VmPageOrMarkerRef(page_or_marker).SwapReferenceForPage(*page);
+                    page_or_marker->SwapReferenceForPage(*maybe_page);
                 ASSERT(state.compression->IsTempReference(ref));
               }
             }
@@ -1577,15 +1738,23 @@ void VmCowPages::DumpLocked(uint depth, bool verbose) const {
       }
       if (p->IsMarker()) {
         printf("offset %#" PRIx64 " zero page marker\n", offset);
-      } else if (p->IsPage()) {
+      } else if (p->IsPage() && ENABLE_COW_SPLIT_BITS) {
         vm_page_t* page = p->Page();
         printf("offset %#" PRIx64 " page %p paddr %#" PRIxPTR "(%c%c%c)\n", offset, page,
-               page->paddr(), page->object.cow_left_split ? 'L' : '.',
-               page->object.cow_right_split ? 'R' : '.', page->object.always_need ? 'A' : '.');
-      } else if (p->IsReference()) {
+               page->paddr(), IsSplit(SplitDir::Left, page) ? 'L' : '.',
+               IsSplit(SplitDir::Right, page) ? 'R' : '.', page->object.always_need ? 'A' : '.');
+      } else if (p->IsReference() && ENABLE_COW_SPLIT_BITS) {
         const uint64_t cookie = p->Reference().value();
         printf("offset %#" PRIx64 " reference %#" PRIx64 "(%c%c)\n", offset, cookie,
-               p->PageOrRefLeftSplit() ? 'L' : '.', p->PageOrRefRightSplit() ? 'R' : '.');
+               IsSplit(SplitDir::Left, p) ? 'L' : '.', IsSplit(SplitDir::Right, p) ? 'R' : '.');
+      } else if (p->IsPage()) {
+        vm_page_t* page = p->Page();
+        printf("offset %#" PRIx64 " page %p paddr %#" PRIxPTR " share %" PRIu32 "(%c)\n", offset,
+               page, page->paddr(), GetShareCount(page), page->object.always_need ? 'A' : '.');
+      } else if (p->IsReference()) {
+        const uint64_t cookie = p->Reference().value();
+        printf("offset %#" PRIx64 " reference %#" PRIx64 " share %" PRIu32 "\n", offset, cookie,
+               GetShareCount(p));
       } else if (p->IsIntervalStart()) {
         printf("offset %#" PRIx64 " page interval start\n", offset);
       } else if (p->IsIntervalEnd()) {
@@ -1615,6 +1784,15 @@ uint32_t VmCowPages::DebugLookupDepthLocked() const {
 }
 
 VmCowPages::AttributionCounts VmCowPages::GetAttributedMemoryInRangeLocked(
+    uint64_t offset_bytes, uint64_t len_bytes) const {
+  canary_.Assert();
+
+  if constexpr (ENABLE_COW_SPLIT_BITS) {
+    return GetAttributedMemoryInRangeUsingSplitsLocked(offset_bytes, len_bytes);
+  }
+}
+
+VmCowPages::AttributionCounts VmCowPages::GetAttributedMemoryInRangeUsingSplitsLocked(
     uint64_t offset_bytes, uint64_t len_bytes) const {
   canary_.Assert();
 
@@ -1740,7 +1918,7 @@ uint64_t VmCowPages::CountAttributedAncestorBytesLocked(uint64_t offset, uint64_
               // If page has already been split and we can see it, then we know
               // the sibling subtree can't see the page and thus it should be
               // attributed to this vmo.
-              (p->PageOrRefLeftSplit() || p->PageOrRefRightSplit()) ||
+              (IsSplit(SplitDir::Left, p) || IsSplit(SplitDir::Right, p)) ||
               // If the sibling cannot access this page then its ours, otherwise we know there's
               // a vmo in the sibling subtree which is 'closer' to this offset, and to which we will
               // attribute the page to.
@@ -2009,7 +2187,7 @@ VmPageOrMarker VmCowPages::CompleteAddPageLocked(AddPageTransaction& transaction
     }
   }
 
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
   VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
   return old;
@@ -2106,7 +2284,7 @@ zx_status_t VmCowPages::AddNewPagesLocked(uint64_t start_offset, list_node_t* pa
     RangeChangeUpdateLocked(start_offset, offset - start_offset, RangeChangeOp::Unmap);
   }
 
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
   return ZX_OK;
 }
@@ -2114,7 +2292,7 @@ zx_status_t VmCowPages::AddNewPagesLocked(uint64_t start_offset, list_node_t* pa
 bool VmCowPages::IsUniAccessibleLocked(vm_page_t* page, uint64_t offset) const {
   DEBUG_ASSERT(page_list_.Lookup(offset)->Page() == page);
 
-  if (page->object.cow_right_split || page->object.cow_left_split) {
+  if (IsSplit(SplitDir::Left, page) || IsSplit(SplitDir::Right, page)) {
     return true;
   }
 
@@ -2136,6 +2314,17 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
                                            uint64_t owner_offset,
                                            AnonymousPageRequest* page_request,
                                            vm_page_t** out_page) {
+  if constexpr (ENABLE_COW_SPLIT_BITS) {
+    return CloneCowPageUsingSplitsLocked(offset, alloc_list, page_owner, page, owner_offset,
+                                         page_request, out_page);
+  }
+}
+
+zx_status_t VmCowPages::CloneCowPageUsingSplitsLocked(uint64_t offset, list_node_t* alloc_list,
+                                                      VmCowPages* page_owner, vm_page_t* page,
+                                                      uint64_t owner_offset,
+                                                      AnonymousPageRequest* page_request,
+                                                      vm_page_t** out_page) {
   DEBUG_ASSERT(page != vm_get_zero_page());
   DEBUG_ASSERT(parent_);
   DEBUG_ASSERT(page_request);
@@ -2220,23 +2409,22 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
       cur->CancelAddPageLocked(*page_transaction);
     });
 
+    const SplitDir target_dir =
+        (target_page_owner->stack_.dir_flag == StackDir::Left) ? SplitDir::Left : SplitDir::Right;
     if (target_page_owner->IsUniAccessibleLocked(target_page, target_page_offset)) {
       // If the page we're covering in the parent is uni-accessible, then we
       // can directly move the page.
+
+      // For now, we won't see a loaned page here.
+      DEBUG_ASSERT(!target_page->is_loaned());
 
       // Assert that we're not trying to split the page the same direction two times. Either
       // some tracking state got corrupted or a page in the subtree we're trying to
       // migrate to got improperly migrated/freed. If we did this migration, then the
       // opposite subtree would lose access to this page.
-      DEBUG_ASSERT(!(target_page_owner->stack_.dir_flag == StackDir::Left &&
-                     target_page->object.cow_left_split));
-      DEBUG_ASSERT(!(target_page_owner->stack_.dir_flag == StackDir::Right &&
-                     target_page->object.cow_right_split));
-      // For now, we won't see a loaned page here.
-      DEBUG_ASSERT(!target_page->is_loaned());
+      DEBUG_ASSERT(!IsSplit(target_dir, target_page));
+      ClearSplits(target_page);
 
-      target_page->object.cow_left_split = 0;
-      target_page->object.cow_right_split = 0;
       VmPageOrMarker removed = target_page_owner->page_list_.RemoveContent(target_page_offset);
       // We know this is a true page since it is just our |target_page|, which is a true page.
       vm_page* removed_page = removed.ReleasePage();
@@ -2254,13 +2442,11 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
       }
 
       // We're going to cover target_page with cover_page, so set appropriate split bit.
-      if (target_page_owner->stack_.dir_flag == StackDir::Left) {
-        target_page->object.cow_left_split = 1;
-        DEBUG_ASSERT(target_page->object.cow_right_split == 0);
-      } else {
-        target_page->object.cow_right_split = 1;
-        DEBUG_ASSERT(target_page->object.cow_left_split == 0);
-      }
+      const SplitDir sibling_dir =
+          (target_dir == SplitDir::Left) ? SplitDir::Right : SplitDir::Left;
+      DEBUG_ASSERT(!IsSplit(sibling_dir, target_page));
+      SetSplit(target_dir, target_page);
+
       target_page = cover_page;
 
       skip_range_update = false;
@@ -2310,6 +2496,17 @@ zx_status_t VmCowPages::CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* f
                                                  VmCowPages* page_owner, vm_page_t* page,
                                                  uint64_t owner_offset,
                                                  AnonymousPageRequest* page_request) {
+  if constexpr (ENABLE_COW_SPLIT_BITS) {
+    return CloneCowPageAsZeroUsingSplitsLocked(offset, freed_list, page_owner, page, owner_offset,
+                                               page_request);
+  }
+}
+
+zx_status_t VmCowPages::CloneCowPageAsZeroUsingSplitsLocked(uint64_t offset,
+                                                            list_node_t* freed_list,
+                                                            VmCowPages* page_owner, vm_page_t* page,
+                                                            uint64_t owner_offset,
+                                                            AnonymousPageRequest* page_request) {
   DEBUG_ASSERT(parent_);
 
   DEBUG_ASSERT(!page_source_ || page_source_->DebugIsPageOk(page, offset));
@@ -2334,12 +2531,12 @@ zx_status_t VmCowPages::CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* f
     return page_transaction.status_value();
   }
 
-  bool left = this == &(parent_locked().left_child_locked());
+  const SplitDir this_dir =
+      (this == &(parent_locked().left_child_locked())) ? SplitDir::Left : SplitDir::Right;
   // Page is in our parent. Check if its uni accessible, if so we can free it.
   if (parent_locked().IsUniAccessibleLocked(page, offset + parent_offset_)) {
     // Make sure we didn't already merge the page in this direction.
-    DEBUG_ASSERT(!(left && page->object.cow_left_split));
-    DEBUG_ASSERT(!(!left && page->object.cow_right_split));
+    DEBUG_ASSERT(!IsSplit(this_dir, page));
     // We are going to be inserting removed pages into a shared free list. So make sure the parent
     // did not have a page source that was handling frees which would require additional work on the
     // owned pages on top of a simple free to the PMM.
@@ -2354,11 +2551,7 @@ zx_status_t VmCowPages::CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* f
     DEBUG_ASSERT(!list_in_list(&removed->queue_node));
     list_add_tail(freed_list, &removed->queue_node);
   } else {
-    if (left) {
-      page->object.cow_left_split = 1;
-    } else {
-      page->object.cow_right_split = 1;
-    }
+    SetSplit(this_dir, page);
   }
   // Insert the zero marker.
   // We know that the slot is empty, so we know we won't be overwriting an actual page.
@@ -2368,6 +2561,16 @@ zx_status_t VmCowPages::CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* f
   // We cannot be forking a page to here if there's already something.
   DEBUG_ASSERT(old.IsEmpty());
   return ZX_OK;
+}
+
+void VmCowPages::ReleaseCowParentPagesLocked(uint64_t start, uint64_t end,
+                                             BatchPQRemove* page_remover) {
+  canary_.Assert();
+
+  if constexpr (ENABLE_COW_SPLIT_BITS) {
+    ReleaseCowParentPagesUsingSplitsLocked(start, end, page_remover);
+    return;
+  }
 }
 
 VMPLCursor VmCowPages::FindInitialPageContentLocked(uint64_t offset, VmCowPages** owner_out,
@@ -3283,7 +3486,7 @@ zx::result<VmCowPages::LookupCursor> VmCowPages::GetLookupCursorLocked(uint64_t 
   DEBUG_ASSERT(!is_hidden_locked());
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset) && max_len > 0 && IS_PAGE_ALIGNED(max_len));
   DEBUG_ASSERT(life_cycle_ == LifeCycle::Alive);
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
 
   if (unlikely(offset >= size_ || !InRange(offset, max_len, size_))) {
     return zx::error{ZX_ERR_OUT_OF_RANGE};
@@ -3391,7 +3594,7 @@ zx_status_t VmCowPages::CommitRangeLocked(uint64_t offset, uint64_t len, uint64_
   // Clear the alloc list from the cursor and let list_cleanup free any remaining pages.
   cursor->ClearAllocList();
 
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
   return status;
 }
@@ -3536,7 +3739,7 @@ zx::result<uint64_t> VmCowPages::UnmapAndFreePagesLocked(uint64_t offset, uint64
     FreePagesLocked(&freed_list, /*freeing_owned_pages=*/true);
   }
 
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
   return zx::ok(page_remover.freed_count());
 }
@@ -4174,7 +4377,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
       },
       start, end);
 
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
   return status;
@@ -4686,10 +4889,12 @@ void VmCowPages::ReleaseCowParentPagesLockedHelper(uint64_t start, uint64_t end,
   // not have a page source that was handling frees which would require additional work on the owned
   // pages on top of a simple free to the PMM.
   DEBUG_ASSERT(!parent_locked().is_source_handling_free_locked());
+  const SplitDir this_dir =
+      (this == &parent_locked().left_child_locked()) ? SplitDir::Left : SplitDir::Right;
+  const SplitDir sibling_dir = (this_dir == SplitDir::Left) ? SplitDir::Right : SplitDir::Left;
   parent_locked().page_list_.RemovePages(
-      [skip_split_bits, sibling_visible, page_remover,
-       left = this == &parent_locked().left_child_locked()](VmPageOrMarker* page_or_mark,
-                                                            uint64_t offset) {
+      [skip_split_bits, sibling_visible, sibling_dir, this_dir, page_remover](
+          VmPageOrMarker* page_or_mark, uint64_t offset) {
         // Hidden VMO hierarchies do not support intervals.
         ASSERT(!page_or_mark->IsInterval());
 
@@ -4705,8 +4910,7 @@ void VmCowPages::ReleaseCowParentPagesLockedHelper(uint64_t start, uint64_t end,
         // If the sibling can still see this page then we need to keep it around, otherwise we can
         // free it. The sibling can see the page if this range is |sibling_visible| and if the
         // sibling hasn't already forked the page, which is recorded in the split bits.
-        if (!sibling_visible || left ? page_or_mark->PageOrRefRightSplit()
-                                     : page_or_mark->PageOrRefLeftSplit()) {
+        if (!sibling_visible || IsSplit(sibling_dir, page_or_mark)) {
           page_remover->PushContent(page_or_mark);
           return ZX_ERR_NEXT;
         }
@@ -4714,23 +4918,18 @@ void VmCowPages::ReleaseCowParentPagesLockedHelper(uint64_t start, uint64_t end,
           // If we were able to update this vmo's parent limit, that made the pages
           // uniaccessible. We clear the split bits to allow ::RemoveChildLocked to efficiently
           // merge vmos without having to worry about pages above parent_limit_.
-          page_or_mark->SetPageOrRefLeftSplit(false);
-          page_or_mark->SetPageOrRefRightSplit(false);
+          ClearSplits(page_or_mark);
         } else {
           // Otherwise set the appropriate split bit to make the page uniaccessible.
-          if (left) {
-            page_or_mark->SetPageOrRefLeftSplit(true);
-          } else {
-            page_or_mark->SetPageOrRefRightSplit(true);
-          }
+          SetSplit(this_dir, page_or_mark);
         }
         return ZX_ERR_NEXT;
       },
       parent_range_start, parent_range_end);
 }
 
-void VmCowPages::ReleaseCowParentPagesLocked(uint64_t start, uint64_t end,
-                                             BatchPQRemove* page_remover) {
+void VmCowPages::ReleaseCowParentPagesUsingSplitsLocked(uint64_t start, uint64_t end,
+                                                        BatchPQRemove* page_remover) {
   // This function releases |this| references to any ancestor vmo's COW pages.
   //
   // To do so, we divide |this| parent into three (possibly 0-length) regions: the region
@@ -5093,7 +5292,7 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
 
   IncrementHierarchyGenerationCountLocked();
 
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
   return ZX_OK;
@@ -5311,11 +5510,13 @@ zx_status_t VmCowPages::TakePagesWithParentLocked(uint64_t offset, uint64_t len,
       DEBUG_ASSERT(!content.Page()->is_loaned());
       pmm_page_queues()->Remove(content.Page());
     } else if (content.IsReference()) {
-      if (auto page = compression->MoveReference(content.Reference())) {
-        InitializeVmPage(*page);
-        AssertHeld(lock_ref());
+      // A regular reference we can move, a temporary reference we need to turn back into
+      // its page so we can move it. To determine if we have a temporary reference we can
+      // just attempt to move it, and if it was a temporary reference we will get a page
+      // returned.
+      if (auto maybe_page = MaybeDecompressReference(compression, content.Reference())) {
         // Don't insert the page in the page queues, since we're trying to remove the pages.
-        VmPageOrMarker::ReferenceValue ref = content.SwapReferenceForPage(*page);
+        VmPageOrMarker::ReferenceValue ref = content.SwapReferenceForPage(*maybe_page);
         ASSERT(compression->IsTempReference(ref));
       }
     }
@@ -5334,7 +5535,7 @@ zx_status_t VmCowPages::TakePagesWithParentLocked(uint64_t offset, uint64_t len,
     RangeChangeUpdateLocked(offset, new_pages_len, RangeChangeOp::Unmap);
   }
 
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
   // We need to finalize the splice page list as soon as we know that we will not be adding pages
@@ -5385,7 +5586,7 @@ zx_status_t VmCowPages::TakePagesLocked(uint64_t offset, uint64_t len, VmPageSpl
   VmCompression* compression = pmm_page_compression();
   bool found_page = false;
   page_list_.ForEveryPageInRangeMutable(
-      [&compression, &found_page, this](VmPageOrMarkerRef p, uint64_t off) {
+      [&compression, &found_page](VmPageOrMarkerRef p, uint64_t off) {
         found_page = true;
         // Splice lists do not support page intervals.
         ASSERT(!p->IsInterval());
@@ -5398,12 +5599,10 @@ zx_status_t VmCowPages::TakePagesLocked(uint64_t offset, uint64_t len, VmPageSpl
           // A regular reference we can move are permitted in the VmPageSpliceList, it is up to the
           // receiver of the pages to reject or otherwise deal with them. A temporary reference we
           // need to turn back into its page so we can move it.
-          if (auto page = compression->MoveReference(p->Reference())) {
-            InitializeVmPage(*page);
-            AssertHeld(lock_ref());
+          if (auto maybe_page = MaybeDecompressReference(compression, p->Reference())) {
             // Don't insert the page in the page queues, since we're trying to remove the pages,
             // just update the page list reader for TakePages below.
-            VmPageOrMarker::ReferenceValue ref = p.SwapReferenceForPage(*page);
+            VmPageOrMarker::ReferenceValue ref = p.SwapReferenceForPage(*maybe_page);
             ASSERT(compression->IsTempReference(ref));
           }
         }
@@ -5433,7 +5632,7 @@ zx_status_t VmCowPages::TakePagesLocked(uint64_t offset, uint64_t len, VmPageSpl
   *taken_len = len;
   RangeChangeUpdateLocked(offset, len, RangeChangeOp::Unmap);
 
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
   return ZX_OK;
@@ -5678,7 +5877,7 @@ zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageS
     FreePagesLocked(&freed_list, /*freeing_owned_pages=*/true);
   }
 
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
   *supplied_len = offset - start;
@@ -6604,7 +6803,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEvictionLocked(vm_page_t* pa
 
   reclamation_event_count_++;
   IncrementHierarchyGenerationCountLocked();
-  VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
   return ReclaimCounts{
       .evicted_non_loaned = loaned ? 0u : 1u,
@@ -6646,8 +6845,14 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompressionLocked(vm_page_t*
     RangeChangeUpdateLocked(offset, PAGE_SIZE, RangeChangeOp::Unmap);
 
     // Start compression of the page by swapping the page list to contain the temporary reference.
-    [[maybe_unused]] vm_page_t* compress_page =
-        page_or_marker.SwapPageForReference(compressor->Start(page));
+    // Ensure the compression system is aware of the page's current share_count so it can track any
+    // changes we make to that value while compression is running.
+    //
+    // When split bits are in use, the share_count will actually encode the split bits according to
+    // |IsSplit| and |SetSplit| above.
+    VmPageOrMarker::ReferenceValue temp_ref = compressor->Start(
+        VmCompressor::PageAndMetadata{.page = page, .metadata = GetShareCount(page)});
+    [[maybe_unused]] vm_page_t* compress_page = page_or_marker.SwapPageForReference(temp_ref);
     DEBUG_ASSERT(compress_page == page);
   }
   pmm_page_queues()->Remove(page);
@@ -6658,9 +6863,10 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompressionLocked(vm_page_t*
   // We now stack own the page (and guarantee to the compressor that it will not be modified) and
   // the VMO owns the temporary reference. We can safely drop the VMO lock and perform the
   // compression step.
-  VmCompressor::CompressResult compression_result = VmCompressor::FailTag{};
-  guard.CallUnlocked(
-      [compressor, &compression_result] { compression_result = compressor->Compress(); });
+  guard.CallUnlocked([compressor] { compressor->Compress(); });
+
+  // Retrieve the result of compression now that we hold the VMO lock again.
+  VmCompressor::CompressResult compression_result = compressor->TakeCompressionResult();
 
   // We hold the VMO lock again and need to reclaim the temporary reference. Either the
   // temporary reference is still installed, and since we hold the VMO lock we now own both the
@@ -6673,16 +6879,27 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompressionLocked(vm_page_t*
       page_list_.LookupOrAllocate(offset, VmPageList::IntervalHandling::NoIntervals);
   DEBUG_ASSERT(!is_in_interval);
   if (slot && slot->IsReference() && compressor->IsTempReference(slot->Reference())) {
-    // Still the original reference, need to replace it with the result of compression.
+    // Slot still holds the original reference; need to replace it with the result of compression.
     VmPageOrMarker::ReferenceValue old_ref{0};
     if (const VmPageOrMarker::ReferenceValue* ref =
             ktl::get_if<VmPageOrMarker::ReferenceValue>(&compression_result)) {
       // Compression succeeded, put the new reference in.
-      old_ref = VmPageOrMarkerRef(slot).ChangeReferenceValue(*ref);
+      // When compression succeeded, the |compressor| internally copied the page's metadata from
+      // the temp reference to the new reference so we don't need to manually copy it here.
+      old_ref = VmPageOrMarkerRef(slot).SwapReferenceForReference(*ref);
       reclamation_event_count_++;
       reclaimed = true;
-    } else if (ktl::holds_alternative<VmCompressor::FailTag>(compression_result)) {
-      // Compression failed, but the page back in.
+    } else if (VmCompressor::FailTag* fail =
+                   ktl::get_if<VmCompressor::FailTag>(&compression_result)) {
+      // Compression failed, put the page back in the slot.
+      // The |compressor| doesn't know how to update the |page| with any changes we made to its
+      // metadata while compression was running, so we need to manually copy the metadata over to
+      // the page's share_count here.
+      //
+      // When split bits are in use, the share_count will actually encode the split bits according
+      // to |IsSplit| and |SetSplit| above.
+      DEBUG_ASSERT(page == fail->src_page.page);
+      SetShareCount(page, fail->src_page.metadata);
       old_ref = VmPageOrMarkerRef(slot).SwapReferenceForPage(page);
       // TODO(https://fxbug.dev/42138396): Placing in a queue and then moving it is inefficient, but
       // avoids needing to reason about whether reclamation could be manually attempted on pages
@@ -6958,14 +7175,14 @@ zx_status_t VmCowPages::ReplacePageLocked(vm_page_t* before_page, uint64_t offse
   return ZX_OK;
 }
 
-bool VmCowPages::DebugValidatePageSplitsHierarchyLocked() const {
+bool VmCowPages::DebugValidateHierarchyLocked() const {
   canary_.Assert();
 
   const VmCowPages* cur = this;
   AssertHeld(cur->lock_ref());
   const VmCowPages* parent_most = cur;
   do {
-    if (!cur->DebugValidatePageSplitsLocked()) {
+    if (!cur->DebugValidatePageSharingLocked()) {
       return false;
     }
     cur = cur->parent_.get();
@@ -7020,6 +7237,14 @@ bool VmCowPages::DebugValidatePageSplitsHierarchyLocked() const {
   return true;
 }
 
+bool VmCowPages::DebugValidatePageSharingLocked() const {
+  canary_.Assert();
+
+  if constexpr (ENABLE_COW_SPLIT_BITS) {
+    return DebugValidatePageSplitsLocked();
+  }
+}
+
 bool VmCowPages::DebugValidatePageSplitsLocked() const {
   canary_.Assert();
 
@@ -7034,7 +7259,7 @@ bool VmCowPages::DebugValidatePageSplitsLocked() const {
     // All pages in non-hidden VMOs should not be split, as this is a meaningless thing to talk
     // about and indicates a book keeping error somewhere else.
     if (!this->is_hidden_locked()) {
-      if (page->PageOrRefLeftSplit() || page->PageOrRefRightSplit()) {
+      if (IsSplit(SplitDir::Left, page) || IsSplit(SplitDir::Right, page)) {
         if (page->IsPage()) {
           printf("Found split page %p (off %p) in non-hidden node %p\n", page->Page(),
                  (void*)offset, this);
@@ -7053,9 +7278,9 @@ bool VmCowPages::DebugValidatePageSplitsLocked() const {
     // expect that if we search down that path we will find that the forked page and that no
     // descendant can 'see' back to this page.
     const VmCowPages* expected = nullptr;
-    if (page->PageOrRefLeftSplit()) {
+    if (IsSplit(SplitDir::Left, page)) {
       expected = &left_child_locked();
-    } else if (page->PageOrRefRightSplit()) {
+    } else if (IsSplit(SplitDir::Right, page)) {
       expected = &right_child_locked();
     } else {
       return ZX_ERR_NEXT;
@@ -7132,9 +7357,9 @@ bool VmCowPages::DebugValidatePageSplitsLocked() const {
     // has partial_cow_release_ set.
     // No leaf VMO in expected should be able to 'see' this page and potentially re-fork it. To
     // validate this we need to walk the entire sub tree.
-    if (page->PageOrRefLeftSplit()) {
+    if (IsSplit(SplitDir::Left, page)) {
       cur = &right_child_locked();
-    } else if (page->PageOrRefRightSplit()) {
+    } else if (IsSplit(SplitDir::Right, page)) {
       cur = &left_child_locked();
     } else {
       return ZX_ERR_NEXT;
@@ -7618,8 +7843,9 @@ void VmCowPages::CopyPageForReplacementLocked(vm_page_t* dst_page, vm_page_t* sr
       arch_clean_invalidate_cache_range((vaddr_t)dst, PAGE_SIZE);
     }
   }
-  dst_page->object.cow_left_split = src_page->object.cow_left_split;
-  dst_page->object.cow_right_split = src_page->object.cow_right_split;
+  // When split bits are in use, the share_count will actually encode the split bits according to
+  // |IsSplit| and |SetSplit| above.
+  dst_page->object.share_count = src_page->object.share_count;
   dst_page->object.always_need = src_page->object.always_need;
   DEBUG_ASSERT(!dst_page->object.always_need || (!dst_page->is_loaned() && !src_page->is_loaned()));
   dst_page->object.dirty_state = src_page->object.dirty_state;

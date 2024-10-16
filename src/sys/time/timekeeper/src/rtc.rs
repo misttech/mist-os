@@ -10,9 +10,10 @@ use fdio::service_connect;
 use fidl::endpoints::create_proxy;
 use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_fs::directory;
-use fuchsia_runtime::UtcInstant;
-use futures::{select, FutureExt, StreamExt, TryFutureExt};
+use fuchsia_runtime::{UtcDuration, UtcInstant};
+use futures::{select, StreamExt, TryFutureExt};
 use std::path::PathBuf;
+use std::pin::pin;
 use thiserror::Error;
 use tracing::{debug, error, warn};
 use {fidl_fuchsia_hardware_rtc as frtc, fidl_fuchsia_io as fio};
@@ -22,12 +23,12 @@ use {fuchsia_sync::Mutex, std::sync::Arc};
 static RTC_PATH: &str = "/dev/class/rtc";
 
 /// Time to wait before declaring a FIDL call to be failed.
-const FIDL_TIMEOUT: zx::Duration = zx::Duration::from_seconds(2);
+const FIDL_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(2);
 
 // The minimum error at which to begin an async wait for top of second while setting RTC.
-const WAIT_THRESHOLD: zx::Duration = zx::Duration::from_millis(1);
+const WAIT_THRESHOLD: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(1);
 
-const RTC_DEVICE_OPEN_TIMEOUT: zx::Duration = zx::Duration::from_seconds(5);
+const RTC_DEVICE_OPEN_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(5);
 
 const NANOS_PER_SECOND: i64 = 1_000_000_000;
 
@@ -112,7 +113,7 @@ impl RtcImpl {
                     ))
                 })?
                 .fuse();
-            let mut timeout = fasync::Timer::new(RTC_DEVICE_OPEN_TIMEOUT).fuse();
+            let mut timeout = pin!(fasync::Timer::new(RTC_DEVICE_OPEN_TIMEOUT));
             select! {
                 device = rtc_devices.next() => {
                     match device {
@@ -214,7 +215,8 @@ impl Rtc for RtcImpl {
     }
 
     async fn set(&self, value: UtcInstant) -> Result<()> {
-        let fractional_second = zx::Duration::from_nanos(value.into_nanos() % NANOS_PER_SECOND);
+        let fractional_second =
+            zx::MonotonicDuration::from_nanos(value.into_nanos() % NANOS_PER_SECOND);
         // The RTC API only accepts integer seconds but we really need higher accuracy, particularly
         // for the kernel clock set by the RTC driver...
         let fidl_time = if fractional_second < WAIT_THRESHOLD {
@@ -225,10 +227,10 @@ impl Rtc for RtcImpl {
             // ...otherwise, wait until the top of the current second than set the RTC using the
             // following second.
             fasync::Timer::new(fasync::MonotonicInstant::after(
-                zx::Duration::from_seconds(1) - fractional_second,
+                zx::MonotonicDuration::from_seconds(1) - fractional_second,
             ))
             .await;
-            zx_time_to_fidl_time(value + zx::Duration::from_seconds(1))
+            zx_time_to_fidl_time(value + UtcDuration::from_seconds(1))
         };
         let status = self
             .proxy
@@ -300,7 +302,7 @@ mod test {
         frtc::Time { year: 2020, month: 14, day: 0, hours: 0, minutes: 0, seconds: 0 };
     const INVALID_FIDL_TIME_2: frtc::Time =
         frtc::Time { year: 2020, month: 8, day: 14, hours: 99, minutes: 99, seconds: 99 };
-    const TEST_OFFSET: zx::Duration = zx::Duration::from_millis(250);
+    const TEST_OFFSET: UtcDuration = UtcDuration::from_millis(250);
     const TEST_ZX_TIME: UtcInstant = UtcInstant::from_nanos(1_597_363_200_000_000_000);
     const DIFFERENT_ZX_TIME: UtcInstant = UtcInstant::from_nanos(1_597_999_999_000_000_000);
 
@@ -313,7 +315,7 @@ mod test {
         let to_fidl = zx_time_to_fidl_time(TEST_ZX_TIME);
         assert_eq!(to_fidl, TEST_FIDL_TIME);
         // Times should be truncated to the previous second
-        let to_fidl_2 = zx_time_to_fidl_time(TEST_ZX_TIME + zx::Duration::from_millis(999));
+        let to_fidl_2 = zx_time_to_fidl_time(TEST_ZX_TIME + UtcDuration::from_millis(999));
         assert_eq!(to_fidl_2, TEST_FIDL_TIME);
 
         let to_zx = fidl_time_to_zx_time(TEST_FIDL_TIME).unwrap();
@@ -349,7 +351,7 @@ mod test {
         assert_eq!(rtc_impl.get().await.is_err(), true);
     }
 
-    const RTC_SETUP_TIME: zx::Duration = zx::Duration::from_millis(90);
+    const RTC_SETUP_TIME: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(90);
 
     #[fuchsia::test]
     async fn rtc_impl_set_whole_second() {
@@ -393,7 +395,7 @@ mod test {
         // Setting a fractional second should cause a delay until the top of second before calling
         // the FIDL interface. We only verify half the expected time has passed to allow for some
         // slack in the timer calculation.
-        assert_gt!(span, TEST_OFFSET / 2);
+        assert_gt!(span, zx::MonotonicDuration::from_nanos(TEST_OFFSET.into_nanos() / 2));
     }
 
     #[fuchsia::test(allow_stalls = false)]

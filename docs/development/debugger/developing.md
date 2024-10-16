@@ -104,13 +104,8 @@ Note: This is a task to help debug issues with zxdb.
 
 1. From the zxdb console, run:
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] attach debug_agent
-  ```
-
-  You should see an output like:
-
-  ```none {:.devsite-disable-click-to-copy}
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  attach debug_agent
   Waiting for process matching "debug_agent".
   Type "filter" to see the current filters.
   Attached Process 1 state=Running koid=345223 name=debug_agent.cm

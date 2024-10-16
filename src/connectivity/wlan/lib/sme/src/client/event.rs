@@ -83,16 +83,16 @@ impl From<DeauthenticateTimeout> for Event {
 #[derive(Debug, Clone)]
 pub struct RsnaCompletionTimeout;
 impl TimeoutDuration for RsnaCompletionTimeout {
-    fn timeout_duration(&self) -> zx::Duration {
-        zx::Duration::from_millis(RSNA_COMPLETION_TIMEOUT_MILLIS)
+    fn timeout_duration(&self) -> zx::MonotonicDuration {
+        zx::MonotonicDuration::from_millis(RSNA_COMPLETION_TIMEOUT_MILLIS)
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct RsnaResponseTimeout;
 impl TimeoutDuration for RsnaResponseTimeout {
-    fn timeout_duration(&self) -> zx::Duration {
-        zx::Duration::from_millis(RSNA_RESPONSE_TIMEOUT_MILLIS)
+    fn timeout_duration(&self) -> zx::MonotonicDuration {
+        zx::MonotonicDuration::from_millis(RSNA_RESPONSE_TIMEOUT_MILLIS)
     }
 }
 
@@ -102,39 +102,39 @@ pub struct RsnaRetransmissionTimeout {
     pub sta_addr: MacAddr,
 }
 impl TimeoutDuration for RsnaRetransmissionTimeout {
-    fn timeout_duration(&self) -> zx::Duration {
-        zx::Duration::from_millis(RSNA_RETRANSMISSION_TIMEOUT_MILLIS)
+    fn timeout_duration(&self) -> zx::MonotonicDuration {
+        zx::MonotonicDuration::from_millis(RSNA_RETRANSMISSION_TIMEOUT_MILLIS)
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct InspectPulseCheck;
 impl TimeoutDuration for InspectPulseCheck {
-    fn timeout_duration(&self) -> zx::Duration {
-        zx::Duration::from_minutes(INSPECT_PULSE_CHECK_MINUTES)
+    fn timeout_duration(&self) -> zx::MonotonicDuration {
+        zx::MonotonicDuration::from_minutes(INSPECT_PULSE_CHECK_MINUTES)
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct InspectPulsePersist;
 impl TimeoutDuration for InspectPulsePersist {
-    fn timeout_duration(&self) -> zx::Duration {
-        zx::Duration::from_minutes(INSPECT_PULSE_PERSIST_MINUTES)
+    fn timeout_duration(&self) -> zx::MonotonicDuration {
+        zx::MonotonicDuration::from_minutes(INSPECT_PULSE_PERSIST_MINUTES)
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct SaeTimeout(pub u64);
 impl TimeoutDuration for SaeTimeout {
-    fn timeout_duration(&self) -> zx::Duration {
-        zx::Duration::from_millis(SAE_RETRANSMISSION_TIMEOUT_MILLIS)
+    fn timeout_duration(&self) -> zx::MonotonicDuration {
+        zx::MonotonicDuration::from_millis(SAE_RETRANSMISSION_TIMEOUT_MILLIS)
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct DeauthenticateTimeout;
 impl TimeoutDuration for DeauthenticateTimeout {
-    fn timeout_duration(&self) -> zx::Duration {
-        zx::Duration::from_millis(DEAUTHENTICATE_TIMEOUT_MILLIS)
+    fn timeout_duration(&self) -> zx::MonotonicDuration {
+        zx::MonotonicDuration::from_millis(DEAUTHENTICATE_TIMEOUT_MILLIS)
     }
 }

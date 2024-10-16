@@ -1,0 +1,55 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+import("//build/testing/perf/test.gni")
+
+rustc_binary("snapshot-filter-bin") {
+  name = "inspect_rust_snapshot_filter_benchmarks"
+  edition = "2021"
+
+  source_root = "src/main.rs"
+  with_unit_tests = true
+
+  deps = [
+    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
+    "//src/developer/fuchsia-criterion",
+    "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/diagnostics/inspect/rust/bench/utils:fuchsia_inspect_bench_utils",
+    "//src/lib/diagnostics/selectors",
+  ]
+
+  test_deps = [ "//src/lib/fuchsia" ]
+
+  sources = [ "src/main.rs" ]
+}
+
+_snapshot_filter_benchmark_component = "snapshot_filter"
+
+fuchsia_component("snapshot-filter-component") {
+  component_name = _snapshot_filter_benchmark_component
+  manifest = "meta/snapshot_filter.cml"
+  deps = [ ":snapshot-filter-bin" ]
+}
+
+fuchsia_component_perf_test("rust-inspect-snapshot-filter-benchmark") {
+  package = "//src/lib/diagnostics/inspect/rust/bench:rust-inspect-benchmarks"
+  component_name = _snapshot_filter_benchmark_component
+  expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.rust_inspect.selectors.txt"
+}
+
+fuchsia_unittest_package("rust-inspect-benchmarks-test") {
+  deps = [ ":snapshot-filter-bin_test" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
+group("tests") {
+  testonly = true
+  deps = [ ":rust-inspect-benchmarks-test" ]
+}

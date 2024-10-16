@@ -6,10 +6,6 @@ library fuchsia.hardware.adcimpl;
 
 const ADC_NAME_MAX_LENGTH uint32 = 64;
 
-/// Identifies the [`fuchsia.hardware.adcimpl/Metadata`] instance provided by the adc platform
-/// device.
-const PDEV_METADATA_TYPE_IDENTIFIER uint32 = 0x00434441;
-
 type AdcChannel = table {
     /// Index of channel.
     1: idx uint32;
@@ -23,5 +19,6 @@ type Metadata = table {
     1: channels vector<AdcChannel>:MAX;
 };
 
-// Name of the FIDL type [`fuchsia.hardware.adcimpl/Metadata`].
+// Name of the FIDL type [`fuchsia.hardware.adcimpl/Metadata`]. Also used as the ID for metadata
+// stored within the ADC platform device.
 const METADATA_TYPE_NAME string = "fuchsia.hardware.adcimpl.Metadata";

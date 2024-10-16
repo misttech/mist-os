@@ -30,8 +30,40 @@ using driver_manager::Collection;
 using driver_manager::Node;
 using testing::ElementsAre;
 
+// TODO(https://fxbug.dev/363012744): this fixture enables each test case being run twice, once with
+// the dynamic linker and once not (the legacy path). Once all test cases support the dynamic
+// linker path, we can merge this with the |DriverRunnerTest| base class.
+class DriverRunnerTest2 : public DriverRunnerTest, public ::testing::WithParamInterface<bool> {
+ public:
+  void SetUp() override { use_dynamic_linker_ = GetParam(); }
+
+  void SetupDriverRunner() {
+    if (use_dynamic_linker_) {
+      auto driver_host_runner =
+          std::make_unique<driver_manager::DriverHostRunner>(dispatcher(), ConnectToRealm());
+      DriverRunnerTest::SetupDriverRunnerWithDynamicLinker(dispatcher(),
+                                                           std::move(driver_host_runner));
+    } else {
+      DriverRunnerTest::SetupDriverRunner();
+    }
+  }
+
+  zx::result<StartDriverResult> StartRootDriver() {
+    if (use_dynamic_linker_) {
+      return DriverRunnerTest::StartRootDriverDynamicLinking();
+    } else {
+      return DriverRunnerTest::StartRootDriver();
+    }
+  }
+
+  bool use_dynamic_linker() const { return use_dynamic_linker_; }
+
+ private:
+  bool use_dynamic_linker_ = false;
+};
+
 // Start the root driver.
-TEST_F(DriverRunnerTest, StartRootDriver) {
+TEST_P(DriverRunnerTest2, StartRootDriver) {
   SetupDriverRunner();
 
   auto root_driver = StartRootDriver();
@@ -1167,80 +1199,6 @@ TEST_F(DriverRunnerTest, CreateAndBindCompositeNodeSpec) {
                                    CreateChildRef("dev.dev-group-1.test-group", "boot-drivers")});
 }
 
-TEST_F(DriverRunnerTest, StartAndInspectLegacyOffers) {
-  SetupDriverRunner();
-
-  auto root_driver = StartRootDriver();
-  ASSERT_EQ(ZX_OK, root_driver.status_value());
-
-  PrepareRealmForSecondDriverComponentStart();
-  fdfw::NodeAddArgs args({
-      .name = "second",
-      .offers =
-          {
-              {
-
-                  fuchsia_component_decl::Offer::WithProtocol(fdecl::OfferProtocol({
-                      .source_name = "fuchsia.package.ProtocolA",
-                      .target_name = "fuchsia.package.RenamedA",
-                  })),
-
-                  fuchsia_component_decl::Offer::WithProtocol(fdecl::OfferProtocol({
-                      .source_name = "fuchsia.package.ProtocolB",
-                      .target_name = "fuchsia.package.RenamedB",
-                  })),
-              },
-          },
-      .symbols =
-          {
-              {
-                  fdfw::NodeSymbol({
-                      .name = "symbol-A",
-                      .address = 0x2301,
-                  }),
-                  fdfw::NodeSymbol({
-                      .name = "symbol-B",
-                      .address = 0x1985,
-                  }),
-              },
-          },
-  });
-  std::shared_ptr<CreatedChild> child =
-      root_driver->driver->AddChild(std::move(args), false, false);
-  EXPECT_TRUE(RunLoopUntilIdle());
-
-  auto hierarchy = Inspect();
-  ASSERT_EQ("root", hierarchy.node().name());
-  ASSERT_EQ(2ul, hierarchy.children().size());
-
-  ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {
-                                                   .node_name = {"node_topology"},
-                                                   .child_names = {"dev"},
-                                               }));
-
-  ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {.node_name = {"node_topology", "dev"},
-                                                .child_names = {"second"},
-                                                .str_properties = {
-                                                    {"driver", root_driver_url},
-                                                }}));
-
-  ASSERT_NO_FATAL_FAILURE(
-      CheckNode(hierarchy, {.node_name = {"node_topology", "dev", "second"},
-                            .child_names = {},
-                            .str_properties = {
-                                {"offers", "fuchsia.package.RenamedA, fuchsia.package.RenamedB"},
-                                {"symbols", "symbol-A, symbol-B"},
-                                {"driver", "unbound"},
-                            }}));
-
-  ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {
-                                                   .node_name = {"orphan_nodes"},
-                                               }));
-
-  StopDriverComponent(std::move(root_driver->controller));
-  realm().AssertDestroyedChildren({CreateChildRef("dev", "boot-drivers")});
-}
-
 // Start a driver and inspect the driver runner.
 TEST_F(DriverRunnerTest, StartAndInspect) {
   SetupDriverRunner();
@@ -1770,5 +1728,14 @@ TEST(NodeTest, ToCollection) {
   EXPECT_EQ(ToCollection(*child2, fdfw::DriverPackageType::kCached), Collection::kFullPackage);
   EXPECT_EQ(ToCollection(*child2, fdfw::DriverPackageType::kUniverse), Collection::kFullPackage);
 }
+
+// The tests are parameterized on whether to use the dynamic linker or not.
+INSTANTIATE_TEST_SUITE_P(/* no prefix */, DriverRunnerTest2, testing::Values(true, false),
+                         [](const testing::TestParamInfo<bool>& info) {
+                           if (info.param) {
+                             return "DynamicLinker";
+                           }
+                           return "Legacy";
+                         });
 
 }  // namespace driver_runner

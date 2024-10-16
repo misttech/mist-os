@@ -4,8 +4,8 @@
 
 """Rule for running size checker on blobfs package."""
 
-load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("@fuchsia_sdk//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
+load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_assembly_inputs")
 load(":providers.bzl", "FuchsiaSizeCheckerInfo")
 load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")

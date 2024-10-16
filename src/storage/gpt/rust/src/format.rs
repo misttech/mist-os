@@ -203,25 +203,36 @@ pub fn serialize_partition_table(
     let partition_table_len = header.part_size as usize * entries.len();
     let partition_table_len =
         partition_table_len.checked_next_multiple_of(block_size).ok_or(anyhow!("Overflow"))?;
+    let partition_table_blocks = (partition_table_len / block_size) as u64;
     let mut partition_table = vec![0u8; partition_table_len];
     let mut partition_table_view = &mut partition_table[..];
-    let mut used_ranges = vec![(0, header.first_usable), (header.last_usable, num_blocks)];
+    let first_usable = partition_table_blocks + 2;
+    let last_usable = num_blocks.saturating_sub(partition_table_blocks + 2);
+    ensure!(
+        first_usable <= last_usable,
+        "GPT metadata too big (need {} blocks for each copy, but only {} blocks available",
+        first_usable,
+        num_blocks
+    );
+    let mut used_ranges = vec![(0, first_usable), (last_usable, num_blocks)];
     let part_size = header.part_size as usize;
     for entry in entries {
+        let part_raw = entry.as_bytes();
+        assert!(part_raw.len() == part_size);
         if !entry.is_empty() {
             entry.ensure_integrity()?;
             used_ranges.push((entry.first_lba, entry.last_lba));
-            let part_raw = entry.as_bytes();
-            assert!(part_raw.len() == header.part_size as usize);
-            digest.write(part_raw);
             partition_table_view[..part_raw.len()].copy_from_slice(part_raw);
         }
+        digest.write(part_raw);
         partition_table_view = &mut partition_table_view[part_size..];
     }
     used_ranges.sort();
     for ranges in used_ranges.windows(2) {
         ensure!(ranges[0].1 <= ranges[1].0, "Partition range overlaps other region");
     }
+    header.first_usable = first_usable;
+    header.last_usable = last_usable;
     header.num_parts = entries.len() as u32;
     header.crc32_parts = digest.sum32();
     header.crc32 = header.compute_checksum();

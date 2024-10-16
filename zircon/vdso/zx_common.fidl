@@ -14,16 +14,32 @@ library zx;
 // zx_status_t and errors.h.
 alias Status = int32;
 
-// zx_time_t: absolute monotonic time in nanoseconds, from a device-specific
-// timebase defined here:
-// https://fuchsia.dev/fuchsia-src/concepts/kernel/time/monotonic.md
+// These aliases all represent points in or quantities of time.
+// See the block comments on the declaration of the associated C types in
+// //zircon/system/public/zircon/time.h for more information on each of these
+// types. Further documentation on timelines in Fuchsia can be found in
+// https://fuchsia.dev/fuchsia-src/concepts/kernel/time/overview.
+//
+// zx_time_t: A point in time on either timeline in nanoseconds (ns).
 alias Time = int64;
+// zx_instant_mono_t: A point in time on the mono timeline in ns.
+alias InstantMono = int64;
+// zx_instant_boot_t: A point in time on the boot timeline in ns.
+alias InstantBoot = int64;
 
-// zx_duration_t: a duration in nanoseconds.
-alias Duration = int64;
-
-// zx_ticks_t: a duration in hardware ticks.
+// zx_ticks_t: A point in time or quantity of hardware ticks.
 alias Ticks = int64;
+// zx_instant_mono_ticks_t: A point in time on the mono timeline in ticks.
+alias InstantMonoTicks = int64;
+// zx_instant_boot_ticks_t: A point in time on the boot timeline in ticks.
+alias InstantBootTicks = int64;
+
+// zx_duration_t: A quantity of time in nanoseconds.
+alias Duration = int64;
+// zx_duration_mono_t: A quantity of time on the mono timeline in ns.
+alias DurationMono = int64;
+// zx_duration_boot_t: A quantity of time on the boot timeline in ns.
+alias DurationBoot = int64;
 
 // zx_koid_t: global kernel object id.
 alias Koid = uint64;

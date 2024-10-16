@@ -4,6 +4,7 @@
 library fuchsia.camera2;
 
 using fuchsia.sysmem;
+using fuchsia.sysmem2;
 using zx;
 
 /// Maximum number of image formats per stream.
@@ -133,6 +134,11 @@ closed protocol Stream {
     /// to complete. This also means that any SetConstraints call on the returned token can't
     /// conflict with the constraints in the `StreamConfig`, otherwise attempts to wait for buffers
     /// on the token will fail.
+    @available(added=NEXT)
+    strict GetBuffers2() -> (resource struct {
+        token client_end:fuchsia.sysmem2.BufferCollectionToken;
+    });
+    @available(deprecated=NEXT, note="use GetBuffers2 or preferably fuchsia.camera3")
     strict GetBuffers() -> (resource struct {
         token client_end:fuchsia.sysmem.BufferCollectionToken;
     });

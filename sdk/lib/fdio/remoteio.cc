@@ -138,7 +138,7 @@ zx::result<fdio_ptr> fdio::create_with_on_open_deprecated(fidl::ClientEnd<fio::N
       result_ = zx::error(ZX_ERR_NOT_SUPPORTED);
     }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(24)
     void handle_unknown_event(fidl::UnknownEventMetadata<fio::Node> metadata) override {}
 #endif
 

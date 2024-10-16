@@ -25,7 +25,7 @@ mod persistence;
 pub use persistence::*;
 
 mod error;
-pub use self::error::{Error, Result};
+pub use self::error::{Error, Result, TransportError};
 
 pub use handle::*;
 pub use server::ServeInner;

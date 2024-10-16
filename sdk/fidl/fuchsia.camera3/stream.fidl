@@ -5,6 +5,7 @@ library fuchsia.camera3;
 
 using fuchsia.math;
 using fuchsia.sysmem;
+using fuchsia.sysmem2;
 using zx;
 
 const MAX_RESOLUTIONS_PER_STREAM uint32 = 256;
@@ -64,6 +65,11 @@ closed protocol Stream {
     /// non-participant. After registering as a participant, clients must always have an outstanding
     /// call to WatchBufferCollection to receive tokens from the server so that they are able to
     /// respond to current and future renegotiation requests.
+    @available(added=NEXT)
+    strict SetBufferCollection2(resource struct {
+        token client_end:<fuchsia.sysmem2.BufferCollectionToken, optional>;
+    });
+    @available(deprecated=NEXT, note="use SetBufferCollection2")
     strict SetBufferCollection(resource struct {
         token client_end:<fuchsia.sysmem.BufferCollectionToken, optional>;
     });
@@ -75,6 +81,11 @@ closed protocol Stream {
     /// Because the camera can output directly to these collections, each client should support
     /// reading from a |fuchsia.sysmem.CoherencyDomain| of RAM, and set |ram_domain_supported| in
     /// their |fuchsia.sysmem.BufferMemoryConstraints|.
+    @available(added=NEXT)
+    strict WatchBufferCollection2() -> (resource struct {
+        token client_end:fuchsia.sysmem2.BufferCollectionToken;
+    });
+    @available(deprecated=NEXT, note="use WatchBufferCollection2")
     strict WatchBufferCollection() -> (resource struct {
         token client_end:fuchsia.sysmem.BufferCollectionToken;
     });

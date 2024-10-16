@@ -129,8 +129,6 @@ struct vm_page {
         return reinterpret_cast<void*>(value);
       }
 
-      // offset 0x20
-
       // This also logically does clear_stack_owner() atomically.
       void set_object(void* obj) {
         // If the caller wants to clear the object, use clear_object() instead.
@@ -278,6 +276,15 @@ struct vm_page {
 
       // offset 0x28
 
+      // Identifies how many objects can access this page besides the owner.
+      //
+      // This may encode either an actual shared reference count, or split status+direction if split
+      // bits are in use. See |IsSplit|, |SetSplit|, |ClearSplits| in the VmCowPages implementation
+      // for details on the encoding for split status+direction.
+      uint32_t share_count;
+
+      // offset 0x2c
+
       // Identifies which queue this page is in.
       uint8_t page_queue_priv;
 
@@ -290,24 +297,11 @@ struct vm_page {
         return ktl::atomic_ref<uint8_t>(*const_cast<uint8_t*>(&page_queue_priv));
       }
 
-      // offset 0x29
+      // offset 0x2d
 
 #define VM_PAGE_OBJECT_PIN_COUNT_BITS 5
 #define VM_PAGE_OBJECT_MAX_PIN_COUNT ((1ul << VM_PAGE_OBJECT_PIN_COUNT_BITS) - 1)
       uint8_t pin_count : VM_PAGE_OBJECT_PIN_COUNT_BITS;
-
-      // Bits used by VmObjectPaged implementation of COW clones.
-      //
-      // Pages of VmObjectPaged have two "split" bits. These bits are used to track which
-      // pages in children of hidden VMOs have diverged from their parent. There are two
-      // bits, left and right, one for each child. In a hidden parent, a 1 split bit means
-      // that page in the child has diverged from the parent and the parent's page is
-      // no longer accessible to that child.
-      //
-      // It should never be the case that both split bits are set, as the page should
-      // be moved into the child instead of setting the second bit.
-      uint8_t cow_left_split : 1;
-      uint8_t cow_right_split : 1;
 
       // Hint for whether the page is always needed and should not be considered for reclamation
       // under memory pressure (unless the kernel decides to override hints for some reason).
@@ -322,7 +316,6 @@ struct vm_page {
       // details in VmCowPages::DirtyState).
       uint8_t dirty_state : VM_PAGE_OBJECT_DIRTY_STATE_BITS;
 
-      uint8_t padding : 6;
       // This struct has no type name and exists inside an unpacked parent and so it really doesn't
       // need to have any padding. By making it packed we allow the next outer variables, to use
       // space we would have otherwise wasted in padding, without breaking alignment rules.
@@ -338,6 +331,11 @@ struct vm_page {
       // of OBJECT state.
     } alloc;  // allocated, but not yet put to any specific use
     struct {
+      // Tracks user-provided metadata for the item in each of the possible buckets.
+      uint32_t left_metadata;
+      uint32_t mid_metadata;
+      uint32_t right_metadata;
+
       // Used by the VmTriPageStorage allocator to record the size of the item in each of the
       // possible buckets. See it for more details.
       uint16_t left_compress_size;
@@ -347,21 +345,17 @@ struct vm_page {
   };
   using object_t = decltype(object);
 
-  // offset 0x2b
+  // offset 0x2e
 
   // logically private; use |state()| and |set_state()|
   vm_page_state state_priv;
 
-  // offset 0x2c
+  // offset 0x2f
 
   // logically private, use loaned getters and setters below.
   static constexpr uint8_t kLoanedStateIsLoaned = 1;
   static constexpr uint8_t kLoanedStateIsLoanCancelled = 2;
   uint8_t loaned_state_priv;
-
-  // This padding is inserted here to make sizeof(vm_page) a multiple of 8 and help validate that
-  // all commented offsets were indeed correct.
-  char padding_bytes[3];
 
   // helper routines
 
@@ -481,17 +475,27 @@ static_assert(offsetof(vm_page_t, object.page_offset_priv) %
               0);
 static_assert(offsetof(vm_page_t, object.page_offset_priv) % alignof(uint64_t) == 0);
 
-static_assert(offsetof(vm_page_t, object.page_queue_priv) == 0x28);
+static_assert(offsetof(vm_page_t, object.share_count) == 0x28);
+static_assert(offsetof(vm_page_t, object.share_count) %
+                  alignof(decltype(vm_page_t::object_t::share_count)) ==
+              0);
+static_assert(offsetof(vm_page_t, object.share_count) % alignof(uint32_t) == 0);
+
+static_assert(offsetof(vm_page_t, object.page_queue_priv) == 0x2c);
 static_assert(offsetof(vm_page_t, object.page_queue_priv) %
                   alignof(decltype(vm_page_t::object_t::page_queue_priv)) ==
               0);
 static_assert(offsetof(vm_page_t, object.page_queue_priv) % alignof(uint8_t) == 0);
 
-static_assert(offsetof(vm_page_t, state_priv) == 0x2b);
+static_assert(offsetof(vm_page_t, state_priv) == 0x2e);
 static_assert(offsetof(vm_page_t, state_priv) % alignof(decltype(vm_page_t::state_priv)) == 0);
 static_assert(offsetof(vm_page_t, state_priv) % alignof(vm_page_state) == 0);
 
-static_assert(offsetof(vm_page_t, padding_bytes) == 0x2d);
+static_assert(offsetof(vm_page_t, loaned_state_priv) == 0x2f);
+static_assert(offsetof(vm_page_t, loaned_state_priv) %
+                  alignof(decltype(vm_page_t::loaned_state_priv)) ==
+              0);
+static_assert(offsetof(vm_page_t, loaned_state_priv) % alignof(vm_page_state) == 0);
 
 // Assert that the page structure isn't growing uncontrollably, and that its
 // size and alignment are kept in sync with the arena selection algorithm.

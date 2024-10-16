@@ -7,6 +7,7 @@
 
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
+use fidl::encoding::ProxyChannelBox;
 use fidl::endpoints::{ControlHandle as _, Responder as _};
 use futures::future::{self, MaybeDone, TryFutureExt};
 use zx_status;
@@ -461,6 +462,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i32, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl_test_protocolpayloads_imported::ImportStructPayload,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x2348a1331ca4cfb0,
             >(_buf?)?;
             Ok(_response.a)
@@ -492,6 +494,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
                     fidl_test_protocolpayloads_imported::ImportStructPayload,
                     u32,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x6a9be48b574d1557,
             >(_buf?)?;
             Ok(_response.map(|x| x.a))
@@ -522,6 +525,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         ) -> Result<(u32, u32), fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 LocalStructPayload,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x743776548de3af0f,
             >(_buf?)?;
             Ok((_response.a, _response.b))
@@ -546,6 +550,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         ) -> Result<MainProtocolTwoWayLocalWithErrorResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<LocalStructPayload, u32>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x2839c029915cb8fc,
             >(_buf?)?;
             Ok(_response.map(|x| (x.a, x.b)))
@@ -572,6 +577,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i32, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl_test_protocolpayloads_imported::ImportStructPayload,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x20f4a8f65ff69473,
             >(_buf?)?;
             Ok(_response.a)
@@ -596,6 +602,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
                     fidl_test_protocolpayloads_imported::ImportStructPayload,
                     u32,
                 >,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x3b7b706d42eb9bbd,
             >(_buf?)?;
             Ok(_response.map(|x| x.a))
@@ -626,6 +633,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         ) -> Result<(u32, u32), fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 MainProtocolTwoWayAnonResponse,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x8bdc969ff7dd759,
             >(_buf?)?;
             Ok((_response.a, _response.b))
@@ -650,6 +658,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         ) -> Result<MainProtocolTwoWayAnonWithErrorResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<MainProtocolTwoWayAnonWithErrorResponse, u32>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x5862bf8170c87a36,
             >(_buf?)?;
             Ok(_response.map(|x| (x.a, x.b)))
@@ -833,210 +842,226 @@ impl futures::Stream for MainProtocolRequestStream {
         if this.is_terminated {
             panic!("polled MainProtocolRequestStream after completion");
         }
-        fidl::encoding::with_tls_decode_buf(|bytes, handles| {
-            match this.inner.channel().read_etc(cx, bytes, handles) {
-                std::task::Poll::Ready(Ok(())) => {}
-                std::task::Poll::Pending => return std::task::Poll::Pending,
-                std::task::Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
-                    this.is_terminated = true;
-                    return std::task::Poll::Ready(None);
+        fidl::encoding::with_tls_decode_buf::<_, fidl::encoding::DefaultFuchsiaResourceDialect>(
+            |bytes, handles| {
+                match this.inner.channel().read_etc(cx, bytes, handles) {
+                    std::task::Poll::Ready(Ok(())) => {}
+                    std::task::Poll::Pending => return std::task::Poll::Pending,
+                    std::task::Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
+                        this.is_terminated = true;
+                        return std::task::Poll::Ready(None);
+                    }
+                    std::task::Poll::Ready(Err(e)) => {
+                        return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                            e.into(),
+                        ))))
+                    }
                 }
-                std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e))))
-                }
-            }
 
-            // A message has been received from the channel
-            let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
+                // A message has been received from the channel
+                let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
 
-            std::task::Poll::Ready(Some(match header.ordinal {
-                0x241e4384443ccb10 => {
-                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(
-                        fidl_test_protocolpayloads_imported::ImportStructPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocolpayloads_imported::ImportStructPayload>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(MainProtocolRequest::OneWayComposed { a: req.a, control_handle })
-                }
-                0x2348a1331ca4cfb0 => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        fidl_test_protocolpayloads_imported::ImportStructPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocolpayloads_imported::ImportStructPayload>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(MainProtocolRequest::TwoWayComposed {
-                        a: req.a,
+                std::task::Poll::Ready(Some(match header.ordinal {
+                    0x241e4384443ccb10 => {
+                        header.validate_request_tx_id(fidl::MethodType::OneWay)?;
+                        let mut req = fidl::new_empty!(
+                            fidl_test_protocolpayloads_imported::ImportStructPayload,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocolpayloads_imported::ImportStructPayload>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle =
+                            MainProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(MainProtocolRequest::OneWayComposed { a: req.a, control_handle })
+                    }
+                    0x2348a1331ca4cfb0 => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            fidl_test_protocolpayloads_imported::ImportStructPayload,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocolpayloads_imported::ImportStructPayload>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle =
+                            MainProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(MainProtocolRequest::TwoWayComposed {
+                            a: req.a,
 
-                        responder: MainProtocolTwoWayComposedResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0x6a9be48b574d1557 => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        fidl_test_protocolpayloads_imported::ImportStructPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocolpayloads_imported::ImportStructPayload>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(MainProtocolRequest::TwoWayComposedWithError {
-                        a: req.a,
+                            responder: MainProtocolTwoWayComposedResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0x6a9be48b574d1557 => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            fidl_test_protocolpayloads_imported::ImportStructPayload,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocolpayloads_imported::ImportStructPayload>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle =
+                            MainProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(MainProtocolRequest::TwoWayComposedWithError {
+                            a: req.a,
 
-                        responder: MainProtocolTwoWayComposedWithErrorResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0x6b9feaf9305b0715 => {
-                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(
-                        LocalStructPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<LocalStructPayload>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(MainProtocolRequest::OneWayLocal { a: req.a, b: req.b, control_handle })
-                }
-                0x743776548de3af0f => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        LocalStructPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<LocalStructPayload>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(MainProtocolRequest::TwoWayLocal {
-                        a: req.a,
-                        b: req.b,
+                            responder: MainProtocolTwoWayComposedWithErrorResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0x6b9feaf9305b0715 => {
+                        header.validate_request_tx_id(fidl::MethodType::OneWay)?;
+                        let mut req = fidl::new_empty!(
+                            LocalStructPayload,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<LocalStructPayload>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle =
+                            MainProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(MainProtocolRequest::OneWayLocal { a: req.a, b: req.b, control_handle })
+                    }
+                    0x743776548de3af0f => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            LocalStructPayload,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<LocalStructPayload>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle =
+                            MainProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(MainProtocolRequest::TwoWayLocal {
+                            a: req.a,
+                            b: req.b,
 
-                        responder: MainProtocolTwoWayLocalResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0x2839c029915cb8fc => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        LocalStructPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<LocalStructPayload>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(MainProtocolRequest::TwoWayLocalWithError {
-                        a: req.a,
-                        b: req.b,
+                            responder: MainProtocolTwoWayLocalResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0x2839c029915cb8fc => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            LocalStructPayload,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<LocalStructPayload>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle =
+                            MainProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(MainProtocolRequest::TwoWayLocalWithError {
+                            a: req.a,
+                            b: req.b,
 
-                        responder: MainProtocolTwoWayLocalWithErrorResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0x2e6b091ae4cee40c => {
-                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(
-                        fidl_test_protocolpayloads_imported::ImportStructPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocolpayloads_imported::ImportStructPayload>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(MainProtocolRequest::OneWayImport { a: req.a, control_handle })
-                }
-                0x20f4a8f65ff69473 => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        fidl_test_protocolpayloads_imported::ImportStructPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocolpayloads_imported::ImportStructPayload>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(MainProtocolRequest::TwoWayImport {
-                        a: req.a,
+                            responder: MainProtocolTwoWayLocalWithErrorResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0x2e6b091ae4cee40c => {
+                        header.validate_request_tx_id(fidl::MethodType::OneWay)?;
+                        let mut req = fidl::new_empty!(
+                            fidl_test_protocolpayloads_imported::ImportStructPayload,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocolpayloads_imported::ImportStructPayload>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle =
+                            MainProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(MainProtocolRequest::OneWayImport { a: req.a, control_handle })
+                    }
+                    0x20f4a8f65ff69473 => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            fidl_test_protocolpayloads_imported::ImportStructPayload,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocolpayloads_imported::ImportStructPayload>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle =
+                            MainProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(MainProtocolRequest::TwoWayImport {
+                            a: req.a,
 
-                        responder: MainProtocolTwoWayImportResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0x3b7b706d42eb9bbd => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        fidl_test_protocolpayloads_imported::ImportStructPayload,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocolpayloads_imported::ImportStructPayload>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(MainProtocolRequest::TwoWayImportWithError {
-                        a: req.a,
+                            responder: MainProtocolTwoWayImportResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0x3b7b706d42eb9bbd => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            fidl_test_protocolpayloads_imported::ImportStructPayload,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<fidl_test_protocolpayloads_imported::ImportStructPayload>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle =
+                            MainProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(MainProtocolRequest::TwoWayImportWithError {
+                            a: req.a,
 
-                        responder: MainProtocolTwoWayImportWithErrorResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0xb43565c01ab54ac => {
-                    header.validate_request_tx_id(fidl::MethodType::OneWay)?;
-                    let mut req = fidl::new_empty!(
-                        MainProtocolOneWayAnonRequest,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<MainProtocolOneWayAnonRequest>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(MainProtocolRequest::OneWayAnon { a: req.a, b: req.b, control_handle })
-                }
-                0x8bdc969ff7dd759 => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        MainProtocolTwoWayAnonRequest,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<MainProtocolTwoWayAnonRequest>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(MainProtocolRequest::TwoWayAnon {
-                        a: req.a,
-                        b: req.b,
+                            responder: MainProtocolTwoWayImportWithErrorResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0xb43565c01ab54ac => {
+                        header.validate_request_tx_id(fidl::MethodType::OneWay)?;
+                        let mut req = fidl::new_empty!(
+                            MainProtocolOneWayAnonRequest,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<MainProtocolOneWayAnonRequest>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle =
+                            MainProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(MainProtocolRequest::OneWayAnon { a: req.a, b: req.b, control_handle })
+                    }
+                    0x8bdc969ff7dd759 => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            MainProtocolTwoWayAnonRequest,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<MainProtocolTwoWayAnonRequest>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle =
+                            MainProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(MainProtocolRequest::TwoWayAnon {
+                            a: req.a,
+                            b: req.b,
 
-                        responder: MainProtocolTwoWayAnonResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0x5862bf8170c87a36 => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        MainProtocolTwoWayAnonWithErrorRequest,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<MainProtocolTwoWayAnonWithErrorRequest>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = MainProtocolControlHandle { inner: this.inner.clone() };
-                    Ok(MainProtocolRequest::TwoWayAnonWithError {
-                        a: req.a,
-                        b: req.b,
+                            responder: MainProtocolTwoWayAnonResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0x5862bf8170c87a36 => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            MainProtocolTwoWayAnonWithErrorRequest,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<MainProtocolTwoWayAnonWithErrorRequest>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle =
+                            MainProtocolControlHandle { inner: this.inner.clone() };
+                        Ok(MainProtocolRequest::TwoWayAnonWithError {
+                            a: req.a,
+                            b: req.b,
 
-                        responder: MainProtocolTwoWayAnonWithErrorResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                _ => Err(fidl::Error::UnknownOrdinal {
-                    ordinal: header.ordinal,
-                    protocol_name:
-                        <MainProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
-                }),
-            }))
-        })
+                            responder: MainProtocolTwoWayAnonWithErrorResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    _ => Err(fidl::Error::UnknownOrdinal {
+                        ordinal: header.ordinal,
+                        protocol_name:
+                            <MainProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
+                    }),
+                }))
+            },
+        )
     }
 }
 

@@ -274,7 +274,7 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 // chance to run before we try and process the next request for this directory.
                 yield_to_executor().await;
             }
-            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            #[cfg(fuchsia_api_level_at_least = "24")]
             fio::DirectoryRequest::_UnknownMethod { .. } => (),
         }
         Ok(ConnectionState::Alive)

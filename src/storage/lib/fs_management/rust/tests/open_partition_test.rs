@@ -4,7 +4,7 @@
 
 use fs_management::partition::{find_partition, PartitionMatcher};
 use ramdevice_client::RamdiskClient;
-use zx::Duration;
+use zx::MonotonicDuration;
 
 #[fuchsia::test]
 async fn find_partition_test() {
@@ -14,7 +14,7 @@ async fn find_partition_test() {
         ..Default::default()
     };
 
-    let controller = find_partition(matcher, Duration::from_seconds(10)).await.unwrap();
+    let controller = find_partition(matcher, MonotonicDuration::from_seconds(10)).await.unwrap();
     assert_eq!(
         &controller.get_topological_path().await.unwrap().unwrap(),
         "/dev/sys/platform/ram-disk/ramctl/ramdisk-0/block",

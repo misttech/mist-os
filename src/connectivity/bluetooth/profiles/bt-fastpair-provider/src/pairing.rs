@@ -140,7 +140,7 @@ struct Procedure {
     /// Current status of the procedure.
     state: ProcedureState,
     /// Tracks the timeout of the pairing procedure.
-    timer: Option<fasync::Timer>,
+    timer: Option<Pin<Box<fasync::Timer>>>,
     /// Inspect properties associated with this procedure.
     inspect_node: ProcedureInspect,
 }
@@ -149,10 +149,12 @@ impl Procedure {
     /// Default timeout duration for a pairing procedure. Per the GFPS specification, if progress
     /// is not made within this amount of time, the procedure should be terminated.
     /// See https://developers.google.com/nearby/fast-pair/specifications/service/gatt#procedure
-    const DEFAULT_PROCEDURE_TIMEOUT_DURATION: zx::Duration = zx::Duration::from_seconds(10);
+    const DEFAULT_PROCEDURE_TIMEOUT_DURATION: zx::MonotonicDuration =
+        zx::MonotonicDuration::from_seconds(10);
 
     fn new(id: PeerId, key: SharedSecret) -> Self {
-        let timer = fasync::Timer::new(Self::DEFAULT_PROCEDURE_TIMEOUT_DURATION.after_now());
+        let timer =
+            Box::pin(fasync::Timer::new(Self::DEFAULT_PROCEDURE_TIMEOUT_DURATION.after_now()));
         Self {
             le_id: id,
             bredr_id: None,
@@ -177,7 +179,9 @@ impl Procedure {
     fn transition(&mut self, state: ProcedureState) -> ProcedureState {
         let old_state = std::mem::replace(&mut self.state, state);
         self.inspect_node.state.set(&format!("{:?}", self.state));
-        self.timer = Some(fasync::Timer::new(Self::DEFAULT_PROCEDURE_TIMEOUT_DURATION.after_now()));
+        self.timer = Some(Box::pin(fasync::Timer::new(
+            Self::DEFAULT_PROCEDURE_TIMEOUT_DURATION.after_now(),
+        )));
         old_state
     }
 

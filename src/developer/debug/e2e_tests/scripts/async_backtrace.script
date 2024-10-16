@@ -17,6 +17,7 @@ Task(id = 0)
                └─ fuchsia_async::runtime::fuchsia::timer::Timer
             └─ fuchsia_async::scope::Join(0x??)
             └─ fuchsia_async::scope::Join(0x??)
+            └─ fuchsia_async::JoinHandle(id = 6)
       └─ async_rust::bar • async_rust.rs:??
          └─ async_rust::baz • async_rust.rs:??
             └─ fuchsia_async::runtime::fuchsia::timer::Timer

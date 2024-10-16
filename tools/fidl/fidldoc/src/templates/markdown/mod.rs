@@ -79,7 +79,6 @@ impl<'a> MarkdownTemplate<'a> {
             ("doc", include_str!("partials/types/doc.hbs"), "Failed to include doc"),
             ("filename", include_str!("partials/types/filename.hbs"), "Failed to include filename"),
             ("type", include_str!("partials/types/type.hbs"), "Failed to include type"),
-            ("vector", include_str!("partials/types/vector.hbs"), "Failed to include vector"),
         ] {
             handlebars.register_template_string(name, template).expect(expect);
         }

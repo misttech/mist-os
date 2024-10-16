@@ -197,12 +197,6 @@ closed protocol Server {
     ///
     /// + request `source` is an Ext4 image to be served over the `root`
     ///            connection.
-    /// + request `flags` is the same flags you can pass to
-    ///            [`fuchsia.io/Directory.Open`] call.  In particular
-    ///            [`OPEN_FLAG_DESCRIBE`] can be used to report mount errors.
-    ///            Note that [`MountVmoError`] will contain a better
-    ///            description of any error that may occur at the mount
-    ///            time.
     /// + request `root` is the server end of a connection that will be
     ///            serving the root of the mounted image.
     /// - result `result` In case we could parse the image far enough to
@@ -213,7 +207,6 @@ closed protocol Server {
     ///           and the `root` connection will be closed.
     strict MountVmo(resource struct {
         source zx.Handle:VMO;
-        flags fuchsia.io.OpenFlags;
         root server_end:fuchsia.io.Directory;
     }) -> (struct {
         result MountVmoResult;

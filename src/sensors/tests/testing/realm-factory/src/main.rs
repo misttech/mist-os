@@ -75,10 +75,39 @@ async fn create_realm() -> Result<RealmInstance, Error> {
     builder
         .add_route(
             Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.hardware.sensors.Driver"))
+                .capability(Capability::service_by_name("fuchsia.hardware.sensors.Service"))
                 .capability(Capability::protocol_by_name("fuchsia.hardware.sensors.Playback"))
                 .from(&playback_ref)
                 .to(&sensors_ref),
+        )
+        .await?;
+
+    // Add a second playback driver that will be used to validate that the sensor manager can get
+    // data from multiple driver providers.
+    let second_playback_ref = builder
+        .add_child(
+            "sensors_playback2",
+            "sensors_playback#meta/sensors_playback.cm",
+            ChildOptions::new(),
+        )
+        .await?;
+
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::service_by_name("fuchsia.hardware.sensors.Service"))
+                .from(&second_playback_ref)
+                .to(&sensors_ref),
+        )
+        .await?;
+
+    // Route playback to the tests to configure the second playback driver.
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name("fuchsia.hardware.sensors.Playback"))
+                .from(&second_playback_ref)
+                .to(Ref::parent()),
         )
         .await?;
 

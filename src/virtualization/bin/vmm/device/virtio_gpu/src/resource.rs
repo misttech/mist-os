@@ -50,8 +50,6 @@ pub struct Resource2D<'a> {
 impl<'a> Resource2D<'a> {
     #[cfg(not(test))]
     pub async fn allocate(cmd: &wire::VirtioGpuResourceCreate2d) -> Result<Resource2D<'a>, Error> {
-        use fidl::endpoints::ClientEnd;
-
         let pixel_format = if let Some(pixel_format) = sysmem_pixel_format(cmd.format.get()) {
             pixel_format
         } else {
@@ -77,11 +75,7 @@ impl<'a> Resource2D<'a> {
             export_token: Some(buffer_tokens.export_token),
             // A sysmem token channel serves both sysmem(1) and sysmem2, so we can convert here
             // until flatland has a field for a sysmem2 token.
-            buffer_collection_token: Some(ClientEnd::<
-                fidl_fuchsia_sysmem::BufferCollectionTokenMarker,
-            >::new(
-                buffer_collection_token_for_flatland.into_channel()
-            )),
+            buffer_collection_token2: Some(buffer_collection_token_for_flatland),
             ..Default::default()
         };
         let allocator =

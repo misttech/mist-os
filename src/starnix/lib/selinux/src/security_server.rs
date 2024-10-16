@@ -23,6 +23,8 @@ use std::num::NonZeroU32;
 use std::ops::DerefMut;
 use std::sync::Arc;
 
+const ROOT_PATH: &'static str = "/";
+
 struct LoadedPolicy {
     /// Parsed policy structure.
     parsed: Policy<ByValue<Vec<u8>>>,
@@ -366,52 +368,74 @@ impl SecurityServer {
         let root_sid_from_mount_option =
             sid_from_mount_option(&mut locked_state, &mount_options.root_context);
 
-        // If `mount_options.context` is set then the file-system and the nodes it contains
-        // have the specified read-only security label set.
-        if let Some(mountpoint_sid) = mountpoint_sid_from_mount_option {
-            FileSystemLabel { sid: mountpoint_sid, scheme: FileSystemLabelingScheme::Mountpoint }
-        } else {
-            // Check for an `fs_use` entry for this file-system type, in the policy.
-            if let Some(FsUseLabelAndType { context, use_type }) =
-                locked_state.policy.as_ref().unwrap().parsed.fs_use_label_and_type(fs_type)
-            {
-                let fs_sid_from_policy = locked_state.security_context_to_sid(context);
-                let fs_sid = fs_sid_from_mount_option.unwrap_or(fs_sid_from_policy);
-                FileSystemLabel {
-                    sid: fs_sid,
-                    scheme: FileSystemLabelingScheme::FsUse {
-                        fs_use_type: use_type,
-                        def_sid: def_sid_from_mount_option
-                            .unwrap_or(SecurityId::initial(InitialSid::File)),
-                        root_sid: root_sid_from_mount_option.unwrap_or(fs_sid),
-                    },
-                }
-            } else {
-                // The name of the filesystem type was not recognized.
-                //
-                // TODO: https://fxbug.dev/363215797 - verify that these defaults are correct.
-                let unrecognized_filesystem_type_sid = SecurityId::initial(InitialSid::File);
-                let unrecognized_filesystem_type_fs_use_type = FsUseType::Xattr;
+        let loaded_policy = locked_state.policy.as_ref().unwrap();
 
-                FileSystemLabel {
-                    sid: fs_sid_from_mount_option.unwrap_or(unrecognized_filesystem_type_sid),
-                    scheme: FileSystemLabelingScheme::FsUse {
-                        fs_use_type: unrecognized_filesystem_type_fs_use_type,
-                        def_sid: def_sid_from_mount_option
-                            .unwrap_or(unrecognized_filesystem_type_sid),
-                        root_sid: root_sid_from_mount_option
-                            .unwrap_or(unrecognized_filesystem_type_sid),
-                    },
-                }
+        if let Some(mountpoint_sid) = mountpoint_sid_from_mount_option {
+            // `mount_options.context` is set, so the file-system and the nodes it contains
+            // have the specified read-only security label set.
+            FileSystemLabel { sid: mountpoint_sid, scheme: FileSystemLabelingScheme::Mountpoint }
+        } else if let Some(FsUseLabelAndType { context, use_type }) =
+            loaded_policy.parsed.fs_use_label_and_type(fs_type)
+        {
+            // There is an `fs_use` statement for this file-system type in the policy.
+            let fs_sid_from_policy = locked_state.security_context_to_sid(context);
+            let fs_sid = fs_sid_from_mount_option.unwrap_or(fs_sid_from_policy);
+            FileSystemLabel {
+                sid: fs_sid,
+                scheme: FileSystemLabelingScheme::FsUse {
+                    fs_use_type: use_type,
+                    def_sid: def_sid_from_mount_option
+                        .unwrap_or(SecurityId::initial(InitialSid::File)),
+                    root_sid: root_sid_from_mount_option.unwrap_or(fs_sid),
+                },
+            }
+        } else if let Some(context) =
+            loaded_policy.parsed.genfscon_label_for_fs_and_path(fs_type, ROOT_PATH.into(), None)
+        {
+            // There is a `genfscon` statement for this file-system type in the policy.
+            let genfscon_sid = locked_state.security_context_to_sid(context);
+            let fs_sid = fs_sid_from_mount_option.unwrap_or(genfscon_sid);
+            FileSystemLabel { sid: fs_sid, scheme: FileSystemLabelingScheme::GenFsCon }
+        } else {
+            // The name of the filesystem type was not recognized.
+            //
+            // TODO: https://fxbug.dev/363215797 - verify that these defaults are correct.
+            let unrecognized_filesystem_type_sid = SecurityId::initial(InitialSid::File);
+            let unrecognized_filesystem_type_fs_use_type = FsUseType::Xattr;
+
+            FileSystemLabel {
+                sid: fs_sid_from_mount_option.unwrap_or(unrecognized_filesystem_type_sid),
+                scheme: FileSystemLabelingScheme::FsUse {
+                    fs_use_type: unrecognized_filesystem_type_fs_use_type,
+                    def_sid: def_sid_from_mount_option.unwrap_or(unrecognized_filesystem_type_sid),
+                    root_sid: root_sid_from_mount_option
+                        .unwrap_or(unrecognized_filesystem_type_sid),
+                },
             }
         }
     }
 
+    /// If there is a genfscon statement for the given filesystem type, returns the
+    /// [`SecurityContext`] that should be used for a node in path `node_path`. When `node_path` is
+    /// the root path ("/") the label additionally corresponds to the `FileSystem` label.
+    pub fn genfscon_label_for_fs_and_path(
+        &self,
+        fs_type: NullessByteStr<'_>,
+        node_path: NullessByteStr<'_>,
+        class_id: Option<ClassId>,
+    ) -> Option<SecurityId> {
+        let mut locked_state = self.state.lock();
+        let security_context = locked_state
+            .policy
+            .as_ref()
+            .unwrap()
+            .parsed
+            .genfscon_label_for_fs_and_path(fs_type, node_path.into(), class_id)?;
+        Some(locked_state.security_context_to_sid(security_context))
+    }
+
     /// Computes the precise access vector for `source_sid` targeting `target_sid` as class
     /// `target_class`.
-    //
-    // TODO(http://b/305722921): Implement complete access decision logic. For now, the security
-    // server abides by explicit `allow [source] [target]:[class] [permissions..];` statements.
     pub fn compute_access_vector(
         &self,
         source_sid: SecurityId,
@@ -430,6 +454,12 @@ impl SecurityServer {
         let source_context = state.sid_to_security_context(source_sid);
         let target_context = state.sid_to_security_context(target_sid);
 
+        // Access decisions are currently based solely on explicit "allow" rules.
+        // TODO: https://fxbug.dev/372400976 - Include permissions from matched "constraints"
+        // rules in the policy.
+        // TODO: https://fxbug.dev/372401676 - Include permissions from "attribute"s associated
+        // with the source & target types via "typeattribute" rules.
+        // TODO: https://fxbug.dev/372400419 - Validate that "neverallow" rules are respected.
         match target_class {
             AbstractObjectClass::System(target_class) => policy.parsed.compute_explicitly_allowed(
                 source_context.type_(),

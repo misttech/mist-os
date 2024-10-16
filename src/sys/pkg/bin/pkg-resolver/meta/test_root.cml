@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/connectivity/network/meta/isolated-network.shard.cml" ],
+    include: [
+        "//src/connectivity/network/meta/isolated-network.shard.cml",
+        "syslog/offer.shard.cml",
+    ],
     children: [
         {
             name: "test_driver",
@@ -23,7 +26,6 @@
         {
             protocol: [
                 "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
             ],
             from: "parent",

@@ -716,7 +716,7 @@ mod tests {
         let sbc_packet_size = 85u64;
 
         media_sender.try_send(Ok(raw.clone())).expect("should be able to send into stream");
-        exec.set_fake_time(fasync::MonotonicInstant::after(zx::Duration::from_seconds(1)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(1)));
         assert!(exec.run_until_stalled(&mut decode_fut).is_pending());
 
         // Expect a request for status and respond as they setup the player after data is first

@@ -46,26 +46,26 @@ zx::result<BoardInfo> GetBoardInfo(
 }
 
 zx::result<fdf::MmioBuffer> MapMmio(
-    MmioResourceIndex mmio_index,
+    std::string_view mmio_name,
     fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device) {
   ZX_DEBUG_ASSERT(platform_device.is_valid());
-  fidl::WireResult<fuchsia_hardware_platform_device::Device::GetMmioById> result =
-      fidl::WireCall(platform_device)->GetMmioById(static_cast<uint32_t>(mmio_index));
+  fidl::WireResult<fuchsia_hardware_platform_device::Device::GetMmioByName> result =
+      fidl::WireCall(platform_device)->GetMmioByName(fidl::StringView::FromExternal(mmio_name));
   if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to map MMIO resource #%" PRIu32 ": FIDL call failed: %s",
-            static_cast<uint32_t>(mmio_index), result.status_string());
+    FDF_LOG(ERROR, "Failed to map MMIO resource '%.*s': FIDL call failed: %s",
+            static_cast<int>(mmio_name.size()), mmio_name.data(), result.status_string());
     return zx::error(result.status());
   }
   if (result->is_error()) {
-    FDF_LOG(ERROR, "Failed to map MMIO resource #%" PRIu32 ": Platform device failed %s",
-            static_cast<uint32_t>(mmio_index), zx_status_get_string(result->error_value()));
+    FDF_LOG(ERROR, "Failed to map MMIO resource '%.*s': Platform device failed %s",
+            static_cast<int>(mmio_name.size()), mmio_name.data(),
+            zx_status_get_string(result->error_value()));
     return zx::error(result->error_value());
   }
   const fuchsia_hardware_platform_device::wire::Mmio* mmio_params = result->value();
   if (!mmio_params->has_offset() || !mmio_params->has_size() || !mmio_params->has_vmo()) {
-    FDF_LOG(ERROR,
-            "Failed to map MMIO resource #%" PRIu32 ": Platform device provided invalid MMIO",
-            static_cast<uint32_t>(mmio_index));
+    FDF_LOG(ERROR, "Failed to map MMIO resource '%.*s': Platform device provided invalid MMIO",
+            static_cast<int>(mmio_name.size()), mmio_name.data());
     return zx::error(ZX_ERR_BAD_STATE);
   };
 
@@ -80,20 +80,21 @@ zx::result<fdf::MmioBuffer> MapMmio(
 }
 
 zx::result<zx::interrupt> GetInterrupt(
-    InterruptResourceIndex interrupt_index,
+    std::string_view interrupt_name,
     fidl::UnownedClientEnd<fuchsia_hardware_platform_device::Device> platform_device) {
   ZX_DEBUG_ASSERT(platform_device.is_valid());
-  fidl::WireResult<fuchsia_hardware_platform_device::Device::GetInterruptById> result =
+  fidl::WireResult<fuchsia_hardware_platform_device::Device::GetInterruptByName> result =
       fidl::WireCall(platform_device)
-          ->GetInterruptById(static_cast<uint32_t>(interrupt_index), /*flags=*/0);
+          ->GetInterruptByName(fidl::StringView::FromExternal(interrupt_name), /*flags=*/0);
   if (result.status() != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to get interrupt resource #%" PRIu32 ": FIDL failed %s",
-            static_cast<uint32_t>(interrupt_index), result.status_string());
+    FDF_LOG(ERROR, "Failed to get interrupt resource '%.*s': FIDL failed %s",
+            static_cast<int>(interrupt_name.size()), interrupt_name.data(), result.status_string());
     return zx::error(result.status());
   }
   if (!result->is_ok()) {
-    FDF_LOG(ERROR, "Failed to get interrupt resource #%" PRIu32 ": Platform device failed %s",
-            static_cast<uint32_t>(interrupt_index), zx_status_get_string(result->error_value()));
+    FDF_LOG(ERROR, "Failed to get interrupt resource '%.*s': Platform device failed %s",
+            static_cast<int>(interrupt_name.size()), interrupt_name.data(),
+            zx_status_get_string(result->error_value()));
     return zx::error(result->error_value());
   }
   zx::interrupt interrupt = std::move(result->value()->irq);

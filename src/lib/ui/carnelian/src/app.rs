@@ -29,7 +29,7 @@ use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::fs;
 use std::path::PathBuf;
-use std::pin::Pin;
+use std::pin::{pin, Pin};
 
 pub(crate) mod strategies;
 
@@ -642,7 +642,8 @@ impl App {
             let mut frame_count = 0;
             app.app_init_common().await?;
             loop {
-                let timeout = Timer::new(zx::Duration::from_millis(500_i64).after_now());
+                let timeout =
+                    pin!(Timer::new(zx::MonotonicDuration::from_millis(500_i64).after_now()));
                 let either = futures::future::select(timeout, internal_receiver.next());
                 let resolved = either.await;
                 match resolved {

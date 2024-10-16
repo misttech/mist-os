@@ -5,8 +5,6 @@
 #ifndef SRC_DEVICES_TESTING_DEVMGR_INTEGRATION_TEST_SHIM_INCLUDE_LIB_DEVMGR_INTEGRATION_TEST_FIXTURE_H_
 #define SRC_DEVICES_TESTING_DEVMGR_INTEGRATION_TEST_SHIM_INCLUDE_LIB_DEVMGR_INTEGRATION_TEST_FIXTURE_H_
 
-#include <fuchsia/diagnostics/cpp/fidl.h>
-#include <fuchsia/driver/test/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/dispatcher.h>
@@ -44,14 +42,19 @@ class IsolatedDevmgr {
 
   // Launch a new isolated devmgr.
   //
-  // TODO(https://fxbug.dev/42065538): Remove |dispatcher| once RealmBuilder::Build no longer requires
-  // it.
+  // TODO(https://fxbug.dev/42065538): Remove |dispatcher| once RealmBuilder::Build no longer
+  // requires it.
   static zx::result<IsolatedDevmgr> Create(devmgr_launcher::Args args,
                                            async_dispatcher_t* dispatcher);
 
   // Get a fd to the root of the isolate devmgr's devfs.  This fd
   // may be used with openat() and fdio_watch_directory().
   const fbl::unique_fd& devfs_root() const { return devfs_root_; }
+
+  fidl::ClientEnd<fuchsia_io::Directory> svc_dir() const {
+    auto root = realm_->component().CloneExposedDir();
+    return fidl::ClientEnd<fuchsia_io::Directory>(root.TakeChannel());
+  }
 
  private:
   std::unique_ptr<component_testing::RealmRoot> realm_;

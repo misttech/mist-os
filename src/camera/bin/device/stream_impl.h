@@ -124,13 +124,22 @@ class StreamImpl {
     void WatchCropRegion(WatchCropRegionCallback callback) override;
     void SetResolution(fuchsia::math::Size coded_size) override;
     void WatchResolution(WatchResolutionCallback callback) override;
+    void SetBufferCollection2(
+        fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token) override;
     void SetBufferCollection(
         fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken> token) override;
+    void WatchBufferCollection2(WatchBufferCollection2Callback callback) override;
     void WatchBufferCollection(WatchBufferCollectionCallback callback) override;
     void WatchOrientation(WatchOrientationCallback callback) override;
     void GetNextFrame(GetNextFrameCallback callback) override;
     void GetNextFrame2(GetNextFrame2Callback callback) override;
     void Rebind(fidl::InterfaceRequest<Stream> request) override;
+
+    void SetBufferCollectionCommon(
+        fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> token);
+    void WatchBufferCollectionCommon(
+        fit::function<void(fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>)>
+            callback);
 
     StreamImpl& stream_;
     std::string log_prefix_;

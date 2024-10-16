@@ -39,7 +39,7 @@ lazy_static! {
     /// Time to wait while a device is sending valid packets before we declare a transaction
     /// failure. Set to a large value in case the device is in the middle of responding to a
     /// slow operation for a different client.
-    static ref TRANSACTION_TIMEOUT: zx::Duration = zx::Duration::from_millis(2000);
+    static ref TRANSACTION_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(2000);
 }
 
 bitfield! {

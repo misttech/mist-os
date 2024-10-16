@@ -10,9 +10,9 @@ use {fuchsia_async as fasync, zx};
 
 const DEADLINE_NAME: DeadlineId<'static> = DeadlineId::new("fake-clock-example", "deadline");
 
-const ONE_DAY: zx::Duration = zx::Duration::from_hours(24);
-const ONE_MILLIS: zx::Duration = zx::Duration::from_millis(1);
-const ONE_HOUR: zx::Duration = zx::Duration::from_hours(1);
+const ONE_DAY: zx::MonotonicDuration = zx::MonotonicDuration::from_hours(24);
+const ONE_MILLIS: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(1);
+const ONE_HOUR: zx::MonotonicDuration = zx::MonotonicDuration::from_hours(1);
 
 #[fasync::run_singlethreaded(test)]
 async fn test_pause_advance() {

@@ -400,9 +400,7 @@ fn register_buffer_collection_with_scenic(
 
     let args = fuicomp::RegisterBufferCollectionArgs {
         export_token: Some(export_token),
-        // Sysmem token channels serve both sysmem(1) and sysmem2 token protocols, so we can convert
-        // here until this protocol accepts a sysmem2 token.
-        buffer_collection_token: Some(buffer_collection_token.into_channel().into()),
+        buffer_collection_token2: Some(buffer_collection_token),
         ..Default::default()
     };
 

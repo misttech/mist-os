@@ -36,7 +36,7 @@ void LogImporter::Start() {
   }
   log_ = std::move(result.value().log);
 
-  start_time_ = zx_clock_get_monotonic();
+  start_time_ = zx_clock_get_boot();
   time_scale_ = static_cast<double>(zx_ticks_per_second()) / 1'000'000'000.0;
 
   wait_.set_object(log_.get());

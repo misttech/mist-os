@@ -33,6 +33,7 @@ _all_actions = [
     ACTION_NAMES.clif_match,
 ]
 
+# buildifier: disable=unused-variable
 _all_compile_actions = [
     ACTION_NAMES.assemble,
     ACTION_NAMES.preprocess_assemble,
@@ -46,6 +47,7 @@ _all_compile_actions = [
     ACTION_NAMES.clif_match,
 ]
 
+# buildifier: disable=unused-variable
 _all_cpp_compile_actions = [
     ACTION_NAMES.linkstamp_compile,
     ACTION_NAMES.cpp_compile,
@@ -62,6 +64,7 @@ _all_link_actions = [
     ACTION_NAMES.cpp_link_nodeps_dynamic_library,
 ]
 
+# buildifier: disable=unused-variable
 def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
     """Compute list of C++ toolchain features required by Clang.
 
@@ -284,7 +287,7 @@ def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
         name = "no_dotd_file",
         enabled = True,
     )
-    features += [no_dotd_file_feature]
+    features.append(no_dotd_file_feature)
 
     return features
 
@@ -487,7 +490,7 @@ def generate_clang_cc_toolchain(
            value. Default to //:clang_info.
            See setup_clang_repository() in repository_utils.bzl.
 
-       sysroot_headers_files: (optional) A label list for the sysroot
+       sysroot_header_files: (optional) A label list for the sysroot
            header files. These will be exposed to the sandbox for C++
            compilation actions.
 
@@ -568,3 +571,47 @@ def generate_clang_cc_toolchain(
         toolchain = ":" + name,
         toolchain_type = "@bazel_tools//tools/cpp:toolchain_type",
     )
+
+def _empty_cc_toolchain_config_impl(ctx):
+    # See CppConfiguration.java class in Bazel sources for the list of
+    # all tool_path() names that must be defined and relative to the
+    # clang repository directory.
+    tool_paths = [
+        tool_path(name = "ar", path = "/usr/bin/false"),
+        tool_path(name = "cpp", path = "/usr/bin/false"),
+        tool_path(name = "gcc", path = "/usr/bin/false"),
+        tool_path(name = "gcov", path = "/usr/bin/false"),
+        tool_path(name = "gcov-tool", path = "/usr/bin/false"),
+        tool_path(name = "ld", path = "/usr/bin/false"),
+        tool_path(name = "llvm-cov", path = "/usr/bin/false"),
+        tool_path(name = "nm", path = "/usr/bin/false"),
+        tool_path("objcopy", path = "/usr/bin/false"),
+        tool_path("objdump", path = "/usr/bin/false"),
+        tool_path("strip", path = "/usr/bin/false"),
+        tool_path(name = "dwp", path = "/usr/bin/false"),
+        tool_path(name = "llvm-profdata", path = "/usr/bin/false"),
+    ]
+
+    features = []
+
+    return cc_common.create_cc_toolchain_config_info(
+        ctx = ctx,
+        toolchain_identifier = "empty_cpp",
+        tool_paths = tool_paths,
+        target_cpu = "x86_64",
+        # Required by constructor, but otherwise ignored by Bazel.
+        # These string values are arbitrary, but are easy to grep
+        # in our source tree if they ever happen to appear in
+        # build error messages.
+        host_system_name = "__bazel_host_system_name__",
+        target_system_name = "__bazel_target_system_name__",
+        target_libc = "__bazel_target_libc__",
+        abi_version = "__bazel_abi_version__",
+        abi_libc_version = "__bazel_abi_libc_version__",
+        compiler = "__bazel_compiler__",
+    )
+
+empty_cc_toolchain_config = rule(
+    implementation = _empty_cc_toolchain_config_impl,
+    doc = "Define a cc_toolchain_config target for an empty C++ toolchain.",
+)

@@ -11,6 +11,7 @@ use futures::channel::oneshot;
 use futures::future::{join_all, BoxFuture, FutureExt};
 use futures::select;
 use std::collections::HashMap;
+use std::pin::pin;
 use std::sync::{Arc, Mutex};
 
 /// Represents a task that implements an action.
@@ -130,7 +131,7 @@ impl ActionSet {
             _ = join_all(prereqs).await;
             let key = action.key();
             let mut action_fut = action.handle(component.clone()).fuse();
-            let mut timer = fasync::Timer::new(std::time::Duration::from_secs(300)).fuse();
+            let mut timer = pin!(fasync::Timer::new(std::time::Duration::from_secs(300)));
             let res = select! {
                 res = action_fut => {
                     res

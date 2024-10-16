@@ -20,12 +20,12 @@
 
 #include "src/developer/memory/metrics/capture.h"
 #include "src/developer/memory/metrics/digest.h"
-#include "src/developer/memory/monitor/debugger.h"
 #include "src/developer/memory/monitor/high_water.h"
 #include "src/developer/memory/monitor/logger.h"
 #include "src/developer/memory/monitor/memory_monitor_config.h"
 #include "src/developer/memory/monitor/metrics.h"
-#include "src/developer/memory/monitor/pressure_notifier.h"
+#include "src/developer/memory/pressure_signaler/debugger.h"
+#include "src/developer/memory/pressure_signaler/pressure_notifier.h"
 #include "src/lib/fxl/command_line.h"
 
 namespace monitor {
@@ -75,7 +75,7 @@ class Monitor : public fuchsia::memory::inspection::Collector {
   inspect::Inspector Inspect(const std::vector<memory::BucketMatch>& bucket_matches);
 
   void GetDigest(const memory::Capture& capture, memory::Digest* digest);
-  void PressureLevelChanged(Level level);
+  void PressureLevelChanged(pressure_signaler::Level level);
 
   std::unique_ptr<memory::CaptureMaker> capture_maker_;
   std::unique_ptr<HighWater> high_water_;
@@ -94,13 +94,13 @@ class Monitor : public fuchsia::memory::inspection::Collector {
   inspect::ComponentInspector inspector_;
   Logger logger_;
   std::unique_ptr<Metrics> metrics_;
-  std::unique_ptr<PressureNotifier> pressure_notifier_;
-  std::unique_ptr<MemoryDebugger> memory_debugger_;
+  std::unique_ptr<pressure_signaler::PressureNotifier> pressure_notifier_;
+  std::unique_ptr<pressure_signaler::MemoryDebugger> memory_debugger_;
   std::unique_ptr<memory::Digester> digester_;
   std::mutex digester_mutex_;
   fuchsia::hardware::ram::metrics::DevicePtr ram_device_;
   uint64_t pending_bandwidth_measurements_ = 0;
-  Level level_;
+  pressure_signaler::Level level_;
 
   friend class test::MemoryBandwidthInspectTest;
   FXL_DISALLOW_COPY_AND_ASSIGN(Monitor);

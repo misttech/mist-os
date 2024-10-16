@@ -11,21 +11,21 @@
 
 namespace monitor {
 
-void Logger::SetPressureLevel(Level l) {
+void Logger::SetPressureLevel(pressure_signaler::Level l) {
   switch (l) {
-    case kImminentOOM:
+    case pressure_signaler::kImminentOOM:
       duration_ = zx::sec(config_->imminent_oom_capture_delay_s());
       break;
-    case kCritical:
+    case pressure_signaler::kCritical:
       duration_ = zx::sec(config_->critical_capture_delay_s());
       break;
-    case kWarning:
+    case pressure_signaler::kWarning:
       duration_ = zx::sec(config_->warning_capture_delay_s());
       break;
-    case kNormal:
+    case pressure_signaler::kNormal:
       duration_ = zx::sec(config_->normal_capture_delay_s());
       break;
-    case kNumLevels:
+    case pressure_signaler::kNumLevels:
       break;
   }
   if (config_->capture_on_pressure_change()) {

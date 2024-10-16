@@ -102,8 +102,12 @@ void SetupCommandLineOptions(const CommandLineOptions& options, Session* session
     system_settings.SetString(ClientSettings::System::kSymbolCache, *options.symbol_cache);
   if (!options.symbol_index_files.empty())
     system_settings.SetList(ClientSettings::System::kSymbolIndexFiles, options.symbol_index_files);
-  if (!options.symbol_servers.empty())
-    system_settings.SetList(ClientSettings::System::kSymbolServers, options.symbol_servers);
+  if (!options.private_symbol_servers.empty())
+    system_settings.SetList(ClientSettings::System::kPrivateSymbolServers,
+                            options.private_symbol_servers);
+  if (!options.public_symbol_servers.empty())
+    system_settings.SetList(ClientSettings::System::kPublicSymbolServers,
+                            options.public_symbol_servers);
   if (!options.symbol_paths.empty())
     system_settings.SetList(ClientSettings::System::kSymbolPaths, options.symbol_paths);
   if (!options.build_id_dirs.empty())

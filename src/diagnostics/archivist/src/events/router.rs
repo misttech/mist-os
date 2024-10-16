@@ -402,7 +402,7 @@ mod tests {
                     let (_, request_stream) =
                         fidl::endpoints::create_proxy_and_stream::<LogSinkMarker>().unwrap();
                     Event {
-                        timestamp: zx::MonotonicInstant::from_nanos(FAKE_TIMESTAMP),
+                        timestamp: zx::BootInstant::from_nanos(FAKE_TIMESTAMP),
                         payload: EventPayload::LogSinkRequested(LogSinkRequestedPayload {
                             component: identity,
                             request_stream,
@@ -413,7 +413,7 @@ mod tests {
                     let (_, request_stream) =
                         fidl::endpoints::create_proxy_and_stream::<InspectSinkMarker>().unwrap();
                     Event {
-                        timestamp: zx::MonotonicInstant::from_nanos(FAKE_TIMESTAMP),
+                        timestamp: zx::BootInstant::from_nanos(FAKE_TIMESTAMP),
                         payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
                             component: identity,
                             request_stream,
@@ -524,7 +524,7 @@ mod tests {
         let request_stream = LogSinkRequestStream::from_channel(fidl::AsyncChannel::from_channel(
             server_end.into_channel(),
         ));
-        let timestamp = zx::MonotonicInstant::get();
+        let timestamp = zx::BootInstant::get();
         producer
             .dispatcher
             .emit(Event {
@@ -587,7 +587,7 @@ mod tests {
         producer
             .dispatcher
             .emit(Event {
-                timestamp: zx::MonotonicInstant::get(),
+                timestamp: zx::BootInstant::get(),
                 payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
                     component: IDENTITY.clone(),
                     request_stream,
@@ -607,7 +607,7 @@ mod tests {
         producer
             .dispatcher
             .emit(Event {
-                timestamp: zx::MonotonicInstant::get(),
+                timestamp: zx::BootInstant::get(),
                 payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
                     component: IDENTITY.clone(),
                     request_stream,
@@ -775,7 +775,7 @@ mod tests {
         let (_proxy, request_stream) =
             fidl::endpoints::create_proxy_and_stream::<InspectSinkMarker>().unwrap();
         Event {
-            timestamp: zx::MonotonicInstant::from_nanos(FAKE_TIMESTAMP),
+            timestamp: zx::BootInstant::from_nanos(FAKE_TIMESTAMP),
             payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
                 component: identity,
                 request_stream,

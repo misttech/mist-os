@@ -4,6 +4,7 @@
 
 #include "src/developer/debug/debug_agent/mock_job_handle.h"
 
+#include "src/developer/debug/debug_agent/job_exception_channel_type.h"
 #include "src/developer/debug/debug_agent/mock_process_handle.h"
 
 namespace debug_agent {
@@ -31,4 +32,21 @@ std::vector<std::unique_ptr<ProcessHandle>> MockJobHandle::GetChildProcesses() c
   return result;
 }
 
+void MockJobHandle::OnException(std::unique_ptr<MockExceptionHandle> exception,
+                                MockJobExceptionInfo info) {
+  switch (info) {
+    case MockJobExceptionInfo::kProcessStarting:
+      FX_CHECK(observer_type_ == JobExceptionChannelType::kDebugger);
+      observer_->OnProcessStarting(exception->GetProcessHandle());
+      break;
+    case MockJobExceptionInfo::kProcessNameChanged:
+      FX_CHECK(observer_type_ == JobExceptionChannelType::kDebugger);
+      observer_->OnProcessNameChanged(exception->GetProcessHandle());
+      break;
+    case MockJobExceptionInfo::kException:
+      FX_CHECK(observer_type_ == JobExceptionChannelType::kException);
+      observer_->OnUnhandledException(std::move(exception));
+      break;
+  }
+}
 }  // namespace debug_agent

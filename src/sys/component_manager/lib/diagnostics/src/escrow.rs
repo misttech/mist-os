@@ -108,7 +108,7 @@ impl DurationStats {
         self: &Arc<Self>,
         moniker: &Moniker,
         stop_time: zx::MonotonicInstant,
-        execution_duration: zx::Duration,
+        execution_duration: zx::MonotonicDuration,
         requested_escrow: bool,
     ) {
         let mut escrowing_components = self.escrowing_components.lock();
@@ -151,12 +151,12 @@ impl Hook for DurationStats {
         match event.event_type() {
             EventType::Started => {
                 if let EventPayload::Started { runtime, .. } = &event.payload {
-                    self.on_component_started(target_moniker, runtime.start_time);
+                    self.on_component_started(target_moniker, runtime.start_time_monotonic);
                 }
             }
             EventType::Stopped => {
                 if let EventPayload::Stopped {
-                    stop_time,
+                    stop_time_monotonic,
                     execution_duration,
                     requested_escrow,
                     ..
@@ -164,7 +164,7 @@ impl Hook for DurationStats {
                 {
                     self.on_component_stopped(
                         target_moniker,
-                        *stop_time,
+                        *stop_time_monotonic,
                         *execution_duration,
                         *requested_escrow,
                     );

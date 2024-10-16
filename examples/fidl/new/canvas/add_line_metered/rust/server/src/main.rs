@@ -72,7 +72,7 @@ async fn run_server(stream: InstanceRequestStream) -> Result<(), Error> {
     let update_sender = || async move {
         loop {
             // Our server sends one update per second.
-            Timer::new(MonotonicInstant::after(zx::Duration::from_seconds(1))).await;
+            Timer::new(MonotonicInstant::after(zx::MonotonicDuration::from_seconds(1))).await;
             let mut state = state_ref.lock().unwrap();
             if !state.changed {
                 continue;

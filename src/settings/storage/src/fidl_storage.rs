@@ -19,14 +19,15 @@ use futures::lock::{Mutex, MutexGuard};
 use futures::{FutureExt, StreamExt};
 use std::any::Any;
 use std::collections::HashMap;
+use std::pin::pin;
 use std::sync::Arc;
-use zx::Duration;
+use zx::MonotonicDuration;
 
 /// Minimum amount of time between flushing to disk, in milliseconds. The flush call triggers
 /// file I/O which is slow.
 const MIN_FLUSH_INTERVAL_MS: i64 = 500;
 const MAX_FLUSH_INTERVAL_MS: i64 = 1_800_000; // 30 minutes
-const MIN_FLUSH_DURATION: Duration = Duration::from_millis(MIN_FLUSH_INTERVAL_MS);
+const MIN_FLUSH_DURATION: MonotonicDuration = MonotonicDuration::from_millis(MIN_FLUSH_INTERVAL_MS);
 
 pub trait FidlStorageConvertible {
     type Storable;
@@ -202,8 +203,7 @@ impl FidlStorage {
 
         // Timer for flush cooldown. OptionFuture allows us to wait on the future even
         // if it's None.
-        let mut next_flush_timer: OptionFuture<Timer> = None.into();
-        let mut next_flush_timer_fuse = next_flush_timer.fuse();
+        let mut next_flush_timer = pin!(OptionFuture::<Timer>::from(None).fuse());
         let mut retries = 0;
         let mut retrying = false;
 
@@ -233,11 +233,10 @@ impl FidlStorage {
                     };
 
                     has_pending_flush = true;
-                    next_flush_timer = Some(Timer::new(next_flush_time)).into();
-                    next_flush_timer_fuse = next_flush_timer.fuse();
+                    next_flush_timer.set(OptionFuture::from(Some(Timer::new(next_flush_time))).fuse());
                 }
 
-                _ = next_flush_timer_fuse => {
+                _ = next_flush_timer => {
                     // Timer triggered, check for pending syncs.
                     if has_pending_flush {
                         let mut cached_storage = cached_storage.lock().await;
@@ -246,7 +245,7 @@ impl FidlStorage {
                         // maximum wait time.
                         if let Err(e) = cached_storage.sync(&storage_dir).await {
                             retrying = true;
-                            let flush_duration = Duration::from_millis(
+                            let flush_duration = MonotonicDuration::from_millis(
                                 2_i64.saturating_pow(retries)
                                     .saturating_mul(MIN_FLUSH_INTERVAL_MS)
                                     .min(MAX_FLUSH_INTERVAL_MS)
@@ -261,8 +260,7 @@ impl FidlStorage {
                             );
 
                             // Reset the timer so we can try again in the future
-                            next_flush_timer = Some(Timer::new(next_flush_time)).into();
-                            next_flush_timer_fuse = next_flush_timer.fuse();
+                            next_flush_timer.set(OptionFuture::from(Some(Timer::new(next_flush_time))).fuse());
                             retries += 1;
                             continue;
                         }

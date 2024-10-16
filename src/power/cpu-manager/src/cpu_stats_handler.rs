@@ -435,7 +435,7 @@ pub mod tests {
 
         // Move fake time forward by 4s. This total time delta combined with the `fake_idle_times`
         // data mean the CPU loads should be reported as 0.75 and 0.25.
-        executor.set_fake_time(executor.now().add(zx::Duration::from_seconds(4)));
+        executor.set_fake_time(executor.now().add(zx::MonotonicDuration::from_seconds(4)));
         executor
             .run_until_stalled(&mut Box::pin(async {
                 match node.handle_message(&Message::GetCpuLoads).await {
@@ -476,7 +476,7 @@ pub mod tests {
         // Move fake time forward by 4s. This total time delta combined with the `fake_idle_times`
         // data mean the CPU loads should be reported as 0.75 and 0.25. CPU load will be considered
         // stale because it has never been calculated before.
-        executor.set_fake_time(executor.now().add(zx::Duration::from_seconds(4)));
+        executor.set_fake_time(executor.now().add(zx::MonotonicDuration::from_seconds(4)));
         executor
             .run_until_stalled(&mut Box::pin(async {
                 match node.handle_message(&Message::GetCpuLoads).await {
@@ -491,7 +491,7 @@ pub mod tests {
         // Move time forward another 4s. Since this is within the 10s cache duration,
         // `fake_idle_times` should remain unpolled and the node should report identical CPU loads
         // as before.
-        executor.set_fake_time(executor.now().add(zx::Duration::from_seconds(4)));
+        executor.set_fake_time(executor.now().add(zx::MonotonicDuration::from_seconds(4)));
         executor
             .run_until_stalled(&mut Box::pin(async {
                 match node.handle_message(&Message::GetCpuLoads).await {
@@ -505,7 +505,7 @@ pub mod tests {
 
         // Move time forward another 8s. We should now see the node poll `fake_idle_times` again and
         // report load from the last 12 seconds (since we've crossed the 10s cache duration).
-        executor.set_fake_time(executor.now().add(zx::Duration::from_seconds(8)));
+        executor.set_fake_time(executor.now().add(zx::MonotonicDuration::from_seconds(8)));
         executor
             .run_until_stalled(&mut Box::pin(async {
                 match node.handle_message(&Message::GetCpuLoads).await {

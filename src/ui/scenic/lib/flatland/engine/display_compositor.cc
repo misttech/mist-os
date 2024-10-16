@@ -25,11 +25,9 @@
 #include "lib/fidl/cpp/hlcpp_conversion.h"
 #include "lib/fidl/cpp/wire/status.h"
 #include "src/lib/fsl/handles/object_info.h"
-#include "src/ui/lib/escher/util/trace_macros.h"
 #include "src/ui/scenic/lib/allocation/id.h"
 #include "src/ui/scenic/lib/display/util.h"
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
-#include "src/ui/scenic/lib/flatland/global_image_data.h"
 #include "src/ui/scenic/lib/utils/helpers.h"
 
 namespace flatland {
@@ -934,12 +932,6 @@ DisplayCompositor::RenderFrameResult DisplayCompositor::RenderFrame(
                                                 std::move(callback));
   }
 
-  // TODO(https://fxbug.dev/42157427): we should be calling ApplyConfig2() here, but it's not
-  // implemented yet. Additionally, if the previous frame was "direct scanout" (but not if "gpu
-  // composited") we should obtain the fences for that frame and pass them directly to
-  // ApplyConfig2(). ReleaseFenceManager is somewhat poorly suited to this, because it was designed
-  // for an old version of ApplyConfig2(), which latter proved to be infeasible for some drivers to
-  // implement.
   const fuchsia_hardware_display_types::ConfigStamp config_stamp = ApplyConfig();
   pending_apply_configs_.push_back({.config_stamp = config_stamp, .frame_number = frame_number});
 

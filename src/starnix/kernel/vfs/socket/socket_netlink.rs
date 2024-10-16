@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::vfs::socket::SocketDomain;
 use futures::channel::mpsc::{
     UnboundedReceiver, UnboundedSender, {self},
 };
@@ -284,20 +285,17 @@ impl NetlinkSocketInner {
         self.messages.query_events()
     }
 
-    fn getsockname(&self) -> Vec<u8> {
+    fn getsockname(&self) -> Result<SocketAddress, Errno> {
         match &self.address {
-            Some(addr) => addr.to_bytes(),
-            _ => vec![],
+            Some(addr) => Ok(SocketAddress::Netlink(addr.clone())),
+            _ => Ok(SocketAddress::default_for_domain(SocketDomain::Netlink)),
         }
     }
 
-    fn getpeername(&self) -> Result<Vec<u8>, Errno> {
+    fn getpeername(&self) -> Result<SocketAddress, Errno> {
         match &self.address {
-            Some(addr) => Ok(addr.to_bytes()),
-            None => {
-                let addr = sockaddr_nl { nl_family: AF_NETLINK, ..Default::default() };
-                Ok(addr.as_bytes().to_vec())
-            }
+            Some(addr) => Ok(SocketAddress::Netlink(addr.clone())),
+            _ => Ok(SocketAddress::default_for_domain(SocketDomain::Netlink)),
         }
     }
 
@@ -504,11 +502,11 @@ impl SocketOps for BaseNetlinkSocket {
 
     fn close(&self, _socket: &Socket) {}
 
-    fn getsockname(&self, _socket: &Socket) -> Vec<u8> {
+    fn getsockname(&self, _socket: &Socket) -> Result<SocketAddress, Errno> {
         self.lock().getsockname()
     }
 
-    fn getpeername(&self, _socket: &Socket) -> Result<Vec<u8>, Errno> {
+    fn getpeername(&self, _socket: &Socket) -> Result<SocketAddress, Errno> {
         self.lock().getpeername()
     }
 
@@ -670,11 +668,11 @@ impl SocketOps for UEventNetlinkSocket {
         }
     }
 
-    fn getsockname(&self, _socket: &Socket) -> Vec<u8> {
+    fn getsockname(&self, _socket: &Socket) -> Result<SocketAddress, Errno> {
         self.lock().getsockname()
     }
 
-    fn getpeername(&self, _socket: &Socket) -> Result<Vec<u8>, Errno> {
+    fn getpeername(&self, _socket: &Socket) -> Result<SocketAddress, Errno> {
         self.lock().getpeername()
     }
 
@@ -861,13 +859,8 @@ impl SocketOps for RouteNetlinkSocket {
     ) -> Result<(), Errno> {
         let RouteNetlinkSocket { inner, client, message_sender: _ } = self;
         let multicast_groups = match socket_address {
-            SocketAddress::Unspecified
-            | SocketAddress::Inet(_)
-            | SocketAddress::Inet6(_)
-            | SocketAddress::Packet(_)
-            | SocketAddress::Unix(_)
-            | SocketAddress::Vsock(_) => return error!(EINVAL),
             SocketAddress::Netlink(NetlinkAddress { pid: _, groups }) => groups,
+            _ => return error!(EINVAL),
         };
         let pid = {
             let mut inner = inner.lock();
@@ -972,12 +965,12 @@ impl SocketOps for RouteNetlinkSocket {
         self.message_sender.close_channel();
     }
 
-    fn getsockname(&self, _socket: &Socket) -> Vec<u8> {
+    fn getsockname(&self, _socket: &Socket) -> Result<SocketAddress, Errno> {
         let RouteNetlinkSocket { inner, client: _, message_sender: _ } = self;
         inner.lock().getsockname()
     }
 
-    fn getpeername(&self, _socket: &Socket) -> Result<Vec<u8>, Errno> {
+    fn getpeername(&self, _socket: &Socket) -> Result<SocketAddress, Errno> {
         self.inner.lock().getpeername()
     }
 
@@ -1106,11 +1099,11 @@ impl SocketOps for DiagnosticNetlinkSocket {
 
     fn close(&self, _socket: &Socket) {}
 
-    fn getsockname(&self, _socket: &Socket) -> Vec<u8> {
+    fn getsockname(&self, _socket: &Socket) -> Result<SocketAddress, Errno> {
         self.inner.lock().getsockname()
     }
 
-    fn getpeername(&self, _socket: &Socket) -> Result<Vec<u8>, Errno> {
+    fn getpeername(&self, _socket: &Socket) -> Result<SocketAddress, Errno> {
         self.inner.lock().getpeername()
     }
 
@@ -1269,11 +1262,11 @@ impl SocketOps for GenericNetlinkSocket {
 
     fn close(&self, _socket: &Socket) {}
 
-    fn getsockname(&self, _socket: &Socket) -> Vec<u8> {
+    fn getsockname(&self, _socket: &Socket) -> Result<SocketAddress, Errno> {
         self.lock().getsockname()
     }
 
-    fn getpeername(&self, _socket: &Socket) -> Result<Vec<u8>, Errno> {
+    fn getpeername(&self, _socket: &Socket) -> Result<SocketAddress, Errno> {
         self.lock().getpeername()
     }
 

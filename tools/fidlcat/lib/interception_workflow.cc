@@ -204,7 +204,8 @@ void InterceptionWorkflow::Initialize(
     const std::vector<std::string>& symbol_index_files,
     const std::vector<std::string>& symbol_paths, const std::vector<std::string>& build_id_dirs,
     const std::vector<std::string>& ids_txts, const std::optional<std::string>& symbol_cache,
-    const std::vector<std::string>& symbol_servers,
+    const std::vector<std::string>& private_symbol_servers,
+    const std::vector<std::string>& public_symbol_servers,
     std::unique_ptr<SyscallDecoderDispatcher> syscall_decoder_dispatcher) {
   syscall_decoder_dispatcher_ = std::move(syscall_decoder_dispatcher);
 
@@ -221,8 +222,14 @@ void InterceptionWorkflow::Initialize(
     system_settings.SetList(zxdb::ClientSettings::System::kSymbolIndexFiles, symbol_index_files);
   }
 
-  if (!symbol_servers.empty()) {
-    system_settings.SetList(zxdb::ClientSettings::System::kSymbolServers, symbol_servers);
+  if (!private_symbol_servers.empty()) {
+    system_settings.SetList(zxdb::ClientSettings::System::kPrivateSymbolServers,
+                            private_symbol_servers);
+  }
+
+  if (!public_symbol_servers.empty()) {
+    system_settings.SetList(zxdb::ClientSettings::System::kPublicSymbolServers,
+                            public_symbol_servers);
   }
 
   if (!symbol_paths.empty()) {
@@ -299,8 +306,9 @@ void InterceptionWorkflow::Attach(const std::vector<zx_koid_t>& process_koids) {
       continue;
     }
 
-    // The debugger is not yet attached to the process.  Attach to it.
-    target->Attach(process_koid, zxdb::Target::AttachMode::kStrong,
+    // The debugger is not yet attached to the process.  Attach to it. The default configuration is
+    // always what we want.
+    target->Attach(process_koid, debug_ipc::AttachConfig(),
                    [this, target, process_koid](fxl::WeakPtr<zxdb::Target> /*target*/,
                                                 const zxdb::Err& err, uint64_t timestamp) {
                      if (!err.ok()) {

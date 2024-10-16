@@ -27,11 +27,11 @@ zx_status_t sys_restricted_enter(uint32_t options, uintptr_t vector_table_ptr, u
           context);
 
   // Reject invalid option bits.
-  if (options & (~ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL)) {
+  if (options != 0) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  return RestrictedEnter(options, vector_table_ptr, context);
+  return RestrictedEnter(vector_table_ptr, context);
 }
 
 zx_status_t sys_restricted_bind_state(uint32_t options, zx_handle_t* out) {

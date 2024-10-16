@@ -20,7 +20,7 @@ use crate::task::{Kernel, ThreadGroup};
 
 /// If the PID table updates multiple times within this interval, we only rescan
 /// it once, to reduce overhead.
-const MINIMUM_RESCAN_INTERVAL: zx::Duration = zx::Duration::from_millis(100);
+const MINIMUM_RESCAN_INTERVAL: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(100);
 
 /// If a new code path is added which mutates the PID table without notifying
 /// the scanner thread, this timeout ensures we will at least eventually unpark

@@ -78,8 +78,7 @@ TEST_F(VirtualCameraTest, FramesReceived) {
   allocator_->AllocateSharedCollection(std::move(allocate_shared_request));
 
   token->Sync([&](fuchsia::sysmem2::Node_Sync_Result result) {
-    stream->SetBufferCollection(
-        fuchsia::sysmem::BufferCollectionTokenHandle(token.Unbind().TakeChannel()));
+    stream->SetBufferCollection2(std::move(token));
   });
   fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> client_token;
   bool token_received = false;

@@ -61,21 +61,22 @@ using ::testing::MatchesRegex;
 template <class Fixture>
 using DlTests = Fixture;
 
-// The helper function returns a MatchesRegex object that matches the format of the error messages
-// for dlopen() and dlsym() when a symbol is undefined. It is intended to be used with EXPECT_THAT()
-// test macros. Example:
+// A matcher that uses MatchesRegex object that match the format of the error
+// messages for dlopen() and dlsym() when a symbol is undefined.
+// Example:
 //    EXPECT_THAT(msg, IsUndefinedSymbolErrMsg(name, module));
-auto IsUndefinedSymbolErrMsg(std::string_view symbol_name, std::string_view module_name) {
-  return MatchesRegex(std::format(
-      // Emitted by Fuchsia-musl when dlsym fails to locate the symbol.
-      "Symbol not found: {}"
-
-      // Emitted by Fuchsia-musl when relocation fails to resolve the symbol.
-      "|.*Error relocating {}: {}: symbol not found"
-
-      // Emitted by Linux-glibc.
-      "|.*{}: undefined symbol: {}",
-      symbol_name, module_name, symbol_name, module_name, symbol_name));
+MATCHER_P2(IsUndefinedSymbolErrMsg, symbol_name, module_name,
+           std::format("error for undefined symbol {} in module{}", symbol_name, module_name)) {
+  return testing::ExplainMatchResult(
+      MatchesRegex(std::format(
+          // Emitted by Fuchsia-musl when dlsym fails to locate the symbol.
+          "Symbol not found: {}"
+          // Emitted by Fuchsia-musl when relocation fails to resolve the symbol.
+          "|.*Error relocating {}: {}: symbol not found"
+          // Emitted by Linux-glibc.
+          "|.*{}: undefined symbol: {}",
+          symbol_name, module_name, symbol_name, module_name, symbol_name)),
+      arg, result_listener);
 }
 
 // This lists the test fixture classes to run DlTests tests against. The

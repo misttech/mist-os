@@ -31,7 +31,7 @@ use futures::StreamExt;
 use metrics_registry::*;
 use std::cell::RefCell;
 use std::rc::Rc;
-use zx::Duration;
+use zx::MonotonicDuration;
 use {fidl_fuchsia_settings as fsettings, zx};
 
 /// The value range reserved for the modifier key meanings.  See the documentation for
@@ -44,33 +44,39 @@ const RESERVED_MODIFIER_RANGE: std::ops::Range<u32> = finput3::NonPrintableKey::
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Settings {
     // The time delay before autorepeat kicks in.
-    delay: Duration,
+    delay: MonotonicDuration,
     // The average period between two successive autorepeats.  A reciprocal of
     // the autorepeat rate.
-    period: Duration,
+    period: MonotonicDuration,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Settings { delay: Duration::from_millis(250), period: Duration::from_millis(50) }
+        Settings {
+            delay: MonotonicDuration::from_millis(250),
+            period: MonotonicDuration::from_millis(50),
+        }
     }
 }
 
 impl From<fsettings::Autorepeat> for Settings {
     /// Conversion, since [fsettings::Autorepeat] has untyped delay and period.
     fn from(s: fsettings::Autorepeat) -> Self {
-        Self { delay: Duration::from_nanos(s.delay), period: Duration::from_nanos(s.period) }
+        Self {
+            delay: MonotonicDuration::from_nanos(s.delay),
+            period: MonotonicDuration::from_nanos(s.period),
+        }
     }
 }
 
 impl Settings {
     /// Modifies the delay.
-    pub fn into_with_delay(self, delay: Duration) -> Self {
+    pub fn into_with_delay(self, delay: MonotonicDuration) -> Self {
         Self { delay, ..self }
     }
 
     /// Modifies the period.
-    pub fn into_with_period(self, period: Duration) -> Self {
+    pub fn into_with_period(self, period: MonotonicDuration) -> Self {
         Self { period, ..self }
     }
 }
@@ -171,7 +177,7 @@ where
 /// a [AnyEvent::Timeout] to `sink`; unless it is canceled.
 fn new_autorepeat_timer(
     sink: UnboundedSender<AnyEvent>,
-    delay: Duration,
+    delay: MonotonicDuration,
     metrics_logger: metrics::MetricsLogger,
 ) -> Rc<Task<()>> {
     let task = Task::local(async move {
@@ -484,7 +490,10 @@ mod tests {
     // any tests may fail, since the tests are tuned to the precise timing that
     // is set here.
     fn default_settings() -> Settings {
-        Settings { delay: Duration::from_millis(500), period: Duration::from_seconds(1) }
+        Settings {
+            delay: MonotonicDuration::from_millis(500),
+            period: MonotonicDuration::from_seconds(1),
+        }
     }
 
     // Creates a new keyboard event for testing.
@@ -519,10 +528,10 @@ mod tests {
 
     // A shorthand for blocking the specified number of milliseconds, asynchronously.
     async fn wait_for_millis(millis: i64) {
-        wait_for_duration(zx::Duration::from_millis(millis)).await;
+        wait_for_duration(zx::MonotonicDuration::from_millis(millis)).await;
     }
 
-    async fn wait_for_duration(duration: Duration) {
+    async fn wait_for_duration(duration: MonotonicDuration) {
         fuchsia_async::Timer::new(MonotonicInstant::after(duration)).await;
     }
 
@@ -554,7 +563,7 @@ mod tests {
 
     // Wait for this long (in fake time) before asserting events to ensure
     // that all events have been drained and all timers have fired.
-    const SLACK_DURATION: Duration = zx::Duration::from_millis(5000);
+    const SLACK_DURATION: MonotonicDuration = zx::MonotonicDuration::from_millis(5000);
 
     // Checks whether the events read from `output` match supplied `expected` events.
     async fn assert_events(output: UnboundedReceiver<InputEvent>, expected: Vec<InputEvent>) {
@@ -585,15 +594,18 @@ mod tests {
     // This method could possibly be implemented in [TestExecutor] for those
     // test executor users who do not care to wake the timers in any special
     // way.
-    fn run_in_fake_time<F>(executor: &mut TestExecutor, main_fut: &mut F, total_duration: Duration)
-    where
+    fn run_in_fake_time<F>(
+        executor: &mut TestExecutor,
+        main_fut: &mut F,
+        total_duration: MonotonicDuration,
+    ) where
         F: Future<Output = ()> + Unpin,
     {
-        const INCREMENT: Duration = zx::Duration::from_millis(13);
+        const INCREMENT: MonotonicDuration = zx::MonotonicDuration::from_millis(13);
         // Run the loop for a bit longer than the fake time needed to pump all
         // the events, to allow the event queue to drain.
         let total_duration = total_duration + SLACK_DURATION;
-        let mut current = zx::Duration::from_millis(0);
+        let mut current = zx::MonotonicDuration::from_millis(0);
         let mut poll_status = Poll::Pending;
 
         // We run until either the future completes or the timeout is reached,
@@ -725,7 +737,7 @@ mod tests {
         let mut joined_fut = Task::local(async move {
             let _r = futures::join!(handler_task, main_fut);
         });
-        run_in_fake_time(&mut executor, &mut joined_fut, zx::Duration::from_seconds(10));
+        run_in_fake_time(&mut executor, &mut joined_fut, zx::MonotonicDuration::from_seconds(10));
     }
 
     #[test]
@@ -784,7 +796,7 @@ mod tests {
         let mut joined_fut = Task::local(async move {
             let _r = futures::join!(handler_task, main_fut);
         });
-        run_in_fake_time(&mut executor, &mut joined_fut, zx::Duration::from_seconds(10));
+        run_in_fake_time(&mut executor, &mut joined_fut, zx::MonotonicDuration::from_seconds(10));
     }
 
     // Ensures that we forward but not act on handled events.
@@ -847,7 +859,7 @@ mod tests {
         let mut joined_fut = Task::local(async move {
             let _r = futures::join!(handler_task, main_fut);
         });
-        run_in_fake_time(&mut executor, &mut joined_fut, zx::Duration::from_seconds(10));
+        run_in_fake_time(&mut executor, &mut joined_fut, zx::MonotonicDuration::from_seconds(10));
     }
 
     // In this test, we wait with a pressed key for long enough that the default
@@ -928,7 +940,7 @@ mod tests {
         let mut joined_fut = Task::local(async move {
             let _r = futures::join!(handler_task, main_fut);
         });
-        run_in_fake_time(&mut executor, &mut joined_fut, zx::Duration::from_seconds(10));
+        run_in_fake_time(&mut executor, &mut joined_fut, zx::MonotonicDuration::from_seconds(10));
     }
 
     // This test is the same as above, but we hold the autorepeat for a little
@@ -1011,7 +1023,7 @@ mod tests {
         let mut joined_fut = Task::local(async move {
             let _r = futures::join!(handler_task, main_fut);
         });
-        run_in_fake_time(&mut executor, &mut joined_fut, zx::Duration::from_seconds(10));
+        run_in_fake_time(&mut executor, &mut joined_fut, zx::MonotonicDuration::from_seconds(10));
     }
 
     // In this test, keys A and B compete for autorepeat:
@@ -1143,7 +1155,7 @@ mod tests {
         let mut joined_fut = Task::local(async move {
             let _r = futures::join!(handler_task, main_fut);
         });
-        run_in_fake_time(&mut executor, &mut joined_fut, zx::Duration::from_seconds(10));
+        run_in_fake_time(&mut executor, &mut joined_fut, zx::MonotonicDuration::from_seconds(10));
     }
 
     // In this test, keys A and B compete for autorepeat:
@@ -1273,7 +1285,7 @@ mod tests {
         let mut joined_fut = Task::local(async move {
             let _r = futures::join!(handler_task, main_fut);
         });
-        run_in_fake_time(&mut executor, &mut joined_fut, zx::Duration::from_seconds(10));
+        run_in_fake_time(&mut executor, &mut joined_fut, zx::MonotonicDuration::from_seconds(10));
     }
 
     #[test]
@@ -1338,7 +1350,7 @@ mod tests {
         let mut joined_fut = Task::local(async move {
             let _r = futures::join!(handler_task, main_fut);
         });
-        run_in_fake_time(&mut executor, &mut joined_fut, zx::Duration::from_seconds(10));
+        run_in_fake_time(&mut executor, &mut joined_fut, zx::MonotonicDuration::from_seconds(10));
     }
 
     //       @0ms ->|<- 2s ->|<- 2s ->|<- 2s ->|
@@ -1449,7 +1461,7 @@ mod tests {
         let mut joined_fut = Task::local(async move {
             let _r = futures::join!(handler_task, main_fut);
         });
-        run_in_fake_time(&mut executor, &mut joined_fut, zx::Duration::from_seconds(10));
+        run_in_fake_time(&mut executor, &mut joined_fut, zx::MonotonicDuration::from_seconds(10));
     }
 
     //       @0ms ->|<- 2s ->|<- 2s ->|<- 2s ->|
@@ -1577,7 +1589,7 @@ mod tests {
         let mut joined_fut = pin!(async move {
             let _r = futures::join!(main_fut, handler_task);
         });
-        run_in_fake_time(&mut executor, &mut joined_fut, zx::Duration::from_seconds(10));
+        run_in_fake_time(&mut executor, &mut joined_fut, zx::MonotonicDuration::from_seconds(10));
     }
 
     #[test]
@@ -1697,6 +1709,6 @@ mod tests {
         let mut joined_fut = Task::local(async move {
             let _r = futures::join!(handler_task, main_fut);
         });
-        run_in_fake_time(&mut executor, &mut joined_fut, zx::Duration::from_seconds(10));
+        run_in_fake_time(&mut executor, &mut joined_fut, zx::MonotonicDuration::from_seconds(10));
     }
 }

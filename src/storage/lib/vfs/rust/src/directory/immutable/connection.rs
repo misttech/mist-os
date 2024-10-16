@@ -13,8 +13,9 @@ use crate::{ObjectRequestRef, ProtocolsExt};
 
 use fidl_fuchsia_io as fio;
 use fio::DirectoryRequest;
-use futures::TryStreamExt as _;
+use futures::TryStreamExt;
 use std::future::Future;
+use std::pin::pin;
 use std::sync::Arc;
 use zx_status::Status;
 
@@ -25,8 +26,9 @@ pub struct ImmutableConnection<DirectoryType: Directory> {
 impl<DirectoryType: Directory> ImmutableConnection<DirectoryType> {
     async fn handle_requests<RS>(mut self, mut requests: RS)
     where
-        RS: futures::stream::TryStream<Ok = DirectoryRequest, Error = fidl::Error> + Unpin,
+        RS: futures::stream::Stream<Item = Result<DirectoryRequest, fidl::Error>>,
     {
+        let mut requests = pin!(requests);
         while let Ok(Some(request)) = requests.try_next().await {
             let _guard = self.base.scope.active_guard();
             if !matches!(self.base.handle_request(request).await, Ok(ConnectionState::Alive)) {
@@ -63,7 +65,7 @@ impl<DirectoryType: Directory> ImmutableConnection<DirectoryType> {
     ) -> Result<impl Future<Output = ()>, Status>
     where
         Transform: FnOnce(fio::DirectoryRequestStream) -> RS,
-        RS: futures::stream::TryStream<Ok = DirectoryRequest, Error = fidl::Error> + Unpin,
+        RS: futures::stream::Stream<Item = Result<DirectoryRequest, fidl::Error>>,
     {
         // Ensure we close the directory if we fail to create the connection.
         let directory = OpenNode::new(directory);

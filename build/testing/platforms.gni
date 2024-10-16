@@ -60,6 +60,14 @@ test_platforms = [
     cpu = "arm64"
   },
   {
+    device_type = "crosvm"
+    cpu = "arm64"
+  },
+  {
+    device_type = "crosvm"
+    cpu = "x64"
+  },
+  {
     os = "Linux"
     cpu = "x64"
   },
@@ -154,6 +162,12 @@ test_platforms = [
     cpu = "x64"
     pool = "fuchsia.tests.anvl"
     os = "Linux"
+  },
+
+  # https://fxbug.dev/355507826
+  {
+    device_type = "Kola"
+    cpu = "arm64"
   },
 
   # Experimental/FYI.

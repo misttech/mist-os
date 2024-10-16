@@ -179,10 +179,10 @@ pub async fn list_directory_recursive<'a>(root_proxy: &'a fio::DirectoryProxy) -
 }
 
 pub async fn write_file<'a>(root_proxy: &'a fio::DirectoryProxy, path: &'a str, contents: &'a str) {
-    let file_proxy = fuchsia_fs::directory::open_file_no_describe_deprecated(
+    let file_proxy = fuchsia_fs::directory::open_file_async(
         &root_proxy,
         path,
-        fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE,
+        fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE,
     )
     .expect("Failed to open file.");
     let _: u64 = file_proxy

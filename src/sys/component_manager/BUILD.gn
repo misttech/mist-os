@@ -24,6 +24,19 @@ rustc_binary("bin") {
 
   if (is_mistos) {
     configs += [ "//build/config/mistos:mistos_config" ]
+
+    # Statically link rust standard library
+    # TODO(https://fxbug.dev/42163719): Dynamically link once security allowlist supports globs.
+    configs += [ "//build/config/mistos:dynamic_rust_standard_library" ]
+    configs -= [ "//build/config/mistos:dynamic_rust_standard_library" ]
+    configs += [ "//build/config/mistos:static_rust_standard_library" ]
+
+  } else {
+    # Statically link rust standard library
+    # TODO(https://fxbug.dev/42163719): Dynamically link once security allowlist supports globs.
+    configs += [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
+    configs -= [ "//build/config/fuchsia:dynamic_rust_standard_library" ]
+    configs += [ "//build/config/fuchsia:static_rust_standard_library" ]
   }
 
   deps = [
@@ -49,10 +62,12 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
     "//sdk/fidl/fuchsia.memory.attribution:fuchsia.memory.attribution_rust",
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
+    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//sdk/fidl/fuchsia.time:fuchsia.time_rust",
     "//sdk/rust/zx",
     "//sdk/rust/zx-status",
+    "//src/devices/bin/devfs:lib",
     "//src/lib/async-utils",
     "//src/lib/diagnostics/inspect/runtime/rust:unchecked_includes",
     "//src/lib/diagnostics/inspect/rust",

@@ -7,7 +7,7 @@ use fuchsia_async::DurationExt;
 use led::{Led, LedControl};
 use lib::backlight::{Backlight, BacklightControl};
 use lib::sensor::{Sensor, SensorControl};
-use zx::Duration;
+use zx::MonotonicDuration;
 
 const SMALL_SLEEP_TIME_MS: i64 = 1;
 const LARGE_SLEEP_TIME_MS: i64 = 500;
@@ -59,8 +59,8 @@ impl Control {
         backlight: &impl BacklightControl,
         leds: &mut impl LedControl,
         num_leds: u32,
-    ) -> Result<Duration, Error> {
-        let mut sleep_time = Duration::from_millis(SMALL_SLEEP_TIME_MS);
+    ) -> Result<MonotonicDuration, Error> {
+        let mut sleep_time = MonotonicDuration::from_millis(SMALL_SLEEP_TIME_MS);
         if let Some(ambient_light_input_rpt) = sensor.read().await? {
             let brightness = backlight.get_brightness().await?;
             let mut new_brightness = num_traits::clamp(
@@ -96,7 +96,7 @@ impl Control {
                 } else {
                     LARGE_SLEEP_TIME_MS
                 };
-            sleep_time = Duration::from_millis(step_time);
+            sleep_time = MonotonicDuration::from_millis(step_time);
         }
         Ok(sleep_time)
     }
@@ -126,7 +126,7 @@ mod tests {
     use lib::backlight::BacklightControl;
     use lib::sensor::{AmbientLightInputRpt, SensorControl};
     use std::sync::Arc;
-    use zx::Duration;
+    use zx::MonotonicDuration;
 
     struct MockSensor {
         next_reading: f32,
@@ -207,7 +207,7 @@ mod tests {
         Devices { sensor: sensor, backlight: backlight, leds: leds }
     }
 
-    async fn run_step(devices: &mut Devices) -> Duration {
+    async fn run_step(devices: &mut Devices) -> MonotonicDuration {
         let num_leds = 1;
         Control::run_auto_brightness_step(
             &devices.sensor,
@@ -216,7 +216,7 @@ mod tests {
             num_leds,
         )
         .await
-        .expect("a Duration")
+        .expect("a MonotonicDuration")
     }
 
     #[fasync::run_singlethreaded(test)]

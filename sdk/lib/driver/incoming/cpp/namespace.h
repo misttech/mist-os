@@ -9,6 +9,7 @@
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/incoming/cpp/service.h>
+#include <lib/driver/incoming/cpp/service_validator.h>
 #include <lib/fdf/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/namespace.h>
@@ -101,6 +102,12 @@ class Namespace final {
   Namespace(Namespace&& other) noexcept;
   Namespace& operator=(Namespace&& other) noexcept;
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
+  void SetServiceValidator(std::optional<ServiceValidator> service_validator) {
+    service_validator_ = std::move(service_validator);
+  }
+#endif
+
   // Connect to a protocol within a driver's namespace.
   // DriverTransport is not supported. Protocols using DriverTransport must be service members.
   template <typename Protocol, typename = std::enable_if_t<!fidl::IsServiceMemberV<Protocol>>>
@@ -128,7 +135,7 @@ class Namespace final {
     return component::OpenServiceAt<FidlService>(svc_dir(), instance);
   }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(24)
   // Protocol must compose fuchsia.io/Node.
   // DriverTransport is not supported. Protocols using DriverTransport must be service members.
   template <typename Protocol>
@@ -151,8 +158,7 @@ class Namespace final {
   template <typename Protocol>
   zx::result<fidl::ClientEnd<Protocol>> Open(const char* path, fuchsia_io::OpenFlags flags) const
       ZX_DEPRECATED_SINCE(
-          1, NEXT,
-          "Use new signature that takes fuchsia.io/Flags instead of fuchsia.io/OpenFlags.") {
+          1, 24, "Use new signature that takes fuchsia.io/Flags instead of fuchsia.io/OpenFlags.") {
     static_assert(!fidl::IsServiceMemberV<Protocol>, "Protocol must not be a ServiceMember.");
     static_assert((std::is_same_v<typename Protocol::Transport, fidl::internal::ChannelTransport>),
                   "Protocol must use ChannelTransport. Use a ServiceMember for DriverTransport.");
@@ -178,9 +184,26 @@ class Namespace final {
         "ServiceMember type must be the Protocol inside of a Service, eg: fuchsia_hardware_pci::Service::Device.");
     if constexpr (std::is_same_v<typename ServiceMember::ProtocolType::Transport,
                                  fidl::internal::ChannelTransport>) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
+      if (service_validator_) {
+        if (!service_validator_->IsValidZirconServiceInstance(
+                std::string(ServiceMember::ServiceName), std::string(instance))) {
+          return zx::error(ZX_ERR_NOT_FOUND);
+        }
+      }
+#endif
+
       return component::ConnectAtMember<ServiceMember>(svc_dir(), instance);
     } else if constexpr (std::is_same_v<typename ServiceMember::ProtocolType::Transport,
                                         fidl::internal::DriverTransport>) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
+      if (service_validator_) {
+        if (!service_validator_->IsValidDriverServiceInstance(
+                std::string(ServiceMember::ServiceName), std::string(instance))) {
+          return zx::error(ZX_ERR_NOT_FOUND);
+        }
+      }
+#endif
       return internal::DriverTransportConnect<ServiceMember>(svc_dir(), instance);
     } else {
       static_assert(internal::always_false<ServiceMember>);
@@ -202,9 +225,26 @@ class Namespace final {
         "ServiceMember type must be the Protocol inside of a Service, eg: fuchsia_hardware_pci::Service::Device.");
     if constexpr (std::is_same_v<typename ServiceMember::ProtocolType::Transport,
                                  fidl::internal::ChannelTransport>) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
+      if (service_validator_) {
+        if (!service_validator_->IsValidZirconServiceInstance(
+                std::string(ServiceMember::ServiceName), std::string(instance))) {
+          return zx::error(ZX_ERR_NOT_FOUND);
+        }
+      }
+#endif
+
       return component::ConnectAt<ServiceMember>(svc_dir(), std::move(server_end), instance);
     } else if constexpr (std::is_same_v<typename ServiceMember::ProtocolType::Transport,
                                         fidl::internal::DriverTransport>) {
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
+      if (service_validator_) {
+        if (!service_validator_->IsValidDriverServiceInstance(
+                std::string(ServiceMember::ServiceName), std::string(instance))) {
+          return zx::error(ZX_ERR_NOT_FOUND);
+        }
+      }
+#endif
       return internal::DriverTransportConnect<ServiceMember>(svc_dir(), std::move(server_end),
                                                              instance);
     } else {
@@ -225,13 +265,17 @@ class Namespace final {
   zx::result<> OpenDeprecated(const char* path, fuchsia_io::OpenFlags flags,
                               zx::channel server_end) const;
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(24)
   // Opens the |path| in the driver's namespace with Open3. DriverTransport is not supported.
   zx::result<> Open(const char* path, fuchsia_io::Flags flags, zx::channel server_end) const;
 #endif
 
   fdio_ns_t* incoming_ = nullptr;
   fidl::ClientEnd<fuchsia_io::Directory> svc_dir_;
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(18)
+  std::optional<ServiceValidator> service_validator_;
+#endif
 };
 
 }  // namespace fdf

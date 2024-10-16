@@ -12,7 +12,7 @@ use fuchsia_async::TimeoutExt;
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use fuchsia_fs::directory::{WatchEvent, Watcher};
 use futures::StreamExt;
-use zx::{self as zx, Duration};
+use zx::{self as zx, MonotonicDuration};
 
 /// Set of parameters to use for identifying the correct partition to open via
 /// [`open_partition`]
@@ -45,7 +45,7 @@ const BLOCK_DEV_PATH: &str = "/dev/class/block/";
 // resources instead of forcing them to retrieve them again.
 pub async fn find_partition(
     matcher: PartitionMatcher,
-    timeout: Duration,
+    timeout: MonotonicDuration,
 ) -> Result<ControllerProxy, Error> {
     let dir = fuchsia_fs::directory::open_in_namespace_deprecated(
         BLOCK_DEV_PATH,
@@ -60,7 +60,7 @@ pub async fn find_partition(
 pub async fn find_partition_in(
     dir: &fio::DirectoryProxy,
     matcher: PartitionMatcher,
-    timeout: Duration,
+    timeout: MonotonicDuration,
 ) -> Result<ControllerProxy, Error> {
     let timeout_seconds = timeout.into_seconds();
     async {
@@ -221,7 +221,7 @@ pub async fn fvm_allocate_partition(
         ..Default::default()
     };
 
-    find_partition(matcher, Duration::from_seconds(40)).await
+    find_partition(matcher, MonotonicDuration::from_seconds(40)).await
 }
 
 #[cfg(test)]

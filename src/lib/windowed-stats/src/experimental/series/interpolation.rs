@@ -16,6 +16,16 @@ pub trait Interpolation {
     type FillSample<F>: Clone
     where
         F: Statistic;
+
+    // TODO(https://fxbug.dev/372328823): The mapping from `Interpolation` types to their
+    //                                    associated `State` types prevents type inference many
+    //                                    APIs that ultimately construct a `TimeMatrix`. This means
+    //                                    that `Interpolation` type parameters must often be
+    //                                    annotated explicitly, even when the type appears in an
+    //                                    expression of a function argument.
+    //
+    //                                    Refactor interpolation so that these type annotations are
+    //                                    less commonly needed (or are not needed at all).
     /// The state (output type) of the interpolation type constructor.
     type State<F>: InterpolationState<F::Aggregation, FillSample = Self::FillSample<F>>
     where

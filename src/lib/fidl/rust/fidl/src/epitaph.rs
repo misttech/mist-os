@@ -72,6 +72,6 @@ pub(crate) fn write_epitaph_impl<T: ChannelLike>(
         (),
     >(msg, |bytes, handles| match channel.write_etc(bytes, handles) {
         Ok(()) | Err(zx_status::Status::PEER_CLOSED) => Ok(()),
-        Err(e) => Err(Error::ServerEpitaphWrite(e)),
+        Err(e) => Err(Error::ServerEpitaphWrite(e.into())),
     })
 }

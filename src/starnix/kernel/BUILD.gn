@@ -343,7 +343,6 @@ rustc_library("starnix_core") {
     "//sdk/fidl/fuchsia.starnix.binder:fuchsia.starnix.binder_rust",
     "//sdk/fidl/fuchsia.starnix.runner:fuchsia.starnix.runner_rust",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_rust",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_rust",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_rust",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
     "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_rust",
@@ -420,6 +419,7 @@ rustc_library("starnix_core") {
     "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:paste",
     "//third_party/rust_crates:pin-project",
+    "//third_party/rust_crates:rand",
     "//third_party/rust_crates:ref-cast",
     "//third_party/rust_crates:regex",
     "//third_party/rust_crates:scopeguard",
@@ -472,7 +472,6 @@ rustc_library("starnix_core") {
     "//src/storage/fxfs/platform:fxfs-testing",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:futures-lite",
-    "//third_party/rust_crates:rand",
     "//third_party/rust_crates:test-case",
     "//third_party/rust_crates:tracing-mutex",
   ]

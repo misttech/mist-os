@@ -197,8 +197,10 @@ mod tests {
 
         // Try to get options, and then set them after a delay.
         let delayed_set = async move {
-            fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_millis(10)))
-                .await;
+            fasync::Timer::new(fasync::MonotonicInstant::after(
+                zx::MonotonicDuration::from_millis(10),
+            ))
+            .await;
             let options = fuzz::Options {
                 runs: Some(100),
                 max_total_time: Some(2000000),

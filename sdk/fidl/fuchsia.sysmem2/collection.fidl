@@ -470,7 +470,7 @@ open protocol Node {
     ///
     /// This message can also be used with a
     /// [`fuchsia.sysmem2/BufferCollectionTokenGroup`].
-    @available(added=NEXT)
+    @available(added=24)
     flexible AttachNodeTracking(resource table {
         /// This field must be set. This evenpair end will be closed after the
         /// `Node` is closed or failed and the node's buffer counts are no
@@ -813,7 +813,7 @@ open protocol BufferCollection {
     /// * error [`fuchsia.sysmem2/Error.PENDING`] The buffer collection hasn't
     ///   attempted allocation yet. This means that WaitForAllBuffersAllocated
     ///   would not respond quickly.
-    @available(added=NEXT)
+    @available(added=24)
     flexible CheckAllBuffersAllocated() -> () error Error;
 
     /// Create a new token to add a new participant to an existing logical

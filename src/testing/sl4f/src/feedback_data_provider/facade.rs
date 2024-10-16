@@ -21,7 +21,7 @@ impl FeedbackDataProviderFacade {
         let data_provider =
             connect_to_protocol::<DataProviderMarker>().context("connect to DataProvider")?;
         let params = GetSnapshotParameters {
-            collection_timeout_per_data: Some(zx::Duration::from_minutes(2).into_nanos()),
+            collection_timeout_per_data: Some(zx::MonotonicDuration::from_minutes(2).into_nanos()),
             ..Default::default()
         };
         let snapshot = data_provider.get_snapshot(params).await.context("get snapshot")?;

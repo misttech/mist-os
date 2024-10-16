@@ -386,6 +386,14 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.camera2/Stream.GetBuffers2",
+        "strictness": "strict",
+        "ordinal": "1947741653376286600",
+        "direction": "two_way",
+        "response": "fuchsia.camera2/StreamGetBuffers2Response"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.camera2/Stream.GetImageFormats",
         "strictness": "strict",
         "ordinal": "9153100260294409499",
@@ -461,6 +469,17 @@
     {
         "kind": "table",
         "name": "fuchsia.camera2/StreamConstraints"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.camera2/StreamGetBuffers2Response.token",
+        "ordinal": "1",
+        "type": "fuchsia.sysmem2/BufferCollectionToken"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.camera2/StreamGetBuffers2Response",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",

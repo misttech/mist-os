@@ -71,6 +71,9 @@ void initialize_page(vm_page_t* page) {
   // Page should be in the alloc state so we can transition it to the ZRAM state.
   DEBUG_ASSERT(page->state() == vm_page_state::ALLOC);
   page->set_state(vm_page_state::ZRAM);
+  page->zram.left_metadata = 0;
+  page->zram.mid_metadata = 0;
+  page->zram.right_metadata = 0;
   page->zram.left_compress_size = 0;
   page->zram.mid_compress_size = 0;
   page->zram.right_compress_size = 0;
@@ -162,6 +165,44 @@ void* VmTriPageStorage::addr_for_slot(vm_page_t* page, PageSlot slot, size_t len
 }
 
 // static
+void VmTriPageStorage::set_slot_metadata(vm_page_t* page, PageSlot slot, uint32_t metadata) {
+  DEBUG_ASSERT(slot != PageSlot::None);
+  DEBUG_ASSERT(page->state() == vm_page_state::ZRAM);
+
+  switch (slot) {
+    case PageSlot::Left:
+      page->zram.left_metadata = metadata;
+      break;
+    case PageSlot::Mid:
+      page->zram.mid_metadata = metadata;
+      break;
+    case PageSlot::Right:
+      page->zram.right_metadata = metadata;
+      break;
+    default:
+      ASSERT(false);
+  }
+}
+
+// static
+uint32_t VmTriPageStorage::get_slot_metadata(vm_page_t* page, PageSlot slot) {
+  DEBUG_ASSERT(slot != PageSlot::None);
+  DEBUG_ASSERT(page->state() == vm_page_state::ZRAM);
+
+  switch (slot) {
+    case PageSlot::Left:
+      return page->zram.left_metadata;
+    case PageSlot::Mid:
+      return page->zram.mid_metadata;
+    case PageSlot::Right:
+      return page->zram.right_metadata;
+    default:
+      ASSERT(false);
+  }
+  return 0;
+}
+
+// static
 void VmTriPageStorage::set_slot_length(vm_page_t* page, PageSlot slot, uint16_t len) {
   DEBUG_ASSERT(slot != PageSlot::None);
   DEBUG_ASSERT(page->state() == vm_page_state::ZRAM);
@@ -185,6 +226,9 @@ void VmTriPageStorage::set_slot_length(vm_page_t* page, PageSlot slot, uint16_t 
 
 // static
 size_t VmTriPageStorage::get_slot_length(vm_page_t* page, PageSlot slot) {
+  DEBUG_ASSERT(slot != PageSlot::None);
+  DEBUG_ASSERT(page->state() == vm_page_state::ZRAM);
+
   switch (slot) {
     case PageSlot::Left:
       return page->zram.left_compress_size;
@@ -217,13 +261,15 @@ VmTriPageStorage::CompressedRef VmTriPageStorage::EncodeRef(vm_page_t* page, Pag
                        (static_cast<uint64_t>(slot) << kRefTagShift));
 }
 
-std::pair<const void*, size_t> VmTriPageStorage::CompressedData(CompressedRef ref) const {
+ktl::tuple<const void*, uint32_t, size_t> VmTriPageStorage::CompressedData(
+    CompressedRef ref) const {
   auto [page, slot] = DecodeRef(ref);
-
   DEBUG_ASSERT(page->state() == vm_page_state::ZRAM);
   DEBUG_ASSERT(slot != PageSlot::None);
+
+  const uint32_t src_metadata = get_slot_metadata(page, slot);
   const size_t src_size = get_slot_length(page, slot);
-  return {addr_for_slot(page, slot, src_size), src_size};
+  return {addr_for_slot(page, slot, src_size), src_metadata, src_size};
 }
 
 uint64_t VmTriPageStorage::bucket_for_page(vm_page_t* page) {
@@ -385,6 +431,7 @@ void VmTriPageStorage::Free(CompressedRef ref) {
       RemovePageFromBucketLocked(page);
     }
     const uint64_t len = get_slot_length(page, slot);
+    set_slot_metadata(page, slot, 0);
     set_slot_length(page, slot, 0);
     if (page_is_full(page)) {
       // The page could still be full after freeing a slot if a very small allocation was placed in
@@ -406,6 +453,28 @@ void VmTriPageStorage::Free(CompressedRef ref) {
     DEBUG_ASSERT(page->state() == vm_page_state::ZRAM && page_is_empty(page));
     pmm_free_page(page);
   }
+}
+
+// The caller is required to hold the lock for the VMO who created the reference.
+// Only |Store|, |Free|, |GetMetadata|, and |SetMetadata| manipulate the reference's metadata.
+// Callers can't hold the reference until |Store| completes, and to call the other methods they must
+// hold the VMO lock. Therefore it is safe to call this without taking or holding our own lock_.
+uint32_t VmTriPageStorage::GetMetadata(CompressedRef ref) {
+  canary_.Assert();
+
+  auto [page, slot] = DecodeRef(ref);
+  return get_slot_metadata(page, slot);
+}
+
+// The caller is required to hold the lock for the VMO who created the reference.
+// Only |Store|, |Free|, |GetMetadata|, and |SetMetadata| manipulate the reference's metadata.
+// Callers can't hold the reference until |Store| completes, and to call the other methods they must
+// hold the VMO lock. Therefore it is safe to call this without taking or holding our own lock_.
+void VmTriPageStorage::SetMetadata(CompressedRef ref, uint32_t metadata) {
+  canary_.Assert();
+
+  auto [page, slot] = DecodeRef(ref);
+  set_slot_metadata(page, slot, metadata);
 }
 
 VmTriPageStorage::MemoryUsage VmTriPageStorage::GetMemoryUsage() const {

@@ -89,7 +89,7 @@ impl<'a> ThermalWatcherBuilder<'a> {
             watcher
         } else {
             // TODO(https://fxbug.dev/368440548): Remove delay when PowerManager can start early.
-            fasync::Timer::new(zx::Duration::from_seconds(15).after_now()).await;
+            fasync::Timer::new(zx::MonotonicDuration::from_seconds(15).after_now()).await;
 
             // This call will always succeed if the protocol is present in the component manifest
             // and the capability routes are correct.

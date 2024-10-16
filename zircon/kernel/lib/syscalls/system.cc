@@ -390,7 +390,7 @@ NO_ASAN zx_status_t sys_system_mexec(zx_handle_t resource, zx_handle_t kernel_vm
 
   platform_mexec_prep(final_bootimage_addr, bootimage_len);
 
-  const zx_time_t dlog_deadline = current_time() + ZX_SEC(5);
+  const zx_instant_mono_t dlog_deadline = current_time() + ZX_SEC(5);
   dlog_shutdown(dlog_deadline);
 
   // Give the watchdog one last pet to hold it off until the new image has booted far enough to pet
@@ -664,7 +664,7 @@ zx_status_t sys_system_get_performance_info(zx_handle_t resource, uint32_t topic
 
 // TODO(https://fxbug.dev/42182544): Reconcile with HaltToken, zx_system_powerctl, and
 // kernel-initiated-oom-reboot.
-zx_status_t sys_system_suspend_enter(zx_handle_t resource, zx_time_t resume_deadline) {
+zx_status_t sys_system_suspend_enter(zx_handle_t resource, zx_instant_boot_t resume_deadline) {
   const zx_status_t validate_status =
       validate_ranged_resource(resource, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_CPU_BASE, 1);
   if (validate_status != ZX_OK) {

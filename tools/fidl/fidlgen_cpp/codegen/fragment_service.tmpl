@@ -32,6 +32,7 @@ class {{ .Name }} final {
     static constexpr char Name[] = "{{ .Name }}";
     static constexpr char ServiceName[] = "{{ .Service.ServiceName }}";
     using ProtocolType = {{ .ProtocolType }};
+    using ServiceType = {{ .Service.Name }};
   };
   {{- end }}
 

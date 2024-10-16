@@ -128,6 +128,8 @@ def config_setting_label_for_target_os_cpu(
     Args:
         target_os: An OS name, using either Bazel or Fuchsia conventions.
         target_cpu: A CPU name, using either Bazel or Fuchsia conventions.
+        common_package_prefix: Package prefix for the repository that contains
+            this .bzl file and the BUILD.bazel next to it.
     Returns:
         A label string pointing to a config_setting() value which will hold
         true when the current build configuration corresponds to

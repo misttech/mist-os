@@ -16,6 +16,12 @@ mod my_tests {
     }
 
     #[test]
+    fn passing_test_with_zero_exit() {
+        println!("My only job is not to panic!()");
+        std::process::exit(0);
+    }
+
+    #[test]
     fn failing_test() {
         panic!("I'm supposed to panic!()");
     }

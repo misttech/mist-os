@@ -116,6 +116,18 @@ impl RecoveryAction {
             RecoveryAction::IfaceRecovery(IfaceRecoveryOperation::StopAp { .. }) => None,
         }
     }
+
+    fn as_timeout_recovery_mechanism(self) -> Option<telemetry::TimeoutRecoveryMechanism> {
+        match self {
+            RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy { .. }) => {
+                Some(telemetry::TimeoutRecoveryMechanism::PhyReset)
+            }
+            RecoveryAction::PhyRecovery(PhyRecoveryOperation::DestroyIface { .. }) => {
+                Some(telemetry::TimeoutRecoveryMechanism::DestroyIface)
+            }
+            RecoveryAction::IfaceRecovery(..) => None,
+        }
+    }
 }
 
 impl WriteInspect for RecoveryAction {
@@ -161,6 +173,9 @@ impl RecoverySummary {
                     self.action.as_phy_recovery_mechanism()?,
                 ))
             }
+            Defect::Iface(IfaceFailure::Timeout { .. }) => Some(
+                telemetry::RecoveryReason::Timeout(self.action.as_timeout_recovery_mechanism()?),
+            ),
             Defect::Iface(IfaceFailure::ApStartFailure { .. }) => Some(
                 telemetry::RecoveryReason::StartApFailure(self.action.as_ap_recovery_mechanism()?),
             ),
@@ -284,6 +299,10 @@ fn thresholded_recovery(
                 recovery_history,
                 latest_defect,
             )
+        }
+        Defect::Iface(IfaceFailure::Timeout { .. }) => {
+            // TODO(b/42066276): Determine thresholds and recovery options.
+            None
         }
     }
 }
@@ -649,7 +668,7 @@ mod tests {
         //
         // This is now 11 hours past the test start time.
         recoveries.add_event(reset_phy_recommendation);
-        exec.set_fake_time(MonotonicInstant::after(zx::Duration::from_hours(11)));
+        exec.set_fake_time(MonotonicInstant::after(zx::MonotonicDuration::from_hours(11)));
         defects.add_event(defect_to_log);
         assert_eq!(None, recovery_fn(PHY_ID, &mut defects, &mut recoveries, defect_to_log,));
 
@@ -657,7 +676,7 @@ mod tests {
         // recovery recommendations has elapsed.
         //
         // This is now 13 hours past the start of the test.
-        exec.set_fake_time(MonotonicInstant::after(zx::Duration::from_hours(2)));
+        exec.set_fake_time(MonotonicInstant::after(zx::MonotonicDuration::from_hours(2)));
         defects.add_event(defect_to_log);
         assert_eq!(
             Some(destroy_iface_recommendation),
@@ -669,14 +688,14 @@ mod tests {
         //
         // This is now 23 hours past the start of the test.
         recoveries.add_event(destroy_iface_recommendation);
-        exec.set_fake_time(MonotonicInstant::after(zx::Duration::from_hours(10)));
+        exec.set_fake_time(MonotonicInstant::after(zx::MonotonicDuration::from_hours(10)));
         defects.add_event(defect_to_log);
         assert_eq!(None, recovery_fn(PHY_ID, &mut defects, &mut recoveries, defect_to_log,));
 
         // Advance the clock another 2 hours to ensure that the time between PHY resets has elapsed.
         //
         // This is now 25 hours past the start of the test.
-        exec.set_fake_time(MonotonicInstant::after(zx::Duration::from_hours(2)));
+        exec.set_fake_time(MonotonicInstant::after(zx::MonotonicDuration::from_hours(2)));
         defects.add_event(defect_to_log);
         assert_eq!(
             Some(reset_phy_recommendation),
@@ -727,13 +746,13 @@ mod tests {
         assert_eq!(None, recovery_fn(PHY_ID, &mut defects, &mut recoveries, defect_to_log,));
 
         // Advance the clock 23 hours, log another defect, and verify no recovery is recommended.
-        exec.set_fake_time(MonotonicInstant::after(zx::Duration::from_hours(23)));
+        exec.set_fake_time(MonotonicInstant::after(zx::MonotonicDuration::from_hours(23)));
         defects.add_event(defect_to_log);
         assert_eq!(None, recovery_fn(PHY_ID, &mut defects, &mut recoveries, defect_to_log,));
 
         // Advance the clock another 2 hours to get beyond the 24 hour throttle and verify that
         // another occurrence of the defect results in a PHY reset recovery recommendation.
-        exec.set_fake_time(MonotonicInstant::after(zx::Duration::from_hours(23)));
+        exec.set_fake_time(MonotonicInstant::after(zx::MonotonicDuration::from_hours(23)));
         defects.add_event(defect_to_log);
         assert_eq!(
             Some(reset_phy_recommendation),
@@ -780,13 +799,13 @@ mod tests {
         assert_eq!(None, recovery_fn(PHY_ID, &mut defects, &mut recoveries, defect_to_log,));
 
         // Advance the clock 11 hours, log another defect, and verify no recovery is recommended.
-        exec.set_fake_time(MonotonicInstant::after(zx::Duration::from_hours(11)));
+        exec.set_fake_time(MonotonicInstant::after(zx::MonotonicDuration::from_hours(11)));
         defects.add_event(defect_to_log);
         assert_eq!(None, recovery_fn(PHY_ID, &mut defects, &mut recoveries, defect_to_log,));
 
         // Advance the clock another 2 hours to get beyond the 12 hour throttle and verify that
         // another occurrence of the defect results in a destroy iface recovery recommendation.
-        exec.set_fake_time(MonotonicInstant::after(zx::Duration::from_hours(2)));
+        exec.set_fake_time(MonotonicInstant::after(zx::MonotonicDuration::from_hours(2)));
         defects.add_event(defect_to_log);
         assert_eq!(
             Some(destroy_iface_recommendation),
@@ -931,6 +950,9 @@ mod tests {
             }
             Defect::Iface(IfaceFailure::CanceledScan { .. }) => {
                 test_thresholded_destroy_iface(&exec, profile, defect, threshold)
+            }
+            Defect::Iface(IfaceFailure::Timeout { .. }) => {
+                // TODO(b/42066276): Determine thresholds and recovery options.
             }
         }
     }

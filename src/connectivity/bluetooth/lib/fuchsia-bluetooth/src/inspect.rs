@@ -161,7 +161,8 @@ impl DataTransferStats {
     fn calculate_throughput(&self) -> u64 {
         // NOTE: probably a better way to calculate the speed than using floats.
         let bytes_per_nano = self.bytes as f64 / self.elapsed.get() as f64;
-        let bytes_per_second = zx::Duration::from_seconds(1).into_nanos() as f64 * bytes_per_nano;
+        let bytes_per_second =
+            zx::MonotonicDuration::from_seconds(1).into_nanos() as f64 * bytes_per_nano;
         bytes_per_second as u64
     }
 }
@@ -403,7 +404,7 @@ mod tests {
         });
 
         // A half second passes.
-        exec.set_fake_time(zx::Duration::from_millis(500).after_now());
+        exec.set_fake_time(zx::MonotonicDuration::from_millis(500).after_now());
 
         // If we transferred 500 bytes then, we should have 1000 bytes per second.
         d.record_transferred(500, fasync::MonotonicInstant::now());
@@ -417,7 +418,7 @@ mod tests {
         });
 
         // In 5 seconds, we transfer 500 more bytes which is much slower.
-        exec.set_fake_time(zx::Duration::from_seconds(5).after_now());
+        exec.set_fake_time(zx::MonotonicDuration::from_seconds(5).after_now());
         d.record_transferred(500, fasync::MonotonicInstant::now());
         assert_data_tree!(inspector, root: {
             data_stream: {

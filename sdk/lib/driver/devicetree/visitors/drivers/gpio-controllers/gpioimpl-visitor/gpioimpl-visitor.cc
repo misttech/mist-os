@@ -124,6 +124,7 @@ zx::result<> GpioImplVisitor::Visit(fdf_devicetree::Node& node,
       // bind rule only once per controller.
       std::vector<uint32_t> controllers;
 
+      uint32_t controller_index = 0;
       for (auto& pinctrl_cfg : (*pinctrl_props)[kPinCtrl0]) {
         auto reference = pinctrl_cfg.AsReference();
 
@@ -139,7 +140,7 @@ zx::result<> GpioImplVisitor::Visit(fdf_devicetree::Node& node,
 
         if (std::find(controllers.begin(), controllers.end(), gpio_node->id()) ==
             controllers.end()) {
-          result = AddInitNodeSpec(node, gpio_node->id());
+          result = AddInitNodeSpec(node, gpio_node->id(), controller_index++);
           if (result.is_error()) {
             return result.take_error();
           }
@@ -173,7 +174,8 @@ zx::result<> GpioImplVisitor::AddChildNodeSpec(fdf_devicetree::Node& child, uint
   return zx::ok();
 }
 
-zx::result<> GpioImplVisitor::AddInitNodeSpec(fdf_devicetree::Node& child, uint32_t controller_id) {
+zx::result<> GpioImplVisitor::AddInitNodeSpec(fdf_devicetree::Node& child, uint32_t controller_id,
+                                              uint32_t controller_index) {
   auto gpio_init_node = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
@@ -184,6 +186,7 @@ zx::result<> GpioImplVisitor::AddInitNodeSpec(fdf_devicetree::Node& child, uint3
       .properties =
           {
               fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+              fdf::MakeProperty(bind_fuchsia::GPIO_CONTROLLER, controller_index),
           },
   }};
   child.AddNodeSpec(gpio_init_node);

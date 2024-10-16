@@ -18,7 +18,7 @@ closed protocol Misc {
     /// ```c
     /// #include <zircon/syscalls.h>
     ///
-    /// zx_status_t zx_nanosleep(zx_time_t deadline);
+    /// zx_status_t zx_nanosleep(zx_instant_mono_t deadline);
     /// ```
     ///
     /// ## Description
@@ -61,7 +61,7 @@ closed protocol Misc {
     /// [`zx_timer_set()`]: timer_set.md
     @blocking
     strict Nanosleep(struct {
-        deadline Time;
+        deadline InstantMono;
     }) -> () error Status;
 
     /// ## Summary
@@ -74,7 +74,7 @@ closed protocol Misc {
     /// ```c
     /// #include <zircon/syscalls.h>
     ///
-    /// zx_ticks_t zx_ticks_get(void);
+    /// zx_instant_mono_ticks_t zx_ticks_get(void);
     /// ```
     ///
     /// ## Description
@@ -115,7 +115,7 @@ closed protocol Misc {
     /// [ticks_per_second](ticks_per_second.md)
     @vdsocall
     strict TicksGet() -> (@wrapped_return struct {
-        ticks Ticks;
+        ticks InstantMonoTicks;
     });
 
     /// ## Summary
@@ -128,7 +128,7 @@ closed protocol Misc {
     /// ```c
     /// #include <zircon/syscalls.h>
     ///
-    /// zx_ticks_t zx_ticks_get_boot(void);
+    /// zx_instant_boot_ticks_t zx_ticks_get_boot(void);
     /// ```
     ///
     /// ## Description
@@ -166,7 +166,7 @@ closed protocol Misc {
     /// [ticks_per_second](ticks_per_second.md)
     @vdsocall
     strict TicksGetBoot() -> (@wrapped_return struct {
-        ticks Ticks;
+        ticks InstantBootTicks;
     });
 
     /// ## Summary
@@ -209,11 +209,11 @@ closed protocol Misc {
     ///
     /// ```
     /// zx_ticks_t ticks_per_second = zx_ticks_per_second();
-    /// zx_ticks_t ticks_start = zx_ticks_get();
+    /// zx_instant_mono_ticks_t ticks_start = zx_ticks_get();
     ///
     /// // do some more work
     ///
-    /// zx_ticks_t ticks_end = zx_ticks_get();
+    /// zx_instant_mono_ticks_t ticks_end = zx_ticks_get();
     /// double elapsed_seconds = (ticks_end - ticks_start) / (double)ticks_per_second;
     ///
     /// ```
@@ -238,14 +238,14 @@ closed protocol Misc {
     /// ```c
     /// #include <zircon/syscalls.h>
     ///
-    /// zx_time_t zx_deadline_after(zx_duration_t nanoseconds);
+    /// zx_instant_mono_t zx_deadline_after(zx_duration_mono_t nanoseconds);
     /// ```
     ///
     /// ## Description
     ///
     /// `zx_deadline_after()` is a utility for converting from now-relative durations
     /// to absolute deadlines. If *nanoseconds* plus the current time is bigger than the
-    /// maximum value for `zx_time_t`, the output is clamped to `ZX_TIME_INFINITE`.
+    /// maximum value for `zx_instant_mono_t`, the output is clamped to `ZX_TIME_INFINITE`.
     ///
     /// ## Rights
     ///
@@ -264,7 +264,7 @@ closed protocol Misc {
     ///
     /// ```
     /// // Sleep 50 milliseconds
-    /// zx_time_t deadline = zx_deadline_after(ZX_MSEC(50));
+    /// zx_instant_mono_t deadline = zx_deadline_after(ZX_MSEC(50));
     /// zx_nanosleep(deadline);
     /// ```
     ///
@@ -273,9 +273,9 @@ closed protocol Misc {
     /// [ticks_get](ticks_get.md)
     @vdsocall
     strict DeadlineAfter(struct {
-        nanoseconds Duration;
+        nanoseconds DurationMono;
     }) -> (@wrapped_return struct {
-        time Time;
+        time InstantMono;
     });
 
     /// ## Summary
@@ -446,7 +446,7 @@ closed protocol Misc {
     // accessible from user mode code (for whatever reason).
     @internal
     strict TicksGetViaKernel() -> (@wrapped_return struct {
-        ticks Ticks;
+        ticks InstantMonoTicks;
     });
 
     // Read the number of high-precision timer ticks since boot including any
@@ -460,6 +460,6 @@ closed protocol Misc {
     // accessible from user mode code (for whatever reason).
     @internal
     strict TicksGetBootViaKernel() -> (@wrapped_return struct {
-        ticks Ticks;
+        ticks InstantBootTicks;
     });
 };

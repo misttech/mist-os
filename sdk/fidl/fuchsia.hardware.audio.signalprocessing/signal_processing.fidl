@@ -375,7 +375,7 @@ type Topology = table {
 
 /// For an overview see
 /// [[Signal Processing Interface]](https://fuchsia.dev/fuchsia-src/concepts/drivers/driver_architectures/audio_drivers/audio_signal_processing).
-closed(removed=NEXT) open(added=NEXT) protocol SignalProcessing {
+closed(removed=24) open(added=24) protocol SignalProcessing {
     /// Exposes read-only signal processing properties.
     compose Reader;
 
@@ -435,7 +435,7 @@ closed(removed=NEXT) open(added=NEXT) protocol SignalProcessing {
 
 /// For an overview see
 /// [[Signal Processing Interface]](https://fuchsia.dev/fuchsia-src/concepts/drivers/driver_architectures/audio_drivers/audio_signal_processing).
-closed(removed=NEXT) open(added=NEXT) protocol Reader {
+closed(removed=24) open(added=24) protocol Reader {
     /// Returns a vector of supported processing elements.
     /// Must return one or more processing elements, or `ZX_ERR_NOT_SUPPORTED`.
     /// If `GetTopologies` returns one or more topologies, then `GetElements` must return one or

@@ -524,6 +524,7 @@ func TestExecute(t *testing.T) {
 
 			tc.flags.buildDir = t.TempDir()
 			tc.flags.productBundleName = "core.x64"
+			tc.flags.pave = true
 			if len(tc.modifiers) > 0 {
 				tc.flags.modifiersPath = writeTempJSONFile(t, tc.modifiers)
 			}
@@ -577,7 +578,8 @@ func TestExecute(t *testing.T) {
 					{Name: "boot-test_product_bundle", Path: "boot-test_product_bundle"},
 				},
 			}
-			if err := execute(ctx, tc.flags, m); err != nil {
+			params := getParamsFromFlags(tc.flags)
+			if err := execute(ctx, tc.flags, params, m); err != nil {
 				t.Fatal(err)
 			}
 

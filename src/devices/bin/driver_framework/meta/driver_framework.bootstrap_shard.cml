@@ -379,12 +379,10 @@
                 "fuchsia.hardware.cpu.ctrl.Service",
                 "fuchsia.hardware.rtc.Service",
                 "fuchsia.hardware.sockettunnel.Service",
+                "fuchsia.hardware.spmi.DebugService",
                 "fuchsia.hardware.suspend.SuspendService",
+                "fuchsia.sysinfo.Service",
             ],
-            from: "#boot-drivers",
-        },
-        {
-            service: "fuchsia.hardware.spmi.DebugService",
             from: "#boot-drivers",
         },
         {

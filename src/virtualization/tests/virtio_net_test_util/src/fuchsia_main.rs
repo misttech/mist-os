@@ -118,7 +118,7 @@ async fn network_device_send(
             .recv()
             .map(|result| Some(result.expect("recv failed")))
             .on_timeout(
-                fuchsia_async::MonotonicInstant::after(zx::Duration::from_seconds(1)),
+                fuchsia_async::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(1)),
                 || None,
             )
             .await;

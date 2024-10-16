@@ -18,7 +18,7 @@ pub(crate) struct ChannelHandler {
     warn_rate_limiter: RateLimiterMonotonic,
 }
 
-const GET_CURRENT_WARN_DELAY: zx::Duration = zx::Duration::from_minutes(30);
+const GET_CURRENT_WARN_DELAY: zx::MonotonicDuration = zx::MonotonicDuration::from_minutes(30);
 
 impl ChannelHandler {
     pub fn new(

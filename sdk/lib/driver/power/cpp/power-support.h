@@ -58,6 +58,10 @@ enum class Error : uint8_t {
   TOPOLOGY_UNAVAILABLE,
   /// The power configuration could not be retrieved.
   CONFIGURATION_UNAVAILABLE,
+  /// Could not access the CpuElementManager capability.
+  CPU_ELEMENT_MANAGER_UNAVAILABLE,
+  /// There was an error making a request to the CpuElementManager protocol.
+  CPU_ELEMENT_MANAGER_REQUEST,
 };
 
 enum class ElementRunnerError : uint8_t {

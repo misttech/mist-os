@@ -471,3 +471,60 @@ impl FSConfig for Fvm {
         format::DiskFormat::Fvm
     }
 }
+
+/// Gpt Configuration
+#[derive(Clone)]
+pub struct Gpt {
+    pub component_type: ComponentType,
+}
+
+impl Default for Gpt {
+    fn default() -> Self {
+        Self { component_type: Default::default() }
+    }
+}
+
+impl Gpt {
+    /// Manages a block device using the default configuration.
+    pub fn new(block_device: fidl_fuchsia_device::ControllerProxy) -> filesystem::Filesystem {
+        filesystem::Filesystem::new(block_device, Self::default())
+    }
+
+    /// Launch Gpt, with the default configuration, as a dynamic child in the fs-collection.
+    pub fn dynamic_child() -> Self {
+        Self {
+            component_type: ComponentType::DynamicChild {
+                collection_name: FS_COLLECTION_NAME.to_string(),
+            },
+            ..Default::default()
+        }
+    }
+}
+
+impl FSConfig for Gpt {
+    fn options(&self) -> Options<'_> {
+        Options {
+            component_name: "storage-host",
+            reuse_component_after_serving: true,
+            format_options: FormatOptions::default(),
+            start_options: StartOptions {
+                read_only: false,
+                verbose: false,
+                fsck_after_every_transaction: false,
+                write_compression_level: -1,
+                write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
+                cache_eviction_policy_override: EvictionPolicyOverride::None,
+                startup_profiling_seconds: 0,
+            },
+            component_type: self.component_type.clone(),
+        }
+    }
+
+    fn is_multi_volume(&self) -> bool {
+        true
+    }
+
+    fn disk_format(&self) -> format::DiskFormat {
+        format::DiskFormat::Gpt
+    }
+}

@@ -214,7 +214,8 @@ mod test {
         let event = InterruptibleEvent::new();
 
         let guard = event.begin_wait();
-        let result = guard.block_until(zx::MonotonicInstant::after(zx::Duration::from_millis(20)));
+        let result =
+            guard.block_until(zx::MonotonicInstant::after(zx::MonotonicDuration::from_millis(20)));
         assert_eq!(result, Err(WakeReason::DeadlineExpired));
     }
 }

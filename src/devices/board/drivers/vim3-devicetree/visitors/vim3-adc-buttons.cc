@@ -113,7 +113,7 @@ zx::result<> Vim3AdcButtonsVisitor::AddAdcMetadata(fdf_devicetree::Node& node) {
   }
 
   fuchsia_hardware_platform_bus::Metadata adc_metadata{{
-      .id = std::to_string(fuchsia_hardware_adcimpl::kPdevMetadataTypeIdentifier),
+      .id = fuchsia_hardware_adcimpl::kMetadataTypeName,
       .data = encoded_metadata.value(),
   }};
 

@@ -531,14 +531,15 @@ TEST_F(DebugAgentTests, WeakFilterMatchDoesNotSendModules) {
   filter.type = debug_ipc::Filter::Type::kProcessName;
   filter.pattern = kProcessName;
   filter.id = 1;
-  filter.weak = true;
+  filter.config.weak = true;
 
   debug_ipc::UpdateFilterReply reply;
   remote_api->OnUpdateFilter(request, &reply);
 
   EXPECT_TRUE(reply.matched_processes_for_filter.empty());
 
-  harness.debug_agent()->OnProcessStarting(
+  harness.debug_agent()->OnProcessChanged(
+      DebugAgent::ProcessChangedHow::kStarting,
       std::make_unique<MockProcessHandle>(kProcessKoid, kProcessName));
 
   // We should have sent a process starting notification, but no modules.
@@ -559,7 +560,7 @@ TEST_F(DebugAgentTests, RecursiveFilterAppliesImplicitFilter) {
   auto& filter = request.filters.emplace_back();
   filter.type = debug_ipc::Filter::Type::kComponentUrl;
   filter.pattern = kRootComponentUrl;
-  filter.recursive = true;
+  filter.config.recursive = true;
 
   debug_ipc::UpdateFilterReply reply;
   remote_api->OnUpdateFilter(request, &reply);

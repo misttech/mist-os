@@ -351,7 +351,7 @@ impl<T: FakeClockObserver> FakeClock<T> {
     }
 
     fn increment(&mut self, increment: &Increment) {
-        let dur = zx::Duration::from_nanos(match increment {
+        let dur = zx::MonotonicDuration::from_nanos(match increment {
             Increment::Determined(d) => *d,
             Increment::Random(rr) => {
                 if let Ok(v) = u64::try_from(rr.min_rand).and_then(|min| {
@@ -389,7 +389,7 @@ type FakeClockHandle<T> = Arc<Mutex<FakeClock<T>>>;
 // each two successive calls.
 fn start_free_running<T: FakeClockObserver>(
     mock_clock: &FakeClockHandle<T>,
-    real_increment: zx::Duration,
+    real_increment: zx::MonotonicDuration,
     increment: Increment,
 ) {
     static INSTANCE_ID: AtomicUsize = AtomicUsize::new(0);
@@ -465,7 +465,11 @@ async fn handle_control_events<T: FakeClockObserver>(
                 } else {
                     // stop free running if we are
                     stop_free_running(&mock_clock);
-                    start_free_running(&mock_clock, zx::Duration::from_nanos(real), increment);
+                    start_free_running(
+                        &mock_clock,
+                        zx::MonotonicDuration::from_nanos(real),
+                        increment,
+                    );
                     responder.send(Ok(()))
                 }
             }
@@ -540,7 +544,7 @@ async fn handle_events<T: FakeClockObserver>(
                 let deadline = if mock_clock.lock().unwrap().ignored_deadline_ids.contains(&id) {
                     zx::MonotonicInstant::INFINITE
                 } else {
-                    mock_clock.lock().unwrap().time + zx::Duration::from_nanos(duration)
+                    mock_clock.lock().unwrap().time + zx::MonotonicDuration::from_nanos(duration)
                 };
 
                 let expiration_point =
@@ -561,8 +565,10 @@ async fn main() -> Result<(), Error> {
     let mock_clock = Arc::new(Mutex::new(FakeClock::<()>::new()));
     start_free_running(
         &mock_clock,
-        zx::Duration::from_millis(DEFAULT_INCREMENTS_MS),
-        Increment::Determined(zx::Duration::from_millis(DEFAULT_INCREMENTS_MS).into_nanos()),
+        zx::MonotonicDuration::from_millis(DEFAULT_INCREMENTS_MS),
+        Increment::Determined(
+            zx::MonotonicDuration::from_millis(DEFAULT_INCREMENTS_MS).into_nanos(),
+        ),
     );
     let m1 = Arc::clone(&mock_clock);
 
@@ -606,7 +612,7 @@ mod tests {
     #[fuchsia::test]
     fn test_event_heap() {
         let time = zx::MonotonicInstant::get();
-        let after = time + zx::Duration::from_millis(10);
+        let after = time + zx::MonotonicDuration::from_millis(10);
         let e1 = PendingEvent { time, event: 0 };
         let e2 = PendingEvent { time: after, event: 1 };
         let mut heap = BinaryHeap::new();
@@ -620,7 +626,7 @@ mod tests {
     fn test_simple_increments() {
         let mut mock_clock = FakeClock::<()>::new();
         let begin = mock_clock.time;
-        let skip = zx::Duration::from_millis(10);
+        let skip = zx::MonotonicDuration::from_millis(10);
         mock_clock.increment(&Increment::Determined(skip.into_nanos()));
         assert_eq!(mock_clock.time, begin + skip);
     }
@@ -628,8 +634,8 @@ mod tests {
     #[fuchsia::test]
     fn test_random_increments() {
         let mut mock_clock = FakeClock::<()>::new();
-        let min = zx::Duration::from_nanos(10);
-        let max = zx::Duration::from_nanos(20);
+        let min = zx::MonotonicDuration::from_nanos(10);
+        let max = zx::MonotonicDuration::from_nanos(20);
         for _ in 0..200 {
             let begin = mock_clock.time;
             let allowed = (begin + min).into_nanos()..(begin + max).into_nanos();
@@ -666,13 +672,13 @@ mod tests {
         let time = mock_clock.time;
         mock_clock.install_event(
             Arc::clone(&clock_handle),
-            time + zx::Duration::from_millis(10),
+            time + zx::MonotonicDuration::from_millis(10),
             e1,
         );
         let (e2, cli2) = zx::EventPair::create();
         mock_clock.install_event(
             Arc::clone(&clock_handle),
-            time + zx::Duration::from_millis(20),
+            time + zx::MonotonicDuration::from_millis(20),
             e2,
         );
         let (e3, cli3) = zx::EventPair::create();
@@ -682,11 +688,13 @@ mod tests {
         assert!(!check_signaled(&cli2));
         assert!(check_signaled(&cli3));
         // increment clock by 10 millis:
-        mock_clock.increment(&Increment::Determined(zx::Duration::from_millis(10).into_nanos()));
+        mock_clock
+            .increment(&Increment::Determined(zx::MonotonicDuration::from_millis(10).into_nanos()));
         assert!(check_signaled(&cli1));
         assert!(!check_signaled(&cli2));
         // increment clock by another 10 millis and check that e2 is signaled
-        mock_clock.increment(&Increment::Determined(zx::Duration::from_millis(10).into_nanos()));
+        mock_clock
+            .increment(&Increment::Determined(zx::MonotonicDuration::from_millis(10).into_nanos()));
         assert!(check_signaled(&cli3));
     }
 
@@ -696,22 +704,25 @@ mod tests {
         let event = {
             let mut mock_clock = clock_handle.lock().unwrap();
             let (event, client) = zx::EventPair::create();
-            let sched = mock_clock.time + zx::Duration::from_millis(10);
+            let sched = mock_clock.time + zx::MonotonicDuration::from_millis(10);
             mock_clock.install_event(Arc::clone(&clock_handle), sched, event);
             client
         };
 
         start_free_running(
             &clock_handle,
-            zx::Duration::from_millis(DEFAULT_INCREMENTS_MS),
-            Increment::Determined(zx::Duration::from_millis(DEFAULT_INCREMENTS_MS).into_nanos()),
+            zx::MonotonicDuration::from_millis(DEFAULT_INCREMENTS_MS),
+            Increment::Determined(
+                zx::MonotonicDuration::from_millis(DEFAULT_INCREMENTS_MS).into_nanos(),
+            ),
         );
         let _ = fasync::OnSignals::new(&event, zx::Signals::EVENT_SIGNALED).await.unwrap();
         stop_free_running(&clock_handle);
 
         // after free running has ended, timer must not be updating anymore:
         let bef = clock_handle.lock().unwrap().time;
-        fasync::Timer::new(zx::MonotonicInstant::after(zx::Duration::from_millis(30))).await;
+        fasync::Timer::new(zx::MonotonicInstant::after(zx::MonotonicDuration::from_millis(30)))
+            .await;
         assert_eq!(clock_handle.lock().unwrap().time, bef);
     }
 
@@ -737,7 +748,7 @@ mod tests {
         let event = {
             let mut mock_clock = clock_handle.lock().unwrap();
             let (event, client) = zx::EventPair::create();
-            let sched = mock_clock.time + zx::Duration::from_millis(10);
+            let sched = mock_clock.time + zx::MonotonicDuration::from_millis(10);
             mock_clock.install_event(Arc::clone(&clock_handle), sched, event);
             client
         };
@@ -754,28 +765,31 @@ mod tests {
         let clock_handle = Arc::new(Mutex::new(FakeClock::<RemovalObserver>::new()));
         let mut mock_clock = clock_handle.lock().unwrap();
         let (event, client) = zx::EventPair::create();
-        let sched = mock_clock.time + zx::Duration::from_millis(10);
+        let sched = mock_clock.time + zx::MonotonicDuration::from_millis(10);
         mock_clock.install_event(Arc::clone(&clock_handle), sched, event);
         assert!(!check_signaled(&client));
         // now reschedule the same event:
-        let sched = mock_clock.time + zx::Duration::from_millis(20);
+        let sched = mock_clock.time + zx::MonotonicDuration::from_millis(20);
         mock_clock.reschedule_event(sched, client.get_koid().unwrap());
         println!("{:?}", mock_clock.pending_events);
         assert!(!check_signaled(&client));
         // advance time and ensure that we don't fire the event
-        mock_clock.increment(&Increment::Determined(zx::Duration::from_millis(10).into_nanos()));
+        mock_clock
+            .increment(&Increment::Determined(zx::MonotonicDuration::from_millis(10).into_nanos()));
         assert!(!check_signaled(&client));
-        mock_clock.increment(&Increment::Determined(zx::Duration::from_millis(10).into_nanos()));
+        mock_clock
+            .increment(&Increment::Determined(zx::MonotonicDuration::from_millis(10).into_nanos()));
         assert!(check_signaled(&client));
         // clear the signal, reschedule once more and see that it gets hit again.
         client.signal_handle(zx::Signals::EVENTPAIR_SIGNALED, zx::Signals::NONE).unwrap();
         assert!(!check_signaled(&client));
-        let sched = mock_clock.time + zx::Duration::from_millis(10);
+        let sched = mock_clock.time + zx::MonotonicDuration::from_millis(10);
         mock_clock.reschedule_event(sched, client.get_koid().unwrap());
         // not yet signaled...
         assert!(!check_signaled(&client));
         // increment once again and it should be signaled then:
-        mock_clock.increment(&Increment::Determined(zx::Duration::from_millis(10).into_nanos()));
+        mock_clock
+            .increment(&Increment::Determined(zx::MonotonicDuration::from_millis(10).into_nanos()));
         assert!(check_signaled(&client));
     }
 
@@ -793,8 +807,10 @@ mod tests {
             .expect("set stop point failed");
         let () = start_free_running(
             &clock_handle,
-            zx::Duration::from_millis(DEFAULT_INCREMENTS_MS),
-            Increment::Determined(zx::Duration::from_millis(DEFAULT_INCREMENTS_MS).into_nanos()),
+            zx::MonotonicDuration::from_millis(DEFAULT_INCREMENTS_MS),
+            Increment::Determined(
+                zx::MonotonicDuration::from_millis(DEFAULT_INCREMENTS_MS).into_nanos(),
+            ),
         );
         // Checking for the stop point should signal the event pair.
         assert!(clock_handle.lock().unwrap().check_stop_point(&StopPoint {
@@ -806,7 +822,7 @@ mod tests {
 
         // A deadline set to expire in the future stops time when the deadline is reached.
         let future_deadline_timeout =
-            clock_handle.lock().unwrap().time + zx::Duration::from_millis(10);
+            clock_handle.lock().unwrap().time + zx::MonotonicDuration::from_millis(10);
         let () = clock_handle.lock().unwrap().add_named_deadline(PendingDeadlineExpireEvent {
             deadline_id: DEADLINE_ID.into(),
             deadline: future_deadline_timeout,
@@ -825,8 +841,10 @@ mod tests {
             .expect("set stop point failed");
         let () = start_free_running(
             &clock_handle,
-            zx::Duration::from_millis(DEFAULT_INCREMENTS_MS),
-            Increment::Determined(zx::Duration::from_millis(DEFAULT_INCREMENTS_MS).into_nanos()),
+            zx::MonotonicDuration::from_millis(DEFAULT_INCREMENTS_MS),
+            Increment::Determined(
+                zx::MonotonicDuration::from_millis(DEFAULT_INCREMENTS_MS).into_nanos(),
+            ),
         );
         assert_eq!(
             fasync::OnSignals::new(&client_event, zx::Signals::EVENTPAIR_SIGNALED).await.unwrap()
@@ -843,8 +861,10 @@ mod tests {
         warn!("checkpoint 1: {:?}", clock_handle.lock().unwrap().time);
         let () = start_free_running(
             &clock_handle,
-            zx::Duration::from_millis(DEFAULT_INCREMENTS_MS),
-            Increment::Determined(zx::Duration::from_millis(DEFAULT_INCREMENTS_MS).into_nanos()),
+            zx::MonotonicDuration::from_millis(DEFAULT_INCREMENTS_MS),
+            Increment::Determined(
+                zx::MonotonicDuration::from_millis(DEFAULT_INCREMENTS_MS).into_nanos(),
+            ),
         );
         // Checking for an unregistered stop point should not stop time.
         assert!(!clock_handle.lock().unwrap().check_stop_point(&StopPoint {
@@ -869,8 +889,10 @@ mod tests {
         stop_free_running(&clock_handle);
         let () = start_free_running(
             &clock_handle,
-            zx::Duration::from_millis(DEFAULT_INCREMENTS_MS),
-            Increment::Determined(zx::Duration::from_millis(DEFAULT_INCREMENTS_MS).into_nanos()),
+            zx::MonotonicDuration::from_millis(DEFAULT_INCREMENTS_MS),
+            Increment::Determined(
+                zx::MonotonicDuration::from_millis(DEFAULT_INCREMENTS_MS).into_nanos(),
+            ),
         );
         drop(client_event);
         assert!(!clock_handle.lock().unwrap().check_stop_point(&StopPoint {
@@ -885,9 +907,9 @@ mod tests {
         // If we set two EXPIRED points and drop the handle of the earlier one, time should stop
         // on the later stop point.
         let future_deadline_timeout_1 =
-            clock_handle.lock().unwrap().time + zx::Duration::from_millis(10);
+            clock_handle.lock().unwrap().time + zx::MonotonicDuration::from_millis(10);
         let future_deadline_timeout_2 =
-            clock_handle.lock().unwrap().time + zx::Duration::from_millis(20);
+            clock_handle.lock().unwrap().time + zx::MonotonicDuration::from_millis(20);
         let () = clock_handle.lock().unwrap().add_named_deadline(PendingDeadlineExpireEvent {
             deadline_id: DEADLINE_ID.into(),
             deadline: future_deadline_timeout_1,
@@ -928,8 +950,10 @@ mod tests {
 
         let () = start_free_running(
             &clock_handle,
-            zx::Duration::from_millis(DEFAULT_INCREMENTS_MS),
-            Increment::Determined(zx::Duration::from_millis(DEFAULT_INCREMENTS_MS).into_nanos()),
+            zx::MonotonicDuration::from_millis(DEFAULT_INCREMENTS_MS),
+            Increment::Determined(
+                zx::MonotonicDuration::from_millis(DEFAULT_INCREMENTS_MS).into_nanos(),
+            ),
         );
         warn!("before signal");
         assert_eq!(
@@ -1047,7 +1071,7 @@ mod tests {
             let deadline = fake_clock_proxy
                 .create_named_deadline(
                     &DEADLINE_ID.into(),
-                    zx::Duration::from_millis(deadline_time_millis).into_nanos(),
+                    zx::MonotonicDuration::from_millis(deadline_time_millis).into_nanos(),
                 )
                 .await
                 .expect("failed to create named deadline");

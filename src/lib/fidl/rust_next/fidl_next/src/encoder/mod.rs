@@ -97,7 +97,7 @@ pub struct Preallocated<'a, E: ?Sized, T> {
     _phantom: PhantomData<T>,
 }
 
-impl<'a, E: Encoder + ?Sized, T> Preallocated<'a, E, T> {
+impl<E: Encoder + ?Sized, T> Preallocated<'_, E, T> {
     /// Writes into the next pre-allocated slot in the encoder.
     pub fn write_next(&mut self, slot: Slot<'_, T>) {
         assert_ne!(self.pos, self.end, "attemped to write more slots than preallocated",);

@@ -6,10 +6,12 @@ library zx;
 const MAX_POWER_LEVELS usize64 = 256;
 const MAX_POWER_LEVEL_TRANSITIONS usize64 = 65536; // MAX_POWER_LEVELS^2
 type ProcessorPowerDomain = struct {
-    // Defines an `id` used for transition requests.
-    domain_id uint32;
     // mask of Cpus that belong to this power domain.
     mask array<uint64, 8>;
+    // Defines an `id` used for transition requests.
+    domain_id uint32;
+    // Padding bytes.
+    padding1 array<uint8, 4>;
 };
 
 type ProcessorPowerLevelOptions = flexible bits : uint64 {
@@ -935,7 +937,7 @@ closed protocol System {
     /// ```c
     /// #include <zircon/syscalls-next.h>
     ///
-    /// zx_status_t zx_system_suspend_enter(zx_handle_t resource, zx_time_t resume_deadline);
+    /// zx_status_t zx_system_suspend_enter(zx_handle_t resource, zx_instant_boot_t resume_deadline);
     /// ```
     ///
     /// ## Description
@@ -963,7 +965,7 @@ closed protocol System {
     @next
     strict SuspendEnter(resource struct {
         resource Handle:RESOURCE;
-        resume_deadline Time;
+        resume_deadline InstantBoot;
     }) -> () error Status;
 
     /// ## Summary

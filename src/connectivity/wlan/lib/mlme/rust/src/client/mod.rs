@@ -561,8 +561,8 @@ impl Client {
         self.connect_req.selected_bss.bssid
     }
 
-    pub fn beacon_period(&self) -> zx::Duration {
-        zx::Duration::from(TimeUnit(self.connect_req.selected_bss.beacon_period))
+    pub fn beacon_period(&self) -> zx::MonotonicDuration {
+        zx::MonotonicDuration::from(TimeUnit(self.connect_req.selected_bss.beacon_period))
     }
 
     pub fn eapol_required(&self) -> bool {

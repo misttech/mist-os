@@ -64,7 +64,7 @@ closed protocol Registry {
     ///
     /// The `fuchsia.ui.test.input.TouchScreen` channel will remain open even
     /// if the `Registry` connection closes.
-    @available(added=NEXT)
+    @available(added=24)
     strict RegisterTouchScreenAndGetDeviceInfo(resource table {
         1: device server_end:TouchScreen;
 
@@ -96,7 +96,7 @@ closed protocol Registry {
     ///
     /// The `fuchsia.ui.test.input.MediaButtonsDevice` channel will remain open
     /// even if the `Registry` connection closes.
-    @available(added=NEXT)
+    @available(added=24)
     strict RegisterMediaButtonsDeviceAndGetDeviceInfo(resource table {
         1: device server_end:MediaButtonsDevice;
     }) -> (resource table {
@@ -125,7 +125,7 @@ closed protocol Registry {
     ///
     /// The `fuchsia.ui.test.input.Keyboard` channel will remain open even
     /// if the `Registry` connection closes.
-    @available(added=NEXT)
+    @available(added=24)
     strict RegisterKeyboardAndGetDeviceInfo(resource table {
         1: device server_end:Keyboard;
     }) -> (resource table {
@@ -154,7 +154,7 @@ closed protocol Registry {
     ///
     /// The `fuchsia.ui.test.input.Mouse` channel will remain open even
     /// if the `Registry` connection closes.
-    @available(added=NEXT)
+    @available(added=24)
     strict RegisterMouseAndGetDeviceInfo(resource table {
         1: device server_end:Mouse;
     }) -> (resource table {

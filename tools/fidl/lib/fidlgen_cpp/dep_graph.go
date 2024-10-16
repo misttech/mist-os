@@ -197,22 +197,22 @@ func (g *DeclDepGraph) addDecl(decl fidlgen.Decl) {
 			if m.MaybeDefaultValue != nil {
 				g.addDepsFromConstant(node, *m.MaybeDefaultValue)
 			}
-			if m.MaybeAlias != nil {
-				g.addDepsFromTypeCtor(node, *m.MaybeAlias)
+			if m.MaybeFromAlias != nil {
+				g.addDepsFromTypeCtor(node, *m.MaybeFromAlias)
 			}
 		}
 	case *fidlgen.Table:
 		for _, m := range decl.Members {
 			g.addDepsFromType(node, m.Type)
-			if m.MaybeAlias != nil {
-				g.addDepsFromTypeCtor(node, *m.MaybeAlias)
+			if m.MaybeFromAlias != nil {
+				g.addDepsFromTypeCtor(node, *m.MaybeFromAlias)
 			}
 		}
 	case *fidlgen.Union:
 		for _, m := range decl.Members {
 			g.addDepsFromType(node, m.Type)
-			if m.MaybeAlias != nil {
-				g.addDepsFromTypeCtor(node, *m.MaybeAlias)
+			if m.MaybeFromAlias != nil {
+				g.addDepsFromTypeCtor(node, *m.MaybeFromAlias)
 			}
 		}
 	case *fidlgen.Alias:
@@ -226,8 +226,8 @@ func (g *DeclDepGraph) addDecl(decl fidlgen.Decl) {
 	case *fidlgen.Overlay:
 		for _, m := range decl.Members {
 			g.addDepsFromType(node, m.Type)
-			if m.MaybeAlias != nil {
-				g.addDepsFromTypeCtor(node, *m.MaybeAlias)
+			if m.MaybeFromAlias != nil {
+				g.addDepsFromTypeCtor(node, *m.MaybeFromAlias)
 			}
 		}
 	}
@@ -258,7 +258,7 @@ func (g *DeclDepGraph) addDepsFromConstant(node *declDepNode, c fidlgen.Constant
 func (g *DeclDepGraph) addDepsFromType(node *declDepNode, typ fidlgen.Type) {
 	// As above, we do not create edges to nullable types or protocols via
 	// endpoint dependencies.
-	if typ.Nullable || typ.ProtocolTransport != "" {
+	if typ.Nullable || typ.Kind == fidlgen.EndpointType {
 		return
 	}
 

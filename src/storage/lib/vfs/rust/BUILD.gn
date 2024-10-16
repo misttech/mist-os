@@ -48,7 +48,6 @@ rustc_library("vfs") {
     ]
   }
 
-  with_unit_tests = true
   sources = [
     "src/common.rs",
     "src/directory.rs",
@@ -102,6 +101,7 @@ rustc_library("vfs") {
     "src/tree_builder.rs",
   ]
 
+  with_unit_tests = true
   test_deps = [
     "//src/lib/fuchsia",
     "//src/testing/fidl:placeholders_rust",

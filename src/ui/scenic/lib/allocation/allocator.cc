@@ -84,15 +84,31 @@ struct ParsedArgs {
 std::optional<ParsedArgs> ParseArgs(fuchsia_ui_composition::RegisterBufferCollectionArgs args) {
   // It's okay if there's no specified RegisterBufferCollectionUsage. In that case, assume it is
   // DEFAULT.
-  if (!args.buffer_collection_token().has_value() || !args.export_token().has_value()) {
+  if (!(args.buffer_collection_token().has_value() ||
+        args.buffer_collection_token2().has_value()) ||
+      !args.export_token().has_value()) {
     FX_LOGS(ERROR) << "RegisterBufferCollection called with missing arguments";
     return std::nullopt;
   }
 
-  if (!args.buffer_collection_token()->is_valid()) {
-    FX_LOGS(ERROR) << "RegisterBufferCollection called with invalid buffer collection token";
+  if (args.buffer_collection_token().has_value() && !args.buffer_collection_token()->is_valid()) {
+    FX_LOGS(ERROR) << "RegisterBufferCollection called with invalid buffer_collection_token";
     return std::nullopt;
   }
+
+  if (args.buffer_collection_token2().has_value() && !args.buffer_collection_token2()->is_valid()) {
+    FX_LOGS(ERROR) << "RegisterBufferCollection called with invalid buffer_collection_token2";
+    return std::nullopt;
+  }
+
+  if (args.buffer_collection_token().has_value() && args.buffer_collection_token2().has_value()) {
+    FX_LOGS(ERROR)
+        << "RegisterBufferCollection called with both buffer_collection_token and buffer_collection_token2 set. Exactly one must be set.";
+    return std::nullopt;
+  }
+  // Exactly one set.
+  FX_DCHECK(!!args.buffer_collection_token().has_value() ^
+            !!args.buffer_collection_token2().has_value());
 
   if (!args.export_token()->value().is_valid()) {
     FX_LOGS(ERROR) << "RegisterBufferCollection called with invalid export token";
@@ -108,6 +124,14 @@ std::optional<ParsedArgs> ParseArgs(fuchsia_ui_composition::RegisterBufferCollec
   if (args.usages().has_value() && args.usages()->has_unknown_bits()) {
     FX_LOGS(ERROR) << "Arguments contain unknown BufferCollectionUsage type";
     return std::nullopt;
+  }
+
+  fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> token;
+  if (args.buffer_collection_token2().has_value()) {
+    token = std::move(args.buffer_collection_token2().value());
+  } else {
+    token = fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>(
+        args.buffer_collection_token()->TakeChannel());
   }
 
   // Grab object koid to be used as unique_id.
@@ -128,8 +152,8 @@ std::optional<ParsedArgs> ParseArgs(fuchsia_ui_composition::RegisterBufferCollec
       .koid = koid,
       .buffer_collection_usages = buffer_collection_usages,
       .export_token = std::move(args.export_token().value()),
-      .buffer_collection_token = fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>(
-          args.buffer_collection_token().value().TakeChannel()),
+      .buffer_collection_token =
+          fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>(token.TakeChannel()),
   };
 }
 

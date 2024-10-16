@@ -218,6 +218,11 @@ impl Encodable for FrameData {
 /// See RFCOMM 5.1.
 const MIN_FRAME_SIZE: usize = 4;
 
+/// The maximum size (bytes) of an RFCOMM header in a packet.
+/// Address (1 byte), Control (1 byte), Length (2 bytes), Credits (1 byte), FCS (1 byte)
+/// See RFCOMM 5.1.
+pub const MAX_RFCOMM_HEADER_SIZE: usize = 6;
+
 /// The maximum length that can be represented in a single E/A padded octet.
 const MAX_SINGLE_OCTET_LENGTH: usize = 127;
 

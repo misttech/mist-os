@@ -296,7 +296,8 @@ macro_rules! cas_filter_rules {
                     if retry < FILTER_CAS_RETRY_MAX - 1 =>
                 {
                     fuchsia_async::Timer::new(
-                        zx::Duration::from_millis(FILTER_CAS_RETRY_INTERVAL_MILLIS).after_now(),
+                        zx::MonotonicDuration::from_millis(FILTER_CAS_RETRY_INTERVAL_MILLIS)
+                            .after_now(),
                     )
                     .await;
                 }

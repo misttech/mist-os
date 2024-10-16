@@ -356,7 +356,7 @@ enum InterfaceConfigState {
 enum Dhcpv4ClientState {
     NotRunning,
     Running(dhcpv4::ClientState),
-    ScheduledRestart(fasync::Timer),
+    ScheduledRestart(Pin<Box<fasync::Timer>>),
 }
 
 #[derive(Debug)]
@@ -1331,9 +1331,10 @@ impl<'a> NetCfg<'a> {
                                     AllowClientRestart::Yes => {
                                         // The client exited due to an unexpected error. Schedule it
                                         // to be restarted after waiting a backoff period.
-                                        *dhcpv4_client = Dhcpv4ClientState::ScheduledRestart(
-                                            fasync::Timer::new(DHCP_CLIENT_RESTART_WAIT_TIME),
-                                        );
+                                        *dhcpv4_client =
+                                            Dhcpv4ClientState::ScheduledRestart(Box::pin(
+                                                fasync::Timer::new(DHCP_CLIENT_RESTART_WAIT_TIME),
+                                            ));
                                     }
                                 }
                             }
@@ -3567,7 +3568,7 @@ mod tests {
             .expect("respond should succeed");
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_stopping_dhcpv6_with_down_lookup_admin() {
         let (
             mut netcfg,
@@ -3733,7 +3734,7 @@ mod tests {
     // `Added` or `Changed` event from the Netstack's interfaces watcher.
     #[test_case(true; "added online")]
     #[test_case(false; "added offline")]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_dhcpv4_server_started(added_online: bool) {
         let (mut netcfg, ServerEnds { dhcpv4_server, .. }) =
             test_netcfg(false).expect("error creating test netcfg");
@@ -3822,7 +3823,7 @@ mod tests {
     #[test_case(false, true; "added offline and removed interface")]
     #[test_case(true, false; "added online and disabled interface")]
     #[test_case(false, false; "added offline and disabled interface")]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_dhcpv4(added_online: bool, remove_interface: bool) {
         let (
             mut netcfg,
@@ -4124,7 +4125,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_dhcpv4_ignores_address_change() {
         let (
             mut netcfg,
@@ -4271,7 +4272,7 @@ mod tests {
     #[test_case(Some(fnet_dhcp::ClientExitReason::NetworkUnreachable), AllowClientRestart::Yes)]
     #[test_case(None, AllowClientRestart::Yes)]
     #[test_case(Some(fnet_dhcp::ClientExitReason::AddressRemovedByUser), AllowClientRestart::No)]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn dhcpv4_handles_client_exit(
         exit_reason: Option<fnet_dhcp::ClientExitReason>,
         expected_allow_restart: AllowClientRestart,
@@ -4678,7 +4679,7 @@ mod tests {
     #[test_case(
         None,
         Some(1); "all_upstreams_preferred_prefix_len")]
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_dhcpv6_acquire_prefix(
         interface_id: Option<NonZeroU64>,
         preferred_prefix_len: Option<u8>,
@@ -5136,7 +5137,7 @@ mod tests {
 
     // Tests that DHCPv6 clients are configured to perform PD on eligible
     // upstream-providing interfaces while a `PrefixControl` channel is open.
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_dhcpv6_pd_on_added_upstream() {
         let (
             mut netcfg,

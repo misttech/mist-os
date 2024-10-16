@@ -10,6 +10,7 @@
 #include <lib/driver/component/cpp/prepare_stop_completer.h>
 #include <lib/driver/component/cpp/start_completer.h>
 #include <lib/driver/incoming/cpp/namespace.h>
+#include <lib/driver/incoming/cpp/service_validator.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/driver/node/cpp/add_child.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
@@ -17,6 +18,7 @@
 #include <lib/inspect/component/cpp/component.h>
 #include <zircon/availability.h>
 
+#include <memory>
 #include <unordered_map>
 
 namespace fdf_internal {
@@ -262,6 +264,17 @@ class DriverBase {
  private:
   void InitializeAndServe(Namespace incoming,
                           fidl::ServerEnd<fuchsia_io::Directory> outgoing_directory_request);
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  // This will enable validating service instance connection requests that are made to the incoming
+  // namespace |incoming()|. It will ensure that the given service + instance combination is valid
+  // before attempting to make a connection. If it is not a valid combination, |Connect()| attempts
+  // on the namespace, will return a ZX_ERR_NOT_FOUND error immediately.
+  //
+  // This can be enabled by setting `service_connect_validation: "true"` in the driver cml's
+  // `program` section.
+  void EnableServiceValidator();
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
 
   std::string name_;
   DriverStartArgs start_args_;

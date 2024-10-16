@@ -163,7 +163,7 @@ void PrettyTypeManager::AddDefaultCppPrettyTypes() {
 
   // Smart pointers.
   cpp_.emplace_back(InternalGlob("std::__2::unique_ptr<*>"),
-                    std::make_unique<PrettyPointer>("__ptr_.__value_"));
+                    std::make_unique<PrettyPointer>("__ptr_"));
   cpp_.emplace_back(InternalGlob("std::__2::shared_ptr<*>"),
                     std::make_unique<PrettyPointer>("__ptr_"));
   cpp_.emplace_back(InternalGlob("std::__2::weak_ptr<*>"),

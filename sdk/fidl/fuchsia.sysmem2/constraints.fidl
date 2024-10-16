@@ -738,6 +738,6 @@ type ImageFormatConstraints = table {
     ///
     /// If the format chosen for allocation doesn't have an A channel, this
     /// field will be un-set in the allocation result.
-    @available(added=NEXT)
+    @available(added=24)
     17: is_alpha_present bool;
 };

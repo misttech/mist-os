@@ -329,7 +329,7 @@ impl ClientIface for SmeClientIface {
         let mut stream = connect_txn.take_event_stream();
         let (sme_result, timed_out) = wait_for_connect_result(&mut stream)
             .map(|res| (res, false))
-            .on_timeout(zx::Duration::from_seconds(30), || {
+            .on_timeout(zx::MonotonicDuration::from_seconds(30), || {
                 (
                     Ok(fidl_sme::ConnectResult {
                         code: fidl_ieee80211::StatusCode::RejectedSequenceTimeout,

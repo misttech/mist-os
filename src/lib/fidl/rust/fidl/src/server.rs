@@ -138,7 +138,7 @@ impl ServeInner {
     ) -> Result<(), Error> {
         match self.channel.write_etc(bytes, handles) {
             Ok(()) | Err(zx_status::Status::PEER_CLOSED) => Ok(()),
-            Err(e) => Err(Error::ServerResponseWrite(e)),
+            Err(e) => Err(Error::ServerResponseWrite(e.into())),
         }
     }
 }

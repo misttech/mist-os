@@ -94,9 +94,12 @@ impl DeviceLookup for DeviceLookupDefaultImpl {
 pub struct FhoEnvironment {
     pub ffx: FfxCommandLine,
     pub context: EnvironmentContext,
-    pub injector: Arc<dyn Injector>,
     pub behavior: FhoConnectionBehavior,
     pub lookup: Arc<dyn DeviceLookup>,
+
+    /// This should not be public, as the daemon is (slowly) being phased out where possible.
+    #[deprecated]
+    pub injector: Arc<dyn Injector>,
 }
 
 impl FhoEnvironment {
@@ -109,6 +112,31 @@ impl FhoEnvironment {
                 return Err(dc.wrap_connection_errors(e).await);
             }
             (r, _) => r,
+        }
+    }
+
+    /// While the surface of this function is a little awkward, this is necessary to provide a
+    /// readable error. Authors shouldn't use this directly, they should instead use
+    /// `TryFromEnv`.
+    pub fn injector<T: TryFromEnv>(&self) -> Result<Arc<dyn Injector>> {
+        let strict = self.ffx.global.strict;
+        match &self.behavior {
+            FhoConnectionBehavior::DaemonConnector(dc) => Ok(dc.clone()),
+            _ => {
+                if strict {
+                    Err(
+                        ffx_command::user_error!(
+                            "ffx-strict doesn't support use of the daemon, which is used to allocate '{}'. This command must either be re-written or you should not use it.",
+                            std::any::type_name::<T>()
+                        )
+                    )
+                } else {
+                    Err(ffx_command::user_error!(
+                        "Attempting to use the daemon to allocate '{}', which is not yet supported",
+                        std::any::type_name::<T>()
+                    ))
+                }
+            }
         }
     }
 }
@@ -237,6 +265,7 @@ impl<T: AsRef<str>> CheckEnv for AvailabilityFlag<T> {
 
 /// A connector lets a tool make multiple attempts to connect to an object. It
 /// retains the environment in the tool body to allow this.
+#[derive(Clone)]
 pub struct Connector<T: TryFromEnv> {
     env: FhoEnvironment,
     _connects_to: std::marker::PhantomData<T>,
@@ -269,7 +298,6 @@ async fn knock_rcs(
 
 async fn daemon_try_connect<T: TryFromEnv>(
     env: &FhoEnvironment,
-    injector: &Arc<dyn Injector>,
     log_target_wait: &mut impl FnMut(&Option<String>, &Option<crate::Error>) -> Result<()>,
     open_target_timeout: Duration,
     knock_target_timeout: Duration,
@@ -283,7 +311,8 @@ async fn daemon_try_connect<T: TryFromEnv>(
                         target,
                         ..
                     }) => {
-                        let Ok(daemon_proxy) = injector.daemon_factory().await else {
+                        let Ok(daemon_proxy) = ffx_fidl::DaemonProxy::try_from_env(env).await
+                        else {
                             // Let the initial try_from_env detect this error.
                             continue;
                         };
@@ -381,10 +410,9 @@ impl<T: TryFromEnv> Connector<T> {
         mut log_target_wait: impl FnMut(&Option<String>, &Option<crate::Error>) -> Result<()>,
     ) -> Result<T> {
         match &self.env.behavior {
-            FhoConnectionBehavior::DaemonConnector(dc) => {
+            FhoConnectionBehavior::DaemonConnector(_) => {
                 daemon_try_connect(
                     &self.env,
-                    dc,
                     &mut log_target_wait,
                     Self::OPEN_TARGET_TIMEOUT,
                     Self::KNOCK_TARGET_TIMEOUT,
@@ -416,13 +444,9 @@ impl<T: TryFromEnv> TryFromEnv for DirectTargetConnector<T> {
         // Configure the environment to use a direct connector
         let connector: Rc<Overnet<SshConnector>> =
             Rc::new(Overnet::<ffx_target::ssh_connector::SshConnector>::new(&env.context).await?);
-        let direct_env = FhoEnvironment {
-            ffx: env.ffx.clone(),
-            context: env.context.clone(),
-            injector: env.injector.clone(),
-            behavior: FhoConnectionBehavior::DirectConnector(connector.clone()),
-            lookup: env.lookup.clone(),
-        };
+
+        let mut direct_env = env.clone();
+        direct_env.behavior = FhoConnectionBehavior::DirectConnector(connector.clone());
         Ok(DirectTargetConnector {
             connector,
             inner: Connector { env: direct_env, _connects_to: Default::default() },
@@ -707,7 +731,10 @@ pub fn daemon_protocol<P>() -> WithDaemonProtocol<P> {
 #[async_trait(?Send)]
 impl TryFromEnv for ffx_fidl::DaemonProxy {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        env.injector.daemon_factory().await.user_message("Failed to create daemon proxy")
+        // Might need to revisit whether it's necessary to cast every daemon_factory() invocation
+        // into a user error. This line originally casted every error into "Failed to create daemon
+        // proxy", which obfuscates the original error.
+        env.injector::<Self>()?.daemon_factory().await.map_err(|e| crate::user_error!("{}", e))
     }
 }
 
@@ -719,7 +746,7 @@ impl TryFromEnv for Option<ffx_fidl::DaemonProxy> {
     /// impl for `ffx_fidl::DaemonProxy`, which returns a `Result<ffx_fidl::DaemonProxy>`.
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
         let res = env
-            .injector
+            .injector::<Self>()?
             .try_daemon()
             .await
             .user_message("Failed internally while checking for daemon.")?;
@@ -730,7 +757,7 @@ impl TryFromEnv for Option<ffx_fidl::DaemonProxy> {
 #[async_trait(?Send)]
 impl TryFromEnv for ffx_fidl::TargetProxy {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        match env.injector.target_factory().await.map_err(|e| {
+        match env.injector::<Self>()?.target_factory().await.map_err(|e| {
             // This error case happens when there are multiple targets in target list.
             // So let's print out the ffx error message directly (which comes from OpenTargetError::QueryAmbiguous)
             // rather than just returning "Failed to create target proxy" which is not helpful.

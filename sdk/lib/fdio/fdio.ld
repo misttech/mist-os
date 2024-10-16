@@ -80,6 +80,7 @@
 		fdio_spawn;
 		fdio_spawn_etc;
 		fdio_spawn_vmo;
+		fdio_transferable_fd;
 		fdio_unbind_from_fd;
 		fdio_unsafe_borrow_channel;
 		fdio_unsafe_fd_to_io;

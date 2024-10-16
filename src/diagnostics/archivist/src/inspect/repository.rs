@@ -196,7 +196,10 @@ impl InspectRepository {
                 return;
             }
 
-            fasync::Timer::new(zx::MonotonicInstant::after(zx::Duration::from_millis(100))).await;
+            fasync::Timer::new(zx::MonotonicInstant::after(zx::MonotonicDuration::from_millis(
+                100,
+            )))
+            .await;
         }
     }
 
@@ -207,7 +210,10 @@ impl InspectRepository {
                 return;
             }
 
-            fasync::Timer::new(zx::MonotonicInstant::after(zx::Duration::from_millis(100))).await;
+            fasync::Timer::new(zx::MonotonicInstant::after(zx::MonotonicDuration::from_millis(
+                100,
+            )))
+            .await;
         }
     }
 }
@@ -340,8 +346,10 @@ mod tests {
         assert!(data_repo.inner.read().get(&identity).is_some());
         drop(server_end);
         while data_repo.inner.read().get(&identity).is_some() {
-            fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_millis(100_i64)))
-                .await;
+            fasync::Timer::new(fasync::MonotonicInstant::after(
+                zx::MonotonicDuration::from_millis(100_i64),
+            ))
+            .await;
         }
     }
 
@@ -379,8 +387,10 @@ mod tests {
         // When the directory disconnects, both the pipeline matchers and the repo are cleaned
         drop(server_end);
         while data_repo.inner.read().get(&identity).is_some() {
-            fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_millis(100_i64)))
-                .await;
+            fasync::Timer::new(fasync::MonotonicInstant::after(
+                zx::MonotonicDuration::from_millis(100_i64),
+            ))
+            .await;
         }
 
         assert!(!pipeline.static_hierarchy_allowlist().component_was_added(&moniker));
@@ -475,8 +485,10 @@ mod tests {
         }
         drop(ep0);
         while repo.inner.read().get(&identity).is_some() {
-            fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_millis(100_i64)))
-                .await;
+            fasync::Timer::new(fasync::MonotonicInstant::after(
+                zx::MonotonicDuration::from_millis(100_i64),
+            ))
+            .await;
         }
     }
 

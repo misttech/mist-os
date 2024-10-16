@@ -47,7 +47,8 @@ _FC_DELEGATES: dict[str, int] = {
 BluetoothAcceptPairing = bt_types.BluetoothAcceptPairing
 BluetoothConnectionType = bt_types.BluetoothConnectionType
 
-ASYNC_OP_TIMEOUT: int = 5
+# TODO: b/372516558 - Investigate to reduce async op seconds
+ASYNC_OP_TIMEOUT: int = 30
 
 
 class BluetoothCommon(bluetooth_common.BluetoothCommon):
@@ -115,6 +116,8 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
             self._pairing_delegate_server.cancel()
             self._pairing_delegate_server = None
         if self.loop is not None:
+            self.loop.stop()
+            self.loop.run_forever()
             self.loop.close()
 
     def is_session_initialized(self) -> bool:

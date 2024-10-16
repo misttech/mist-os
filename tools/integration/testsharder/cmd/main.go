@@ -21,10 +21,14 @@ import (
 
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder"
+	"go.fuchsia.dev/fuchsia/tools/integration/testsharder/proto"
 	"go.fuchsia.dev/fuchsia/tools/lib/color"
 	"go.fuchsia.dev/fuchsia/tools/lib/flagmisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/hostplatform"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
+
+	"google.golang.org/protobuf/encoding/prototext"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 func usage() {
@@ -37,32 +41,41 @@ Shards tests produced by a build.
 type testsharderFlags struct {
 	buildDir                       string
 	outputFile                     string
-	tags                           flagmisc.StringsValue
 	modifiersPath                  string
-	targetTestCount                int
-	targetDurationSecs             int
-	perTestTimeoutSecs             int
-	maxShardsPerEnvironment        int
-	maxShardSize                   int
 	affectedTestsPath              string
 	affectedTestsMaxAttempts       int
 	affectedTestsMultiplyThreshold int
 	affectedOnly                   bool
-	hermeticDeps                   bool
-	imageDeps                      bool
-	pave                           bool
 	skipUnaffected                 bool
-	perShardPackageRepos           bool
-	cacheTestPackages              bool
-	productBundleName              string
+
+	testsharderParamsFile   string
+	tags                    flagmisc.StringsValue
+	targetTestCount         int
+	targetDurationSecs      int
+	perTestTimeoutSecs      int
+	maxShardsPerEnvironment int
+	maxShardSize            int
+	hermeticDeps            bool
+	imageDeps               bool
+	pave                    bool
+	perShardPackageRepos    bool
+	cacheTestPackages       bool
+	productBundleName       string
 }
 
 func parseFlags() testsharderFlags {
 	var flags testsharderFlags
 	flag.StringVar(&flags.buildDir, "build-dir", "", "path to the fuchsia build directory root (required)")
 	flag.StringVar(&flags.outputFile, "output-file", "", "path to a file which will contain the shards as JSON, default is stdout")
-	flag.Var(&flags.tags, "tag", "environment tags on which to filter; only the tests that match all tags will be sharded")
 	flag.StringVar(&flags.modifiersPath, "modifiers", "", "path to the json manifest containing tests to modify")
+	flag.StringVar(&flags.affectedTestsPath, "affected-tests", "", "path to a file containing names of tests affected by the change being tested. One test name per line.")
+	flag.IntVar(&flags.affectedTestsMaxAttempts, "affected-tests-max-attempts", 2, "maximum attempts for each affected test. Only applied to tests that are not multiplied")
+	flag.BoolVar(&flags.affectedOnly, "affected-only", false, "whether to create test shards for only the affected tests found in either the modifiers file or the affected-tests file.")
+	flag.BoolVar(&flags.skipUnaffected, "skip-unaffected", false, "whether the shards should ignore hermetic, unaffected tests")
+
+	flag.StringVar(&flags.testsharderParamsFile, "params-file", "", "path to the testsharder params file")
+	// TODO(https://fxbug.dev/372309464): Remove below flags once they are passed through the params file.
+	flag.Var(&flags.tags, "tag", "environment tags on which to filter; only the tests that match all tags will be sharded")
 	flag.IntVar(&flags.targetDurationSecs, "target-duration-secs", 0, "approximate duration that each shard should run in")
 	flag.IntVar(&flags.maxShardsPerEnvironment, "max-shards-per-env", 8, "maximum shards allowed per environment. If <= 0, no max will be set")
 	flag.IntVar(&flags.maxShardSize, "max-shard-size", 0, "target max number of tests per shard. It will only have effect if used with target-duration-secs to further "+
@@ -73,23 +86,54 @@ func parseFlags() testsharderFlags {
 	// TODO(https://fxbug.dev/42055729): Support different timeouts for different tests.
 	flag.IntVar(&flags.perTestTimeoutSecs, "per-test-timeout-secs", 0, "per-test timeout, applied to all tests. If <= 0, no timeout will be set")
 	flag.IntVar(&flags.targetTestCount, "target-test-count", 0, "target number of tests per shard. If <= 0, will be ignored. Otherwise, tests will be placed into more, smaller shards")
-	flag.StringVar(&flags.affectedTestsPath, "affected-tests", "", "path to a file containing names of tests affected by the change being tested. One test name per line.")
-	flag.IntVar(&flags.affectedTestsMaxAttempts, "affected-tests-max-attempts", 2, "maximum attempts for each affected test. Only applied to tests that are not multiplied")
 	flag.IntVar(&flags.affectedTestsMultiplyThreshold, "affected-tests-multiply-threshold", 0, "if there are <= this many tests in -affected-tests, they may be multplied "+
 		"(modified to run many times in a separate shard), but only be multiplied if allowed by certain constraints designed to minimize false rejections and bot demand.")
-	flag.BoolVar(&flags.affectedOnly, "affected-only", false, "whether to create test shards for only the affected tests found in either the modifiers file or the affected-tests file.")
 	flag.BoolVar(&flags.hermeticDeps, "hermetic-deps", false, "whether to add all the images and blobs used by the shard as dependencies")
 	flag.BoolVar(&flags.imageDeps, "image-deps", false, "whether to add all the images used by the shard as dependencies")
 	flag.BoolVar(&flags.pave, "pave", false, "whether the shards generated should pave or netboot fuchsia")
-	flag.BoolVar(&flags.skipUnaffected, "skip-unaffected", false, "whether the shards should ignore hermetic, unaffected tests")
 	flag.BoolVar(&flags.perShardPackageRepos, "per-shard-package-repos", false, "whether to construct a local package repo for each shard")
 	flag.BoolVar(&flags.cacheTestPackages, "cache-test-packages", false, "whether the test packages should be cached on disk in the local package repo")
 	flag.StringVar(&flags.productBundleName, "product-bundle-name", "", "name of product bundle to use")
+
 	flag.Usage = usage
 
 	flag.Parse()
 
 	return flags
+}
+
+// ReadParams deserializes a Params proto from a textproto file.
+func ReadParams(path string) (*proto.Params, error) {
+	bytes, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var message proto.Params
+	if err := prototext.Unmarshal(bytes, &message); err != nil {
+		return nil, err
+	}
+	if message.MaxShardsPerEnv == 0 {
+		message.MaxShardsPerEnv = 8
+	}
+	return &message, nil
+}
+
+func getParamsFromFlags(flags testsharderFlags) *proto.Params {
+	return &proto.Params{
+		EnvironmentTags:                flags.tags,
+		TargetDuration:                 durationpb.New(time.Duration(flags.targetDurationSecs) * time.Second),
+		MaxShardsPerEnv:                int32(flags.maxShardsPerEnvironment),
+		MaxShardSize:                   int32(flags.maxShardSize),
+		PerTestTimeout:                 durationpb.New(time.Duration(flags.perTestTimeoutSecs) * time.Second),
+		TargetTestCount:                int32(flags.targetTestCount),
+		AffectedTestsMultiplyThreshold: int32(flags.affectedTestsMultiplyThreshold),
+		HermeticDeps:                   flags.hermeticDeps,
+		ImageDeps:                      flags.imageDeps,
+		Pave:                           flags.pave,
+		PerShardPackageRepos:           flags.perShardPackageRepos,
+		CacheTestPackages:              flags.cacheTestPackages,
+		ProductBundleName:              flags.productBundleName,
+	}
 }
 
 func main() {
@@ -108,6 +152,16 @@ func main() {
 
 func mainImpl(ctx context.Context) error {
 	flags := parseFlags()
+	var params *proto.Params
+	if flags.testsharderParamsFile != "" {
+		var err error
+		params, err = ReadParams(flags.testsharderParamsFile)
+		if err != nil {
+			return err
+		}
+	} else {
+		params = getParamsFromFlags(flags)
+	}
 
 	if flags.buildDir == "" {
 		return fmt.Errorf("must specify a Fuchsia build output directory")
@@ -117,7 +171,7 @@ func mainImpl(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return execute(ctx, flags, m)
+	return execute(ctx, flags, params, m)
 }
 
 type buildModules interface {
@@ -137,31 +191,31 @@ var getHostPlatform = func() (string, error) {
 	return hostplatform.Name()
 }
 
-func execute(ctx context.Context, flags testsharderFlags, m buildModules) error {
-	targetDuration := time.Duration(flags.targetDurationSecs) * time.Second
-	if flags.targetTestCount > 0 && targetDuration > 0 {
+func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, m buildModules) error {
+	targetDuration := params.TargetDuration.AsDuration()
+	if params.TargetTestCount > 0 && targetDuration > 0 {
 		return fmt.Errorf("max-shard-size and target-duration-secs cannot both be set")
 	}
 
-	if flags.maxShardSize > 0 {
-		if flags.targetTestCount > 0 {
+	if params.MaxShardSize > 0 {
+		if params.TargetTestCount > 0 {
 			return fmt.Errorf("max-shard-size has no effect when used with target-test-count")
 		}
 		if targetDuration == 0 {
 			// If no target duration is set, then max shard size will effectively just
 			// become the target test count.
-			flags.targetTestCount = flags.maxShardSize
+			params.TargetTestCount = params.MaxShardSize
 		}
 	}
 
-	perTestTimeout := time.Duration(flags.perTestTimeoutSecs) * time.Second
+	perTestTimeout := params.PerTestTimeout.AsDuration()
 
 	if err := testsharder.ValidateTests(m.TestSpecs(), m.Platforms()); err != nil {
 		return err
 	}
 
 	opts := &testsharder.ShardOptions{
-		Tags: flags.tags,
+		Tags: params.EnvironmentTags,
 	}
 	// Pass in the test-list to carry over tags to the shards.
 	testListPath := filepath.Join(flags.buildDir, m.TestListLocation()[0])
@@ -238,7 +292,7 @@ func execute(ctx context.Context, flags testsharderFlags, m buildModules) error 
 			// run all tests.
 			flags.skipUnaffected = false
 		}
-		affectedModifiers, err := testsharder.AffectedModifiers(m.TestSpecs(), affectedTestNames, flags.affectedTestsMaxAttempts, flags.affectedTestsMultiplyThreshold)
+		affectedModifiers, err := testsharder.AffectedModifiers(m.TestSpecs(), affectedTestNames, flags.affectedTestsMaxAttempts, int(params.AffectedTestsMultiplyThreshold))
 		if err != nil {
 			return err
 		}
@@ -306,25 +360,31 @@ func execute(ctx context.Context, flags testsharderFlags, m buildModules) error 
 		shards = append(shards, nonhermeticShards...)
 	}
 
-	shards, newTargetDuration := testsharder.WithTargetDuration(shards, targetDuration, flags.targetTestCount, flags.maxShardSize, flags.maxShardsPerEnvironment, testDurations)
+	shards, newTargetDuration := testsharder.WithTargetDuration(shards, targetDuration, int(params.TargetTestCount), int(params.MaxShardSize), int(params.MaxShardsPerEnv), testDurations)
 
 	// Add the multiplied shards back into the list of shards to run.
 	if newTargetDuration > targetDuration {
 		targetDuration = newTargetDuration
 	}
-	multipliedShards = testsharder.SplitOutMultipliers(ctx, multipliedShards, testDurations, targetDuration, flags.targetTestCount, testsharder.MaxMultipliedRunsPerShard, testsharder.MultipliedShardPrefix)
-	multipliedAffectedShards = testsharder.SplitOutMultipliers(ctx, multipliedAffectedShards, testDurations, targetDuration, flags.targetTestCount, testsharder.MaxMultipliedRunsPerShard, testsharder.AffectedShardPrefix)
+	multipliedShards = testsharder.SplitOutMultipliers(ctx, multipliedShards, testDurations, targetDuration, int(params.TargetTestCount), testsharder.MaxMultipliedRunsPerShard, testsharder.MultipliedShardPrefix)
+	multipliedAffectedShards = testsharder.SplitOutMultipliers(ctx, multipliedAffectedShards, testDurations, targetDuration, int(params.TargetTestCount), testsharder.MaxMultipliedRunsPerShard, testsharder.AffectedShardPrefix)
 	shards = append(multipliedAffectedShards, shards...)
 	shards = append(shards, multipliedShards...)
 
 	for _, s := range shards {
+		// Pave = false means netboot = true. We set this after creating the shards
+		// so that `netboot` doesn't get added to the shard names since this would
+		// apply to all shards.
+		if !params.Pave {
+			s.Env.Netboot = true
+		}
 		if s.Env.Dimensions.DeviceType() == "" {
 			continue
 		}
-		if err := testsharder.AddFFXDeps(s, flags.buildDir, m.Tools(), flags.pave); err != nil {
+		if err := testsharder.AddFFXDeps(s, flags.buildDir, m.Tools(), params.Pave); err != nil {
 			return err
 		}
-		productBundle := flags.productBundleName
+		productBundle := params.ProductBundleName
 		if s.ProductBundle != "" {
 			productBundle = s.ProductBundle
 		}
@@ -344,12 +404,12 @@ func execute(ctx context.Context, flags testsharderFlags, m buildModules) error 
 			return err
 		}
 		ffxPath := filepath.Join(flags.buildDir, ffxTool.Path)
-		if err := testsharder.AddImageDeps(ctx, s, flags.buildDir, m.Images(), flags.pave, pbPath, ffxPath); err != nil {
+		if err := testsharder.AddImageDeps(ctx, s, flags.buildDir, m.Images(), params.Pave, pbPath, ffxPath); err != nil {
 			return err
 		}
 	}
 
-	if flags.perShardPackageRepos || flags.hermeticDeps {
+	if params.PerShardPackageRepos || params.HermeticDeps {
 		pkgRepos := m.PackageRepositories()
 		if len(pkgRepos) < 1 {
 			return errors.New("build did not generate a package repository")
@@ -367,7 +427,7 @@ func execute(ctx context.Context, flags testsharderFlags, m buildModules) error 
 					// that don't support SSH.
 					continue
 				}
-				if err := s.CreatePackageRepo(flags.buildDir, pkgRepos[0].Path, flags.cacheTestPackages || flags.hermeticDeps); err != nil {
+				if err := s.CreatePackageRepo(flags.buildDir, pkgRepos[0].Path, params.CacheTestPackages || params.HermeticDeps); err != nil {
 					return err
 				}
 			}
@@ -376,6 +436,14 @@ func execute(ctx context.Context, flags testsharderFlags, m buildModules) error 
 
 	if err := testsharder.ExtractDeps(shards, flags.buildDir); err != nil {
 		return err
+	}
+
+	// If the shard timeout is provided in the params file, use that instead
+	// of the computed shard timeout.
+	if params.ShardTimeout.AsDuration() > 0 {
+		for _, s := range shards {
+			s.TimeoutSecs = int(params.ShardTimeout.GetSeconds())
+		}
 	}
 
 	// Add back the skipped shards so that we can process and upload results

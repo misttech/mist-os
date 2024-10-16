@@ -37,9 +37,6 @@ pub use fidl_conversion::{
 const SCAN_RETRY_DELAY_MS: i64 = 100;
 // Max time allowed for consumers of scan results to retrieve results
 const SCAN_CONSUMER_MAX_SECONDS_ALLOWED: i64 = 5;
-// A long amount of time that a scan should be able to finish within. If a scan takes longer than
-// this is indicates something is wrong.
-const SCAN_TIMEOUT: zx::Duration = zx::Duration::from_seconds(60);
 /// Capacity of "first come, first serve" slots available to scan requesters
 pub const SCAN_REQUEST_BUFFER_SIZE: usize = 100;
 
@@ -147,7 +144,7 @@ pub async fn serve_scanning_loop(
                     if !results.is_empty() {
                         location_sensor_updates.push(location_sensor_updater
                             .update_scan_results(results.clone())
-                            .on_timeout(zx::Duration::from_seconds(SCAN_CONSUMER_MAX_SECONDS_ALLOWED), || {
+                            .on_timeout(zx::MonotonicDuration::from_seconds(SCAN_CONSUMER_MAX_SECONDS_ALLOWED), || {
                                 error!("Timed out waiting for location sensor to get results");
 
                             })
@@ -258,13 +255,7 @@ async fn perform_scan(
                 return (scan_request, Err(types::ScanError::GeneralError));
             }
         };
-        // TODO(https://fxbug.dev/42062802) Log metrics when this times out so we are aware of the issue.
-        let scan_results = sme_scan(&sme_proxy, &scan_request, &mut scan_defects)
-            .on_timeout(SCAN_TIMEOUT, || {
-                error!("Timed out waiting on scan response from SME");
-                Err(fidl_policy::ScanErrorCode::GeneralError)
-            })
-            .await;
+        let scan_results = sme_scan(&sme_proxy, &scan_request, &mut scan_defects).await;
         report_scan_defects_to_sme(&sme_proxy, &scan_results, &scan_request).await;
 
         match scan_results {
@@ -291,8 +282,10 @@ async fn perform_scan(
                         return (scan_request, Err(scan_err));
                     }
                     info!("Driver requested a delay before retrying scan");
-                    fasync::Timer::new(zx::Duration::from_millis(SCAN_RETRY_DELAY_MS).after_now())
-                        .await;
+                    fasync::Timer::new(
+                        zx::MonotonicDuration::from_millis(SCAN_RETRY_DELAY_MS).after_now(),
+                    )
+                    .await;
                 }
             },
         }

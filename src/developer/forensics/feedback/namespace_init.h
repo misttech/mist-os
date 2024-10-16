@@ -37,12 +37,11 @@ void MoveAndRecordBootId(const std::string& new_boot_id,
                          const std::string& previous_boot_id_path = kPreviousBootIdPath,
                          const std::string& current_boot_id_path = kCurrentBootIdPath);
 
-// Move the build version stored at |current_build_version_path| to |previoius_build_version_path|
+// Move the build version stored at |current_build_version_path| to |previous_build_version_path|
 // and write the current build version to |current_build_version_path|.
-void MoveAndRecordBuildVersion(
-    const std::string& current_build_version,
-    const std::string& previous_build_version_path = kPreviousBuildVersionPath,
-    const std::string& current_build_version_path = kCurrentBuildVersionPath);
+void MoveAndRecordBuildVersion(const std::string& current_build_version,
+                               const std::string& previous_build_version_path,
+                               const std::string& current_build_version_path);
 
 }  // namespace forensics::feedback
 

@@ -23,52 +23,24 @@
 # but each entry needs a ticket assigned to the assembly team with an agreed
 # upon solution for how to address the tech-debt.
 
+# Use the product assembly config target to specify the product configuration.
+fuchsia_product_assembly_config_label = "//products/terminal"
+zedboot_product_assembly_config_label = "//products/zedboot"
+
 include_shell_commands_package = true
 
 legacy_cache_package_labels = []
-
-# Add UI packages on terminal.
-legacy_cache_package_labels += [
-  "//src/fonts/collections:small-open-fonts-collection",
-  "//src/ui/bin/terminal",
-  "//src/ui/bin/tiles-session",
-
-  # Used to mock out display hardware in UI integration tests.
-  "//src/graphics/display/testing/fake-coordinator-connector",
-]
-
-# Used by Chromium tests, such as //src/chromium:tests.
-# Although deps in the individual tests ensures these are available in Fuchsia
-# infrastructure, Chromium infrastructure runs such tests run on this image,
-# so they must be explicitly included in cached packages.
-# TODO(crbug.com/1408597): Remove once the Chromium tests package the fake.
-legacy_cache_package_labels += [ "//src/chromium:chromium_test_base_deps" ]
 
 # Add SDK tools set to "cache" so these tools are automatically available in
 # QEMU images generated for the SDK, but in cache, so they can be updated.
 legacy_cache_package_labels += [ "//sdk/bundles:tools" ]
 
-# Add Test UI Stack for use in tests.
-# TODO(https://fxbug.dev/42056298): Remove once we migrate client usage to subpackages.
-legacy_cache_package_labels +=
-    [ "//src/ui/testing/test_ui_stack:test-ui-stack-flavors" ]
-
-# Add validator package for use in tests.
-# TODO(https://fxbug.dev/42077782): Remove once we support packages in the SDK.
-legacy_cache_package_labels +=
-    [ "//src/diagnostics/validator/inspect:validator" ]
-
 # Add test validation packages for use in tests.
 # TODO(https://fxbug.dev/42077782): Remove once we support packages in the SDK and we want to put this
 # in the SDK.
 legacy_cache_package_labels += [
-  "//src/tests/fidl/dynsuite/client_suite/harness",
+  # This is a group of 11 testing packages
   "//src/tests/fidl/compatibility:packages",
-  "//src/tests/fidl/dynsuite/server_suite/harness",
 ]
-
-# Use the product assembly config target to specify the product configuration.
-fuchsia_product_assembly_config_label = "//products/terminal"
-zedboot_product_assembly_config_label = "//products/zedboot"
 
 discoverable_package_labels = [ "//bundles/tools" ]

@@ -22,7 +22,7 @@ pub(super) struct InitialContender {
 
     /// The maximum time that can elapse between two fingers down and fingers up
     /// to be considered a secondary tap gesture.
-    pub(super) max_time_elapsed: zx::Duration,
+    pub(super) max_time_elapsed: zx::MonotonicDuration,
 }
 
 impl InitialContender {
@@ -95,7 +95,7 @@ struct OneFingerContactContender {
 
     /// The maximum time that can elapse between two fingers down and fingers up
     /// to be considered a secondary tap gesture.
-    max_time_elapsed: zx::Duration,
+    max_time_elapsed: zx::MonotonicDuration,
 }
 
 impl OneFingerContactContender {
@@ -193,7 +193,7 @@ struct TwoFingerContactsContender {
 
     /// The maximum time that can elapse between two fingers down and fingers up
     /// to be considered a secondary tap gesture.
-    max_time_elapsed: zx::Duration,
+    max_time_elapsed: zx::MonotonicDuration,
 }
 
 impl TwoFingerContactsContender {
@@ -331,7 +331,7 @@ struct OneFingerRaisedContender {
 
     /// The maximum time that can elapse between two fingers down and fingers up
     /// to be considered a secondary tap gesture.
-    max_time_elapsed: zx::Duration,
+    max_time_elapsed: zx::MonotonicDuration,
 }
 
 impl OneFingerRaisedContender {
@@ -425,7 +425,7 @@ struct MatchedContender {
 
     /// The maximum time that can elapse between two fingers down and fingers up
     /// to be considered a secondary tap gesture.
-    max_time_elapsed: zx::Duration,
+    max_time_elapsed: zx::MonotonicDuration,
 }
 
 impl gesture_arena::MatchedContender for MatchedContender {
@@ -518,7 +518,7 @@ mod tests {
     use assert_matches::assert_matches;
     use std::any::TypeId;
 
-    const MAX_TIME_ELAPSED: zx::Duration = zx::Duration::from_nanos(10000);
+    const MAX_TIME_ELAPSED: zx::MonotonicDuration = zx::MonotonicDuration::from_nanos(10000);
     const MAX_FINGER_DISPLACEMENT_IN_MM: f32 = 10.0;
     const HALF_MOTION: f32 = MAX_FINGER_DISPLACEMENT_IN_MM / 2.0;
 

@@ -153,7 +153,10 @@ impl KernelStats {
                     // to `end_stats`, which would be invalid.
                     let start_time = fuchsia_async::MonotonicInstant::now();
                     let start_stats = self.resource.cpu_stats()?;
-                    fuchsia_async::Timer::new(zx::Duration::from_nanos(duration).after_now()).await;
+                    fuchsia_async::Timer::new(
+                        zx::MonotonicDuration::from_nanos(duration).after_now(),
+                    )
+                    .await;
                     let end_stats = self.resource.cpu_stats()?;
                     let end_time = fuchsia_async::MonotonicInstant::now();
 
@@ -275,8 +278,9 @@ mod tests {
     #[fuchsia::test]
     async fn get_cpu_load() -> Result<(), Error> {
         let kernel_stats_provider = serve_kernel_stats(OnError::Panic).await?;
-        let cpu_loads =
-            kernel_stats_provider.get_cpu_load(zx::Duration::from_seconds(1).into_nanos()).await?;
+        let cpu_loads = kernel_stats_provider
+            .get_cpu_load(zx::MonotonicDuration::from_seconds(1).into_nanos())
+            .await?;
 
         assert!(
             cpu_loads.iter().all(|l| l > &0.0 && l <= &100.0),

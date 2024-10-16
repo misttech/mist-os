@@ -30,8 +30,8 @@ Loading 15 modules for cobalt.cm ...Done.
 
 If you wanted to capture a minidump, you would first `pause` the debugger:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] pause
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+pause
 ```
 
 You should see an output like:
@@ -47,8 +47,8 @@ You should see an output like:
 
 Use `savedump` to save a minidump:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] savedump cobalt.dump
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+savedump cobalt.dump
 ```
 
 You should see an output like:
@@ -60,8 +60,8 @@ Minidump written to cobalt.dump
 
 Once you have saved the minidump, you can exit the debugger:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] quit
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+quit
 ```
 
 Your minidump is now saved in your working directory. You are now ready to load
@@ -105,8 +105,8 @@ differences about things to look out for in each language.
 
   1. List the stack frames:
 
-      ```none {:.devsite-disable-click-to-copy}
-      [zxdb] frame
+      ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+      frame
       ```
 
       You should see an output like:
@@ -161,8 +161,8 @@ differences about things to look out for in each language.
 
       List the frames of each thread:
 
-      ```none {:.devsite-disable-click-to-copy}
-      [zxdb] thread * frame
+      ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+      thread * frame
       ```
 
       You should see an output like:
@@ -175,8 +175,8 @@ differences about things to look out for in each language.
   1. List the frames of each thread, but with more detailed information,
      you can combine `thread` with the `backtrace` verb:
 
-      ```none {:.devsite-disable-click-to-copy}
-      [zxdb] thread * backtrace
+      ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+      thread * backtrace
       ```
 
       This command helps you see the local variables for each stack frame. Keep
@@ -281,8 +281,8 @@ differences about things to look out for in each language.
 
      Note: You can also use any of the regular zxdb thread and frame commands.
 
-      ```none {:.devsite-disable-click-to-copy}
-      [zxdb] thread
+      ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+      thread
       ```
 
       You should see an output like:
@@ -294,8 +294,8 @@ differences about things to look out for in each language.
 
   1. List a specific thread. For example, `thread 1`:
 
-      ```none {:.devsite-disable-click-to-copy}
-      [zxdb] thread 1
+      ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+      thread 1
       ```
 
       You should see an output like:
@@ -309,8 +309,8 @@ differences about things to look out for in each language.
       Note: As this component ran on a single thread, this output is The
       same as when you ran `frame` after loading the minidump into zxdb.
 
-      ```none {:.devsite-disable-click-to-copy}
-      [zxdb] frame
+      ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+      frame
       ```
 
       You should see an output like:
@@ -360,8 +360,8 @@ differences about things to look out for in each language.
   1. Based on the output from the previous step, you may want to dive deeper
      into `frame 0`:
 
-      ```none {:.devsite-disable-click-to-copy}
-      [zxdb] frame 0
+      ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+      frame 0
       ```
 
       You should see an output like:
@@ -372,8 +372,8 @@ differences about things to look out for in each language.
 
   1. To see additional lines of code from the current frame, use `list`:
 
-      ```none {:.devsite-disable-click-to-copy}
-      [zxdb] list
+      ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+      list
       ```
 
       You should see an output like:
@@ -402,8 +402,8 @@ differences about things to look out for in each language.
 
   1. To see all local variables in the current stack frame, use `locals`:
 
-      ```none {:.devsite-disable-click-to-copy}
-      [zxdb] locals
+      ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+      locals
       ```
 
       You should see an output like:
@@ -428,8 +428,8 @@ differences about things to look out for in each language.
       For example:
 
 
-      ```none {:.devsite-disable-click-to-copy}
-      [zxdb] print _task_context
+      ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+      print _task_context
       ```
 
       You should see an output like:
@@ -476,8 +476,8 @@ differences about things to look out for in each language.
 
   1. List the stack frames:
 
-      ```none {:.devsite-disable-click-to-copy}
-      [zxdb] frame
+      ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+      frame
       ```
 
       You should see an output like:
@@ -496,8 +496,8 @@ differences about things to look out for in each language.
 
       List the frames of each thread:
 
-      ```none {:.devsite-disable-click-to-copy}
-      [zxdb] thread * frame
+      ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+      thread * frame
       ```
 
       You should see an output like:
@@ -567,8 +567,8 @@ differences about things to look out for in each language.
   1. To list the frames of each thread, but with more detailed information,
      you can combine `thread` with the `backtrace` verb:
 
-      ```none {:.devsite-disable-click-to-copy}
-      [zxdb] thread * backtrace
+      ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+      thread * backtrace
       ```
 
       This command helps you see the local variables for each stack frame. Keep
@@ -771,8 +771,8 @@ differences about things to look out for in each language.
 
      Note: You can also use any of the regular zxdb thread and frame commands.
 
-      ```none {:.devsite-disable-click-to-copy}
-      [zxdb] thread
+      ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+      thread
       ```
 
       You should see an output like:
@@ -787,8 +787,8 @@ differences about things to look out for in each language.
 
   1. List a specific thread. For example, `thread 2`:
 
-      ```none {:.devsite-disable-click-to-copy}
-      [zxdb] thread 2
+      ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+      thread 2
       ```
 
       You should see an output like:
@@ -799,8 +799,8 @@ differences about things to look out for in each language.
 
   1. You can then use `frame` to see this specific stack frame from `thread 2`:
 
-      ```none {:.devsite-disable-click-to-copy}
-      [zxdb] frame
+      ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+      frame
       ```
 
       You should see an output like:
@@ -832,8 +832,8 @@ differences about things to look out for in each language.
       Note: This example is on a different thread to show the difference when
       you follow the `thread` noun with `frame`.
 
-      ```none {:.devsite-disable-click-to-copy}
-      [zxdb] thread 1
+      ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+      thread 1
       ```
 
       You should see an output like:
@@ -844,8 +844,8 @@ differences about things to look out for in each language.
 
   1. You can then use `frame` to see this specific stack frame from `thread 1`:
 
-      ```none {:.devsite-disable-click-to-copy}
-      [zxdb] frame
+      ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+      frame
       ```
 
       You should see an output like:
@@ -859,8 +859,8 @@ differences about things to look out for in each language.
   1. Based on the output from the previous step, you may want to dive deeper
      into `frame 5`:
 
-      ```none {:.devsite-disable-click-to-copy}
-      [zxdb] frame 5
+      ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+      frame 5
       ```
 
       You should see an output like:
@@ -871,8 +871,8 @@ differences about things to look out for in each language.
 
   1. To see additional lines of code from the current frame, use `list`:
 
-      ```none {:.devsite-disable-click-to-copy}
-      [zxdb] list
+      ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+      list
       ```
 
       You should see an output like:
@@ -894,8 +894,8 @@ differences about things to look out for in each language.
 
   1. To see all local variables in the current stack frame, use `locals`:
 
-      ```none {:.devsite-disable-click-to-copy}
-      [zxdb] locals
+      ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+      locals
       ```
 
       You should see an output like:
@@ -937,8 +937,8 @@ differences about things to look out for in each language.
       You can then see more information about a specific variable with `print`.
       For example:
 
-      ```none {:.devsite-disable-click-to-copy}
-      [zxdb] print upload_schedule
+      ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+      print upload_schedule
       ```
 
       You should see an output like:

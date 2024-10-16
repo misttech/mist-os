@@ -239,12 +239,12 @@ impl SocketOps for RemoteUnixDomainSocket {
         let _ = self.client.close(zx::MonotonicInstant::ZERO);
     }
 
-    fn getsockname(&self, _socket: &Socket) -> Vec<u8> {
-        vec![]
+    fn getsockname(&self, _socket: &Socket) -> Result<SocketAddress, Errno> {
+        Ok(SocketAddress::default_for_domain(SocketDomain::Unix))
     }
 
-    fn getpeername(&self, _socket: &Socket) -> Result<Vec<u8>, Errno> {
-        Ok(vec![])
+    fn getpeername(&self, socket: &Socket) -> Result<SocketAddress, Errno> {
+        self.getsockname(socket)
     }
 
     fn setsockopt(

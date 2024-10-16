@@ -17,6 +17,7 @@
 use {
     bitflags::bitflags,
     zx_status as zx_status,
+    fidl::encoding::ProxyChannelBox,
     futures::future::{self, MaybeDone, TryFutureExt},
     fidl::{
         endpoints::{ControlHandle as _, Responder as _},

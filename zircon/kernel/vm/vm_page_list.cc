@@ -1145,8 +1145,8 @@ zx_status_t VmPageList::ClipIntervalEnd(uint64_t interval_end, uint64_t len) {
 
 void VmPageList::MergeFrom(
     VmPageList& other, const uint64_t offset, const uint64_t end_offset,
-    fit::inline_function<void(VmPageOrMarker&&, uint64_t offset), 3 * sizeof(void*)> release_fn,
-    fit::inline_function<void(VmPageOrMarker*, uint64_t offset)> migrate_fn) {
+    fit::inline_function<void(VmPageOrMarker&& p, uint64_t offset), 3 * sizeof(void*)> release_fn,
+    fit::inline_function<void(VmPageOrMarker* p, uint64_t offset)> migrate_fn) {
   constexpr uint64_t kNodeSize = PAGE_SIZE * VmPageListNode::kPageFanOut;
   // The skewed |offset| in |other| must be equal to 0 skewed in |this|. This allows
   // nodes to moved directly between the lists, without having to worry about allocations.
@@ -1231,8 +1231,8 @@ void VmPageList::MergeFrom(
   }
 }
 
-void VmPageList::MergeOnto(VmPageList& other,
-                           fit::inline_function<void(VmPageOrMarker&&)> release_fn) {
+void VmPageList::MergeOnto(
+    VmPageList& other, fit::inline_function<void(VmPageOrMarker&& p, uint64_t offset)> release_fn) {
   DEBUG_ASSERT(other.list_skew_ == list_skew_);
 
   auto iter = list_.begin();
@@ -1252,7 +1252,8 @@ void VmPageList::MergeOnto(VmPageList& other,
         VmPageOrMarker removed = ktl::move(old_page);
         old_page = ktl::move(page);
         if (!removed.IsEmpty()) {
-          release_fn(ktl::move(removed));
+          uint64_t target_offset = target->GetKey() - other.list_skew_ + i * PAGE_SIZE;
+          release_fn(ktl::move(removed), target_offset);
         }
       }
     } else {

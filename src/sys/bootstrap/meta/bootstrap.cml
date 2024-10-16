@@ -19,12 +19,21 @@
     ],
     capabilities: [
         { dictionary: "toolbox" },
+        { dictionary: "diagnostics" },
     ],
     offer: [
         {
             config: [ "fuchsia.diagnostics.ExceptionHandlerAvailable" ],
             from: "parent",
             to: "#critical-services",
+        },
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "#archivist",
+            to: "self/diagnostics",
         },
         {
             protocol: [ "fuchsia.boot.WriteOnlyLog" ],
@@ -78,6 +87,14 @@
                 "fuchsia.logger.LogSink",
             ],
             from: "#archivist",
+            to: [
+                "#critical-services",
+                "#shutdown_shim",
+            ],
+        },
+        {
+            dictionary: "diagnostics",
+            from: "self",
             to: [
                 "#critical-services",
                 "#shutdown_shim",
@@ -153,6 +170,10 @@
                 "fuchsia.logger.LogSink",
             ],
             from: "#archivist",
+        },
+        {
+            dictionary: "diagnostics",
+            from: "self",
         },
     ],
 }

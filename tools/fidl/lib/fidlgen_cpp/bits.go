@@ -41,7 +41,7 @@ func (c *compiler) compileBits(val fidlgen.Bits) *Bits {
 		Attributes:   Attributes{val.Attributes},
 		Strictness:   val.Strictness,
 		nameVariants: name,
-		Type:         c.compileType(val.Type).nameVariants,
+		Type:         c.compileType(val.Type, nil).nameVariants,
 		Mask:         val.Mask,
 		MaskName:     name.appendName("Mask"),
 	}

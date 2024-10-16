@@ -267,7 +267,8 @@ impl UpdatingTufClient {
     }
 }
 
-pub const METADATA_CACHE_STALE_TIMEOUT: zx::Duration = zx::Duration::from_minutes(5);
+pub const METADATA_CACHE_STALE_TIMEOUT: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_minutes(5);
 
 struct AutoClient {
     updating_client: Weak<AsyncMutex<UpdatingTufClient>>,
@@ -283,10 +284,12 @@ struct AutoClientInspectState {
 }
 
 #[cfg(not(test))]
-const AUTO_CLIENT_SSE_RECONNECT_DELAY: zx::Duration = zx::Duration::from_minutes(1);
+const AUTO_CLIENT_SSE_RECONNECT_DELAY: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_minutes(1);
 
 #[cfg(test)]
-const AUTO_CLIENT_SSE_RECONNECT_DELAY: zx::Duration = zx::Duration::from_minutes(0);
+const AUTO_CLIENT_SSE_RECONNECT_DELAY: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_minutes(0);
 
 impl AutoClient {
     fn from_updating_client_and_auto_url(

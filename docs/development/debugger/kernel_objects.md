@@ -8,8 +8,8 @@ Virtual Memory Objects can be mapped but won't have open handles with the
 
 For example:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] handles
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+handles
       Handle  Type                  Koid
       <none>  ZX_OBJ_TYPE_VMO      30040
   4166674259  ZX_OBJ_TYPE_TIMER    30158
@@ -22,8 +22,8 @@ For example:
 
 Note: This command is `handle` and not `handles`.
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] handle 4166674259
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+handle 4166674259
   Handle  4166674259
     Type  ZX_OBJ_TYPE_TIMER
     Koid  30158
@@ -39,8 +39,8 @@ VMOs that have no open handles.
 
 For example:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] handle -k 30108
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+handle -k 30108
                    Handle  <none>
                      Type  ZX_OBJ_TYPE_VMO
                      Koid  30108

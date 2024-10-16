@@ -23,7 +23,7 @@ fpromise::result<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> OpenWith
   return fpromise::ok(std::move(client));
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#if FUCHSIA_API_LEVEL_AT_LEAST(24)
 fpromise::result<fidl::WireSharedClient<fuchsia_io::File>, zx_status_t> OpenWithResult(
     const fdf::Namespace& ns, async_dispatcher_t* dispatcher, const char* path,
     fuchsia_io::Flags flags) {

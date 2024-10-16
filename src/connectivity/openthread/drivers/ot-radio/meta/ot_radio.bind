@@ -38,6 +38,6 @@ node "pdev" {
   fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID == 0;
 }
 
-optional node "gpio-init" {
+node "gpio-init" {
   fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
 }

@@ -187,7 +187,49 @@ fit::result<fdf::wire::NodeError> ValidateSymbols(std::vector<fdf::NodeSymbol>& 
   return fit::ok();
 }
 
+std::optional<NodeOffer> CreateCompositeOffer(fidl::AnyArena& arena, NodeOffer& offer,
+                                              std::string_view parents_name, bool primary_parent) {
+  zx::result get_offer_result = GetInnerOffer(offer);
+  if (get_offer_result.is_error()) {
+    return std::nullopt;
+  }
+
+  auto [inner_offer, transport] = get_offer_result.value();
+
+  std::optional<fdecl::wire::Offer> composite_offer;
+  if (inner_offer.is_service()) {
+    // We route 'service' capabilities based on the parent's name.
+    composite_offer = CreateCompositeServiceOffer(arena, inner_offer, parents_name, primary_parent);
+  } else {
+    // Other capabilities we can simply forward unchanged, but allocated on the new arena.
+    composite_offer = fidl::ToWire(arena, fidl::ToNatural(inner_offer));
+  }
+
+  if (!composite_offer) {
+    return std::nullopt;
+  }
+
+  switch (transport) {
+    case OfferTransport::ZirconTransport:
+      return fdf::wire::Offer::WithZirconTransport(arena, *composite_offer);
+    case OfferTransport::DriverTransport:
+      return fdf::wire::Offer::WithDriverTransport(arena, *composite_offer);
+  }
+}
+
 }  // namespace
+
+zx::result<std::pair<fdecl::wire::Offer, OfferTransport>> GetInnerOffer(const NodeOffer& offer) {
+  switch (offer.Which()) {
+    case fdf::wire::Offer::Tag::kZirconTransport:
+      return zx::ok(std::make_pair(offer.zircon_transport(), OfferTransport::ZirconTransport));
+    case fdf::wire::Offer::Tag::kDriverTransport:
+      return zx::ok(std::make_pair(offer.driver_transport(), OfferTransport::DriverTransport));
+    default:
+      LOGF(ERROR, "Unknown offer transport type %d", offer.Which());
+      return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+}
 
 std::optional<fdecl::wire::Offer> CreateCompositeServiceOffer(fidl::AnyArena& arena,
                                                               fdecl::wire::Offer& offer,
@@ -284,19 +326,6 @@ std::optional<fdecl::wire::Offer> CreateCompositeServiceOffer(fidl::AnyArena& ar
   return fdecl::wire::Offer::WithService(arena, service.Build());
 }
 
-std::optional<fdecl::wire::Offer> CreateCompositeOffer(fidl::AnyArena& arena,
-                                                       fdecl::wire::Offer& offer,
-                                                       std::string_view parents_name,
-                                                       bool primary_parent) {
-  // We route 'service' capabilities based on the parent's name.
-  if (offer.is_service()) {
-    return CreateCompositeServiceOffer(arena, offer, parents_name, primary_parent);
-  }
-
-  // Other capabilities we can simply forward unchanged, but allocated on the new arena.
-  return fidl::ToWire(arena, fidl::ToNatural(offer));
-}
-
 Node::Node(std::string_view name, std::vector<std::weak_ptr<Node>> parents,
            NodeManager* node_manager, async_dispatcher_t* dispatcher, DeviceInspect inspect,
            uint32_t primary_index, NodeType type)
@@ -367,16 +396,16 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
   }
 
   // Copy the offers from each parent.
-  std::vector<fdecl::wire::Offer> node_offers;
+  std::vector<NodeOffer> node_offers;
   size_t parent_index = 0;
-  for (const std::weak_ptr<Node> parent : composite->parents_) {
+  for (const std::weak_ptr<Node>& parent : composite->parents_) {
     auto parent_ptr = parent.lock();
     if (!parent_ptr) {
       LOGF(ERROR, "Composite parent node freed before use");
       return zx::error(ZX_ERR_INTERNAL);
     }
     auto parent_offers = parent_ptr->offers();
-    node_offers.reserve(node_offers.size() + parent_offers.count());
+    node_offers.reserve(node_offers.size() + parent_offers.size());
 
     for (auto& parent_offer : parent_offers) {
       auto offer = CreateCompositeOffer(composite->arena_, parent_offer,
@@ -775,20 +804,22 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
       std::make_shared<Node>(name, std::vector<std::weak_ptr<Node>>{weak_from_this()},
                              *node_manager_, dispatcher_, std::move(inspect));
 
-  auto& deprecated_offers = args.offers();
+  if (args.offers().has_value()) {
+    LOGF(ERROR, "Failed to add Node '%.*s', offers() is no longer supported.",
+         static_cast<int>(name.size()), name.data());
+    return fit::as_error(fdf::wire::NodeError::kInternal);
+  }
+
   auto& fdf_offers = args.offers2();
   std::vector<fuchsia_driver_framework::NodeProperty> properties;
   const auto& arg_properties = args.properties();
   if (arg_properties.has_value()) {
     properties = arg_properties.value();
   }
-  if (deprecated_offers.has_value() || fdf_offers.has_value()) {
+  if (fdf_offers.has_value()) {
     size_t n = 0;
-    if (deprecated_offers.has_value()) {
-      n += deprecated_offers.value().size();
-    }
     if (fdf_offers.has_value()) {
-      n += fdf_offers.value().size();
+      n = fdf_offers.value().size();
     }
     child->offers_.reserve(n);
 
@@ -802,19 +833,6 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
         fdecl::Ref::WithChild(fdecl::ChildRef()
                                   .name(source_node->MakeComponentMoniker())
                                   .collection(CollectionName(source_node->collection_)));
-
-    if (deprecated_offers.has_value()) {
-      for (auto& offer : deprecated_offers.value()) {
-        fit::result new_offer = ProcessNodeOffer(offer, source_ref);
-        if (new_offer.is_error()) {
-          LOGF(ERROR, "Failed to add Node '%s': Bad add offer: %d",
-               child->MakeTopologicalPath().c_str(), new_offer.error_value());
-          return new_offer.take_error();
-        }
-
-        child->offers_.emplace_back(fidl::ToWire(child->arena_, new_offer.value()));
-      }
-    }
 
     if (fdf_offers.has_value()) {
       for (auto& fdf_offer : fdf_offers.value()) {
@@ -843,7 +861,19 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
           return new_offer.take_error();
         }
         auto [processed_offer, property] = std::move(new_offer.value());
-        child->offers_.emplace_back(fidl::ToWire(child->arena_, processed_offer));
+        switch (fdf_offer.Which()) {
+          case fdf::Offer::Tag::kZirconTransport:
+            child->offers_.emplace_back(fdf::wire::Offer::WithZirconTransport(
+                child->arena_, fidl::ToWire(child->arena_, processed_offer)));
+            break;
+          case fdf::Offer::Tag::kDriverTransport:
+            child->offers_.emplace_back(fdf::wire::Offer::WithDriverTransport(
+                child->arena_, fidl::ToWire(child->arena_, processed_offer)));
+            break;
+          default:
+            LOGF(ERROR, "Unknown offer transport type %d", fdf_offer.Which());
+            return fit::error(fdf::NodeError::kInternal);
+        }
         properties.emplace_back(property);
       }
     }
@@ -1143,6 +1173,12 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
     symbols = this->symbols();
   }
 
+  fidl::VectorView<fdf::wire::Offer> offers_for_start_wire(arena_, offers_.size());
+  for (size_t i = 0; i < offers_.size(); i++) {
+    const auto& offer = offers_[i];
+    offers_for_start_wire[i] = fidl::ToWire(arena_, fidl::ToNatural(offer));
+  }
+
   std::optional<DriverHost::DriverLoadArgs> dynamic_linker_load_args;
   std::optional<DriverHost::DriverStartArgs> dynamic_linker_start_args;
   if (use_dynamic_linker) {
@@ -1152,7 +1188,8 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
       return;
     }
     dynamic_linker_load_args = std::move(*result);
-    dynamic_linker_start_args = DriverHost::DriverStartArgs(properties_, symbols, start_info);
+    dynamic_linker_start_args =
+        DriverHost::DriverStartArgs(properties_, symbols, offers_for_start_wire, start_info);
   }
 
   // Launch a driver host if we are not colocated.
@@ -1206,8 +1243,8 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
   auto driver_endpoints = fidl::Endpoints<fuchsia_driver_host::Driver>::Create();
   driver_component_.emplace(*this, std::string(url), std::move(controller),
                             std::move(driver_endpoints.client));
-  driver_host_.value()->Start(std::move(client_end), name_, properties_, symbols, start_info,
-                              std::move(driver_endpoints.server),
+  driver_host_.value()->Start(std::move(client_end), name_, properties_, symbols,
+                              offers_for_start_wire, start_info, std::move(driver_endpoints.server),
                               [weak_self = weak_from_this(), name = name_,
                                cb = std::move(cb)](zx::result<> result) mutable {
                                 auto node_ptr = weak_self.lock();

@@ -9,7 +9,6 @@ import time
 from typing import Any, List
 
 from honeydew.interfaces.device_classes import fuchsia_device
-from honeydew.typing.bluetooth import BluetoothConnectionType
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 DEFAULT_WAITING_SECS = 10
@@ -44,8 +43,12 @@ def retrieve_device_id(
 def forget_all_bt_devices(device: fuchsia_device.FuchsiaDevice) -> None:
     """Unpairs and deletes any BT peer pairing data from the device."""
     data = device.bluetooth_gap.get_known_remote_devices()
-    for device_id in data.keys():
-        device.bluetooth_gap.forget_device(identifier=device_id)
+    _LOGGER.info(data)
+    for identifier in data.keys():
+        if data[str(identifier)]["connected"]:
+            device.bluetooth_gap.forget_device(
+                identifier=data[identifier]["id"]
+            )
 
 
 def verify_bt_connection(
@@ -58,14 +61,11 @@ def verify_bt_connection(
     _LOGGER.info("Checking if device is connected to %s", identifier)
     for _ in range(num_retries):
         data = device.bluetooth_gap.get_known_remote_devices()
-        if data[identifier]["connected"]:
+        _LOGGER.info(data)
+        if data[str(identifier)]["connected"]:
             _LOGGER.info("Connection is active")
             return True
         _LOGGER.info("Connection is not active, Checking in 10 seconds")
-        device.bluetooth_avrcp.connect_device(
-            identifier=identifier,
-            connection_type=BluetoothConnectionType.CLASSIC,
-        )
         time.sleep(wait_secs)
     return False
 
@@ -80,7 +80,7 @@ def verify_bt_pairing(
     _LOGGER.info("Checking if device is paired to %s", identifier)
     for _ in range(num_retries):
         data = device.bluetooth_gap.get_known_remote_devices()
-        if data[identifier]["bonded"]:
+        if data[str(identifier)]["bonded"]:
             _LOGGER.info("Pairing is complete")
             return True
         _LOGGER.info("Pairing is not completed, Checking in 10 seconds")

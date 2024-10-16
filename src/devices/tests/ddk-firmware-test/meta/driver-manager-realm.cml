@@ -38,10 +38,7 @@
             to: "#devfs",
         },
         {
-            protocol: [
-                "fuchsia.logger.LogSink",
-                "fuchsia.process.Launcher",
-            ],
+            protocol: [ "fuchsia.process.Launcher" ],
             from: "parent",
             to: "#driver-manager",
         },
@@ -58,11 +55,6 @@
             protocol: [ "fuchsia.driver.index.DriverIndex" ],
             from: "#driver-index",
             to: "#driver-manager",
-        },
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: "#driver-index",
         },
         {
             protocol: "fuchsia.component.resolution.Resolver-base",

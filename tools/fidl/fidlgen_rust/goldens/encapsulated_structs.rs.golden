@@ -7,6 +7,7 @@
 
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
+use fidl::encoding::ProxyChannelBox;
 use fidl::endpoints::{ControlHandle as _, Responder as _};
 use futures::future::{self, MaybeDone, TryFutureExt};
 use zx_status;
@@ -43,7 +44,7 @@ pub struct NonInlineStructTestStruct {
     pub h: fidl::Handle,
 }
 
-impl fidl::Standalone for NonInlineStructTestStruct {}
+impl fidl::Standalone<fidl::encoding::DefaultFuchsiaResourceDialect> for NonInlineStructTestStruct {}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[repr(C)]
@@ -61,7 +62,7 @@ pub struct TopLevelStruct {
     pub b: NonInlineStructTestStruct,
 }
 
-impl fidl::Standalone for TopLevelStruct {}
+impl fidl::Standalone<fidl::encoding::DefaultFuchsiaResourceDialect> for TopLevelStruct {}
 
 mod internal {
     use super::*;

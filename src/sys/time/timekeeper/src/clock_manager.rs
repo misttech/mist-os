@@ -11,7 +11,7 @@ use crate::rtc::Rtc;
 use crate::time_source_manager::{KernelMonotonicProvider, TimeSourceManager};
 use crate::{Command, Config, UtcTransform};
 use chrono::prelude::*;
-use fuchsia_runtime::{UtcClock, UtcClockUpdate, UtcInstant};
+use fuchsia_runtime::{UtcClock, UtcClockUpdate, UtcDuration, UtcInstant};
 use futures::channel::mpsc;
 use futures::{select, FutureExt, SinkExt, StreamExt};
 use std::cell::Cell;
@@ -36,14 +36,15 @@ const NOMINAL_RATE_CORRECTION_PPM: i64 = 20;
 
 /// The longest duration for which Timekeeper will apply a clock frequency adjustment in response to
 /// a single time update.
-const MAX_SLEW_DURATION: zx::Duration = zx::Duration::from_minutes(90);
+const MAX_SLEW_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_minutes(90);
 
 /// The largest error that may be corrected through slewing at the maximum rate.
-const MAX_RATE_MAX_ERROR: zx::Duration =
-    zx::Duration::from_nanos((MAX_SLEW_DURATION.into_nanos() * MAX_RATE_CORRECTION_PPM) / MILLION);
+const MAX_RATE_MAX_ERROR: zx::MonotonicDuration = zx::MonotonicDuration::from_nanos(
+    (MAX_SLEW_DURATION.into_nanos() * MAX_RATE_CORRECTION_PPM) / MILLION,
+);
 
 /// The largest error that may be corrected through slewing at the preferred rate.
-const NOMINAL_RATE_MAX_ERROR: zx::Duration = zx::Duration::from_nanos(
+const NOMINAL_RATE_MAX_ERROR: zx::MonotonicDuration = zx::MonotonicDuration::from_nanos(
     (MAX_SLEW_DURATION.into_nanos() * NOMINAL_RATE_CORRECTION_PPM) / MILLION,
 );
 
@@ -52,7 +53,7 @@ const NOMINAL_RATE_MAX_ERROR: zx::Duration = zx::Duration::from_nanos(
 const ERROR_BOUND_UPDATE: u64 = 100_000_000; // 100ms
 
 /// The interval at which the error bound will be refreshed while no other events are in progress.
-const ERROR_REFRESH_INTERVAL: zx::Duration = zx::Duration::from_minutes(6);
+const ERROR_REFRESH_INTERVAL: zx::MonotonicDuration = zx::MonotonicDuration::from_minutes(6);
 
 /// Denotes an unknown clock error bound
 const ZX_CLOCK_UNKNOWN_ERROR_BOUND: u64 = u64::MAX;
@@ -77,7 +78,7 @@ impl ClockCorrection {
     ) -> Self {
         let difference = final_transform.difference(&initial_transform, start_time);
         let difference_nanos = difference.into_nanos();
-        let difference_abs = zx::Duration::from_nanos(difference_nanos.abs());
+        let difference_abs = zx::MonotonicDuration::from_nanos(difference_nanos.abs());
         let sign = if difference_nanos < 0 { -1 } else { 1 };
 
         if difference_abs < NOMINAL_RATE_MAX_ERROR {
@@ -87,27 +88,32 @@ impl ClockCorrection {
         } else if difference_abs < MAX_RATE_MAX_ERROR {
             // Round rate up to the next greater PPM such that duration will be slightly under
             // MAX_SLEW_DURATION rather that slightly over MAX_SLEW_DURATION.
-            let rate =
-                (((difference_nanos * MILLION) / MAX_SLEW_DURATION.into_nanos()) + sign) as i32;
-            let duration = (difference * MILLION) / rate;
-            ClockCorrection::MaxDurationSlew(Slew::new(rate, duration, start_time, final_transform))
+            let rate = ((difference_nanos * MILLION) / MAX_SLEW_DURATION.into_nanos()) + sign;
+            let duration =
+                zx::MonotonicDuration::from_nanos((difference.into_nanos() * MILLION) / rate);
+            ClockCorrection::MaxDurationSlew(Slew::new(
+                rate as i32,
+                duration,
+                start_time,
+                final_transform,
+            ))
         } else {
             ClockCorrection::Step(Step::new(difference, start_time, final_transform))
         }
     }
 
     /// Returns the total clock change made by this `ClockCorrection`.
-    fn difference(&self) -> zx::Duration {
+    fn difference(&self) -> UtcDuration {
         match self {
             ClockCorrection::Step(step) => step.difference,
             ClockCorrection::NominalRateSlew(slew) | ClockCorrection::MaxDurationSlew(slew) => {
-                zx::Duration::from_nanos(
-                    (slew.duration.into_nanos() * slew.slew_rate_adjust as i64) / MILLION,
+                UtcDuration::from_nanos(
+                    (slew.duration.into_nanos() * (slew.slew_rate_adjust as i64)) / MILLION,
                 )
             }
             // Setting max error bound does not result in a clock change, only the clock
-            // errro bound change.
-            ClockCorrection::MaxErrorBound => zx::Duration::ZERO,
+            // error bound change.
+            ClockCorrection::MaxErrorBound => UtcDuration::ZERO,
         }
     }
 
@@ -126,7 +132,7 @@ impl ClockCorrection {
 #[derive(PartialEq)]
 struct Step {
     /// Change in clock value being made.
-    difference: zx::Duration,
+    difference: UtcDuration,
     /// Monotonic time at the step.
     monotonic: zx::MonotonicInstant,
     /// UTC time after the step.
@@ -140,7 +146,7 @@ struct Step {
 impl Step {
     /// Returns a step to move onto the supplied transform at the supplied monotonic time.
     fn new(
-        difference: zx::Duration,
+        difference: UtcDuration,
         start_time: zx::MonotonicInstant,
         final_transform: &UtcTransform,
     ) -> Self {
@@ -172,7 +178,7 @@ struct Slew {
     /// Additional clock rate adjustment to execute the slew, in parts per million.
     slew_rate_adjust: i32,
     /// Monotonic duration for which the slew is to be maintained.
-    duration: zx::Duration,
+    duration: zx::MonotonicDuration,
     /// Error bound at start of the slew.
     start_error_bound: u64,
     /// Error bound at completion of the slew.
@@ -184,12 +190,12 @@ impl Slew {
     /// using the supplied transform and assuming the slew starts at the supplied monotonic time.
     fn new(
         slew_rate_adjust: i32,
-        duration: zx::Duration,
+        duration: zx::MonotonicDuration,
         start_time: zx::MonotonicInstant,
         final_transform: &UtcTransform,
     ) -> Self {
         let absolute_slew_correction_nanos =
-            (duration.into_nanos() * slew_rate_adjust as i64).abs() / MILLION;
+            (duration.into_nanos() * (slew_rate_adjust as i64)).abs() / MILLION;
         Slew {
             base_rate_adjust: final_transform.rate_adjust_ppm,
             slew_rate_adjust,
@@ -214,7 +220,8 @@ impl Slew {
         // Note: fuchsia_async time can be mocked independently so can't assume its equivalent to
         // the supplied monotonic time.
         let start_time = fasync::MonotonicInstant::now();
-        let finish_time = start_time + self.duration;
+        let finish_time =
+            start_time + zx::MonotonicDuration::from_nanos(self.duration.into_nanos());
 
         // For large slews we expect the reduction in error bound while applying the correction to
         // exceed the growth in error bound due to oscillator error but there is no guarantee of
@@ -235,7 +242,7 @@ impl Slew {
         // threshold during the course of the slew ...
         if self.start_error_bound > self.end_error_bound + ERROR_BOUND_UPDATE {
             let bound_change = (self.start_error_bound - self.end_error_bound) as i64;
-            let error_update_interval = zx::Duration::from_nanos(
+            let error_update_interval = zx::MonotonicDuration::from_nanos(
                 ((self.duration.into_nanos() as i128 * ERROR_BOUND_UPDATE as i128)
                     / bound_change as i128) as i64,
             );
@@ -365,7 +372,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
 
         // Pause before first sampling is sometimes useful. But not if no delay
         // was ordered, so as not to change the scheduling order.
-        if first_delay != zx::Duration::ZERO {
+        if first_delay != zx::MonotonicDuration::ZERO {
             // This should be an uncommon setting, so log it.
             info!("delaying first time source sample by: {:?}", first_delay);
             _ = fasync::Timer::new(fasync::MonotonicInstant::after(first_delay)).await;
@@ -429,7 +436,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
                 debug!("backing off for pull source resampling.");
                 pull_delay
             } else {
-                zx::Duration::from_millis(10)
+                zx::MonotonicDuration::from_millis(10)
             };
             debug!("clock_manager: waiting for command");
             select! {
@@ -617,7 +624,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
     }
 
     /// Records a correction to the clock with diagnostics.
-    fn record_clock_correction(&self, correction: zx::Duration, strategy: ClockCorrectionStrategy) {
+    fn record_clock_correction(&self, correction: UtcDuration, strategy: ClockCorrectionStrategy) {
         self.diagnostics.record(Event::ClockCorrection { track: self.track, correction, strategy });
     }
 }
@@ -659,12 +666,12 @@ mod tests {
 
     const NANOS_PER_SECOND: i64 = 1_000_000_000;
     const TEST_ROLE: Role = Role::Primary;
-    const SAMPLE_SPACING: zx::Duration = zx::Duration::from_millis(100);
-    const OFFSET: zx::Duration = zx::Duration::from_seconds(1111_000);
-    const OFFSET_2: zx::Duration = zx::Duration::from_seconds(2222_000);
+    const SAMPLE_SPACING: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(100);
+    const OFFSET: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(1111_000);
+    const OFFSET_2: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(2222_000);
     const BASE_RATE: i32 = -9;
     const BASE_RATE_2: i32 = 2;
-    const STD_DEV: zx::Duration = zx::Duration::from_millis(88);
+    const STD_DEV: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(88);
     const BACKSTOP_TIME: UtcInstant = UtcInstant::from_nanos(222222 * NANOS_PER_SECOND);
     const ERROR_GROWTH_PPM: u32 = 30;
 
@@ -720,7 +727,7 @@ mod tests {
         monotonic: zx::MonotonicInstant,
         synthetic: UtcInstant,
         rate_adjust_ppm: i32,
-        std_dev: zx::Duration,
+        std_dev: zx::MonotonicDuration,
     ) -> UtcTransform {
         UtcTransform {
             reference_offset: monotonic,
@@ -737,24 +744,31 @@ mod tests {
         // Note the initial transform has a reference point before monotonic_ref and has been
         // running since then with a small rate adjustment.
         let initial_transform = create_transform(
-            mono - zx::Duration::from_minutes(1),
-            UtcInstant::from_nanos((mono - zx::Duration::from_minutes(1) + OFFSET).into_nanos()),
+            mono - zx::MonotonicDuration::from_minutes(1),
+            UtcInstant::from_nanos(
+                (mono - zx::MonotonicDuration::from_minutes(1) + OFFSET).into_nanos(),
+            ),
             BASE_RATE,
-            zx::Duration::from_nanos(0),
+            zx::MonotonicDuration::from_nanos(0),
         );
         let final_transform = create_transform(
             mono,
-            UtcInstant::from_nanos((mono + OFFSET + zx::Duration::from_millis(50)).into_nanos()),
+            UtcInstant::from_nanos(
+                (mono + OFFSET + zx::MonotonicDuration::from_millis(50)).into_nanos(),
+            ),
             BASE_RATE_2,
             STD_DEV,
         );
 
         let correction =
             ClockCorrection::for_transition(mono, &initial_transform, &final_transform);
-        let expected_difference = zx::Duration::from_nanos(
-            zx::Duration::from_minutes(1).into_nanos() * -BASE_RATE as i64 / MILLION,
-        ) + zx::Duration::from_millis(50);
-        assert_eq!(correction.difference(), expected_difference);
+        let expected_difference = zx::MonotonicDuration::from_nanos(
+            zx::MonotonicDuration::from_minutes(1).into_nanos() * -BASE_RATE as i64 / MILLION,
+        ) + zx::MonotonicDuration::from_millis(50);
+        assert_eq!(
+            correction.difference(),
+            UtcDuration::from_nanos(expected_difference.into_nanos())
+        );
 
         // The values chosen for rates and offset differences mean this is a nominal rate slew.
         let expected_duration = (expected_difference * MILLION) / NOMINAL_RATE_CORRECTION_PPM;
@@ -787,20 +801,22 @@ mod tests {
         );
         let final_transform = create_transform(
             mono,
-            UtcInstant::from_nanos((mono + OFFSET - zx::Duration::from_millis(500)).into_nanos()),
+            UtcInstant::from_nanos(
+                (mono + OFFSET - zx::MonotonicDuration::from_millis(500)).into_nanos(),
+            ),
             BASE_RATE,
             STD_DEV,
         );
 
         let correction =
             ClockCorrection::for_transition(mono, &initial_transform, &final_transform);
-        let expected_difference = zx::Duration::from_millis(-500);
+        let expected_difference = zx::MonotonicDuration::from_millis(-500);
         // Note there is a slight loss of precision in converting from a difference to a rate for
         // a duration.
         assert_near!(correction.difference().into_nanos(), expected_difference.into_nanos(), 10);
 
         // The value chosen for offset difference means this is a max duration slew.
-        let expected_duration = zx::Duration::from_nanos(5376344086021);
+        let expected_duration = zx::MonotonicDuration::from_nanos(5376344086021);
         let expected_rate = -93;
         let expected_start_error_bound =
             final_transform.error_bound(mono) + correction.difference().into_nanos().abs() as u64;
@@ -824,21 +840,25 @@ mod tests {
     fn clock_correction_for_transition_step() {
         let mono = zx::MonotonicInstant::get();
         let initial_transform = create_transform(
-            mono - zx::Duration::from_minutes(1),
-            UtcInstant::from_nanos((mono - zx::Duration::from_minutes(1) + OFFSET).into_nanos()),
+            mono - zx::MonotonicDuration::from_minutes(1),
+            UtcInstant::from_nanos(
+                (mono - zx::MonotonicDuration::from_minutes(1) + OFFSET).into_nanos(),
+            ),
             0,
-            zx::Duration::from_nanos(0),
+            zx::MonotonicDuration::from_nanos(0),
         );
         let final_transform = create_transform(
             mono,
-            UtcInstant::from_nanos((mono + OFFSET + zx::Duration::from_hours(1)).into_nanos()),
+            UtcInstant::from_nanos(
+                (mono + OFFSET + zx::MonotonicDuration::from_hours(1)).into_nanos(),
+            ),
             BASE_RATE_2,
             STD_DEV,
         );
 
         let correction =
             ClockCorrection::for_transition(mono, &initial_transform, &final_transform);
-        let expected_difference = zx::Duration::from_hours(1);
+        let expected_difference = UtcDuration::from_hours(1);
         assert_eq!(correction.difference(), expected_difference);
         assert_eq!(correction.strategy(), ClockCorrectionStrategy::Step);
         match correction {
@@ -869,7 +889,7 @@ mod tests {
         let slew = Slew {
             base_rate_adjust: 5,
             slew_rate_adjust: -20,
-            duration: zx::Duration::from_seconds(10),
+            duration: zx::MonotonicDuration::from_seconds(10),
             start_error_bound: 9_000_000,
             end_error_bound: 1_000_000,
         };
@@ -893,7 +913,7 @@ mod tests {
         let slew = Slew {
             base_rate_adjust: 3,
             slew_rate_adjust: 80,
-            duration: zx::Duration::from_hours(10),
+            duration: zx::MonotonicDuration::from_hours(10),
             start_error_bound: 800_000_000,
             end_error_bound: 550_000_000,
         };
@@ -932,7 +952,7 @@ mod tests {
         let slew = Slew {
             base_rate_adjust: 0,
             slew_rate_adjust: -2,
-            duration: zx::Duration::from_hours(10),
+            duration: zx::MonotonicDuration::from_hours(10),
             start_error_bound: 200_000_000,
             end_error_bound: 800_000_000,
         };
@@ -1249,7 +1269,7 @@ mod tests {
         // Since we used the same covariance for the first two samples the offset in the Kalman
         // filter is roughly midway between the sample offsets, but slight closer to the second
         // because oscillator uncertainty.
-        let expected_offset = zx::Duration::from_nanos(1666500000080699);
+        let expected_offset = zx::MonotonicDuration::from_nanos(1666500000080699);
 
         // Check that the clock has been updated. The UTC should be bounded by the expected offset
         // added to the monotonic window in which the calculation took place.
@@ -1270,7 +1290,7 @@ mod tests {
                 track: *TEST_TRACK,
                 monotonic: monotonic_ref,
                 utc: UtcInstant::from_nanos((monotonic_ref + expected_offset).into_nanos()),
-                sqrt_covariance: zx::Duration::from_nanos(62225396),
+                sqrt_covariance: zx::MonotonicDuration::from_nanos(62225396),
             },
             Event::FrequencyWindowDiscarded {
                 track: *TEST_TRACK,
@@ -1278,7 +1298,7 @@ mod tests {
             },
             Event::ClockCorrection {
                 track: *TEST_TRACK,
-                correction: ANY_DURATION,
+                correction: UtcDuration::from_nanos(ANY_DURATION.into_nanos()),
                 strategy: ClockCorrectionStrategy::Step,
             },
             Event::UpdateClock { track: *TEST_TRACK, reason: ClockUpdateReason::TimeStep },
@@ -1292,7 +1312,7 @@ mod tests {
         // Calculate a small change in offset that will be corrected by slewing and is large enough
         // to require an error bound reduction. Note the tests doesn't have to actually wait this
         // long since we can manually trigger async timers.
-        let delta_offset = zx::Duration::from_millis(600);
+        let delta_offset = zx::MonotonicDuration::from_millis(600);
         let filtered_delta_offset = delta_offset / 2;
 
         let clock = create_clock();
@@ -1397,11 +1417,11 @@ mod tests {
                 utc: UtcInstant::from_nanos(
                     (monotonic_ref + OFFSET + filtered_delta_offset).into_nanos(),
                 ),
-                sqrt_covariance: zx::Duration::from_nanos(62225396),
+                sqrt_covariance: zx::MonotonicDuration::from_nanos(62225396),
             },
             Event::ClockCorrection {
                 track: *TEST_TRACK,
-                correction: ANY_DURATION,
+                correction: UtcDuration::from_nanos(ANY_DURATION.into_nanos()),
                 strategy: ClockCorrectionStrategy::MaxDurationSlew,
             },
             Event::UpdateClock { track: *TEST_TRACK, reason: ClockUpdateReason::BeginSlew },

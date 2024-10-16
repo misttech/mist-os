@@ -31,8 +31,8 @@ constexpr uint32_t kMaxWaitHandleCount = ZX_WAIT_MANY_MAX_ITEMS;
 static_assert(ZX_WAIT_MANY_MAX_ITEMS == ZX_CHANNEL_MAX_MSG_HANDLES);
 
 // zx_status_t zx_object_wait_one
-zx_status_t sys_object_wait_one(zx_handle_t handle_value, zx_signals_t signals, zx_time_t deadline,
-                                user_out_ptr<zx_signals_t> observed) {
+zx_status_t sys_object_wait_one(zx_handle_t handle_value, zx_signals_t signals,
+                                zx_instant_mono_t deadline, user_out_ptr<zx_signals_t> observed) {
   LTRACEF("handle %x\n", handle_value);
 
   Event event;
@@ -84,14 +84,14 @@ zx_status_t sys_object_wait_one(zx_handle_t handle_value, zx_signals_t signals, 
 
 // zx_status_t zx_object_wait_many
 zx_status_t sys_object_wait_many(user_inout_ptr<zx_wait_item_t> user_items, size_t count,
-                                 zx_time_t deadline) {
+                                 zx_instant_mono_t deadline) {
   LTRACEF("count %zu\n", count);
 
   const auto up = ProcessDispatcher::GetCurrent();
   const Deadline slackDeadline(deadline, up->GetTimerSlackPolicy());
 
   if (!count) {
-    const zx_time_t now = current_time();
+    const zx_instant_mono_t now = current_time();
     {
       ThreadDispatcher::AutoBlocked by(ThreadDispatcher::Blocked::WAIT_MANY);
       zx_status_t result = Thread::Current::SleepEtc(slackDeadline, Interruptible::Yes, now);

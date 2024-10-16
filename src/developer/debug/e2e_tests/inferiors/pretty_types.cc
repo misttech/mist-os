@@ -23,6 +23,7 @@ class Child : public Parent {
 
 int main() {
   std::shared_ptr<Parent> p = std::make_shared<Child>();
+  std::unique_ptr<Parent> up = std::make_unique<Child>();
   std::string_view sv = "abc";
   std::map<std::string, int> map = {{"a", 1}, {"b", 2}};
   std::unordered_set<int> set = {0, 1, 2};

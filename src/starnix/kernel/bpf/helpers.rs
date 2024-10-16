@@ -6,9 +6,8 @@ use crate::bpf::map::{Map, RingBufferWakeupPolicy};
 use crate::bpf::program::ProgramType;
 use crate::task::CurrentTask;
 use ebpf::{
-    new_bpf_type_identifier, BpfValue, DataWidth, EbpfHelper, EbpfRunContext, FieldMapping,
-    FieldType, FunctionSignature, MemoryId, MemoryParameterSize, PacketAccessor, PacketDescriptor,
-    Type,
+    new_bpf_type_identifier, BpfValue, EbpfHelper, EbpfRunContext, FieldMapping, FieldType,
+    FunctionSignature, MemoryId, MemoryParameterSize, Type,
 };
 use linux_uapi::{
     __sk_buff, bpf_flow_keys, bpf_func_id_BPF_FUNC_csum_update,
@@ -33,21 +32,12 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
-fn read_packet_data(
-    _context: &mut HelperFunctionContext<'_>,
-    _sk_buf_ptr: BpfValue,
-    _offset: i32,
-    _width: DataWidth,
-) -> Option<BpfValue> {
-    track_stub!(TODO("https://fxbug.dev/287120494"), "read_skbuf_data");
-    None
-}
-
 pub struct HelperFunctionContext<'a> {
     pub locked: &'a mut Locked<'a, BpfHelperOps>,
     pub current_task: &'a CurrentTask,
 }
 
+#[derive(Debug)]
 pub enum HelperFunctionContextMarker {}
 impl EbpfRunContext for HelperFunctionContextMarker {
     type Context<'a> = HelperFunctionContext<'a>;
@@ -1074,17 +1064,12 @@ pub fn get_bpf_args(program_type: ProgramType) -> &'static [Type] {
     }
 }
 
-pub fn get_packet_descriptor(
-    program_type: ProgramType,
-) -> Option<PacketDescriptor<HelperFunctionContextMarker>> {
+pub fn get_packet_memory_id(program_type: ProgramType) -> Option<MemoryId> {
     match program_type {
         ProgramType::CgroupSkb
         | ProgramType::SchedAct
         | ProgramType::SchedCls
-        | ProgramType::SocketFilter => Some(PacketDescriptor {
-            packet_memory_id: SK_BUF_ID.clone(),
-            packet_accessor: PacketAccessor::new(read_packet_data),
-        }),
+        | ProgramType::SocketFilter => Some(SK_BUF_ID.clone()),
         _ => None,
     }
 }

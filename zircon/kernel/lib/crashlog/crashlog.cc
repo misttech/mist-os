@@ -124,7 +124,10 @@ size_t crashlog_to_string(ktl::span<char> target, zircon_crash_reason_t reason) 
         break;
     }
     fprintf(&outfile, "ZIRCON REBOOT REASON (%s)\n\n", reason_str);
-    fprintf(&outfile, "UPTIME (ms)\n%" PRIi64 "\n\n", current_time() / ZX_MSEC(1));
+    fprintf(&outfile, "UPTIME (ms)\n%" PRIi64 "\n\n", current_boot_time() / ZX_MSEC(1));
+    // TODO(https://fxbug.dev/371420920): The RUNTIME field should eventually be added to the RAM
+    // mappable crashlog as well.
+    fprintf(&outfile, "RUNTIME (ms)\n%" PRIi64 "\n\n", current_time() / ZX_MSEC(1));
 
     // Keep the format and values in sync with the symbolizer.
     // Print before the registers (KASLR offset).

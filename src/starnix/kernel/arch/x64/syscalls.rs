@@ -47,7 +47,7 @@ pub fn sys_alarm(
     current_task: &CurrentTask,
     duration: u32,
 ) -> Result<u32, Errno> {
-    let duration = zx::Duration::from_seconds(duration.into());
+    let duration = zx::MonotonicDuration::from_seconds(duration.into());
     let new_value = timeval_from_duration(duration);
     let old_value = current_task.thread_group.set_itimer(
         current_task,
@@ -58,7 +58,7 @@ pub fn sys_alarm(
     let remaining = duration_from_timeval(old_value.it_value)?;
 
     let old_value_seconds = remaining.into_seconds();
-    if old_value_seconds == 0 && remaining != zx::Duration::default() {
+    if old_value_seconds == 0 && remaining != zx::MonotonicDuration::default() {
         // We can't return a zero value if the alarm was scheduled even if it had
         // less than one second remaining. Return 1 instead.
         return Ok(1);
@@ -431,7 +431,7 @@ pub fn sys_time(
     current_task: &CurrentTask,
     time_addr: UserRef<__kernel_time_t>,
 ) -> Result<__kernel_time_t, Errno> {
-    let time = (utc::utc_now().into_nanos() / zx::Duration::from_seconds(1).into_nanos())
+    let time = (utc::utc_now().into_nanos() / zx::MonotonicDuration::from_seconds(1).into_nanos())
         as __kernel_time_t;
     if !time_addr.is_null() {
         current_task.write_object(time_addr, &time)?;
@@ -520,7 +520,7 @@ mod tests {
             UserAddress::default(),
             std::mem::size_of::<__kernel_time_t>() as u64,
         );
-        zx::Duration::from_seconds(2).sleep();
+        zx::MonotonicDuration::from_seconds(2).sleep();
         let time2 = sys_time(&mut locked, &current_task, address.into()).expect("time");
         assert!(time2 >= time1 + 2);
         assert!(time2 < time1 + 10);

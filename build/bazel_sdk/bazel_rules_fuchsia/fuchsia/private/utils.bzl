@@ -256,7 +256,7 @@ def rule_variants(implementation, variants = [], attrs = {}, **rule_kwargs):
            be augmented with a private '_variant' attribute corresponding to
            the 'variants' item value used to create it.
 
-        rule_kwargs: Extra arguments are passed directly to each result rule()
+        **rule_kwargs: Extra arguments are passed directly to each result rule()
            constructor.
 
     Returns:
@@ -495,14 +495,34 @@ Returns the current `CcToolchainInfo`.
     # We didn't find anything.
     fail("In order to use find_cc_toolchain, your rule has to depend on C++ toolchain. See find_cc_toolchain.bzl docs for details.")
 
-def preprocesss_file(ctx, source, includes, headers = []):
+def with_fuchsia_constraint(target_compatible_with = []):
+    """Adds "@platforms//os:fuchsia" to the specified list if it's not already present."""
+    return target_compatible_with if (
+        "@platforms//os:fuchsia" in target_compatible_with
+    ) else target_compatible_with + ["@platforms//os:fuchsia"]
+
+# These rule attributes are needed by rules that want to call preprocess_file()
+PREPROCESS_FILE_ATTRS = {
+    "_preprocessor_binary": attr.label(
+        default = Label("@fuchsia_clang//:bin/clang-cpp"),
+        executable = True,
+        allow_single_file = True,
+        cfg = "exec",
+    ),
+}
+
+def preprocesss_file(ctx, source, includes, headers = [], files = depset()):
     """Helper function for .S file preprocessing.
 
+    This function must be called from a rule implementation function
+    whose rule definitions' attributes includes PREPROCESS_FILE_ATTRS
+
     Args:
-      ctx: The rule context for which to find a toolchain.
+      ctx: The rule context.
       source: The source file to be preprocessed. It should be a .S file
       includes: A depset of includes paths (as strings) needed for preprocessing.
       headers: A list of headers in the format of File.
+      files: A depset of additional inputs to preprocessing action.
 
     Returns:
       A File of preprocessed file.
@@ -511,11 +531,8 @@ def preprocesss_file(ctx, source, includes, headers = []):
     dest_filename = source.basename.rstrip(".S")
     output_file = ctx.actions.declare_file(dest_filename)
 
-    cc_toolchain = find_cc_toolchain(ctx)
-
     pp_args = ctx.actions.args()
     pp_args.add("-undef")
-    pp_args.add("-E")
     pp_args.add("-P")
     pp_args.add_all(includes, before_each = "-I")
     pp_args.add("-x", "assembler-with-cpp")
@@ -523,9 +540,9 @@ def preprocesss_file(ctx, source, includes, headers = []):
     pp_args.add("-o", output_file)
 
     ctx.actions.run(
-        executable = cc_toolchain.preprocessor_executable,
+        executable = ctx.executable._preprocessor_binary,
         arguments = [pp_args],
-        inputs = [source] + cc_toolchain.all_files.to_list() + headers,
+        inputs = [source] + headers + files.to_list(),
         outputs = [output_file],
     )
     return output_file

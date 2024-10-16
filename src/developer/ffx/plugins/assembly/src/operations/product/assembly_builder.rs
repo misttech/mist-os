@@ -21,6 +21,7 @@ use assembly_domain_config::DomainConfigPackage;
 use assembly_driver_manifest::{DriverManifestBuilder, DriverPackageType};
 use assembly_file_relative_path::SupportsFileRelativePaths;
 use assembly_images_config::{FilesystemImageMode, ImagesConfig};
+use assembly_memory_buckets::MemoryBuckets;
 use assembly_named_file_map::NamedFileMap;
 use assembly_package_utils::PackageInternalPathBuf;
 use assembly_platform_configuration::{
@@ -82,6 +83,9 @@ pub struct ImageAssemblyConfigBuilder {
     /// The packages for assembly to create specified by AIBs
     packages_to_compile: BTreeMap<String, CompiledPackageBuilder>,
 
+    /// The memory buckets to merge and make available to memory monitor.
+    memory_buckets: MemoryBuckets,
+
     /// Data passed to the board's Board Driver, if provided.
     board_driver_arguments: Option<BoardDriverArguments>,
 
@@ -116,6 +120,7 @@ impl ImageAssemblyConfigBuilder {
             kernel_args: BTreeSet::default(),
             qemu_kernel: None,
             packages_to_compile: BTreeMap::default(),
+            memory_buckets: MemoryBuckets::default(),
             board_driver_arguments: None,
             configuration_capabilities: None,
             devicetree: None,
@@ -214,6 +219,7 @@ impl ImageAssemblyConfigBuilder {
             shell_commands,
             packages_to_compile,
             bootfs_files_package,
+            memory_buckets,
         } = bundle;
 
         self.add_bundle_packages(bundle_path, &packages)?;
@@ -281,6 +287,10 @@ impl ImageAssemblyConfigBuilder {
         for compiled_package in packages_to_compile {
             self.add_compiled_package(&compiled_package, bundle_path)?;
         }
+
+        let memory_buckets: Vec<Utf8PathBuf> =
+            memory_buckets.clone().into_iter().map(|b| b.to_utf8_pathbuf()).collect();
+        self.add_memory_buckets(&memory_buckets)?;
 
         assembly_util::set_option_once_or(
             &mut self.qemu_kernel,
@@ -710,6 +720,10 @@ impl ImageAssemblyConfigBuilder {
         Ok(())
     }
 
+    pub fn add_memory_buckets(&mut self, buckets: &Vec<Utf8PathBuf>) -> Result<()> {
+        self.memory_buckets.add_buckets(buckets)
+    }
+
     /// Construct an ImageAssembly ImageAssemblyConfig from the collected items in the
     /// builder.
     ///
@@ -723,11 +737,22 @@ impl ImageAssemblyConfigBuilder {
     /// If this cannot create a completed ImageAssemblyConfig, it will return an error
     /// instead.
     pub fn build(
-        self,
+        mut self,
         outdir: impl AsRef<Utf8Path>,
         tools: &impl ToolProvider,
     ) -> Result<assembly_config_schema::ImageAssemblyConfig> {
         let outdir = outdir.as_ref();
+
+        // Merge the memory buckets into a single file and make it available
+        // to memory monitor. This has to happen during `build()` to ensure that
+        // all the AIBs have been added, but before we decompose `self` below.
+        let memory_buckets_path = outdir.join("memory_buckets.json");
+        self.memory_buckets.write(&memory_buckets_path)?;
+        self.add_config_data_entry(
+            "memory_monitor".to_string(),
+            FileEntry { source: memory_buckets_path, destination: "buckets.json".into() },
+        )?;
+
         // Decompose the fields in self, so that they can be recomposed into the generated
         // image assembly configuration.
         let Self {
@@ -746,6 +771,7 @@ impl ImageAssemblyConfigBuilder {
             qemu_kernel,
             shell_commands,
             packages_to_compile,
+            memory_buckets: _,
             board_driver_arguments,
             configuration_capabilities,
             devicetree,
@@ -769,7 +795,21 @@ impl ImageAssemblyConfigBuilder {
                         package_name.clone(),
                     ));
                     let (_d, package_entry) =
-                        PackageEntry::parse_from(PackageOrigin::AIB, PackageSet::Base, p)?;
+                        PackageEntry::parse_from(PackageOrigin::AIB, PackageSet::Base, p.clone())?;
+
+                    // TODO(b/361426282): remove this block once we've migrated tee_manager
+                    if let Ok((board_origin_destination, _)) =
+                        PackageEntry::parse_from(PackageOrigin::Board, PackageSet::Base, &p)
+                    {
+                        if let Some(PackageSetDestination::Blob(PackageDestination::FromBoard(_))) =
+                            packages.existing_key(board_origin_destination)
+                        {
+                            // We only want to continue if this package exists and it was added by the
+                            // _board_ previously.
+                            continue;
+                        }
+                    }
+
                     packages
                         .try_insert_unique(d, package_entry)
                         .with_context(|| format!("Adding compiled package {package_name}"))?;
@@ -1253,6 +1293,7 @@ mod tests {
             shell_commands: ShellCommands::default(),
             packages_to_compile: Vec::default(),
             bootfs_files_package: Some(test_file_path),
+            memory_buckets: Vec::default(),
         }
     }
 

@@ -208,10 +208,10 @@ async fn realm_user(
         .await
         .expect("FIDL error for open exposed directory")
         .expect("component manager error for open exposed directory");
-    let _binder_node = fuchsia_fs::directory::open_node_deprecated(
+    let _binder_node = fuchsia_fs::directory::open_node(
         &exposed_proxy,
         "fuchsia.component.Binder2",
-        fuchsia_fs::OpenFlags::NOT_DIRECTORY,
+        fio::Flags::PROTOCOL_NODE,
     )
     .await
     .unwrap();

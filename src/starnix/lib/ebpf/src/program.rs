@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::converter::cbpf_to_ebpf;
-use crate::executor::{execute, execute_with_arguments};
+use crate::executor::execute;
 use crate::verifier::{
     verify, CallingContext, FunctionSignature, NullVerifierLogger, Type, VerifierLogger,
 };
@@ -153,71 +153,72 @@ impl BpfValue {
     }
 }
 
-/// Wrapper around the helper function needed to access the content of a packet.
-pub struct PacketAccessor<C: EbpfRunContext>(
-    Arc<dyn Fn(&mut C::Context<'_>, BpfValue, i32, DataWidth) -> Option<BpfValue> + Send + Sync>,
-);
-
-impl<C: EbpfRunContext> PacketAccessor<C> {
-    /// Run the helper function.
-    pub fn run(
+pub trait PacketAccessor<C: EbpfRunContext> {
+    fn load<'a>(
         &self,
-        context: &mut C::Context<'_>,
+        context: &mut C::Context<'a>,
         packet_ptr: BpfValue,
         offset: i32,
         width: DataWidth,
-    ) -> Option<BpfValue> {
-        self.0(context, packet_ptr, offset, width)
-    }
+    ) -> Option<BpfValue>;
+    fn packet_len<'a>(&self, context: &mut C::Context<'a>, packet_ptr: BpfValue) -> usize;
 }
 
-impl<C: EbpfRunContext> PacketAccessor<C> {
-    pub fn new(
-        f: impl Fn(&mut C::Context<'_>, BpfValue, i32, DataWidth) -> Option<BpfValue>
-            + Send
-            + Sync
-            + 'static,
-    ) -> Self {
-        Self(Arc::new(f))
-    }
-}
-
-impl<C: EbpfRunContext> std::fmt::Debug for PacketAccessor<C> {
+impl<'a, C: EbpfRunContext> std::fmt::Debug for &'a dyn PacketAccessor<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         f.debug_struct("PacketAccessor").finish()
     }
 }
 
-/// A `PacketAccessor` callback that reads the data from a value of type `T`.
-pub fn read_raw_packet_data<C, T>(
-    _context: &mut C,
-    packet_ptr: BpfValue,
-    offset: i32,
-    width: DataWidth,
-) -> Option<BpfValue>
-where
-    T: IntoBytes + Immutable,
-{
-    let data = unsafe { packet_ptr.as_ptr::<T>().as_ref()? }.as_bytes();
-    if offset < 0 || offset as usize >= data.len() {
-        return None;
+/// A `PacketAccessor` that reads the data from a value of type `T`.
+#[derive(Default)]
+pub struct DirectPacketAccessor<T: IntoBytes + Immutable> {
+    _phantom: std::marker::PhantomData<T>,
+}
+
+impl<C: EbpfRunContext, T: IntoBytes + Immutable> PacketAccessor<C> for DirectPacketAccessor<T> {
+    fn load<'a>(
+        &self,
+        _context: &mut C::Context<'a>,
+        packet_ptr: BpfValue,
+        offset: i32,
+        width: DataWidth,
+    ) -> Option<BpfValue> {
+        let data = unsafe { packet_ptr.as_ptr::<T>().as_ref()? }.as_bytes();
+        if offset < 0 || offset as usize >= data.len() {
+            return None;
+        }
+        let slice = &data[(offset as usize)..];
+        match width {
+            DataWidth::U8 => u8::read_from_prefix(slice).ok().map(|(v, _)| v.into()),
+            DataWidth::U16 => u16::read_from_prefix(slice).ok().map(|(v, _)| v.into()),
+            DataWidth::U32 => u32::read_from_prefix(slice).ok().map(|(v, _)| v.into()),
+            DataWidth::U64 => u64::read_from_prefix(slice).ok().map(|(v, _)| v.into()),
+        }
     }
-    let slice = &data[(offset as usize)..];
-    match width {
-        DataWidth::U8 => u8::read_from_prefix(slice).ok().map(|(v, _)| v.into()),
-        DataWidth::U16 => u16::read_from_prefix(slice).ok().map(|(v, _)| v.into()),
-        DataWidth::U32 => u32::read_from_prefix(slice).ok().map(|(v, _)| v.into()),
-        DataWidth::U64 => u64::read_from_prefix(slice).ok().map(|(v, _)| v.into()),
+
+    fn packet_len<'a>(&self, _context: &mut C::Context<'a>, _packet_ptr: BpfValue) -> usize {
+        std::mem::size_of::<T>()
     }
 }
 
-/// Data required to be able to validate and run operation that load the content of a network
-/// packet.
-pub struct PacketDescriptor<C: EbpfRunContext> {
-    /// The id of the structure that represents a network packet.
-    pub packet_memory_id: MemoryId,
-    /// The helper function needed to access the content of a packet.
-    pub packet_accessor: PacketAccessor<C>,
+/// A `PacketAccessor` for the case when the is no packet.
+#[derive(Default)]
+pub struct EmptyPacketAccessor {}
+
+impl<C: EbpfRunContext> PacketAccessor<C> for EmptyPacketAccessor {
+    fn load<'a>(
+        &self,
+        _context: &mut C::Context<'a>,
+        _packet_ptr: BpfValue,
+        _offset: i32,
+        _width: DataWidth,
+    ) -> Option<BpfValue> {
+        None
+    }
+    fn packet_len<'a>(&self, _context: &mut C::Context<'a>, _packet_ptr: BpfValue) -> usize {
+        0
+    }
 }
 
 pub struct EbpfHelper<C: EbpfRunContext> {
@@ -254,17 +255,12 @@ impl<C: EbpfRunContext> std::fmt::Debug for EbpfHelper<C> {
 
 pub struct EbpfProgramBuilder<C: EbpfRunContext> {
     helpers: HashMap<u32, EbpfHelper<C>>,
-    packet_accessor: Option<PacketAccessor<C>>,
     calling_context: CallingContext,
 }
 
 impl<C: EbpfRunContext> Default for EbpfProgramBuilder<C> {
     fn default() -> Self {
-        Self {
-            helpers: Default::default(),
-            packet_accessor: Default::default(),
-            calling_context: Default::default(),
-        }
+        Self { helpers: Default::default(), calling_context: Default::default() }
     }
 }
 
@@ -286,9 +282,8 @@ impl<C: EbpfRunContext> EbpfProgramBuilder<C> {
         self.calling_context.set_args(args);
     }
 
-    pub fn set_packet_descriptor(&mut self, packet_descriptor: PacketDescriptor<C>) {
-        self.calling_context.set_packet_memory_id(packet_descriptor.packet_memory_id);
-        self.packet_accessor = Some(packet_descriptor.packet_accessor);
+    pub fn set_packet_memory_id(&mut self, packet_memory_id: MemoryId) {
+        self.calling_context.set_packet_memory_id(packet_memory_id);
     }
 
     // This function signature will need more parameters eventually. The client needs to be able to
@@ -306,21 +301,21 @@ impl<C: EbpfRunContext> EbpfProgramBuilder<C> {
         logger: &mut dyn VerifierLogger,
     ) -> Result<EbpfProgram<C>, EbpfError> {
         let code = verify(code, self.calling_context, logger)?;
-        Ok(EbpfProgram { code, helpers: self.helpers, packet_accessor: self.packet_accessor })
+        Ok(EbpfProgram { code, helpers: self.helpers })
     }
 }
 
-/// An abstraction over a ebpf program and its registered helper functions.
+/// An abstraction over an eBPF program and its registered helper functions.
 #[derive(Debug)]
 pub struct EbpfProgram<C: EbpfRunContext> {
     pub code: Vec<bpf_insn>,
     pub helpers: HashMap<u32, EbpfHelper<C>>,
-    pub packet_accessor: Option<PacketAccessor<C>>,
 }
 
 impl<C: EbpfRunContext> EbpfProgram<C> {
-    /// Executes the current program passing `data` and `packet_size` as two
-    /// arguments.
+    /// Executes the current program on the specified `data`.
+    /// The program receives a pointer to the `data` and the size of the packet (provided by the
+    /// `PacketAccessor`) as the first two arguments.
     ///
     /// Warning: If this program was a cBPF program then the `data` must be the
     /// packet. It's passed to the `PacketAccessor` as the packet. `packet_size`
@@ -328,32 +323,41 @@ impl<C: EbpfRunContext> EbpfProgram<C> {
     pub fn run<T: IntoBytes + FromBytes + Immutable>(
         &self,
         run_context: &mut C::Context<'_>,
+        packet_accessor: &dyn PacketAccessor<C>,
         data: &mut T,
-        packet_size: usize,
     ) -> u64 {
-        self.run_with_arguments(run_context, &[data as *mut T as u64, packet_size as u64])
+        let packet_ptr: BpfValue = (data as *mut T).into();
+        let packet_len = packet_accessor.packet_len(run_context, packet_ptr);
+        self.run_with_arguments(run_context, packet_accessor, &[packet_ptr, packet_len.into()])
     }
 
-    /// Executes the current program on the provided data.  Warning: If
-    /// this program was a cbpf program, and it uses BPF_MEM, the
-    /// scratch memory must be provided by the caller to this
-    /// function.  The translated CBPF program will use the last 16
-    /// words of |data|.
-    pub fn run_with_slice(&self, run_context: &mut C::Context<'_>, data: &mut [u8]) -> u64 {
-        execute(self, run_context, data)
+    /// Executes the current program on the provided data.
+    pub fn run_with_slice(
+        &self,
+        run_context: &mut C::Context<'_>,
+        packet_accessor: &dyn PacketAccessor<C>,
+        data: &mut [u8],
+    ) -> u64 {
+        self.run_with_arguments(
+            run_context,
+            packet_accessor,
+            &[data.as_mut_ptr().into(), data.len().into()],
+        )
     }
 
-    pub fn run_with_arguments(&self, run_context: &mut C::Context<'_>, arguments: &[u64]) -> u64 {
-        execute_with_arguments(self, run_context, arguments)
+    pub fn run_with_arguments(
+        &self,
+        run_context: &mut C::Context<'_>,
+        packet_accessor: &dyn PacketAccessor<C>,
+        arguments: &[BpfValue],
+    ) -> u64 {
+        execute(self, run_context, packet_accessor, arguments)
     }
 }
 
 impl EbpfProgram<()> {
     /// This method instantiates an EbpfProgram given a cbpf original.
-    pub fn from_cbpf(
-        bpf_code: &[sock_filter],
-        packet_accessor: PacketAccessor<()>,
-    ) -> Result<Self, EbpfError> {
+    pub fn from_cbpf(bpf_code: &[sock_filter]) -> Result<Self, EbpfError> {
         let mut builder = EbpfProgramBuilder::default();
         let packet_memory_id = new_bpf_type_identifier();
         builder.set_args(&[
@@ -371,7 +375,7 @@ impl EbpfProgram<()> {
             // value pointed by the first argument.
             Type::ScalarValueParameter,
         ]);
-        builder.set_packet_descriptor(PacketDescriptor { packet_memory_id, packet_accessor });
+        builder.set_packet_memory_id(packet_memory_id);
         builder.load(cbpf_to_ebpf(bpf_code)?, &mut NullVerifierLogger)
     }
 }
@@ -411,7 +415,8 @@ mod test {
         result: u32,
         msg: &str,
     ) {
-        let return_value = prg.run(&mut (), &mut data, std::mem::size_of::<seccomp_data>());
+        let return_value =
+            prg.run(&mut (), &DirectPacketAccessor::<seccomp_data>::default(), &mut data);
         assert_eq!(return_value, result as u64, "{}: filter return value is {}", msg, return_value);
     }
 
@@ -450,11 +455,7 @@ mod test {
             sock_filter { code: BPF_RET_K, jt: 0, jf: 0, k: SECCOMP_RET_ALLOW },
         ];
 
-        let prg = EbpfProgram::<()>::from_cbpf(
-            &test_prg,
-            PacketAccessor::new(read_raw_packet_data::<(), seccomp_data>),
-        )
-        .expect("Error parsing program");
+        let prg = EbpfProgram::<()>::from_cbpf(&test_prg).expect("Error parsing program");
 
         with_prg_assert_result(
             &prg,
@@ -528,11 +529,7 @@ mod test {
                 sock_filter { code: BPF_RET_A, jt: 0, jf: 0, k: 0 },
             ];
 
-            let prg = EbpfProgram::<()>::from_cbpf(
-                &test_prg,
-                PacketAccessor::new(read_raw_packet_data::<(), seccomp_data>),
-            )
-            .expect("Error parsing program");
+            let prg = EbpfProgram::<()>::from_cbpf(&test_prg).expect("Error parsing program");
 
             with_prg_assert_result(
                 &prg,
@@ -558,11 +555,7 @@ mod test {
                 sock_filter { code: BPF_RET_A, jt: 0, jf: 0, k: 0 },
             ];
 
-            let prg = EbpfProgram::<()>::from_cbpf(
-                &test_prg,
-                PacketAccessor::new(read_raw_packet_data::<(), seccomp_data>),
-            )
-            .expect("Error parsing program");
+            let prg = EbpfProgram::<()>::from_cbpf(&test_prg).expect("Error parsing program");
 
             with_prg_assert_result(
                 &prg,
@@ -633,7 +626,7 @@ mod test {
         let v_ptr = (&v as *const u64) as u64;
         let mut data =
             ProgramArgument { data: v_ptr, data_end: v_ptr + std::mem::size_of::<u64>() as u64 };
-        assert_eq!(program.run(&mut (), &mut data, 0), v);
+        assert_eq!(program.run(&mut (), &EmptyPacketAccessor::default(), &mut data), v);
     }
 
     #[test]
@@ -687,7 +680,7 @@ mod test {
         let v_ptr = (&v as *const u64) as u64;
         let mut data =
             ProgramArgument { data: v_ptr, data_end: v_ptr + std::mem::size_of::<u64>() as u64 };
-        assert_eq!(program.run(&mut (), &mut data, 0), v);
+        assert_eq!(program.run(&mut (), &EmptyPacketAccessor::default(), &mut data), v);
     }
 
     #[test]
@@ -728,7 +721,7 @@ mod test {
         let v_ptr = (&v as *const u64) as u64;
         let mut data =
             ProgramArgument { data: v_ptr, data_end: v_ptr + std::mem::size_of::<u64>() as u64 };
-        assert_eq!(program.run(&mut (), &mut data, 0), 17);
+        assert_eq!(program.run(&mut (), &EmptyPacketAccessor::default(), &mut data), 17);
     }
 
     #[test]
@@ -744,10 +737,7 @@ mod test {
         let mut builder = EbpfProgramBuilder::<()>::default();
 
         let packet_memory_id = new_bpf_type_identifier();
-        builder.set_packet_descriptor(PacketDescriptor {
-            packet_memory_id: packet_memory_id.clone(),
-            packet_accessor: PacketAccessor::new(read_raw_packet_data::<(), ()>),
-        });
+        builder.set_packet_memory_id(packet_memory_id.clone());
         let second_memory_id = new_bpf_type_identifier();
         builder.set_args(&[
             Type::PtrToMemory {

@@ -89,14 +89,14 @@ impl<'buf, T: ?Sized> Slot<'buf, T> {
     }
 }
 
-impl<'buf, T> Slot<'buf, T> {
+impl<T> Slot<'_, T> {
     /// Returns a slice of the underlying bytes.
     pub fn as_bytes(&self) -> &[u8] {
         unsafe { from_raw_parts(self.ptr.cast::<u8>(), size_of::<T>()) }
     }
 }
 
-impl<'buf, T, const N: usize> Slot<'buf, [T; N]> {
+impl<T, const N: usize> Slot<'_, [T; N]> {
     /// Returns a slot of the element at the given index.
     pub fn index(&mut self, index: usize) -> Slot<'_, T> {
         assert!(index < N, "attempted to index out-of-bounds");
@@ -105,7 +105,7 @@ impl<'buf, T, const N: usize> Slot<'buf, [T; N]> {
     }
 }
 
-impl<'buf, T> Slot<'buf, [T]> {
+impl<T> Slot<'_, [T]> {
     /// Creates a new slice slot from the given pointer.
     ///
     /// # Safety

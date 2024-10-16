@@ -15,22 +15,22 @@ impl_ot_castable!(SrpServerLeaseInfo, otSrpServerLeaseInfo);
 
 impl SrpServerLeaseInfo {
     /// The lease time of a host/service in milliseconds.
-    pub fn lease(&self) -> zx::Duration {
-        zx::Duration::from_millis(self.0.mLease.into())
+    pub fn lease(&self) -> zx::MonotonicDuration {
+        zx::MonotonicDuration::from_millis(self.0.mLease.into())
     }
 
     /// The key lease time of a host/service in milliseconds.
-    pub fn key_lease(&self) -> zx::Duration {
-        zx::Duration::from_millis(self.0.mKeyLease.into())
+    pub fn key_lease(&self) -> zx::MonotonicDuration {
+        zx::MonotonicDuration::from_millis(self.0.mKeyLease.into())
     }
 
     /// The remaining lease time of the host/service in milliseconds.
-    pub fn remaining_lease(&self) -> zx::Duration {
-        zx::Duration::from_millis(self.0.mRemainingLease.into())
+    pub fn remaining_lease(&self) -> zx::MonotonicDuration {
+        zx::MonotonicDuration::from_millis(self.0.mRemainingLease.into())
     }
 
     /// The remaining key lease time of a host/service in milliseconds.
-    pub fn remaining_key_lease(&self) -> zx::Duration {
-        zx::Duration::from_millis(self.0.mRemainingKeyLease.into())
+    pub fn remaining_key_lease(&self) -> zx::MonotonicDuration {
+        zx::MonotonicDuration::from_millis(self.0.mRemainingKeyLease.into())
     }
 }

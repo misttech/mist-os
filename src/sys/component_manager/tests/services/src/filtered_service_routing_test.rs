@@ -300,16 +300,16 @@ async fn filtered_service_through_collection_test() {
 }
 
 /// Test that clients can open a protocol in an aggregated service directory, given a path
-/// to the service instance and the protocol, with the `fuchsia.io/OpenFlags.NOT_DIRECTORY` flag.
+/// to the service instance and the protocol, with the `fuchsia.io/Flags.PROTOCOL_SERVICE` flag.
 ///
 /// This ensures the FilteredServiceProvider uses correct flags when opening service
 /// instance directories served by the source component.
 #[fuchsia::test]
-async fn aggregate_open_as_not_directory_test() {
-    let dynamic_child_name = "echo_client_as_not_directory";
+async fn aggregate_open_with_protocol_service_test() {
+    let dynamic_child_name = "echo_client_with_protocol_service";
 
     // Create a provider for the `goodbye` instance.
-    let dynamic_provider_name = "open_as_not_directory_test_provider";
+    let dynamic_provider_name = "open_with_protocol_service_test_provider";
     create_dynamic_service_provider(dynamic_provider_name).await;
 
     // Create a client and offer it a service with the `default` and `goodbye` instances.
@@ -350,13 +350,13 @@ async fn aggregate_open_as_not_directory_test() {
     .await
     .expect("Failed to get child expose directory.");
 
-    // Open the `regular_echo` protocol in the `default` instance with the NOT_DIRECTORY flag.
-    let echo = fuchsia_fs::directory::open_no_describe_deprecated::<fexamples::EchoMarker>(
+    // Open the `regular_echo` protocol in the `default` instance with the `PROTOCOL_SERVICE` flag.
+    let echo = fuchsia_fs::directory::open_async::<fexamples::EchoMarker>(
         &exposed_dir,
         vec![fexamples::EchoServiceMarker::SERVICE_NAME, "default", "regular_echo"]
             .join("/")
             .as_str(),
-        fio::OpenFlags::NOT_DIRECTORY,
+        fio::Flags::PROTOCOL_SERVICE,
     )
     .expect("failed to open regular_echo");
 

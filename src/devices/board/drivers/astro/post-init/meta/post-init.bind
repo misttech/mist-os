@@ -6,6 +6,7 @@ composite post_init;
 
 using fuchsia.amlogic.platform.s905d2;
 using fuchsia.google.platform;
+using fuchsia.gpio;
 using fuchsia.hardware.gpio;
 using fuchsia.hardware.platform.bus;
 
@@ -43,4 +44,8 @@ node "touch-interrupt" {
 node "touch-reset" {
   fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.s905d2.GPIOZ_PIN_ID.PIN_9;
+}
+
+node "gpio-init" {
+  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
 }

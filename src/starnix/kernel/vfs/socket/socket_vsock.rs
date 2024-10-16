@@ -215,22 +215,22 @@ impl SocketOps for VsockSocket {
         self.shutdown(socket, SocketShutdownFlags::READ | SocketShutdownFlags::WRITE).unwrap();
     }
 
-    fn getsockname(&self, socket: &Socket) -> Vec<u8> {
+    fn getsockname(&self, socket: &Socket) -> Result<SocketAddress, Errno> {
         let inner = self.lock();
         if let Some(address) = &inner.address {
-            address.to_bytes()
+            Ok(address.clone())
         } else {
-            SocketAddress::default_for_domain(socket.domain).to_bytes()
+            Ok(SocketAddress::default_for_domain(socket.domain))
         }
     }
 
-    fn getpeername(&self, socket: &Socket) -> Result<Vec<u8>, Errno> {
+    fn getpeername(&self, socket: &Socket) -> Result<SocketAddress, Errno> {
         let inner = self.lock();
         match &inner.state {
             VsockSocketState::Connected(_) => {
                 // Do not know how to get the peer address at the moment,
                 // so just return the default address.
-                Ok(SocketAddress::default_for_domain(socket.domain).to_bytes())
+                Ok(SocketAddress::default_for_domain(socket.domain))
             }
             _ => {
                 error!(ENOTCONN)
@@ -400,7 +400,7 @@ mod tests {
         });
 
         // Wait for the thread to become blocked on the read.
-        zx::Duration::from_seconds(2).sleep();
+        zx::MonotonicDuration::from_seconds(2).sleep();
 
         socket_file
             .write(&mut locked, &current_task, &mut VecInputBuffer::new(&[0; XFER_SIZE]))

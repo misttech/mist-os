@@ -39,9 +39,9 @@ where
     #[cfg(test)]
     fn from_temp_dir(temp: &tempfile::TempDir) -> Self {
         Self::new(
-            fuchsia_fs::directory::open_in_namespace_deprecated(
+            fuchsia_fs::directory::open_in_namespace(
                 temp.path().to_str().unwrap(),
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                fio::PERM_READABLE | fio::PERM_WRITABLE,
             )
             .unwrap(),
         )
@@ -52,16 +52,13 @@ where
         path: String,
         not_found_err: tuf::Error,
     ) -> tuf::Result<Box<dyn AsyncRead + Send + Unpin + 'a>> {
-        let file_proxy = fuchsia_fs::directory::open_file_deprecated(
-            &self.repo_proxy,
-            &path,
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .map_err(|err| match err {
-            fuchsia_fs::node::OpenError::OpenError(zx::Status::NOT_FOUND) => not_found_err,
-            _ => make_opaque_error(anyhow!("opening '{}': {:?}", path, err)),
-        })?;
+        let file_proxy =
+            fuchsia_fs::directory::open_file(&self.repo_proxy, &path, fio::PERM_READABLE)
+                .await
+                .map_err(|err| match err {
+                    fuchsia_fs::node::OpenError::OpenError(zx::Status::NOT_FOUND) => not_found_err,
+                    _ => make_opaque_error(anyhow!("opening '{}': {:?}", path, err)),
+                })?;
 
         let reader: Box<dyn AsyncRead + Send + Unpin + 'a> = Box::new(
             AsyncReader::from_proxy(file_proxy)
@@ -81,10 +78,10 @@ where
             // This is needed because if there's no "/" in `path`, .parent() will return Some("")
             // instead of None.
             if !parent.as_os_str().is_empty() {
-                let _sub_dir = fuchsia_fs::directory::create_directory_recursive_deprecated(
+                let _sub_dir = fuchsia_fs::directory::create_directory_recursive(
                     &self.repo_proxy,
                     parent.to_str().ok_or_else(|| make_opaque_error(anyhow!("Invalid path")))?,
-                    fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                    fio::PERM_READABLE | fio::PERM_WRITABLE,
                 )
                 .await
                 .context("creating sub directories")
@@ -92,10 +89,10 @@ where
             }
         }
 
-        let (temp_path, temp_proxy) = fuchsia_fs::directory::create_randomly_named_file_deprecated(
+        let (temp_path, temp_proxy) = fuchsia_fs::directory::create_randomly_named_file(
             &self.repo_proxy,
             &path,
-            fio::OpenFlags::RIGHT_WRITABLE,
+            fio::PERM_WRITABLE,
         )
         .await
         .with_context(|| format!("creating file: {path}"))

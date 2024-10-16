@@ -237,7 +237,7 @@ mod tests {
         exec.run_until_stalled(&mut frame_fut).expect_pending("no frames until time passes");
 
         // Run the ring buffer for a bit over half a second.
-        exec.set_fake_time(fasync::MonotonicInstant::after(zx::Duration::from_millis(500)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(zx::MonotonicDuration::from_millis(500)));
         let _ = exec.wake_expired_timers();
 
         let result = exec.run_until_stalled(&mut frame_fut);

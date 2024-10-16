@@ -21,7 +21,7 @@ const DELAY_NOTIFICATION: usize = 10;
 // Spend no more than this many loop turns before giving up for the inspect to match.
 const MAX_LOOPS_COUNT: usize = 20;
 
-const RESTART_DELAY: zx::Duration = zx::Duration::from_seconds(1);
+const RESTART_DELAY: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(1);
 
 macro_rules! block_until_inspect_matches {
     ($moniker:expr, $($tree:tt)+) => {{
@@ -314,13 +314,15 @@ async fn test_system_activity_control() -> Result<()> {
 
     let _ = system_activity_control.stop_application_activity().await.unwrap();
 
+    // After a suspend attempt, due to SAG's self-lease of Execution State, the CPU element will go
+    // to level 1 and Execution State will go to level 1.
     block_until_inspect_matches!(
         &env.sag_moniker,
         root: contains {
             booting: false,
             power_elements: {
                 execution_state: {
-                    power_level: 0u64,
+                    power_level: 1u64,
                 },
                 application_activity: {
                     power_level: 0u64,
@@ -332,7 +334,7 @@ async fn test_system_activity_control() -> Result<()> {
                     power_level: 0u64,
                 },
                 cpu: {
-                    power_level: 0u64,
+                    power_level: 1u64,
                 },
             },
             suspend_stats: {

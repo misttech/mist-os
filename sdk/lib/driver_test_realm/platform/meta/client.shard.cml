@@ -20,10 +20,5 @@
             from: "parent",
             to: [ "#platform_driver_test_realm" ],
         },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [ "#platform_driver_test_realm" ],
-        },
     ],
 }

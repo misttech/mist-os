@@ -4,7 +4,7 @@
 
 use crate::mm::{
     read_to_array, read_to_object_as_bytes, read_to_vec, MemoryAccessorExt, NumberOfElementsRead,
-    TaskMemoryAccessor, UNIFIED_ASPACES_ENABLED,
+    RemoteMemoryManager, TaskMemoryAccessor, UNIFIED_ASPACES_ENABLED,
 };
 use crate::task::{CurrentTask, Task};
 use smallvec::{smallvec, SmallVec};
@@ -407,21 +407,27 @@ impl<'a, M: TaskMemoryAccessor> UserBuffersOutputBuffer<'a, M> {
 }
 
 impl<'a> UserBuffersOutputBuffer<'a, CurrentTask> {
-    pub fn unified_new(mm: &'a CurrentTask, buffers: UserBuffers) -> Result<Self, Errno> {
-        Self::new_inner(mm, buffers)
+    pub fn unified_new(task: &'a CurrentTask, buffers: UserBuffers) -> Result<Self, Errno> {
+        Self::new_inner(task, buffers)
     }
 
     pub fn unified_new_at(
-        mm: &'a CurrentTask,
+        task: &'a CurrentTask,
         address: UserAddress,
         length: usize,
     ) -> Result<Self, Errno> {
-        Self::unified_new(mm, smallvec![UserBuffer { address, length }])
+        Self::unified_new(task, smallvec![UserBuffer { address, length }])
     }
 }
 
 impl<'a> UserBuffersOutputBuffer<'a, Task> {
-    pub fn syscall_new(mm: &'a Task, buffers: UserBuffers) -> Result<Self, Errno> {
+    pub fn syscall_new(task: &'a Task, buffers: UserBuffers) -> Result<Self, Errno> {
+        Self::new_inner(task, buffers)
+    }
+}
+
+impl<'a> UserBuffersOutputBuffer<'a, RemoteMemoryManager> {
+    pub fn remote_new(mm: &'a RemoteMemoryManager, buffers: UserBuffers) -> Result<Self, Errno> {
         Self::new_inner(mm, buffers)
     }
 }
@@ -581,21 +587,27 @@ impl<'a, M: TaskMemoryAccessor> UserBuffersInputBuffer<'a, M> {
 }
 
 impl<'a> UserBuffersInputBuffer<'a, CurrentTask> {
-    pub fn unified_new(mm: &'a CurrentTask, buffers: UserBuffers) -> Result<Self, Errno> {
-        Self::new_inner(mm, buffers)
+    pub fn unified_new(task: &'a CurrentTask, buffers: UserBuffers) -> Result<Self, Errno> {
+        Self::new_inner(task, buffers)
     }
 
     pub fn unified_new_at(
-        mm: &'a CurrentTask,
+        task: &'a CurrentTask,
         address: UserAddress,
         length: usize,
     ) -> Result<Self, Errno> {
-        Self::unified_new(mm, smallvec![UserBuffer { address, length }])
+        Self::unified_new(task, smallvec![UserBuffer { address, length }])
     }
 }
 
 impl<'a> UserBuffersInputBuffer<'a, Task> {
-    pub fn syscall_new(mm: &'a Task, buffers: UserBuffers) -> Result<Self, Errno> {
+    pub fn syscall_new(task: &'a Task, buffers: UserBuffers) -> Result<Self, Errno> {
+        Self::new_inner(task, buffers)
+    }
+}
+
+impl<'a> UserBuffersInputBuffer<'a, RemoteMemoryManager> {
+    pub fn remote_new(mm: &'a RemoteMemoryManager, buffers: UserBuffers) -> Result<Self, Errno> {
         Self::new_inner(mm, buffers)
     }
 }

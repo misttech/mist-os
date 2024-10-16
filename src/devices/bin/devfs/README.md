@@ -5,6 +5,10 @@ component framework so that, during shutdown, when all components that depend
 on devfs are removed, the driver manager can be signalled that driver shutdown
 can commence.
 
+In prod, devfs is a "builtin component" that runs in component manager's
+process. This saves on the overhead of running a small component. A standalone
+version is provided for integration tests (devfs-test.cml).
+
 ## Building
 
 This component should automatically be included in most builds.

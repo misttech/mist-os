@@ -6,7 +6,7 @@ use bitfield::bitfield;
 use packet_encoding::{decodable_enum, Decodable, Encodable};
 
 use crate::frame::FrameParseError;
-use crate::{DLCI, MAX_RFCOMM_FRAME_SIZE};
+use crate::DLCI;
 
 /// The length (in bytes) of a DLC Parameter Negotiation command.
 /// Defined in GSM 7.10 Section 5.4.6.3.1.
@@ -58,12 +58,12 @@ pub struct ParameterNegotiationParams {
 
 impl ParameterNegotiationParams {
     /// Returns the default parameters for a Parameter Negotiation command.
-    pub fn default_command(dlci: DLCI) -> Self {
+    pub fn default_command(dlci: DLCI, max_frame_size: u16) -> Self {
         Self {
             dlci,
             credit_based_flow_handshake: CreditBasedFlowHandshake::SupportedRequest,
             priority: 1,
-            max_frame_size: u16::try_from(MAX_RFCOMM_FRAME_SIZE).expect("should convert"),
+            max_frame_size,
             initial_credits: DEFAULT_INITIAL_CREDITS,
         }
     }

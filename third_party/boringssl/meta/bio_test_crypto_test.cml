@@ -28,14 +28,6 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#netstack",
-                "#stash",
-            ],
-        },
-        {
             protocol: "fuchsia.stash.SecureStore",
             from: "#stash",
             to: "#netstack",

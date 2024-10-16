@@ -5,7 +5,7 @@
 use anyhow::format_err;
 use bt_rfcomm::frame::mux_commands::*;
 use bt_rfcomm::frame::{CommandResponse, Frame, FrameData, FrameParseError, UIHData, UserData};
-use bt_rfcomm::{Role, ServerChannel, DLCI};
+use bt_rfcomm::{max_packet_size_from_l2cap_mtu, Role, ServerChannel, DLCI};
 use fidl_fuchsia_bluetooth::ErrorCode;
 use fuchsia_bluetooth::types::{Channel, PeerId};
 use fuchsia_inspect_derive::{AttachError, Inspect};
@@ -155,18 +155,21 @@ impl Inspect for &mut SessionInner {
 }
 
 impl SessionInner {
-    /// Creates and returns an RFCOMM SessionInner that represents a Session between this device
+    /// Creates and returns an RFCOMM `SessionInner` that represents a Session between this device
     /// and a remote peer.
+    /// `max_packet_size` is the maximum RFCOMM packet size that can be sent over the underlying
+    /// L2CAP transport.
     /// `outgoing_frame_sender` is used to relay RFCOMM frames to be sent to the remote peer.
     /// `channel_opened_fn` is used by the `SessionInner` to relay peer-opened RFCOMM channels to
     /// local clients.
     fn create(
         id: PeerId,
+        max_packet_size: u16,
         outgoing_frame_sender: mpsc::Sender<Frame>,
         channel_opened_fn: ChannelOpenedFn,
     ) -> Self {
         Self {
-            multiplexer: SessionMultiplexer::create(),
+            multiplexer: SessionMultiplexer::create(max_packet_size),
             outstanding_frames: OutstandingFrames::new(),
             pending_channels: HashMap::new(),
             outgoing_frame_sender,
@@ -277,7 +280,7 @@ impl SessionInner {
         // and max frame size are negotiated.
         let requested_parameters = SessionParameters {
             credit_based_flow: params.credit_based_flow(),
-            max_frame_size: usize::from(params.max_frame_size),
+            max_frame_size: params.max_frame_size,
         };
         let updated_parameters = self.multiplexer().negotiate_parameters(requested_parameters);
 
@@ -285,7 +288,7 @@ impl SessionInner {
         let _ = self.multiplexer().find_or_create_session_channel(params.dlci);
 
         // Set the flow control method depending on the negotiated parameters.
-        let flow_control = if updated_parameters.credit_based_flow() {
+        let flow_control = if updated_parameters.credit_based_flow {
             // The credits provided in the peer's response `params` is our (local) credit count.
             // `DEFAULT_INITIAL_CREDITS` is always assigned as the peer's (remote) credit count.
             let credits = Credits::new(
@@ -349,8 +352,8 @@ impl SessionInner {
             warn!(role = ?self.role(), "ParameterNegotiation request before multiplexer startup");
             return Err(Error::MultiplexerNotStarted);
         }
-
-        let pn_params = ParameterNegotiationParams::default_command(dlci);
+        let max_frame_size = self.multiplexer().parameters().max_frame_size;
+        let pn_params = ParameterNegotiationParams::default_command(dlci, max_frame_size);
         let pn_command = MuxCommand {
             params: MuxCommandParams::ParameterNegotiation(pn_params),
             command_response: CommandResponse::Command,
@@ -576,13 +579,12 @@ impl SessionInner {
                 // DLC-specific parameters: Initial credit count is set to a default value.
                 let mut pn_response = pn_command.clone();
                 let updated_parameters = self.multiplexer().parameters();
-                pn_response.credit_based_flow_handshake = if updated_parameters.credit_based_flow()
-                {
+                pn_response.credit_based_flow_handshake = if updated_parameters.credit_based_flow {
                     CreditBasedFlowHandshake::SupportedResponse
                 } else {
                     CreditBasedFlowHandshake::Unsupported
                 };
-                pn_response.max_frame_size = updated_parameters.max_frame_size() as u16;
+                pn_response.max_frame_size = updated_parameters.max_frame_size;
                 pn_response.initial_credits = DEFAULT_INITIAL_CREDITS;
                 MuxCommandParams::ParameterNegotiation(pn_response)
             }
@@ -887,18 +889,22 @@ pub struct Session {
 }
 
 impl Session {
-    /// Creates a new RFCOMM Session with peer `id` over the `l2cap_channel`. Any multiplexed
-    /// RFCOMM channels will be relayed using the `channel_opened_callback`.
+    /// Creates a new RFCOMM Session with peer over the `l2cap_channel`. Opened RFCOMM channels
+    /// will be relayed using the `channel_opened_callback`.
     pub fn create(
         id: PeerId,
         l2cap_channel: Channel,
         channel_opened_callback: ChannelOpenedFn,
     ) -> Self {
-        // The `session_inner` relays outgoing packets (to be sent to the remote peer) to the
-        // `Session` using this mpsc::channel.
+        // The `session_inner` drives the state machine an RFCOMM session. It receives incoming
+        // RFCOMM packets and sends outgoing packets (intended for the remote peer) via the
+        // `frames_to_peer_sender`.
         let (frames_to_peer_sender, frame_receiver) = mpsc::channel(MAX_CONCURRENT_FRAMES);
+        let max_rfcomm_packet_size =
+            max_packet_size_from_l2cap_mtu(l2cap_channel.max_tx_size() as u16);
         let session_inner = Arc::new(Mutex::new(SessionInner::create(
             id,
+            max_rfcomm_packet_size,
             frames_to_peer_sender,
             channel_opened_callback,
         )));
@@ -1111,15 +1117,21 @@ mod tests {
         }
     }
 
+    const MAX_PACKET_SIZE_FOR_TEST: u16 = 800;
+    const PEER_MAX_PACKET_SIZE: u16 = 100;
     /// Creates and returns the SessionInner processing task. Uses a channel_opened_fn that
     /// indiscriminately accepts all opened RFCOMM channels.
     fn setup_session_task() -> (impl Future<Output = ()>, Channel) {
         let id = PeerId(987);
-        let (local, remote) = Channel::create();
+        let (local, remote) = Channel::create_with_max_tx(MAX_PACKET_SIZE_FOR_TEST.into());
         let channel_opened_fn = Box::new(|_server_channel, _channel| async { Ok(()) }.boxed());
         let (frame_sender, frame_receiver) = mpsc::channel(0);
-        let session_inner =
-            Arc::new(Mutex::new(SessionInner::create(id, frame_sender, channel_opened_fn)));
+        let session_inner = Arc::new(Mutex::new(SessionInner::create(
+            id,
+            local.max_tx_size() as u16,
+            frame_sender,
+            channel_opened_fn,
+        )));
         let (sender, _receiver) = oneshot::channel();
         let session_fut =
             Session::session_task(PeerId(1), local, session_inner, frame_receiver, sender);
@@ -1163,7 +1175,7 @@ mod tests {
         let (channel_opened_fn, channel_receiver) = create_inbound_relay();
         let (outgoing_frame_sender, outgoing_frames) = mpsc::channel(0);
         let session = SessionInner {
-            multiplexer: SessionMultiplexer::create(),
+            multiplexer: SessionMultiplexer::create(MAX_PACKET_SIZE_FOR_TEST),
             outstanding_frames: OutstandingFrames::new(),
             pending_channels: HashMap::new(),
             outgoing_frame_sender,
@@ -1271,7 +1283,7 @@ mod tests {
         let user_dlci1 = DLCI::try_from(10).unwrap();
         let data1 = MuxCommand {
             params: MuxCommandParams::ParameterNegotiation(
-                ParameterNegotiationParams::default_command(user_dlci1),
+                ParameterNegotiationParams::default_command(user_dlci1, MAX_PACKET_SIZE_FOR_TEST),
             ),
             command_response: CommandResponse::Command,
         };
@@ -1280,7 +1292,7 @@ mod tests {
         let user_dlci2 = DLCI::try_from(15).unwrap();
         let data2 = MuxCommand {
             params: MuxCommandParams::ParameterNegotiation(
-                ParameterNegotiationParams::default_command(user_dlci2),
+                ParameterNegotiationParams::default_command(user_dlci2, MAX_PACKET_SIZE_FOR_TEST),
             ),
             command_response: CommandResponse::Command,
         };
@@ -1451,9 +1463,14 @@ mod tests {
 
         // Remote initiates DLC PN over a random user DLCI - expect to reply with a DLCPN response.
         let random_dlci = DLCI::try_from(3).unwrap();
-        let dlcpn = make_dlc_pn_frame(CommandResponse::Command, random_dlci, false, 64);
-        let expected_response =
-            make_dlc_pn_frame(CommandResponse::Response, random_dlci, false, 64);
+        let dlcpn = make_dlc_pn_frame(CommandResponse::Command, random_dlci, false, 1000);
+        // Expect to choose the smaller packet size.
+        let expected_response = make_dlc_pn_frame(
+            CommandResponse::Response,
+            random_dlci,
+            false,
+            MAX_PACKET_SIZE_FOR_TEST,
+        );
         handle_and_expect_frame(
             &mut exec,
             &mut session,
@@ -1463,13 +1480,18 @@ mod tests {
         );
 
         // The global session parameters should be set.
-        let expected_parameters =
-            SessionParameters { credit_based_flow: false, max_frame_size: 64 };
+        let expected_parameters = SessionParameters {
+            credit_based_flow: false,
+            max_frame_size: MAX_PACKET_SIZE_FOR_TEST,
+        };
         assert_eq!(session.session_parameters(), expected_parameters);
 
         // Multiple DLC PN requests before a DLC is established is OK - new parameters.
-        let dlcpn = make_dlc_pn_frame(CommandResponse::Command, random_dlci, true, 11);
-        let expected_response = make_dlc_pn_frame(CommandResponse::Response, random_dlci, true, 11);
+        let dlcpn =
+            make_dlc_pn_frame(CommandResponse::Command, random_dlci, true, PEER_MAX_PACKET_SIZE);
+        // Expect to choose the smaller packet size.
+        let expected_response =
+            make_dlc_pn_frame(CommandResponse::Response, random_dlci, true, PEER_MAX_PACKET_SIZE);
         handle_and_expect_frame(
             &mut exec,
             &mut session,
@@ -1479,7 +1501,8 @@ mod tests {
         );
 
         // The global session parameters should be updated.
-        let expected_parameters = SessionParameters { credit_based_flow: true, max_frame_size: 11 };
+        let expected_parameters =
+            SessionParameters { credit_based_flow: true, max_frame_size: PEER_MAX_PACKET_SIZE };
         assert_eq!(session.session_parameters(), expected_parameters);
     }
 
@@ -1633,7 +1656,6 @@ mod tests {
             let mut establish_fut = Box::pin(session.establish_session_channel(user_dlci));
             exec.run_until_stalled(&mut establish_fut).expect_pending("should wait for channel");
             let channel = expect_channel(&mut exec, &mut channel_receiver);
-            assert_eq!(channel.max_tx_size(), 666); // 672 (default max) - 6
             assert_matches!(exec.run_until_stalled(&mut establish_fut), Poll::Ready(true));
             channel
         };
@@ -1887,14 +1909,14 @@ mod tests {
             let mut handle_fut = Box::pin(session.handle_frame(make_dlc_pn_frame(
                 CommandResponse::Response,
                 user_dlci,
-                true, // Peer supports credit-based flow control.
-                100,  // Peer supports max-frame-size of 100.
+                true,                 // Peer supports credit-based flow control.
+                PEER_MAX_PACKET_SIZE, // Peer supports max-frame-size of 100.
             )));
             assert_matches!(exec.run_until_stalled(&mut handle_fut), Poll::Ready(Ok(_)));
         }
         assert!(session.multiplexer().parameters_negotiated());
         let expected_parameters =
-            SessionParameters { credit_based_flow: true, max_frame_size: 100 };
+            SessionParameters { credit_based_flow: true, max_frame_size: PEER_MAX_PACKET_SIZE };
         assert_eq!(session.multiplexer().parameters(), expected_parameters);
     }
 
@@ -1926,9 +1948,9 @@ mod tests {
             assert_matches!(exec.run_until_stalled(&mut handle_fut), Poll::Ready(Ok(_)));
         }
         // The session-wide parameters should not be negotiated.
-        assert_eq!(
+        assert_matches!(
             session.multiplexer().parameter_negotiation_state(),
-            ParameterNegotiationState::NotNegotiated
+            ParameterNegotiationState::NotNegotiated(_)
         );
         // Client should be notified of cancellation.
         expect_channel_error(&mut exec, &mut outbound_channels, ErrorCode::Canceled);
@@ -1965,9 +1987,9 @@ mod tests {
             FrameData::UnnumberedAcknowledgement,
         );
         // The session-wide parameters should not be negotiated.
-        assert_eq!(
+        assert_matches!(
             session.multiplexer().parameter_negotiation_state(),
-            ParameterNegotiationState::NotNegotiated
+            ParameterNegotiationState::NotNegotiated(_)
         );
         // Client should be notified of cancellation.
         expect_channel_error(&mut exec, &mut outbound_channels, ErrorCode::Canceled);
@@ -2004,7 +2026,7 @@ mod tests {
             );
             exec.run_until_stalled(&mut handle_fut)
                 .expect_pending("should wait for outgoing frame");
-            // We then expect the session to initiate a Parameter Negotiation request, since
+            // We then expect the session to initiate a Parameter Negotiation request since
             // the session has not negotiated parameters.
             expect_mux_command(
                 &mut exec,
@@ -2025,8 +2047,8 @@ mod tests {
                 make_dlc_pn_frame(
                     CommandResponse::Response,
                     expected_dlci,
-                    true, // Supports credit-based flow control.
-                    100,  // Supports max frame size of 100.
+                    true,                 // Peer supports credit-based flow control.
+                    PEER_MAX_PACKET_SIZE, // Peer supports max frame size of 100.
                 ),
                 FrameData::SetAsynchronousBalancedMode, // Outgoing SABM.
             );
@@ -2038,8 +2060,10 @@ mod tests {
                 session.handle_frame(Frame::make_ua_response(Role::Responder, expected_dlci)),
             );
             exec.run_until_stalled(&mut handle_fut).expect_pending("should wait for channel");
-            // We then expect to open a local RFCOMM channel to be relayed to a profile client.
-            let _channel = expect_channel(&mut exec, &mut outbound_channels);
+            // We then expect to open a local RFCOMM channel to be relayed to a profile client. The
+            // max TX of the delivered RFCOMM channel should be the negotiated smaller packet size.
+            let channel = expect_channel(&mut exec, &mut outbound_channels);
+            assert_eq!(channel.max_tx_size(), PEER_MAX_PACKET_SIZE as usize);
             exec.run_until_stalled(&mut handle_fut)
                 .expect_pending("should wait for outgoing frame");
             // Upon successful channel delivery, we expect an outgoing ModemStatus frame to
@@ -2068,6 +2092,7 @@ mod tests {
         // Simulate PN finishing ahead of time so that we can directly test the rejection case.
         session.finish_parameter_negotiation(&ParameterNegotiationParams::default_command(
             expected_dlci,
+            MAX_PACKET_SIZE_FOR_TEST,
         ));
         // Initiate an open RFCOMM channel request with a random valid ServerChannel. Expect
         // an outgoing SABM.
@@ -2270,7 +2295,8 @@ mod tests {
     fn test_open_rfcomm_channel_relays_channel_to_callback() {
         let mut exec = fasync::TestExecutor::new();
 
-        let (local, mut remote) = Channel::create();
+        let l2cap_max_packet_size = 500;
+        let (local, mut remote) = Channel::create_with_max_tx(l2cap_max_packet_size);
         let (channel_open_fn, _inbound_channels) = create_inbound_relay();
         let session = Session::create(PeerId(321), local, channel_open_fn);
         let (outbound_fn, mut outbound_channels) = create_outbound_relay();
@@ -2291,8 +2317,8 @@ mod tests {
 
         // 4. Remote should receive an RFCOMM frame to negotiate parameters.
         expect_frame_received_by_peer(&mut exec, &mut remote);
-        // 5. Remote responds positively.
-        let pn_response = make_dlc_pn_frame(CommandResponse::Response, expected_dlci, true, 100);
+        // 5. Remote responds positively with a large max packet size.
+        let pn_response = make_dlc_pn_frame(CommandResponse::Response, expected_dlci, true, 1000);
         send_peer_frame(&remote, pn_response);
 
         // 6. Remote should receive an RFCOMM frame to establish the `expected_dlci`.
@@ -2302,8 +2328,10 @@ mod tests {
         send_peer_frame(&remote, ua);
 
         // Mux startup, Parameter negotiation, and channel establishment are complete. The RFCOMM
-        // channel should be ready and relayed to the client.
-        let _channel = expect_channel(&mut exec, &mut outbound_channels);
+        // channel should be ready and relayed to the client - with our preferred packet size less
+        // RFCOMM header bytes since ours is smaller.
+        let channel = expect_channel(&mut exec, &mut outbound_channels);
+        assert_eq!(channel.max_tx_size(), l2cap_max_packet_size - 6);
 
         // Client trying to connect again on the same channel should fail immediately.
         let (outbound_fn2, mut outbound_channels2) = create_outbound_relay();

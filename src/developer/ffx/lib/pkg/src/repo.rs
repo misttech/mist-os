@@ -9,7 +9,7 @@ use fidl_fuchsia_developer_ffx_ext::{
     RepositoryError, RepositoryRegistrationAliasConflictMode, RepositoryTarget,
 };
 use fidl_fuchsia_pkg::RepositoryManagerProxy;
-use fidl_fuchsia_pkg_ext::MirrorConfigBuilder;
+use fidl_fuchsia_pkg_ext::{MirrorConfigBuilder, RepositoryConfigBuilder};
 use fidl_fuchsia_pkg_rewrite::EngineProxy;
 use fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule};
 use fuchsia_hyper::{new_https_client, HttpsClient};
@@ -405,13 +405,11 @@ pub async fn register_target_with_repo_instance(
         aliases
     };
 
-    let mut config = repo_instance.repo_config.clone();
     let mirrors = repo_instance.repo_config.mirrors();
     let mut subscribe = false;
     //remove all the mirrors, there should only be one placeholder
     for m in mirrors {
         subscribe = subscribe || m.subscribe();
-        config.remove_mirror(m.mirror_url());
     }
     // now add repo_host_addr as the mirror
     let mirror_url = format!("http://{repo_host_addr}/{}", repo_instance.name);
@@ -425,9 +423,24 @@ pub async fn register_target_with_repo_instance(
         ffx::RepositoryError::InvalidUrl
     })?;
     mirror = mirror.subscribe(subscribe);
-    config.insert_mirror(mirror.build());
 
-    match repo_proxy.add(&config.into()).await {
+    let mut config = RepositoryConfigBuilder::new(
+        RepositoryUrl::parse_host(repo_name.to_string()).map_err(|err| {
+            tracing::error!("failed to parse repo url {}: {:#}", repo_name, err);
+            ffx::RepositoryError::InvalidUrl
+        })?,
+    )
+    .add_mirror(mirror)
+    .root_version(repo_instance.repo_config.root_version())
+    .root_threshold(repo_instance.repo_config.root_threshold())
+    .use_local_mirror(repo_instance.repo_config.use_local_mirror())
+    .repo_storage_type(repo_instance.repo_config.repo_storage_type().clone());
+
+    for key in repo_instance.repo_config.root_keys() {
+        config = config.add_root_key(key.clone());
+    }
+
+    match repo_proxy.add(&config.build().into()).await {
         Ok(Ok(())) => {}
         Ok(Err(err)) => {
             tracing::error!("failed to add config: {:#?}", Status::from_raw(err));
@@ -438,12 +451,11 @@ pub async fn register_target_with_repo_instance(
             return Err(ffx::RepositoryError::TargetCommunicationFailure);
         }
     }
-
     if !aliases.is_empty() {
-        let () = create_aliases_fidl(rewrite_engine_proxy, repo_name, &aliases).await?;
+        create_aliases_fidl(rewrite_engine_proxy, repo_name, &aliases).await
+    } else {
+        Ok(())
     }
-
-    Ok(())
 }
 
 async fn read_alias_repos(

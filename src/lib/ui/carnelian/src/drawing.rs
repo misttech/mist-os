@@ -743,7 +743,7 @@ mod tests {
     use fuchsia_framebuffer::FrameUsage;
     use once_cell::sync::Lazy;
 
-    const DEFAULT_TIMEOUT: zx::Duration = zx::Duration::from_seconds(5);
+    const DEFAULT_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(5);
 
     // This font creation method isn't ideal. The correct method would be to ask the Fuchsia
     // font service for the font data.

@@ -6,6 +6,7 @@
 
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/trace/event.h>
 #include <lib/zx/result.h>
 
 #include <string>
@@ -17,6 +18,7 @@ namespace {
 // Reads a manifest from a |ManifestBytesIterator| producing a vector of bytes.
 zx::result<std::vector<uint8_t>> DrainManifestBytesIterator(
     fidl::ClientEnd<fuchsia_sys2::ManifestBytesIterator> iterator_client_end) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   fidl::SyncClient iterator(std::move(iterator_client_end));
   std::vector<uint8_t> result;
 
@@ -46,6 +48,7 @@ struct Moniker {
 };
 
 zx::result<Moniker> SplitMoniker(const std::string& moniker) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__, "moniker", moniker);
   // A valid moniker for launching in a dynamic collection looks like:
   // parent_moniker/collection:name
   size_t leaf_divider = moniker.find_last_of('/');
@@ -69,6 +72,7 @@ zx::result<Moniker> SplitMoniker(const std::string& moniker) {
 
 zx::result<std::unique_ptr<profiler::Component>> profiler::Component::Create(
     async_dispatcher_t* dispatcher, const std::string& url, const std::string& moniker) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__, "moniker", moniker, "url", url);
   std::unique_ptr component = std::make_unique<Component>(dispatcher);
   auto client_end = component::Connect<fuchsia_sys2::LifecycleController>(
       "/svc/fuchsia.sys2.LifecycleController.root");
@@ -115,6 +119,7 @@ zx::result<std::unique_ptr<profiler::Component>> profiler::Component::Create(
 
 zx::result<> profiler::Component::TraverseRealm(
     std::string moniker, const fit::function<zx::result<>(const std::string&)>& f) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__, "moniker", moniker);
   if (zx::result self_res = f(moniker); self_res.is_error()) {
     return self_res;
   }
@@ -141,6 +146,7 @@ zx::result<> profiler::Component::TraverseRealm(
 }
 
 zx::result<> profiler::Component::Start(ComponentWatcher::ComponentEventHandler on_start) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__, "moniker", moniker_);
   if (!on_start) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
@@ -176,6 +182,7 @@ zx::result<> profiler::Component::Start(ComponentWatcher::ComponentEventHandler 
 }
 
 zx::result<> profiler::Component::Stop() {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__, "moniker", moniker_);
   if (zx::result res = component_watcher_.Reset(); res.is_error()) {
     return res;
   }
@@ -189,6 +196,7 @@ zx::result<> profiler::Component::Stop() {
 }
 
 zx::result<> profiler::Component::Destroy() {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__, "moniker", moniker_);
   if (auto destroy_res = lifecycle_controller_client_->DestroyInstance({{
           .parent_moniker = parent_moniker_,
           .child = {{.name = name_, .collection = collection_}},

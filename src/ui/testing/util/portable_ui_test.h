@@ -18,6 +18,7 @@
 #include <vector>
 
 #include <src/lib/testing/loop_fixture/real_loop_fixture.h>
+#include <src/ui/testing/util/logging_event_loop.h>
 #include <src/ui/testing/util/screenshot_helper.h>
 
 namespace ui_testing {
@@ -26,7 +27,7 @@ using component_testing::Route;
 using fuchsia_ui_composition::ScreenshotFormat;
 using ChildName = std::string;
 
-class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
+class PortableUITest : public LoggingEventLoop, public ::testing::Test {
  public:
   static constexpr auto kTestUIStack = "ui";
   static constexpr auto kTestUIStackRef = component_testing::ChildRef{kTestUIStack};

@@ -135,7 +135,7 @@ TEST_F(CommandLineOptionsTest, SimpleParseCommandLineTest) {
                                    build_id_dir.c_str(),
                                    "--symbol-cache",
                                    symbol_cache.c_str(),
-                                   "--symbol-server",
+                                   "--public-symbol-server",
                                    symbol_server.c_str(),
                                    "--connect",
                                    connect.c_str(),
@@ -175,7 +175,8 @@ TEST_F(CommandLineOptionsTest, SimpleParseCommandLineTest) {
   ASSERT_EQ(symbol_path, options.symbol_paths[0]);
   ASSERT_EQ(build_id_dir, options.build_id_dirs[0]);
   ASSERT_EQ(symbol_cache, options.symbol_cache);
-  ASSERT_EQ(symbol_server, options.symbol_servers[0]);
+  ASSERT_EQ(symbol_server, options.public_symbol_servers[0]);
+  ASSERT_TRUE(options.private_symbol_servers.empty());
   ASSERT_EQ(fidl_ir_path, options.fidl_ir_paths[0]);
   ASSERT_EQ(2, options.stack_level);
 

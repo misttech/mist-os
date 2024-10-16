@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
 
 rustc_binary("bin") {
@@ -11,6 +12,7 @@ rustc_binary("bin") {
   with_unit_tests = true
 
   deps = [
+    ":bt_device_id_profile_config",
     "//sdk/fidl/fuchsia.bluetooth.bredr:fuchsia.bluetooth.bredr_rust",
     "//sdk/fidl/fuchsia.bluetooth.deviceid:fuchsia.bluetooth.deviceid_rust",
     "//sdk/rust/zx",
@@ -46,14 +48,43 @@ rustc_binary("bin") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-fuchsia_component("component") {
+fuchsia_component_manifest("manifest") {
   component_name = "bt-device-id"
   manifest = "meta/bt-device-id.cml"
+}
+
+fuchsia_structured_config_rust_lib("bt_device_id_profile_config") {
+  cm_label = ":manifest"
+}
+
+# The default structured config for this component disables the default DI advertisement.
+fuchsia_structured_config_values("default_config_values") {
+  cm_label = ":manifest"
+  values = {
+    vendor_id = 65535  # Vendor ID = 0xFFFF (disabled)
+    product_id = 0  # Product ID not specified
+    version = 0  # Product version not specified
+    primary = true
+    service_description = ""
+  }
+}
+
+fuchsia_component("component") {
+  cm_label = ":manifest"
   deps = [ ":bin" ]
 }
 
-fuchsia_package("bt-device-id") {
+fuchsia_package("without-config") {
+  package_name = "bt-device-id"
+  validate_structured_config = false
   deps = [ ":component" ]
+}
+
+fuchsia_package("bt-device-id") {
+  deps = [
+    ":component",
+    ":default_config_values",
+  ]
 }
 
 fuchsia_unittest_package("bt-device-id-tests") {

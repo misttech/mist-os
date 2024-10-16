@@ -128,7 +128,7 @@ impl FuzzRegistry {
     ) -> Result<(), zx::Status> {
         // Try to extract the provider from the map within the timeout.
         let provider_fut = self.get_provider(&url).fuse();
-        let timer_fut = fasync::Timer::new(zx::Duration::from_nanos(timeout)).fuse();
+        let timer_fut = fasync::Timer::new(zx::MonotonicDuration::from_nanos(timeout)).fuse();
         pin_mut!(provider_fut, timer_fut);
         let provider = select! {
             result = provider_fut => result,
@@ -322,12 +322,12 @@ mod tests {
 
     // Converts milliseconds to nanoseconds for use in `fuchsia.fuzzer.Registry/Connect`.
     fn timeout_ms(milliseconds: i64) -> i64 {
-        zx::Duration::from_millis(milliseconds).into_nanos()
+        zx::MonotonicDuration::from_millis(milliseconds).into_nanos()
     }
 
     // Delays the calling future for the given number of |milliseconds|.
     async fn delay_ms(milliseconds: i64) {
-        fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_millis(
+        fasync::Timer::new(fasync::MonotonicInstant::after(zx::MonotonicDuration::from_millis(
             milliseconds,
         )))
         .await;

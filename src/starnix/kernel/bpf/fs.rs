@@ -16,10 +16,8 @@ use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_not_dir,
     fs_node_impl_xattr_delegate, CacheMode, FdNumber, FileObject, FileOps, FileSystem,
     FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
-    FsNodeOps, FsStr, FsString, MemoryDirectoryFile, MemoryXattrStorage, NamespaceNode, XattrOp,
-    XattrStorage as _,
+    FsNodeOps, FsStr, MemoryDirectoryFile, MemoryXattrStorage, NamespaceNode, XattrStorage as _,
 };
-use linux_uapi::XATTR_NAME_SELINUX;
 use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_uapi::auth::FsCred;
@@ -31,20 +29,9 @@ use starnix_uapi::vfs::{default_statfs, FdEvents};
 use starnix_uapi::{errno, error, statfs, BPF_FS_MAGIC};
 use std::sync::Arc;
 
-/// The default selinux context to use for each BPF object.
-const DEFAULT_BPF_SELINUX_CONTEXT: &str = "u:object_r:fs_bpf:s0";
-
-pub fn get_selinux_context(path: &FsStr) -> FsString {
-    if bstr::ByteSlice::contains_str(&**path, "net_shared") {
-        b"u:object_r:fs_bpf_net_shared:s0".into()
-    } else {
-        DEFAULT_BPF_SELINUX_CONTEXT.into()
-    }
-}
-
 /// A reference to a BPF object that can be stored in either an FD or an entry in the /sys/fs/bpf
 /// filesystem.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum BpfHandle {
     Program(Arc<Program>),
     Map(Arc<Map>),
@@ -162,12 +149,9 @@ impl BpfFs {
     ) -> Result<FileSystemHandle, Errno> {
         let kernel = current_task.kernel();
         let fs = FileSystem::new(kernel, CacheMode::Permanent, BpfFs, options)?;
-        let node = FsNode::new_root_with_properties(
-            BpfFsDir::new(DEFAULT_BPF_SELINUX_CONTEXT.into()),
-            |info| {
-                info.mode |= FileMode::ISVTX;
-            },
-        );
+        let node = FsNode::new_root_with_properties(BpfFsDir::new(), |info| {
+            info.mode |= FileMode::ISVTX;
+        });
         fs.set_root_node(node);
         Ok(fs)
     }
@@ -201,12 +185,8 @@ pub struct BpfFsDir {
 }
 
 impl BpfFsDir {
-    fn new(selinux_context: &FsStr) -> Self {
-        let xattrs = MemoryXattrStorage::default();
-        xattrs
-            .set_xattr(XATTR_NAME_SELINUX.to_bytes().into(), selinux_context, XattrOp::Create)
-            .expect("Failed to set selinux context.");
-        Self { xattrs }
+    fn new() -> Self {
+        Self { xattrs: MemoryXattrStorage::default() }
     }
 
     pub fn register_pin(
@@ -215,12 +195,11 @@ impl BpfFsDir {
         node: &NamespaceNode,
         name: &FsStr,
         object: BpfHandle,
-        selinux_context: &FsStr,
     ) -> Result<(), Errno> {
         node.entry.create_entry(current_task, &node.mount, name, |dir, _mount, _name| {
             Ok(dir.fs().create_node(
                 current_task,
-                BpfFsObject::new(object, &selinux_context),
+                BpfFsObject::new(object),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o600), current_task.as_fscred()),
             ))
         })?;
@@ -246,14 +225,13 @@ impl FsNodeOps for BpfFsDir {
         _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
-        name: &FsStr,
+        _name: &FsStr,
         mode: FileMode,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        let selinux_context = get_selinux_context(name);
         Ok(node.fs().create_node(
             current_task,
-            BpfFsDir::new(selinux_context.as_ref()),
+            BpfFsDir::new(),
             FsNodeInfo::new_factory(mode | FileMode::ISVTX, owner),
         ))
     }
@@ -312,12 +290,8 @@ pub struct BpfFsObject {
 }
 
 impl BpfFsObject {
-    fn new(handle: BpfHandle, selinux_context: &FsStr) -> Self {
-        let xattrs = MemoryXattrStorage::default();
-        xattrs
-            .set_xattr(XATTR_NAME_SELINUX.to_bytes().into(), selinux_context, XattrOp::Create)
-            .expect("Failed to set selinux context.");
-        Self { handle, xattrs }
+    fn new(handle: BpfHandle) -> Self {
+        Self { handle, xattrs: MemoryXattrStorage::default() }
     }
 }
 

@@ -16,6 +16,7 @@
 
 #include <gtest/gtest.h>
 
+#include "lib/component/incoming/cpp/service.h"
 #include "src/sensors/playback/serialization.h"
 
 using fuchsia_component::Namespace;
@@ -23,6 +24,7 @@ using fuchsia_component::NamespaceEntry;
 using fuchsia_component::NamespaceInputEntry;
 using fuchsia_hardware_sensors::Driver;
 using fuchsia_hardware_sensors::Playback;
+using fuchsia_hardware_sensors::Service;
 using fuchsia_hardware_sensors_realm::RealmFactory;
 using fuchsia_math::Vec3F;
 
@@ -74,6 +76,8 @@ class InstalledNamespace {
     return fdio_service_connect(path.c_str(), request.release());
   }
 
+  std::string prefix() const { return prefix_; }
+
  private:
   std::string prefix_;
   /// This is not used, but it keeps the RealmFactory connection alive.
@@ -82,7 +86,6 @@ class InstalledNamespace {
   /// for the test.
   zx::channel realm_factory_;
 };
-
 template <typename Interface>
 InstalledNamespace ExtendNamespace(
     fidl::ClientEnd<fuchsia_component_sandbox::Dictionary> dictionary,
@@ -135,7 +138,13 @@ std::pair<fidl::ClientEnd<Playback>, fidl::ClientEnd<Driver>> CreateStandardEndp
   auto [playback_client_end, playback_server_end] = fidl::Endpoints<Playback>::Create();
   EXPECT_EQ(test_ns.Connect(std::move(playback_server_end)), ZX_OK);
   auto [driver_client_end, driver_server_end] = fidl::Endpoints<Driver>::Create();
-  EXPECT_EQ(test_ns.Connect(std::move(driver_server_end)), ZX_OK);
+
+  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> svc =
+      component::OpenServiceRoot(test_ns.prefix());
+  EXPECT_TRUE(svc.is_ok());
+  auto service = component::OpenServiceAt<Service>(svc.value(), "playback_sensor_driver");
+  EXPECT_TRUE(service.is_ok());
+  EXPECT_TRUE(service->connect_driver(std::move(driver_server_end)).is_ok());
 
   return std::make_pair(std::move(playback_client_end), std::move(driver_client_end));
 }
@@ -568,7 +577,14 @@ TEST(SensorsPlaybackTest, DriverDisconnectsIfPlaybackDisconnects) {
 
   // Connect to the Driver protocol and call a method to make sure it's connected.
   auto [driver_client_end, driver_server_end] = fidl::Endpoints<Driver>::Create();
-  ASSERT_EQ(test_ns.Connect(std::move(driver_server_end)), ZX_OK);
+
+  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> svc =
+      component::OpenServiceRoot(test_ns.prefix());
+  ASSERT_TRUE(svc.is_ok());
+  zx::result service = component::OpenServiceAt<Service>(*svc, "playback_sensor_driver");
+  ASSERT_TRUE(service.is_ok());
+  ASSERT_TRUE(service->connect_driver(std::move(driver_server_end)).is_ok());
+
   fidl::Client driver_client(std::move(driver_client_end), dispatcher, &handler);
 
   result_ok = std::nullopt;

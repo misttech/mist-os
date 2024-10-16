@@ -12,6 +12,7 @@ use futures::{select, FutureExt, StreamExt};
 use profile_client::{ProfileClient, ProfileEvent};
 use std::collections::HashMap;
 use std::future::Future;
+use std::pin::Pin;
 use tracing::{debug, info, warn};
 use {
     fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_hfp as fidl_hfp,
@@ -28,8 +29,7 @@ pub const SEARCH_RESULT_CONNECT_DELAY_SECONDS: i64 = 1;
 const SEARCH_RESULT_CONNECT_DELAY_DURATION: fasync::Duration =
     fasync::Duration::from_seconds(SEARCH_RESULT_CONNECT_DELAY_SECONDS);
 
-type SearchResultTimer =
-    Box<dyn Future<Output = (PeerId, Option<Vec<ProtocolDescriptor>>)> + Unpin>;
+type SearchResultTimer = Pin<Box<dyn Future<Output = (PeerId, Option<Vec<ProtocolDescriptor>>)>>>;
 
 /// Toplevel struct containing the streams of incoming events that are not specific to a single
 /// peer.
@@ -185,7 +185,7 @@ where
 
         let fut = FutureExt::map(timer, move |_| (peer_id, protocol));
 
-        Box::new(fut)
+        Box::pin(fut)
     }
 
     async fn handle_search_result_timer_expiry(

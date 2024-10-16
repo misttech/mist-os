@@ -89,9 +89,8 @@ extern "C" [[noreturn]] void syscall_from_restricted(const syscall_regs_t* regs)
 
 // entry points
 
-zx_status_t RestrictedEnter(uint32_t options, uintptr_t vector_table_ptr, uintptr_t context) {
-  LTRACEF("options %#x vector %#" PRIx64 " context %#" PRIx64 "\n", options, vector_table_ptr,
-          context);
+zx_status_t RestrictedEnter(uintptr_t vector_table_ptr, uintptr_t context) {
+  LTRACEF("vector %#" PRIx64 " context %#" PRIx64 "\n", vector_table_ptr, context);
 
   // validate the vector table pointer
   if (!is_user_accessible(vector_table_ptr)) {
@@ -105,8 +104,6 @@ zx_status_t RestrictedEnter(uint32_t options, uintptr_t vector_table_ptr, uintpt
     return ZX_ERR_BAD_STATE;
   }
   DEBUG_ASSERT(!rs->in_restricted());
-
-  rs->set_in_thread_exceptions_enabled(!(options & ZX_RESTRICTED_OPT_EXCEPTION_CHANNEL));
 
   const zx_restricted_state_t* state_buffer = rs->state_ptr();
   if (!state_buffer) {

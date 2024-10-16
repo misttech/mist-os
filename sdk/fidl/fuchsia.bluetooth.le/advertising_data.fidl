@@ -22,7 +22,7 @@ const MAX_URI_LENGTH uint16 = 278;
 
 // The size of the broadcast name is at least 4 UTF-8 characters (min 4 bytes)
 // and a max of 32 UTF-8 characters (32 * 4) = 128
-@available(added=NEXT)
+@available(added=24)
 const MAX_BROADCAST_NAME_OCTETS uint8 = 128;
 
 /// Entry in the `service_data` field of a [`fuchsia.bluetooth.le/AdvertisingData`].
@@ -71,7 +71,7 @@ type AdvertisingData = table {
     /// Identifies the peer as belonging to a Coordinated Set.
     /// Resolution and generation of this parameter is defined in the
     /// Coordinated Set Identification Service Specification.
-    @available(added=NEXT)
+    @available(added=24)
     9: resolvable_set_identifier array<uint8, 6>;
 
     /// The broadcast name string can be used by a user interface on a scanning
@@ -82,6 +82,6 @@ type AdvertisingData = table {
     /// long and no more than 32 characters.
     ///
     /// Defined in the Public Broadcast Profile specification.
-    @available(added=NEXT)
+    @available(added=24)
     10: broadcast_name string:MAX_BROADCAST_NAME_OCTETS;
 };

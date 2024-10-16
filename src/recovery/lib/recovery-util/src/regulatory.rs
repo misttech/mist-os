@@ -67,7 +67,7 @@ mod tests {
     use fuchsia_async::TimeoutExt;
     use futures::channel::mpsc;
     use futures::{StreamExt, TryStreamExt};
-    use zx::Duration;
+    use zx::MonotonicDuration;
     use {
         fidl_fuchsia_hwinfo as hwinfo, fidl_fuchsia_location_namedplace as regulatory,
         fuchsia_async as fasync,
@@ -179,7 +179,7 @@ mod tests {
         set_region_code(&valid_region_code, &proxy).unwrap();
 
         let region_code_received =
-            receiver.next().on_timeout(Duration::from_seconds(5), || None).await.unwrap();
+            receiver.next().on_timeout(MonotonicDuration::from_seconds(5), || None).await.unwrap();
         assert_eq!(region_code_received, valid_region_code);
     }
 

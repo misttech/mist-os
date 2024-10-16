@@ -493,6 +493,6 @@ type KeyEvent = table {
     7: lock_state LockState;
 
     /// Identifies the device originating this event.
-    @available(added=NEXT)
+    @available(added=24)
     8: device_id uint32;
 };

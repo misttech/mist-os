@@ -105,7 +105,7 @@ fn log_at_most_once_per_min_factory(
     move |message| {
         let now = zx::MonotonicInstant::from_nanos(time_source.now());
         let should_log = match last_logged {
-            Some(last_logged) => (now - last_logged) >= zx::Duration::from_minutes(1),
+            Some(last_logged) => (now - last_logged) >= zx::MonotonicDuration::from_minutes(1),
             None => true,
         };
         if should_log {
@@ -244,7 +244,7 @@ mod tests {
         assert_eq!(*log_count.borrow(), 1);
 
         {
-            *now.borrow_mut() += zx::Duration::from_seconds(30);
+            *now.borrow_mut() += zx::MonotonicDuration::from_seconds(30);
         }
 
         // Not enough time has passed, so log_count shouldn't increase
@@ -252,7 +252,7 @@ mod tests {
         assert_eq!(*log_count.borrow(), 1);
 
         {
-            *now.borrow_mut() += zx::Duration::from_seconds(30);
+            *now.borrow_mut() += zx::MonotonicDuration::from_seconds(30);
         }
 
         // Enough time has passed, so log_count should increase

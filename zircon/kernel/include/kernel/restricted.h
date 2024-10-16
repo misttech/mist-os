@@ -16,7 +16,7 @@
 // Routines to support restricted mode.
 
 // Enter restricted mode on the current thread.
-zx_status_t RestrictedEnter(uint32_t options, uintptr_t vector_table_ptr, uintptr_t context);
+zx_status_t RestrictedEnter(uintptr_t vector_table_ptr, uintptr_t context);
 
 // Called as part of a synchronous exception that is to be handled by the
 // normal mode in-thread exception handler.

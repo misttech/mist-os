@@ -32,42 +32,50 @@ const std::vector<fpbus::Mmio> display_mmios{
         // VPU
         .base = S905D3_VPU_BASE,
         .length = S905D3_VPU_LENGTH,
+        .name = "vpu",
     }},
     {{
         // MIPI DSI "TOP"
         .base = S905D3_MIPI_TOP_DSI_BASE,
         .length = S905D3_MIPI_TOP_DSI_LENGTH,
+        .name = "dsi-top",
     }},
     {{
         // MIPI DSI PHY
         .base = S905D3_DSI_PHY_BASE,
         .length = S905D3_DSI_PHY_LENGTH,
+        .name = "dsi-phy",
     }},
     {{
         // DSI Host Controller
         .base = S905D3_MIPI_DSI_BASE,
         .length = S905D3_MIPI_DSI_LENGTH,
+        .name = "dsi-controller",
     }},
     {{
         // HIU / HHI
         .base = S905D3_HIU_BASE,
         .length = S905D3_HIU_LENGTH,
+        .name = "hhi",
     }},
     {{
         // AOBUS
         // TODO(https://fxbug.dev/42081392): Restrict range to RTI
         .base = S905D3_AOBUS_BASE,
         .length = S905D3_AOBUS_LENGTH,
+        .name = "always-on-rti",
     }},
     {{
         // RESET
         .base = S905D3_RESET_BASE,
         .length = S905D3_RESET_LENGTH,
+        .name = "ee-reset",
     }},
     {{
         // PERIPHS_REGS (GPIO Multiplexer)
         .base = S905D3_GPIO_BASE,
         .length = S905D3_GPIO_LENGTH,
+        .name = "gpio-mux",
     }},
 };
 
@@ -75,14 +83,17 @@ const std::vector<fpbus::Irq> display_irqs{
     {{
         .irq = S905D3_VIU1_VSYNC_IRQ,
         .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
+        .name = "viu1-vsync",
     }},
     {{
         .irq = S905D3_RDMA_DONE,
         .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
+        .name = "rdma-done",
     }},
     {{
         .irq = S905D3_VID1_WR,
         .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
+        .name = "vdin1-write-done",
     }},
 };
 

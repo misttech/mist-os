@@ -24,6 +24,8 @@
 #include <zircon/fidl.h>
 #include <zircon/syscalls.h>
 
+#include <cstdio>
+
 #include "sdk/lib/zxio/private.h"
 #include "sdk/lib/zxio/vector.h"
 
@@ -632,8 +634,9 @@ constexpr fio::NodeAttributesQuery BuildAttributeQuery(
     query |= fio::NodeAttributesQuery::kVerityEnabled;
   if (attr_has.casefold)
     query |= fio::NodeAttributesQuery::kCasefold;
+  if (attr_has.wrapping_key_id)
+    query |= fio::NodeAttributesQuery::kWrappingKeyId;
 #endif
-
   return query;
 }
 
@@ -686,6 +689,12 @@ zx::result<fio::wire::MutableNodeAttributes> BuildMutableAttributes(
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   if (mutable_attrs->has.casefold) {
     builder.casefold(mutable_attrs->casefold);
+  }
+  if (mutable_attrs->has.wrapping_key_id) {
+    builder.wrapping_key_id(
+        fidl::ObjectView<fidl::Array<uint8_t, ZXIO_WRAPPING_KEY_ID_LENGTH>>::FromExternal(
+            reinterpret_cast<fidl::Array<uint8_t, ZXIO_WRAPPING_KEY_ID_LENGTH>*>(
+                const_cast<uint8_t*>(mutable_attrs->wrapping_key_id))));
   }
 #endif
   return zx::ok(builder.Build());
@@ -781,6 +790,11 @@ zx_status_t Remote<Protocol, kObjectType>::AttrGet(zxio_node_attributes_t* inout
       inout_attr->has.fsverity_enabled) {
     return AttributesGetCommon(client(), inout_attr);
   }
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  if (inout_attr->has.wrapping_key_id) {
+    return AttributesGetCommon(client(), inout_attr);
+  }
+#endif
   return AttrGetCommon(client(), ToZxioAbilitiesForFile(), inout_attr);
 }
 
@@ -791,6 +805,11 @@ zx_status_t Remote<Protocol, kObjectType>::AttrSet(const zxio_node_attributes_t*
   if (attr->has.mode || attr->has.uid || attr->has.gid || attr->has.rdev || attr->has.access_time) {
     return AttributesSetCommon(client(), attr);
   }
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  if (attr->has.wrapping_key_id) {
+    return AttributesSetCommon(client(), attr);
+  }
+#endif
   return AttrSetCommon(client(), ToIo1ModePermissionsForFile(), attr);
 }
 
@@ -1561,7 +1580,7 @@ class Directory : public Remote<fio::Directory, ZXIO_OBJECT_TYPE_DIR> {
     // If any of the attributes that exist only in io2 are requested, we call GetAttributes (io2)
     if (inout_attr->has.mode || inout_attr->has.uid || inout_attr->has.gid ||
         inout_attr->has.rdev || inout_attr->has.access_time || inout_attr->has.change_time ||
-        inout_attr->has.casefold) {
+        inout_attr->has.casefold || inout_attr->has.wrapping_key_id) {
       return AttributesGetCommon(client(), inout_attr);
     }
     return AttrGetCommon(client(), ToZxioAbilitiesForDirectory(), inout_attr);
@@ -1571,7 +1590,8 @@ class Directory : public Remote<fio::Directory, ZXIO_OBJECT_TYPE_DIR> {
     // If these attributes are set, call `update_attributes` (io2) otherwise, we can fall back to
     // `SetAttr` to only update creation and modification time.
     if (attr->has.mode || attr->has.uid || attr->has.gid || attr->has.rdev ||
-        attr->has.access_time || attr->has.casefold) {
+        attr->has.access_time || attr->has.casefold || attr->has.access_time ||
+        attr->has.wrapping_key_id) {
       return AttributesSetCommon(client(), attr);
     }
     return AttrSetCommon(client(), ToIo1ModePermissionsForDirectory(), attr);
@@ -2096,6 +2116,12 @@ zx_status_t zxio_attr_from_wire(const fio::wire::NodeAttributes2& in, zxio_node_
     memcpy(out->fsverity_root_hash, in.immutable_attributes.root_hash().data(),
            ZXIO_ROOT_HASH_LENGTH);
     out->has.fsverity_root_hash = true;
+  }
+
+  if (in.mutable_attributes.has_wrapping_key_id()) {
+    memcpy(std::begin(out->wrapping_key_id), in.mutable_attributes.wrapping_key_id().begin(),
+           ZXIO_WRAPPING_KEY_ID_LENGTH);
+    out->has.wrapping_key_id = true;
   }
 
   if (in.immutable_attributes.has_verity_enabled()) {

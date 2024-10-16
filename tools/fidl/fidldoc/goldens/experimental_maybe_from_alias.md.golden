@@ -30,7 +30,7 @@
         <tr id="Testing.u2">
             <td><code>u2</code></td>
             <td>
-                <code>vector&lt;uint64&gt;[1]</code>
+                <code>vector&lt;<a class='link' href='#U64'>U64</a>&gt;:1</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -38,7 +38,7 @@
         <tr id="Testing.u3">
             <td><code>u3</code></td>
             <td>
-                <code>uint64[1]</code>
+                <code>array&lt;<a class='link' href='#U64'>U64</a>,&nbsp;1&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -46,7 +46,7 @@
         <tr id="Testing.u4">
             <td><code>u4</code></td>
             <td>
-                <code>vector&lt;vector&lt;uint64&gt;&gt;</code>
+                <code>vector&lt;vector&lt;<a class='link' href='#U64'>U64</a>&gt;:1&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -54,7 +54,7 @@
         <tr id="Testing.u5">
             <td><code>u5</code></td>
             <td>
-                <code>vector&lt;array&gt;</code>
+                <code>vector&lt;array&lt;<a class='link' href='#U64'>U64</a>,&nbsp;1&gt;&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -62,7 +62,7 @@
         <tr id="Testing.u6">
             <td><code>u6</code></td>
             <td>
-                <code>[4]</code>
+                <code>array&lt;vector&lt;<a class='link' href='#U64'>U64</a>&gt;:1,&nbsp;4&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -70,7 +70,7 @@
         <tr id="Testing.u7">
             <td><code>u7</code></td>
             <td>
-                <code>[4]</code>
+                <code>array&lt;array&lt;<a class='link' href='#U64'>U64</a>,&nbsp;1&gt;,&nbsp;4&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -86,7 +86,7 @@
         <tr id="Testing.v2">
             <td><code>v2</code></td>
             <td>
-                <code>vector&lt;vector&lt;uint64&gt;&gt;</code>
+                <code>vector&lt;<a class='link' href='#Vector'>Vector</a>&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -94,7 +94,7 @@
         <tr id="Testing.v3">
             <td><code>v3</code></td>
             <td>
-                <code>[4]</code>
+                <code>array&lt;<a class='link' href='#Vector'>Vector</a>,&nbsp;4&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -110,7 +110,7 @@
         <tr id="Testing.a2">
             <td><code>a2</code></td>
             <td>
-                <code>vector&lt;array&gt;</code>
+                <code>vector&lt;<a class='link' href='#AliasOfArray'>AliasOfArray</a>&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -118,7 +118,7 @@
         <tr id="Testing.a3">
             <td><code>a3</code></td>
             <td>
-                <code>[4]</code>
+                <code>array&lt;<a class='link' href='#AliasOfArray'>AliasOfArray</a>,&nbsp;4&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -134,7 +134,7 @@
         <tr id="Testing.r2">
             <td><code>r2</code></td>
             <td>
-                <code>vector&lt;test.experimentalmaybefromalias/MyProtocol&gt;</code>
+                <code>vector&lt;<a class='link' href='#AliasOfRequest'>AliasOfRequest</a>&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -142,7 +142,7 @@
         <tr id="Testing.r3">
             <td><code>r3</code></td>
             <td>
-                <code>test.experimentalmaybefromalias/MyProtocol[4]</code>
+                <code>array&lt;<a class='link' href='#AliasOfRequest'>AliasOfRequest</a>,&nbsp;4&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -158,7 +158,7 @@
         <tr id="Testing.b2">
             <td><code>b2</code></td>
             <td>
-                <code>vector&lt;vector&lt;uint8&gt;&gt;</code>
+                <code>vector&lt;<a class='link' href='#AliasOfBytes'>AliasOfBytes</a>&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -166,7 +166,7 @@
         <tr id="Testing.b3">
             <td><code>b3</code></td>
             <td>
-                <code>[4]</code>
+                <code>array&lt;<a class='link' href='#AliasOfBytes'>AliasOfBytes</a>,&nbsp;4&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -182,7 +182,7 @@
         <tr id="Testing.s2">
             <td><code>s2</code></td>
             <td>
-                <code>vector&lt;string&gt;</code>
+                <code>vector&lt;<a class='link' href='#AliasOfString'>AliasOfString</a>&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -190,7 +190,7 @@
         <tr id="Testing.s3">
             <td><code>s3</code></td>
             <td>
-                <code>[4]</code>
+                <code>array&lt;<a class='link' href='#AliasOfString'>AliasOfString</a>,&nbsp;4&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -206,7 +206,7 @@
         <tr id="Testing.vv2">
             <td><code>vv2</code></td>
             <td>
-                <code>vector&lt;vector&lt;uint64&gt;&gt;[3]</code>
+                <code>vector&lt;<a class='link' href='#AliasOfVectorContainingAliasOfVector'>AliasOfVectorContainingAliasOfVector</a>&gt;:3</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -214,7 +214,7 @@
         <tr id="Testing.vv3">
             <td><code>vv3</code></td>
             <td>
-                <code>[3]</code>
+                <code>array&lt;<a class='link' href='#AliasOfVectorContainingAliasOfVector'>AliasOfVectorContainingAliasOfVector</a>,&nbsp;3&gt;</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -230,7 +230,7 @@
         <tr id="Testing.aa2">
             <td><code>aa2</code></td>
             <td>
-                <code>vector&lt;array&gt;[3]</code>
+                <code>vector&lt;<a class='link' href='#AliasOfArrayContainingAliasOfArray'>AliasOfArrayContainingAliasOfArray</a>&gt;:3</code>
             </td>
             <td></td>
             <td>No default</td>
@@ -238,7 +238,7 @@
         <tr id="Testing.aa3">
             <td><code>aa3</code></td>
             <td>
-                <code>[3]</code>
+                <code>array&lt;<a class='link' href='#AliasOfArrayContainingAliasOfArray'>AliasOfArrayContainingAliasOfArray</a>,&nbsp;3&gt;</code>
             </td>
             <td></td>
             <td>No default</td>

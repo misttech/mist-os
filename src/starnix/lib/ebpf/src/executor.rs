@@ -4,7 +4,8 @@
 
 use crate::visitor::{BpfVisitor, ProgramCounter, Register, Source};
 use crate::{
-    BpfValue, DataWidth, EbpfProgram, EbpfRunContext, BPF_STACK_SIZE, GENERAL_REGISTER_COUNT,
+    BpfValue, DataWidth, EbpfProgram, EbpfRunContext, PacketAccessor, BPF_STACK_SIZE,
+    GENERAL_REGISTER_COUNT,
 };
 use byteorder::{BigEndian, ByteOrder, LittleEndian};
 use std::mem::MaybeUninit;
@@ -12,35 +13,16 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use zerocopy::IntoBytes;
 
-pub fn execute_with_arguments<C: EbpfRunContext>(
-    program: &EbpfProgram<C>,
-    run_context: &mut C::Context<'_>,
-    arguments: &[u64],
-) -> u64 {
-    let arguments = arguments.iter().map(|v| BpfValue::from(*v)).collect::<Vec<_>>();
-    execute_impl(program, run_context, &arguments)
-}
-
 pub fn execute<C: EbpfRunContext>(
     program: &EbpfProgram<C>,
     run_context: &mut C::Context<'_>,
-    data: &mut [u8],
-) -> u64 {
-    execute_impl(
-        program,
-        run_context,
-        &[BpfValue::from(data.as_mut_ptr()), BpfValue::from(data.len())],
-    )
-}
-
-fn execute_impl<C: EbpfRunContext>(
-    program: &EbpfProgram<C>,
-    run_context: &mut C::Context<'_>,
+    packet_accessor: &dyn PacketAccessor<C>,
     arguments: &[BpfValue],
 ) -> u64 {
     assert!(arguments.len() < 5);
     let mut context = ComputationContext {
         program,
+        packet_accessor,
         registers: Default::default(),
         stack: vec![MaybeUninit::uninit(); BPF_STACK_SIZE / std::mem::size_of::<BpfValue>()]
             .into_boxed_slice()
@@ -73,6 +55,8 @@ impl BpfValue {
 struct ComputationContext<'a, C: EbpfRunContext> {
     /// The program to execute.
     program: &'a EbpfProgram<C>,
+    /// The packet accessor.
+    packet_accessor: &'a dyn PacketAccessor<C>,
     /// Register 0 to 9.
     registers: [BpfValue; GENERAL_REGISTER_COUNT as usize],
     /// The state of the stack.
@@ -892,8 +876,8 @@ impl<C: EbpfRunContext> BpfVisitor for ComputationContext<'_, C> {
     fn load_from_packet<'a>(
         &mut self,
         context: &mut Self::Context<'a>,
-        dst: Register,
-        src: Register,
+        dst_reg: Register,
+        src_reg: Register,
         offset: i16,
         register_offset: Option<Register>,
         width: DataWidth,
@@ -905,14 +889,10 @@ impl<C: EbpfRunContext> BpfVisitor for ComputationContext<'_, C> {
             self.result = Some(self.reg(0).as_u64());
             return Ok(());
         };
-        if let Some(value) = self.program.packet_accessor.as_ref().unwrap().run(
-            context,
-            self.reg(src),
-            offset,
-            width,
-        ) {
+        let src_reg = self.reg(src_reg);
+        if let Some(value) = self.packet_accessor.load(context, src_reg, offset, width) {
             self.next();
-            self.set_reg(dst, value.into());
+            self.set_reg(dst_reg, value.into());
         } else {
             self.result = Some(self.reg(0).as_u64());
         }

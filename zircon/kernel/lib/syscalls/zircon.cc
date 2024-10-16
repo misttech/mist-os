@@ -50,7 +50,7 @@ constexpr size_t kMaxCPRNGDraw = ZX_CPRNG_DRAW_MAX_LEN;
 constexpr size_t kMaxCPRNGSeed = ZX_CPRNG_ADD_ENTROPY_MAX_LEN;
 
 // zx_status_t zx_nanosleep
-zx_status_t sys_nanosleep(zx_time_t deadline) {
+zx_status_t sys_nanosleep(zx_instant_mono_t deadline) {
   LTRACEF("nseconds %" PRIi64 "\n", deadline);
   kcounter_add(syscalls_zx_nanosleep, 1);
 
@@ -59,7 +59,7 @@ zx_status_t sys_nanosleep(zx_time_t deadline) {
     return ZX_OK;
   }
 
-  const zx_time_t now = current_time();
+  const zx_instant_mono_t now = current_time();
   const auto up = ProcessDispatcher::GetCurrent();
   const Deadline slackDeadline(deadline, up->GetTimerSlackPolicy());
 
@@ -70,22 +70,22 @@ zx_status_t sys_nanosleep(zx_time_t deadline) {
   return Thread::Current::SleepEtc(slackDeadline, Interruptible::Yes, now);
 }
 
-zx_time_t sys_clock_get_monotonic_via_kernel() {
+zx_instant_mono_t sys_clock_get_monotonic_via_kernel() {
   kcounter_add(syscalls_zx_clock_get_monotonic, 1);
   return current_time();
 }
 
-zx_time_t sys_clock_get_boot_via_kernel() {
+zx_instant_boot_t sys_clock_get_boot_via_kernel() {
   kcounter_add(syscalls_zx_clock_get_boot, 1);
   return current_boot_time();
 }
 
-zx_ticks_t sys_ticks_get_via_kernel() {
+zx_instant_mono_ticks_t sys_ticks_get_via_kernel() {
   kcounter_add(syscalls_zx_ticks_get, 1);
   return current_ticks();
 }
 
-zx_ticks_t sys_ticks_get_boot_via_kernel() {
+zx_instant_boot_ticks_t sys_ticks_get_boot_via_kernel() {
   kcounter_add(syscalls_zx_ticks_get_boot, 1);
   return current_boot_ticks();
 }

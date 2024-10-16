@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 import("//src/starnix/kernel/args.gni")
 
@@ -11,6 +12,7 @@ rustc_library("kernel_manager") {
     "src/kernels.rs",
     "src/lib.rs",
   ]
+  with_unit_tests = true
 
   deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
@@ -33,10 +35,17 @@ rustc_library("kernel_manager") {
     "//third_party/rust_crates:tracing",
   ]
 
+  test_deps = [ "//src/lib/fuchsia" ]
+
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 
   if (starnix_enable_wake_locks) {
     features = [ "wake_locks" ]
     deps += [ "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust" ]
   }
+}
+
+fuchsia_unittest_package("starnix_kernel_manager-tests") {
+  deps = [ ":kernel_manager_test" ]
+  manifest = "meta/kernel_manager-tests.cml"
 }

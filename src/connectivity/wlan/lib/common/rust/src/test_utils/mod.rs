@@ -16,7 +16,7 @@ pub mod fake_stas;
 pub trait ExpectWithin: Future + Sized {
     fn expect_within<S: ToString + Clone>(
         self,
-        duration: zx::Duration,
+        duration: zx::MonotonicDuration,
         msg: S,
     ) -> OnTimeout<Self, Box<dyn FnOnce() -> Self::Output>> {
         let msg = msg.clone().to_string();

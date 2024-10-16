@@ -84,7 +84,7 @@ func AddImageDeps(ctx context.Context, s *Shard, buildDir string, images []build
 		}
 	}()
 
-	if err := ffx.Run(ctx, "config", "set", "daemon.autostart", "false", "-l", "global"); err != nil {
+	if err := ffx.Run(ctx, "config", "set", "daemon.autostart", "false"); err != nil {
 		return err
 	}
 	artifactsGroup := "flash"

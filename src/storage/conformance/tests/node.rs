@@ -10,11 +10,6 @@ use {fidl_fuchsia_io as fio, zx};
 #[fuchsia::test]
 async fn test_open_node_on_directory() {
     let harness = TestHarness::new().await;
-
-    if !harness.config.supports_open3 {
-        return;
-    }
-
     let root = root_directory(vec![]);
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
 
@@ -43,10 +38,6 @@ async fn test_open_node_on_directory() {
 #[fuchsia::test]
 async fn test_open_node_on_file() {
     let harness = TestHarness::new().await;
-
-    if !harness.config.supports_open3 {
-        return;
-    }
 
     let root = root_directory(vec![file("file", vec![])]);
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
@@ -86,11 +77,6 @@ async fn test_open_node_on_file() {
 #[fuchsia::test]
 async fn test_set_attr_and_set_flags_on_node() {
     let harness = TestHarness::new().await;
-
-    if !harness.config.supports_open3 {
-        return;
-    }
-
     let root = root_directory(vec![file("file", vec![])]);
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
 
@@ -128,11 +114,6 @@ async fn test_set_attr_and_set_flags_on_node() {
 #[fuchsia::test]
 async fn test_node_clone() {
     let harness = TestHarness::new().await;
-
-    if !harness.config.supports_open3 {
-        return;
-    }
-
     let root = root_directory(vec![file("file", vec![])]);
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
 
@@ -157,11 +138,6 @@ async fn test_node_clone() {
 #[fuchsia::test]
 async fn test_open_node_with_attributes() {
     let harness = TestHarness::new().await;
-
-    if !harness.config.supports_open3 {
-        return;
-    }
-
     let root = root_directory(vec![]);
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
 

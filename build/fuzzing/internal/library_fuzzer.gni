@@ -25,7 +25,8 @@ template("library_fuzzer") {
     target_type = invoker.target_type
   }
   target(target_type, target_name) {
-    variant_selector_target_type = "fuzzed_executable"
+    # Library fuzzers include the engine in-process.
+    variant_selector_target_type = "fuzzer_engine"
     testonly = true
     deps = []
     forward_variables_from(invoker,

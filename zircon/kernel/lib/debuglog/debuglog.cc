@@ -207,7 +207,7 @@ zx_status_t DLog::Write(uint32_t severity, uint32_t flags, ktl::string_view str)
   hdr.datalen = static_cast<uint16_t>(len);
   hdr.severity = static_cast<uint8_t>(severity);
   hdr.flags = static_cast<uint8_t>(flags);
-  hdr.timestamp = current_time();
+  hdr.timestamp = current_boot_time();
   Thread* t = Thread::Current::Get();
   if (t) {
     hdr.pid = t->pid();

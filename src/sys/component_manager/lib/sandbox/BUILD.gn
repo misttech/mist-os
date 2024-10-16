@@ -42,18 +42,24 @@ rustc_library("sandbox") {
     "src/connector.rs",
     "src/data.rs",
     "src/dict.rs",
+    "src/dir_entry.rs",
     "src/directory.rs",
     "src/fidl/capability.rs",
     "src/fidl/connector.rs",
+    "src/fidl/connector_router.rs",
     "src/fidl/data.rs",
+    "src/fidl/data_router.rs",
     "src/fidl/dict.rs",
+    "src/fidl/dictionary_router.rs",
     "src/fidl/dir_entry.rs",
+    "src/fidl/dir_entry_router.rs",
     "src/fidl/directory.rs",
     "src/fidl/handle.rs",
     "src/fidl/instance_token.rs",
     "src/fidl/mod.rs",
     "src/fidl/receiver.rs",
     "src/fidl/router.rs",
+    "src/fidl/specific_router.rs",
     "src/fidl/store.rs",
     "src/fidl/unit.rs",
     "src/handle.rs",
@@ -61,6 +67,7 @@ rustc_library("sandbox") {
     "src/lib.rs",
     "src/receiver.rs",
     "src/router.rs",
+    "src/specific_router.rs",
     "src/unit.rs",
   ]
 
@@ -73,10 +80,7 @@ rustc_library("sandbox") {
       "//third_party/rust_crates:scopeguard",
       "//third_party/rust_crates:tracing",
     ]
-    sources += [
-      "src/dir_entry.rs",
-      "src/fidl/registry.rs",
-    ]
+    sources += [ "src/fidl/registry.rs" ]
   }
 
   visibility = [

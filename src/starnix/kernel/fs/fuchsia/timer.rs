@@ -29,7 +29,7 @@ impl TimerOps for ZxTimer {
         deadline: TargetTime,
     ) -> Result<(), Errno> {
         self.timer
-            .set(deadline.estimate_monotonic(), zx::Duration::default())
+            .set(deadline.estimate_monotonic(), zx::MonotonicDuration::default())
             .map_err(|status| from_status_like_fdio!(status))?;
         Ok(())
     }

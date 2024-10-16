@@ -59,6 +59,9 @@ pub trait Statistic: Clone + Fill<Self::Sample> {
 /// The associated data semantic type of a `Statistic`.
 pub type Semantic<F> = <F as Statistic>::Semantic;
 
+/// The associated metadata type of a `Statistic`.
+pub type Metadata<F> = <Semantic<F> as DataSemantic>::Metadata;
+
 /// The associated sample type of a `Statistic`.
 pub type Sample<F> = <F as Statistic>::Sample;
 

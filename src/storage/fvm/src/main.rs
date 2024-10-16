@@ -985,10 +985,10 @@ impl Component {
                 &inner.metadata.partitions.get(&partition_index).ok_or(zx::Status::INTERNAL)?;
             PartitionInfo {
                 block_count: 0, // Supplied via `get_volume_info`.
-                block_size: fvm.block_size(),
                 type_guid: partition.type_guid,
                 instance_guid: partition.guid,
-                name: partition.name().to_string(),
+                name: Some(partition.name().to_string()),
+                flags: 0,
             }
         };
 
@@ -1004,8 +1004,8 @@ impl Component {
         };
 
         let block_server = Arc::new(BlockServer::new(
-            partition_info,
-            Arc::new(PartitionInterface { partition_index, key, fvm: fvm.clone() }),
+            fvm.block_size(),
+            Arc::new(PartitionInterface { partition_index, partition_info, key, fvm: fvm.clone() }),
         ));
 
         let server_end = server_end.into_channel().into();
@@ -1190,6 +1190,7 @@ impl Component {
 
 struct PartitionInterface {
     partition_index: u16,
+    partition_info: PartitionInfo,
     key: Option<zxcrypt::Key>,
     fvm: Arc<Fvm>,
 }
@@ -1201,6 +1202,10 @@ impl Interface for PartitionInterface {
 
     fn on_detach_vmo(&self, vmo: &zx::Vmo) {
         self.fvm.device.detach_vmo(vmo);
+    }
+
+    async fn get_info(&self) -> Result<Cow<'_, PartitionInfo>, zx::Status> {
+        Ok(Cow::Borrowed(&self.partition_info))
     }
 
     async fn read(

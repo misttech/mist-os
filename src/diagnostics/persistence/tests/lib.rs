@@ -16,7 +16,7 @@ use std::io::Read;
 use std::mem::take;
 use std::{thread, time};
 use tracing::*;
-use zx::{Duration, MonotonicInstant};
+use zx::{MonotonicDuration, MonotonicInstant};
 
 mod mock_fidl;
 mod mock_filesystems;
@@ -88,7 +88,7 @@ async fn diagnostics_persistence_integration() {
     // persistence to verify that the change doesn't happen too soon.
     // backoff_time should be the same as "min_seconds_between_fetch" in
     // TEST_CONFIG_CONTENTS.
-    let backoff_time = MonotonicInstant::get() + Duration::from_seconds(1);
+    let backoff_time = MonotonicInstant::get() + MonotonicDuration::from_seconds(1);
 
     // For development it may be convenient to set this to 5. For production, slow virtual devices
     // may cause test flakes even with surprisingly long timeouts.
@@ -267,7 +267,8 @@ async fn wait_for_inspect_source() {
 
     loop {
         assert!(
-            start_time + Duration::from_seconds(GIVE_UP_POLLING_SECS) > MonotonicInstant::get()
+            start_time + MonotonicDuration::from_seconds(GIVE_UP_POLLING_SECS)
+                > MonotonicInstant::get()
         );
         let published_inspect =
             inspect_fetcher.snapshot_raw::<Inspect, serde_json::Value>().await.unwrap().to_string();
@@ -453,7 +454,8 @@ fn expect_file_change(rules: FileChange<'_>) {
 
     loop {
         assert!(
-            start_time + Duration::from_seconds(GIVE_UP_POLLING_SECS) > MonotonicInstant::get()
+            start_time + MonotonicDuration::from_seconds(GIVE_UP_POLLING_SECS)
+                > MonotonicInstant::get()
         );
         let contents =
             unbrittle_too_big_message(zero_file_timestamps(file_contents(rules.file_name)));

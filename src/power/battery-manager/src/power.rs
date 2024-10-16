@@ -151,7 +151,7 @@ async fn process_watch_event(
         // poll and update battery status to catch changes that might not
         // otherwise be notified (i.e. gradual charge/discharge)
         let battery_manager = battery_manager.clone();
-        let mut timer = fasync::Interval::new(zx::Duration::from_seconds(60));
+        let mut timer = fasync::Interval::new(zx::MonotonicDuration::from_seconds(60));
         debug!("::power:: process_watch_event spawn periodic timer");
 
         fasync::Task::spawn(async move {

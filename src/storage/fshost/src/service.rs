@@ -7,9 +7,9 @@ use crate::device::constants::{
     self, BLOB_VOLUME_LABEL, DATA_PARTITION_LABEL, LEGACY_DATA_PARTITION_LABEL,
     UNENCRYPTED_VOLUME_LABEL, ZXCRYPT_DRIVER_PATH,
 };
-use crate::device::{BlockDevice, Device};
+use crate::device::{BlockDevice, Device, DeviceTag};
 use crate::environment::{Environment, FilesystemLauncher, ServeFilesystemStatus};
-use crate::{debug_log, fxblob, watcher};
+use crate::{debug_log, fxblob};
 use anyhow::{anyhow, Context, Error};
 use device_watcher::recursive_wait_and_open;
 use fidl::endpoints::{Proxy, RequestStream, ServerEnd};
@@ -18,11 +18,12 @@ use fidl_fuchsia_hardware_block::{BlockMarker, BlockProxy};
 use fidl_fuchsia_hardware_block_volume::VolumeManagerMarker;
 use fidl_fuchsia_io::{self as fio, DirectoryMarker, OpenFlags};
 use fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream};
-use fs_management::format::DiskFormat;
+use fs_management::format::{detect_disk_format, DiskFormat};
 use fs_management::partition::{
     find_partition, fvm_allocate_partition, partition_matches_with_proxy, PartitionMatcher,
 };
 use fs_management::{filesystem, Blobfs, F2fs, Fxfs, Minfs};
+use fuchsia_async::TimeoutExt as _;
 use fuchsia_fs::directory::{
     clone_onto_no_describe, create_directory_recursive_deprecated, open_file_deprecated,
 };
@@ -30,13 +31,13 @@ use fuchsia_fs::file::write;
 use fuchsia_runtime::HandleType;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
-use futures::{StreamExt, TryStreamExt};
+use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use std::collections::HashSet;
 use std::sync::Arc;
 use uuid::Uuid;
 use vfs::service;
 use zx::sys::{zx_handle_t, zx_status_t};
-use zx::{self as zx, AsHandleRef, Duration};
+use zx::{self as zx, AsHandleRef, MonotonicDuration};
 use {fidl_fuchsia_fshost as fshost, fuchsia_async as fasync};
 
 pub enum FshostShutdownResponder {
@@ -55,7 +56,7 @@ impl FshostShutdownResponder {
     }
 }
 
-const FIND_PARTITION_DURATION: Duration = Duration::from_seconds(20);
+const FIND_PARTITION_DURATION: MonotonicDuration = MonotonicDuration::from_seconds(20);
 
 fn data_partition_names() -> Vec<String> {
     vec![DATA_PARTITION_LABEL.to_string(), LEGACY_DATA_PARTITION_LABEL.to_string()]
@@ -333,6 +334,7 @@ async fn wipe_storage_fvm(
 }
 
 async fn write_data_file(
+    environment: &Arc<Mutex<dyn Environment>>,
     config: &fshost_config::Config,
     ramdisk_prefix: Option<String>,
     launcher: &FilesystemLauncher,
@@ -358,7 +360,7 @@ async fn write_data_file(
         usize::try_from(content_size).context("Failed to convert u64 content_size to usize")?;
 
     let (mut filesystem, mut data) = if config.fxfs_blob {
-        fxblob::mount_or_format_data(ramdisk_prefix, launcher)
+        fxblob::mount_or_format_data(environment, launcher)
             .await
             .map(|(fs, data)| ((Some(fs), data)))?
     } else {
@@ -491,45 +493,79 @@ async fn shred_data_volume(
     } else {
         // Otherwise we need to find the Fxfs partition and shred it.
         tracing::info!("Filesystem is not running; shredding offline.");
-        let partition_controller = if config.fxfs_blob {
-            let fxfs_matcher = PartitionMatcher {
-                detected_disk_formats: Some(vec![DiskFormat::Fxfs]),
-                ignore_prefix: ramdisk_prefix,
-                ..Default::default()
-            };
-            find_partition(fxfs_matcher, FIND_PARTITION_DURATION).await.map_err(|e| {
-                tracing::error!("Failed to find fxfs: {e:?}");
-                zx::Status::NOT_FOUND
-            })?
+
+        let filesystem = if config.fxfs_blob {
+            // We find the device via our own matcher.
+            let registered_devices = environment.lock().await.registered_devices().clone();
+            let block_connector = registered_devices
+                .get_block_connector(DeviceTag::FxblobOnRecovery)
+                .map_err(|error| {
+                    tracing::error!(?error, "shred_data_volume: unable to get block connector");
+                    zx::Status::NOT_FOUND
+                })
+                .on_timeout(FIND_PARTITION_DURATION, || {
+                    tracing::error!("Failed to find fxfs within timeout");
+                    Err(zx::Status::NOT_FOUND)
+                })
+                .await?;
+
+            // Check to see if the device needs formatting.
+            let format = detect_disk_format(
+                &block_connector
+                    .connect_block()
+                    .map_err(|error| {
+                        tracing::error!(?error, "connect_block failed");
+                        zx::Status::INTERNAL
+                    })?
+                    .into_proxy()
+                    .unwrap(),
+            )
+            .await;
+            if format != DiskFormat::Fxfs {
+                ServeFilesystemStatus::FormatRequired
+            } else {
+                launcher
+                    .serve_data_from(fs_management::filesystem::Filesystem::from_boxed_config(
+                        block_connector,
+                        Box::new(Fxfs::dynamic_child()),
+                    ))
+                    .await
+                    .map_err(|error| {
+                        tracing::error!(?error, "serving fxfs");
+                        zx::Status::INTERNAL
+                    })?
+            }
         } else {
-            find_data_partition(ramdisk_prefix).await.map_err(|e| {
+            let partition_controller = find_data_partition(ramdisk_prefix).await.map_err(|e| {
                 tracing::error!("shred_data_volume: unable to find partition: {e:?}");
                 zx::Status::NOT_FOUND
-            })?
-        };
-        let partition_path = partition_controller
-            .get_topological_path()
-            .await
-            .map_err(|e| {
-                tracing::error!("Failed to get topo path (fidl error): {e:?}");
-                zx::Status::INTERNAL
-            })?
-            .map_err(|e| {
-                let status = zx::Status::from_raw(e);
-                tracing::error!("Failed to get topo path: {}", status.to_string());
-                status
             })?;
-        let mut device = Box::new(
-            BlockDevice::from_proxy(partition_controller, &partition_path).await.map_err(|e| {
-                tracing::error!("failed to make new device: {e:?}");
-                zx::Status::NOT_FOUND
-            })?,
-        );
-        let filesystem =
+            let partition_path = partition_controller
+                .get_topological_path()
+                .await
+                .map_err(|e| {
+                    tracing::error!("Failed to get topo path (fidl error): {e:?}");
+                    zx::Status::INTERNAL
+                })?
+                .map_err(|e| {
+                    let status = zx::Status::from_raw(e);
+                    tracing::error!("Failed to get topo path: {}", status.to_string());
+                    status
+                })?;
+            let mut device = Box::new(
+                BlockDevice::from_proxy(partition_controller, &partition_path).await.map_err(
+                    |e| {
+                        tracing::error!("failed to make new device: {e:?}");
+                        zx::Status::NOT_FOUND
+                    },
+                )?,
+            );
             launcher.serve_data(device.as_mut(), Fxfs::dynamic_child()).await.map_err(|e| {
                 tracing::error!("serving fxfs: {e:?}");
                 zx::Status::INTERNAL
-            })?;
+            })?
+        };
+
         let mut filesystem = match filesystem {
             // If we already need to format for some reason, we don't need to worry about shredding
             // the data volume.
@@ -614,6 +650,7 @@ pub fn fshost_admin(
                     Ok(fshost::AdminRequest::WriteDataFile { responder, payload, filename }) => {
                         tracing::info!(?filename, "admin write data file called");
                         let res = match write_data_file(
+                            &env,
                             &config,
                             ramdisk_prefix.clone(),
                             &launcher,
@@ -698,47 +735,6 @@ pub fn fshost_admin(
                     }
                     Err(e) => {
                         tracing::error!("admin server failed: {:?}", e);
-                        return;
-                    }
-                }
-            }
-        }
-    })
-}
-
-/// Create a new service node which implements the fuchsia.fshost.BlockWatcher protocol.
-pub fn fshost_block_watcher(pauser: watcher::Watcher) -> Arc<service::Service> {
-    service::host(move |mut stream: fshost::BlockWatcherRequestStream| {
-        let mut pauser = pauser.clone();
-        async move {
-            while let Some(request) = stream.next().await {
-                match request {
-                    Ok(fshost::BlockWatcherRequest::Pause { responder }) => {
-                        let res = match pauser.pause().await {
-                            Ok(()) => zx::Status::OK.into_raw(),
-                            Err(e) => {
-                                tracing::error!("block watcher service: failed to pause: {:?}", e);
-                                zx::Status::BAD_STATE.into_raw()
-                            }
-                        };
-                        responder.send(res).unwrap_or_else(|e| {
-                            tracing::error!("failed to send Pause response. error: {:?}", e);
-                        });
-                    }
-                    Ok(fshost::BlockWatcherRequest::Resume { responder }) => {
-                        let res = match pauser.resume().await {
-                            Ok(()) => zx::Status::OK.into_raw(),
-                            Err(e) => {
-                                tracing::error!("block watcher service: failed to resume: {:?}", e);
-                                zx::Status::BAD_STATE.into_raw()
-                            }
-                        };
-                        responder.send(res).unwrap_or_else(|e| {
-                            tracing::error!("failed to send Resume response. error: {:?}", e);
-                        });
-                    }
-                    Err(e) => {
-                        tracing::error!("block watcher server failed: {:?}", e);
                         return;
                     }
                 }

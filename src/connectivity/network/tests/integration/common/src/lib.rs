@@ -39,17 +39,20 @@ pub type Result<T = ()> = std::result::Result<T, anyhow::Error>;
 /// Extra time to use when waiting for an async event to occur.
 ///
 /// A large timeout to help prevent flakes.
-pub const ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT: zx::Duration = zx::Duration::from_seconds(120);
+pub const ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_seconds(120);
 
 /// Extra time to use when waiting for an async event to not occur.
 ///
 /// Since a negative check is used to make sure an event did not happen, its okay to use a
 /// smaller timeout compared to the positive case since execution stall in regards to the
 /// monotonic clock will not affect the expected outcome.
-pub const ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT: zx::Duration = zx::Duration::from_seconds(5);
+pub const ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_seconds(5);
 
 /// The time to wait between two consecutive checks of an event.
-pub const ASYNC_EVENT_CHECK_INTERVAL: zx::Duration = zx::Duration::from_seconds(1);
+pub const ASYNC_EVENT_CHECK_INTERVAL: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_seconds(1);
 
 /// Returns `true` once the stream yields a `true`.
 ///
@@ -69,7 +72,7 @@ pub async fn try_all<S: Stream<Item = Result<bool>>>(stream: S) -> Result<bool> 
 
 /// Asynchronously sleeps for specified `secs` seconds.
 pub async fn sleep(secs: i64) {
-    fasync::Timer::new(zx::Duration::from_seconds(secs).after_now()).await;
+    fasync::Timer::new(zx::MonotonicDuration::from_seconds(secs).after_now()).await;
 }
 
 /// Gets a component event stream yielding component stopped events.
@@ -189,7 +192,7 @@ pub async fn get_inspect_data(
                 return datum;
             }
             None => {
-                fasync::Timer::new(zx::Duration::from_millis(100).after_now()).await;
+                fasync::Timer::new(zx::MonotonicDuration::from_millis(100).after_now()).await;
             }
         }
     }

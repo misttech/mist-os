@@ -5,11 +5,11 @@
 //! Tests for the NAT hooks.
 
 use std::marker::PhantomData;
-use std::num::NonZeroU16;
+use std::num::{NonZeroU16, NonZeroU64};
 use std::ops::RangeInclusive;
 
 use fidl_fuchsia_net_ext::{self as fnet_ext, IntoExt as _};
-use fidl_fuchsia_net_filter_ext::{Action, NatHook, PortRange};
+use fidl_fuchsia_net_filter_ext::{Action, InterfaceMatcher, Matchers, NatHook, PortRange};
 use heck::SnakeCase as _;
 use net_types::ip::IpAddress as _;
 use net_types::Witness as _;
@@ -17,23 +17,31 @@ use netstack_testing_macros::netstack_test;
 use test_case::test_case;
 
 use crate::ip_hooks::{
-    Addrs, ExpectedConnectivity, OriginalDestination, Realms, SockAddrs, SocketType, TcpSocket,
-    TestIpExt, TestNet, TestRealm, UdpSocket, LOW_RULE_PRIORITY, MEDIUM_RULE_PRIORITY,
+    Addrs, ExpectedConnectivity, OriginalDestination, Ports, Realms, RouterTestIpExt, SockAddrs,
+    SocketType, Sockets, TcpSocket, TestIpExt, TestNet, TestRealm, TestRouterNet, UdpSocket,
+    LOW_RULE_PRIORITY, MEDIUM_RULE_PRIORITY,
 };
+
+fn local_type_name<T>() -> &'static str {
+    std::any::type_name::<T>().split("::").last().unwrap()
+}
 
 // TODO(https://fxbug.dev/341128580): exercise ICMP once it can be NATed
 // correctly.
 #[netstack_test]
 #[variant(I, Ip)]
-#[test_case(PhantomData::<TcpSocket>)]
-#[test_case(PhantomData::<UdpSocket>)]
+#[test_case(PhantomData::<TcpSocket>; "tcp")]
+#[test_case(PhantomData::<UdpSocket>; "udp")]
 async fn redirect_ingress_no_assigned_address<I: TestIpExt, S: SocketType>(
     name: &str,
     _socket_type: PhantomData<S>,
 ) {
+    diagnostics_log::initialize(diagnostics_log::PublishOptions::default())
+        .expect("initialize logging");
+
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let network = sandbox.create_network("net").await.expect("create network");
-    let name = format!("{name}_{}", std::any::type_name::<S>().to_snake_case());
+    let name = format!("{name}_{}", local_type_name::<S>().to_snake_case());
 
     let mut net = TestNet::new::<I>(
         &sandbox,
@@ -56,6 +64,13 @@ async fn redirect_ingress_no_assigned_address<I: TestIpExt, S: SocketType>(
     // rule installed, the traffic from the client should not reach the server
     // because Redirect drops the packet when there is no address assigned to
     // the incoming interface.
+    net.server
+        .install_nat_rule::<I>(
+            LOW_RULE_PRIORITY,
+            S::matcher::<I>(),
+            Action::Redirect { dst_port: None },
+        )
+        .await;
     let _handles = net
         .run_test_with::<I, S, _>(
             ExpectedConnectivity::None,
@@ -67,14 +82,68 @@ async fn redirect_ingress_no_assigned_address<I: TestIpExt, S: SocketType>(
                         .await
                         .expect("remove address");
                     assert!(removed);
+                })
+            },
+        )
+        .await;
+}
 
-                    server
-                        .install_nat_rule::<I>(
-                            LOW_RULE_PRIORITY,
-                            S::matcher::<I>(),
-                            Action::Redirect { dst_port: None },
-                        )
-                        .await;
+// TODO(https://fxbug.dev/341128580): exercise ICMP once it can be NATed
+// correctly.
+#[netstack_test]
+#[variant(I, Ip)]
+#[test_case(PhantomData::<TcpSocket>; "tcp")]
+#[test_case(PhantomData::<UdpSocket>; "udp")]
+async fn masquerade_egress_no_assigned_address<I: TestIpExt, S: SocketType>(
+    name: &str,
+    _socket_type: PhantomData<S>,
+) {
+    diagnostics_log::initialize(diagnostics_log::PublishOptions::default())
+        .expect("initialize logging");
+
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let network = sandbox.create_network("net").await.expect("create network");
+    let name = format!("{name}_{}", local_type_name::<S>().to_snake_case());
+
+    let mut net = TestNet::new::<I>(
+        &sandbox,
+        &network,
+        &name,
+        None, /* ip_hook */
+        Some(NatHook::Egress),
+    )
+    .await;
+
+    // Send from the client to server and back; assert that we have two-way
+    // connectivity when no filtering has been configured.
+    //
+    // This has the side effect of completing neighbor resolution on the client
+    // for the server, so that we can remove the address assigned to the server
+    // and still expect traffic from the client to reach it.
+    let _handles = net.run_test::<I, S>(ExpectedConnectivity::TwoWay).await;
+
+    // Remove the server's assigned address. Even though we have a Masquerade NAT
+    // rule installed, the response traffic from the server should not reach the
+    // client because Masquerade drops the outgoing packet when there is no address
+    // assigned to the outgoing interface.
+    net.server
+        .install_nat_rule::<I>(
+            LOW_RULE_PRIORITY,
+            S::matcher::<I>(),
+            Action::Masquerade { src_port: None },
+        )
+        .await;
+    let _handles = net
+        .run_test_with::<I, S, _>(
+            ExpectedConnectivity::None,
+            |TestNet { client: _, server }, _addrs, ()| {
+                Box::pin(async move {
+                    let removed = server
+                        .interface
+                        .del_address_and_subnet_route(I::SERVER_ADDR_WITH_PREFIX)
+                        .await
+                        .expect("remove address");
+                    assert!(removed);
                 })
             },
         )
@@ -104,9 +173,12 @@ async fn redirect_ingress<I: TestIpExt, S: SocketType>(
     _socket_type: PhantomData<S>,
     change_dst_port: bool,
 ) {
+    diagnostics_log::initialize(diagnostics_log::PublishOptions::default())
+        .expect("initialize logging");
+
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let network = sandbox.create_network("net").await.expect("create network");
-    let name = format!("{name}_{}", std::any::type_name::<S>().to_snake_case());
+    let name = format!("{name}_{}", local_type_name::<S>().to_snake_case());
 
     let mut net = TestNet::new::<I>(
         &sandbox,
@@ -120,22 +192,14 @@ async fn redirect_ingress<I: TestIpExt, S: SocketType>(
     // Install a rule to redirect incoming traffic to the primary address of the
     // incoming interface. This should have no effect on connectivity because
     // the incoming traffic is already destined to this address.
-    let _handles = net
-        .run_test_with::<I, S, _>(
-            ExpectedConnectivity::TwoWay,
-            |TestNet { client: _, server }, _addrs, ()| {
-                Box::pin(async move {
-                    server
-                        .install_nat_rule::<I>(
-                            LOW_RULE_PRIORITY,
-                            S::matcher::<I>(),
-                            Action::Redirect { dst_port: None },
-                        )
-                        .await;
-                })
-            },
+    net.server
+        .install_nat_rule::<I>(
+            LOW_RULE_PRIORITY,
+            S::matcher::<I>(),
+            Action::Redirect { dst_port: None },
         )
         .await;
+    let _handles = net.run_test::<I, S>(ExpectedConnectivity::TwoWay).await;
 
     // Now run a similar test, but instead of sending from the client socket to
     // the address the server socket is bound to, send to some other address
@@ -210,9 +274,12 @@ async fn redirect_local_egress<I: TestIpExt, S: SocketType>(
     _socket_type: PhantomData<S>,
     change_dst_port: bool,
 ) {
+    diagnostics_log::initialize(diagnostics_log::PublishOptions::default())
+        .expect("initialize logging");
+
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let network = sandbox.create_network("net").await.expect("create network");
-    let name = format!("{name}_{}", std::any::type_name::<S>().to_snake_case());
+    let name = format!("{name}_{}", local_type_name::<S>().to_snake_case());
 
     let mut netstack = TestRealm::new::<I>(
         &sandbox,
@@ -276,6 +343,154 @@ async fn redirect_local_egress<I: TestIpExt, S: SocketType>(
             known_to_client: true,
             known_to_server: true,
         }),
+    )
+    .await;
+}
+
+// TODO(https://fxbug.dev/341128580): exercise ICMP once it can be NATed
+// correctly.
+#[netstack_test]
+#[variant(I, Ip)]
+#[test_case(PhantomData::<TcpSocket>; "tcp")]
+#[test_case(PhantomData::<UdpSocket>; "udp")]
+async fn masquerade<I: RouterTestIpExt, S: SocketType>(name: &str, _socket_type: PhantomData<S>) {
+    diagnostics_log::initialize(diagnostics_log::PublishOptions::default())
+        .expect("initialize logging");
+
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let name = format!("{name}_{}", local_type_name::<S>().to_snake_case());
+
+    // Set up a network with two hosts (client and server) and a router. The client
+    // and server are both link-layer neighbors with the router but on isolated L2
+    // networks.
+    let mut net =
+        TestRouterNet::<I>::new(&sandbox, &name, None /* ip_hook */, Some(NatHook::Egress)).await;
+
+    // Install a rule on the egress hook of the router that masquerades outgoing
+    // traffic behind its IP address.
+    net.install_nat_rule(
+        Matchers {
+            out_interface: Some(InterfaceMatcher::Id(
+                NonZeroU64::new(net.router_server_interface.id()).unwrap(),
+            )),
+            ..Default::default()
+        },
+        Action::Masquerade { src_port: None },
+    )
+    .await;
+
+    // The traffic should look to the server like it is originating from the router,
+    // and the NATing should be transparent to the client.
+    let (sockets, sock_addrs) = S::bind_sockets(net.realms(), TestRouterNet::<I>::addrs()).await;
+    let fnet_ext::IpAddress(router_addr) = I::ROUTER_SERVER_ADDR_WITH_PREFIX.addr.into();
+    let _handles = S::run_test::<I>(
+        net.realms(),
+        sockets,
+        SockAddrs {
+            client: std::net::SocketAddr::new(router_addr, sock_addrs.client.port()),
+            server: sock_addrs.server,
+        },
+        ExpectedConnectivity::TwoWay,
+        None,
+    )
+    .await;
+}
+
+// TODO(https://fxbug.dev/341128580): exercise ICMP once it can be NATed
+// correctly.
+#[netstack_test]
+#[variant(I, Ip)]
+#[test_case(PhantomData::<TcpSocket>, false; "tcp")]
+#[test_case(PhantomData::<UdpSocket>, false; "udp")]
+#[test_case(PhantomData::<UdpSocket>, true; "udp restrict to occupied port")]
+#[test_case(PhantomData::<TcpSocket>, true; "tcp restrict to occupied port")]
+async fn masquerade_rewrite_src_port<I: RouterTestIpExt, S: SocketType>(
+    name: &str,
+    _socket_type: PhantomData<S>,
+    rewrite_to_conflicting_port: bool,
+) {
+    diagnostics_log::initialize(diagnostics_log::PublishOptions::default())
+        .expect("initialize logging");
+
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let name = format!("{name}_{}", local_type_name::<S>().to_snake_case());
+
+    // Set up a network with two hosts (client and server) and a router. The client
+    // and server are both link-layer neighbors with the router but on isolated L2
+    // networks.
+    let mut net =
+        TestRouterNet::<I>::new(&sandbox, &name, None /* ip_hook */, Some(NatHook::Egress)).await;
+
+    // Bind one socket on the router and one on the server and send some data back
+    // and forth, so that the connection is tracked by the router netstack.
+    let realms = Realms { client: &net.router, server: &net.server };
+    let (sockets, sock_addrs) = S::bind_sockets(
+        realms,
+        Addrs {
+            client: I::ROUTER_SERVER_ADDR_WITH_PREFIX.addr,
+            server: I::SERVER_ADDR_WITH_PREFIX.addr,
+        },
+    )
+    .await;
+    let client_port = NonZeroU16::new(sock_addrs.client.port()).unwrap();
+    let (server, _client) =
+        S::run_test::<I>(realms, sockets, sock_addrs, ExpectedConnectivity::TwoWay, None).await;
+
+    // Install a rule on the egress hook of the router that masquerades outgoing
+    // traffic behind its IP address, and restrict the range of ports within which
+    // the source port can be rewritten.
+    let masquerade_src_port = if rewrite_to_conflicting_port {
+        // Restrict the source port rewrite range such that either the only allowed port
+        // is the one that's already bound on the router, causing a conflict.
+        client_port
+    } else {
+        // Specify the source port rewrite range such that the port should be available
+        // on the router.
+        NonZeroU16::new(different_ephemeral_port(client_port.get())).unwrap()
+    };
+    net.install_nat_rule(
+        Matchers {
+            out_interface: Some(InterfaceMatcher::Id(
+                NonZeroU64::new(net.router_server_interface.id()).unwrap(),
+            )),
+            ..S::matcher::<I>()
+        },
+        Action::Masquerade { src_port: Some(PortRange(masquerade_src_port..=masquerade_src_port)) },
+    )
+    .await;
+
+    // Now bind a new socket on the client to the same port used by the router, and
+    // send to the same server as before, so that the there is a conflict. The
+    // router should attempt to rewrite the source port of the client's traffic.
+    //
+    // If the source port range of the Masquerade rule includes a port that does not
+    // conflict with an existing tuple, the client's source port should be mapped to
+    // an unoccupied one as part of the NAT configuration, and communication with
+    // the server should succeed.
+    //
+    // If it was restricted to only the port that's already occupied, the traffic
+    // from the client will be dropped because there is no viable option to remap
+    // its source port while avoiding a conflict.
+    let (Sockets { client: new_client, server: _ }, _sock_addrs) = S::bind_sockets_to_ports(
+        net.realms(),
+        TestRouterNet::<I>::addrs(),
+        Ports { src: client_port.get(), dst: 0 /* we're not using the server socket */ },
+    )
+    .await;
+    let fnet_ext::IpAddress(router_addr) = I::ROUTER_SERVER_ADDR_WITH_PREFIX.addr.into();
+    let _handles = S::run_test::<I>(
+        net.realms(),
+        Sockets { client: new_client, server },
+        SockAddrs {
+            client: std::net::SocketAddr::new(router_addr, masquerade_src_port.get()),
+            server: sock_addrs.server,
+        },
+        if rewrite_to_conflicting_port {
+            ExpectedConnectivity::None
+        } else {
+            ExpectedConnectivity::TwoWay
+        },
+        None,
     )
     .await;
 }

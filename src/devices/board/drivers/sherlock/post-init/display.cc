@@ -32,42 +32,50 @@ static const std::vector<fpbus::Mmio> display_mmios{
         // VPU
         .base = T931_VPU_BASE,
         .length = T931_VPU_LENGTH,
+        .name = "vpu",
     }},
     {{
         // MIPI DSI "TOP"
         .base = T931_TOP_MIPI_DSI_BASE,
         .length = T931_TOP_MIPI_DSI_LENGTH,
+        .name = "dsi-top",
     }},
     {{
         // MIPI DSI PHY
         .base = T931_DSI_PHY_BASE,
         .length = T931_DSI_PHY_LENGTH,
+        .name = "dsi-phy",
     }},
     {{
         // DSI Host Controller
         .base = T931_MIPI_DSI_BASE,
         .length = T931_MIPI_DSI_LENGTH,
+        .name = "dsi-controller",
     }},
     {{
         // HIU / HHI
         .base = T931_HIU_BASE,
         .length = T931_HIU_LENGTH,
+        .name = "hhi",
     }},
     {{
         // AOBUS
         // TODO(https://fxbug.dev/42081392): Restrict range to RTI
         .base = T931_AOBUS_BASE,
         .length = T931_AOBUS_LENGTH,
+        .name = "always-on-rti",
     }},
     {{
         // RESET
         .base = T931_RESET_BASE,
         .length = T931_RESET_LENGTH,
+        .name = "ee-reset",
     }},
     {{
         // PERIPHS_REGS (GPIO Multiplexer)
         .base = T931_GPIO_BASE,
         .length = T931_GPIO_LENGTH,
+        .name = "gpio-mux",
     }},
 };
 
@@ -75,14 +83,17 @@ static const std::vector<fpbus::Irq> display_irqs{
     {{
         .irq = T931_VIU1_VSYNC_IRQ,
         .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
+        .name = "viu1-vsync",
     }},
     {{
         .irq = T931_RDMA_DONE,
         .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
+        .name = "rdma-done",
     }},
     {{
         .irq = T931_VID1_WR,
         .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
+        .name = "vdin1-write-done",
     }},
 };
 

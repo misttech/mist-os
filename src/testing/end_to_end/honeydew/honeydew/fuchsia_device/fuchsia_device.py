@@ -366,7 +366,7 @@ class FuchsiaDevice(
         """
         if self._device_info.serial_socket is None:
             raise errors.FuchsiaDeviceError(
-                "'device_serial_socket' arg need to be provided during the init to use Serial affordance"
+                "'serial_socket' arg need to be provided during the init to use Serial affordance"
             )
 
         serial_obj: serial_transport_interface.Serial = (

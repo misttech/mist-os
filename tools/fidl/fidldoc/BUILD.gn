@@ -26,7 +26,6 @@ if (is_host) {
     "src/templates/markdown/partials/header_dir.hbs",
     "src/templates/markdown/partials/declarations/tables.hbs",
     "src/templates/markdown/partials/declarations/enums.hbs",
-    "src/templates/markdown/partials/types/vector.hbs",
     "src/templates/markdown/partials/declarations/constants.hbs",
     "src/templates/markdown/partials/declarations/aliases.hbs",
     "src/templates/markdown/partials/declarations/protocols.hbs",

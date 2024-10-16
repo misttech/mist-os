@@ -33,9 +33,11 @@ void AmlEthernet::ResetPhy(ResetPhyCompleter::Sync& completer) {
   const auto& gpio_reset = gpios_[PHY_RESET];
   if (gpio_reset.is_valid()) {
     {
-      fidl::WireResult result = gpio_reset->Write(0);
+      fidl::WireResult result =
+          gpio_reset->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputLow);
       if (!result.ok()) {
-        zxlogf(ERROR, "Failed to send Write request to reset gpio: %s", result.status_string());
+        zxlogf(ERROR, "Failed to send SetBufferMode request to reset gpio: %s",
+               result.status_string());
         completer.ReplyError(result.status());
         return;
       }
@@ -48,9 +50,11 @@ void AmlEthernet::ResetPhy(ResetPhyCompleter::Sync& completer) {
     }
     zx_nanosleep(zx_deadline_after(ZX_MSEC(100)));
     {
-      fidl::WireResult result = gpio_reset->Write(1);
+      fidl::WireResult result =
+          gpio_reset->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputHigh);
       if (!result.ok()) {
-        zxlogf(ERROR, "Failed to send Write request to reset gpio: %s", result.status_string());
+        zxlogf(ERROR, "Failed to send SetBufferMode request to reset gpio: %s",
+               result.status_string());
         completer.ReplyError(result.status());
         return;
       }
@@ -121,9 +125,11 @@ zx_status_t AmlEthernet::Bind() {
   // Set reset line to output if implemented
   const auto& gpio_reset = gpios_[PHY_RESET];
   if (gpio_reset.is_valid()) {
-    fidl::WireResult result = gpio_reset->ConfigOut(0);
+    fidl::WireResult result =
+        gpio_reset->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputLow);
     if (!result.ok()) {
-      zxlogf(ERROR, "Failed to send ConfigOut request to reset gpio: %s", result.status_string());
+      zxlogf(ERROR, "Failed to send SetBufferMode request to reset gpio: %s",
+             result.status_string());
       return result.status();
     }
     if (result->is_error()) {

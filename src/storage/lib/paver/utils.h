@@ -47,9 +47,11 @@ zx::result<> WipeBlockPartition(const paver::BlockDevices& devices,
                                 std::optional<uuid::Uuid> unique_guid,
                                 std::optional<uuid::Uuid> type_guid);
 
-zx::result<> IsBoard(const fbl::unique_fd& devfs_root, std::string_view board_name);
+zx::result<> IsBoard(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+                     std::string_view board_name);
 
-zx::result<> IsBootloader(const fbl::unique_fd& devfs_root, std::string_view vendor);
+zx::result<> IsBootloader(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+                          std::string_view vendor);
 
 }  // namespace paver
 

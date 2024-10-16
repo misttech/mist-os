@@ -141,8 +141,9 @@ fn get_log_level(level: i32) -> String {
 }
 
 // Assume monotonic time is sufficient for debug logs in recovery.
-fn format_time(timestamp: zx::sys::zx_time_t) -> String {
-    format!("{:05}.{:06}", timestamp / 1000000000, (timestamp / 1000) % 1000000)
+fn format_time(timestamp: zx::BootInstant) -> String {
+    let nanos = timestamp.into_nanos();
+    format!("{:05}.{:06}", nanos / 1000000000, (nanos / 1000) % 1000000)
 }
 
 pub type LogHandlerFnPtr = Box<dyn FnMut(String)>;
@@ -483,7 +484,7 @@ mod tests {
                     .log(&flog::LogMessage {
                         pid: 0,
                         tid: 0,
-                        time: 0,
+                        time: zx::BootInstant::ZERO,
                         severity: 0,
                         dropped_logs: 0,
                         tags: vec![tag],

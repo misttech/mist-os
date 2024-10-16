@@ -93,7 +93,7 @@ async fn connect_with_failed_association() {
     let phy = helper.proxy();
     let () = helper
         .run_until_complete_or_timeout(
-            zx::Duration::from_seconds(240),
+            zx::MonotonicDuration::from_seconds(240),
             format!("connecting to {} ({})", AP_SSID.to_string_not_redactable(), bssid),
             scan_and_associate(&phy, &AP_SSID, &bssid, &Channel::new(1, Cbw::Cbw20)),
             save_network_fut,

@@ -6,8 +6,10 @@
 
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/trace/event.h>
 
 zx::result<> profiler::ComponentWatcher::Watch() {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   auto client_end = component::Connect<fuchsia_component::EventStream>();
   if (client_end.is_error()) {
     FX_LOGS(ERROR) << "Failed to connect to event stream";
@@ -36,6 +38,7 @@ zx::result<> profiler::ComponentWatcher::Reset() {
 
 zx::result<> profiler::ComponentWatcher::WatchForMoniker(std::string moniker,
                                                          ComponentEventHandler handler) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__, "moniker", moniker);
   // The events api strips leading "./"s from monikers
   std::string normalized = moniker;
   if (normalized[0] == '.' && normalized[1] == '/') {
@@ -60,6 +63,7 @@ zx::result<> profiler::ComponentWatcher::WatchForUrl(std::string url,
 
 void profiler::ComponentWatcher::HandleEvent(
     fidl::Result<fuchsia_component::EventStream::GetNext> &res) {
+  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   if (res.is_error()) {
     FX_LOGS(ERROR) << "GetEventFailed";
     return;

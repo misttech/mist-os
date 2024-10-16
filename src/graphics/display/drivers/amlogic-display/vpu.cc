@@ -78,27 +78,25 @@ zx::result<std::unique_ptr<Vpu>> Vpu::Create(
   ZX_DEBUG_ASSERT(platform_device.is_valid());
 
   // Map VPU registers
-  zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(MmioResourceIndex::kVpu, platform_device);
+  zx::result<fdf::MmioBuffer> vpu_mmio_result = MapMmio(kMmioNameVpu, platform_device);
   if (vpu_mmio_result.is_error()) {
     return vpu_mmio_result.take_error();
   }
   fdf::MmioBuffer vpu_mmio = std::move(vpu_mmio_result).value();
 
-  zx::result<fdf::MmioBuffer> hhi_mmio_result = MapMmio(MmioResourceIndex::kHhi, platform_device);
+  zx::result<fdf::MmioBuffer> hhi_mmio_result = MapMmio(kMmioNameHhi, platform_device);
   if (hhi_mmio_result.is_error()) {
     return hhi_mmio_result.take_error();
   }
   fdf::MmioBuffer hhi_mmio = std::move(hhi_mmio_result).value();
 
-  zx::result<fdf::MmioBuffer> aobus_mmio_result =
-      MapMmio(MmioResourceIndex::kAonRti, platform_device);
+  zx::result<fdf::MmioBuffer> aobus_mmio_result = MapMmio(kMmioNameAlwaysOnRti, platform_device);
   if (aobus_mmio_result.is_error()) {
     return aobus_mmio_result.take_error();
   }
   fdf::MmioBuffer aobus_mmio = std::move(aobus_mmio_result).value();
 
-  zx::result<fdf::MmioBuffer> reset_mmio_result =
-      MapMmio(MmioResourceIndex::kEeReset, platform_device);
+  zx::result<fdf::MmioBuffer> reset_mmio_result = MapMmio(kMmioNameEeReset, platform_device);
   if (reset_mmio_result.is_error()) {
     return reset_mmio_result.take_error();
   }

@@ -44,7 +44,7 @@
         <tr id="ClientEndWrapper.value">
             <td><code>value</code></td>
             <td>
-                <code><a class='link' href='#DriverProtocol'>DriverProtocol</a></code>
+                <code>client_end:<a class='link' href='#DriverProtocol'>DriverProtocol</a></code>
             </td>
             <td></td>
             <td>No default</td>
@@ -59,7 +59,7 @@
         <tr id="ServerEndWrapper.value">
             <td><code>value</code></td>
             <td>
-                <code>server_end&lt;<a class='link' href='#DriverProtocol'>DriverProtocol</a>&gt;</code>
+                <code>server_end:<a class='link' href='#DriverProtocol'>DriverProtocol</a></code>
             </td>
             <td></td>
             <td>No default</td>
@@ -89,7 +89,7 @@
 <td><h3 id="T.fdf_handle" class="add-link hide-from-toc">2</h3></td>
             <td><code>fdf_handle</code></td>
             <td>
-                <code><a class='link' href='#DriverProtocol'>DriverProtocol</a></code>
+                <code>client_end:<a class='link' href='#DriverProtocol'>DriverProtocol</a></code>
             </td>
             <td></td>
         </tr>

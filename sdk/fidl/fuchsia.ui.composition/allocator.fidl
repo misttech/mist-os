@@ -4,6 +4,7 @@
 library fuchsia.ui.composition;
 
 using fuchsia.sysmem;
+using fuchsia.sysmem2;
 using zx;
 
 /// The set of error codes returned by Allocator::RegisterBufferCollection().
@@ -72,7 +73,10 @@ type RegisterBufferCollectionArgs = resource table {
     /// when all [`BufferCollectionImportToken`]s are closed and all the associated Image resources
     /// are released.
     ///
-    /// This field is REQUIRED.
+    /// Exactly one of `buffer_collection_token2` / `buffer_collection_token` must be set.
+    @available(added=NEXT)
+    5: buffer_collection_token2 client_end:fuchsia.sysmem2.BufferCollectionToken;
+    @available(added=7, deprecated=NEXT, note="use buffer_collection_token2")
     2: buffer_collection_token client_end:fuchsia.sysmem.BufferCollectionToken;
 
     /// The client can register a buffer collection for various uses, each

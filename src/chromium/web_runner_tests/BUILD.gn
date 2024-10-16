@@ -92,6 +92,9 @@ fuchsia_test_package("web_runner_tests") {
     log_settings = {
       max_severity = "ERROR"
     }
+    if (is_debug) {
+      timeout_secs = 500
+    }
   }
 }
 

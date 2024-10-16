@@ -52,16 +52,17 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
     /// `new_ip_socket` returns an error if no route to the remote was found in
     /// the forwarding table or if the given local IP address is not valid for
     /// the found route.
-    fn new_ip_socket(
+    fn new_ip_socket<O>(
         &mut self,
         bindings_ctx: &mut BC,
         device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
         local_ip: Option<IpDeviceAddr<I::Addr>>,
         remote_ip: SocketIpAddr<I::Addr>,
         proto: I::Proto,
-        transparent: bool,
-        marks: &Marks,
-    ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError>;
+        options: &O,
+    ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError>
+    where
+        O: RouteResolutionOptions<I>;
 
     /// Sends an IP packet on a socket.
     ///
@@ -80,25 +81,25 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         bindings_ctx: &mut BC,
         socket: &IpSock<I, Self::WeakDeviceId>,
         body: S,
-        mtu: Option<u32>,
         options: &O,
     ) -> Result<(), IpSockSendError>
     where
         S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
-        O: SendOptions<I>;
+        O: SendOptions<I> + RouteResolutionOptions<I>;
 
     /// Confirms the provided IP socket destination is reachable.
     ///
     /// Implementations must retrieve the next hop given the provided
     /// IP socket and confirm neighbor reachability for the resolved target
     /// device.
-    fn confirm_reachable(
+    fn confirm_reachable<O>(
         &mut self,
         bindings_ctx: &mut BC,
         socket: &IpSock<I, Self::WeakDeviceId>,
-        marks: &Marks,
-    );
+        options: &O,
+    ) where
+        O: RouteResolutionOptions<I>;
 
     /// Creates a temporary IP socket and sends a single packet on it.
     ///
@@ -131,29 +132,19 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         proto: I::Proto,
         options: &O,
         get_body_from_src_ip: F,
-        mtu: Option<u32>,
-        transparent: bool,
     ) -> Result<(), SendOneShotIpPacketError<E>>
     where
         S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
         F: FnOnce(IpDeviceAddr<I::Addr>) -> Result<S, E>,
-        O: SendOptions<I>,
+        O: SendOptions<I> + RouteResolutionOptions<I>,
     {
         let tmp = self
-            .new_ip_socket(
-                bindings_ctx,
-                device,
-                local_ip,
-                remote_ip,
-                proto,
-                transparent,
-                options.marks(),
-            )
+            .new_ip_socket(bindings_ctx, device, local_ip, remote_ip, proto, options)
             .map_err(|err| SendOneShotIpPacketError::CreateAndSendError { err: err.into() })?;
         let packet = get_body_from_src_ip(*tmp.local_ip())
             .map_err(SendOneShotIpPacketError::SerializeError)?;
-        self.send_ip_packet(bindings_ctx, &tmp, packet, mtu, options)
+        self.send_ip_packet(bindings_ctx, &tmp, packet, options)
             .map_err(|err| SendOneShotIpPacketError::CreateAndSendError { err: err.into() })
     }
 
@@ -167,14 +158,12 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
         proto: I::Proto,
         options: &O,
         get_body_from_src_ip: F,
-        mtu: Option<u32>,
-        transparent: bool,
     ) -> Result<(), IpSockCreateAndSendError>
     where
         S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
         F: FnOnce(IpDeviceAddr<I::Addr>) -> S,
-        O: SendOptions<I>,
+        O: SendOptions<I> + RouteResolutionOptions<I>,
     {
         #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
         self.send_oneshot_ip_packet_with_fallible_serializer(
@@ -185,8 +174,6 @@ pub trait IpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
             proto,
             options,
             |ip| Ok::<_, Infallible>(get_body_from_src_ip(ip)),
-            mtu,
-            transparent,
         )
         .map_err(|err| match err {
             SendOneShotIpPacketError::CreateAndSendError { err } => err,
@@ -290,10 +277,11 @@ pub trait DeviceIpSocketHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
     ///
     /// This corresponds to the GET_MAXSIZES call described in:
     /// https://www.rfc-editor.org/rfc/rfc1122#section-3.4
-    fn get_mms(
+    fn get_mms<O: RouteResolutionOptions<I>>(
         &mut self,
         bindings_ctx: &mut BC,
         ip_sock: &IpSock<I, Self::WeakDeviceId>,
+        options: &O,
     ) -> Result<Mms, MmsError>;
 }
 
@@ -332,7 +320,7 @@ pub struct IpSockDefinition<I: IpExt, D> {
     pub remote_ip: SocketIpAddr<I::Addr>,
     /// The socket's local address.
     ///
-    ///  Guaranteed to be unicast in its subnet since it's always equal to an
+    /// Guaranteed to be unicast in its subnet since it's always equal to an
     /// address assigned to the local device. We can't use the `UnicastAddr`
     /// witness type since `Ipv4Addr` doesn't implement `UnicastAddress`.
     //
@@ -345,11 +333,6 @@ pub struct IpSockDefinition<I: IpExt, D> {
     pub device: Option<D>,
     /// The IP protocol the socket is bound to.
     pub proto: I::Proto,
-    /// Whether the socket is transparent.
-    ///
-    /// This allows transparently proxying traffic to the socket, and allows the
-    /// socket to be bound to a non-local address.
-    pub transparent: bool,
 }
 
 impl<I: IpExt, D> IpSock<I, D> {
@@ -368,10 +351,6 @@ impl<I: IpExt, D> IpSock<I, D> {
     /// Returns the socket's protocol.
     pub fn proto(&self) -> I::Proto {
         self.definition.proto
-    }
-    /// Returns whether the socket is transparent.
-    pub fn transparent(&self) -> bool {
-        self.definition.transparent
     }
 }
 
@@ -449,16 +428,18 @@ where
     CC: IpSocketContext<I, BC> + CounterContext<IpCounters<I>> + UseIpSocketHandlerBlanket,
     CC::DeviceId: filter::InterfaceProperties<BC::DeviceClass>,
 {
-    fn new_ip_socket(
+    fn new_ip_socket<O>(
         &mut self,
         bindings_ctx: &mut BC,
         device: Option<EitherDeviceId<&CC::DeviceId, &CC::WeakDeviceId>>,
         local_ip: Option<IpDeviceAddr<I::Addr>>,
         remote_ip: SocketIpAddr<I::Addr>,
         proto: I::Proto,
-        transparent: bool,
-        marks: &Marks,
-    ) -> Result<IpSock<I, CC::WeakDeviceId>, IpSockCreationError> {
+        options: &O,
+    ) -> Result<IpSock<I, CC::WeakDeviceId>, IpSockCreationError>
+    where
+        O: RouteResolutionOptions<I>,
+    {
         let device = device
             .as_ref()
             .map(|d| d.as_strong_ref().ok_or(ResolveRouteError::Unreachable))
@@ -469,9 +450,15 @@ where
         // the socket. We do not care about the actual destination here because
         // we will recalculate it when we send a packet so that the best route
         // available at the time is used for each outgoing packet.
-        let resolved_route =
-            self.lookup_route(bindings_ctx, device, local_ip, remote_ip, transparent, marks)?;
-        Ok(new_ip_socket(device, resolved_route, remote_ip, proto, transparent))
+        let resolved_route = self.lookup_route(
+            bindings_ctx,
+            device,
+            local_ip,
+            remote_ip,
+            options.transparent(),
+            options.marks(),
+        )?;
+        Ok(new_ip_socket(device, resolved_route, remote_ip, proto))
     }
 
     fn send_ip_packet<S, O>(
@@ -479,26 +466,27 @@ where
         bindings_ctx: &mut BC,
         ip_sock: &IpSock<I, CC::WeakDeviceId>,
         body: S,
-        mtu: Option<u32>,
         options: &O,
     ) -> Result<(), IpSockSendError>
     where
         S: TransportPacketSerializer<I>,
         S::Buffer: BufferMut,
-        O: SendOptions<I>,
+        O: SendOptions<I> + RouteResolutionOptions<I>,
     {
         // TODO(joshlf): Call `trace!` with relevant fields from the socket.
         self.increment(|counters| &counters.send_ip_packet);
 
-        send_ip_packet(self, bindings_ctx, ip_sock, body, mtu, options)
+        send_ip_packet(self, bindings_ctx, ip_sock, body, options)
     }
 
-    fn confirm_reachable(
+    fn confirm_reachable<O>(
         &mut self,
         bindings_ctx: &mut BC,
         socket: &IpSock<I, CC::WeakDeviceId>,
-        marks: &Marks,
-    ) {
+        options: &O,
+    ) where
+        O: RouteResolutionOptions<I>,
+    {
         let bound_device = socket.device().and_then(|weak| weak.upgrade());
         let bound_device = bound_device.as_ref();
         let bound_address = Some((*socket.local_ip()).into());
@@ -507,9 +495,34 @@ where
             self,
             bindings_ctx,
             destination,
-            RuleInput { packet_origin: PacketOrigin::Local { bound_address, bound_device }, marks },
+            RuleInput {
+                packet_origin: PacketOrigin::Local { bound_address, bound_device },
+                marks: options.marks(),
+            },
         )
     }
+}
+
+/// Provides hooks for altering route resolution behavior of [`IpSock`].
+///
+/// Must be implemented by the socket option type of an `IpSock` when using it
+/// to call [`IpSocketHandler::new_ip_socket`] or
+/// [`IpSocketHandler::send_ip_packet`]. This is implemented as a trait instead
+/// of an inherent impl on a type so that users of sockets that don't need
+/// certain option types can avoid allocating space for those options.
+// TODO(https://fxbug.dev/323389672): We need a mechanism to inform `IpSock` of
+// changes in the route resolution options when it starts caching previously
+// calculated routes. Any changes to the options here *MUST* cause the route to
+// be re-calculated.
+pub trait RouteResolutionOptions<I: Ip> {
+    /// Whether the socket is transparent.
+    ///
+    /// This allows transparently proxying traffic to the socket, and allows the
+    /// socket to be bound to a non-local address.
+    fn transparent(&self) -> bool;
+
+    /// Returns the marks carried by packets created on the socket.
+    fn marks(&self) -> &Marks;
 }
 
 /// Provides hooks for altering sending behavior of [`IpSock`].
@@ -537,15 +550,18 @@ pub trait SendOptions<I: IpExt> {
     /// Returns TCLASS/TOS field value that should be set in IP headers.
     fn dscp_and_ecn(&self) -> DscpAndEcn;
 
-    /// Returns the marks for the send operation.
-    fn marks(&self) -> &Marks;
+    /// The IP MTU to use for this transmission.
+    ///
+    /// Note that the minimum overall MTU is used considering the device and
+    /// path. This option can be used to restrict an MTU to an upper bound.
+    fn mtu(&self) -> Mtu;
 }
 
-/// Empty send options that never overrides default values.
+/// Empty send and creation options that never overrides default values.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
-pub struct DefaultSendOptions;
+pub struct DefaultIpSocketOptions;
 
-impl<I: IpExt> SendOptions<I> for DefaultSendOptions {
+impl<I: IpExt> SendOptions<I> for DefaultIpSocketOptions {
     fn hop_limit(&self, _destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
         None
     }
@@ -562,10 +578,118 @@ impl<I: IpExt> SendOptions<I> for DefaultSendOptions {
         DscpAndEcn::default()
     }
 
+    fn mtu(&self) -> Mtu {
+        Mtu::no_limit()
+    }
+}
+
+impl<I: Ip> RouteResolutionOptions<I> for DefaultIpSocketOptions {
+    fn transparent(&self) -> bool {
+        false
+    }
+
     fn marks(&self) -> &Marks {
         &Marks::UNMARKED
     }
 }
+
+/// A trait providing send options delegation to an inner type.
+///
+/// A blanket impl of [`SendOptions`] is provided to all implementers. This
+/// trait has the same shape as `SendOptions` but all the methods provide
+/// default implementations that delegate to the value returned by
+/// `DelegatedSendOptions::Delegate`. For brevity, the default `delegate` is
+/// [`DefaultIpSocketOptions`].
+#[allow(missing_docs)]
+pub trait DelegatedSendOptions<I: IpExt>: OptionDelegationMarker {
+    /// Returns the delegate providing the impl for all default methods.
+    fn delegate(&self) -> &impl SendOptions<I> {
+        &DefaultIpSocketOptions
+    }
+
+    fn hop_limit(&self, destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
+        self.delegate().hop_limit(destination)
+    }
+
+    fn multicast_loop(&self) -> bool {
+        self.delegate().multicast_loop()
+    }
+
+    fn allow_broadcast(&self) -> Option<I::BroadcastMarker> {
+        self.delegate().allow_broadcast()
+    }
+
+    fn dscp_and_ecn(&self) -> DscpAndEcn {
+        self.delegate().dscp_and_ecn()
+    }
+
+    fn mtu(&self) -> Mtu {
+        self.delegate().mtu()
+    }
+}
+
+impl<O: DelegatedSendOptions<I> + OptionDelegationMarker, I: IpExt> SendOptions<I> for O {
+    fn hop_limit(&self, destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
+        self.hop_limit(destination)
+    }
+
+    fn multicast_loop(&self) -> bool {
+        self.multicast_loop()
+    }
+
+    fn allow_broadcast(&self) -> Option<I::BroadcastMarker> {
+        self.allow_broadcast()
+    }
+
+    fn dscp_and_ecn(&self) -> DscpAndEcn {
+        self.dscp_and_ecn()
+    }
+
+    fn mtu(&self) -> Mtu {
+        self.mtu()
+    }
+}
+
+/// A trait providing route resolution options delegation to an inner type.
+///
+/// A blanket impl of [`RouteResolutionOptions`] is provided to all
+/// implementers. This trait has the same shape as `RouteResolutionOptions` but
+/// all the methods provide default implementations that delegate to the value
+/// returned by `DelegatedRouteResolutionOptions::Delegate`. For brevity, the
+/// default `delegate` is [`DefaultIpSocketOptions`].
+#[allow(missing_docs)]
+pub trait DelegatedRouteResolutionOptions<I: Ip>: OptionDelegationMarker {
+    /// Returns the delegate providing the impl for all default methods.
+    fn delegate(&self) -> &impl RouteResolutionOptions<I> {
+        &DefaultIpSocketOptions
+    }
+
+    fn transparent(&self) -> bool {
+        self.delegate().transparent()
+    }
+
+    fn marks(&self) -> &Marks {
+        self.delegate().marks()
+    }
+}
+
+impl<O: DelegatedRouteResolutionOptions<I> + OptionDelegationMarker, I: IpExt>
+    RouteResolutionOptions<I> for O
+{
+    fn transparent(&self) -> bool {
+        self.transparent()
+    }
+
+    fn marks(&self) -> &Marks {
+        self.marks()
+    }
+}
+
+/// A marker trait to allow option delegation traits.
+///
+/// This trait sidesteps trait resolution rules around the delegation traits
+/// because of the `Ip` parameter in them.
+pub trait OptionDelegationMarker {}
 
 /// The configurable hop limits for a socket.
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
@@ -618,7 +742,6 @@ fn new_ip_socket<I, D>(
     route: ResolvedRoute<I, D>,
     remote_ip: SocketIpAddr<I::Addr>,
     proto: I::Proto,
-    transparent: bool,
 ) -> IpSock<I, D::Weak>
 where
     I: IpExt,
@@ -648,13 +771,8 @@ where
         .or(requested_device)
         .map(|d| d.downgrade());
 
-    let definition = IpSockDefinition {
-        local_ip: src_addr,
-        remote_ip,
-        device: socket_device,
-        proto,
-        transparent,
-    };
+    let definition =
+        IpSockDefinition { local_ip: src_addr, remote_ip, device: socket_device, proto };
     IpSock { definition }
 }
 
@@ -663,7 +781,6 @@ fn send_ip_packet<I, S, BC, CC, O>(
     bindings_ctx: &mut BC,
     socket: &IpSock<I, CC::WeakDeviceId>,
     mut body: S,
-    mtu: Option<u32>,
     options: &O,
 ) -> Result<(), IpSockSendError>
 where
@@ -673,7 +790,7 @@ where
     BC: IpSocketBindingsContext,
     CC: IpSocketContext<I, BC>,
     CC::DeviceId: filter::InterfaceProperties<BC::DeviceClass>,
-    O: SendOptions<I> + ?Sized,
+    O: SendOptions<I> + RouteResolutionOptions<I>,
 {
     trace_duration!(bindings_ctx, c"ip::send_packet");
 
@@ -712,8 +829,7 @@ where
     }
 
     let IpSock {
-        definition:
-            IpSockDefinition { remote_ip, local_ip, device: socket_device, proto, transparent },
+        definition: IpSockDefinition { remote_ip, local_ip, device: socket_device, proto },
     } = socket;
     let ResolvedRoute {
         src_addr: local_ip,
@@ -727,7 +843,7 @@ where
         socket_device,
         *local_ip,
         *remote_ip,
-        *transparent,
+        options.transparent(),
         options.marks(),
     )?;
 
@@ -776,7 +892,7 @@ where
             socket_device,
             local_ip,
             remote_ip,
-            *transparent,
+            options.transparent(),
             options.marks(),
         )
         .inspect_err(|_| {
@@ -831,7 +947,7 @@ where
         destination,
         ttl,
         proto: *proto,
-        mtu,
+        mtu: options.mtu(),
         dscp_and_ecn: options.dscp_and_ecn(),
     };
     IpSocketContext::send_ip_packet(core_ctx, bindings_ctx, meta, body, packet_metadata).or_else(
@@ -847,7 +963,7 @@ where
                 destination: IpPacketDestination::Loopback(&egress_device),
                 ttl,
                 proto: *proto,
-                mtu,
+                mtu: options.mtu(),
                 dscp_and_ecn: options.dscp_and_ecn(),
             };
             let packet_metadata = IpLayerPacketMetadata::default();
@@ -886,13 +1002,13 @@ where
     BC: IpSocketBindingsContext,
     CC: IpDeviceMtuContext<I> + IpSocketContext<I, BC> + UseDeviceIpSocketHandlerBlanket,
 {
-    fn get_mms(
+    fn get_mms<O: RouteResolutionOptions<I>>(
         &mut self,
         bindings_ctx: &mut BC,
         ip_sock: &IpSock<I, Self::WeakDeviceId>,
+        options: &O,
     ) -> Result<Mms, MmsError> {
-        let IpSockDefinition { remote_ip, local_ip, device, proto: _, transparent } =
-            &ip_sock.definition;
+        let IpSockDefinition { remote_ip, local_ip, device, proto: _ } = &ip_sock.definition;
         let device = device
             .as_ref()
             .map(|d| d.upgrade().ok_or(ResolveRouteError::Unreachable))
@@ -910,8 +1026,8 @@ where
                 device.as_ref(),
                 Some(*local_ip),
                 *remote_ip,
-                *transparent,
-                &Marks::default(),
+                options.transparent(),
+                options.marks(),
             )
             .map_err(MmsError::NoDevice)?;
         let mtu = self.get_mtu(&device);
@@ -1361,22 +1477,24 @@ pub(crate) mod testutil {
         FakeCoreCtx<State, Meta, D>:
             SendFrameContext<BC, SendIpPacketMeta<I, Self::DeviceId, SpecifiedAddr<I::Addr>>>,
     {
-        fn new_ip_socket(
+        fn new_ip_socket<O>(
             &mut self,
             _bindings_ctx: &mut BC,
             device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
             local_ip: Option<IpDeviceAddr<I::Addr>>,
             remote_ip: SocketIpAddr<I::Addr>,
             proto: I::Proto,
-            transparent: bool,
-            _marks: &Marks,
-        ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
+            options: &O,
+        ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError>
+        where
+            O: RouteResolutionOptions<I>,
+        {
             self.state.fake_ip_socket_ctx_mut().new_ip_socket(
                 device,
                 local_ip,
                 remote_ip,
                 proto,
-                transparent,
+                options.transparent(),
             )
         }
 
@@ -1385,26 +1503,24 @@ pub(crate) mod testutil {
             bindings_ctx: &mut BC,
             socket: &IpSock<I, Self::WeakDeviceId>,
             body: S,
-            mtu: Option<u32>,
             options: &O,
         ) -> Result<(), IpSockSendError>
         where
             S: TransportPacketSerializer<I>,
             S::Buffer: BufferMut,
-            O: SendOptions<I>,
+            O: SendOptions<I> + RouteResolutionOptions<I>,
         {
-            let meta =
-                self.state.fake_ip_socket_ctx_mut().resolve_send_meta(socket, mtu, options)?;
+            let meta = self.state.fake_ip_socket_ctx_mut().resolve_send_meta(socket, options)?;
             self.send_frame(bindings_ctx, meta, body).or_else(
                 |SendFrameError { serializer: _, error }| IpSockSendError::from_send_frame(error),
             )
         }
 
-        fn confirm_reachable(
+        fn confirm_reachable<O>(
             &mut self,
             _bindings_ctx: &mut BC,
             _socket: &IpSock<I, Self::WeakDeviceId>,
-            _marks: &Marks,
+            _options: &O,
         ) {
         }
     }
@@ -1731,7 +1847,7 @@ pub(crate) mod testutil {
                 .transpose()?;
             let device = device.as_ref().map(|d| d.as_ref());
             let resolved_route = self.lookup_route(device, local_ip, remote_ip, transparent)?;
-            Ok(new_ip_socket(device, resolved_route, remote_ip, proto, transparent))
+            Ok(new_ip_socket(device, resolved_route, remote_ip, proto))
         }
 
         fn lookup_route(
@@ -1793,14 +1909,12 @@ pub(crate) mod testutil {
         fn resolve_send_meta<O>(
             &mut self,
             socket: &IpSock<I, D::Weak>,
-            mtu: Option<u32>,
             options: &O,
         ) -> Result<SendIpPacketMeta<I, D, SpecifiedAddr<I::Addr>>, IpSockSendError>
         where
-            O: SendOptions<I>,
+            O: SendOptions<I> + RouteResolutionOptions<I>,
         {
-            let IpSockDefinition { remote_ip, local_ip, device, proto, transparent } =
-                &socket.definition;
+            let IpSockDefinition { remote_ip, local_ip, device, proto } = &socket.definition;
             let device = device
                 .as_ref()
                 .map(|d| d.upgrade().ok_or(ResolveRouteError::Unreachable))
@@ -1811,7 +1925,12 @@ pub(crate) mod testutil {
                 next_hop,
                 local_delivery_device: _,
                 internal_forwarding: _,
-            } = self.lookup_route(device.as_ref(), Some(*local_ip), *remote_ip, *transparent)?;
+            } = self.lookup_route(
+                device.as_ref(),
+                Some(*local_ip),
+                *remote_ip,
+                options.transparent(),
+            )?;
 
             let remote_ip: &SpecifiedAddr<_> = remote_ip.as_ref();
 
@@ -1823,7 +1942,7 @@ pub(crate) mod testutil {
                 destination,
                 proto: *proto,
                 ttl: options.hop_limit(remote_ip),
-                mtu,
+                mtu: options.mtu(),
                 dscp_and_ecn: DscpAndEcn::default(),
             })
         }

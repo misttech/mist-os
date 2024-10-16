@@ -735,7 +735,7 @@ mod tests {
     async fn ramdisk_builder_sets_block_count() {
         for block_count in [1, 2, 3, 16] {
             let ramdisk = Ramdisk::builder().block_count(block_count).start().await.unwrap();
-            let client_end = ramdisk.client.open().await.unwrap();
+            let client_end = ramdisk.client.open().unwrap();
             let proxy = client_end.into_proxy().unwrap();
             let info = proxy.get_info().await.unwrap().unwrap();
             assert_eq!(info.block_count, block_count);

@@ -758,7 +758,7 @@ impl<T> ReferenceReceiver<T> {
         debug!("{resource_name} {resource_id:?} removal is pending references: {refs:?}");
         // If we get stuck trying to remove the resource, log the remaining refs
         // at a low frequency to aid debugging.
-        let interval_logging = fasync::Interval::new(zx::Duration::from_seconds(30))
+        let interval_logging = fasync::Interval::new(zx::MonotonicDuration::from_seconds(30))
             .map(move |()| {
                 warn!("{resource_name} {resource_id:?} removal is pending references: {refs:?}")
             })
@@ -993,6 +993,10 @@ impl Netstack {
         properties: InterfaceProperties,
     ) -> InterfaceEventProducer {
         create_interface_event_producer(&self.interfaces_event_sink, id, properties)
+    }
+
+    async fn add_default_rule<I: Ip>(&self) {
+        self.ctx.bindings_ctx().routes.add_default_rule::<I>().await
     }
 
     async fn add_loopback(
@@ -1238,6 +1242,9 @@ impl NetstackSeed {
             NamedTask::spawn("resource_removal", resource_removal_worker.run());
         let resource_removal_task_fut = resource_removal_task.into_future().fuse();
         let mut resource_removal_task_fut = pin!(resource_removal_task_fut);
+
+        netstack.add_default_rule::<Ipv4>().await;
+        netstack.add_default_rule::<Ipv6>().await;
 
         let (loopback_stopper, _, loopback_tasks): (
             futures::channel::oneshot::Sender<_>,

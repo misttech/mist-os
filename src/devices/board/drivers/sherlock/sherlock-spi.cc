@@ -110,11 +110,17 @@ const std::vector<fdf::NodeProperty> kGpioInitProperties = std::vector{
 zx_status_t Sherlock::SpiInit() {
   // setup pinmux for the SPI bus
   // SPI_A
-  gpio_init_steps_.push_back(GpioFunction(T931_GPIOC(0), 5));                              // MOSI
-  gpio_init_steps_.push_back(GpioFunction(T931_GPIOC(1), 5));                              // MISO
-  gpio_init_steps_.push_back(GpioOutput(GPIO_SPICC0_SS0, true));                           // SS0
-  gpio_init_steps_.push_back(GpioPull(T931_GPIOC(3), fuchsia_hardware_pin::Pull::kDown));  // SCLK
-  gpio_init_steps_.push_back(GpioFunction(T931_GPIOC(3), 5));                              // SCLK
+  gpio_init_steps_.push_back(GpioFunction(T931_GPIOC(0), 5));     // MOSI
+  gpio_init_steps_.push_back(GpioFunction(T931_GPIOC(1), 5));     // MISO
+  gpio_init_steps_.push_back(GpioOutput(GPIO_SPICC0_SS0, true));  // SS0
+  gpio_init_steps_.push_back(fuchsia_hardware_pinimpl::InitStep::WithCall({{
+      // SCLK
+      .pin = T931_GPIOC(3),
+      .call = fuchsia_hardware_pinimpl::InitCall::WithPinConfig({{
+          .pull = fuchsia_hardware_pin::Pull::kDown,
+          .function = 5,
+      }}),
+  }}));
 
   std::vector<fpbus::Metadata> spi_metadata;
   spi_metadata.emplace_back([&]() {

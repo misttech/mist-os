@@ -8,16 +8,16 @@ use diagnostics_assertions::{
 };
 use diagnostics_reader::{ArchiveReader, Inspect};
 use fidl::endpoints::create_endpoints;
+use fidl::{AsHandleRef, HandleBased};
 use fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus};
 use fuchsia_component::client::connect_to_protocol;
 use futures::channel::mpsc;
-use futures::StreamExt;
+use futures::{FutureExt, StreamExt};
 use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
 use realm_proxy_client::RealmProxyClient;
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Instant;
-use zx::{self as zx, AsHandleRef, HandleBased};
 use {
     fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_power_observability as fobs,
     fidl_fuchsia_power_suspend as fsuspend, fidl_fuchsia_power_system as fsystem,
@@ -46,6 +46,16 @@ async fn create_realm() -> Result<(RealmProxyClient, String)> {
     let (client, server) = create_endpoints();
     let result = realm_factory
         .create_realm(server)
+        .await?
+        .map_err(realm_proxy_client::Error::OperationError)?;
+    Ok((RealmProxyClient::from(client), result))
+}
+
+async fn create_realm_ext(options: ftest::RealmOptions) -> Result<(RealmProxyClient, String)> {
+    let realm_factory = connect_to_protocol::<ftest::RealmFactoryMarker>()?;
+    let (client, server) = create_endpoints();
+    let result = realm_factory
+        .create_realm_ext(options, server)
         .await?
         .map_err(realm_proxy_client::Error::OperationError)?;
     Ok((RealmProxyClient::from(client), result))
@@ -268,7 +278,7 @@ const DELAY_NOTIFICATION: usize = 10;
 // Spend no more than this many loop turns before giving up for the inspect to match.
 const MAX_LOOPS_COUNT: usize = 20;
 
-const RESTART_DELAY: zx::Duration = zx::Duration::from_seconds(1);
+const RESTART_DELAY: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(1);
 
 macro_rules! block_until_inspect_matches {
     ($sag_moniker:expr, $($tree:tt)+) => {{
@@ -298,7 +308,7 @@ macro_rules! block_until_inspect_matches {
                     }
                     if  i >= MAX_LOOPS_COUNT {  // upper bound, so test terminates on mismatch
                         // Print the actual, so we know why the match failed if it does.
-                        return Err(anyhow::anyhow!("err: {}: last observed {:?}", error, &data));
+                        return Err(anyhow::anyhow!("err: {}: last observed:\n{}", error, serde_json::to_string_pretty(&data).unwrap()));
                     }
                 }
             }
@@ -394,7 +404,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
             booting: false,
             power_elements: {
                 execution_state: {
-                    power_level: 0u64,
+                    power_level: 1u64,
                 },
                 application_activity: {
                     power_level: 0u64,
@@ -406,7 +416,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                     power_level: 0u64,
                 },
                 cpu: {
-                    power_level: 0u64,
+                    power_level: 1u64,
                 },
                 execution_resume_latency: contains {
                     power_level: 0u64,
@@ -519,7 +529,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
             booting: false,
             power_elements: {
                 execution_state: {
-                    power_level: 0u64,
+                    power_level: 1u64,
                 },
                 application_activity: {
                     power_level: 0u64,
@@ -531,7 +541,7 @@ async fn test_activity_governor_increments_suspend_success_on_application_activi
                     power_level: 0u64,
                 },
                 cpu: {
-                    power_level: 0u64,
+                    power_level: 1u64,
                 },
                 execution_resume_latency: contains {
                     power_level: 0u64,
@@ -668,6 +678,13 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
     );
 
     drop(wake_handling_lease_control);
+
+    {
+        // Trigger suspend by making Execution State go to Active then Inactive.
+        let suspend_controller = create_suspend_topology(&realm).await?;
+        lease(&suspend_controller, 1).await?;
+    }
+
     assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
     suspend_device
         .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
@@ -685,7 +702,7 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
             booting: false,
             power_elements: {
                 execution_state: {
-                    power_level: 0u64,
+                    power_level: 1u64,
                 },
                 application_activity: {
                     power_level: 0u64,
@@ -697,7 +714,7 @@ async fn test_activity_governor_raises_execution_state_power_level_on_wake_handl
                     power_level: 0u64,
                 },
                 cpu: {
-                    power_level: 0u64,
+                    power_level: 1u64,
                 },
                 execution_resume_latency: contains {
                     power_level: 0u64,
@@ -834,6 +851,13 @@ async fn test_activity_governor_raises_execution_state_power_level_on_full_wake_
     );
 
     drop(wake_handling_lease_control);
+
+    {
+        // Trigger suspend by making Execution State go to Active then Inactive.
+        let suspend_controller = create_suspend_topology(&realm).await?;
+        lease(&suspend_controller, 1).await?;
+    }
+
     assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
     suspend_device
         .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
@@ -851,7 +875,7 @@ async fn test_activity_governor_raises_execution_state_power_level_on_full_wake_
             booting: false,
             power_elements: {
                 execution_state: {
-                    power_level: 0u64,
+                    power_level: 1u64,
                 },
                 application_activity: {
                     power_level: 0u64,
@@ -863,7 +887,7 @@ async fn test_activity_governor_raises_execution_state_power_level_on_full_wake_
                     power_level: 0u64,
                 },
                 cpu: {
-                    power_level: 0u64,
+                    power_level: 1u64,
                 },
                 execution_resume_latency: contains {
                     power_level: 0u64,
@@ -1076,7 +1100,7 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
             booting: false,
             power_elements: {
                 execution_state: {
-                    power_level: 0u64,
+                    power_level: 1u64,
                 },
                 application_activity: {
                     power_level: 0u64,
@@ -1088,7 +1112,7 @@ async fn test_activity_governor_forwards_resume_latency_to_suspender() -> Result
                     power_level: 0u64,
                 },
                 cpu: {
-                    power_level: 0u64,
+                    power_level: 1u64,
                 },
                 execution_resume_latency: {
                     power_level: 1u64,
@@ -1213,7 +1237,7 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
             booting: false,
             power_elements: {
                 execution_state: {
-                    power_level: 0u64,
+                    power_level: 1u64,
                 },
                 application_activity: {
                     power_level: 0u64,
@@ -1225,7 +1249,7 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
                     power_level: 0u64,
                 },
                 cpu: {
-                    power_level: 0u64,
+                    power_level: 1u64,
                 },
                 execution_resume_latency: {
                     power_level: 1u64,
@@ -1249,7 +1273,7 @@ async fn test_activity_governor_increments_fail_count_on_suspend_error() -> Resu
                 },
             },
             wake_leases: {},
-            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: NonZeroUintProperty,
+            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -1349,7 +1373,7 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
             booting: false,
             power_elements: {
                 execution_state: {
-                    power_level: 0u64,
+                    power_level: 1u64,
                 },
                 application_activity: {
                     power_level: 0u64,
@@ -1361,7 +1385,7 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                     power_level: 0u64,
                 },
                 cpu: {
-                    power_level: 0u64,
+                    power_level: 1u64,
                 },
                 execution_resume_latency: {
                     power_level: 1u64,
@@ -1385,7 +1409,7 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                 },
             },
             wake_leases: {},
-            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: NonZeroUintProperty,
+            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
             config: {
                 use_suspender: true,
                 wait_for_suspending_token: false,
@@ -1419,7 +1443,7 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
             booting: false,
             power_elements: {
                 execution_state: {
-                    power_level: 0u64,
+                    power_level: 1u64,
                 },
                 application_activity: {
                     power_level: 0u64,
@@ -1431,7 +1455,7 @@ async fn test_activity_governor_suspends_successfully_after_failure() -> Result<
                     power_level: 0u64,
                 },
                 cpu: {
-                    power_level: 0u64,
+                    power_level: 1u64,
                 },
                 execution_resume_latency: {
                     power_level: 1u64,
@@ -1502,10 +1526,9 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
 
         while let Some(Ok(req)) = listener_stream.next().await {
             match req {
-                fsystem::ActivityGovernorListenerRequest::OnResume { responder } => {
-                    fasync::Timer::new(fasync::Duration::from_millis(50)).await;
-                    responder.send().unwrap();
-                    fasync::Timer::new(fasync::Duration::from_millis(50)).await;
+                fsystem::ActivityGovernorListenerRequest::OnResume { .. } => {
+                    // OnResume never responds.
+                    // Check SAG state after resume to confirm SAG doesn't block on the OnResume.
                     on_resume_tx.try_send(()).unwrap();
                 }
                 fsystem::ActivityGovernorListenerRequest::OnSuspendStarted { responder } => {
@@ -1529,29 +1552,6 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
         lease(&suspend_controller, 1).await?;
     }
 
-    // OnSuspendStarted and OnResume should have been called once.
-    on_suspend_started_rx.next().await.unwrap();
-
-    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
-    suspend_device
-        .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
-            suspend_duration: Some(2i64),
-            suspend_overhead: Some(1i64),
-            ..Default::default()
-        }))
-        .await
-        .unwrap()
-        .unwrap();
-
-    on_resume_rx.next().await.unwrap();
-
-    // Should only have been 1 suspend after all listener handling.
-    let current_stats = stats.watch().await?;
-    assert_eq!(Some(1), current_stats.success_count);
-    assert_eq!(Some(0), current_stats.fail_count);
-    assert_eq!(None, current_stats.last_failed_error);
-    assert_eq!(Some(2), current_stats.last_time_in_suspend);
-
     // Await SAG's power elements to drop their power levels.
     block_until_inspect_matches!(
         activity_governor_moniker,
@@ -1572,6 +1572,79 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
                 },
                 cpu: {
                     power_level: 0u64,
+                },
+                execution_resume_latency: contains {
+                    power_level: 0u64,
+                },
+            },
+            suspend_stats: {
+                ref fobs::SUSPEND_SUCCESS_COUNT: 0u64,
+                ref fobs::SUSPEND_FAIL_COUNT: 0u64,
+                ref fobs::SUSPEND_LAST_FAILED_ERROR: 0u64,
+                ref fobs::SUSPEND_LAST_TIMESTAMP: -1i64,
+                ref fobs::SUSPEND_LAST_DURATION: -1i64,
+            },
+            suspend_events: {
+                "0": {
+                    ref fobs::SUSPEND_ATTEMPTED_AT: AnyProperty,
+                },
+            },
+            wake_leases: {},
+            ref fobs::UNHANDLED_SUSPEND_FAILURES_COUNT: 0u64,
+            config: {
+                use_suspender: true,
+                wait_for_suspending_token: false,
+            },
+            "fuchsia.inspect.Health": contains {
+                status: "OK",
+            },
+        }
+    );
+
+    // OnSuspendStarted should have been called once.
+    on_suspend_started_rx.next().await.unwrap();
+
+    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
+    suspend_device
+        .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
+            suspend_duration: Some(2i64),
+            suspend_overhead: Some(1i64),
+            ..Default::default()
+        }))
+        .await
+        .unwrap()
+        .unwrap();
+
+    // Should only have been 1 suspend after all listener handling.
+    let current_stats = stats.watch().await?;
+    assert_eq!(Some(1), current_stats.success_count);
+    assert_eq!(Some(0), current_stats.fail_count);
+    assert_eq!(None, current_stats.last_failed_error);
+    assert_eq!(Some(2), current_stats.last_time_in_suspend);
+
+    // OnResume should have been called once.
+    on_resume_rx.next().await.unwrap();
+
+    // OnResume does not block. SAG raises ExecutionState to Suspending state.
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: {
+            booting: false,
+            power_elements: {
+                execution_state: {
+                    power_level: 1u64,
+                },
+                application_activity: {
+                    power_level: 0u64,
+                },
+                full_wake_handling: {
+                    power_level: 0u64,
+                },
+                wake_handling: {
+                    power_level: 0u64,
+                },
+                cpu: {
+                    power_level: 1u64,
                 },
                 execution_resume_latency: contains {
                     power_level: 0u64,
@@ -1609,7 +1682,7 @@ async fn test_activity_governor_suspends_after_listener_hanging_on_resume() -> R
 }
 
 #[fuchsia::test]
-async fn test_activity_governor_still_suspends_if_on_suspend_started_hangs() -> Result<()> {
+async fn test_activity_governor_blocks_for_on_suspend_started() -> Result<()> {
     let (realm, _) = create_realm().await?;
     let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
     set_up_default_suspender(&suspend_device).await;
@@ -1659,17 +1732,25 @@ async fn test_activity_governor_still_suspends_if_on_suspend_started_hangs() -> 
     })
     .detach();
 
+    // Queue up a callback from `suspend_device`, to let us know when
+    // SAG requests to suspend the hardware.
+    let await_suspend = suspend_device.await_suspend();
+
     // Cycle execution_state power level to make SAG start suspending.
     {
         let suspend_controller = create_suspend_topology(&realm).await?;
         lease(&suspend_controller, 1).await?;
     }
 
-    // Ensure that the OnSuspendStarted callback begins.
+    // Wait to receive the OnSuspendStarted() callback.
     on_suspend_started_rx.next().await.unwrap();
 
-    // Verify that SAG does not block indefinitely on OnSuspendStarted.
-    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
+    // Give SAG some time to take any further suspend actions.
+    fasync::Timer::new(fasync::Duration::from_millis(1000)).await;
+
+    // Verify that SAG did _not_ suspend the hardware (because we did not
+    // respond to the callback).
+    assert!(await_suspend.now_or_never().is_none());
 
     Ok(())
 }
@@ -1998,124 +2079,6 @@ async fn test_activity_governor_handles_suspend_failure() -> Result<()> {
     on_suspend_started_rx.next().await.unwrap();
 
     assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
-
-    Ok(())
-}
-
-#[fuchsia::test]
-async fn test_activity_governor_blocks_lease_while_suspend_in_progress() -> Result<()> {
-    let (realm, _) = create_realm().await?;
-    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
-    set_up_default_suspender(&suspend_device).await;
-
-    let stats = realm.connect_to_protocol::<fsuspend::StatsMarker>().await?;
-    let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
-
-    // First watch should return immediately with default values.
-    let current_stats = stats.watch().await?;
-    assert_eq!(Some(0), current_stats.success_count);
-    assert_eq!(Some(0), current_stats.fail_count);
-    assert_eq!(None, current_stats.last_failed_error);
-    assert_eq!(None, current_stats.last_time_in_suspend);
-
-    // Inform SAG that booting has completed.
-    //
-    // Note that the resulting lease is dropped immediately. Dropping
-    // the lease allows the `await_suspend()` call below to complete.
-    let suspend_controller = create_suspend_topology(&realm).await?;
-    lease(&suspend_controller, 1).await.unwrap();
-
-    // Register a listener to receive the `OnResume()` callback.
-    //
-    // This must be done before the `await_suspend()` call, to avoid
-    // having the registration race with the invocation of resume
-    // callbacks.
-    let (listener_client_end, mut listener_stream) =
-        fidl::endpoints::create_request_stream().unwrap();
-    activity_governor
-        .register_listener(fsystem::ActivityGovernorRegisterListenerRequest {
-            listener: Some(listener_client_end),
-            ..Default::default()
-        })
-        .await
-        .unwrap();
-
-    // Start a task to process callbacks from SAG.
-    //
-    // This must be done before the `await_suspend()` call. Otherwise:
-    // 1. SAG will be stuck waiting for a reply to `OnSuspendStarted()`.
-    // 2. The reply will never come, because `await_suspend()` has not
-    //    returned.
-    let (mut on_resume_tx, mut on_resume_rx) = mpsc::channel(1);
-    fasync::Task::local(async move {
-        while let Some(Ok(req)) = listener_stream.next().await {
-            match req {
-                fsystem::ActivityGovernorListenerRequest::OnResume { responder } => {
-                    on_resume_tx.start_send(()).unwrap();
-                    responder.send().unwrap();
-                }
-                fsystem::ActivityGovernorListenerRequest::OnSuspendStarted { responder } => {
-                    responder.send().unwrap();
-                }
-                fsystem::ActivityGovernorListenerRequest::OnSuspendFail { responder } => {
-                    responder.send().unwrap();
-                }
-                fsystem::ActivityGovernorListenerRequest::_UnknownMethod { ordinal, .. } => {
-                    panic!("Unexpected method: {}", ordinal);
-                }
-            }
-        }
-    })
-    .detach();
-
-    assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
-
-    let now = Instant::now();
-    let (mut on_lease_tx, mut on_lease_rx) = mpsc::channel(1);
-    fasync::Task::local(async move {
-        {
-            // Try to take a lease. This should not be granted until the system resumes.
-            lease(&suspend_controller, 1).await.unwrap();
-            on_lease_tx.try_send(now.elapsed()).unwrap();
-        }
-    })
-    .detach();
-
-    fasync::Task::local(async move {
-        // Wait some time before resuming.
-        fasync::Timer::new(fasync::Duration::from_millis(100)).await;
-        let resume_time = now.elapsed();
-        suspend_device
-            .resume(&tsc::DeviceResumeRequest::Result(tsc::SuspendResult {
-                suspend_duration: Some(49i64),
-                suspend_overhead: Some(51i64),
-                ..Default::default()
-            }))
-            .await
-            .unwrap()
-            .unwrap();
-        assert!(resume_time < on_lease_rx.next().await.unwrap(), "Lease was granted too early");
-    })
-    .detach();
-
-    // Wait for OnResume to be called.
-    on_resume_rx.next().await.unwrap();
-
-    // Note: although there's no lease held here, and SAG could
-    // initiate another suspend before `stats.watch()` completes,
-    // there's no race regarding the values in `current_stats`.
-    //
-    // The values in `current_stats` are well-defined, because:
-    // 1. SAG cannot update these values until SAG's suspend request
-    //    to the suspend HAL completes, and
-    // 2. SAG's request to the suspend HAL can't complete until
-    //    this test call suspend_device.await_suspend() again.
-    let current_stats = stats.watch().await?;
-    assert_eq!(Some(1), current_stats.success_count);
-    assert_eq!(Some(0), current_stats.fail_count);
-    assert_eq!(None, current_stats.last_failed_error);
-    assert_eq!(Some(49), current_stats.last_time_in_suspend);
-    assert_eq!(Some(51), current_stats.last_time_in_suspend_operations);
 
     Ok(())
 }
@@ -2456,8 +2419,13 @@ async fn test_element_info_provider() -> Result<()> {
 
     drop(full_wake_handling_lease_control);
 
-    assert_eq!(es_status.watch_power_level().await?.unwrap(), 0);
     assert_eq!(fwh_status.watch_power_level().await?.unwrap(), 0);
+
+    // Raise Execution State to Active then drop to trigger a suspend.
+    let suspend_lease_control = lease(&suspend_controller, 1).await?;
+    assert_eq!(es_status.watch_power_level().await?.unwrap(), 2);
+    drop(suspend_lease_control);
+    assert_eq!(es_status.watch_power_level().await?.unwrap(), 0);
 
     // Check suspend is triggered and resume.
     assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
@@ -2479,8 +2447,13 @@ async fn test_element_info_provider() -> Result<()> {
 
     drop(wake_handling_lease_control);
 
-    assert_eq!(es_status.watch_power_level().await?.unwrap(), 0);
     assert_eq!(wh_status.watch_power_level().await?.unwrap(), 0);
+
+    // Raise Execution State to Active then drop to trigger a suspend.
+    let suspend_lease_control = lease(&suspend_controller, 1).await?;
+    assert_eq!(es_status.watch_power_level().await?.unwrap(), 2);
+    drop(suspend_lease_control);
+    assert_eq!(es_status.watch_power_level().await?.unwrap(), 0);
 
     // Check suspend is triggered and resume.
     assert_eq!(0, suspend_device.await_suspend().await.unwrap().unwrap().state_index.unwrap());
@@ -2747,5 +2720,276 @@ async fn test_activity_governor_handles_1000_wake_leases() -> Result<()> {
         }
     );
 
+    Ok(())
+}
+
+async fn create_cpu_driver_topology(
+    realm: &RealmProxyClient,
+) -> Result<(Arc<PowerElementContext>, Arc<Cell<fbroker::PowerLevel>>)> {
+    let topology = realm.connect_to_protocol::<fbroker::TopologyMarker>().await?;
+    let cpu_element_manager =
+        realm.connect_to_protocol::<fsystem::CpuElementManagerMarker>().await?;
+    let cpu_element_token = cpu_element_manager
+        .get_cpu_dependency_token()
+        .await
+        .unwrap()
+        .assertive_dependency_token
+        .unwrap();
+
+    let cpu_driver_controller = Arc::new(
+        PowerElementContext::builder(&topology, "cpu_driver", &[0, 1])
+            .dependencies(vec![fbroker::LevelDependency {
+                dependency_type: fbroker::DependencyType::Assertive,
+                dependent_level: 1,
+                requires_token: cpu_element_token,
+                requires_level_by_preference: vec![1],
+            }])
+            .build()
+            .await?,
+    );
+
+    let cpu_driver_context = cpu_driver_controller.clone();
+    let cpu_driver_power_level = Arc::new(Cell::new(0));
+    let cpu_driver_power_level2 = cpu_driver_power_level.clone();
+
+    fasync::Task::local(async move {
+        let update_fn = Arc::new(basic_update_fn_factory(&cpu_driver_context));
+        let cpu_driver_power_level = cpu_driver_power_level2.clone();
+
+        run_power_element(
+            &cpu_driver_context.name(),
+            &cpu_driver_context.required_level,
+            0,    /* initial_level */
+            None, /* inspect_node */
+            Box::new(move |new_power_level: fbroker::PowerLevel| {
+                let update_fn = update_fn.clone();
+                let cpu_driver_power_level = cpu_driver_power_level.clone();
+
+                async move {
+                    cpu_driver_power_level.set(new_power_level);
+                    update_fn(new_power_level).await;
+                }
+                .boxed_local()
+            }),
+        )
+        .await;
+    })
+    .detach();
+
+    Ok((cpu_driver_controller, cpu_driver_power_level))
+}
+
+#[fuchsia::test]
+async fn test_activity_governor_cpu_element_and_execution_state_interaction() -> Result<()> {
+    let (realm, activity_governor_moniker) = create_realm_ext(ftest::RealmOptions {
+        wait_for_suspending_token: Some(true),
+        ..Default::default()
+    })
+    .await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
+    let cpu_element_manager =
+        realm.connect_to_protocol::<fsystem::CpuElementManagerMarker>().await?;
+    let (cpu_driver_controller, cpu_driver_power_level) =
+        create_cpu_driver_topology(&realm).await.unwrap();
+
+    fasync::Task::local(async move {
+        cpu_element_manager
+            .add_execution_state_dependency(
+                fsystem::CpuElementManagerAddExecutionStateDependencyRequest {
+                    dependency_token: Some(
+                        cpu_driver_controller.assertive_dependency_token().unwrap(),
+                    ),
+                    power_level: Some(1),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap()
+            .unwrap();
+    })
+    .detach();
+
+    // This call should not be processed until the topology is set up.
+    let _wake_lease = activity_governor.take_wake_lease("wake_lease").await?;
+
+    // Trigger "boot complete" signal.
+    {
+        let suspend_controller = create_suspend_topology(&realm).await?;
+        lease(&suspend_controller, 1).await.unwrap();
+    }
+
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            booting: false,
+            power_elements: contains {
+                execution_state: {
+                    power_level: 1u64,
+                },
+                application_activity: {
+                    power_level: 0u64,
+                },
+                full_wake_handling: {
+                    power_level: 0u64,
+                },
+                wake_handling: {
+                    power_level: 0u64,
+                },
+                cpu: {
+                    power_level: 1u64,
+                },
+            },
+            "fuchsia.inspect.Health": contains {
+                status: "OK",
+            },
+        }
+    );
+
+    assert_eq!(1u8, cpu_driver_power_level.get());
+
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_activity_governor_cpu_element_returns_invalid_args() -> Result<()> {
+    let (realm, _) = create_realm_ext(ftest::RealmOptions {
+        wait_for_suspending_token: Some(true),
+        ..Default::default()
+    })
+    .await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let cpu_element_manager =
+        realm.connect_to_protocol::<fsystem::CpuElementManagerMarker>().await?;
+
+    // Empty request should return InvalidArgs.
+    assert_eq!(
+        fsystem::AddExecutionStateDependencyError::InvalidArgs,
+        cpu_element_manager
+            .add_execution_state_dependency(
+                fsystem::CpuElementManagerAddExecutionStateDependencyRequest {
+                    dependency_token: None,
+                    power_level: None,
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap()
+            .unwrap_err()
+    );
+
+    // Missing token should return InvalidArgs.
+    assert_eq!(
+        fsystem::AddExecutionStateDependencyError::InvalidArgs,
+        cpu_element_manager
+            .add_execution_state_dependency(
+                fsystem::CpuElementManagerAddExecutionStateDependencyRequest {
+                    dependency_token: None,
+                    power_level: Some(1),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap()
+            .unwrap_err()
+    );
+
+    // Missing power level should return InvalidArgs.
+    assert_eq!(
+        fsystem::AddExecutionStateDependencyError::InvalidArgs,
+        cpu_element_manager
+            .add_execution_state_dependency(
+                fsystem::CpuElementManagerAddExecutionStateDependencyRequest {
+                    dependency_token: Some(zx::Event::create()),
+                    power_level: None,
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap()
+            .unwrap_err()
+    );
+
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_activity_governor_cpu_element_returns_bad_state() -> Result<()> {
+    let (realm, _) = create_realm_ext(ftest::RealmOptions {
+        wait_for_suspending_token: Some(true),
+        ..Default::default()
+    })
+    .await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let cpu_element_manager =
+        realm.connect_to_protocol::<fsystem::CpuElementManagerMarker>().await?;
+    let (cpu_driver_controller, _) = create_cpu_driver_topology(&realm).await.unwrap();
+
+    cpu_element_manager
+        .add_execution_state_dependency(
+            fsystem::CpuElementManagerAddExecutionStateDependencyRequest {
+                dependency_token: Some(cpu_driver_controller.assertive_dependency_token().unwrap()),
+                power_level: Some(1),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap()
+        .unwrap();
+
+    assert_eq!(
+        fsystem::AddExecutionStateDependencyError::BadState,
+        cpu_element_manager
+            .add_execution_state_dependency(
+                fsystem::CpuElementManagerAddExecutionStateDependencyRequest {
+                    dependency_token: Some(
+                        cpu_driver_controller.assertive_dependency_token().unwrap()
+                    ),
+                    power_level: Some(1),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap()
+            .unwrap_err()
+    );
+
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_activity_governor_cpu_element_allows_leases_during_boot() -> Result<()> {
+    let (realm, activity_governor_moniker) = create_realm_ext(ftest::RealmOptions {
+        wait_for_suspending_token: Some(true),
+        ..Default::default()
+    })
+    .await?;
+    let suspend_device = realm.connect_to_protocol::<tsc::DeviceMarker>().await?;
+    set_up_default_suspender(&suspend_device).await;
+
+    let (cpu_driver_controller, cpu_driver_power_level) =
+        create_cpu_driver_topology(&realm).await.unwrap();
+
+    // The CPU power element should be powered up on boot.
+    block_until_inspect_matches!(
+        activity_governor_moniker,
+        root: contains {
+            power_elements: {
+                cpu: {
+                    power_level: 1u64,
+                },
+            },
+        }
+    );
+
+    assert_eq!(0u8, cpu_driver_power_level.get());
+    let _cpu_lease = lease(&cpu_driver_controller, 1).await.unwrap();
+    assert_eq!(1u8, cpu_driver_power_level.get());
     Ok(())
 }

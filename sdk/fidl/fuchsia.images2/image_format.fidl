@@ -168,7 +168,7 @@ type PixelFormat = flexible enum {
     /// Deprecated. Use `R8G8B8A8` with
     /// ['fuchsia.sysemm2.ImageFormatConstraints.is_alpha_present'] set to false
     /// instead.
-    @available(added=12, deprecated=NEXT)
+    @available(added=12, deprecated=24)
     R8G8B8X8 = 119;
 
     /// 32bpp BGRA, 1 plane.  RGB only, 8 bits per each of B/G/R/A sample.
@@ -193,7 +193,7 @@ type PixelFormat = flexible enum {
     /// Deprecated. Use `B8G8R8A8` with
     /// [`fuchsia.sysemm2/ImageFormatConstraints.is_alpha_present`] set to false
     /// instead.
-    @available(added=12, deprecated=NEXT)
+    @available(added=12, deprecated=24)
     B8G8R8X8 = 120;
 
     /// YUV only, 8 bits per Y sample

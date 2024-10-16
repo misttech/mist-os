@@ -863,6 +863,7 @@ mod tests {
     use futures::stream::futures_unordered::FuturesUnordered;
     use futures::stream::StreamExt as _;
     use ramdevice_client::RamdiskClient;
+    use std::borrow::Cow;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
     use {fidl_fuchsia_hardware_block as block, zx};
@@ -874,11 +875,11 @@ mod tests {
         let ramdisk = RamdiskClient::create(RAMDISK_BLOCK_SIZE, RAMDISK_BLOCK_COUNT)
             .await
             .expect("RamdiskClient::create failed");
-        let client_end = ramdisk.open().await.expect("ramdisk.open failed");
+        let client_end = ramdisk.open().expect("ramdisk.open failed");
         let proxy = client_end.into_proxy().expect("into_proxy failed");
         let block_client = RemoteBlockClient::new(proxy).await.expect("new failed");
         assert_eq!(block_client.block_size(), 1024);
-        let client_end = ramdisk.open().await.expect("ramdisk.open failed");
+        let client_end = ramdisk.open().expect("ramdisk.open failed");
         let proxy = client_end.into_proxy().expect("into_proxy failed");
         (ramdisk, proxy, block_client)
     }
@@ -1051,8 +1052,10 @@ mod tests {
         // get false-positives from is_connected.
         while block_client.is_connected() {
             // Sleep for a bit to minimise lock contention.
-            fasync::Timer::new(fasync::MonotonicInstant::after(zx::Duration::from_millis(500)))
-                .await;
+            fasync::Timer::new(fasync::MonotonicInstant::after(
+                zx::MonotonicDuration::from_millis(500),
+            ))
+            .await;
         }
 
         // But once is_connected goes negative, it should stay negative.
@@ -1273,6 +1276,16 @@ mod tests {
             flush_called: Arc<AtomicBool>,
         }
         impl block_server::async_interface::Interface for Interface {
+            async fn get_info(&self) -> Result<Cow<'_, PartitionInfo>, zx::Status> {
+                Ok(Cow::Owned(PartitionInfo {
+                    block_count: 1000,
+                    type_guid: [0; 16],
+                    instance_guid: [0; 16],
+                    name: Some("foo".to_string()),
+                    flags: 0,
+                }))
+            }
+
             async fn read(
                 &self,
                 _device_block_offset: u64,
@@ -1318,13 +1331,7 @@ mod tests {
             },
             async {
                 let block_server = BlockServer::new(
-                    PartitionInfo {
-                        block_count: 1000,
-                        block_size: 512,
-                        type_guid: [0; 16],
-                        instance_guid: [0; 16],
-                        name: "foo".to_string(),
-                    },
+                    512,
                     Arc::new(Interface { flush_called: flush_called.clone() }),
                 );
                 block_server.handle_requests(stream.cast_stream()).await.unwrap();

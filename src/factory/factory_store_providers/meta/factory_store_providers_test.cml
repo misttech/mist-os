@@ -52,14 +52,6 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [
-                "#factory_items",
-                "#factory_store_providers",
-            ],
-        },
-        {
             protocol: [ "fuchsia.boot.FactoryItems" ],
             from: "#factory_items",
             to: [ "#factory_store_providers" ],

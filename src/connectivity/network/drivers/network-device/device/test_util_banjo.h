@@ -79,7 +79,6 @@ class RxReturn : public fbl::DoublyLinkedListable<std::unique_ptr<RxReturn>> {
       : buffer_(rx_buffer_t{
             .meta =
                 {
-                    .info_type = static_cast<uint32_t>(netdev::wire::InfoType::kNoInfo),
                     .frame_type = static_cast<uint8_t>(netdev::wire::FrameType::kEthernet),
                 },
             .data_list = &(*parts_.begin()),

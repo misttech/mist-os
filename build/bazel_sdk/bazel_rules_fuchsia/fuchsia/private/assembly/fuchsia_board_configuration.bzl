@@ -6,6 +6,10 @@
 
 load("@bazel_skylib//lib:paths.bzl", "paths")
 load(
+    "//fuchsia/private/licenses:common.bzl",
+    "check_type",
+)
+load(
     ":providers.bzl",
     "FuchsiaBoardConfigInfo",
     "FuchsiaBoardInputBundleInfo",
@@ -17,10 +21,6 @@ load(
     "extract_labels",
     "replace_labels_with_files",
     "select_single_file",
-)
-load(
-    "//fuchsia/private/licenses:common.bzl",
-    "check_type",
 )
 
 def _copy_directory(ctx, src, dst, inputs, outputs, subdirectories_to_skip = None):
@@ -328,7 +328,7 @@ def _fuchsia_hybrid_board_configuration_impl(ctx):
             files = depset(all_outputs),
         ),
         FuchsiaBoardConfigInfo(
-            files = board_outputs + bib_outputs,
+            files = all_outputs,
             config = board_configuration_file.path,
         ),
     ]
@@ -360,4 +360,5 @@ def fuchsia_hybrid_board_configuration(
         name = name,
         board_configuration = board_configuration,
         replacement_board_input_bundles = replacement_board_input_bundles,
+        **kwargs
     )

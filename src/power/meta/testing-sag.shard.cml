@@ -14,16 +14,19 @@
     ],
     offer: [
         {
-            config: [
-                "fuchsia.power.UseSuspender",
-                "fuchsia.power.WaitForSuspendingToken",
-            ],
+            config: [ "fuchsia.power.UseSuspender" ],
             from: "void",
             to: "#system-activity-governor",
             availability: "optional",
         },
         {
-            protocol: "test.suspendcontrol.Device",
+            config: [ "fuchsia.power.WaitForSuspendingToken" ],
+            from: "parent",
+            to: "#system-activity-governor",
+            availability: "optional",
+        },
+        {
+            service: "fuchsia.hardware.suspend.SuspendService",
             from: "#fake-suspend",
             to: "#system-activity-governor",
         },

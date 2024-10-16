@@ -117,7 +117,7 @@ impl AvrcpVolume {
 /// How long we will wait for the system to report a new volume after requesting a new volume.
 /// This is chosen as 100 milliseconds as half of the required response time in the AVRCP Spec,
 /// Section 6.2
-const SETVOLUME_TIMEOUT: zx::Duration = zx::Duration::from_millis(100);
+const SETVOLUME_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(100);
 
 impl VolumeRelay {
     /// Start a relay between AVRCP and Settings.Audio.
@@ -557,7 +557,7 @@ mod tests {
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
         // Mimic no volume change by waiting out the maximum time we will wait for a new volume.
-        exec.set_fake_time(zx::Duration::from_millis(105).after_now());
+        exec.set_fake_time(zx::MonotonicDuration::from_millis(105).after_now());
         let _ = exec.wake_expired_timers();
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
@@ -598,7 +598,7 @@ mod tests {
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");
 
         // Mimic no volume change by waiting out the maximum time we will wait for a new volume.
-        exec.set_fake_time(zx::Duration::from_millis(105).after_now());
+        exec.set_fake_time(zx::MonotonicDuration::from_millis(105).after_now());
         let _ = exec.wake_expired_timers();
 
         exec.run_until_stalled(&mut relay_fut).expect_pending("should be pending");

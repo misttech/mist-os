@@ -7,6 +7,7 @@
 
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
+use fidl::encoding::ProxyChannelBox;
 use fidl::endpoints::{ControlHandle as _, Responder as _};
 use futures::future::{self, MaybeDone, TryFutureExt};
 use zx_status;
@@ -307,29 +308,34 @@ impl futures::Stream for AllowedRequestStream {
         if this.is_terminated {
             panic!("polled AllowedRequestStream after completion");
         }
-        fidl::encoding::with_tls_decode_buf(|bytes, handles| {
-            match this.inner.channel().read_etc(cx, bytes, handles) {
-                std::task::Poll::Ready(Ok(())) => {}
-                std::task::Poll::Pending => return std::task::Poll::Pending,
-                std::task::Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
-                    this.is_terminated = true;
-                    return std::task::Poll::Ready(None);
+        fidl::encoding::with_tls_decode_buf::<_, fidl::encoding::DefaultFuchsiaResourceDialect>(
+            |bytes, handles| {
+                match this.inner.channel().read_etc(cx, bytes, handles) {
+                    std::task::Poll::Ready(Ok(())) => {}
+                    std::task::Poll::Pending => return std::task::Poll::Pending,
+                    std::task::Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
+                        this.is_terminated = true;
+                        return std::task::Poll::Ready(None);
+                    }
+                    std::task::Poll::Ready(Err(e)) => {
+                        return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                            e.into(),
+                        ))))
+                    }
                 }
-                std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e))))
-                }
-            }
 
-            // A message has been received from the channel
-            let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
+                // A message has been received from the channel
+                let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
 
-            std::task::Poll::Ready(Some(match header.ordinal {
-                _ => Err(fidl::Error::UnknownOrdinal {
-                    ordinal: header.ordinal,
-                    protocol_name: <AllowedMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
-                }),
-            }))
-        })
+                std::task::Poll::Ready(Some(match header.ordinal {
+                    _ => Err(fidl::Error::UnknownOrdinal {
+                        ordinal: header.ordinal,
+                        protocol_name:
+                            <AllowedMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
+                    }),
+                }))
+            },
+        )
     }
 }
 
@@ -625,6 +631,7 @@ impl DenyEachBindingProxyInterface for DenyEachBindingProxy {
         ) -> Result<DenyEachBindingOnlyDenyCppResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<DenyEachBindingOnlyDenyCppResponse, u32>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x290bad96051b1b92,
             >(_buf?)?;
             Ok(_response.map(|x| x.b))
@@ -648,6 +655,7 @@ impl DenyEachBindingProxyInterface for DenyEachBindingProxy {
         ) -> Result<DenyEachBindingOnlyDenyDartResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<DenyEachBindingOnlyDenyDartResponse, u32>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x75384066a26d87d7,
             >(_buf?)?;
             Ok(_response.map(|x| x.b))
@@ -670,6 +678,7 @@ impl DenyEachBindingProxyInterface for DenyEachBindingProxy {
         ) -> Result<DenyEachBindingOnlyDenyGoResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<DenyEachBindingOnlyDenyGoResponse, u32>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x657655b981478d99,
             >(_buf?)?;
             Ok(_response.map(|x| x.b))
@@ -693,6 +702,7 @@ impl DenyEachBindingProxyInterface for DenyEachBindingProxy {
         ) -> Result<DenyEachBindingOnlyDenyLibfuzzerResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<DenyEachBindingOnlyDenyLibfuzzerResponse, u32>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x1e4f89c329617b1e,
             >(_buf?)?;
             Ok(_response.map(|x| x.b))
@@ -716,6 +726,7 @@ impl DenyEachBindingProxyInterface for DenyEachBindingProxy {
         ) -> Result<DenyEachBindingOnlyDenySyzkallerResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<DenyEachBindingOnlyDenySyzkallerResponse, u32>,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
                 0x202ee614a749e98a,
             >(_buf?)?;
             Ok(_response.map(|x| x.b))
@@ -830,115 +841,124 @@ impl futures::Stream for DenyEachBindingRequestStream {
         if this.is_terminated {
             panic!("polled DenyEachBindingRequestStream after completion");
         }
-        fidl::encoding::with_tls_decode_buf(|bytes, handles| {
-            match this.inner.channel().read_etc(cx, bytes, handles) {
-                std::task::Poll::Ready(Ok(())) => {}
-                std::task::Poll::Pending => return std::task::Poll::Pending,
-                std::task::Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
-                    this.is_terminated = true;
-                    return std::task::Poll::Ready(None);
+        fidl::encoding::with_tls_decode_buf::<_, fidl::encoding::DefaultFuchsiaResourceDialect>(
+            |bytes, handles| {
+                match this.inner.channel().read_etc(cx, bytes, handles) {
+                    std::task::Poll::Ready(Ok(())) => {}
+                    std::task::Poll::Pending => return std::task::Poll::Pending,
+                    std::task::Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
+                        this.is_terminated = true;
+                        return std::task::Poll::Ready(None);
+                    }
+                    std::task::Poll::Ready(Err(e)) => {
+                        return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                            e.into(),
+                        ))))
+                    }
                 }
-                std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e))))
-                }
-            }
 
-            // A message has been received from the channel
-            let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
+                // A message has been received from the channel
+                let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
 
-            std::task::Poll::Ready(Some(match header.ordinal {
-                0x290bad96051b1b92 => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        DenyEachBindingOnlyDenyCppRequest,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<DenyEachBindingOnlyDenyCppRequest>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = DenyEachBindingControlHandle { inner: this.inner.clone() };
-                    Ok(DenyEachBindingRequest::OnlyDenyCpp {
-                        a: req.a,
+                std::task::Poll::Ready(Some(match header.ordinal {
+                    0x290bad96051b1b92 => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            DenyEachBindingOnlyDenyCppRequest,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<DenyEachBindingOnlyDenyCppRequest>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle =
+                            DenyEachBindingControlHandle { inner: this.inner.clone() };
+                        Ok(DenyEachBindingRequest::OnlyDenyCpp {
+                            a: req.a,
 
-                        responder: DenyEachBindingOnlyDenyCppResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0x75384066a26d87d7 => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        DenyEachBindingOnlyDenyDartRequest,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<DenyEachBindingOnlyDenyDartRequest>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = DenyEachBindingControlHandle { inner: this.inner.clone() };
-                    Ok(DenyEachBindingRequest::OnlyDenyDart {
-                        a: req.a,
+                            responder: DenyEachBindingOnlyDenyCppResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0x75384066a26d87d7 => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            DenyEachBindingOnlyDenyDartRequest,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<DenyEachBindingOnlyDenyDartRequest>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle =
+                            DenyEachBindingControlHandle { inner: this.inner.clone() };
+                        Ok(DenyEachBindingRequest::OnlyDenyDart {
+                            a: req.a,
 
-                        responder: DenyEachBindingOnlyDenyDartResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0x657655b981478d99 => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        DenyEachBindingOnlyDenyGoRequest,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<DenyEachBindingOnlyDenyGoRequest>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = DenyEachBindingControlHandle { inner: this.inner.clone() };
-                    Ok(DenyEachBindingRequest::OnlyDenyGo {
-                        a: req.a,
+                            responder: DenyEachBindingOnlyDenyDartResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0x657655b981478d99 => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            DenyEachBindingOnlyDenyGoRequest,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<DenyEachBindingOnlyDenyGoRequest>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle =
+                            DenyEachBindingControlHandle { inner: this.inner.clone() };
+                        Ok(DenyEachBindingRequest::OnlyDenyGo {
+                            a: req.a,
 
-                        responder: DenyEachBindingOnlyDenyGoResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0x1e4f89c329617b1e => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        DenyEachBindingOnlyDenyLibfuzzerRequest,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<DenyEachBindingOnlyDenyLibfuzzerRequest>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = DenyEachBindingControlHandle { inner: this.inner.clone() };
-                    Ok(DenyEachBindingRequest::OnlyDenyLibfuzzer {
-                        a: req.a,
+                            responder: DenyEachBindingOnlyDenyGoResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0x1e4f89c329617b1e => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            DenyEachBindingOnlyDenyLibfuzzerRequest,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<DenyEachBindingOnlyDenyLibfuzzerRequest>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle =
+                            DenyEachBindingControlHandle { inner: this.inner.clone() };
+                        Ok(DenyEachBindingRequest::OnlyDenyLibfuzzer {
+                            a: req.a,
 
-                        responder: DenyEachBindingOnlyDenyLibfuzzerResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                0x202ee614a749e98a => {
-                    header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
-                    let mut req = fidl::new_empty!(
-                        DenyEachBindingOnlyDenySyzkallerRequest,
-                        fidl::encoding::DefaultFuchsiaResourceDialect
-                    );
-                    fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<DenyEachBindingOnlyDenySyzkallerRequest>(&header, _body_bytes, handles, &mut req)?;
-                    let control_handle = DenyEachBindingControlHandle { inner: this.inner.clone() };
-                    Ok(DenyEachBindingRequest::OnlyDenySyzkaller {
-                        a: req.a,
+                            responder: DenyEachBindingOnlyDenyLibfuzzerResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    0x202ee614a749e98a => {
+                        header.validate_request_tx_id(fidl::MethodType::TwoWay)?;
+                        let mut req = fidl::new_empty!(
+                            DenyEachBindingOnlyDenySyzkallerRequest,
+                            fidl::encoding::DefaultFuchsiaResourceDialect
+                        );
+                        fidl::encoding::Decoder::<fidl::encoding::DefaultFuchsiaResourceDialect>::decode_into::<DenyEachBindingOnlyDenySyzkallerRequest>(&header, _body_bytes, handles, &mut req)?;
+                        let control_handle =
+                            DenyEachBindingControlHandle { inner: this.inner.clone() };
+                        Ok(DenyEachBindingRequest::OnlyDenySyzkaller {
+                            a: req.a,
 
-                        responder: DenyEachBindingOnlyDenySyzkallerResponder {
-                            control_handle: std::mem::ManuallyDrop::new(control_handle),
-                            tx_id: header.tx_id,
-                        },
-                    })
-                }
-                _ => Err(fidl::Error::UnknownOrdinal {
-                    ordinal: header.ordinal,
-                    protocol_name:
-                        <DenyEachBindingMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
-                }),
-            }))
-        })
+                            responder: DenyEachBindingOnlyDenySyzkallerResponder {
+                                control_handle: std::mem::ManuallyDrop::new(control_handle),
+                                tx_id: header.tx_id,
+                            },
+                        })
+                    }
+                    _ => Err(fidl::Error::UnknownOrdinal {
+                        ordinal: header.ordinal,
+                        protocol_name:
+                            <DenyEachBindingMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
+                    }),
+                }))
+            },
+        )
     }
 }
 
@@ -1619,23 +1639,26 @@ impl futures::Stream for ImportsSameNameContextRequestStream {
         if this.is_terminated {
             panic!("polled ImportsSameNameContextRequestStream after completion");
         }
-        fidl::encoding::with_tls_decode_buf(|bytes, handles| {
-            match this.inner.channel().read_etc(cx, bytes, handles) {
-                std::task::Poll::Ready(Ok(())) => {}
-                std::task::Poll::Pending => return std::task::Poll::Pending,
-                std::task::Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
-                    this.is_terminated = true;
-                    return std::task::Poll::Ready(None);
+        fidl::encoding::with_tls_decode_buf::<_, fidl::encoding::DefaultFuchsiaResourceDialect>(
+            |bytes, handles| {
+                match this.inner.channel().read_etc(cx, bytes, handles) {
+                    std::task::Poll::Ready(Ok(())) => {}
+                    std::task::Poll::Pending => return std::task::Poll::Pending,
+                    std::task::Poll::Ready(Err(zx_status::Status::PEER_CLOSED)) => {
+                        this.is_terminated = true;
+                        return std::task::Poll::Ready(None);
+                    }
+                    std::task::Poll::Ready(Err(e)) => {
+                        return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(
+                            e.into(),
+                        ))))
+                    }
                 }
-                std::task::Poll::Ready(Err(e)) => {
-                    return std::task::Poll::Ready(Some(Err(fidl::Error::ServerRequestRead(e))))
-                }
-            }
 
-            // A message has been received from the channel
-            let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
+                // A message has been received from the channel
+                let (header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
 
-            std::task::Poll::Ready(Some(match header.ordinal {
+                std::task::Poll::Ready(Some(match header.ordinal {
                 0x698380acfd29e8f => {
                     header.validate_request_tx_id(fidl::MethodType::OneWay)?;
                     let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload, fidl::encoding::DefaultFuchsiaResourceDialect);
@@ -1663,7 +1686,8 @@ impl futures::Stream for ImportsSameNameContextRequestStream {
                     protocol_name: <ImportsSameNameContextMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME,
                 }),
             }))
-        })
+            },
+        )
     }
 }
 

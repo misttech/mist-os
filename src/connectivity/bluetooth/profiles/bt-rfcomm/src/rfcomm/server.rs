@@ -222,7 +222,7 @@ impl RfcommServer {
         if self.is_active_session(&peer_id) {
             return Err(format_err!("RFCOMM Session already exists with peer {peer_id}"));
         }
-        info!(%peer_id, "Handling new L2CAP connection for the RFCOMM PSM");
+        info!(%peer_id, max_tx = %l2cap.max_tx_size(), "Handling new L2CAP connection for the RFCOMM PSM");
 
         // Create a new RFCOMM Session with the provided `channel_opened_callback` which will be
         // called anytime an RFCOMM channel is created. Opened RFCOMM channels will be delivered
@@ -519,7 +519,8 @@ mod tests {
 
         // Start up a session with remote peer.
         let id = PeerId(1);
-        let (local, mut remote) = Channel::create();
+        let local_max_packet_size = 700;
+        let (local, mut remote) = Channel::create_with_max_tx(local_max_packet_size as usize);
         assert!(rfcomm.new_l2cap_connection(id, local).is_ok());
 
         // Simulate a client connect request.
@@ -541,13 +542,13 @@ mod tests {
 
         // Expect to send a frame to peer - parameter negotiation.
         expect_frame_received_by_peer(&mut exec, &mut remote);
-        // Simulate peer responding positively.
+        // Simulate peer responding positively with a larger max packet size.
         let data = MuxCommand {
             params: MuxCommandParams::ParameterNegotiation(ParameterNegotiationParams {
                 dlci: expected_dlci,
                 credit_based_flow_handshake: CreditBasedFlowHandshake::SupportedResponse,
                 priority: 12,
-                max_frame_size: 100,
+                max_frame_size: 900,
                 initial_credits: 1,
             }),
             command_response: CommandResponse::Response,
@@ -562,7 +563,14 @@ mod tests {
         send_peer_frame(&remote, ua);
 
         // The channel should be established and relayed to the client that requested it.
-        assert_matches!(exec.run_until_stalled(&mut connect_request_fut), Poll::Ready(Ok(Ok(_))));
+        let channel_held_by_client = match exec.run_until_stalled(&mut connect_request_fut) {
+            Poll::Ready(Ok(Ok(c))) => c,
+            x => panic!("Expected future ready with channel, got: {x:?}"),
+        };
+        // The reported max TX should be our preferred max TX since ours is smaller. Less 6 bytes
+        // for the RFCOMM header.
+        let expected_rfcomm_max_tx = local_max_packet_size - 6;
+        assert_eq!(channel_held_by_client.max_tx_sdu_size, Some(expected_rfcomm_max_tx));
     }
 
     #[fuchsia::test]

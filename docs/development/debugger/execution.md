@@ -32,8 +32,8 @@ To list the threads in the current process:
 
 Note: This is the `thread` noun. You can also use `t` to express `thread`.
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] thread
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+thread
   # State   Koid Name
 ▶ 1 Blocked 1323 initial-thread
   2 Running 3462 worker-thread
@@ -53,8 +53,8 @@ threads. There are several ways to suspend a thread:
 
 For example, to suspend thread `2` with the `pause` command:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] thread 2 pause
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+thread 2 pause
 🛑 syscalls-x86-64.S:67
    65 m_syscall zx_port_create 60 2 1
    66 m_syscall zx_port_queue 61 2 1
@@ -73,8 +73,8 @@ all processes that are currently attached.
 
 For example:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] pause
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+pause
    508                 const zx_port_packet_t* packet))
    509
  ▶ 510 BLOCKING_SYSCALL(port_wait, zx_status_t, /* no attributes */, 3, (handle, deadline, packet),
@@ -91,8 +91,8 @@ completes normally.
 
 For example, to `continue` thread `1`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] thread 1 continue
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+thread 1 continue
 ```
 
 If you run `continue` without any additional context, zxdb continues all the
@@ -100,8 +100,8 @@ threads of all attached processes.
 
 For example:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] continue
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+continue
 ```
 
 ### Stepping a thread
@@ -116,16 +116,16 @@ Note: For more information on pausing a thread, see
 
   Exits the function and stops right after the call.
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] finish
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  finish
   ```
 
 * `next` (`n`)
 
   Advances to the next line, stepping over function calls.
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] next
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  next
   ```
 
 * `nexti`
@@ -137,8 +137,8 @@ Note: For more information on pausing a thread, see
   This does not work for all cases. For example, a manually set up call frame
   and a `jump` may result stepping into a new stack frame.
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] nexti
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  nexti
   ```
 
 * `ss`
@@ -146,8 +146,8 @@ Note: For more information on pausing a thread, see
   List function calls on the current line and step in to the call selected. This
   automatically completes any of the other calls that happen to occur first.
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] ss
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  ss
     1 std::string::string
     2 MyClass::MyClass
     3 HelperFunctionCall
@@ -167,8 +167,8 @@ Note: For more information on pausing a thread, see
   Function names that do not contain the argument substring  are skipped and
   only matching functions are stepped into.
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] step
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  step
   [zxdb] step MyFunction
   ```
 
@@ -176,8 +176,8 @@ Note: For more information on pausing a thread, see
 
   Advances exactly one machine instruction.
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] stepi
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  stepi
   ```
 
 
@@ -186,14 +186,14 @@ Note: For more information on pausing a thread, see
   Given a line location, continues the thread until execution gets there. For
   example, to run until line `45` of the current file:
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] until 45
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  until 45
   ```
 
   You can also run until execution gets back to a given stack frame:
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] frame 2 until
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  frame 2 until
   ```
 
 ## Stack frames {#stack-frames}
@@ -208,8 +208,8 @@ To list the stack frames in the current thread:
 
 Note: This is the `frame` noun. You can also use `f` to express `frame`.
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] frame
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+frame
 ▶ 0 fxl::CommandLineFromIterators<const char *const *>() • command_line.h:203
   1 fxl::CommandLineFromArgcArgv() • command_line.h:224
   2 main() • main.cc:174
@@ -225,8 +225,8 @@ You can use the `up` and `down` commands to navigate the frame list.
 
 For example, use `up` to navigate from the current frame `0` to frame `1`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] up
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+up
   1 fxl::CommandLineFromIterators<const char *const *>() • command_line.h:204
 ```
 
@@ -240,8 +240,8 @@ For example, use `down` to navigate from the current frame `1` to frame `0`:
 You can also navigate to a specific frame by using the `frame` command with a
 frame number:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] frame 1
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+frame 1
 ```
 
 ### Use `backtrace` for additional details {#backtrace}
@@ -256,8 +256,8 @@ Note: This is the `backtrace` verb. You can also use `bt` to express
 To list the stack frames in the current thread, but with more detailed
 information, use `backtrace`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] backtrace
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+backtrace
 ▶ 0 fxl::CommandLineFromIteratorsFindFirstPositionalArg<const char *const *>() • command_line.h:185
       IP = 0x10f982cf2ad0, BP = 0x66b45a01af50, SP = 0x66b45a01af38
       first = (const char* const*) 0x59f4e1268dc0
@@ -280,15 +280,15 @@ You can list code around the instruction pointer of specific stack frames.
 For example, to `list` the source code around the instruction pointer of stack
 frame `3`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] frame 3 list
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+frame 3 list
 ```
 
 When you use `list` without context, zxdb lists the source code
 around the instruction pointer of the current stack frame:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] list
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+list
    183 inline CommandLine CommandLineFromIteratorsFindFirstPositionalArg(
    184     InputIterator first, InputIterator last,
  ▶ 185     InputIterator* first_positional_arg) {
@@ -304,24 +304,24 @@ Additionally, you can use `list` to list specific things:
 
   Use `list` to list functions:
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] list MyClass::MyFunc
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  list MyClass::MyFunc
   ```
 
 * {Files}
 
   Use `list` to list specific files:
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] list --all myfile.cc:1
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  list --all myfile.cc:1
   ```
 
 * {File with line numbers}
 
   Use `list` to list specific files with specific line numbers:
 
-  ```none {:.devsite-disable-click-to-copy}
-  [zxdb] list foo.cc:43
+  ```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+  list foo.cc:43
   ```
 
 [zxdb-noun]: /docs/development/debugger/commands.md#noun

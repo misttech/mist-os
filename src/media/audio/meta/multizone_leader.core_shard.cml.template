@@ -11,11 +11,6 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: "#multizone_leader",
-        },
-        {
             protocol: [ "fuchsia.feedback.CrashReportingProductRegister" ],
             from: "#feedback",
             to: "#multizone_leader",

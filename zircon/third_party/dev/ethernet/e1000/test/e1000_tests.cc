@@ -153,7 +153,6 @@ netdriver::wire::TxBuffer CreateTxBuffer(IdType buffer_id) {
   return netdriver::wire::TxBuffer{
       .id = static_cast<uint32_t>(buffer_id),
       .meta{
-          .info = fuchsia_hardware_network_driver::wire::FrameInfo::WithNoInfo({}),
           .frame_type = netdev::wire::FrameType::kEthernet,
       },
   };

@@ -19,7 +19,7 @@ use {fuchsia_async as fasync, zx};
 ///
 /// This is a large enough number to avoid too much log spam and false positives
 /// in CQ where timing is not always reliable.
-const ACTION_INTERVAL: zx::Duration = zx::Duration::from_minutes(1);
+const ACTION_INTERVAL: zx::MonotonicDuration = zx::MonotonicDuration::from_minutes(1);
 /// The interval count threshold after which we consider the resource stuck.
 ///
 /// This is a large enough number to avoid generating false positive error log
@@ -197,9 +197,9 @@ impl ResourceRemovalSink {
 #[cfg_attr(test, derive(Debug, Eq, PartialEq, Copy, Clone))]
 enum State {
     Started,
-    Pending(zx::Duration),
-    Stuck(zx::Duration),
-    Finished(zx::Duration),
+    Pending(zx::MonotonicDuration),
+    Stuck(zx::MonotonicDuration),
+    Finished(zx::MonotonicDuration),
 }
 
 /// A trait abstracting the actions taken by [`ResourceRemovalWorker`] to
@@ -220,7 +220,7 @@ impl ActionHandler for LoggingHandler {
         // shouldn't be hit because all the durations reported can't be
         // negative.
         let std_duration =
-            |d: zx::Duration| Duration::from_nanos(d.into_nanos().try_into().unwrap());
+            |d: zx::MonotonicDuration| Duration::from_nanos(d.into_nanos().try_into().unwrap());
         match state {
             State::Started => {
                 debug!("deferred resource removal: {info:?}")
@@ -381,7 +381,7 @@ mod tests {
         completer.send(Default::default()).unwrap();
         // Now the worker shuts down.
         assert_eq!(executor.run_until_stalled(&mut fut), Poll::Ready(()));
-        handler.assert_action::<ResourceA>(State::Finished(zx::Duration::ZERO));
+        handler.assert_action::<ResourceA>(State::Finished(zx::MonotonicDuration::ZERO));
     }
 
     #[test]

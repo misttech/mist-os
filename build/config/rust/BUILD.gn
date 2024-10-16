@@ -148,10 +148,6 @@ config("bootfs") {
       configs += [ ":one_codegen_unit" ]
     }
   }
-
-  # Can't dynamically link libstd and libtest for ZBI binaries.
-  # TODO(https://fxbug.dev/42163719): reconsider this.
-  rustflags += [ "-Cprefer-dynamic=no" ]
 }
 
 config("proc_macro_test") {

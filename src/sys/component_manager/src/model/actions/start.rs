@@ -369,7 +369,8 @@ async fn start_component(
             logger,
         );
         timestamp = started.timestamp;
-        runtime_info = RuntimeInfo::new(timestamp, diagnostics_receiver);
+        let timestamp_monotonic = started.timestamp_monotonic;
+        runtime_info = RuntimeInfo::new(timestamp, timestamp_monotonic, diagnostics_receiver);
         runtime_dir = started.runtime_dir().cloned();
         state.replace(|instance_state| match instance_state {
             InstanceState::Resolved(resolved) => InstanceState::Started(resolved, started),
@@ -858,7 +859,7 @@ mod tests {
         let (_test_harness, child) = build_tree_with_single_child(TEST_CHILD_NAME).await;
 
         {
-            let timestamp = zx::MonotonicInstant::get();
+            let timestamp = zx::BootInstant::get();
             ActionsManager::register(
                 child.clone(),
                 StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
@@ -879,7 +880,7 @@ mod tests {
         }
 
         {
-            let timestamp = zx::MonotonicInstant::get();
+            let timestamp = zx::BootInstant::get();
             ActionsManager::register(
                 child.clone(),
                 StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
@@ -897,7 +898,7 @@ mod tests {
         let (test_harness, child) = build_tree_with_single_child(TEST_CHILD_NAME).await;
 
         {
-            let timestamp = zx::MonotonicInstant::get();
+            let timestamp = zx::BootInstant::get();
             ActionsManager::register(
                 child.clone(),
                 StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),

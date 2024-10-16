@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use assert_matches::assert_matches;
-use fidl_fuchsia_net_routes_ext::rules::close_rule_set;
 use fidl_fuchsia_net_routes_ext::{self as fnet_routes_ext, FidlRouteIpExt};
+use fnet_routes_ext::admin::FidlRouteAdminIpExt;
 use fnet_routes_ext::rules::{
-    add_rule, new_rule_set, remove_rule, FidlRuleAdminIpExt, FidlRuleIpExt, InstalledRule,
-    RuleAction, RuleEvent, RuleIndex, RuleMatcher,
+    add_rule, close_rule_set, new_rule_set, remove_rule, FidlRuleAdminIpExt, FidlRuleIpExt,
+    InstalledRule, RuleAction, RuleEvent, RuleIndex, RuleMatcher, DEFAULT_RULE_SET_PRIORITY,
 };
 use futures::TryStreamExt as _;
 use net_types::ip::Ip;
@@ -18,12 +18,43 @@ use std::pin::pin;
 // Verifies the watcher protocols correctly report `added` and `removed` events.
 #[netstack_test]
 #[variant(I, Ip)]
-async fn rule_watcher_add_remove<I: Ip + FidlRouteIpExt + FidlRuleIpExt + FidlRuleAdminIpExt>(
+async fn rule_watcher_add_remove<
+    I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt + FidlRuleIpExt + FidlRuleAdminIpExt,
+>(
     name: &str,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     // Rules are not supported in netstack2.
     let realm = sandbox.create_netstack_realm::<Netstack3, _>(name).expect("create realm");
+
+    // Connect to the watcher protocol and consume all existing events.
+    let state_proxy =
+        realm.connect_to_protocol::<I::StateMarker>().expect("failed to connect to routes/State");
+    let event_stream = fnet_routes_ext::rules::rule_event_stream_from_state::<I>(&state_proxy)
+        .expect("failed to connect to routes watcher");
+    let mut event_stream = pin!(event_stream);
+
+    // There should be a default rule that points to the main table.
+    let main_table =
+        realm.connect_to_protocol::<I::RouteTableMarker>().expect("connect to main route table");
+    let main_table_id =
+        fnet_routes_ext::admin::get_table_id::<I>(&main_table).await.expect("get main table id");
+
+    let default_rule = assert_matches!(
+        event_stream.try_next().await,
+        Ok(Some(RuleEvent::Existing(existing))) => existing
+    );
+    assert_eq!(
+        default_rule,
+        InstalledRule {
+            priority: DEFAULT_RULE_SET_PRIORITY,
+            index: RULE_INDEX_0,
+            matcher: RuleMatcher::default(),
+            action: RuleAction::Lookup(main_table_id.get()),
+        }
+    );
+
+    assert_matches!(event_stream.try_next().await, Ok(Some(RuleEvent::Idle)));
 
     let rule_table =
         realm.connect_to_protocol::<I::RuleTableMarker>().expect("connect to rule table");
@@ -37,20 +68,12 @@ async fn rule_watcher_add_remove<I: Ip + FidlRouteIpExt + FidlRuleIpExt + FidlRu
         .await
         .expect("fidl error")
         .expect("failed to add a new rule");
-
-    // Connect to the watcher protocol and consume all existing events.
-    let state_proxy =
-        realm.connect_to_protocol::<I::StateMarker>().expect("failed to connect to routes/State");
-    let event_stream = fnet_routes_ext::rules::rule_event_stream_from_state::<I>(&state_proxy)
-        .expect("failed to connect to routes watcher");
-    let mut event_stream = pin!(event_stream);
-
-    let existing = assert_matches!(
+    let added = assert_matches!(
         event_stream.try_next().await,
-        Ok(Some(RuleEvent::Existing(existing))) => existing
+        Ok(Some(RuleEvent::Added(added))) => added
     );
     assert_eq!(
-        existing,
+        added,
         InstalledRule {
             priority,
             index: RULE_INDEX_0,
@@ -58,8 +81,6 @@ async fn rule_watcher_add_remove<I: Ip + FidlRouteIpExt + FidlRuleIpExt + FidlRu
             action: RuleAction::Unreachable,
         }
     );
-
-    assert_matches!(event_stream.try_next().await, Ok(Some(RuleEvent::Idle)));
 
     add_rule::<I>(&rule_set, RULE_INDEX_1, RuleMatcher::default(), RuleAction::Unreachable)
         .await

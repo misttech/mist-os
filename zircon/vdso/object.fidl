@@ -30,7 +30,7 @@ closed protocol Object {
     ///
     /// zx_status_t zx_object_wait_one(zx_handle_t handle,
     ///                                zx_signals_t signals,
-    ///                                zx_time_t deadline,
+    ///                                zx_instant_mono_t deadline,
     ///                                zx_signals_t* observed);
     /// ```
     ///
@@ -110,7 +110,7 @@ closed protocol Object {
     strict WaitOne(resource struct {
         handle Handle;
         signals Signals;
-        deadline Time;
+        deadline InstantMono;
     }) -> (struct {
         observed Signals;
     }) error Status;
@@ -126,7 +126,7 @@ closed protocol Object {
     ///
     /// zx_status_t zx_object_wait_many(zx_wait_item_t* items,
     ///                                 size_t num_items,
-    ///                                 zx_time_t deadline);
+    ///                                 zx_instant_mono_t deadline);
     /// ```
     ///
     /// ## Description
@@ -229,7 +229,7 @@ closed protocol Object {
     strict WaitMany(resource struct {
         @inout
         items vector<WaitItem>:WAIT_MANY_MAX_ITEMS;
-        deadline Time;
+        deadline InstantMono;
     }) -> () error Status;
 
     /// ## Summary
@@ -309,7 +309,7 @@ closed protocol Object {
     ///     zx_signals_t trigger;
     ///     zx_signals_t observed;
     ///     uint64_t count;
-    ///     zx_time_t timestamp;       // depends on ZX_WAIT_ASYNC_TIMESTAMP
+    ///     zx_instant_mono_t timestamp;       // depends on ZX_WAIT_ASYNC_TIMESTAMP
     ///     uint64_t reserved1;
     /// } zx_packet_signal_t;
     /// ```
@@ -1029,7 +1029,7 @@ closed protocol Object {
     ///
     ///     // The monotonic time at which `zx_process_start()` was called, only valid
     ///     // if the |ZX_INFO_PROCESS_FLAG_STARTED| flag is set.
-    ///     zx_time_t start_time;
+    ///     zx_instant_mono_t start_time;
     ///
     ///     // Bitwise OR of ZX_INFO_PROCESS_FLAG_* values.
     ///     uint32_t flags;

@@ -18,7 +18,7 @@ use vfs::directory::immutable::connection::ImmutableConnection;
 use vfs::directory::immutable::Simple;
 use vfs::execution_scope::{ActiveGuard, ExecutionScope};
 use vfs::ToObjectRequest;
-use zx::Duration;
+use zx::MonotonicDuration;
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
 
 use super::{ServiceFs, ServiceObjTrait};
@@ -38,7 +38,7 @@ pub struct StallableServiceFs<ServiceObjTy: ServiceObjTrait> {
     fs: ServiceFs<ServiceObjTy>,
     connector: OutgoingConnector,
     state: State,
-    debounce_interval: zx::Duration,
+    debounce_interval: zx::MonotonicDuration,
     is_terminated: bool,
 }
 
@@ -144,7 +144,7 @@ impl OutgoingConnector {
     fn serve(
         &mut self,
         server_end: ServerEnd<fio::DirectoryMarker>,
-        debounce_interval: Duration,
+        debounce_interval: MonotonicDuration,
     ) -> StalledFut {
         let (unbound_sender, unbound_receiver) = oneshot::channel();
         let object_request = self.flags.to_object_request(server_end);
@@ -185,7 +185,10 @@ impl OutgoingConnector {
 }
 
 impl<ServiceObjTy: ServiceObjTrait> StallableServiceFs<ServiceObjTy> {
-    pub(crate) fn new(mut fs: ServiceFs<ServiceObjTy>, debounce_interval: zx::Duration) -> Self {
+    pub(crate) fn new(
+        mut fs: ServiceFs<ServiceObjTy>,
+        debounce_interval: zx::MonotonicDuration,
+    ) -> Self {
         let channel_queue =
             fs.channel_queue.as_mut().expect("Must not poll the original ServiceFs");
         assert!(
@@ -289,7 +292,7 @@ mod tests {
     ) -> (fasync::MonotonicInstant, MockServer, impl FusedFuture<Output = ()>) {
         let initial = fasync::MonotonicInstant::from_nanos(0);
         TestExecutor::advance_to(initial).await;
-        const IDLE_DURATION: Duration = Duration::from_nanos(1_000_000);
+        const IDLE_DURATION: MonotonicDuration = MonotonicDuration::from_nanos(1_000_000);
 
         let mut fs = ServiceFs::new();
         fs.serve_connection(server_end).unwrap().dir("svc").add_fidl_service(Requests::ServiceA);
@@ -305,7 +308,7 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn drain_request() {
-        const IDLE_DURATION: Duration = Duration::from_nanos(1_000_000);
+        const IDLE_DURATION: MonotonicDuration = MonotonicDuration::from_nanos(1_000_000);
         const NUM_FOO_REQUESTS: usize = 10;
         let (client_end, server_end) = fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
         let (initial, mock_server, fs) = setup_test(server_end).await;
@@ -347,7 +350,7 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn no_request() {
-        const IDLE_DURATION: Duration = Duration::from_nanos(1_000_000);
+        const IDLE_DURATION: MonotonicDuration = MonotonicDuration::from_nanos(1_000_000);
         let (client_end, server_end) = fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
         let (initial, mock_server, fs) = setup_test(server_end).await;
         pin_mut!(fs);
@@ -377,7 +380,7 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn request_then_stalled() {
-        const IDLE_DURATION: Duration = Duration::from_nanos(1_000_000);
+        const IDLE_DURATION: MonotonicDuration = MonotonicDuration::from_nanos(1_000_000);
 
         let (client_end, server_end) = fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
         let proxy =
@@ -408,7 +411,7 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn stalled_then_request() {
-        const IDLE_DURATION: Duration = Duration::from_nanos(1_000_000);
+        const IDLE_DURATION: MonotonicDuration = MonotonicDuration::from_nanos(1_000_000);
         let (client_end, server_end) = fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
         let (initial, mock_server, fs) = setup_test(server_end).await;
         pin_mut!(fs);
@@ -441,7 +444,7 @@ mod tests {
     /// duration, the service fs should stall.
     #[fuchsia::test(allow_stalls = false)]
     async fn periodic_requests() {
-        const IDLE_DURATION: Duration = Duration::from_nanos(1_000_000);
+        const IDLE_DURATION: MonotonicDuration = MonotonicDuration::from_nanos(1_000_000);
         let (client_end, server_end) = fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
         let (mut current_time, mock_server, fs) = setup_test(server_end).await;
         let fs = fasync::Task::local(fs);
@@ -482,7 +485,7 @@ mod tests {
     /// escrow those connections, so we don't want to disrupt them.
     #[fuchsia::test(allow_stalls = false)]
     async fn some_other_outgoing_dir_connection_blocks_stalling() {
-        const IDLE_DURATION: Duration = Duration::from_nanos(1_000_000);
+        const IDLE_DURATION: MonotonicDuration = MonotonicDuration::from_nanos(1_000_000);
         let (client_end, server_end) = fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
         let (initial, mock_server, fs) = setup_test(server_end).await;
         pin_mut!(fs);
@@ -491,12 +494,8 @@ mod tests {
 
         {
             // We can open another connection that's not the main outgoing directory connection,
-            let svc = crate::directory::open_directory_no_describe(
-                &client_end,
-                "svc",
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
-            )
-            .unwrap();
+            let svc = crate::directory::open_directory_async(&client_end, "svc", fio::R_STAR_DIR)
+                .unwrap();
 
             TestExecutor::advance_to(initial + IDLE_DURATION).await;
             assert!(TestExecutor::poll_until_stalled(&mut fs).await.is_pending());
@@ -531,7 +530,7 @@ mod tests {
         let mock_server_clone = mock_server.clone();
 
         const MIN_REQUEST_INTERVAL: i64 = 10_000_000;
-        let idle_duration = Duration::from_nanos(MIN_REQUEST_INTERVAL * 5);
+        let idle_duration = MonotonicDuration::from_nanos(MIN_REQUEST_INTERVAL * 5);
         let (client_end, server_end) = fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
 
         let component_task = async move {
@@ -577,7 +576,7 @@ mod tests {
                     .unwrap();
             proxy.foo().await.unwrap();
             drop(proxy);
-            deadline += Duration::from_nanos(MIN_REQUEST_INTERVAL * (delay_factor as i64));
+            deadline += MonotonicDuration::from_nanos(MIN_REQUEST_INTERVAL * (delay_factor as i64));
             TestExecutor::advance_to(deadline).await;
         }
 

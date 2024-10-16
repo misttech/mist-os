@@ -11,7 +11,7 @@
 #include "src/developer/memory/metrics/capture.h"
 #include "src/developer/memory/metrics/digest.h"
 #include "src/developer/memory/monitor/memory_monitor_config.h"
-#include "src/developer/memory/monitor/pressure_observer.h"
+#include "src/developer/memory/pressure_signaler/pressure_observer.h"
 #include "src/lib/fxl/macros.h"
 
 namespace monitor {
@@ -28,7 +28,7 @@ class Logger {
         digest_cb_(std::move(digest_cb)),
         config_(config) {}
 
-  void SetPressureLevel(Level l);
+  void SetPressureLevel(pressure_signaler::Level l);
 
  private:
   void Log();

@@ -2948,24 +2948,6 @@ impl ResourceAccessor for RemoteResourceAccessor {
                 }
             }
         }
-        if let Some(mut files) = response.get_responses2 {
-            // Validate that the server returned a single response, as a single fd was sent.
-            if files.len() == 1 {
-                let file = files.pop().unwrap();
-                let Some(flags) = file.flags else {
-                    log_warn!("Incorrect response to file request. Missing flags.");
-                    return error!(ENOENT);
-                };
-                if let Some(handle) = file.file {
-                    return Ok((
-                        new_remote_file(current_task, handle, flags.into())?,
-                        FdFlags::empty(),
-                    ));
-                } else {
-                    return Ok((new_null_file(current_task, flags.into()), FdFlags::empty()));
-                }
-            }
-        }
         error!(ENOENT)
     }
 
@@ -2978,16 +2960,10 @@ impl ResourceAccessor for RemoteResourceAccessor {
     ) -> Result<FdNumber, Errno> {
         profile_duration!("RemoteAddFile");
         let flags: fbinder::FileFlags = file.flags().into();
-        let handle1 = file.to_handle(current_task)?;
-        let handle2 = file.to_handle(current_task)?;
+        let handle = file.to_handle(current_task)?;
         let response = self.run_file_request(fbinder::FileRequest {
             add_requests: Some(vec![fbinder::FileHandle {
-                file: handle1,
-                flags: Some(flags),
-                ..fbinder::FileHandle::default()
-            }]),
-            add_requests2: Some(vec![fbinder::FileHandle {
-                file: handle2,
+                file: handle,
                 flags: Some(flags),
                 ..fbinder::FileHandle::default()
             }]),
@@ -8253,7 +8229,7 @@ pub mod tests {
                     }
                     for fd in payload.get_requests.unwrap_or(vec![]) {
                         if let Some(file) = fds.remove(&fd) {
-                            response.get_responses2.get_or_insert_with(Vec::new).push(file);
+                            response.get_responses.get_or_insert_with(Vec::new).push(file);
                         } else {
                             responder.send(Err(fposix::Errno::Ebadf))?;
                             continue 'event_loop;

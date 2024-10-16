@@ -15,6 +15,7 @@
 #![deny(missing_docs)]
 pub use fidl_fuchsia_diagnostics::{Interest, Severity};
 pub use fuchsia_macro::{main, test};
+use libc as _;
 use std::future::Future;
 #[doc(hidden)]
 pub use tracing::error;
@@ -180,8 +181,13 @@ where
 pub fn test_not_async<F, R>(f: F) -> R
 where
     F: FnOnce(usize) -> R,
+    R: fuchsia_async::test_support::TestResult,
 {
-    f(0)
+    let result = f(0);
+    if result.is_ok() {
+        install_lsan_hook();
+    }
+    result
 }
 
 /// Run an async test function with a single threaded executor.
@@ -192,7 +198,11 @@ where
     Fut: Future<Output = R> + 'static,
     R: fuchsia_async::test_support::TestResult,
 {
-    fuchsia_async::test_support::run_singlethreaded_test(f)
+    let result = fuchsia_async::test_support::run_singlethreaded_test(f);
+    if result.is_ok() {
+        install_lsan_hook();
+    }
+    result
 }
 
 /// Run an async test function with a multi threaded executor (containing `num_threads`).
@@ -203,7 +213,11 @@ where
     Fut: Future<Output = R> + Send + 'static,
     R: fuchsia_async::test_support::MultithreadedTestResult,
 {
-    fuchsia_async::test_support::run_test(f, num_threads)
+    let result = fuchsia_async::test_support::run_test(f, num_threads);
+    if result.is_ok() {
+        install_lsan_hook();
+    }
+    result
 }
 
 /// Run an async test function until it stalls. The executor will also use fake time.
@@ -215,10 +229,14 @@ where
     Fut: 'static + Future<Output = R>,
     R: fuchsia_async::test_support::TestResult,
 {
-    fuchsia_async::test_support::run_until_stalled_test(
+    let result = fuchsia_async::test_support::run_until_stalled_test(
         &mut fuchsia_async::TestExecutor::new_with_fake_time(),
         f,
-    )
+    );
+    if result.is_ok() {
+        install_lsan_hook();
+    }
+    result
 }
 
 //
@@ -240,4 +258,45 @@ where
 #[doc(hidden)]
 pub fn adapt_to_take_test_run_number<R>(f: impl Fn() -> R) -> impl Fn(usize) -> R {
     move |_| f()
+}
+
+//
+// LEAK SANITIZER SUPPORT
+//
+
+// Note that the variant is named variant_asan (for AddressSanitizer), but the specific sanitizer we
+// are targeting is lsan (LeakSanitizer), which is enabled as part of the asan variant.
+
+#[doc(hidden)]
+#[cfg(not(feature = "variant_asan"))]
+pub fn disable_lsan_for_should_panic() {}
+
+#[doc(hidden)]
+#[cfg(feature = "variant_asan")]
+pub fn disable_lsan_for_should_panic() {
+    extern "C" {
+        fn __lsan_disable();
+    }
+    unsafe {
+        __lsan_disable();
+    }
+}
+
+#[cfg(not(feature = "variant_asan"))]
+fn install_lsan_hook() {}
+
+#[cfg(feature = "variant_asan")]
+fn install_lsan_hook() {
+    extern "C" {
+        fn __lsan_do_leak_check();
+    }
+    // Wrap the call because atexit requires a safe function pointer.
+    extern "C" fn lsan_do_leak_check() {
+        unsafe { __lsan_do_leak_check() }
+    }
+    // Wait until atexit hooks are called, in case there is more cleanup left to do.
+    let err = unsafe { libc::atexit(lsan_do_leak_check) };
+    if err != 0 {
+        panic!("Failed to install atexit hook for LeakSanitizer: atexit returned {err}");
+    }
 }

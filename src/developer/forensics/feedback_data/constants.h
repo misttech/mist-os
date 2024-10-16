@@ -21,6 +21,7 @@ namespace feedback_data {
 constexpr char kAttachmentAnnotations[] = "annotations.json";
 constexpr char kAttachmentBuildSnapshot[] = "build.snapshot.xml";
 constexpr char kAttachmentInspect[] = "inspect.json";
+constexpr char kAttachmentKernelBootOptions[] = "build.kernel-boot-options.txt";
 constexpr char kAttachmentLogKernel[] = "log.kernel.txt";
 constexpr char kAttachmentLogSystem[] = "log.system.txt";
 constexpr char kAttachmentLogSystemPrevious[] = "log.system.previous_boot.txt";

@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use std::ffi::CStr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, OnceLock};
-use zx::{self as zx, Duration};
+use zx::{self as zx, MonotonicDuration};
 
 pub(crate) static TRACE_CATEGORY: &CStr = c"archivist";
 
@@ -173,7 +173,7 @@ impl GlobalConnectionStats {
     }
 
     /// Record the duration of a whole request to GetNext.
-    pub fn record_batch_duration(&self, duration: Duration) {
+    pub fn record_batch_duration(&self, duration: MonotonicDuration) {
         let micros = duration.into_micros();
         if micros >= 0 {
             self.batch_iterator.get_next.time_usec.insert(micros as u64);
@@ -181,7 +181,7 @@ impl GlobalConnectionStats {
     }
 
     /// Record the duration of obtaining data from a single component.
-    pub fn record_component_duration(&self, moniker: impl AsRef<str>, duration: Duration) {
+    pub fn record_component_duration(&self, moniker: impl AsRef<str>, duration: MonotonicDuration) {
         let nanos = duration.into_nanos();
         if nanos >= 0 {
             // Lazily initialize stats that may not be needed for all diagnostics types.

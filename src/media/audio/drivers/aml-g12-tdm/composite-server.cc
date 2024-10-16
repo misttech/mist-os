@@ -109,6 +109,9 @@ AudioCompositeServer::AudioCompositeServer(
   // Make sure that all reads/writes have gone through.
   BarrierBeforeRelease();
   ZX_ASSERT(bti_.release_quarantine() == ZX_OK);
+
+  // We may not need to StartSocPower above -- it might suffice to just power-down here.
+  ZX_ASSERT(StopSocPower() == ZX_OK);
 }
 
 zx_status_t AudioCompositeServer::ConfigEngine(size_t index, size_t dai_index, bool input,
@@ -408,6 +411,20 @@ void AudioCompositeServer::CreateRingBuffer(CreateRingBufferRequest& request,
     // epitaph to convey that the previous ring buffer resource is not there anymore.
     engine.ring_buffer->Unbind(ZX_ERR_NO_RESOURCES);
   }
+
+  // RingBuffer::SetActiveChannels is optional; we must work well for clients who _never_ call it.
+  // However, ideally we can leave the hardware powered-down by default, until a client connects.
+  //
+  // The hardware is put into the powered-off state when initially configured, until the first
+  // RingBuffer is created. At that point the hardware powers-up automatically, so that clients who
+  // do not use SetActiveChannels get the expected behavior. After that first RingBuffer creation,
+  // the hardware retains its power state across the creation and destruction of RingBuffers -- the
+  // only thing that changes its power level is a SetActiveChannels() call.
+  if (!first_ring_buffer_has_been_created_) {
+    ZX_ASSERT(StartSocPower(/*wait_for_completion*/ true) == ZX_OK);
+    first_ring_buffer_has_been_created_ = true;
+  }
+
   // Engine is on by default.
   engines_on_.set(ring_buffer_index, true);
   engine.ring_buffer_format = request.format();

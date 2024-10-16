@@ -805,7 +805,7 @@ async fn test_wlan_ap_dhcp_server<M: Manager, N: Netstack>(name: &str) {
     // These values effectively result in a large timeout of 60s which should avoid
     // flakes. This test was run locally 100 times without flakes.
     /// Duration to sleep between polls.
-    const POLL_WAIT: zx::Duration = zx::Duration::from_seconds(1);
+    const POLL_WAIT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(1);
     /// Maximum number of times we'll poll the DHCP server to check its parameters.
     const RETRY_COUNT: u64 = 120;
 

@@ -18,7 +18,7 @@ use fuchsia_async::{self as fasync, DurationExt};
 use futures::future::Fuse;
 use futures::{FutureExt, StreamExt};
 use std::sync::Arc;
-use zx::Duration;
+use zx::MonotonicDuration;
 
 /// The amount of time in milliseconds to wait for a camera device to be detected.
 pub const CAMERA_WATCHER_TIMEOUT: i64 = 30_000;
@@ -169,7 +169,8 @@ async fn get_camera_id(
     // continue to watch for an update to the devices. If we receive a nonempty response,
     // we extract the id and return. If the timeout is reached, then it is assumed to be an error.
     let timer =
-        fasync::Timer::new(Duration::from_millis(CAMERA_WATCHER_TIMEOUT).after_now()).fuse();
+        fasync::Timer::new(MonotonicDuration::from_millis(CAMERA_WATCHER_TIMEOUT).after_now())
+            .fuse();
     let camera_ids = call_async!(camera_watcher_proxy => watch_devices()).fuse();
 
     // Used to add the second watch call if the first comes back with empty devices.

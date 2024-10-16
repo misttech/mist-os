@@ -53,7 +53,7 @@ async fn verify_tx_and_rx(
         let mut sent_payload = Vec::new();
         let (header, received_payload) = helper
             .run_until_complete_or_timeout(
-                zx::Duration::from_seconds(5),
+                zx::MonotonicDuration::from_seconds(5),
                 "verify ethernet_tx_rx",
                 event::on_transmit(event::extract(|frame: Buffered<DataFrame>| {
                     for mac::Msdu { dst_addr, src_addr, llc_frame } in frame.get() {
@@ -98,7 +98,7 @@ async fn ethernet_tx_rx() {
 
     connect_or_timeout(
         &mut helper,
-        zx::Duration::from_seconds(30),
+        zx::MonotonicDuration::from_seconds(30),
         &AP_SSID,
         &BSS,
         &Protection::Open,

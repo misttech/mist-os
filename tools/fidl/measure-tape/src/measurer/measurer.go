@@ -319,7 +319,7 @@ func (m *Measurer) toDecl(typ fidlgen.Type) (keyedDecl, error) {
 		}, nil
 	case fidlgen.HandleType:
 		fallthrough
-	case fidlgen.RequestType:
+	case fidlgen.EndpointType:
 		return keyedDecl{
 			decl:     handleDecl{},
 			nullable: typ.Nullable,
@@ -343,6 +343,13 @@ func (m *Measurer) toDecl(typ fidlgen.Type) (keyedDecl, error) {
 func (m *Measurer) lookup(name fidlgen.Name) (keyedDecl, error) {
 	root, ok := m.roots[name.LibraryName()]
 	if !ok {
+		fqn := name.FullyQualifiedName()
+		if fqn == "zx/InstantBoot" || fqn == "zx/InstantMono" {
+			return keyedDecl{
+				key:  name.FullyQualifiedName(),
+				decl: primitiveDecl{size: toSize(fidlgen.Int64)},
+			}, nil
+		}
 		return keyedDecl{}, fmt.Errorf("missing definition for %s, you may be missing a JSON IR", name)
 	}
 	fqn := name.FullyQualifiedName()

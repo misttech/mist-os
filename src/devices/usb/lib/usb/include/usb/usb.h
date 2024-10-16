@@ -378,9 +378,11 @@ static inline zx_status_t usb_clear_feature(const usb_protocol_t* usb, uint8_t r
 // usb_ep_direction2() useful with you have b_endpoint_address outside of a descriptor.
 #define usb_ep_direction2(addr) ((addr)&USB_ENDPOINT_DIR_MASK)
 #define usb_ep_type(ep) ((ep)->bm_attributes & USB_ENDPOINT_TYPE_MASK)
+#define usb_ep_type2(ep) ((ep).bm_attributes() & USB_ENDPOINT_TYPE_MASK)  // FIDL endpoint
 #define usb_ep_sync_type(ep) ((ep)->bm_attributes & USB_ENDPOINT_SYNCHRONIZATION_MASK)
 // Max packet size is in bits 10..0
 #define usb_ep_max_packet(ep) (le16toh((ep)->w_max_packet_size) & 0x07FF)
+#define usb_ep_max_packet2(ep) (le16toh((ep).w_max_packet_size()) & 0x07FF)  // FIDL endpoint.
 // For high speed interrupt and isochronous endpoints, additional transactions per microframe
 // are in bits 12..11
 #define usb_ep_add_mf_transactions(ep) ((le16toh((ep)->w_max_packet_size) >> 11) & 3)

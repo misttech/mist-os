@@ -13,8 +13,8 @@ namespace {
 TEST(SystemClockTest, MonotonicClock) {
   SystemClock clock;
 
-  auto time1 = clock.Now();
-  auto time2 = clock.Now();
+  auto time1 = clock.MonotonicNow();
+  auto time2 = clock.MonotonicNow();
 
   EXPECT_GE(time2, time1);
 }

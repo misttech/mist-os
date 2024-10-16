@@ -21,7 +21,7 @@ closed protocol Clockfuncs {
     /// ```c
     /// #include <zircon/syscalls.h>
     ///
-    /// zx_time_t zx_clock_get_monotonic(void);
+    /// zx_instant_mono_t zx_clock_get_monotonic(void);
     /// ```
     ///
     /// ## Description
@@ -44,7 +44,7 @@ closed protocol Clockfuncs {
     /// `zx_clock_get_monotonic()` cannot fail.
     @vdsocall
     strict ClockGetMonotonic() -> (@wrapped_return struct {
-        time Time;
+        time InstantMono;
     });
 
     // Read clock monotonic, but demand that the read be performed using a
@@ -54,7 +54,7 @@ closed protocol Clockfuncs {
     // to be used by application code.
     @internal
     strict ClockGetMonotonicViaKernel() -> (@wrapped_return struct {
-        time Time;
+        time InstantMono;
     });
 
     /// ## Summary
@@ -66,7 +66,7 @@ closed protocol Clockfuncs {
     /// ```c
     /// #include <zircon/syscalls.h>
     ///
-    /// zx_time_t zx_clock_get_boot(void);
+    /// zx_instant_boot_t zx_clock_get_boot(void);
     /// ```
     ///
     /// ## Description
@@ -89,7 +89,7 @@ closed protocol Clockfuncs {
     /// `zx_clock_get_boot()` cannot fail.
     @vdsocall
     strict ClockGetBoot() -> (@wrapped_return struct {
-        time Time;
+        time InstantBoot;
     });
 
     // Read clock boot, but demand that the read be performed using a
@@ -99,7 +99,7 @@ closed protocol Clockfuncs {
     // to be used by application code.
     @internal
     strict ClockGetBootViaKernel() -> (@wrapped_return struct {
-        time Time;
+        time InstantBoot;
     });
 
     // TODO: handle:CLOCK for all of these.

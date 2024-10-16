@@ -70,7 +70,7 @@ fn benchmark_{{ .Name }}_encode(b: &mut Bencher) {
         },
         |value| {
             {{- /* Encode to TLS buffers since that's what the bindings do in practice. */}}
-            with_tls_encode_buf(|bytes, handles| {
+            with_tls_encode_buf::<_, DefaultFuchsiaResourceDialect>(|bytes, handles| {
                 Encoder::<DefaultFuchsiaResourceDialect>::encode_with_context::<{{ .ValueType }}>(_V2_CONTEXT, bytes, handles, {{ if not .IsResource }}&*{{ end }}value).unwrap();
                 {{- /* Return the underlying heap storage of handles, since with_tls_encode_buf
                     clears it after calling this closure, which otherwise would close all the

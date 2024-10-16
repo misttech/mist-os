@@ -174,12 +174,12 @@ pub trait SocketOps: Send + Sync + AsAny {
     ///
     /// The name is derived from the address and domain. A socket
     /// will always have a name, even if it is not bound to an address.
-    fn getsockname(&self, socket: &Socket) -> Vec<u8>;
+    fn getsockname(&self, socket: &Socket) -> Result<SocketAddress, Errno>;
 
     /// Returns the name of the peer of this socket, if such a peer exists.
     ///
     /// Returns an error if the socket is not connected.
-    fn getpeername(&self, socket: &Socket) -> Result<Vec<u8>, Errno>;
+    fn getpeername(&self, socket: &Socket) -> Result<SocketAddress, Errno>;
 
     /// Sets socket-specific options.
     fn setsockopt(
@@ -248,10 +248,10 @@ pub struct Socket {
 #[derive(Default)]
 struct SocketState {
     /// The value of SO_RCVTIMEO.
-    receive_timeout: Option<zx::Duration>,
+    receive_timeout: Option<zx::MonotonicDuration>,
 
     /// The value for SO_SNDTIMEO.
-    send_timeout: Option<zx::Duration>,
+    send_timeout: Option<zx::MonotonicDuration>,
 
     /// The socket's mark. Can get and set with SO_MARK.
     mark: u32,
@@ -371,11 +371,11 @@ impl Socket {
         ops.as_any().downcast_ref::<T>()
     }
 
-    pub fn getsockname(&self) -> Vec<u8> {
+    pub fn getsockname(&self) -> Result<SocketAddress, Errno> {
         self.ops.getsockname(self)
     }
 
-    pub fn getpeername(&self) -> Result<Vec<u8>, Errno> {
+    pub fn getpeername(&self) -> Result<SocketAddress, Errno> {
         self.ops.getpeername(self)
     }
 
@@ -389,7 +389,7 @@ impl Socket {
         let read_timeval = || {
             let timeval_ref = user_opt.try_into()?;
             let duration = duration_from_timeval(task.read_object(timeval_ref)?)?;
-            Ok(if duration == zx::Duration::default() { None } else { Some(duration) })
+            Ok(if duration == zx::MonotonicDuration::default() { None } else { Some(duration) })
         };
 
         match level {
@@ -433,11 +433,11 @@ impl Socket {
         Ok(value)
     }
 
-    pub fn receive_timeout(&self) -> Option<zx::Duration> {
+    pub fn receive_timeout(&self) -> Option<zx::MonotonicDuration> {
         self.state.lock().receive_timeout
     }
 
-    pub fn send_timeout(&self) -> Option<zx::Duration> {
+    pub fn send_timeout(&self) -> Option<zx::MonotonicDuration> {
         self.state.lock().send_timeout
     }
 

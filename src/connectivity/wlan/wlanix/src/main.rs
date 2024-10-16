@@ -2301,7 +2301,7 @@ mod tests {
         assert_variant!(
             test_helper.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::Disconnect { info })) => {
-                assert_eq!(info.connected_duration, zx::Duration::from_nanos(connection_length_nanos.into()));
+                assert_eq!(info.connected_duration, zx::MonotonicDuration::from_nanos(connection_length_nanos.into()));
                 assert_eq!(info.is_sme_reconnecting, mocked_is_sme_reconnecting);
                 assert_eq!(info.disconnect_source, mocked_disconnect_source);
                 assert_eq!(info.original_bss_desc.ssid, Ssid::try_from("foo").unwrap());
@@ -2373,7 +2373,7 @@ mod tests {
         assert_variant!(
             test_helper.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::Disconnect { info })) => {
-                assert_eq!(info.connected_duration, zx::Duration::from_nanos(connection_length_nanos.into()));
+                assert_eq!(info.connected_duration, zx::MonotonicDuration::from_nanos(connection_length_nanos.into()));
                 assert_eq!(info.is_sme_reconnecting, mocked_is_sme_reconnecting);
                 assert_eq!(info.disconnect_source, mocked_disconnect_source);
                 assert_eq!(info.original_bss_desc.ssid, Ssid::try_from("foo").unwrap());

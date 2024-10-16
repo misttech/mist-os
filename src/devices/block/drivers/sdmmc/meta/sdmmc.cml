@@ -25,14 +25,22 @@
             key: "enable_suspend",
             type: "bool",
         },
-        { protocol: "fuchsia.power.broker.Topology" },
 
-        // Used by //sdk/lib/driver/power/cpp
-        { protocol: "fuchsia.power.system.ActivityGovernor" },
+        // START: Power-related capabilities, some used by
+        // //sdk/lib/driver/power/ccp
+        {
+            protocol: [
+                "fuchsia.power.broker.Topology",
+                "fuchsia.power.system.ActivityGovernor",
+                "fuchsia.power.system.CpuElementManager",
+            ],
+        },
+        { service: "fuchsia.hardware.power.PowerTokenService" },
+
+        // END
         {
             protocol: [ "fuchsia.scheduler.RoleManager" ],
         },
-        { service: "fuchsia.hardware.power.PowerTokenService" },
         { service: "fuchsia.hardware.sdmmc.SdmmcService" },
     ],
     expose: [

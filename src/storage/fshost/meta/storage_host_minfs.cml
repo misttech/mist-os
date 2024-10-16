@@ -2,16 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "inspect/offer.shard.cml" ],
+    include: [
+        "inspect/offer.shard.cml",
+        "syslog/offer.shard.cml",
+    ],
     children: [
-        {
-            name: "storage_host",
-            url: "#meta/storage-host.cm",
-            startup: "eager",
-        },
         {
             name: "fvm",
             url: "#meta/fvm2.cm",
+        },
+    ],
+    collections: [
+        {
+            name: "storage-host",
+            durability: "transient",
         },
     ],
     capabilities: [
@@ -42,33 +46,21 @@
     ],
     use: [
         {
-            protocol: "fuchsia.storagehost.StorageHost",
-            from: "#storage_host",
-        },
-        {
-            directory: "partitions",
-            from: "#storage_host",
-            rights: [ "rw*" ],
-            path: "/partitions",
-        },
-        {
             protocol: "fuchsia.component.Realm",
             from: "framework",
+        },
+        {
+            service: [
+                "fuchsia.hardware.block.volume.Service",
+                "fuchsia.hardware.ramdisk.Service",
+            ],
         },
     ],
     offer: [
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [
-                "#fvm",
-                "#storage_host",
-            ],
-        },
-        {
             protocol: [ "fuchsia.tracing.provider.Registry" ],
             from: "parent",
-            to: [ "#storage_host" ],
+            to: [ "#storage-host" ],
             availability: "optional",
         },
     ],
@@ -79,10 +71,6 @@
                 "blob-exec",
             ],
             from: "self",
-        },
-        {
-            directory: "partitions",
-            from: "#storage_host",
         },
         {
             directory: "volumes",

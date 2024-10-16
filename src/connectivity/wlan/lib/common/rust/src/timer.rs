@@ -71,7 +71,7 @@ impl<E> Timer<E> {
         id
     }
 
-    pub fn schedule_after(&mut self, duration: zx::Duration, event: E) -> EventId {
+    pub fn schedule_after(&mut self, duration: zx::MonotonicDuration, event: E) -> EventId {
         self.schedule_at(fasync::MonotonicInstant::after(duration).into_zx(), event)
     }
 
@@ -84,7 +84,7 @@ impl<E> Timer<E> {
 }
 
 pub trait TimeoutDuration {
-    fn timeout_duration(&self) -> zx::Duration;
+    fn timeout_duration(&self) -> zx::MonotonicDuration;
 }
 
 #[cfg(test)]
@@ -99,8 +99,8 @@ mod tests {
 
     type TestEvent = u32;
     impl TimeoutDuration for TestEvent {
-        fn timeout_duration(&self) -> zx::Duration {
-            zx::Duration::from_seconds(10)
+        fn timeout_duration(&self) -> zx::MonotonicDuration {
+            zx::MonotonicDuration::from_seconds(10)
         }
     }
 
@@ -108,8 +108,8 @@ mod tests {
     fn test_timer_schedule_at() {
         let _exec = fasync::TestExecutor::new();
         let (mut timer, mut time_stream) = create_timer::<TestEvent>();
-        let timeout1 = zx::MonotonicInstant::after(zx::Duration::from_seconds(5));
-        let timeout2 = zx::MonotonicInstant::after(zx::Duration::from_seconds(10));
+        let timeout1 = zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(5));
+        let timeout2 = zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(10));
         assert_eq!(timer.schedule_at(timeout1, 7), 0);
         assert_eq!(timer.schedule_at(timeout2, 9), 1);
 
@@ -132,8 +132,8 @@ mod tests {
     fn test_timer_schedule_after() {
         let _exec = fasync::TestExecutor::new();
         let (mut timer, mut time_stream) = create_timer::<TestEvent>();
-        let timeout1 = zx::Duration::from_seconds(1000);
-        let timeout2 = zx::Duration::from_seconds(5);
+        let timeout1 = zx::MonotonicDuration::from_seconds(1000);
+        let timeout2 = zx::MonotonicDuration::from_seconds(5);
         assert_eq!(timer.schedule_after(timeout1, 7), 0);
         assert_eq!(timer.schedule_after(timeout2, 9), 1);
 
@@ -158,14 +158,14 @@ mod tests {
     fn test_timer_schedule() {
         let _exec = fasync::TestExecutor::new();
         let (mut timer, mut time_stream) = create_timer::<TestEvent>();
-        let start = zx::MonotonicInstant::after(zx::Duration::from_millis(0));
+        let start = zx::MonotonicInstant::after(zx::MonotonicDuration::from_millis(0));
 
         assert_eq!(timer.schedule(5u32), 0);
 
         let (t, event) = time_stream.try_next().unwrap().expect("expect time entry");
         assert_eq!(event.id, 0);
         assert_eq!(event.event, 5);
-        assert!(start + zx::Duration::from_seconds(10) <= t);
+        assert!(start + zx::MonotonicDuration::from_seconds(10) <= t);
     }
 
     #[test]
@@ -175,10 +175,10 @@ mod tests {
             let (timer, time_stream) = mpsc::unbounded::<ScheduledEvent<TestEvent>>();
             let mut timeout_stream = make_async_timed_event_stream(time_stream);
             let now = zx::MonotonicInstant::get();
-            schedule(&timer, now + zx::Duration::from_millis(40), 0);
-            schedule(&timer, now + zx::Duration::from_millis(10), 1);
-            schedule(&timer, now + zx::Duration::from_millis(20), 2);
-            schedule(&timer, now + zx::Duration::from_millis(30), 3);
+            schedule(&timer, now + zx::MonotonicDuration::from_millis(40), 0);
+            schedule(&timer, now + zx::MonotonicDuration::from_millis(10), 1);
+            schedule(&timer, now + zx::MonotonicDuration::from_millis(20), 2);
+            schedule(&timer, now + zx::MonotonicDuration::from_millis(30), 3);
 
             let mut events = vec![];
             for _ in 0u32..4 {

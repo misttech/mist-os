@@ -413,31 +413,8 @@ async fn open_file_with_extra_rights() {
 }
 
 #[fuchsia::test]
-async fn open3_not_supported_returns_correct_error() {
-    let harness = TestHarness::new().await;
-
-    if harness.config.supports_open3 {
-        return;
-    }
-
-    let root = root_directory(vec![directory("dir", vec![])]);
-    let test_dir = harness.get_directory(root, harness.dir_rights.all());
-    let dir_proxy = open_dir_with_flags(&test_dir, fio::OpenFlags::RIGHT_READABLE, "dir").await;
-
-    // fuchsia.io/Directory.Open3
-    assert_matches!(
-        dir_proxy.open3_node::<fio::DirectoryMarker>(".", fio::Flags::empty(), None).await,
-        Err(zx::Status::NOT_SUPPORTED)
-    );
-}
-
-#[fuchsia::test]
 async fn open3_rights() {
     let harness = TestHarness::new().await;
-
-    if !harness.config.supports_open3 {
-        return;
-    }
 
     const CONTENT: &[u8] = b"content";
     let test_dir = harness.get_directory(
@@ -486,10 +463,6 @@ async fn open3_rights() {
 async fn open3_invalid() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open3 {
-        return;
-    }
-
     let test_dir = harness.get_directory(
         root_directory(vec![]),
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
@@ -518,7 +491,7 @@ async fn open3_invalid() {
 async fn open3_create_dot_fails_with_already_exists() {
     let harness = TestHarness::new().await;
 
-    if !(harness.config.supports_open3 && harness.config.supports_modify_directory) {
+    if !harness.config.supports_modify_directory {
         return;
     }
 
@@ -541,10 +514,6 @@ async fn open3_create_dot_fails_with_already_exists() {
 #[fuchsia::test]
 async fn open3_open_directory() {
     let harness = TestHarness::new().await;
-
-    if !harness.config.supports_open3 {
-        return;
-    }
 
     let test_dir = harness.get_directory(
         root_directory(vec![directory("dir", vec![])]),
@@ -625,10 +594,6 @@ async fn open3_open_directory() {
 async fn open3_open_file() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open3 {
-        return;
-    }
-
     const CONTENT: &[u8] = b"content";
     let test_dir = harness.get_directory(
         root_directory(vec![file("file", CONTENT.to_vec())]),
@@ -694,7 +659,7 @@ async fn open3_open_file() {
 async fn open3_file_append() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open3 || !harness.config.supports_append {
+    if !harness.config.supports_append {
         return;
     }
 
@@ -724,7 +689,7 @@ async fn open3_file_append() {
 async fn open3_file_truncate_invalid() {
     let harness = TestHarness::new().await;
 
-    if !(harness.config.supports_open3 && harness.config.supports_append) {
+    if !harness.config.supports_append {
         return;
     }
 
@@ -744,7 +709,7 @@ async fn open3_file_truncate_invalid() {
 async fn open3_file_truncate() {
     let harness = TestHarness::new().await;
 
-    if !(harness.config.supports_open3 && harness.config.supports_append) {
+    if !harness.config.supports_append {
         return;
     }
 
@@ -768,10 +733,6 @@ async fn open3_file_truncate() {
 #[fuchsia::test]
 async fn open3_directory_get_representation() {
     let harness = TestHarness::new().await;
-
-    if !harness.config.supports_open3 {
-        return;
-    }
 
     let test_dir = harness.get_directory(root_directory(vec![]), fio::OpenFlags::RIGHT_READABLE);
 
@@ -808,10 +769,6 @@ async fn open3_directory_get_representation() {
 #[fuchsia::test]
 async fn open3_file_get_representation() {
     let harness = TestHarness::new().await;
-
-    if !harness.config.supports_open3 {
-        return;
-    }
 
     let test_dir = harness
         .get_directory(root_directory(vec![file("file", vec![])]), fio::OpenFlags::RIGHT_READABLE);
@@ -857,10 +814,6 @@ async fn open3_file_get_representation() {
 async fn open3_dir_optional_rights() {
     let harness = TestHarness::new().await;
 
-    if !harness.config.supports_open3 {
-        return;
-    }
-
     let test_dir = harness.get_directory(
         root_directory(vec![]),
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
@@ -887,10 +840,6 @@ async fn open3_dir_optional_rights() {
 #[fuchsia::test]
 async fn open3_request_attributes_rights_failure() {
     let harness = TestHarness::new().await;
-
-    if !harness.config.supports_open3 {
-        return;
-    }
 
     let test_dir = harness.get_directory(
         root_directory(vec![]),
@@ -920,10 +869,6 @@ async fn open3_request_attributes_rights_failure() {
 #[fuchsia::test]
 async fn open3_open_existing_directory() {
     let harness = TestHarness::new().await;
-
-    if !harness.config.supports_open3 {
-        return;
-    }
 
     let test_dir = harness.get_directory(
         root_directory(vec![directory("dir", vec![])]),

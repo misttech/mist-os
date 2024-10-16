@@ -240,9 +240,7 @@ TEST_P(ParameterizedYUVPixelTest, YUVTest) {
       allocation::BufferCollectionImportExportTokens::New();
   fuc::RegisterBufferCollectionArgs rbc_args = {};
   rbc_args.set_export_token(std::move(bc_tokens.export_token));
-  rbc_args.set_buffer_collection_token(
-      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
-          scenic_token.Unbind().TakeChannel()));
+  rbc_args.set_buffer_collection_token2(std::move(scenic_token));
   fuc::Allocator_RegisterBufferCollection_Result result;
   ASSERT_OK(flatland_allocator_->RegisterBufferCollection(std::move(rbc_args), &result));
   ASSERT_FALSE(result.is_err());
@@ -336,9 +334,7 @@ TEST_P(ParameterizedSRGBPixelTest, RGBTest) {
       allocation::BufferCollectionImportExportTokens::New();
   fuc::RegisterBufferCollectionArgs rbc_args = {};
   rbc_args.set_export_token(std::move(bc_tokens.export_token));
-  rbc_args.set_buffer_collection_token(
-      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
-          scenic_token.Unbind().TakeChannel()));
+  rbc_args.set_buffer_collection_token2(std::move(scenic_token));
   fuc::Allocator_RegisterBufferCollection_Result result;
   flatland_allocator_->RegisterBufferCollection(std::move(rbc_args), &result);
   ASSERT_FALSE(result.is_err());
@@ -601,9 +597,7 @@ TEST_P(ParameterizedFlipAndOrientationTest, FlipAndOrientationRenderTest) {
       allocation::BufferCollectionImportExportTokens::New();
   fuc::RegisterBufferCollectionArgs rbc_args = {};
   rbc_args.set_export_token(std::move(bc_tokens.export_token));
-  rbc_args.set_buffer_collection_token(
-      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
-          scenic_token.Unbind().TakeChannel()));
+  rbc_args.set_buffer_collection_token2(std::move(scenic_token));
   fuc::Allocator_RegisterBufferCollection_Result result;
   flatland_allocator_->RegisterBufferCollection(std::move(rbc_args), &result);
   ASSERT_FALSE(result.is_err());

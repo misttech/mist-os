@@ -40,7 +40,7 @@ static PKG_PATH: &'static str = "/pkg";
 // Maximum time that the runner will wait for break_on_start eventpair to signal.
 // This is set to prevent debuggers from blocking us for too long, either intentionally
 // or unintentionally.
-const MAX_WAIT_BREAK_ON_START: zx::Duration = zx::Duration::from_millis(300);
+const MAX_WAIT_BREAK_ON_START: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(300);
 
 /// Error encountered running test component
 #[derive(Debug, Error)]
@@ -361,13 +361,10 @@ fn get_pkg_and_lib_proxy<'a>(
         .get(&PKG_PATH.parse().unwrap())
         .ok_or_else(|| ComponentError::MissingPkg(url.clone()))?;
 
-    let lib_proxy = fuchsia_component::directory::open_directory_no_describe(
-        pkg_dir,
-        "lib",
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-    )
-    .map_err(Into::into)
-    .map_err(|e| ComponentError::LibraryLoadError(url.clone(), e))?;
+    let lib_proxy =
+        fuchsia_component::directory::open_directory_async(pkg_dir, "lib", fio::RX_STAR_DIR)
+            .map_err(Into::into)
+            .map_err(|e| ComponentError::LibraryLoadError(url.clone(), e))?;
     Ok((pkg_dir, lib_proxy))
 }
 

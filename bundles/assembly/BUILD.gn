@@ -10,6 +10,7 @@ import("//build/bazel/bazel_inputs.gni")
 import("//build/config/clang/clang.gni")
 import("//build/icu/icu_assembly_input_bundle.gni")
 import("//bundles/assembly/platform_aibs.gni")
+import("//bundles/assembly/rust_libstd.gni")
 import("//src/lib/icu/tzdata/icu_tzres_source.gni")
 import("//third_party/sbase/binaries.gni")
 import("//zircon/kernel/phys/qemu.gni")
@@ -485,6 +486,16 @@ assembly_input_bundle("fake_battery_driver") {
     {
       package_target = "//src/power/fake-powersource:fake-battery"
       driver_components = [ "meta/fake_battery.cm" ]
+    },
+  ]
+}
+
+# AIB for the sdhci driver
+assembly_input_bundle("sdhci_driver") {
+  boot_driver_packages = [
+    {
+      package_target = "//src/devices/block/drivers/sdhci:package"
+      driver_components = [ "meta/sdhci.cm" ]
     },
   ]
 }
@@ -1722,6 +1733,8 @@ assembly_input_bundle("factory_reset_trigger") {
 # move them to other AIBs that are included by all other products.
 #
 assembly_input_bundle("common_standard") {
+  memory_buckets = [ "//src/developer/memory/buckets/buckets.json" ]
+
   bootfs_files_labels = [ "//src/sys/core:bootfs" ]
 
   base_packages = [
@@ -2183,6 +2196,27 @@ assembly_input_bundle("bluetooth_core") {
   ]
 }
 
+# Bluetooth profile support: Device Identification
+#
+# feature_set_levels: minimal
+# build-types: all
+#
+assembly_input_bundle("bluetooth_device_id") {
+  flexible_packages =
+      [ "//src/connectivity/bluetooth/profiles/bt-device-id:without-config" ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/connectivity/bluetooth/profiles/bt-device-id/meta/bt-device-id.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
 # Bluetooth profile support: HFP - AG
 #
 # feature_set_levels: minimal
@@ -2590,6 +2624,11 @@ assembly_input_bundle("fshost_common") {
           label = "//sdk/lib/svc($shlib_toolchain)"
           source = "${root_out_dir}/${target_cpu}-shared/libsvc.so"
           destination = "lib/libsvc.so"
+        },
+        {
+          label = "//build/toolchain/runtime:shared-rust-libstd-deps"
+          source = "${rust_libstd_path}"
+          destination = "lib/${rust_libstd_so_name}"
         },
       ]
       component_includes = [
@@ -4255,7 +4294,6 @@ assembly_input_bundle("tee_manager_shard_only") {
 # Static resources files to make available to product assembly subsystems.
 assembly_resources_directory("resources") {
   sources = [
-    "//src/developer/memory/buckets/buckets.json",
     "//src/sys/core/core_component_id_index.json5",
     build_info_files.version,
 

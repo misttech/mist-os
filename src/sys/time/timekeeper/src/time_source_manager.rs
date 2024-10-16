@@ -18,21 +18,21 @@ use tracing::{debug, error, info, warn};
 /// Sets the maximum rate at which Timekeeper is willing to accept new updates from a time source in
 /// order to limit the Timekeeper resource utilization. This value is also used to apply an upper
 /// limit on the monotonic age of time updates.
-const MIN_UPDATE_DELAY: zx::Duration = zx::Duration::from_minutes(1);
+const MIN_UPDATE_DELAY: zx::MonotonicDuration = zx::MonotonicDuration::from_minutes(1);
 
 /// The time to wait before restart after a complete failure of the time source. Many time source
 /// failures are likely to repeat so this is useful to limit resource utilization.
-const RESTART_DELAY: zx::Duration = zx::Duration::from_minutes(5);
+const RESTART_DELAY: zx::MonotonicDuration = zx::MonotonicDuration::from_minutes(5);
 
 /// Same as above, except used when *no* valid samples have yet been obtained. This allows us
 /// to restart faster in case of initial issues, which if left unhandled would delay setting
 /// the UTC clock, and would make programs sensitive to correct UTC time (e.g. those that
 /// validate SSL) quite unhappy.
-const RESTART_DELAY_INITIAL: zx::Duration = zx::Duration::from_seconds(10);
+const RESTART_DELAY_INITIAL: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(10);
 
 /// How frequently a source that declares itself to be healthy needs to produce updates in order to
 /// remain selected. Sources are restarted if they fail to produce updates faster than this.
-const SOURCE_KEEPALIVE: zx::Duration = zx::Duration::from_minutes(60);
+const SOURCE_KEEPALIVE: zx::MonotonicDuration = zx::MonotonicDuration::from_minutes(60);
 
 /// A provider of monotonic times.
 pub trait MonotonicProvider: Send + Sync {
@@ -452,10 +452,11 @@ mod test {
     use crate::enums::{SampleValidationError as SVE, TimeSourceError as TSE};
     use crate::time_source::{FakePullTimeSource, FakePushTimeSource};
     use anyhow::anyhow;
+    use fuchsia_runtime::UtcDuration;
 
     const BACKSTOP_FACTOR: i64 = 100;
     const TEST_ROLE: Role = Role::Monitor;
-    const STD_DEV: zx::Duration = zx::Duration::from_millis(22);
+    const STD_DEV: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(22);
 
     macro_rules! assert_push_manager {
         ($manager:expr) => {{
@@ -479,13 +480,13 @@ mod test {
 
     /// A provider of artificial monotonic times that increment by a fixed duration each call.
     struct FakeMonotonicProvider {
-        increment: zx::Duration,
+        increment: zx::MonotonicDuration,
         last_time: zx::MonotonicInstant,
     }
 
     impl FakeMonotonicProvider {
         /// Constructs a new `FakeMonotonicProvider` that increments by `increment` on each call.
-        pub fn new(increment: zx::Duration) -> Self {
+        pub fn new(increment: zx::MonotonicDuration) -> Self {
             FakeMonotonicProvider { increment, last_time: zx::MonotonicInstant::ZERO }
         }
     }
@@ -506,7 +507,8 @@ mod test {
     ) -> TimeSourceManager<FakeDiagnostics, FakeMonotonicProvider> {
         let manager = TimeManager::Push(PushSourceManager {
             role: TEST_ROLE,
-            backstop: UtcInstant::ZERO + (MIN_UPDATE_DELAY * BACKSTOP_FACTOR),
+            backstop: UtcInstant::ZERO
+                + UtcDuration::from_nanos((MIN_UPDATE_DELAY * BACKSTOP_FACTOR).into_nanos()),
             delays_enabled: true,
             monotonic: FakeMonotonicProvider::new(MIN_UPDATE_DELAY),
             time_source: Box::new(time_source),
@@ -527,7 +529,8 @@ mod test {
     ) -> TimeSourceManager<FakeDiagnostics, FakeMonotonicProvider> {
         let manager = TimeManager::Pull(PullSourceManager {
             role: TEST_ROLE,
-            backstop: UtcInstant::ZERO + (MIN_UPDATE_DELAY * BACKSTOP_FACTOR),
+            backstop: UtcInstant::ZERO
+                + UtcDuration::from_nanos((MIN_UPDATE_DELAY * BACKSTOP_FACTOR).into_nanos()),
             delays_enabled: true,
             monotonic: FakeMonotonicProvider::new(MIN_UPDATE_DELAY),
             time_source: Box::new(time_source),
@@ -549,7 +552,8 @@ mod test {
         diagnostics: Arc<FakeDiagnostics>,
     ) -> TimeSourceManager<FakeDiagnostics, FakeMonotonicProvider> {
         let manager = TimeManager::Push(PushSourceManager {
-            backstop: UtcInstant::ZERO + (MIN_UPDATE_DELAY * BACKSTOP_FACTOR),
+            backstop: UtcInstant::ZERO
+                + UtcDuration::from_nanos((MIN_UPDATE_DELAY * BACKSTOP_FACTOR).into_nanos()),
             role: TEST_ROLE,
             delays_enabled: false,
             monotonic: FakeMonotonicProvider::new(MIN_UPDATE_DELAY),
@@ -567,7 +571,8 @@ mod test {
     /// accept between samples.rate at hence the rate we choose our fake monotonic clock to tick at.
     fn create_sample(utc_factor: i64, monotonic_factor: i64) -> Sample {
         Sample {
-            utc: UtcInstant::ZERO + (MIN_UPDATE_DELAY * utc_factor),
+            utc: UtcInstant::ZERO
+                + UtcDuration::from_nanos((MIN_UPDATE_DELAY * utc_factor).into_nanos()),
             monotonic: zx::MonotonicInstant::ZERO + (MIN_UPDATE_DELAY * monotonic_factor),
             std_dev: STD_DEV,
         }
@@ -741,7 +746,10 @@ mod test {
             manager
                 .next_sample()
                 .map(|_| true)
-                .on_timeout(zx::MonotonicInstant::after(zx::Duration::from_millis(50)), || false)
+                .on_timeout(
+                    zx::MonotonicInstant::after(zx::MonotonicDuration::from_millis(50)),
+                    || false
+                )
                 .await,
             false
         );
@@ -770,7 +778,10 @@ mod test {
             manager
                 .next_sample()
                 .map(|_| true)
-                .on_timeout(zx::MonotonicInstant::after(zx::Duration::from_millis(50)), || false)
+                .on_timeout(
+                    zx::MonotonicInstant::after(zx::MonotonicDuration::from_millis(50)),
+                    || false
+                )
                 .await,
             false
         );

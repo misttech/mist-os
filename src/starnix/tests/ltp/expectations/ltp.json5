@@ -17,13 +17,21 @@
                 "adjtimex01",
                 "adjtimex02",
                 "adjtimex03",
-                "bind02",
                 "clock_adjtime01",
                 "clock_adjtime02",
                 "clock_settime01",
                 "clock_settime02",
+
+                // TODO(https://fxbug.dev/42066087): Requires CLONE_VM without CLONE_THREAD.
+                // Currently, we implement this combination of flags by making a copy-on-write
+                // clone of the VM, which is insufficient to pass this test because the test uses
+                // a volatile write to communicate the status of the child process.
                 "clone05",
-                "clone08",
+
+                // Requires CLONE_NEWNET. In order to implement CLONE_NEWNET, we would need to
+                // support network namespaces. Additionally, even if we supported network
+                // namespaces, this test would still fail until we implement CLONE_VM without
+                // CLONE_THREAD because the test uses a shared VM to send back the result.
                 "clone09",
                 "cpuacct_1_1",
                 "cve-2015-7550",
@@ -177,7 +185,6 @@
                 "times03",
                 "umount2_01",
                 "umount2_02",
-                "utsname03_clone",
                 "writetest01",
 
                 // These tests fail when an init is run in the container to set up /apex.
@@ -204,7 +211,6 @@
                 "fallocate05",
 
                 // These tests hang
-                "aio01",
                 "fork14",
 
                 // TODO(https://fxbug.dev/322874889) requires a working sched_setaffinity

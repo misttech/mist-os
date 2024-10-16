@@ -2810,6 +2810,7 @@ where
 
     /// Closes a socket.
     pub fn close(&mut self, id: TcpApiSocketId<I, C>) {
+        debug!("close on {id:?}");
         let (core_ctx, bindings_ctx) = self.contexts();
         let (destroy, pending) =
             core_ctx.with_socket_mut_transport_demux(&id, |core_ctx, socket_state| {
@@ -3295,8 +3296,7 @@ where
                 IpDeviceAddr::new_from_socket_ip_addr(*local_ip),
                 *remote_ip,
                 IpProto::Tcp.into(),
-                false, /* transparent */
-                &conn.socket_options.ip_options.marks,
+                &conn.socket_options.ip_options,
             )
             .map_err(|_: IpSockCreationError| SetDeviceError::Unroutable)?;
         core_ctx.with_demux_mut(|DemuxState { socketmap }| {
@@ -3586,6 +3586,7 @@ where
             None => return,
         };
         let (core_ctx, bindings_ctx) = self.contexts();
+        debug!("handle_timer on {id:?}");
         trace_duration!(bindings_ctx, c"tcp::handle_timer");
         // Alias refs so we can move weak_id to the closure.
         let id_alias = &id;
@@ -4992,19 +4993,19 @@ where
             local_ip,
             remote_ip,
             IpProto::Tcp.into(),
-            false, /* transparent */
-            &socket_options.ip_options.marks,
+            &socket_options.ip_options,
         )
         .map_err(|err| match err {
             IpSockCreationError::Route(_) => ConnectError::NoRoute,
         })?;
 
-    let device_mms =
-        core_ctx.get_mms(bindings_ctx, &ip_sock).map_err(|_err: ip::socket::MmsError| {
+    let device_mms = core_ctx.get_mms(bindings_ctx, &ip_sock, &socket_options.ip_options).map_err(
+        |_err: ip::socket::MmsError| {
             // We either cannot find the route, or the device for
             // the route cannot handle the smallest TCP/IP packet.
             ConnectError::NoRoute
-        })?;
+        },
+    )?;
 
     let conn_addr =
         demux.update_demux_state_for_connect(core_ctx, |demux_id, DemuxState { socketmap }| {
@@ -5249,7 +5250,7 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
         Some(ip_sock) => {
             let body = tcp_serialize_segment(segment, conn_addr);
             core_ctx
-                .send_ip_packet(bindings_ctx, ip_sock, body, None, ip_sock_options)
+                .send_ip_packet(bindings_ctx, ip_sock, body, ip_sock_options)
                 .map_err(|err| IpSockCreateAndSendError::Send(err))
         }
         None => {
@@ -5262,8 +5263,6 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
                 IpProto::Tcp.into(),
                 ip_sock_options,
                 |_addr| tcp_serialize_segment(segment, conn_addr),
-                None,
-                false, /* transparent */
             )
         }
     };
@@ -5321,10 +5320,10 @@ mod tests {
     use netstack3_ip::nud::testutil::FakeLinkResolutionNotifier;
     use netstack3_ip::nud::LinkResolutionContext;
     use netstack3_ip::socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx};
-    use netstack3_ip::socket::{IpSockSendError, MmsError, SendOptions};
+    use netstack3_ip::socket::{IpSockSendError, MmsError, RouteResolutionOptions, SendOptions};
     use netstack3_ip::testutil::DualStackSendIpPacketMeta;
     use netstack3_ip::{
-        BaseTransportIpContext, HopLimits, IpTransportContext, Marks, ReceiveIpPacketMeta,
+        BaseTransportIpContext, HopLimits, IpTransportContext, ReceiveIpPacketMeta,
     };
     use packet::{Buf, BufferMut, ParseBuffer as _};
     use packet_formats::icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode};
@@ -5648,11 +5647,15 @@ mod tests {
         D: FakeStrongDeviceId,
         BC: TcpTestBindingsTypes<D>,
     {
-        fn get_mms(
+        fn get_mms<O>(
             &mut self,
             _bindings_ctx: &mut BC,
             _ip_sock: &IpSock<I, Self::WeakDeviceId>,
-        ) -> Result<Mms, MmsError> {
+            _options: &O,
+        ) -> Result<Mms, MmsError>
+        where
+            O: RouteResolutionOptions<I>,
+        {
             Ok(Mms::from_mtu::<I>(Mtu::new(1500), 0).unwrap())
         }
     }
@@ -5697,16 +5700,18 @@ mod tests {
     impl<I: TcpTestIpExt, D: FakeStrongDeviceId, BC: TcpTestBindingsTypes<D>> IpSocketHandler<I, BC>
         for TcpCoreCtx<D, BC>
     {
-        fn new_ip_socket(
+        fn new_ip_socket<O>(
             &mut self,
             bindings_ctx: &mut BC,
             device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
             local_ip: Option<IpDeviceAddr<I::Addr>>,
             remote_ip: SocketIpAddr<I::Addr>,
             proto: I::Proto,
-            transparent: bool,
-            marks: &Marks,
-        ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError> {
+            options: &O,
+        ) -> Result<IpSock<I, Self::WeakDeviceId>, IpSockCreationError>
+        where
+            O: RouteResolutionOptions<I>,
+        {
             IpSocketHandler::<I, BC>::new_ip_socket(
                 &mut self.ip_socket_ctx,
                 bindings_ctx,
@@ -5714,8 +5719,7 @@ mod tests {
                 local_ip,
                 remote_ip,
                 proto,
-                transparent,
-                marks,
+                options,
             )
         }
 
@@ -5724,24 +5728,25 @@ mod tests {
             bindings_ctx: &mut BC,
             socket: &IpSock<I, Self::WeakDeviceId>,
             body: S,
-            mtu: Option<u32>,
             options: &O,
         ) -> Result<(), IpSockSendError>
         where
             S: TransportPacketSerializer<I>,
             S::Buffer: BufferMut,
-            O: SendOptions<I>,
+            O: SendOptions<I> + RouteResolutionOptions<I>,
         {
-            self.ip_socket_ctx.send_ip_packet(bindings_ctx, socket, body, mtu, options)
+            self.ip_socket_ctx.send_ip_packet(bindings_ctx, socket, body, options)
         }
 
-        fn confirm_reachable(
+        fn confirm_reachable<O>(
             &mut self,
             bindings_ctx: &mut BC,
             socket: &IpSock<I, Self::WeakDeviceId>,
-            marks: &Marks,
-        ) {
-            self.ip_socket_ctx.confirm_reachable(bindings_ctx, socket, marks)
+            options: &O,
+        ) where
+            O: RouteResolutionOptions<I>,
+        {
+            self.ip_socket_ctx.confirm_reachable(bindings_ctx, socket, options)
         }
     }
 

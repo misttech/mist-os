@@ -8,7 +8,7 @@
         binary: "bin/sensors_playback_bin",
     },
     capabilities: [
-        { protocol: "fuchsia.hardware.sensors.Driver" },
+        { service: "fuchsia.hardware.sensors.Service" },
         { protocol: "fuchsia.hardware.sensors.Playback" },
     ],
     use: [
@@ -20,7 +20,7 @@
     ],
     expose: [
         {
-            protocol: "fuchsia.hardware.sensors.Driver",
+            service: "fuchsia.hardware.sensors.Service",
             from: "self",
         },
         {

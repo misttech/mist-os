@@ -27,6 +27,7 @@
 #define MPIDR_AFF1_SHIFT 8
 #define MPIDR_AFF2_MASK (0xFFULL << 16)
 #define MPIDR_AFF2_SHIFT 16
+#define MPIDR_MT (0x1ULL < 24)
 #define MPIDR_AFF3_MASK (0xFFULL << 32)
 #define MPIDR_AFF3_SHIFT 32
 

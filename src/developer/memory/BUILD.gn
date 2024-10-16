@@ -8,5 +8,6 @@ group("tests") {
   deps = [
     "//src/developer/memory/metrics/tests",
     "//src/developer/memory/monitor/tests",
+    "//src/developer/memory/pressure_signaler/tests",
   ]
 }

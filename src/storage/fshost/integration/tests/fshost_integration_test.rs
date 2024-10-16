@@ -329,7 +329,7 @@ async fn partition_max_size_set() {
 
     let dev = fixture.dir("dev-topological/class/block", fio::OpenFlags::empty());
     let data_partition_controller =
-        find_partition_in(&dev, data_matcher, zx::Duration::from_seconds(10))
+        find_partition_in(&dev, data_matcher, zx::MonotonicDuration::from_seconds(10))
             .await
             .expect("failed to find data partition");
 
@@ -592,65 +592,6 @@ async fn fxblob_within_gpt() {
     fixture.tear_down().await;
 }
 
-// TODO(https://fxbug.dev/339491886): port to storage-host
-#[fuchsia::test]
-#[cfg_attr(feature = "storage-host", ignore)]
-async fn pausing_block_watcher_ignores_devices() {
-    // The first disk has a blank data filesystem
-    let mut disk_builder1 = fshost_test_fixture::disk_builder::DiskBuilder::new();
-    disk_builder1.format_volumes(volumes_spec());
-    let disk_vmo = disk_builder1.build().await;
-
-    // The second disk has a formatted data filesystem with a test file inside it.
-    let mut disk_builder2 = fshost_test_fixture::disk_builder::DiskBuilder::new();
-    disk_builder2.format_volumes(volumes_spec()).format_data(data_fs_spec());
-    let disk_vmo2 = disk_builder2.build().await;
-
-    let mut fixture = new_builder().build().await;
-    let pauser = fixture
-        .realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<fshost::BlockWatcherMarker>()
-        .unwrap();
-    let dev = fixture.dir("dev-topological/class/block", fio::OpenFlags::empty());
-
-    // A block device added when the block watcher is paused doesn't do anything.
-    assert_eq!(pauser.pause().await.unwrap(), zx::Status::OK.into_raw());
-    fixture.add_ramdisk(disk_vmo).await;
-    // Wait for the block device entry to appear in devfs before resuming.
-    device_watcher::wait_for_device_with(&dev, |info| {
-        info.topological_path.ends_with("ramdisk-0/block").then_some(())
-    })
-    .await
-    .unwrap();
-
-    // A block device added after the block watcher is resumed is processed.
-    assert_eq!(pauser.resume().await.unwrap(), zx::Status::OK.into_raw());
-    fixture.add_ramdisk(disk_vmo2).await;
-    fixture.check_fs_type("blob", blob_fs_type()).await;
-    fixture.check_fs_type("data", data_fs_type()).await;
-    // Only the second disk we attached has a file inside. We use it as a proxy for testing that
-    // only the second one was processed.
-    fixture.check_test_data_file().await;
-    fixture.check_test_blob(DATA_FILESYSTEM_VARIANT == "fxblob").await;
-
-    fixture.tear_down().await;
-}
-
-#[fuchsia::test]
-async fn block_watcher_second_pause_fails() {
-    let fixture = new_builder().build().await;
-    let pauser = fixture
-        .realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<fshost::BlockWatcherMarker>()
-        .unwrap();
-    assert_eq!(pauser.pause().await.unwrap(), zx::Status::OK.into_raw());
-    // A paused block watcher should fail if paused a second time
-    assert_eq!(pauser.pause().await.unwrap(), zx::Status::BAD_STATE.into_raw());
-    fixture.tear_down().await;
-}
-
 #[fuchsia::test]
 #[cfg_attr(feature = "fxfs", ignore)]
 async fn shred_data_volume_not_supported() {
@@ -726,7 +667,7 @@ async fn shred_data_volume_when_mounted() {
 #[cfg_attr(not(feature = "fxfs"), ignore)]
 async fn shred_data_volume_from_recovery() {
     let mut builder = new_builder();
-    builder.with_disk().format_volumes(volumes_spec());
+    builder.with_disk().with_gpt().format_volumes(volumes_spec());
     let fixture = builder.build().await;
 
     let vmo = fixture.ramdisk_vmo().unwrap().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();

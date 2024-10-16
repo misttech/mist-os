@@ -462,7 +462,7 @@ impl Driver for DummyDevice {
         Ok(vec![])
     }
 
-    async fn make_joinable(&self, _duration: zx::Duration, _port: u16) -> ZxResult<()> {
+    async fn make_joinable(&self, _duration: zx::MonotonicDuration, _port: u16) -> ZxResult<()> {
         Ok(())
     }
 

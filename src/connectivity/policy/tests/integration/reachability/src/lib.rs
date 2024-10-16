@@ -487,8 +487,8 @@ async fn initialize_fake_clock(fake_clock: &ftesting::FakeClockControlProxy) -> 
     // Resume clock at normal increments.
     fake_clock
         .resume_with_increments(
-            zx::Duration::from_millis(1).into_nanos(),
-            &ftesting::Increment::Determined(zx::Duration::from_millis(1).into_nanos()),
+            zx::MonotonicDuration::from_millis(1).into_nanos(),
+            &ftesting::Increment::Determined(zx::MonotonicDuration::from_millis(1).into_nanos()),
         )
         .await
         .expect("resume with increment failed")
@@ -504,8 +504,8 @@ async fn accelerate_fake_clock(fake_clock: &ftesting::FakeClockControlProxy) -> 
     // because it is dominated by setup/teardown.
     fake_clock
         .resume_with_increments(
-            zx::Duration::from_millis(1).into_nanos(),
-            &ftesting::Increment::Determined(zx::Duration::from_millis(5).into_nanos()),
+            zx::MonotonicDuration::from_millis(1).into_nanos(),
+            &ftesting::Increment::Determined(zx::MonotonicDuration::from_millis(5).into_nanos()),
         )
         .await
         .expect("resume with increment failed")

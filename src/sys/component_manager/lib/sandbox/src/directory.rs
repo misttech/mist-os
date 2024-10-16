@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::CapabilityBound;
 use core::fmt;
 use fidl::endpoints::ClientEnd;
 use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio};
@@ -27,6 +28,8 @@ impl Directory {
         Directory { client_end }
     }
 }
+
+impl CapabilityBound for Directory {}
 
 impl fmt::Debug for Directory {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

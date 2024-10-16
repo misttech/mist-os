@@ -136,6 +136,7 @@ impl fho::FfxTool for SuiteAdapter {
     }
 
     async fn from_env(env: fho::FhoEnvironment, cmd: Self::Command) -> fho::Result<Self> {
+        #[allow(deprecated)]
         let injector = env.injector.clone();
         Ok(SuiteAdapter { cmd, injector })
     }

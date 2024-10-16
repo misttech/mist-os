@@ -47,7 +47,7 @@ type AdvertisingModeHint = strict enum : uint8 {
     SLOW = 3;
 };
 
-@available(added=NEXT)
+@available(added=24)
 type AdvertisingProcedure = flexible union {
     /// Advertise using legacy advertising packets. All devices should be able
     /// to discover this type of packet.
@@ -100,7 +100,7 @@ type AdvertisingParameters = table {
     /// If not present, we default to legacy advertising to maintain optimal compatibility with
     /// pre-Bluetooth 5.0 devices. See field descriptions within AdvertisingProcedure for more
     /// information.
-    @available(added=NEXT)
+    @available(added=24)
     6: advertising_procedure AdvertisingProcedure;
 
     /// If privacy is not enabled, the address type will always be public.
@@ -114,7 +114,7 @@ type AdvertisingParameters = table {
     ///
     /// If this field is unset, the address type will be public or random depending on if privacy
     /// is enabled in the system.
-    @available(added=NEXT)
+    @available(added=24)
     7: address_type bt.AddressType;
 };
 
@@ -155,7 +155,7 @@ closed protocol AdvertisedPeripheral {
 closed protocol Peripheral {
     /// A [`Peripheral`] may reserve L2CAP connection-oriented channels for
     /// receiving connections from peers.
-    @available(added=NEXT)
+    @available(added=24)
     compose ChannelListenerRegistry;
 
     /// Start advertising continuously as a LE peripheral. If advertising cannot
@@ -241,7 +241,7 @@ closed protocol Peripheral {
 ///
 /// Use cases which reveal information are noted in documentation and marked as only available
 /// through PrivilegedPeripheral, and are an error if used through Peripheral.
-@available(added=NEXT)
+@available(added=24)
 @discoverable(server="platform")
 closed protocol PrivilegedPeripheral {
     compose Peripheral;

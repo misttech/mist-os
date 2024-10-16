@@ -5,6 +5,7 @@
 #include "post-init.h"
 
 #include <fidl/fuchsia.hardware.gpio/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.pin/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/inspect/cpp/reader.h>
 
@@ -186,20 +187,21 @@ zx::result<uint32_t> PostInit::ReadGpios(cpp20::span<const char* const> node_nam
     fidl::SyncClient<fuchsia_hardware_gpio::Gpio> gpio_client(*std::move(gpio));
 
     {
-      auto result = gpio_client->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kNoPull);
+      fidl::Result<fuchsia_hardware_gpio::Gpio::SetBufferMode> result =
+          gpio_client->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kInput);
       if (result.is_error()) {
         if (result.error_value().is_framework_error()) {
-          FDF_LOG(ERROR, "Call to ConfigIn failed: %s",
+          FDF_LOG(ERROR, "Call to SetBufferMode failed: %s",
                   result.error_value().framework_error().FormatDescription().c_str());
           return zx::error(result.error_value().framework_error().status());
         }
         if (result.error_value().is_domain_error()) {
-          FDF_LOG(ERROR, "ConfigIn failed: %s",
+          FDF_LOG(ERROR, "SetBufferMode failed: %s",
                   zx_status_get_string(result.error_value().domain_error()));
           return zx::error(result.error_value().domain_error());
         }
 
-        FDF_LOG(ERROR, "Unknown error from call to ConfigIn");
+        FDF_LOG(ERROR, "Unknown error from call to SetBufferMode");
         return zx::error(ZX_ERR_BAD_STATE);
       }
     }
@@ -352,22 +354,34 @@ zx::result<> PostInit::EnableSelinaOsc() {
     return gpio.take_error();
   }
 
-  fidl::SyncClient osc_en(*std::move(gpio));
+  fidl::SyncClient osc_en_gpio(*std::move(gpio));
 
-  if (auto result = osc_en->SetAltFunction(0); result.is_error()) {
+  zx::result pin = incoming()->Connect<fuchsia_hardware_pin::Service::Device>("selina-osc-en");
+  if (pin.is_error()) {
+    FDF_LOG(ERROR, "Failed to connect to GPIO node: %s", pin.status_string());
+    return pin.take_error();
+  }
+
+  fidl::SyncClient osc_en_pin(*std::move(pin));
+
+  fuchsia_hardware_pin::Configuration config{{
+      .pull = fuchsia_hardware_pin::Pull::kNone,
+      .function = 0,
+  }};
+  if (auto result = osc_en_pin->Configure(std::move(config)); result.is_error()) {
     if (result.error_value().is_framework_error()) {
-      FDF_LOG(ERROR, "Call to set SELINA_OSC_EN alt function failed: %s",
+      FDF_LOG(ERROR, "Call to set SELINA_OSC_EN configuraiton failed: %s",
               result.error_value().framework_error().FormatDescription().c_str());
       return zx::error(result.error_value().framework_error().status());
     }
     if (result.error_value().is_domain_error()) {
-      FDF_LOG(ERROR, "Failed to set SELINA_OSC_EN alt function: %s",
+      FDF_LOG(ERROR, "Failed to set SELINA_OSC_EN configuration: %s",
               zx_status_get_string(result.error_value().domain_error()));
       return zx::error(result.error_value().domain_error());
     }
   }
 
-  if (auto result = osc_en->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kNoPull);
+  if (auto result = osc_en_gpio->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kInput);
       result.is_error()) {
     if (result.error_value().is_framework_error()) {
       FDF_LOG(ERROR, "Call to set SELINA_OSC_EN to input failed: %s",

@@ -92,6 +92,7 @@ async fn main() -> Result<(), Error> {
         fuchsia_async::Socket::from_socket(receiver),
         &mut formatter,
         &Symbolizer::new(),
+        true,
     )
     .await;
     let _ = std::io::stdout().flush();

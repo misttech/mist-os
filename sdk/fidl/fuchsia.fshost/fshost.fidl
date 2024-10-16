@@ -9,27 +9,6 @@ using fuchsia.fxfs;
 using fuchsia.hardware.block;
 using fuchsia.io;
 
-/// Manages the block watcher.
-/// TODO(https://fxbug.dev/42061696): Gracefully handle multiple users of the BlockWatcher API.
-@discoverable
-closed protocol BlockWatcher {
-    /// Pauses the block watcher. This will return when the block watcher has stopped processing
-    /// new device events.
-    ///
-    /// Returns ZX_ERR_BAD_STATE if the block watcher is paused more than once.
-    strict Pause() -> (struct {
-        status zx.Status;
-    });
-
-    /// Resumes the block watcher. This will return when the block watcher is once again processing
-    /// new device events.
-    ///
-    /// Returns ZX_ERR_BAD_STATE if the watcher isn't paused.
-    strict Resume() -> (struct {
-        status zx.Status;
-    });
-};
-
 type MountOptions = resource table {
     1: read_only bool;
     /// [DEPRECATED] Metrics are always enabled now.

@@ -16,10 +16,10 @@ use netstack3_base::{AnyDevice, DeviceIdContext};
 use netstack3_ip::{MulticastMembershipHandler, TransportIpContext};
 
 use crate::internal::datagram::{
-    BoundSocketsFromSpec, DatagramBoundStateContext, DatagramSocketMapSpec, DatagramSocketOptions,
-    DatagramSocketSet, DatagramSocketSpec, DatagramStateContext, DualStackConverter,
-    DualStackDatagramBoundStateContext, DualStackIpExt, IpExt, IpOptions, NonDualStackConverter,
-    NonDualStackDatagramBoundStateContext, SocketState,
+    BoundSocketsFromSpec, DatagramBoundStateContext, DatagramIpSpecificSocketOptions,
+    DatagramSocketMapSpec, DatagramSocketSet, DatagramSocketSpec, DatagramStateContext,
+    DualStackConverter, DualStackDatagramBoundStateContext, DualStackIpExt, IpExt, IpOptions,
+    NonDualStackConverter, NonDualStackDatagramBoundStateContext, SocketState,
 };
 
 /// A mirror trait of [`DatagramStateContext`] allowing foreign crates to
@@ -265,7 +265,7 @@ pub trait DualStackDatagramSpecBoundStateContext<I: IpExt, CC: DeviceIdContext<A
     fn to_other_socket_options<'a>(
         core_ctx: &CC,
         state: &'a IpOptions<I, CC::WeakDeviceId, Self>,
-    ) -> &'a DatagramSocketOptions<I::OtherVersion, CC::WeakDeviceId>;
+    ) -> &'a DatagramIpSpecificSocketOptions<I::OtherVersion, CC::WeakDeviceId>;
 
     fn ds_converter(core_ctx: &CC) -> impl DualStackConverter<I, CC::WeakDeviceId, Self>;
 
@@ -322,7 +322,7 @@ where
     fn to_other_socket_options<'a>(
         &self,
         state: &'a IpOptions<I, Self::WeakDeviceId, S>,
-    ) -> &'a DatagramSocketOptions<I::OtherVersion, Self::WeakDeviceId> {
+    ) -> &'a DatagramIpSpecificSocketOptions<I::OtherVersion, Self::WeakDeviceId> {
         S::to_other_socket_options(self, state)
     }
 

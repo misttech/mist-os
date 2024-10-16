@@ -26,6 +26,10 @@
             service: "fuchsia.hardware.ramdisk.Service",
             path: "/realm_builder_exposed_dir/fuchsia.hardware.ramdisk.Service",
         },
+        {
+            service: "fuchsia.hardware.block.volume.Service",
+            path: "/realm_builder_exposed_dir/fuchsia.hardware.block.volume.Service",
+        },
     ],
     expose: [
         {
@@ -37,7 +41,10 @@
             from: "self",
         },
         {
-            service: "fuchsia.hardware.ramdisk.Service",
+            service: [
+                "fuchsia.hardware.block.volume.Service",
+                "fuchsia.hardware.ramdisk.Service",
+            ],
             from: "self",
         },
     ],

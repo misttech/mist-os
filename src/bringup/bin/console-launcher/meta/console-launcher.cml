@@ -192,6 +192,7 @@
                 "fuchsia.power.suspend.Stats",
                 "fuchsia.power.system.ActivityGovernor",
                 "test.sagcontrol.State",
+                "test.suspendcontrol.Device",
             ],
 
             // The source of this protocol may not be available on all products.

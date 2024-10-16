@@ -100,34 +100,38 @@ func TestSymboltable(t *testing.T) {
 		{
 			name: "protocol, client end",
 			type_: fidlgen.Type{
-				Kind:       fidlgen.IdentifierType,
-				Identifier: "foo/protocol",
+				Kind:     fidlgen.EndpointType,
+				Role:     fidlgen.ClientRole,
+				Protocol: "foo/protocol",
 			},
 			expected: "client_end:foo/protocol",
 		},
 		{
 			name: "protocol, client end optional",
 			type_: fidlgen.Type{
-				Kind:       fidlgen.IdentifierType,
-				Identifier: "foo/protocol",
-				Nullable:   true,
+				Kind:     fidlgen.EndpointType,
+				Role:     fidlgen.ClientRole,
+				Protocol: "foo/protocol",
+				Nullable: true,
 			},
 			expected: "client_end:<foo/protocol,optional>",
 		},
 		{
 			name: "protocol, server end",
 			type_: fidlgen.Type{
-				Kind:           fidlgen.RequestType,
-				RequestSubtype: "foo/protocol",
+				Kind:     fidlgen.EndpointType,
+				Role:     fidlgen.ServerRole,
+				Protocol: "foo/protocol",
 			},
 			expected: "server_end:foo/protocol",
 		},
 		{
 			name: "protocol, server end, optional",
 			type_: fidlgen.Type{
-				Kind:           fidlgen.RequestType,
-				RequestSubtype: "foo/protocol",
-				Nullable:       true,
+				Kind:     fidlgen.EndpointType,
+				Role:     fidlgen.ServerRole,
+				Protocol: "foo/protocol",
+				Nullable: true,
 			},
 			expected: "server_end:<foo/protocol,optional>",
 		},

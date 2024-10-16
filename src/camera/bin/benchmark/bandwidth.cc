@@ -131,13 +131,12 @@ void Bandwidth::ConnectSequential(uint32_t stream_index) {
   allocate_shared_request.set_token_request(streams_[stream_index].token.NewRequest());
   sysmem_allocator_->AllocateSharedCollection(std::move(allocate_shared_request));
 
-  streams_[stream_index].ptr->SetBufferCollection(fuchsia::sysmem::BufferCollectionTokenHandle(
-      std::move(streams_[stream_index].token).Unbind().TakeChannel()));
-  streams_[stream_index].ptr->WatchBufferCollection(
-      [this, stream_index](fuchsia::sysmem::BufferCollectionTokenHandle token_v1) {
-        auto token_v2 = fuchsia::sysmem2::BufferCollectionTokenHandle(token_v1.TakeChannel());
+  streams_[stream_index].ptr->SetBufferCollection2(
+      std::move(streams_[stream_index].token).Unbind());
+  streams_[stream_index].ptr->WatchBufferCollection2(
+      [this, stream_index](fuchsia::sysmem2::BufferCollectionTokenHandle token) {
         fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
-        bind_shared_request.set_token(std::move(token_v2));
+        bind_shared_request.set_token(std::move(token));
         bind_shared_request.set_buffer_collection_request(
             streams_[stream_index].collection.NewRequest(dispatcher_));
         sysmem_allocator_->BindSharedCollection(std::move(bind_shared_request));

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/fidl/txn_header.h>
+#include <lib/zx/time.h>
 
 #include <utility>
 
@@ -19,7 +20,7 @@ fuchsia_logger::wire::LogMessage CreateLogMessage(fuchsia_logger::wire::LogMessa
     lm.pid = 1024;
   }
   lm.tid = 1034;
-  lm.time = 93892493921;
+  lm.time = zx::time_boot(93892493921);
   lm.severity = static_cast<int32_t>(fuchsia_logger::wire::LogLevelFilter::kInfo);
   return lm;
 }

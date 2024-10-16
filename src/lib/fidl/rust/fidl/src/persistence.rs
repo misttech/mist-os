@@ -24,10 +24,8 @@ pub trait Persistable:
 
 /// Marker trait implemented for FIDL resource structs, tables, and unions.
 /// These can be used with the standalone encoding/decoding API, but not the persistence API.
-pub trait Standalone:
-    TypeMarker<Owned = Self>
-    + Decode<Self, DefaultFuchsiaResourceDialect>
-    + for<'a> ResourceTypeMarker<Borrowed<'a> = &'a mut Self>
+pub trait Standalone<D>:
+    TypeMarker<Owned = Self> + Decode<Self, D> + for<'a> ResourceTypeMarker<Borrowed<'a> = &'a mut Self>
 {
 }
 
@@ -147,7 +145,7 @@ where
 
 /// Encodes a FIDL object to bytes, handles, and wire metadata following
 /// RFC-0120. Must be a resource struct, table, or union.
-pub fn standalone_encode_resource<T: Standalone>(
+pub fn standalone_encode_resource<T: Standalone<D>, D: ResourceDialect>(
     mut body: T,
 ) -> Result<(Vec<u8>, Vec<HandleDisposition<'static>>, WireMetadata)>
 where
@@ -186,7 +184,7 @@ pub fn standalone_decode_value<T: Persistable>(bytes: &[u8], metadata: &WireMeta
 
 /// Decodes a FIDL object from bytes, handles, and wire metadata following
 /// RFC-0120. Must be a resource struct, table, or union.
-pub fn standalone_decode_resource<T: Standalone>(
+pub fn standalone_decode_resource<T: Standalone<D>, D: ResourceDialect>(
     bytes: &[u8],
     handles: &mut [HandleInfo],
     metadata: &WireMetadata,

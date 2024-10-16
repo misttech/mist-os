@@ -5,10 +5,10 @@
 #include "scsi.h"
 
 #include <inttypes.h>
-#include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
-#include <lib/scsi/block-device-dfv1.h>
-#include <lib/scsi/controller-dfv1.h>
+#include <lib/scsi/block-device.h>
+#include <lib/scsi/controller.h>
+#include <lib/virtio/driver_utils.h>
 #include <netinet/in.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -144,7 +144,63 @@ void ScsiDevice::IrqRingUpdate() {
   request_queue_.IrqRingUpdate(free_chain);
 }
 
-zx_status_t ScsiDevice::ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
+zx::result<> ScsiDriver::Start() {
+  parent_node_.Bind(std::move(node()));
+
+  auto [controller_client_end, controller_server_end] =
+      fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
+  auto [node_client_end, node_server_end] =
+      fidl::Endpoints<fuchsia_driver_framework::Node>::Create();
+
+  node_controller_.Bind(std::move(controller_client_end));
+  root_node_.Bind(std::move(node_client_end));
+
+  fidl::Arena arena;
+
+  const auto args =
+      fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena).name(arena, name()).Build();
+
+  // Add root device, which will contain block devices for logical units
+  auto result =
+      parent_node_->AddChild(args, std::move(controller_server_end), std::move(node_server_end));
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Failed to add child: %s", result.status_string());
+    return zx::error(result.status());
+  }
+
+  zx::result<fidl::ClientEnd<fuchsia_hardware_pci::Device>> pci_client_result =
+      incoming()->Connect<fuchsia_hardware_pci::Service::Device>();
+  if (pci_client_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to get pci client: %s", pci_client_result.status_string());
+    return pci_client_result.take_error();
+  }
+
+  zx::result<std::pair<zx::bti, std::unique_ptr<virtio::Backend>>> bti_and_backend_result =
+      virtio::GetBtiAndBackend(ddk::Pci(std::move(pci_client_result).value()));
+  if (!bti_and_backend_result.is_ok()) {
+    FDF_LOG(ERROR, "GetBtiAndBackend failed: %s", bti_and_backend_result.status_string());
+    return bti_and_backend_result.take_error();
+  }
+  auto [bti, backend] = std::move(bti_and_backend_result).value();
+
+  scsi_device_ = std::make_unique<ScsiDevice>(this, std::move(bti), std::move(backend));
+  zx_status_t status = scsi_device_->Init();
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  status = scsi_device_->ProbeLuns();
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok();
+}
+
+void ScsiDriver::PrepareStop(fdf::PrepareStopCompleter completer) {
+  scsi_device_->Release();
+  completer(zx::ok());
+}
+
+zx_status_t ScsiDriver::ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
                                            iovec data) {
   struct scsi_sync_callback_state {
     sync_completion_t completion;
@@ -157,8 +213,8 @@ zx_status_t ScsiDevice::ExecuteCommandSync(uint8_t target, uint16_t lun, iovec c
     state->status = status;
     sync_completion_signal(&state->completion);
   };
-  QueueCommand(target, lun, cdb, is_write, zx::unowned_vmo(), 0, data.iov_len, callback, &cookie,
-               data.iov_base, /*vmar_mapped=*/false);
+  scsi_device_->QueueCommand(target, lun, cdb, is_write, zx::unowned_vmo(), 0, data.iov_len,
+                             callback, &cookie, data.iov_base, /*vmar_mapped=*/false);
   sync_completion_wait(&cookie.completion, ZX_TIME_INFINITE);
   return cookie.status;
 }
@@ -176,13 +232,13 @@ zx::result<> ScsiDevice::AllocatePages(zx::vmo& vmo, fzl::VmoMapper& mapper, siz
   }
 
   if (zx_status_t status = mapper.Map(vmo, 0, data_size); status != ZX_OK) {
-    zxlogf(ERROR, "Failed to map IO buffer: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to map IO buffer: %s", zx_status_get_string(status));
     return zx::error(status);
   }
   return zx::ok();
 }
 
-void ScsiDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
+void ScsiDriver::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
                                      uint32_t block_size_bytes, scsi::DeviceOp* device_op,
                                      iovec data) {
   zx_handle_t data_vmo;
@@ -194,9 +250,10 @@ void ScsiDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bo
     zx::vmo vmo;
     trim_data_vmo = std::move(vmo);
     fzl::VmoMapper mapper;
-    if (zx::result<> result = AllocatePages(trim_data_vmo.value(), mapper, data.iov_len);
+    if (zx::result<> result =
+            scsi_device_->AllocatePages(trim_data_vmo.value(), mapper, data.iov_len);
         result.is_error()) {
-      zxlogf(ERROR, "Failed to allocate data buffer: %s", result.status_string());
+      FDF_LOG(ERROR, "Failed to allocate data buffer: %s", result.status_string());
       return;
     }
     memcpy(mapper.start(), data.iov_base, data.iov_len);
@@ -244,9 +301,10 @@ void ScsiDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bo
     }
   }
 
-  return QueueCommand(target, lun, cdb, is_write, zx::unowned_vmo(data_vmo), vmo_offset_bytes,
-                      transfer_bytes, DeviceOpCompletionCb, static_cast<void*>(device_op), rw_data,
-                      vmar_mapped, std::move(trim_data_vmo));
+  return scsi_device_->QueueCommand(target, lun, cdb, is_write, zx::unowned_vmo(data_vmo),
+                                    vmo_offset_bytes, transfer_bytes, DeviceOpCompletionCb,
+                                    static_cast<void*>(device_op), rw_data, vmar_mapped,
+                                    std::move(trim_data_vmo));
 }
 
 void ScsiDevice::QueueCommand(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
@@ -293,7 +351,7 @@ void ScsiDevice::QueueCommand(uint8_t target, uint16_t lun, iovec cdb, bool is_w
   auto request_desc = request_queue_.AllocDescChain(/*count=*/descriptor_chain_length, &id);
   // For testing purposes, this condition can be triggered by failing
   // AllocDescChain every N attempts. But we would have to Signal the cv
-  // somewhere. A good place to do that is at the bottom of WorkerThread,
+  // somewhere. A good place to do that is at the bottom of ProbeLuns,
   // after the luns are probed, in a loop. If we do the signaling there,
   // we'd need to ensure error injection doesn't start until after luns are
   // probed.
@@ -383,7 +441,7 @@ void ScsiDevice::QueueCommand(uint8_t target, uint16_t lun, iovec cdb, bool is_w
 constexpr uint32_t SCSI_SECTOR_SIZE = 512;
 constexpr uint32_t SCSI_MAX_XFER_SECTORS = 1024;  // 512K clamp
 
-zx_status_t ScsiDevice::WorkerThread() {
+zx_status_t ScsiDevice::ProbeLuns() {
   uint8_t max_target;
   uint16_t max_lun;
   uint32_t max_sectors;
@@ -411,8 +469,8 @@ zx_status_t ScsiDevice::WorkerThread() {
   // QEMU's max_target/max_lun refer to the last valid whereas GCE's refers to the first
   // invalid target/lun. Use <= to handle both.
   for (uint8_t target = 0u; target <= max_target; target++) {
-    zx::result<uint32_t> lun_count = ScanAndBindLogicalUnits(
-        zxdev(), target, max_sectors * SCSI_SECTOR_SIZE, max_lun, nullptr, options);
+    zx::result<uint32_t> lun_count = scsi_driver_->ScanAndBindLogicalUnits(
+        target, max_sectors * SCSI_SECTOR_SIZE, max_lun, nullptr, options);
     if (lun_count.is_error() || lun_count.value() == 0) {
       // For now, assume REPORT LUNS is supported. A failure indicates no LUNs on this target.
       continue;
@@ -441,7 +499,7 @@ zx_status_t ScsiDevice::Init() {
   {
     fbl::AutoLock lock(&lock_);
     if (config_.max_channel > 1) {
-      zxlogf(WARNING, "config_.max_channel %d not expected.", config_.max_channel);
+      FDF_LOG(WARNING, "config_.max_channel %d not expected.", config_.max_channel);
     }
   }
 
@@ -450,26 +508,26 @@ zx_status_t ScsiDevice::Init() {
   if (DeviceFeaturesSupported() & VIRTIO_F_VERSION_1) {
     DriverFeaturesAck(VIRTIO_F_VERSION_1);
     if (zx_status_t status = DeviceStatusFeaturesOk(); status != ZX_OK) {
-      zxlogf(ERROR, "Feature negotiation failed: %s", zx_status_get_string(status));
+      FDF_LOG(ERROR, "Feature negotiation failed: %s", zx_status_get_string(status));
       return status;
     }
   }
 
   if (!bti().is_valid()) {
-    zxlogf(ERROR, "invalid bti handle");
+    FDF_LOG(ERROR, "invalid bti handle");
     return ZX_ERR_BAD_HANDLE;
   }
   {
     fbl::AutoLock lock(&lock_);
     auto err = control_ring_.Init(/*index=*/Queue::CONTROL);
     if (err) {
-      zxlogf(ERROR, "failed to allocate control queue");
+      FDF_LOG(ERROR, "failed to allocate control queue");
       return err;
     }
 
     err = request_queue_.Init(/*index=*/Queue::REQUEST);
     if (err) {
-      zxlogf(ERROR, "failed to allocate request queue");
+      FDF_LOG(ERROR, "failed to allocate request queue");
       return err;
     }
     request_buffers_size_ =
@@ -481,7 +539,7 @@ zx_status_t ScsiDevice::Init() {
       auto status = buffer_factory->CreateContiguous(bti(), buffer_size, 0,
                                                      &scsi_io_slot_table_[i].request_buffer);
       if (status) {
-        zxlogf(ERROR, "failed to allocate queue working memory");
+        FDF_LOG(ERROR, "failed to allocate queue working memory");
         return status;
       }
       scsi_io_slot_table_[i].avail = true;
@@ -491,36 +549,7 @@ zx_status_t ScsiDevice::Init() {
   }
   StartIrqThread();
   DriverStatusOk();
-
-  // Synchronize against Unbind()/Release() before the worker thread is running.
-  fbl::AutoLock lock(&lock_);
-  auto status = DdkAdd(ddk::DeviceAddArgs("virtio-scsi").set_flags(DEVICE_ADD_NON_BINDABLE));
-  device_ = zxdev();
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "failed to run DdkAdd");
-    device_ = nullptr;
-    return status;
-  }
-
-  auto td = [](void* ctx) {
-    ScsiDevice* const device = static_cast<ScsiDevice*>(ctx);
-    return device->WorkerThread();
-  };
-  int ret = thrd_create_with_name(&worker_thread_, td, this, "virtio-scsi-worker");
-  if (ret != thrd_success) {
-    return ZX_ERR_INTERNAL;
-  }
-
-  return status;
-}
-
-void ScsiDevice::DdkRelease() {
-  {
-    fbl::AutoLock lock(&lock_);
-    worker_thread_should_exit_ = true;
-  }
-  thrd_join(worker_thread_, nullptr);
-  Release();
+  return ZX_OK;
 }
 
 }  // namespace virtio

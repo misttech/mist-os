@@ -6,7 +6,7 @@ use crate::context::LowpanCtlContext;
 use crate::invocation::CommandEnum;
 use crate::prelude::*;
 use fuchsia_async::{MonotonicInstant, Timer};
-use zx::Duration;
+use zx::MonotonicDuration;
 
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "repeat", description = "repeats the given command")]
@@ -27,8 +27,8 @@ impl RepeatCommand {
             return Err(format_err!("Wait value must be positive"));
         }
 
-        let wait_duration = Duration::from_nanos(
-            (self.wait * (Duration::from_seconds(1).into_nanos() as f64)) as i64,
+        let wait_duration = MonotonicDuration::from_nanos(
+            (self.wait * (MonotonicDuration::from_seconds(1).into_nanos() as f64)) as i64,
         );
 
         let mut count = self.count;

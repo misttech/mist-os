@@ -27,6 +27,7 @@ go_library("lib") {
     "//tools/botanist:constants",
     "//tools/botanist:targets",
     "//tools/build",
+    "//tools/debug/covargs:covargs_lib",
     "//tools/debug/elflib",
     "//tools/integration/testsharder:testsharder_lib",
     "//tools/lib/clock",

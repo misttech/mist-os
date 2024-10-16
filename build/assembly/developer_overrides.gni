@@ -439,8 +439,11 @@ if (product_assembly_overrides_label != false) {
   # extract 'labels' from the temp scope.
   _temp_labels = _temp_scope.labels
   if (_temp_scope.use_bazel_images_only) {
-    # For Bazel-assembled products we can directly set the assembly target that's matched against.
-    _assembly_pattern = _temp_labels.images
+    # For Bazel-assembled products we directly set the assembly target that's matched against
+    # as a wildcard in the directory of the product bundle.  This imposes restrictions on the
+    # product to define the product assembly in the same dir, or a subdir, of the one that the
+    # product bundle is defined in.
+    _assembly_pattern = get_label_info(_temp_labels.images, "dir") + "/*"
   } else {
     # For GN-assembled products, we'll use the wildcard on the directory to get the right one.
     _assembly_pattern = get_label_info(_temp_labels.images, "dir") + ":*"

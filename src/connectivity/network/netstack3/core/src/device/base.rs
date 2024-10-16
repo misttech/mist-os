@@ -37,7 +37,7 @@ use netstack3_device::{
     Devices, DevicesIter, IpLinkDeviceState, IpLinkDeviceStateInner, Ipv6DeviceLinkLayerAddr,
     OriginTracker, OriginTrackerContext, WeakDeviceId,
 };
-use netstack3_filter::{IpPacket, ProofOfEgressCheck};
+use netstack3_filter::ProofOfEgressCheck;
 use netstack3_ip::device::{
     AddressIdIter, AssignedAddress as _, DualStackIpDeviceState, IpDeviceAddressContext,
     IpDeviceAddressIdContext, IpDeviceConfigurationContext, IpDeviceFlags, IpDeviceIpExt,
@@ -195,7 +195,7 @@ impl<
         ProofOfEgressCheck { .. }: ProofOfEgressCheck,
     ) -> Result<(), SendFrameError<S>>
     where
-        S: Serializer + IpPacket<I>,
+        S: Serializer,
         S::Buffer: BufferMut,
     {
         send_ip_frame(self, bindings_ctx, device, destination, body)
@@ -219,7 +219,7 @@ impl<
         ProofOfEgressCheck { .. }: ProofOfEgressCheck,
     ) -> Result<(), SendFrameError<S>>
     where
-        S: Serializer + IpPacket<I>,
+        S: Serializer,
         S::Buffer: BufferMut,
     {
         let Self { config: _, core_ctx } = self;
@@ -293,10 +293,6 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
     ) -> O {
         let (devices, locked) = self.read_lock_and::<crate::lock_ordering::DeviceLayerState>();
         cb(devices.iter(), locked)
-    }
-
-    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
-        get_mtu(self, device_id)
     }
 
     fn loopback_id(&mut self) -> Option<Self::DeviceId> {
@@ -563,10 +559,6 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
     ) -> O {
         let (devices, locked) = self.read_lock_and::<crate::lock_ordering::DeviceLayerState>();
         cb(devices.iter(), locked)
-    }
-
-    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
-        get_mtu(self, device_id)
     }
 
     fn loopback_id(&mut self) -> Option<Self::DeviceId> {
@@ -855,7 +847,10 @@ pub(crate) fn ip_device_state_and_core_ctx<'a, BC: BindingsContext, L>(
     )
 }
 
-fn get_mtu<BC: BindingsContext, L: LockBefore<crate::lock_ordering::DeviceLayerState>>(
+pub(crate) fn get_mtu<
+    BC: BindingsContext,
+    L: LockBefore<crate::lock_ordering::DeviceLayerState>,
+>(
     core_ctx: &mut CoreCtx<'_, BC, L>,
     device: &DeviceId<BC>,
 ) -> Mtu {

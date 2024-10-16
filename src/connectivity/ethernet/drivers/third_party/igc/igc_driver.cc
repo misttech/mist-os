@@ -61,7 +61,6 @@ IgcDriver::IgcDriver(fdf::DriverStartArgs start_args,
     buffer = {
         .meta{
             .port = kPortId,
-            .info = netdriver::wire::FrameInfo::WithNoInfo({}),
             .frame_type = netdev::wire::FrameType::kEthernet,
         },
         .data{adapter_->rx_buffer_arena, 1u},
@@ -657,7 +656,6 @@ void IgcDriver::Stop(fdf::Arena& arena, StopCompleter::Sync& completer) {
       buffers[buf_idx] = {
           .meta{
               .port = kPortId,
-              .info = netdriver::wire::FrameInfo::WithNoInfo({}),
               .frame_type = netdev::wire::FrameType::kEthernet,
           },
           .data = parts,

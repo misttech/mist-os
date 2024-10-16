@@ -49,7 +49,7 @@ pub fn create_log_sink_requested_event(
             event_type: Some(fcomponent::EventType::CapabilityRequested),
             moniker: Some(target_moniker),
             component_url: Some(target_url),
-            timestamp: Some(zx::MonotonicInstant::get().into_nanos()),
+            timestamp: Some(zx::BootInstant::get()),
             ..Default::default()
         }),
         payload: Some(fcomponent::EventPayload::CapabilityRequested(
@@ -137,7 +137,7 @@ impl TestHarness {
     pub async fn manager_test(mut self, test_dump_logs: bool) {
         let mut p = setup_default_packet();
         let lm1 = LogMessage {
-            time: p.metadata.time,
+            time: zx::BootInstant::from_nanos(p.metadata.time),
             pid: p.metadata.pid,
             tid: p.metadata.tid,
             dropped_logs: p.metadata.dropped_logs,

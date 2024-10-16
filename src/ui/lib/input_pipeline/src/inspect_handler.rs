@@ -377,7 +377,7 @@ mod tests {
     use test_case::test_case;
 
     fn fixed_now() -> zx::MonotonicInstant {
-        zx::MonotonicInstant::ZERO + zx::Duration::from_nanos(42)
+        zx::MonotonicInstant::ZERO + zx::MonotonicDuration::from_nanos(42)
     }
 
     #[fasync::run_singlethreaded(test)]

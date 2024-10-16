@@ -150,7 +150,6 @@
                 "fuchsia.driver.development.Manager",
                 "fuchsia.driver.registrar.DriverRegistrar",
                 "fuchsia.fshost.Admin",
-                "fuchsia.fshost.BlockWatcher",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.hardware.power.statecontrol.RebootMethodsWatcherRegister",
                 "fuchsia.inspect.InspectSink",
@@ -227,6 +226,11 @@
             protocol: "fuchsia.sys2.RouteValidator",
             from: "framework",
             as: "fuchsia.sys2.RouteValidator.root",
+            to: "#core",
+        },
+        {
+            dictionary: "diagnostics",
+            from: "#bootstrap",
             to: "#core",
         },
         {

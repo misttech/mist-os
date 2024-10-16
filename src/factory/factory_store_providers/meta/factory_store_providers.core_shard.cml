@@ -31,10 +31,7 @@
             to: [ "#factory_store_providers" ],
         },
         {
-            protocol: [
-                "fuchsia.boot.FactoryItems",
-                "fuchsia.logger.LogSink",
-            ],
+            protocol: [ "fuchsia.boot.FactoryItems" ],
             from: "parent",
             to: "#factory_store_providers",
         },

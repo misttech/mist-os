@@ -7,38 +7,6 @@ A set of repository rules used by the Bazel workspace for the Fuchsia
 platform build.
 """
 
-def _ninja_target_from_gn_label(gn_label):
-    """Convert a GN label into an equivalent Ninja target name"""
-
-    #
-    # E.g.:
-    #  //build/bazel:something(//build/toolchain/fuchsia:x64)
-    #       --> build/bazel:something
-    #
-    #  //build/bazel/something:something(//....)
-    #       --> build/bazel:something
-    #
-    # This assumes that all labels are in the default toolchain (since
-    # otherwise the corresponding Ninja label is far too complex to compute).
-    #
-    ninja_target = gn_label.split("(")[0].removeprefix("//")
-    dir_name, _, target_name = ninja_target.partition(":")
-    if dir_name.endswith("/" + target_name):
-        ninja_target = dir_name.removesuffix(target_name).removesuffix("/") + ":" + target_name
-    return ninja_target
-
-def _gn_label_decompose(gn_label):
-    """Decompose a GN label into a directory name and a target name."""
-    gn_label = gn_label.split("(")[0]  # Remove toolchain suffix if present.
-    gn_dir, colon, gn_name = gn_label.partition(":")
-    if colon != ":":
-        gn_dir = gn_label
-        sep = gn_label.rfind("/")
-        if sep < 2:
-            fail("Invalid GN label does not start with //: " + gn_label)
-        gn_name = gn_label[sep + 1:]
-    return gn_dir, gn_name
-
 ################################################################################
 ################################################################################
 #####
@@ -111,7 +79,6 @@ def _gn_targets_repository_impl(repo_ctx):
     build_dir_name = "_files"
 
     all_files = []
-    all_dir_links = []
 
     # Build a { bazel_package -> { gn_target_name -> entry } } map.
     package_map = {}

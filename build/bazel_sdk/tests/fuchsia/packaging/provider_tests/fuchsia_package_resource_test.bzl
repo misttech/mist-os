@@ -249,6 +249,7 @@ def _test_resource_collection_contents():
 
 # Entry point from the BUILD file; macro for running each test case's macro and
 # declaring a test suite that wraps them together.
+# buildifier: disable=function-docstring
 def fuchsia_package_resource_test_suite(name, **kwargs):
     # Call all test functions and wrap their targets in a suite.
     _test_provider_contents()

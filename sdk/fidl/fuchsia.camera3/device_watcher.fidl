@@ -12,7 +12,7 @@ alias DeviceId = uint64;
 /// which will allow multiple instances of the same protocol to exist side-by-side. Clients are
 /// not required to maintain a connection to the Watcher in order to use established Camera
 /// connections.
-@discoverable
+@discoverable(client="platform,external", server="platform")
 closed protocol DeviceWatcher {
     /// Returns a list of available camera IDs when it has changed from the previously returned
     /// list of IDs, or when it is called by a client for the first time. The returned list may be

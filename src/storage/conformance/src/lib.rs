@@ -59,8 +59,10 @@ pub async fn get_open_status(node_proxy: &fio::NodeProxy) -> zx::Status {
 pub async fn assert_on_open_not_received(node_proxy: &fio::NodeProxy) {
     let mut events = Clone::clone(node_proxy).take_event_stream();
     // Wait at most 200ms for an OnOpen event to appear.
-    let event =
-        events.next().on_timeout(zx::Duration::from_millis(200).after_now(), || Option::None).await;
+    let event = events
+        .next()
+        .on_timeout(zx::MonotonicDuration::from_millis(200).after_now(), || Option::None)
+        .await;
     assert!(event.is_none(), "Unexpected OnOpen event received");
 }
 

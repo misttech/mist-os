@@ -29,7 +29,7 @@ use crate::types::{
 use crate::INVALID_EVENT_ID;
 
 const DEV_DIR_PATH: &str = "/dev/class/display-coordinator";
-const TIMEOUT: zx::Duration = zx::Duration::from_seconds(2);
+const TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(2);
 
 /// Client abstraction for the `fuchsia.hardware.display.Coordinator` protocol. Instances can be
 /// safely cloned and passed across threads.

@@ -81,7 +81,7 @@ impl RegisterTool {
             .map_err(|e: ffx_config::api::ConfigError| bug!(e))?;
         let mgr = PkgServerInstances::new(instance_root);
 
-        let repo_name = if let Some(name) = &self.cmd.repository {
+        let mut repo_name = if let Some(name) = &self.cmd.repository {
             Some(name.to_string())
         } else {
             pkg::config::get_default_repository().await?
@@ -93,11 +93,26 @@ impl RegisterTool {
             )
         })?;
 
-        let pkg_server_info = mgr.get_instance(repo_name.clone())?;
+        // if none was found, check for a product bundle repo server which has the prefix of repo_name.
+        let pkg_server_info = match mgr.get_instance(repo_name.clone())? {
+            Some(instance) => Some(instance),
+            None => {
+                let instances = mgr.list_instances()?;
+                instances
+                    .iter()
+                    .find(|s| s.name.starts_with(&format!("{repo_name}.")))
+                    .and_then(|s| Some(s.clone()))
+            }
+        };
 
         let target_spec = ffx_target::get_target_specifier(&self.context)
             .await
             .user_message("getting target specifier from config")?;
+
+        // update the repo name if we matched a product bundle repo.
+        if let Some(info) = pkg_server_info.as_ref() {
+            repo_name = info.name.clone();
+        }
 
         let repository_target = RepositoryTarget {
             repo_name: Some(repo_name.clone()),
@@ -226,9 +241,11 @@ mod test {
         RepositoryError, RepositoryRegistryRequest, RepositoryStorageType, SshHostAddrInfo,
         TargetRequest,
     };
-    use fidl_fuchsia_pkg::RepositoryManagerRequest;
+    use fidl_fuchsia_pkg::{MirrorConfig, RepositoryConfig, RepositoryManagerRequest};
     use fidl_fuchsia_pkg_ext::{RepositoryConfigBuilder, RepositoryRegistrationAliasConflictMode};
-    use fidl_fuchsia_pkg_rewrite::{EditTransactionRequest, EngineRequest, RuleIteratorRequest};
+    use fidl_fuchsia_pkg_rewrite::{
+        EditTransactionRequest, EngineRequest, LiteralRule, Rule, RuleIteratorRequest,
+    };
     use fuchsia_repo::repository::RepositorySpec;
     use fuchsia_url::RepositoryUrl;
     use futures::channel::oneshot::{channel, Receiver};
@@ -258,11 +275,65 @@ mod test {
         (repos, receiver)
     }
 
-    async fn setup_fake_repo_proxy() -> (RepositoryManagerProxy, Receiver<Result<(), i32>>) {
+    async fn setup_fake_repo_proxy(
+        expected_config: Option<RepositoryConfig>,
+    ) -> (RepositoryManagerProxy, Receiver<Result<(), i32>>) {
         let (sender, receiver) = channel();
         let mut _sender = Some(sender);
         let repos = fho::testing::fake_proxy(move |req| match req {
-            RepositoryManagerRequest::Add { repo: _, responder } => {
+            RepositoryManagerRequest::Add { repo, responder } => {
+                if let Some(expected) = &expected_config {
+                    if expected.repo_url != repo.repo_url {
+                        tracing::error!("expected {:?} got {:?}", expected.repo_url, repo.repo_url);
+                        responder.send(Err(-100)).unwrap();
+                        return;
+                    } else if expected.root_keys != repo.root_keys {
+                        tracing::error!(
+                            "expected {:?} got {:?}",
+                            expected.root_keys,
+                            repo.root_keys
+                        );
+                        responder.send(Err(-101)).unwrap();
+                        return;
+                    } else if expected.mirrors != repo.mirrors {
+                        tracing::error!("expected {:?} got {:?}", expected.mirrors, repo.mirrors);
+                        responder.send(Err(-102)).unwrap();
+                        return;
+                    } else if expected.root_version != repo.root_version {
+                        tracing::error!(
+                            "expected {:?} got {:?}",
+                            expected.root_version,
+                            repo.root_version
+                        );
+                        responder.send(Err(-103)).unwrap();
+                        return;
+                    } else if expected.root_threshold != repo.root_threshold {
+                        tracing::error!(
+                            "expected {:?} got {:?}",
+                            expected.root_threshold,
+                            repo.root_threshold
+                        );
+                        responder.send(Err(-104)).unwrap();
+                        return;
+                    } else if expected.use_local_mirror != repo.use_local_mirror {
+                        tracing::error!(
+                            "expected {:?} got {:?}",
+                            expected.use_local_mirror,
+                            repo.use_local_mirror
+                        );
+                        responder.send(Err(-105)).unwrap();
+                        return;
+                    } else if expected.storage_type != repo.storage_type {
+                        tracing::error!(
+                            "expected {:?} got {:?}",
+                            expected.storage_type,
+                            repo.storage_type
+                        );
+                        responder.send(Err(-106)).unwrap();
+                        return;
+                    }
+                }
+
                 responder.send(Ok(())).unwrap();
             }
             other => panic!("Unexpected request: {:?}", other),
@@ -270,11 +341,14 @@ mod test {
         (repos, receiver)
     }
 
-    async fn setup_fake_engine_proxy() -> (EngineProxy, Receiver<Result<(), i32>>) {
+    async fn setup_fake_engine_proxy(
+        expected_rule: Option<Rule>,
+    ) -> (EngineProxy, Receiver<Result<(), i32>>) {
         let (sender, receiver) = channel();
         let mut _sender = Some(sender);
         let repos = fho::testing::fake_proxy(move |req| match req {
             EngineRequest::StartEditTransaction { transaction, control_handle: _ } => {
+                let expected_rule = expected_rule.clone();
                 fuchsia_async::Task::local(async move {
                     let mut tx_stream = transaction.into_stream().unwrap();
 
@@ -289,7 +363,49 @@ mod test {
                                     responder.send(&[]).unwrap();
                                 }
                             }
-                            EditTransactionRequest::Add { rule: _, responder } => {
+                            EditTransactionRequest::Add { rule, responder } => {
+                                if let Some(Rule::Literal(ref expected)) = expected_rule {
+                                    if let Rule::Literal(actual) = rule {
+                                        if expected.host_match != actual.host_match {
+                                            tracing::error!(
+                                                "host_match expected {:?} got {:?}",
+                                                expected.host_match,
+                                                actual.host_match
+                                            );
+                                            responder.send(Err(-100)).unwrap();
+                                            return;
+                                        }
+                                        if expected.host_replacement != actual.host_replacement {
+                                            tracing::error!(
+                                                "host_replacement expected {:?} got {:?}",
+                                                expected.host_replacement,
+                                                actual.host_replacement
+                                            );
+                                            responder.send(Err(-101)).unwrap();
+                                            return;
+                                        }
+                                        if expected.path_prefix_match != actual.path_prefix_match {
+                                            tracing::error!(
+                                                "path_prefix_match expected {:?} got {:?}",
+                                                expected.path_prefix_match,
+                                                actual.path_prefix_match
+                                            );
+                                            responder.send(Err(-102)).unwrap();
+                                            return;
+                                        }
+                                        if expected.path_prefix_replacement
+                                            != actual.path_prefix_replacement
+                                        {
+                                            tracing::error!(
+                                                "path_prefix_replacement expected {:?} got {:?}",
+                                                expected.path_prefix_replacement,
+                                                actual.path_prefix_replacement
+                                            );
+                                            responder.send(Err(-103)).unwrap();
+                                            return;
+                                        }
+                                    }
+                                }
                                 responder.send(Ok(())).unwrap();
                             }
                             EditTransactionRequest::Commit { responder } => {
@@ -336,6 +452,7 @@ mod test {
         context: &EnvironmentContext,
         server_mode: ServerMode,
         name: &str,
+        aliases: BTreeSet<String>,
     ) -> Result<()> {
         let instance_root = root.join("repo_servers");
         context
@@ -353,10 +470,7 @@ mod test {
         mgr.write_instance(&PkgServerInfo {
             name: name.into(),
             address: ([127, 0, 0, 1], 8888).into(),
-            repo_spec: RepositorySpec::Pm {
-                path: Utf8PathBuf::from("/some/repo/path"),
-                aliases: BTreeSet::new(),
-            },
+            repo_spec: RepositorySpec::Pm { path: Utf8PathBuf::from("/some/repo/path"), aliases },
             registration_storage_type: fidl_fuchsia_pkg_ext::RepositoryStorageType::Ephemeral,
             registration_alias_conflict_mode: RepositoryRegistrationAliasConflictMode::ErrorOut
                 .into(),
@@ -372,15 +486,21 @@ mod test {
         let env = ffx_config::test_init().await.expect("test env");
 
         let (repos, receiver) = setup_fake_server().await;
-        let (repo_proxy, _) = setup_fake_repo_proxy().await;
-        let (engine_proxy, _) = setup_fake_engine_proxy().await;
+        let (repo_proxy, _) = setup_fake_repo_proxy(None).await;
+        let (engine_proxy, _) = setup_fake_engine_proxy(None).await;
         let (target_proxy, _) = setup_fake_target_proxy().await;
 
         let aliases = vec![String::from("my-alias")];
 
-        make_server_instance(env.isolate_root.path(), &env.context, ServerMode::Daemon, REPO_NAME)
-            .await
-            .expect("repo server instance");
+        make_server_instance(
+            env.isolate_root.path(),
+            &env.context,
+            ServerMode::Daemon,
+            REPO_NAME,
+            BTreeSet::<String>::new(),
+        )
+        .await
+        .expect("repo server instance");
 
         env.context
             .query(TARGET_DEFAULT_KEY)
@@ -426,8 +546,8 @@ mod test {
         let env = ffx_config::test_init().await.expect("test env");
 
         let (repos, _) = setup_fake_server().await;
-        let (repo_proxy, _) = setup_fake_repo_proxy().await;
-        let (engine_proxy, _) = setup_fake_engine_proxy().await;
+        let (repo_proxy, _) = setup_fake_repo_proxy(None).await;
+        let (engine_proxy, _) = setup_fake_engine_proxy(None).await;
         let (target_proxy, _) = setup_fake_target_proxy().await;
 
         let aliases = vec![String::from("my-alias")];
@@ -437,6 +557,7 @@ mod test {
             &env.context,
             ServerMode::Foreground,
             REPO_NAME,
+            BTreeSet::<String>::new(),
         )
         .await
         .expect("repo server instance");
@@ -469,6 +590,88 @@ mod test {
     }
 
     #[fuchsia::test]
+    async fn test_register_standalone_product_bundle() {
+        let env = ffx_config::test_init().await.expect("test env");
+
+        let expected_config = RepositoryConfig {
+            repo_url: Some("fuchsia-pkg://test-repo.fuchsia.com".into()),
+            root_keys: Some(vec![]),
+            mirrors: Some(vec![MirrorConfig {
+                mirror_url: Some("http://127.0.0.1:8888/test-repo.fuchsia.com".into()),
+                subscribe: Some(false),
+                blob_mirror_url: None,
+                ..Default::default()
+            }]),
+            root_version: Some(1),
+            root_threshold: Some(1),
+            use_local_mirror: Some(false),
+            storage_type: Some(fidl_fuchsia_pkg::RepositoryStorageType::Ephemeral),
+            ..Default::default()
+        };
+
+        let expected_rule = Rule::Literal(LiteralRule {
+            host_match: "fuchsia.com".into(),
+            host_replacement: "test-repo.fuchsia.com".into(),
+            path_prefix_match: "/".into(),
+            path_prefix_replacement: "/".into(),
+        });
+
+        let (repos, _) = setup_fake_server().await;
+        let (repo_proxy, _) = setup_fake_repo_proxy(Some(expected_config)).await;
+        let (engine_proxy, _) = setup_fake_engine_proxy(Some(expected_rule)).await;
+        let (target_proxy, _) = setup_fake_target_proxy().await;
+
+        let mut aliases = BTreeSet::new();
+        aliases.insert("fuchsia.com".into());
+        make_server_instance(
+            env.isolate_root.path(),
+            &env.context,
+            ServerMode::Foreground,
+            "test-repo.fuchsia.com",
+            aliases,
+        )
+        .await
+        .expect("repo server instance");
+
+        env.context
+            .query(TARGET_DEFAULT_KEY)
+            .level(Some(ConfigLevel::User))
+            .set(TARGET_NAME.into())
+            .await
+            .expect("set default target");
+
+        env.context
+            .query("repository.default")
+            .level(Some(ConfigLevel::User))
+            .set("test-repo".into())
+            .await
+            .expect("set default repo name");
+
+        let tool = RegisterTool {
+            cmd: RegisterCommand {
+                repository: None,
+                alias: vec![],
+                storage_type: None,
+                alias_conflict_mode:
+                    fidl_fuchsia_developer_ffx::RepositoryRegistrationAliasConflictMode::Replace,
+            },
+            repos: repos.clone(),
+            context: env.context.clone(),
+            repo_proxy,
+            engine_proxy,
+            target_proxy,
+        };
+        let buffers = TestBuffers::default();
+        let writer = <RegisterTool as FfxMain>::Writer::new_test(None, &buffers);
+
+        let res = tool.main(writer).await;
+        match res {
+            Ok(_) => (),
+            Err(e) => assert!(false, "Unexpected error {e:?}"),
+        }
+    }
+
+    #[fuchsia::test]
     async fn test_register_default_repository() {
         let env = ffx_config::test_init().await.unwrap();
 
@@ -485,13 +688,14 @@ mod test {
             &env.context,
             ServerMode::Daemon,
             default_repo_name,
+            BTreeSet::<String>::new(),
         )
         .await
         .expect("repo server instance");
 
         let (repos, receiver) = setup_fake_server().await;
-        let (repo_proxy, _) = setup_fake_repo_proxy().await;
-        let (engine_proxy, _) = setup_fake_engine_proxy().await;
+        let (repo_proxy, _) = setup_fake_repo_proxy(None).await;
+        let (engine_proxy, _) = setup_fake_engine_proxy(None).await;
         let (target_proxy, _) = setup_fake_target_proxy().await;
 
         let tool = RegisterTool {
@@ -531,8 +735,8 @@ mod test {
         let env = ffx_config::test_init().await.expect("test env");
 
         let (repos, receiver) = setup_fake_server().await;
-        let (repo_proxy, _) = setup_fake_repo_proxy().await;
-        let (engine_proxy, _) = setup_fake_engine_proxy().await;
+        let (repo_proxy, _) = setup_fake_repo_proxy(None).await;
+        let (engine_proxy, _) = setup_fake_engine_proxy(None).await;
         let (target_proxy, _) = setup_fake_target_proxy().await;
 
         let aliases = vec![String::from("my-alias")];
@@ -544,9 +748,15 @@ mod test {
             .await
             .expect("set default target");
 
-        make_server_instance(env.isolate_root.path(), &env.context, ServerMode::Daemon, REPO_NAME)
-            .await
-            .expect("repo server instance");
+        make_server_instance(
+            env.isolate_root.path(),
+            &env.context,
+            ServerMode::Daemon,
+            REPO_NAME,
+            BTreeSet::<String>::new(),
+        )
+        .await
+        .expect("repo server instance");
 
         let tool = RegisterTool {
             cmd: RegisterCommand {
@@ -585,8 +795,8 @@ mod test {
         let env = ffx_config::test_init().await.expect("test env");
 
         let (repos, receiver) = setup_fake_server().await;
-        let (repo_proxy, _) = setup_fake_repo_proxy().await;
-        let (engine_proxy, _) = setup_fake_engine_proxy().await;
+        let (repo_proxy, _) = setup_fake_repo_proxy(None).await;
+        let (engine_proxy, _) = setup_fake_engine_proxy(None).await;
         let (target_proxy, _) = setup_fake_target_proxy().await;
 
         env.context
@@ -596,9 +806,15 @@ mod test {
             .await
             .expect("set default target");
 
-        make_server_instance(env.isolate_root.path(), &env.context, ServerMode::Daemon, REPO_NAME)
-            .await
-            .expect("repo server instance");
+        make_server_instance(
+            env.isolate_root.path(),
+            &env.context,
+            ServerMode::Daemon,
+            REPO_NAME,
+            BTreeSet::<String>::new(),
+        )
+        .await
+        .expect("repo server instance");
 
         let tool = RegisterTool {
             cmd: RegisterCommand {
@@ -641,9 +857,15 @@ mod test {
             .set(TARGET_NAME.into())
             .await
             .expect("set default target");
-        make_server_instance(env.isolate_root.path(), &env.context, ServerMode::Daemon, REPO_NAME)
-            .await
-            .expect("repo server instance");
+        make_server_instance(
+            env.isolate_root.path(),
+            &env.context,
+            ServerMode::Daemon,
+            REPO_NAME,
+            BTreeSet::<String>::new(),
+        )
+        .await
+        .expect("repo server instance");
 
         let repos = fho::testing::fake_proxy(move |req| match req {
             RepositoryRegistryRequest::RegisterTarget {
@@ -655,8 +877,8 @@ mod test {
             }
             other => panic!("Unexpected request: {:?}", other),
         });
-        let (repo_proxy, _) = setup_fake_repo_proxy().await;
-        let (engine_proxy, _) = setup_fake_engine_proxy().await;
+        let (repo_proxy, _) = setup_fake_repo_proxy(None).await;
+        let (engine_proxy, _) = setup_fake_engine_proxy(None).await;
         let (target_proxy, _) = setup_fake_target_proxy().await;
 
         let tool = RegisterTool {
@@ -693,9 +915,15 @@ mod test {
             .await
             .expect("set default target");
 
-        make_server_instance(env.isolate_root.path(), &env.context, ServerMode::Daemon, REPO_NAME)
-            .await
-            .expect("repo server instance");
+        make_server_instance(
+            env.isolate_root.path(),
+            &env.context,
+            ServerMode::Daemon,
+            REPO_NAME,
+            BTreeSet::<String>::new(),
+        )
+        .await
+        .expect("repo server instance");
 
         let repos = fho::testing::fake_proxy(move |req| match req {
             RepositoryRegistryRequest::RegisterTarget {
@@ -707,8 +935,8 @@ mod test {
             }
             other => panic!("Unexpected request: {:?}", other),
         });
-        let (repo_proxy, _) = setup_fake_repo_proxy().await;
-        let (engine_proxy, _) = setup_fake_engine_proxy().await;
+        let (repo_proxy, _) = setup_fake_repo_proxy(None).await;
+        let (engine_proxy, _) = setup_fake_engine_proxy(None).await;
         let (target_proxy, _) = setup_fake_target_proxy().await;
 
         let tool = RegisterTool {
@@ -748,13 +976,19 @@ mod test {
         let env = ffx_config::test_init().await.expect("test env");
 
         let (repos, receiver) = setup_fake_server().await;
-        let (repo_proxy, _) = setup_fake_repo_proxy().await;
-        let (engine_proxy, _) = setup_fake_engine_proxy().await;
+        let (repo_proxy, _) = setup_fake_repo_proxy(None).await;
+        let (engine_proxy, _) = setup_fake_engine_proxy(None).await;
         let (target_proxy, _) = setup_fake_target_proxy().await;
 
-        make_server_instance(env.isolate_root.path(), &env.context, ServerMode::Daemon, REPO_NAME)
-            .await
-            .expect("repo server instance");
+        make_server_instance(
+            env.isolate_root.path(),
+            &env.context,
+            ServerMode::Daemon,
+            REPO_NAME,
+            BTreeSet::<String>::new(),
+        )
+        .await
+        .expect("repo server instance");
 
         let aliases = vec![String::from("my-alias")];
 

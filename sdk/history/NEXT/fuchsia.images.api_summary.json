@@ -98,6 +98,14 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.images/ImagePipe2.AddBufferCollection2",
+        "strictness": "strict",
+        "ordinal": "1737389764772934894",
+        "direction": "one_way",
+        "request": "fuchsia.images/ImagePipe2AddBufferCollection2Request"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.images/ImagePipe2.AddImage",
         "strictness": "strict",
         "ordinal": "2546337025867051925",
@@ -134,6 +142,23 @@
         "name": "fuchsia.images/ImagePipe2",
         "openness": "closed",
         "transport": "channel"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.images/ImagePipe2AddBufferCollection2Request.buffer_collection_id",
+        "ordinal": "1",
+        "type": "uint32"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.images/ImagePipe2AddBufferCollection2Request.buffer_collection_token",
+        "ordinal": "2",
+        "type": "fuchsia.sysmem2/BufferCollectionToken"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.images/ImagePipe2AddBufferCollection2Request",
+        "resourceness": "resource"
     },
     {
         "kind": "struct/member",

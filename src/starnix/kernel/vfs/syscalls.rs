@@ -2,14 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::{MemoryAccessor, MemoryAccessorExt, TaskMemoryAccessor, PAGE_SIZE};
+use crate::mm::{MemoryAccessor, MemoryAccessorExt, PAGE_SIZE};
 use crate::security;
 use crate::task::{
     CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Timeline,
     TimerWakeup, Waiter,
 };
+use crate::vfs::aio::AioContext;
 use crate::vfs::buffers::{UserBuffersInputBuffer, UserBuffersOutputBuffer};
-use crate::vfs::eventfd::{new_eventfd, EventFdFileObject, EventFdType};
+use crate::vfs::eventfd::{new_eventfd, EventFdType};
 use crate::vfs::fs_args::MountParams;
 use crate::vfs::inotify::InotifyFileObject;
 use crate::vfs::io_uring::{IoUringFileObject, IORING_MAX_ENTRIES};
@@ -17,15 +18,14 @@ use crate::vfs::pidfd::new_pidfd;
 use crate::vfs::pipe::{new_pipe, PipeFileObject};
 use crate::vfs::timer::TimerFile;
 use crate::vfs::{
-    checked_add_offset_and_length, new_memfd, splice, AioContext, CheckAccessReason, DirentSink64,
-    EpollFileObject, FallocMode, FdFlags, FdNumber, FileAsyncOwner, FileHandle, FileSystemOptions,
-    FlockOperation, FsStr, FsString, IoOperation, IoOperationType, LookupContext, NamespaceNode,
+    checked_add_offset_and_length, new_memfd, splice, CheckAccessReason, DirentSink64,
+    EpollFileObject, EpollKey, FallocMode, FdFlags, FdNumber, FileAsyncOwner, FileHandle,
+    FileSystemOptions, FlockOperation, FsStr, FsString, LookupContext, NamespaceNode,
     PathWithReachability, RecordLockCommand, RenameFlags, SeekTarget, StatxFlags, SymlinkMode,
     SymlinkTarget, TargetFdNumber, TimeUpdateType, UnlinkKind, ValueOrSize, WdNumber, WhatToMount,
     XattrOp,
 };
 
-use smallvec::smallvec;
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -62,7 +62,7 @@ use starnix_uapi::{
     F_ADD_SEALS, F_DUPFD, F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_GETLEASE, F_GETLK, F_GETOWN,
     F_GETOWN_EX, F_GET_SEALS, F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW, F_OWNER_PGRP, F_OWNER_PID,
     F_OWNER_TID, F_SETFD, F_SETFL, F_SETLEASE, F_SETLK, F_SETLKW, F_SETOWN, F_SETOWN_EX,
-    IN_CLOEXEC, IN_NONBLOCK, IOCB_FLAG_RESFD, IORING_REGISTER_BUFFERS, IORING_SETUP_CQSIZE,
+    IN_CLOEXEC, IN_NONBLOCK, IORING_REGISTER_BUFFERS, IORING_SETUP_CQSIZE,
     IORING_UNREGISTER_BUFFERS, MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_HUGETLB, MFD_HUGE_MASK,
     MFD_HUGE_SHIFT, NAME_MAX, O_CLOEXEC, O_CREAT, O_NOFOLLOW, O_PATH, O_TMPFILE, PATH_MAX,
     PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI, POLLRDBAND, POLLRDNORM, POLLWRBAND,
@@ -2127,6 +2127,18 @@ where
     Ok(num_fds)
 }
 
+fn deadline_after_timespec(
+    current_task: &CurrentTask,
+    user_timespec: UserRef<timespec>,
+) -> Result<zx::MonotonicInstant, Errno> {
+    if user_timespec.is_null() {
+        Ok(zx::MonotonicInstant::INFINITE)
+    } else {
+        let timespec = current_task.read_object(user_timespec)?;
+        Ok(zx::MonotonicInstant::after(duration_from_timespec(timespec)?))
+    }
+}
+
 pub fn sys_pselect6(
     locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
@@ -2137,14 +2149,7 @@ pub fn sys_pselect6(
     timeout_addr: UserRef<timespec>,
     sigmask_addr: UserRef<pselect6_sigmask>,
 ) -> Result<i32, Errno> {
-    let start_time = zx::MonotonicInstant::get();
-
-    let deadline = if timeout_addr.is_null() {
-        zx::MonotonicInstant::INFINITE
-    } else {
-        let timespec = current_task.read_object(timeout_addr)?;
-        start_time + duration_from_timespec(timespec)?
-    };
+    let deadline = deadline_after_timespec(current_task, timeout_addr)?;
 
     let num_fds = select(
         locked,
@@ -2161,7 +2166,7 @@ pub fn sys_pselect6(
         && !current_task.thread_group.read().personality.contains(PersonalityFlags::STICKY_TIMEOUTS)
     {
         let now = zx::MonotonicInstant::get();
-        let remaining = std::cmp::max(deadline - now, zx::Duration::from_seconds(0));
+        let remaining = std::cmp::max(deadline - now, zx::MonotonicDuration::from_seconds(0));
         current_task.write_object(timeout_addr, &timespec_from_duration(remaining))?;
     }
 
@@ -2202,7 +2207,7 @@ pub fn sys_select(
         && !current_task.thread_group.read().personality.contains(PersonalityFlags::STICKY_TIMEOUTS)
     {
         let now = zx::MonotonicInstant::get();
-        let remaining = std::cmp::max(deadline - now, zx::Duration::from_seconds(0));
+        let remaining = std::cmp::max(deadline - now, zx::MonotonicDuration::from_seconds(0));
         current_task
             .write_object(timeout_addr, &starnix_uapi::time::timeval_from_duration(remaining))?;
     }
@@ -2265,6 +2270,10 @@ pub fn sys_epoll_ctl(
         }
         EPOLL_CTL_DEL => {
             epoll_file.delete(&operand_file)?;
+            current_task
+                .kernel()
+                .suspend_resume_manager
+                .remove_epoll(operand_file.weak_handle.as_ptr() as EpollKey);
             operand_file.unregister_epfd(epfd);
         }
         _ => return error!(EINVAL),
@@ -2336,12 +2345,7 @@ pub fn sys_epoll_pwait2(
     user_timespec: UserRef<timespec>,
     user_sigmask: UserRef<SigSet>,
 ) -> Result<usize, Errno> {
-    let deadline = if user_timespec.is_null() {
-        zx::MonotonicInstant::INFINITE
-    } else {
-        let ts = current_task.read_object(user_timespec)?;
-        zx::MonotonicInstant::after(duration_from_timespec(ts)?)
-    };
+    let deadline = deadline_after_timespec(current_task, user_timespec)?;
     do_epoll_pwait(locked, current_task, epfd, events, max_events, deadline, user_sigmask)
 }
 
@@ -2498,7 +2502,7 @@ pub fn sys_ppoll(
         -1
     } else {
         let ts = current_task.read_object(user_timespec)?;
-        duration_from_timespec(ts)?.into_millis() as i32
+        duration_from_timespec::<zx::MonotonicTimeline>(ts)?.into_millis() as i32
     };
 
     let deadline = start_time + duration_from_poll_timeout(timeout)?;
@@ -2520,7 +2524,7 @@ pub fn sys_ppoll(
     }
 
     let now = zx::MonotonicInstant::get();
-    let remaining = std::cmp::max(deadline - now, zx::Duration::from_seconds(0));
+    let remaining = std::cmp::max(deadline - now, zx::MonotonicDuration::from_seconds(0));
     let remaining_timespec = timespec_from_duration(remaining);
 
     // From gVisor: "ppoll is normally restartable if interrupted by something other than a signal
@@ -2858,8 +2862,8 @@ pub fn sys_readahead(
 pub fn sys_io_setup(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
-    nr_events: u32,
-    ctx_idp: UserRef<aio_context_t>,
+    user_nr_events: UserValue<u32>,
+    user_ctx_idp: UserRef<aio_context_t>,
 ) -> Result<(), Errno> {
     // From https://man7.org/linux/man-pages/man2/io_setup.2.html:
     //
@@ -2868,47 +2872,40 @@ pub fn sys_io_setup(
     //   0.
     //
     // TODO: Determine what "internal limits" means.
-    if nr_events > i32::MAX as u32 {
+    let max_operations =
+        user_nr_events.validate(0..(i32::MAX as u32)).ok_or_else(|| errno!(EINVAL))? as usize;
+    if current_task.read_object(user_ctx_idp)? != 0 {
         return error!(EINVAL);
     }
-    if current_task.read_object(ctx_idp)? != 0 {
-        return error!(EINVAL);
-    }
-    let mut mm_state = current_task.mm().state.write();
-    let ctx_id = mm_state.aio_contexts.setup_context(nr_events)?;
-    current_task.write_object(ctx_idp, &ctx_id)?;
+    let ctx_id = AioContext::create(current_task, max_operations)?;
+    current_task.write_object(user_ctx_idp, &ctx_id).map_err(|e| {
+        let _ = current_task.mm().destroy_aio_context(ctx_id.into());
+        e
+    })?;
     Ok(())
 }
 
 pub fn sys_io_submit(
-    locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     ctx_id: aio_context_t,
-    nr: i32,
+    user_nr: UserValue<i32>,
     mut iocb_addrs: UserRef<UserAddress>,
 ) -> Result<i32, Errno> {
-    if nr < 0 {
-        return error!(EINVAL);
-    }
+    let nr = user_nr.validate(0..i32::MAX).ok_or_else(|| errno!(EINVAL))?;
     if nr == 0 {
         return Ok(0);
     }
-    let ctx = {
-        let mm_state = current_task.mm().state.read();
-        mm_state.aio_contexts.get_context(ctx_id).ok_or_else(|| errno!(EINVAL))?
-    };
+    let ctx = current_task.mm().get_aio_context(ctx_id.into()).ok_or_else(|| errno!(EINVAL))?;
 
     // `iocbpp` is an array of addresses to iocb's.
     let mut num_submitted: i32 = 0;
     loop {
         let iocb_addr = current_task.read_object(iocb_addrs)?;
-        let iocb_ref: UserRef<iocb> = UserRef::new(iocb_addr.clone());
+        let iocb_ref = UserRef::<iocb>::new(iocb_addr.clone());
         let control_block = current_task.read_object(iocb_ref)?;
 
-        match (
-            num_submitted,
-            submit_iocb(locked, current_task, control_block, iocb_addr, ctx.clone()),
-        ) {
+        match (num_submitted, ctx.submit(current_task, control_block, iocb_addr)) {
             (0, Err(e)) => return Err(e),
             (_, Err(_)) => break,
             (_, Ok(())) => {
@@ -2922,85 +2919,7 @@ pub fn sys_io_submit(
         iocb_addrs = iocb_addrs.next();
     }
 
-    Ok(num_submitted.into())
-}
-
-fn submit_iocb(
-    _locked: &mut Locked<'_, Unlocked>,
-    current_task: &CurrentTask,
-    control_block: iocb,
-    iocb_addr: UserAddress,
-    ctx: Arc<Mutex<AioContext>>,
-) -> Result<(), Errno> {
-    let file = current_task.files.get(FdNumber::from_raw(control_block.aio_fildes as i32))?;
-    let id = control_block.aio_data;
-    let opcode = control_block.aio_lio_opcode as u32;
-    let offset = control_block.aio_offset as usize;
-    let flags = control_block.aio_flags;
-
-    let op_type = match opcode {
-        starnix_uapi::IOCB_CMD_PREAD => IoOperationType::Read,
-        starnix_uapi::IOCB_CMD_PREADV => IoOperationType::ReadV,
-        starnix_uapi::IOCB_CMD_PWRITE => IoOperationType::Write,
-        starnix_uapi::IOCB_CMD_PWRITEV => IoOperationType::WriteV,
-        _ => {
-            track_stub!(TODO("https://fxbug.dev/297433877"), "io_submit opcode", opcode);
-            return error!(ENOSYS);
-        }
-    };
-    match op_type {
-        IoOperationType::Read | IoOperationType::ReadV => {
-            if !file.can_read() {
-                return error!(EBADF);
-            }
-        }
-        IoOperationType::Write | IoOperationType::WriteV => {
-            if !file.can_write() {
-                return error!(EBADF);
-            }
-        }
-    }
-    let mut buffers = match op_type {
-        IoOperationType::Read | IoOperationType::Write => smallvec![UserBuffer {
-            address: control_block.aio_buf.into(),
-            length: control_block.aio_nbytes as usize,
-        }],
-        IoOperationType::ReadV | IoOperationType::WriteV => {
-            let count: i32 = control_block.aio_nbytes.try_into().map_err(|_| errno!(EINVAL))?;
-            current_task.read_iovec(control_block.aio_buf.into(), count.into())?
-        }
-    };
-
-    // Validate the user buffers and offset synchronously.
-    let buffer_length = UserBuffer::cap_buffers_to_max_rw_count(
-        current_task.maximum_valid_address(),
-        &mut buffers,
-    )?;
-    checked_add_offset_and_length(offset, buffer_length)?;
-
-    let eventfd = if flags & IOCB_FLAG_RESFD == IOCB_FLAG_RESFD {
-        let eventfd = current_task.files.get(FdNumber::from_raw(control_block.aio_resfd as i32))?;
-        if eventfd.downcast_file::<EventFdFileObject>().is_none() {
-            return error!(EINVAL);
-        }
-        Some(Arc::downgrade(&eventfd))
-    } else {
-        None
-    };
-
-    let mut ctx = ctx.lock();
-    ctx.queue_op(
-        current_task,
-        IoOperation {
-            op_type,
-            file: Arc::downgrade(&file),
-            buffers,
-            offset,
-            id,
-            iocb_addr,
-            eventfd,
-        },
-    )
+    Ok(num_submitted)
 }
 
 pub fn sys_io_getevents(
@@ -3010,30 +2929,17 @@ pub fn sys_io_getevents(
     min_nr: i64,
     nr: i64,
     events_ref: UserRef<io_event>,
-    timeout_ref: UserRef<timespec>,
+    user_timeout: UserRef<timespec>,
 ) -> Result<i32, Errno> {
     if min_nr < 0 || min_nr > nr || nr < 0 {
         return error!(EINVAL);
     }
+    let min_results = min_nr as usize;
+    let max_results = nr as usize;
+    let deadline = deadline_after_timespec(current_task, user_timeout)?;
 
-    if !timeout_ref.addr().is_null() && min_nr != 0 {
-        let timeout = current_task.read_object(timeout_ref)?;
-        if (timeout.tv_sec, timeout.tv_nsec) != (0, 0) {
-            track_stub!(TODO("https://fxbug.dev/297433877"), "io_getevents with blocking");
-            return error!(ENOSYS);
-        }
-    }
-
-    let ctx = {
-        let mm_state = current_task.mm().state.read();
-        mm_state.aio_contexts.get_context(ctx_id).ok_or_else(|| errno!(EINVAL))?
-    };
-
-    let events = {
-        let mut ctx = ctx.lock();
-        ctx.read_available_results(nr as usize)
-    };
-
+    let ctx = current_task.mm().get_aio_context(ctx_id.into()).ok_or_else(|| errno!(EINVAL))?;
+    let events = ctx.get_events(current_task, min_results, max_results, deadline)?;
     current_task.write_objects(events_ref, &events)?;
 
     Ok(events.len() as i32)
@@ -3047,8 +2953,7 @@ pub fn sys_io_cancel(
     _result: UserRef<io_event>,
 ) -> Result<(), Errno> {
     let _iocb = current_task.read_object(user_iocb)?;
-    let mm_state = current_task.mm().state.read();
-    let _ctx = mm_state.aio_contexts.get_context(ctx_id).ok_or_else(|| errno!(EINVAL))?;
+    let _ctx = current_task.mm().get_aio_context(ctx_id.into()).ok_or_else(|| errno!(EINVAL))?;
 
     track_stub!(TODO("https://fxbug.dev/297433877"), "io_cancel");
     return error!(ENOSYS);
@@ -3059,8 +2964,9 @@ pub fn sys_io_destroy(
     current_task: &CurrentTask,
     ctx_id: aio_context_t,
 ) -> Result<(), Errno> {
-    let mut mm_state = current_task.mm().state.write();
-    mm_state.aio_contexts.destroy_context(ctx_id)
+    let aio_context = current_task.mm().destroy_aio_context(ctx_id.into())?;
+    std::mem::drop(aio_context);
+    Ok(())
 }
 
 pub fn sys_io_uring_setup(

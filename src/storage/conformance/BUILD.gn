@@ -62,6 +62,7 @@ rustc_test("conformance_test") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-fs",
+    "//src/testing/fidl:placeholders_rust",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:futures",
   ]
@@ -87,6 +88,7 @@ rustc_test("conformance_test") {
     "tests/get_connection_info.rs",
     "tests/node.rs",
     "tests/remote.rs",
+    "tests/service.rs",
     "tests/tests.rs",
   ]
 }

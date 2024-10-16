@@ -79,12 +79,11 @@ import("//build/toolchain/toolchain_environment.gni")
 #     TODO(https://fxbug.dev/333125197): Remove this parameter.
 #
 #   stable (optional)
-#     Note: this option only currently used if sdk == "source"'
-#     Whether this sdk_atom is stabilized. If false, there will not be
-#     .api file generated, and the atom will be marked as unstable in the final
-#     IDK.
+#     Whether this sdk_atom is stabilized. If false, an `.api` file will not be
+#     generated, and the atom will be marked as unstable in the final IDK.
+#     Required if `sdk == "source"` and `sdk_publishable` is specified and not
+#     "internal". Not allowed otherwise.
 #     TODO(https://fxbug.dev/333125197): Remove this parameter.
-#     Defaults to false.
 #
 #   sdk_headers
 #     Optional: Required, except if the global `is_kernel` is true.
@@ -96,11 +95,12 @@ import("//build/toolchain/toolchain_environment.gni")
 #     Type: list(string)
 #
 #   sdk_name
-#     Optional: Name under which the library is published. This can be used
-#     when $target_name is already used by another target in the Fuchsia build.
+#     Optional: Override the name of the library in the SDK. This can be used
+#     when `target_name` is already used by another SDK atom.
+#     Only allowed when `sdk == "source" and `sdk_publishable` is specified.
 #     TODO(https://fxbug.dev/333125197): Remove this parameter.
 #     Type: string
-#     Default: target_name
+#     Default: `target_name`
 #
 #   sdk_headers_for_internal_use
 #     Optional: This is always forwarded to the corresponding `sdk_*` template.
@@ -194,14 +194,21 @@ template("zx_library") {
           "Must be an SDK category name if specified - received: ${invoker.sdk_publishable}")
       sdk_category = invoker.sdk_publishable
     }
+    assert((sdkable && shape == "source") || !defined(invoker.stable))
 
     extra_target_args = {
     }
     if (shape == "source") {
       if (sdkable) {
-        name = target_name
+        assert(
+            defined(invoker.stable) !=
+                # TODO(https://fxbug.dev/331991540): Remove "firmware_sdk" once no longer used.
+                (sdk_category == "internal" || sdk_category == "firmware_sdk"),
+            "`stable` must be specified except for categories that are always unstable.")
         if (defined(invoker.sdk_name)) {
           name = invoker.sdk_name
+        } else {
+          name = target_name
         }
         target_type = "sdk_source_set"
         extra_target_args = {
@@ -217,8 +224,10 @@ template("zx_library") {
         }
       } else {
         target_type = "static_library"
+        assert(!defined(invoker.sdk_name))
       }
     } else if (shape == "static") {
+      assert(!defined(invoker.sdk_name))
       if (sdkable) {
         target_type = "sdk_static_library"
         extra_target_args = {
@@ -235,6 +244,7 @@ template("zx_library") {
         target_type = "static_library"
       }
     } else if (shape == "shared") {
+      assert(!defined(invoker.sdk_name))
       if (sdkable) {
         assert(sdk_category == "partner")
         target_type = "sdk_shared_library"

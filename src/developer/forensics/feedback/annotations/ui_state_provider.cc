@@ -105,7 +105,7 @@ Annotations UIStateProvider::Get() {
   }
 
   const auto& time = std::get<zx::time>(last_transition_time_);
-  const auto formatted_duration = FormatDuration(clock_->Now() - time);
+  const auto formatted_duration = FormatDuration(clock_->MonotonicNow() - time);
 
   // FormatDuration returns std::nullopt if duration was negative- if so, send Error::kBadValue as
   // annotation value

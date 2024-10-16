@@ -50,18 +50,18 @@ class LogBuffer : public feedback_data::LogSink {
 
   // Executes |action| after a message with a time greater than or equal to |timestamp| is received
   // or NotifyInterruption is called.
-  void ExecuteAfter(zx::duration timestamp, ::fit::closure action);
+  void ExecuteAfter(zx::time_boot timestamp, ::fit::closure action);
 
  private:
   struct Message {
-    Message(const LogSink::MessageOr& message, int64_t default_timestamp);
+    Message(const LogSink::MessageOr& message, zx::time_boot default_timestamp);
 
-    int64_t timestamp;
+    zx::time_boot timestamp;
     std::string msg;
   };
 
   void Sort();
-  void RunActions(int64_t timestamp);
+  void RunActions(zx::time_boot timestamp);
   void EnforceCapacity();
 
   // Resets variables keeping track of the last message
@@ -77,7 +77,7 @@ class LogBuffer : public feedback_data::LogSink {
 
   bool is_sorted_{true};
 
-  std::multimap<int64_t, ::fit::closure, std::greater<>> actions_at_time_;
+  std::multimap<zx::time_boot, ::fit::closure, std::greater<>> actions_at_time_;
 
   size_t size_{0u};
   const size_t capacity_;

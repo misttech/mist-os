@@ -28,7 +28,7 @@ pub async fn wait_for_non_loopback_interface_up<
     interface_state: &fidl_fuchsia_net_interfaces::StateProxy,
     mut wait_for_netmgr: &mut F,
     exclude_ids: Option<&HashSet<u64>>,
-    timeout: zx::Duration,
+    timeout: zx::MonotonicDuration,
 ) -> Result<(u64, String)> {
     let mut if_map = HashMap::<u64, fidl_fuchsia_net_interfaces_ext::PropertiesAndState<()>>::new();
     let mut wait_for_interface = pin!(fidl_fuchsia_net_interfaces_ext::wait_interface(

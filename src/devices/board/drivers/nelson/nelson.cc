@@ -1,7 +1,6 @@
 // Copyright 2018 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
 #include "src/devices/board/drivers/nelson/nelson.h"
 
 #include <assert.h>
@@ -25,6 +24,7 @@
 #include <bind/fuchsia/amlogic/platform/s905d3/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/google/platform/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/platform/bus/cpp/bind.h>
 #include <fbl/algorithm.h>
@@ -98,6 +98,11 @@ int Nelson::Thread() {
     zxlogf(ERROR, "TouchInit failed: %d", status);
   }
 
+  if ((status = AddPostInitDevice()) != ZX_OK) {
+    zxlogf(ERROR, "%s: AddPostInitDevice() failed: %d", __func__, status);
+    return status;
+  }
+
   // GpioInit() must be called after other subsystems that bind to GPIO have had a chance to add
   // their init steps.
   if ((status = GpioInit()) != ZX_OK) {
@@ -105,11 +110,6 @@ int Nelson::Thread() {
     return status;
   }
   gpio_init_steps_.clear();
-
-  if ((status = AddPostInitDevice()) != ZX_OK) {
-    zxlogf(ERROR, "%s: AddPostInitDevice() failed: %d", __func__, status);
-    return status;
-  }
 
   if ((status = RegistersInit()) != ZX_OK) {
     zxlogf(ERROR, "RegistersInit failed: %d", status);
@@ -288,6 +288,15 @@ zx_status_t Nelson::AddPostInitDevice() {
   };
 
   auto spec = ddk::CompositeNodeSpec(post_init_rules, post_init_properties);
+
+  const ddk::BindRule gpio_init_rules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+  const device_bind_prop_t gpio_init_properties[] = {
+      ddk::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+  spec.AddParentSpec(gpio_init_rules, gpio_init_properties);
+
   for (const uint32_t pin : kPostInitGpios) {
     const ddk::BindRule gpio_rules[] = {
         ddk::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,
@@ -300,6 +309,8 @@ zx_status_t Nelson::AddPostInitDevice() {
         ddk::MakeProperty(bind_fuchsia::GPIO_PIN, pin),
     };
     spec.AddParentSpec(gpio_rules, gpio_properties);
+
+    gpio_init_steps_.push_back(GpioPull(pin, fuchsia_hardware_pin::Pull::kNone));
   }
 
   if (zx_status_t status = DdkAddCompositeNodeSpec("post-init", spec); status != ZX_OK) {

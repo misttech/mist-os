@@ -72,6 +72,24 @@
         "zx/Duration": {
           "kind": "alias"
         },
+        "zx/DurationBoot": {
+          "kind": "alias"
+        },
+        "zx/DurationMono": {
+          "kind": "alias"
+        },
+        "zx/InstantBoot": {
+          "kind": "alias"
+        },
+        "zx/InstantBootTicks": {
+          "kind": "alias"
+        },
+        "zx/InstantMono": {
+          "kind": "alias"
+        },
+        "zx/InstantMonoTicks": {
+          "kind": "alias"
+        },
         "zx/Koid": {
           "kind": "alias"
         },

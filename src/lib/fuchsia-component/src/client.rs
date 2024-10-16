@@ -6,8 +6,7 @@
 
 use anyhow::{format_err, Context as _, Error};
 use fidl::endpoints::{
-    DiscoverableProtocolMarker, MemberOpener, ProtocolMarker, ServerEnd, ServiceMarker,
-    ServiceProxy,
+    DiscoverableProtocolMarker, MemberOpener, ProtocolMarker, ServiceMarker, ServiceProxy,
 };
 use fidl_fuchsia_component::{RealmMarker, RealmProxy};
 use fidl_fuchsia_component_decl::ChildRef;
@@ -57,11 +56,11 @@ impl<D: Borrow<fio::DirectoryProxy>, P: DiscoverableProtocolMarker> ProtocolConn
     pub fn connect_with(self, server_end: zx::Channel) -> Result<(), Error> {
         self.svc_dir
             .borrow()
-            .open(
-                fio::OpenFlags::empty(),
-                fio::ModeType::empty(),
+            .open3(
                 P::PROTOCOL_NAME,
-                ServerEnd::new(server_end),
+                fio::Flags::PROTOCOL_SERVICE,
+                &fio::Options::default(),
+                server_end.into(),
             )
             .context("error connecting to protocol")
     }
@@ -205,7 +204,7 @@ pub fn connect_to_named_protocol_at_dir_root<P: ProtocolMarker>(
     let (proxy, server_end) = fidl::endpoints::create_proxy::<P>()?;
     directory.as_ref_directory().open(
         filename,
-        fio::OpenFlags::empty(),
+        fio::Flags::PROTOCOL_SERVICE,
         server_end.into_channel().into(),
     )?;
     Ok(proxy)
@@ -229,13 +228,7 @@ pub struct ServiceInstanceDirectory(pub fio::DirectoryProxy);
 impl MemberOpener for ServiceInstanceDirectory {
     fn open_member(&self, member: &str, server_end: zx::Channel) -> Result<(), fidl::Error> {
         let Self(directory) = self;
-        // NB: This can't use fdio::service_connect_at because the return type is fidl::Error.
-        directory.open(
-            fio::OpenFlags::NOT_DIRECTORY,
-            fio::ModeType::empty(),
-            member,
-            ServerEnd::new(server_end),
-        )
+        directory.open3(member, fio::Flags::PROTOCOL_SERVICE, &fio::Options::default(), server_end)
     }
 }
 
@@ -409,18 +402,17 @@ pub mod test_util {
     use std::sync::Arc;
     use vfs::directory::entry_container::Directory;
     use vfs::execution_scope::ExecutionScope;
+    use vfs::ObjectRequest;
 
     #[cfg(test)]
     pub fn run_directory_server(dir: Arc<dyn Directory>) -> fio::DirectoryProxy {
         let (dir_proxy, dir_server) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         let scope = ExecutionScope::new();
-        dir.open(
-            scope,
-            fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-            vfs::path::Path::dot(),
-            ServerEnd::new(dir_server.into_channel()),
-        );
+        let flags =
+            fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::from_bits(fio::R_STAR_DIR.bits()).unwrap();
+        ObjectRequest::new3(flags, &fio::Options::default(), dir_server.into_channel())
+            .handle(|request| dir.open3(scope, vfs::path::Path::dot(), flags, request));
         dir_proxy
     }
 }

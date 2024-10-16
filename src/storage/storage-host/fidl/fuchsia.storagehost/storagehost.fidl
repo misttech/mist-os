@@ -4,20 +4,68 @@
 @available(added=HEAD)
 library fuchsia.storagehost;
 
-using fuchsia.device;
+using fuchsia.hardware.block.partition;
+using fuchsia.hardware.block.volume;
 using zx;
 
-/// Interface for controlling storage-host.
 @discoverable
-closed protocol StorageHost {
-    /// Binds the storage-host to the block device driver managed by `device_controller`.
-    /// storage-host will connect to the fuchsia.hardware.block.volume.Volume protocol offered by
-    /// the driver, and attempt to load the partitions from the block device.  The block device
-    /// must be formatted in a supported format (e.g. GPT).
-    /// Each partition will have an entry added to the `partitions` directory of storage-host.
-    /// A service node named `block` can be used to connect to the
-    /// fuchsia.hardware.block.volume.Volume service for that partition.
-    strict Start(resource struct {
-        device_controller client_end:fuchsia.device.Controller;
+closed protocol Partition {
+    /// Appends an update to `transaction` (see `PartitionManager.CreateTransaction`)
+    /// to modify the partition's metadata.  The update is only applied once the transaction
+    /// is committed.  Fails if the transaction was already committed.
+    strict UpdateMetadata(resource table {
+        1: transaction zx.Handle:EVENTPAIR;
+        2: type_guid fuchsia.hardware.block.partition.Guid;
+        3: flags uint64;
     }) -> () error zx.Status;
+};
+
+@discoverable
+closed protocol PartitionsManager {
+    /// Starts a new transaction to modify the partition table.  The transaction will only be
+    /// applied when `CommitTransaction` is called.  Only one transaction may be active at any given
+    /// time.  Closing all handles to the returned event will cancel the transaction.
+    /// Changes are added to the transaction via the `Partition` interface, passing in a
+    /// duplicate of the `transaction` object.
+    ///
+    /// All changes in the transaction are applied atomically.
+    strict CreateTransaction() -> (resource struct {
+        transaction zx.Handle:EVENTPAIR;
+    }) error zx.Status;
+
+    /// Commits the changes pending in the transaction.
+    strict CommitTransaction(resource struct {
+        transaction zx.Handle:EVENTPAIR;
+    }) -> () error zx.Status;
+};
+
+type PartitionInfo = struct {
+    name string:fuchsia.hardware.block.partition.NAME_LENGTH;
+    type_guid fuchsia.hardware.block.partition.Guid;
+    num_blocks uint64;
+    flags uint64;
+};
+
+// This limit is arbitrary and can change as needed.
+const MAX_PARTITIONS uint32 = 128;
+
+@discoverable
+closed protocol PartitionsAdmin {
+    /// Wipes and re-initializes the partition table.  This is a destructive operation!
+    /// If there are any active clients of existing partitions, their connections will be severed.
+    /// This function is only intended to be used in product configurations where nothing is
+    /// actively using any partitions, so there's no need to make this operation graceful.
+    ///
+    /// Partitions are allocated contiguously and in the provided order.  Random instance GUIDs are
+    /// assigned.  Empty entries are permitted (i.e. all fields set to 0) and will result in an
+    /// empty slot in the partition table, which allows the table size to be set appropriately.
+    strict ResetPartitionTable(struct {
+        partitions vector<PartitionInfo>:MAX_PARTITIONS;
+    }) -> () error zx.Status;
+};
+
+/// Each partition exposes this service.
+service PartitionService {
+    volume client_end:fuchsia.hardware.block.volume.Volume;
+    partition client_end:Partition;
 };

@@ -4,15 +4,18 @@
 
 #include "src/devices/usb/drivers/dwc3/dwc3.h"
 
+#include <fidl/fuchsia.hardware.usb.dci/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.descriptor/cpp/wire.h>
+#include <fidl/fuchsia.hardware.usb.endpoint/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/fit/defer.h>
 #include <lib/zx/clock.h>
+#include <zircon/syscalls.h>
 
-#include <cstdlib>
-#include <span>
-
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/designware/platform/cpp/bind.h>
 #include <fbl/auto_lock.h>
 #include <usb/usb.h>
 
@@ -20,19 +23,60 @@
 
 namespace dwc3 {
 
+namespace fdci = fuchsia_hardware_usb_dci;
 namespace fdescriptor = fuchsia_hardware_usb_descriptor;
+namespace fendpoint = fuchsia_hardware_usb_endpoint;
+namespace fio = fuchsia_io;
+
+zx_status_t CacheFlushCommon(dma_buffer::ContiguousBuffer* buffer, zx_off_t offset, size_t length,
+                             uint32_t flush_options) {
+  if (offset + length < offset || offset + length > buffer->size()) {
+    return ZX_ERR_OUT_OF_RANGE;
+  }
+  auto virt{reinterpret_cast<uintptr_t>(buffer->virt()) + offset};
+  return zx_cache_flush(reinterpret_cast<void*>(virt), length, flush_options);
+}
+
+zx_status_t CacheFlush(dma_buffer::ContiguousBuffer* buffer, zx_off_t offset, size_t length) {
+  return CacheFlushCommon(buffer, offset, length, ZX_CACHE_FLUSH_DATA);
+}
+
+zx_status_t CacheFlushInvalidate(dma_buffer::ContiguousBuffer* buffer, zx_off_t offset,
+                                 size_t length) {
+  return CacheFlushCommon(buffer, offset, length, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
+}
 
 zx_status_t Dwc3::Create(void* ctx, zx_device_t* parent) {
-  auto dev = std::make_unique<Dwc3>(parent);
+  auto dev = std::make_unique<Dwc3>(parent, fdf::Dispatcher::GetCurrent()->async_dispatcher());
   if (zx_status_t status = dev->AcquirePDevResources(); status != ZX_OK) {
     zxlogf(ERROR, "Dwc3 Create failed (%s)", zx_status_get_string(status));
     return status;
   }
 
-  if (zx_status_t status =
-          dev->DdkAdd(ddk::DeviceAddArgs("dwc3")
-                          .forward_metadata(parent, DEVICE_METADATA_MAC_ADDRESS)
-                          .forward_metadata(parent, DEVICE_METADATA_SERIAL_NUMBER));
+  zx::result<fidl::ClientEnd<fio::Directory>> result{dev->ServeProtocol()};
+  if (result.is_error()) {
+    zxlogf(ERROR, "Dwc3::ServeProtocol(): %s", result.status_string());
+    return result.status_value();
+  }
+
+  zx_device_str_prop_t props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                           bind_fuchsia_designware_platform::BIND_PLATFORM_DEV_VID_DESIGNWARE),
+
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                           bind_fuchsia_designware_platform::BIND_PLATFORM_DEV_DID_DWC3),
+  };
+
+  std::array offers = {
+      fdci::UsbDciService::Name,
+  };
+
+  if (zx_status_t status = dev->DdkAdd(ddk::DeviceAddArgs("dwc3")
+                                           .set_str_props(props)
+                                           .forward_metadata(parent, DEVICE_METADATA_MAC_ADDRESS)
+                                           .forward_metadata(parent, DEVICE_METADATA_SERIAL_NUMBER)
+                                           .set_fidl_service_offers(offers)
+                                           .set_outgoing_dir(result.value().TakeChannel()));
       status != ZX_OK) {
     zxlogf(ERROR, "DdkAdd failed: %s", zx_status_get_string(status));
     return status;
@@ -80,6 +124,31 @@ zx_status_t Dwc3::AcquirePDevResources() {
   return ZX_OK;
 }
 
+zx::result<fidl::ClientEnd<fio::Directory>> Dwc3::ServeProtocol() {
+  zx::result result =
+      outgoing_.AddService<fdci::UsbDciService>(fdci::UsbDciService::InstanceHandler({
+          .device = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
+      }));
+
+  if (result.is_error()) {
+    zxlogf(ERROR, "Failed to add service: %s", result.status_string());
+    return zx::error(result.status_value());
+  }
+
+  auto endpoints{fidl::CreateEndpoints<fio::Directory>()};
+  if (endpoints.is_error()) {
+    return zx::error(endpoints.status_value());
+  }
+
+  result = outgoing_.Serve(std::move(endpoints->server));
+  if (result.is_error()) {
+    zxlogf(ERROR, "outgoing_.Serve(): %s", result.status_string());
+    return zx::error(result.status_value());
+  }
+
+  return zx::ok(std::move(endpoints->client));
+}
+
 zx_status_t Dwc3::Init() {
   // Start by identifying our hardware and making sure that we recognize it, and
   // it is a version that we know we can support.  Then, reset the hardware so
@@ -113,8 +182,8 @@ zx_status_t Dwc3::Init() {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  // Now go ahead and allocate the user endpoint storage.
-  user_endpoints_.Init(ep_count - kUserEndpointStartNum);
+  // Now go ahead and allocate the user endpoint storage and uep servers.
+  user_endpoints_.Init(ep_count - kUserEndpointStartNum, bti_, this);
 
   // Now that we have our BTI, and have reset our hardware, we can go ahead and
   // release the quarantine on any pages which may have been previously pinned
@@ -125,20 +194,20 @@ zx_status_t Dwc3::Init() {
   }
 
   // If something goes wrong after this point, make sure to release any of our
-  // allocated IoBuffers.
+  // allocated dma buffers.
   auto cleanup = fit::defer([this]() { ReleaseResources(); });
 
   // Strictly speaking, we should not need RW access to this buffer.
   // Unfortunately, attempting to writeback and invalidate the cache before
   // reading anything from the buffer produces a page fault right if this buffer
   // is mapped read only, so for now, we keep the buffer mapped RW.
-  if (zx_status_t status =
-          event_buffer_.Init(bti_.get(), kEventBufferSize, IO_BUFFER_RW | IO_BUFFER_CONTIG);
-      status != ZX_OK) {
-    zxlogf(ERROR, "event_buffer init failed: %s", zx_status_get_string(status));
+  zx_status_t status = dma_buffer::CreateBufferFactory()->CreateContiguous(bti_, kEventBufferSize,
+                                                                           12, &event_buffer_);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "dma_buffer init fails: %s", zx_status_get_string(status));
     return status;
   }
-  event_buffer_.CacheFlushInvalidate(0, kEventBufferSize);
+  CacheFlushInvalidate(event_buffer_.get(), 0, kEventBufferSize);
 
   // Now that we have allocated our event buffer, we have at least one region
   // pinned.  We need to be sure to place the hardware into reset before
@@ -147,9 +216,9 @@ zx_status_t Dwc3::Init() {
 
   {
     fbl::AutoLock lock(&ep0_.lock);
-    if (zx_status_t status =
-            ep0_.buffer.Init(bti_.get(), UINT16_MAX, IO_BUFFER_RW | IO_BUFFER_CONTIG);
-        status != ZX_OK) {
+    zx_status_t status =
+        dma_buffer::CreateBufferFactory()->CreateContiguous(bti_, kEp0BufferSize, 12, &ep0_.buffer);
+    if (status != ZX_OK) {
       zxlogf(ERROR, "ep0_buffer init failed: %s", zx_status_get_string(status));
       return status;
     }
@@ -162,6 +231,7 @@ zx_status_t Dwc3::Init() {
 
   // Things went well.  Cancel our cleanup routine.
   cleanup.cancel();
+  init_done_.Signal();  // Unblock any FIDL clients awaiting Endpoint service.
   return ZX_OK;
 }
 
@@ -204,7 +274,7 @@ void Dwc3::ReleaseResources() {
     fbl::AutoLock lock(&ep0_.lock);
     ep0_.out.enabled = false;
     ep0_.in.enabled = false;
-    ep0_.buffer.release();
+    ep0_.buffer.reset();
     ep0_.shared_fifo.Release();
   }
 
@@ -214,7 +284,7 @@ void Dwc3::ReleaseResources() {
     uep.ep.enabled = false;
   }
 
-  event_buffer_.release();
+  event_buffer_.reset();
   has_pinned_memory_ = false;
 }
 
@@ -358,15 +428,16 @@ void Dwc3::HandleResetEvent() {
 
   {
     fbl::AutoLock lock(&dci_lock_);
-    if (dci_intf_valid()) {
-      DciIntfWrapSetConnected(true);
+    if (dci_intf_.is_valid()) {
+      DciIntfSetConnected(true);
     }
   }
 }
 
 void Dwc3::HandleConnectionDoneEvent() {
   uint16_t ep0_max_packet = 0;
-  usb_speed_t new_speed = USB_SPEED_UNDEFINED;
+  fdescriptor::wire::UsbSpeed new_speed{fdescriptor::UsbSpeed::kUndefined};
+
   {
     fbl::AutoLock lock(&lock_);
     auto* mmio = get_mmio();
@@ -375,19 +446,19 @@ void Dwc3::HandleConnectionDoneEvent() {
 
     switch (speed) {
       case DSTS::CONNECTSPD_HIGH:
-        new_speed = USB_SPEED_HIGH;
+        new_speed = fdescriptor::UsbSpeed::kHigh;
         ep0_max_packet = 64;
         break;
       case DSTS::CONNECTSPD_FULL:
-        new_speed = USB_SPEED_FULL;
+        new_speed = fdescriptor::UsbSpeed::kFull;
         ep0_max_packet = 64;
         break;
       case DSTS::CONNECTSPD_SUPER:
-        new_speed = USB_SPEED_SUPER;
+        new_speed = fdescriptor::UsbSpeed::kSuper;
         ep0_max_packet = 512;
         break;
       case DSTS::CONNECTSPD_ENHANCED_SUPER:
-        new_speed = USB_SPEED_ENHANCED_SUPER;
+        new_speed = fdescriptor::UsbSpeed::kEnhancedSuper;
         ep0_max_packet = 512;
         break;
       default:
@@ -411,8 +482,8 @@ void Dwc3::HandleConnectionDoneEvent() {
 
   {
     fbl::AutoLock lock(&dci_lock_);
-    if (dci_intf_valid()) {
-      DciIntfWrapSetSpeed(new_speed);
+    if (dci_intf_.is_valid()) {
+      DciIntfSetSpeed(new_speed);
     }
   }
 }
@@ -428,8 +499,8 @@ void Dwc3::HandleDisconnectedEvent() {
 
   {
     fbl::AutoLock lock(&dci_lock_);
-    if (dci_intf_valid()) {
-      DciIntfWrapSetConnected(false);
+    if (dci_intf_.is_valid()) {
+      DciIntfSetConnected(false);
     }
   }
 
@@ -467,67 +538,36 @@ void Dwc3::DdkRelease() {
   delete this;
 }
 
-void Dwc3::UsbDciRequestQueue(usb_request_t* usb_req, const usb_request_complete_callback_t* cb) {
-  Request req{usb_req, *cb, sizeof(*usb_req)};
-
-  zx_status_t queue_result = [&]() {
-    const uint8_t ep_num = UsbAddressToEpNum(req.request()->header.ep_address);
-    UserEndpoint* const uep = get_user_endpoint(ep_num);
-
-    if (uep == nullptr) {
-      zxlogf(ERROR, "Dwc3::UsbDciRequestQueue: bad ep address 0x%02X", ep_num);
-      return ZX_ERR_INVALID_ARGS;
-    }
-
-    const zx_off_t length = req.request()->header.length;
-    zxlogf(SERIAL, "UsbDciRequestQueue ep %u length %zu", ep_num, length);
-
-    {
-      fbl::AutoLock lock(&uep->ep.lock);
-
-      if (!uep->ep.enabled) {
-        zxlogf(ERROR, "Dwc3: ep(%u) not enabled!", ep_num);
-        return ZX_ERR_BAD_STATE;
-      }
-
-      // OUT transactions must have length > 0 and multiple of max packet size
-      if (uep->ep.IsOutput()) {
-        if (length == 0 || ((length % uep->ep.max_packet_size) != 0)) {
-          zxlogf(ERROR, "Dwc3: OUT transfers must be multiple of max packet size (len %ld mps %hu)",
-                 length, uep->ep.max_packet_size);
-          return ZX_ERR_INVALID_ARGS;
-        }
-      }
-
-      // Add the request to our queue of pending requests.  Then, if we are
-      // configured, kick the queue to make sure it is running.  Do not fail the
-      // request!  In particular, during the set interface callback to the CDC
-      // driver, the driver will attempt to queue a request.  We are (at this
-      // point in time) not _technically_ configured yet.  We declare ourselves
-      // to be configured only after our call into the CDC client succeeds.  So,
-      // if we fail requests because we are not yet configured yet (as the dwc2
-      // driver does), we are just going to end up in the infinite recursion or
-      // deadlock traps described below.
-      uep->ep.queued_reqs.push(std::move(req));
-      if (configured_) {
-        UserEpQueueNext(*uep);
-      }
-      return ZX_OK;
-    }
-  }();
-
-  if (queue_result != ZX_OK) {
-    ZX_DEBUG_ASSERT(false);
-    req.request()->response.status = queue_result;
-    req.request()->response.actual = 0;
-    pending_completions_.push(std::move(req));
-    if (zx_status_t status = SignalIrqThread(IrqSignal::Wakeup); status != ZX_OK) {
-      zxlogf(DEBUG, "Failed to signal IRQ thread %s", zx_status_get_string(status));
-    }
+void Dwc3::ConnectToEndpoint(ConnectToEndpointRequest& request,
+                             ConnectToEndpointCompleter::Sync& completer) {
+  zx_status_t status{init_done_.Wait(zx::deadline_after(kEndpointDeadline))};
+  if (status == ZX_ERR_TIMED_OUT) {
+    zxlogf(ERROR, "Init() runtime exceeds deadline");
+    completer.Reply(fit::as_error(status));
+    return;
   }
+
+  UserEndpoint* uep{get_user_endpoint(UsbAddressToEpNum(request.ep_addr()))};
+  if (uep == nullptr || !uep->server.has_value()) {
+    completer.Reply(fit::as_error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+
+  uep->server->Connect(uep->server->dispatcher(), std::move(request.ep()));
+  completer.Reply(fit::ok());
 }
 
-zx_status_t Dwc3::CommonSetInterface() {
+void Dwc3::SetInterface(SetInterfaceRequest& request, SetInterfaceCompleter::Sync& completer) {
+  fbl::AutoLock lock(&dci_lock_);
+
+  if (dci_intf_.is_valid()) {
+    zxlogf(ERROR, "%s: DCI Interface already set", __func__);
+    completer.Reply(zx::error(ZX_ERR_BAD_STATE));
+    return;
+  }
+
+  dci_intf_.Bind(std::move(request.interface()));
+
   StartPeripheralMode();
 
   // Start the interrupt thread.
@@ -535,70 +575,45 @@ zx_status_t Dwc3::CommonSetInterface() {
   if (int rc = thrd_create_with_name(&irq_thread_, irq_thunk, static_cast<void*>(this),
                                      "dwc3-interrupt-thread");
       rc != thrd_success) {
-    return ZX_ERR_INTERNAL;
+    completer.Reply(zx::error(ZX_ERR_INTERNAL));
+    return;
   }
   irq_thread_started_.store(true);
 
-  return ZX_OK;
+  completer.Reply(zx::ok());
 }
 
-zx_status_t Dwc3::UsbDciSetInterface(const usb_dci_interface_protocol_t* interface) {
-  fbl::AutoLock lock(&dci_lock_);
-
-  if (dci_intf_valid()) {
-    zxlogf(ERROR, "%s: DCI Interface already set", __func__);
-    return ZX_ERR_BAD_STATE;
-  }
-
-  dci_intf_ = ddk::UsbDciInterfaceProtocolClient(interface);
-
-  return CommonSetInterface();
-}
-
-void Dwc3::SetInterface(SetInterfaceRequest& request, SetInterfaceCompleter::Sync& completer) {
-  fbl::AutoLock lock(&dci_lock_);
-
-  if (dci_intf_valid()) {
-    zxlogf(ERROR, "%s: DCI Interface already set", __func__);
-    completer.Reply(zx::error(ZX_ERR_BAD_STATE));
-    return;
-  }
-
-  dci_intf_ = DciInterfaceFidlClient{};
-  std::get<DciInterfaceFidlClient>(dci_intf_).Bind(std::move(request.interface()));
-
-  if (zx_status_t status = CommonSetInterface(); status != ZX_OK) {
-    completer.Reply(zx::error(status));
-  } else {
-    completer.Reply(fit::ok());
-  }
-}
-
-zx_status_t Dwc3::CommonConfigureEndpoint(const usb_endpoint_descriptor_t* ep_desc,
-                                          const usb_ss_ep_comp_descriptor_t* ss_comp_desc) {
-  const uint8_t ep_num = UsbAddressToEpNum(ep_desc->b_endpoint_address);
+void Dwc3::ConfigureEndpoint(ConfigureEndpointRequest& request,
+                             ConfigureEndpointCompleter::Sync& completer) {
+  const uint8_t ep_num = UsbAddressToEpNum(request.ep_descriptor().b_endpoint_address());
   UserEndpoint* const uep = get_user_endpoint(ep_num);
 
   if (uep == nullptr) {
-    return ZX_ERR_INVALID_ARGS;
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
   }
 
-  uint8_t ep_type = usb_ep_type(ep_desc);
+  uint8_t ep_type = usb_ep_type2(request.ep_descriptor());
+
   if (ep_type == USB_ENDPOINT_ISOCHRONOUS) {
     zxlogf(ERROR, "isochronous endpoints are not supported");
-    return ZX_ERR_NOT_SUPPORTED;
+    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+    return;
   }
 
   fbl::AutoLock lock(&uep->ep.lock);
 
   if (zx_status_t status = uep->fifo.Init(bti_); status != ZX_OK) {
     zxlogf(ERROR, "fifo init failed %s", zx_status_get_string(status));
-    return status;
+    completer.Reply(zx::error(status));
+    return;
   }
-  uep->ep.max_packet_size = usb_ep_max_packet(ep_desc);
+
+  uep->ep.max_packet_size = usb_ep_max_packet2(request.ep_descriptor());
   uep->ep.type = ep_type;
-  uep->ep.interval = ep_desc->b_interval;
+  uep->ep.interval = request.ep_descriptor().b_interval();
   // TODO(voydanoff) USB3 support
+
   uep->ep.enabled = true;
   EpSetConfig(uep->ep, true);
 
@@ -607,49 +622,20 @@ zx_status_t Dwc3::CommonConfigureEndpoint(const usb_endpoint_descriptor_t* ep_de
     UserEpQueueNext(*uep);
   }
 
-  return ZX_OK;
+  completer.Reply(zx::ok());
 }
 
-zx_status_t Dwc3::UsbDciConfigEp(const usb_endpoint_descriptor_t* ep_desc,
-                                 const usb_ss_ep_comp_descriptor_t* ss_comp_desc) {
-  return CommonConfigureEndpoint(ep_desc, ss_comp_desc);
-}
-
-void Dwc3::ConfigureEndpoint(ConfigureEndpointRequest& request,
-                             ConfigureEndpointCompleter::Sync& completer) {
-  // For now, we'll convert the FIDL-structs into the requisite banjo-structs. Later, when we get
-  // rid of the banjo stuff, we can just use the FIDL struct field data directly.
-  usb_endpoint_descriptor_t ep_desc{
-      .b_length = request.ep_descriptor().b_length(),
-      .b_descriptor_type = request.ep_descriptor().b_descriptor_type(),
-      .b_endpoint_address = request.ep_descriptor().b_endpoint_address(),
-      .bm_attributes = request.ep_descriptor().bm_attributes(),
-      .w_max_packet_size = request.ep_descriptor().w_max_packet_size(),
-      .b_interval = request.ep_descriptor().b_interval()};
-
-  usb_ss_ep_comp_descriptor_t ss_comp_desc{
-      .b_length = request.ss_comp_descriptor().b_length(),
-      .b_descriptor_type = request.ss_comp_descriptor().b_descriptor_type(),
-      .b_max_burst = request.ss_comp_descriptor().b_max_burst(),
-      .bm_attributes = request.ss_comp_descriptor().bm_attributes(),
-      .w_bytes_per_interval = request.ss_comp_descriptor().w_bytes_per_interval()};
-
-  if (zx_status_t status = CommonConfigureEndpoint(&ep_desc, &ss_comp_desc); status != ZX_OK) {
-    completer.Reply(zx::error(status));
-  } else {
-    completer.Reply(fit::ok());
-  }
-}
-
-zx_status_t Dwc3::CommonDisableEndpoint(uint8_t ep_addr) {
-  const uint8_t ep_num = UsbAddressToEpNum(ep_addr);
+void Dwc3::DisableEndpoint(DisableEndpointRequest& request,
+                           DisableEndpointCompleter::Sync& completer) {
+  const uint8_t ep_num = UsbAddressToEpNum(request.ep_address());
   UserEndpoint* const uep = get_user_endpoint(ep_num);
 
   if (uep == nullptr) {
-    return ZX_ERR_INVALID_ARGS;
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
   }
 
-  RequestQueue to_complete;
+  FidlRequestQueue to_complete;
   {
     fbl::AutoLock lock(&uep->ep.lock);
     to_complete = UserEpCancelAllLocked(*uep);
@@ -658,71 +644,44 @@ zx_status_t Dwc3::CommonDisableEndpoint(uint8_t ep_addr) {
   }
 
   to_complete.CompleteAll(ZX_ERR_IO_NOT_PRESENT, 0);
-  return ZX_OK;
-}
-
-zx_status_t Dwc3::UsbDciDisableEp(uint8_t ep_address) { return CommonDisableEndpoint(ep_address); }
-
-void Dwc3::DisableEndpoint(DisableEndpointRequest& request,
-                           DisableEndpointCompleter::Sync& completer) {
-  if (zx_status_t status = CommonDisableEndpoint(request.ep_address()); status != ZX_OK) {
-    completer.Reply(zx::error(status));
-  } else {
-    completer.Reply(fit::ok());
-  }
-}
-
-zx_status_t Dwc3::CommonEndpointSetStall(uint8_t ep_addr) {
-  const uint8_t ep_num = UsbAddressToEpNum(ep_addr);
-  UserEndpoint* const uep = get_user_endpoint(ep_num);
-
-  if (uep == nullptr) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  fbl::AutoLock lock(&uep->ep.lock);
-  return EpSetStall(uep->ep, true);
-}
-
-zx_status_t Dwc3::UsbDciEpSetStall(uint8_t ep_address) {
-  return CommonEndpointSetStall(ep_address);
+  completer.Reply(zx::ok());
 }
 
 void Dwc3::EndpointSetStall(EndpointSetStallRequest& request,
                             EndpointSetStallCompleter::Sync& completer) {
-  if (zx_status_t status = CommonEndpointSetStall(request.ep_address()); status != ZX_OK) {
-    completer.Reply(zx::error(status));
-  } else {
-    completer.Reply(fit::ok());
-  }
-}
-
-zx_status_t Dwc3::CommonEndpointClearStall(uint8_t ep_addr) {
-  const uint8_t ep_num = UsbAddressToEpNum(ep_addr);
+  const uint8_t ep_num = UsbAddressToEpNum(request.ep_address());
   UserEndpoint* const uep = get_user_endpoint(ep_num);
 
   if (uep == nullptr) {
-    return ZX_ERR_INVALID_ARGS;
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
   }
 
   fbl::AutoLock lock(&uep->ep.lock);
-  return EpSetStall(uep->ep, false);
-}
-
-zx_status_t Dwc3::UsbDciEpClearStall(uint8_t ep_address) {
-  return CommonEndpointClearStall(ep_address);
+  if (zx_status_t status = EpSetStall(uep->ep, true); status != ZX_OK) {
+    completer.Reply(zx::error(status));
+  } else {
+    completer.Reply(zx::ok());
+  }
 }
 
 void Dwc3::EndpointClearStall(EndpointClearStallRequest& request,
                               EndpointClearStallCompleter::Sync& completer) {
-  if (zx_status_t status = CommonEndpointClearStall(request.ep_address()); status != ZX_OK) {
+  const uint8_t ep_num = UsbAddressToEpNum(request.ep_address());
+  UserEndpoint* const uep = get_user_endpoint(ep_num);
+
+  if (uep == nullptr) {
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+
+  fbl::AutoLock lock(&uep->ep.lock);
+  if (zx_status_t status = EpSetStall(uep->ep, false); status != ZX_OK) {
     completer.Reply(zx::error(status));
   } else {
-    completer.Reply(fit::ok());
+    completer.Reply(zx::ok());
   }
 }
-
-size_t Dwc3::UsbDciGetRequestSize() { return Request::RequestSize(sizeof(usb_request_t)); }
 
 zx_status_t Dwc3::CommonCancelAll(uint8_t ep_addr) {
   const uint8_t ep_num = UsbAddressToEpNum(ep_addr);
@@ -735,47 +694,19 @@ zx_status_t Dwc3::CommonCancelAll(uint8_t ep_addr) {
   return UserEpCancelAll(*uep);
 }
 
-zx_status_t Dwc3::UsbDciCancelAll(uint8_t ep_address) { return CommonCancelAll(ep_address); }
-
 void Dwc3::CancelAll(CancelAllRequest& request, CancelAllCompleter::Sync& completer) {
   if (zx_status_t status = CommonCancelAll(request.ep_address()); status != ZX_OK) {
     completer.Reply(zx::error(status));
   } else {
-    completer.Reply(fit::ok());
+    completer.Reply(zx::ok());
   }
 }
 
-void Dwc3::DciIntfWrapSetSpeed(usb_speed_t speed) {
-  ZX_ASSERT(dci_intf_valid());
-
-  if (std::holds_alternative<DciInterfaceBanjoClient>(dci_intf_)) {
-    std::get<DciInterfaceBanjoClient>(dci_intf_).SetSpeed(speed);
-    return;
-  }
-
-  fdescriptor::wire::UsbSpeed fspeed{fdescriptor::wire::UsbSpeed::kUndefined};
-
-  // Convert banjo usb_speed_t into FIDL speed struct.
-  switch (speed) {
-    case USB_SPEED_LOW:
-      fspeed = fdescriptor::wire::UsbSpeed::kLow;
-      break;
-    case USB_SPEED_FULL:
-      fspeed = fdescriptor::wire::UsbSpeed::kFull;
-      break;
-    case USB_SPEED_HIGH:
-      fspeed = fdescriptor::wire::UsbSpeed::kHigh;
-      break;
-    case USB_SPEED_SUPER:
-      fspeed = fdescriptor::wire::UsbSpeed::kSuper;
-      break;
-    case USB_SPEED_ENHANCED_SUPER:
-      fspeed = fdescriptor::wire::UsbSpeed::kEnhancedSuper;
-      break;
-  };
+void Dwc3::DciIntfSetSpeed(fdescriptor::wire::UsbSpeed speed) {
+  ZX_ASSERT(dci_intf_.is_valid());
 
   fidl::Arena arena;
-  auto result = std::get<DciInterfaceFidlClient>(dci_intf_).buffer(arena)->SetSpeed(fspeed);
+  auto result = dci_intf_.buffer(arena)->SetSpeed(speed);
   if (!result.ok()) {
     zxlogf(ERROR, "(framework) SetSpeed(): %s", result.status_string());
   } else if (result->is_error()) {
@@ -783,16 +714,11 @@ void Dwc3::DciIntfWrapSetSpeed(usb_speed_t speed) {
   }
 }
 
-void Dwc3::DciIntfWrapSetConnected(bool connected) {
-  ZX_ASSERT(dci_intf_valid());
-
-  if (std::holds_alternative<DciInterfaceBanjoClient>(dci_intf_)) {
-    std::get<DciInterfaceBanjoClient>(dci_intf_).SetConnected(connected);
-    return;
-  }
+void Dwc3::DciIntfSetConnected(bool connected) {
+  ZX_ASSERT(dci_intf_.is_valid());
 
   fidl::Arena arena;
-  auto result = std::get<DciInterfaceFidlClient>(dci_intf_).buffer(arena)->SetConnected(connected);
+  auto result = dci_intf_.buffer(arena)->SetConnected(connected);
   if (!result.ok()) {
     zxlogf(ERROR, "(framework) SetConnected(): %s", result.status_string());
   } else if (result->is_error()) {
@@ -800,29 +726,16 @@ void Dwc3::DciIntfWrapSetConnected(bool connected) {
   }
 }
 
-zx_status_t Dwc3::DciIntfWrapControl(const usb_setup_t* setup, const uint8_t* write_buffer,
-                                     size_t write_size, uint8_t* read_buffer, size_t read_size,
-                                     size_t* read_actual) {
-  ZX_ASSERT(dci_intf_valid());
-
-  if (std::holds_alternative<DciInterfaceBanjoClient>(dci_intf_)) {
-    return std::get<DciInterfaceBanjoClient>(dci_intf_).Control(
-        setup, write_buffer, write_size, read_buffer, read_size, read_actual);
-  }
-
-  // Convert banjo usb_setup_t into FIDL setup struct.
-  fdescriptor::wire::UsbSetup fsetup;
-  fsetup.bm_request_type = setup->bm_request_type;
-  fsetup.b_request = setup->b_request;
-  fsetup.w_value = setup->w_value;
-  fsetup.w_index = setup->w_index;
-  fsetup.w_length = setup->w_length;
+zx_status_t Dwc3::DciIntfControl(const fdescriptor::wire::UsbSetup* setup,
+                                 const uint8_t* write_buffer, size_t write_size,
+                                 uint8_t* read_buffer, size_t read_size, size_t* read_actual) {
+  ZX_ASSERT(dci_intf_.is_valid());
 
   auto fwrite =
       fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(write_buffer), write_size);
 
   fidl::Arena arena;
-  auto result = std::get<DciInterfaceFidlClient>(dci_intf_).buffer(arena)->Control(fsetup, fwrite);
+  auto result = dci_intf_.buffer(arena)->Control(*setup, fwrite);
 
   if (!result.ok()) {
     zxlogf(ERROR, "(framework) Control(): %s", result.status_string());
@@ -847,6 +760,91 @@ zx_status_t Dwc3::DciIntfWrapControl(const usb_setup_t* setup, const uint8_t* wr
   }
 
   return ZX_OK;
+}
+
+void Dwc3::EpServer::GetInfo(GetInfoCompleter::Sync& completer) {
+  auto info{fendpoint::EndpointInfo::WithControl(fendpoint::ControlEndpointInfo{})};
+
+  switch (uep_->ep.type) {
+    case USB_ENDPOINT_CONTROL:
+      // Set up above.
+      break;
+    case USB_ENDPOINT_ISOCHRONOUS: {
+      fendpoint::IsochronousEndpointInfo isoc;
+      isoc.lead_time(1);
+      info.isochronous(std::move(isoc));
+      break;
+    }
+    case USB_ENDPOINT_BULK:
+      info.bulk(fendpoint::BulkEndpointInfo{});
+      break;
+    case USB_ENDPOINT_INTERRUPT:
+      info.interrupt(fendpoint::InterruptEndpointInfo{});
+      break;
+    default:
+      // In theory, this should never happen unless a new EP type is added to the spec.
+      zxlogf(ERROR, "unknown usb endpoint type: 0x%xd", uep_->ep.type);
+      completer.Reply(zx::error(ZX_ERR_BAD_STATE));
+  }
+
+  completer.Reply(zx::ok(std::move(info)));
+}
+
+void Dwc3::EpServer::QueueRequests(QueueRequestsRequest& request,
+                                   QueueRequestsCompleter::Sync& completer) {
+  for (auto& req : request.req()) {
+    fbl::AutoLock lock(&uep_->ep.lock);
+
+    usb::FidlRequest freq{std::move(req)};
+
+    zx_status_t status{ZX_OK};
+
+    if (!uep_->ep.enabled) {
+      status = ZX_ERR_BAD_STATE;
+      zxlogf(ERROR, "Dwc3: ep(%u) not enabled!", uep_->ep.ep_num);
+    }
+
+    if (status == ZX_OK && freq->data()->size() != 1) {
+      status = ZX_ERR_INVALID_ARGS;
+      zxlogf(ERROR, "scatter-gather not implemented");
+    }
+
+    if (status == ZX_OK && uep_->ep.IsOutput()) {
+      // Dig the length out of the request data block.
+      size_t length{freq->data()->at(0).size().value()};
+
+      if (length == 0 || (length % uep_->ep.max_packet_size) != 0) {
+        status = ZX_ERR_INVALID_ARGS;
+        zxlogf(ERROR, "Dwc3: OUT transfers must be multiple of max packet size (len %ld mps %hu)",
+               length, uep_->ep.max_packet_size);
+      }
+    }
+
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "failing request with status %s", zx_status_get_string(status));
+      RequestComplete(status, 0, std::move(freq));
+
+      if (status = dwc3_->SignalIrqThread(IrqSignal::Wakeup); status != ZX_OK) {
+        zxlogf(DEBUG, "Failed to signal IRQ thread %s", zx_status_get_string(status));
+      }
+      continue;
+    }
+
+    RequestInfo info{0, 0, uep_, std::move(freq)};
+    uep_->ep.queued_reqs.push(std::move(info));
+
+    if (dwc3_->configured_) {
+      dwc3_->UserEpQueueNext(*uep_);
+    }
+  }
+}
+
+void Dwc3::EpServer::CancelAll(CancelAllCompleter::Sync& completer) {
+  if (zx_status_t status = dwc3_->CommonCancelAll(uep_->ep.ep_num); status != ZX_OK) {
+    completer.Reply(zx::error(status));
+  } else {
+    completer.Reply(zx::ok());
+  }
 }
 
 static constexpr zx_driver_ops_t driver_ops = []() {

@@ -40,10 +40,10 @@ LogExporter::~LogExporter() {
 }
 
 // Returns only seconds part
-uint64_t GetSeconds(uint64_t nanoseconds) { return nanoseconds / 1000000000UL; }
+uint64_t GetSeconds(zx::time_boot timestamp) { return timestamp.get() / 1000000000UL; }
 
 // Returns only nano seconds part
-uint64_t GetNanoSeconds(uint64_t nanoseconds) { return (nanoseconds / 1000UL) % 1000000UL; }
+uint64_t GetNanoSeconds(zx::time_boot timestamp) { return (timestamp.get() / 1000UL) % 1000000UL; }
 
 #define RETURN_IF_ERROR(expr) \
   do {                        \

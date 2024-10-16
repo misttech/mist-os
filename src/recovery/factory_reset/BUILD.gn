@@ -6,8 +6,6 @@ import("//build/components.gni")
 import("//build/config.gni")
 import("//build/test.gni")
 import("//build/testing/environments.gni")
-import("//src/storage/fshost/generated_fshost_config.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 source_set("lib") {
   sources = [
@@ -65,10 +63,6 @@ executable("fdr") {
     "//sdk/fidl/fuchsia.recovery:fuchsia.recovery_cpp",
     "//sdk/lib/component/incoming/cpp",
   ]
-}
-
-core_shard("factory_reset_core_shard") {
-  shard_file = "meta/factory_reset.core_shard.cml"
 }
 
 fuchsia_component_manifest("manifest") {

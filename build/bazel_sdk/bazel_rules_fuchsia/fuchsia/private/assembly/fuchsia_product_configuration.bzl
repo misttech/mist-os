@@ -33,26 +33,33 @@ INPUT_DEVICE_TYPE = struct(
 )
 
 def _create_pkg_detail(dep, relative = None):
+    package_manifest_path = None
+    configs = None
+
+    # Find the package manifest and configs from the input depending on the provider.
     if FuchsiaPackageInfo in dep:
-        path = ""
-        if relative:
-            path = dep[FuchsiaPackageInfo].package_manifest.path.removeprefix(relative + "/")
-        else:
-            path = dep[FuchsiaPackageInfo].package_manifest.path
+        package_manifest_path = dep[FuchsiaPackageInfo].package_manifest.path
+    else:
+        package_manifest_path = dep[FuchsiaAssembledPackageInfo].package.package_manifest.path
+        configs = dep[FuchsiaAssembledPackageInfo].configs
 
-        return {"manifest": path}
+    # Relativize the path if necessary.
+    if relative:
+        package_manifest_path = package_manifest_path.removeprefix(relative + "/")
 
-    package = dep[FuchsiaAssembledPackageInfo].package
-    configs = dep[FuchsiaAssembledPackageInfo].configs
-    config_data = []
-    for config in configs:
-        config_data.append(
-            {
-                "destination": config.destination,
-                "source": config.source.path,
-            },
-        )
-    return {"manifest": package.package_manifest.path, "config_data": config_data}
+    # If we have configs, return them.
+    if configs:
+        config_data = []
+        for config in configs:
+            config_data.append(
+                {
+                    "destination": config.destination,
+                    "source": config.source.path,
+                },
+            )
+        return {"manifest": package_manifest_path, "config_data": config_data}
+    else:
+        return {"manifest": package_manifest_path}
 
 def _collect_file_deps(dep):
     if FuchsiaPackageInfo in dep:
@@ -104,9 +111,10 @@ def _fuchsia_product_configuration_impl(ctx):
 
     base_driver_details = []
     for dep in ctx.attr.base_driver_packages:
+        package_detail = _create_pkg_detail(dep, relative_base)
         base_driver_details.append(
             {
-                "package": dep[FuchsiaPackageInfo].package_manifest.path,
+                "package": package_detail["manifest"],
                 "components": get_driver_component_manifests(dep),
             },
         )

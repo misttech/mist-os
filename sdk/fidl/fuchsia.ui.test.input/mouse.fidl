@@ -122,7 +122,7 @@ closed protocol MouseInputListener {
         9: wheel_y_physical_pixel float64;
 
         // Identifies the device originating this event.
-        @available(added=NEXT)
+        @available(added=24)
         10: device_id uint32;
     });
 };

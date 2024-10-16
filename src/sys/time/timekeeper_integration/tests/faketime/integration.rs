@@ -116,8 +116,8 @@ async fn freerun_time_fast(fake_clock: &FakeClockController) {
     fake_clock.pause().await.expect("Failed to pause time");
     fake_clock
         .resume_with_increments(
-            zx::Duration::from_millis(1).into_nanos(),
-            &Increment::Determined(zx::Duration::from_minutes(1).into_nanos()),
+            zx::MonotonicDuration::from_millis(1).into_nanos(),
+            &Increment::Determined(zx::MonotonicDuration::from_minutes(1).into_nanos()),
         )
         .await
         .expect("Failed to resume time")
@@ -125,7 +125,8 @@ async fn freerun_time_fast(fake_clock: &FakeClockController) {
 }
 
 /// The duration after which timekeeper restarts an inactive time source.
-const INACTIVE_SOURCE_RESTART_DURATION: zx::Duration = zx::Duration::from_hours(1);
+const INACTIVE_SOURCE_RESTART_DURATION: zx::MonotonicDuration =
+    zx::MonotonicDuration::from_hours(1);
 
 #[fuchsia::test]
 async fn test_restart_inactive_time_source_that_claims_healthy() -> Result<()> {

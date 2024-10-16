@@ -40,7 +40,6 @@
         {
             protocol: [
                 "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.logger.LogSink",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.sysmem.Allocator",

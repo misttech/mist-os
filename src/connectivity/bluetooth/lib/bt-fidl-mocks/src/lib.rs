@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use zx::Duration;
+use zx::MonotonicDuration;
 
 /// Defines a generic utility to expect calls to a FIDL message and extract their parameters.
 pub mod expect;
@@ -21,6 +21,6 @@ pub mod hci;
 
 const TIMEOUT_SECONDS: i64 = 4 * 60;
 
-pub fn timeout_duration() -> Duration {
-    Duration::from_seconds(TIMEOUT_SECONDS)
+pub fn timeout_duration() -> MonotonicDuration {
+    MonotonicDuration::from_seconds(TIMEOUT_SECONDS)
 }

@@ -274,7 +274,7 @@ impl OutputWorker {
                                 // abnormal and indicates possible glitching while receiving playback
                                 // audio from the system and/or extracting it for analysis.
                                 let timestamp_interval = monotonic_zx_time - last_timestamp;
-                                if  timestamp_interval > zx::Duration::from_millis(100) {
+                                if  timestamp_interval > zx::MonotonicDuration::from_millis(100) {
                                     trace!(
                                         "AudioFacade::OutputWorker: Extraction position timestamp jumped by more than 100ms ({:?}ms). Expect glitches.",
                                         timestamp_interval.into_millis());
@@ -290,7 +290,7 @@ impl OutputWorker {
                                 // while receiving playback audio from the system and/or extracting it
                                 // for analysis.
                                 let observed_interval = now - last_event_time;
-                                if  observed_interval > zx::Duration::from_millis(150) {
+                                if  observed_interval > zx::MonotonicDuration::from_millis(150) {
                                     trace!(
                                         "AudioFacade::OutputWorker: Extraction position not updated for 150ms ({:?}ms). Expect glitches.",
                                         observed_interval.into_millis());
@@ -692,7 +692,7 @@ impl InputWorker {
                                 // be injected and/or providing it to the system.
                                 let timestamp_interval = monotonic_zx_time - last_timestamp;
 
-                                if  timestamp_interval > zx::Duration::from_millis(100) {
+                                if  timestamp_interval > zx::MonotonicDuration::from_millis(100) {
                                     trace!("AudioFacade::InputWorker: Injection position timestamp jumped by more than 100ms ({:?}ms). Expect glitches.",
                                         timestamp_interval.into_millis());
                                 }
@@ -707,7 +707,7 @@ impl InputWorker {
                                 // system.
                                 let observed_interval = now - last_event_time;
 
-                                if  observed_interval > zx::Duration::from_millis(150) {
+                                if  observed_interval > zx::MonotonicDuration::from_millis(150) {
                                     trace!("AudioFacade::InputWorker: Injection position not updated for 150ms ({:?}ms). Expect glitches.",
                                         observed_interval.into_millis());
                                 }

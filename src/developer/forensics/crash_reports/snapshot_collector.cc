@@ -85,7 +85,7 @@ feedback::Annotations SnapshotCollector::GetMissingSnapshotAnnotations(const std
                   GetMissingSnapshotAnnotations(kNoUuidSnapshotUuid)));
   }
 
-  const zx::time current_time{clock_->Now()};
+  const zx::time current_time{clock_->MonotonicNow()};
 
   std::string uuid;
 

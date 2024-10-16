@@ -4,8 +4,8 @@
 
 #[derive(Copy, Clone, Eq, PartialEq, Default, Debug)]
 pub struct TaskTimeStats {
-    pub user_time: zx::Duration,
-    pub system_time: zx::Duration,
+    pub user_time: zx::MonotonicDuration,
+    pub system_time: zx::MonotonicDuration,
 }
 
 impl std::ops::Add for TaskTimeStats {

@@ -79,8 +79,13 @@ const std::map<uint32_t, std::string> kGpioPinFunctionMap = {
 namespace nelson {
 
 zx_status_t Nelson::OtRadioInit() {
-  gpio_init_steps_.push_back(GpioFunction(GPIO_TH_SOC_INT, 0));
-  gpio_init_steps_.push_back(GpioPull(GPIO_TH_SOC_INT, fuchsia_hardware_pin::Pull::kNone));
+  gpio_init_steps_.push_back(fuchsia_hardware_pinimpl::InitStep::WithCall({{
+      .pin = GPIO_TH_SOC_INT,
+      .call = fuchsia_hardware_pinimpl::InitCall::WithPinConfig({{
+          .pull = fuchsia_hardware_pin::Pull::kNone,
+          .function = 0,
+      }}),
+  }}));
   gpio_init_steps_.push_back(GpioInput(GPIO_TH_SOC_INT));
   gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_TH_RST_L, 0));  // Reset
   gpio_init_steps_.push_back(GpioOutput(GPIO_SOC_TH_RST_L, true));

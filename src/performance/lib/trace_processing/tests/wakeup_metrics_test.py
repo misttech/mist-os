@@ -42,6 +42,28 @@ class WakeupMetricsTest(unittest.TestCase):
         )
         self.assertEqual(result, [])
 
+    def test_process_metrics_raises_on_zero_wakeups(self) -> None:
+        model = WakeupMetricsTest._load_model("zero_wakeups.json")
+        with self.assertRaises(RuntimeError) as context:
+            wakeup.WakeupMetricsProcessor(
+                _LABEL, _EVENTS, require_wakeup=True
+            ).process_metrics(model)
+        self.assertEqual(
+            str(context.exception),
+            "Required wakeup not present in trace, observed events: '', missing event: 'WakeupEvent1'",
+        )
+
+    def test_process_metrics_raises_on_incomplete_wakeup(self) -> None:
+        model = WakeupMetricsTest._load_model("incomplete_wakeup.json")
+        with self.assertRaises(RuntimeError) as context:
+            wakeup.WakeupMetricsProcessor(
+                _LABEL, _EVENTS, require_wakeup=True
+            ).process_metrics(model)
+        self.assertEqual(
+            str(context.exception),
+            "Required wakeup not present in trace, observed events: 'WakeupEvent1,WakeupEvent2', missing event: 'WakeupEvent3'",
+        )
+
     def test_process_metrics_handles_one_wakeup(self) -> None:
         model = WakeupMetricsTest._load_model("one_wakeup.json")
         result = wakeup.WakeupMetricsProcessor(_LABEL, _EVENTS).process_metrics(

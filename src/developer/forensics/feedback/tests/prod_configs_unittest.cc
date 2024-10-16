@@ -96,6 +96,10 @@ TEST_F(ProdConfigTest, DefaultSnapshot) {
                                                 "build.product",
                                                 "build.version",
                                                 "build.version.previous-boot",
+                                                "build.platform.version",
+                                                "build.platform.version.previous-boot",
+                                                "build.product.version",
+                                                "build.product.version.previous-boot",
                                                 "device.board-name",
                                                 "device.feedback-id",
                                                 "device.num-cpus",
@@ -124,6 +128,7 @@ TEST_F(ProdConfigTest, DefaultSnapshot) {
 
   EXPECT_THAT(config->attachment_allowlist, UnorderedElementsAreArray({
                                                 "build.snapshot.xml",
+                                                "build.kernel-boot-options.txt",
                                                 "inspect.json",
                                                 "log.kernel.txt",
                                                 "log.system.previous_boot.txt",

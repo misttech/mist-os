@@ -41,10 +41,5 @@
             from: "self",
             to: "#test-collection",
         },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: "#test-collection",
-        },
     ],
 }

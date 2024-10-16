@@ -229,6 +229,13 @@ class AmlSdmmc : public fdf::DriverBase,
 
   using SdmmcVmoStore = vmo_store::VmoStore<vmo_store::HashTableStorage<uint32_t, OwnedVmoInfo>>;
 
+  // Sweeps from zero to the max delay and creates a TuneWindow representing the largest span of
+  // delay values that failed.
+  static TuneWindow GetFailingWindow(TuneResults results);
+
+  static uint32_t DistanceToFailingPoint(TuneSettings point,
+                                         cpp20::span<const TuneResults> adj_delay_results);
+
   zx::result<> InitResources(fidl::ClientEnd<fuchsia_hardware_platform_device::Device> pdev_client);
   // TODO(b/309152899): Once fuchsia.power.SuspendEnabled config cap is available, have this method
   // return failure if power management could not be configured. Use fuchsia.power.SuspendEnabled to
@@ -250,15 +257,9 @@ class AmlSdmmc : public fdf::DriverBase,
   template <typename T>
   void DoRequestAndComplete(fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcReq> reqs,
                             fdf::Arena& arena, T& completer) TA_REQ(lock_);
-
-  uint32_t DistanceToFailingPoint(TuneSettings point,
-                                  cpp20::span<const TuneResults> adj_delay_results);
   zx::result<TuneSettings> PerformTuning(cpp20::span<const TuneResults> adj_delay_results);
   zx_status_t TuningDoTransfer(const TuneContext& context) TA_REQ(tuning_lock_);
   bool TuningTestSettings(const TuneContext& context) TA_REQ(tuning_lock_);
-  // Sweeps from zero to the max delay and creates a TuneWindow representing the largest span of
-  // delay values that failed.
-  TuneWindow GetFailingWindow(TuneResults results);
   TuneResults TuneDelayLines(const TuneContext& context) TA_REQ(tuning_lock_);
 
   void SetTuneSettings(const TuneSettings& settings) TA_REQ(lock_);
@@ -291,7 +292,9 @@ class AmlSdmmc : public fdf::DriverBase,
   // lease control client end in |lease_control_client_end|. That is unless
   // |lease_control_client_end| is valid to begin with (i.e., a lease had already been acquired), in
   // which case ZX_ERR_ALREADY_BOUND is returned instead.
-  zx_status_t AcquireLease(
+  // This should only be used during driver initialization until a higher level component can
+  // manage our power state
+  zx_status_t AcquireInitLease(
       const fidl::WireSyncClient<fuchsia_power_broker::Lessor>& lessor_client,
       fidl::ClientEnd<fuchsia_power_broker::LeaseControl>& lease_control_client_end);
 
@@ -321,10 +324,7 @@ class AmlSdmmc : public fdf::DriverBase,
   std::unique_ptr<dma_buffer::ContiguousBuffer> descs_buffer_ TA_GUARDED(lock_);
   trace_async_id_t trace_async_id_;
   std::vector<std::variant<SdmmcRequestInfo, SdmmcTaskInfo>> delayed_requests_;
-  // TODO(b/368636358): Re-enable actual hardware power state manipulation.
-#if 0
   uint32_t clk_div_saved_ = 0;
-#endif
 
   fidl::WireSyncClient<fuchsia_power_broker::ElementControl> hardware_power_element_control_client_;
   fidl::WireSyncClient<fuchsia_power_broker::Lessor> hardware_power_lessor_client_;

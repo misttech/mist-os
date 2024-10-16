@@ -178,24 +178,27 @@ zx_status_t Nelson::AudioInit() {
     return fuchsia_hardware_pinimpl::InitStep::WithDelay(delay.get());
   };
 
+  auto audio_pin = [](uint32_t pin, uint64_t function) {
+    return fuchsia_hardware_pinimpl::InitStep::WithCall({{
+        .pin = pin,
+        .call = fuchsia_hardware_pinimpl::InitCall::WithPinConfig({{
+            .function = function,
+            .drive_strength_ua = 3'000,
+        }}),
+    }});
+  };
+
   // TDM pin assignments.
-  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_I2S_SCLK, S905D3_GPIOA_1_TDMB_SCLK_FN));
-  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_I2S_FS, S905D3_GPIOA_2_TDMB_FS_FN));
-  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_I2S_DO0, S905D3_GPIOA_3_TDMB_D0_FN));
-  constexpr uint64_t ua = 3000;
-  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_I2S_SCLK, ua));
-  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_I2S_FS, ua));
-  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_I2S_DO0, ua));
+  gpio_init_steps_.push_back(audio_pin(GPIO_SOC_I2S_SCLK, S905D3_GPIOA_1_TDMB_SCLK_FN));
+  gpio_init_steps_.push_back(audio_pin(GPIO_SOC_I2S_FS, S905D3_GPIOA_2_TDMB_FS_FN));
+  gpio_init_steps_.push_back(audio_pin(GPIO_SOC_I2S_DO0, S905D3_GPIOA_3_TDMB_D0_FN));
 
 #ifdef ENABLE_BT
   // PCM pin assignments.
   gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_BT_PCM_IN, S905D3_GPIOX_8_TDMA_DIN1_FN));
-  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_BT_PCM_OUT, S905D3_GPIOX_9_TDMA_D0_FN));
-  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_BT_PCM_SYNC, S905D3_GPIOX_10_TDMA_FS_FN));
-  gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_BT_PCM_CLK, S905D3_GPIOX_11_TDMA_SCLK_FN));
-  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_BT_PCM_OUT, ua));
-  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_BT_PCM_SYNC, ua));
-  gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_BT_PCM_CLK, ua));
+  gpio_init_steps_.push_back(audio_pin(GPIO_SOC_BT_PCM_OUT, S905D3_GPIOX_9_TDMA_D0_FN));
+  gpio_init_steps_.push_back(audio_pin(GPIO_SOC_BT_PCM_SYNC, S905D3_GPIOX_10_TDMA_FS_FN));
+  gpio_init_steps_.push_back(audio_pin(GPIO_SOC_BT_PCM_CLK, S905D3_GPIOX_11_TDMA_SCLK_FN));
 #endif
 
   // PDM pin assignments

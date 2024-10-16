@@ -36,7 +36,7 @@ use rive_rs::File;
 #[cfg(feature = "debug_touch_to_update")]
 use std::time::Instant;
 use tracing::{error, info};
-use zx::{Duration, Event};
+use zx::{Event, MonotonicDuration};
 
 const LOGO_IMAGE_PATH: &str = "/pkg/data/logo.riv";
 const BG_COLOR: Color = Color::white();
@@ -170,7 +170,7 @@ impl ViewAssistant for ProgressBarViewAssistant {
                 MessageTarget::View(self.view_key),
                 make_message(ProgressBarMessages::SetProgressSmooth(
                     rand_percent,
-                    Duration::from_seconds(1),
+                    MonotonicDuration::from_seconds(1),
                 )),
             );
             let text = format!("Progress Bar {}%   ", rand_percent as i32);
@@ -198,13 +198,13 @@ impl ProgressBarAppAssistant {
         app_context: &AppSender,
         status: Status,
         percent_complete: f32,
-        elapsed_time: Option<Duration>,
+        elapsed_time: Option<MonotonicDuration>,
     ) {
         match status {
             Status::Active => {
                 let progress = percent_complete / 100.0;
                 let progress_message = if elapsed_time.is_some()
-                    && elapsed_time.unwrap() > Duration::from_seconds(0)
+                    && elapsed_time.unwrap() > MonotonicDuration::from_seconds(0)
                 {
                     ProgressBarMessages::SetProgressSmooth(progress, elapsed_time.unwrap())
                 } else {
@@ -284,7 +284,7 @@ impl AppAssistant for ProgressBarAppAssistant {
                                     if let Some(status) = payload.status {
                                         let elapsed_time = if let Some(nanos) = payload.elapsed_time
                                         {
-                                            Some(Duration::from_nanos(nanos))
+                                            Some(MonotonicDuration::from_nanos(nanos))
                                         } else {
                                             None
                                         };

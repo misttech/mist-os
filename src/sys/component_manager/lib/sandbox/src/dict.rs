@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::Capability;
+use crate::{Capability, CapabilityBound};
 use derivative::Derivative;
 use fidl_fuchsia_component_sandbox as fsandbox;
 use std::collections::BTreeMap;
@@ -39,6 +39,8 @@ pub(crate) struct DictInner {
     #[derivative(Debug = "ignore")]
     task_group: Option<fasync::TaskGroup>,
 }
+
+impl CapabilityBound for Dict {}
 
 impl Default for Dict {
     fn default() -> Self {

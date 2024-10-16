@@ -56,7 +56,9 @@ async fn record_cleanup_task(records: Arc<Mutex<Vec<Record>>>) {
             if records_guard.is_empty() {
                 // If we have no records, then we can sleep for as long as the timeout and check
                 // again
-                zx::MonotonicInstant::after(zx::Duration::from_seconds(CLEANUP_DEADLINE_SECONDS))
+                zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(
+                    CLEANUP_DEADLINE_SECONDS,
+                ))
             } else {
                 // If there's an upcoming record to delete, sleep until then
                 records_guard[0].deadline.clone()
@@ -84,7 +86,7 @@ impl CrashRecords {
     /// `CLEANUP_DEADLINE_SECONDS`.
     pub async fn add_report(&self, thread_koid: zx::Koid, report: ComponentCrashInfo) {
         self.records.lock().await.push(Record {
-            deadline: zx::MonotonicInstant::after(zx::Duration::from_seconds(
+            deadline: zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(
                 CLEANUP_DEADLINE_SECONDS,
             )),
             koid: thread_koid.clone(),

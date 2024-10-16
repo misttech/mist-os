@@ -46,9 +46,9 @@ PYTHONPATH=$FUCHSIA_DIR/$BUILD_DIR/host_x64:$FUCHSIA_DIR/src/developer/ffx/lib/f
 
 echo "Running coverage tool..."
 HONEYDEW_FASTBOOT_OVERRIDE=$FASTBOOT_PATH coverage \
-    run --source $HONEYDEW_SRC -m unittest discover \
+    run --source $HONEYDEW_SRC --omit "*test*.py" -m unittest discover \
     --top-level-directory $HONEYDEW_SRC \
-    --start-directory $HONEYDEW_SRC/tests/unit_tests \
+    --start-directory $HONEYDEW_SRC \
     --pattern "*_test.py"
 
 if [ $? -ne 0 ]; then
@@ -59,7 +59,7 @@ if [ $? -ne 0 ]; then
 fi
 
 echo "Generating coverage stats..."
-output=$(coverage report -m --include "$INCLUDE_FILES")
+output=$(coverage report -m --include "$INCLUDE_FILES" --omit "*test*.py" --skip-empty)
 # `coverage report` returns non-zero exit code when there is no coverage data to
 # report; ignore those occurrences and only bubble up other failure modes.
 if [[ $? -ne 0 && $output != "No data to report"* ]]; then

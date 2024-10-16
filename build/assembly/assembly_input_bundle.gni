@@ -196,6 +196,9 @@ import("//build/python/python_action.gni")
 #       optional 'label' field is required when the file is created by the
 #       build, and is the label of the target that creates the file.
 #
+#  memory_buckets (optional; default: [])
+#    [list of paths] Paths to memory bucket configs that should get merged and
+#    passed to memory monitor.
 #
 #  create_aib_package (optional; default: true)
 #    [boolean] Set to true to also create a package that contains the contents
@@ -730,6 +733,16 @@ template("assembly_input_bundle") {
     creation_deps += [ ":${labels.compiled_packages}" ]
   }
 
+  if (defined(invoker.memory_buckets)) {
+    foreach(memory_bucket, invoker.memory_buckets) {
+      creation_args += [
+        "--memory-buckets",
+        rebase_path(memory_bucket, root_build_dir),
+      ]
+      creation_inputs += [ memory_bucket ]
+    }
+  }
+
   # Create the out-of-tree-usable Assembly Input Bundle
   python_action(labels.assembly_input_bundle) {
     forward_variables_from(invoker,
@@ -755,6 +768,7 @@ template("assembly_input_bundle") {
       "${files.assembly_input_bundle_dir}/kernel",
       "${files.assembly_input_bundle_dir}/packages",
       "${files.assembly_input_bundle_dir}/subpackages",
+      "${files.assembly_input_bundle_dir}/memory_buckets",
     ]
 
     outputs = [ files.assembly_input_bundle_config ]

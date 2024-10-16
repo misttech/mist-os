@@ -1134,6 +1134,16 @@ pub(super) struct GenericFsContext<PS: ParseStrategy> {
     contexts: SimpleArray<PS, FsContexts<PS>>,
 }
 
+impl<PS: ParseStrategy> GenericFsContext<PS> {
+    pub(super) fn fs_type(&self) -> &[u8] {
+        PS::deref_slice(&self.fs_type.data)
+    }
+
+    pub(super) fn contexts(&self) -> &FsContexts<PS> {
+        &self.contexts.data
+    }
+}
+
 impl<PS: ParseStrategy> Parse<PS> for GenericFsContext<PS>
 where
     SimpleArray<PS, PS::Slice<u8>>: Parse<PS>,
@@ -1169,6 +1179,20 @@ pub(super) struct FsContext<PS: ParseStrategy> {
     class: PS::Output<le::U32>,
     /// The security context allocated to the filesystem.
     context: Context<PS>,
+}
+
+impl<PS: ParseStrategy> FsContext<PS> {
+    pub(super) fn partial_path(&self) -> &[u8] {
+        PS::deref_slice(&self.partial_path.data)
+    }
+
+    pub(super) fn context(&self) -> &Context<PS> {
+        &self.context
+    }
+
+    pub(super) fn class(&self) -> Option<ClassId> {
+        NonZeroU32::new((*PS::deref(&self.class)).into()).map(ClassId)
+    }
 }
 
 impl<PS: ParseStrategy> Parse<PS> for FsContext<PS>

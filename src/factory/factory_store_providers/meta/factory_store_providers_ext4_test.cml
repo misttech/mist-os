@@ -44,11 +44,6 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [ "#factory_store_providers" ],
-        },
-        {
             directory: "pkg",
             from: "framework",
             as: "config-data",

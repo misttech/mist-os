@@ -227,7 +227,7 @@ impl BluetoothSysFacade {
                                 (true, None)
                             }
                             PairingMethod::PasskeyEntry => {
-                                let timeout = zx::Duration::from_seconds(30); // Spec defined timeout
+                                let timeout = zx::MonotonicDuration::from_seconds(30); // Spec defined timeout
                                 let pin = match pin_receiver
                                     .next()
                                     .on_timeout(timeout.after_now(), || None)
@@ -470,7 +470,7 @@ impl BluetoothSysFacade {
                 Some(stream) => {
                     match stream
                         .next()
-                        .on_timeout(zx::Duration::from_millis(100).after_now(), || None)
+                        .on_timeout(zx::MonotonicDuration::from_millis(100).after_now(), || None)
                         .await
                     {
                         Some(Ok(d)) => d,
@@ -678,7 +678,7 @@ impl BluetoothSysFacade {
             Some(stream) => {
                 match stream
                     .next()
-                    .on_timeout(zx::Duration::from_seconds(1).after_now(), || None)
+                    .on_timeout(zx::MonotonicDuration::from_seconds(1).after_now(), || None)
                     .await
                 {
                     Some(r) => match r {

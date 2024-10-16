@@ -15,10 +15,7 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.logger.LogSink",
-                "fuchsia.tracing.provider.Registry",
-            ],
+            protocol: [ "fuchsia.tracing.provider.Registry" ],
             from: "parent",
             to: "#realm_builder",
         },

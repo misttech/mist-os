@@ -214,7 +214,7 @@ impl RemoteClient {
     fn schedule_after<D>(
         &self,
         ctx: &mut Context<D>,
-        duration: zx::Duration,
+        duration: zx::MonotonicDuration,
         event: ClientEvent,
     ) -> EventId {
         ctx.schedule_after(duration, TimedEvent::ClientEvent(self.addr, event))
@@ -225,9 +225,9 @@ impl RemoteClient {
             ctx,
             // dot11BssMaxIdlePeriod (IEEE Std 802.11-2016, 11.24.13 and Annex C.3) is measured in
             // increments of 1000 TUs, with a range from 1-65535. We therefore need do this
-            // conversion to zx::Duration in a 64-bit number space to avoid any overflow that might
+            // conversion to zx::MonotonicDuration in a 64-bit number space to avoid any overflow that might
             // occur, as 65535 * 1000 > 2^sizeof(TimeUnit).
-            zx::Duration::from(TimeUnit(1000)) * (BSS_MAX_IDLE_PERIOD as i64),
+            zx::MonotonicDuration::from(TimeUnit(1000)) * (BSS_MAX_IDLE_PERIOD as i64),
             ClientEvent::BssIdleTimeout,
         )
     }

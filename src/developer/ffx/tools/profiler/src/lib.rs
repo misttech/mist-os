@@ -15,6 +15,8 @@ use std::io::{stdin, BufRead};
 use std::process::Command;
 use std::time::Duration;
 use tempfile::Builder;
+use termion::{color, style};
+use tracing::info;
 use {fidl_fuchsia_cpu_profiler as profiler, fidl_fuchsia_test_manager as test_manager};
 
 use schemars::JsonSchema;
@@ -27,6 +29,7 @@ pub struct ShowCpuProfilerCmd {
     pub mean_sample_time: Option<u64>,
     pub max_sample_time: Option<u64>,
     pub min_sample_time: Option<u64>,
+    pub missing_process_mappings: Option<Vec<u64>>,
 }
 
 impl fmt::Display for ShowCpuProfilerCmd {
@@ -47,6 +50,9 @@ impl fmt::Display for ShowCpuProfilerCmd {
         if let Some(min_sample_time) = self.min_sample_time {
             write!(f, "    Min sample time: {}us\n", min_sample_time)?;
         }
+        if let Some(ref pids) = self.missing_process_mappings {
+            write!(f, "    Processes missing mappings: {:?}\n", pids)?;
+        }
         Ok(())
     }
 }
@@ -65,13 +71,18 @@ impl FfxMain for ProfilerTool {
     type Writer = Writer;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
+        info!(?self.cmd, "Running profiler...");
         Ok(profiler(self.controller, writer, self.cmd).await?)
     }
 }
 
 fn gather_targets(opts: &args::Attach) -> Result<fidl_fuchsia_cpu_profiler::TargetConfig> {
     if let Some(moniker) = &opts.moniker {
-        if !opts.pids.is_empty() || !opts.tids.is_empty() || !opts.job_ids.is_empty() {
+        if !opts.pids.is_empty()
+            || !opts.tids.is_empty()
+            || !opts.job_ids.is_empty()
+            || opts.system_wide
+        {
             ffx_bail!(
                 "Targeting both a component and specific jobs/processes/threads is not supported"
             )
@@ -79,7 +90,11 @@ fn gather_targets(opts: &args::Attach) -> Result<fidl_fuchsia_cpu_profiler::Targ
         let component_config = profiler::AttachConfig::AttachToComponentMoniker(moniker.clone());
         Ok(profiler::TargetConfig::Component(component_config))
     } else if let Some(url) = &opts.url {
-        if !opts.pids.is_empty() || !opts.tids.is_empty() || !opts.job_ids.is_empty() {
+        if !opts.pids.is_empty()
+            || !opts.tids.is_empty()
+            || !opts.job_ids.is_empty()
+            || opts.system_wide
+        {
             ffx_bail!(
                 "Targeting both a component and specific jobs/processes/threads is not supported"
             )
@@ -87,13 +102,16 @@ fn gather_targets(opts: &args::Attach) -> Result<fidl_fuchsia_cpu_profiler::Targ
         let component_config = profiler::AttachConfig::AttachToComponentUrl(url.clone());
         Ok(profiler::TargetConfig::Component(component_config))
     } else {
-        let tasks: Vec<_> = opts
+        let mut tasks: Vec<_> = opts
             .job_ids
             .iter()
             .map(|&id| profiler::Task::Job(id))
             .chain(opts.pids.iter().map(|&id| profiler::Task::Process(id)))
             .chain(opts.tids.iter().map(|&id| profiler::Task::Thread(id)))
             .collect();
+        if opts.system_wide {
+            tasks.push(profiler::Task::SystemWide(profiler::SystemWide {}));
+        }
         if tasks.is_empty() {
             ffx_bail!("No targets were specified")
         }
@@ -102,6 +120,7 @@ fn gather_targets(opts: &args::Attach) -> Result<fidl_fuchsia_cpu_profiler::Targ
 }
 
 pub async fn symbolize(from: &PathBuf, to: &PathBuf) -> Result<()> {
+    info!("Symbolizing profile...");
     let sdk = ffx_config::global_env_context()
         .context("loading global environment context")?
         .get_sdk()
@@ -124,13 +143,17 @@ pub async fn symbolize(from: &PathBuf, to: &PathBuf) -> Result<()> {
         .map_err(|err| ffx_error!("Failed to wait cmd: {err:?}"))?
         .code()
     {
-        Some(0) => Ok(()),
+        Some(0) => {
+            info!("Symbolizer finished.");
+            Ok(())
+        }
         Some(exit_code) => ffx_bail!("Symbolizer exited with code: {exit_code}"),
         None => ffx_bail!("Symbolizer terminated by signal."),
     }
 }
 
 pub fn pprof_conversion(from: &PathBuf, to: PathBuf) -> Result<()> {
+    info!("Converting to pprof...");
     let from_str = from
         .clone()
         .into_os_string()
@@ -143,15 +166,18 @@ pub fn pprof_conversion(from: &PathBuf, to: PathBuf) -> Result<()> {
     if !samples_to_pprof::convert(from_str, to_str) {
         ffx_bail!("Failed to convert to pprof");
     }
+    info!("pprof conversion complete.");
     Ok(())
 }
 
+#[derive(Debug)]
 struct SessionOpts {
     symbolize: bool,
     print_stats: bool,
     pprof_conversion: bool,
     output: String,
     duration: Option<u64>,
+    color_output: bool,
 }
 
 async fn run_session(
@@ -160,6 +186,7 @@ async fn run_session(
     config: profiler::Config,
     opts: SessionOpts,
 ) -> Result<()> {
+    info!(?config, ?opts, "Running profiler session...");
     let (client, server) = fidl::Socket::create_stream();
     let client = fidl::AsyncSocket::from_socket(client);
     let controller = controller.await?;
@@ -171,6 +198,7 @@ async fn run_session(
         })
         .await?
         .map_err(|e| ffx_error!("Failed to start: {:?}", e))?;
+    info!("Profiler session is configured.");
 
     let tmp_dir = Builder::new().prefix("fuchsia_cpu_profiler_").tempdir()?;
 
@@ -184,10 +212,12 @@ async fn run_session(
     let copy_task =
         fuchsia_async::Task::local(async move { futures::io::copy(client, &mut output).await });
 
+    info!("Starting profiler...");
     controller
         .start(&profiler::SessionStartRequest { buffer_results: Some(true), ..Default::default() })
         .await?
         .map_err(|e| ffx_error!("Failed to start: {:?}", e))?;
+    info!("Profiler started.");
 
     if let &Some(duration) = &opts.duration {
         writer.line(format!("Waiting for {} seconds...", duration))?;
@@ -199,7 +229,24 @@ async fn run_session(
         })
         .await;
     }
+    info!("Stopping profiler...");
     let stats = controller.stop().await?;
+    if let Some(ref pids) = &stats.missing_process_mappings {
+        if !pids.is_empty() {
+            writeln!(
+                writer.stderr(),
+                "{}[WARNING] Failed to get symbols for some processes: {:?}\n\
+                This can occur when processes exit before the profiler is able to read their modules.{}",
+                if opts.color_output {
+                    format!("{}", color::Fg(color::Red))
+                } else {
+                    String::from("")
+                },
+                pids,
+                if opts.color_output { format!("{}", style::Reset) } else { String::from("") },
+            )?;
+        }
+    }
     if opts.print_stats {
         let output = ShowCpuProfilerCmd {
             samples_collected: stats.samples_collected,
@@ -207,12 +254,16 @@ async fn run_session(
             mean_sample_time: stats.mean_sample_time,
             max_sample_time: stats.max_sample_time,
             min_sample_time: stats.min_sample_time,
+            missing_process_mappings: stats.missing_process_mappings,
         };
         writer.machine(&output)?;
         writer.line(format!("\n{output}"))?;
     }
+    info!("Profiler stopped, waiting for copy to complete...");
     copy_task.await?;
+    info!("Copy from profiler completed, resetting profiler...");
     controller.reset().await?;
+    info!("Profiler state reset.");
 
     if !opts.symbolize {
         return Ok(());
@@ -258,6 +309,7 @@ pub async fn profiler(
                 output: opts.output,
                 duration: opts.duration,
                 pprof_conversion: opts.pprof_conversion,
+                color_output: opts.color_output,
             };
             (target, config, session_opts)
         }
@@ -299,6 +351,7 @@ pub async fn profiler(
                 output: opts.output,
                 duration: opts.duration,
                 pprof_conversion: opts.pprof_conversion,
+                color_output: opts.color_output,
             };
             (target, config, session_opts)
         }

@@ -28,16 +28,6 @@
             from: "framework",
         },
     ],
-    offer: [
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [
-                "#base-component",
-                "#base-superpackage-component",
-            ],
-        },
-    ],
     environments: [
         {
             name: "base_resolver_env",

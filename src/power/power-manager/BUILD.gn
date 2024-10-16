@@ -172,18 +172,12 @@ group("tests") {
   testonly = true
   deps = [
     ":power-manager-tests",
+    "integration:tests",
     "rkf45:rkf45-tests",
     "system_power_mode_config:tests",
     "testing/fake_root:tests",
     "thermal_config:tests",
   ]
-}
-
-# The integration test uses real time and accelerate it by 100 times. It only can be run on builders
-# that can handle 100x acceleration without messing up the timestamps.
-group("integration_tests") {
-  testonly = true
-  deps = [ "integration:tests" ]
 }
 
 node_config("astro") {

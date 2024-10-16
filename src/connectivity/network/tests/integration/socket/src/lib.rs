@@ -987,7 +987,7 @@ async fn assert_preflight_response_invalidated(
 ) {
     async fn invoke_with_retries(
         retries: usize,
-        delay: zx::Duration,
+        delay: zx::MonotonicDuration,
         op: impl Fn() -> Result,
     ) -> Result {
         for _ in 0..retries {
@@ -1009,7 +1009,7 @@ async fn assert_preflight_response_invalidated(
     // We avoid flakes due to this behavior by retrying multiple times with an
     // arbitrary delay.
     const RETRY_COUNT: usize = 3;
-    const RETRY_DELAY: zx::Duration = zx::Duration::from_millis(500);
+    const RETRY_DELAY: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(500);
     let result = invoke_with_retries(RETRY_COUNT, RETRY_DELAY, || {
         validate_send_msg_preflight_response(
             &preflight,
@@ -1959,7 +1959,7 @@ async fn decrease_tcp_sendbuf_size<I: TestIpExt, N: Netstack>(name: &str) {
                 r.unwrap();
                 true
             })
-            .on_timeout(zx::Duration::from_seconds(2), || false)
+            .on_timeout(zx::MonotonicDuration::from_seconds(2), || false)
             .await
         {
             written += data.len();
@@ -2291,6 +2291,9 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
                 is_packet_spurious(IpVersion::V4, &frame_data[..])
             }
             fhardware_network::FrameType::Ethernet => Ok(false),
+            fhardware_network::FrameType::__SourceBreaking { unknown_ordinal } => {
+                panic!("unknown frame type {unknown_ordinal}")
+            }
         }?;
         Ok((!is_spurious).then_some((frame_type, frame_data)))
     });
@@ -2315,7 +2318,10 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
             .and_then(|f| {
                 futures::future::ready(f.context("frame stream ended unexpectedly").map(Some))
             })
-            .on_timeout(fasync::MonotonicInstant::after(zx::Duration::from_millis(50)), || Ok(None))
+            .on_timeout(
+                fasync::MonotonicInstant::after(zx::MonotonicDuration::from_millis(50)),
+                || Ok(None),
+            )
             .await
             .context("failed to read frame")?)
     }

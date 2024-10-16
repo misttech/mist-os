@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::SpecificRouter;
 use from_enum::FromEnum;
 use router_error::Explain;
 use std::fmt::Debug;
@@ -85,9 +86,11 @@ pub enum Capability {
     Directory(crate::Directory),
     Handle(crate::Handle),
     Router(crate::Router),
+    ConnectorRouter(crate::SpecificRouter<crate::Connector>),
+    DictionaryRouter(crate::SpecificRouter<crate::Dict>),
+    DirEntryRouter(crate::SpecificRouter<crate::DirEntry>),
+    DataRouter(crate::SpecificRouter<crate::Data>),
     Instance(crate::WeakInstanceToken),
-
-    #[cfg(target_os = "fuchsia")]
     DirEntry(crate::DirEntry),
 }
 
@@ -103,13 +106,16 @@ impl Capability {
         let out = match self {
             Self::Connector(s) => Self::Connector(s.clone()),
             Self::Router(s) => Self::Router(s.clone()),
+            Self::ConnectorRouter(s) => Self::ConnectorRouter(s.clone()),
+            Self::DictionaryRouter(s) => Self::DictionaryRouter(s.clone()),
+            Self::DirEntryRouter(s) => Self::DirEntryRouter(s.clone()),
+            Self::DataRouter(s) => Self::DataRouter(s.clone()),
             Self::Dictionary(s) => Self::Dictionary(s.clone()),
             Self::Data(s) => Self::Data(s.clone()),
             Self::Unit(s) => Self::Unit(s.clone()),
             Self::Directory(s) => Self::Directory(s.clone()),
             Self::Handle(s) => Self::Handle(s.try_clone()?),
             Self::Instance(s) => Self::Instance(s.clone()),
-            #[cfg(target_os = "fuchsia")]
             Self::DirEntry(s) => Self::DirEntry(s.clone()),
         };
         Ok(out)
@@ -117,17 +123,155 @@ impl Capability {
 
     pub fn debug_typename(&self) -> &'static str {
         match self {
-            Self::Connector(_) => "Sender",
+            Self::Connector(_) => "Connector",
             Self::Router(_) => "Router",
+            Self::ConnectorRouter(_) => "ConnectorRouter",
+            Self::DictionaryRouter(_) => "DictionaryRouter",
+            Self::DirEntryRouter(_) => "DirEntryRouter",
+            Self::DataRouter(_) => "DataRouter",
             Self::Dictionary(_) => "Dictionary",
             Self::Data(_) => "Data",
             Self::Unit(_) => "Unit",
             Self::Directory(_) => "Directory",
             Self::Handle(_) => "Handle",
             Self::Instance(_) => "Instance",
-
-            #[cfg(target_os = "fuchsia")]
             Self::DirEntry(_) => "DirEntry",
         }
     }
 }
+
+impl TryFrom<Capability> for crate::Connector {
+    type Error = ();
+
+    fn try_from(c: Capability) -> Result<Self, Self::Error> {
+        match c {
+            Capability::Connector(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<Capability> for crate::Dict {
+    type Error = ();
+
+    fn try_from(c: Capability) -> Result<Self, Self::Error> {
+        match c {
+            Capability::Dictionary(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<Capability> for crate::Directory {
+    type Error = ();
+
+    fn try_from(c: Capability) -> Result<Self, Self::Error> {
+        match c {
+            Capability::Directory(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<Capability> for crate::DirEntry {
+    type Error = ();
+
+    fn try_from(c: Capability) -> Result<Self, Self::Error> {
+        match c {
+            Capability::DirEntry(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<Capability> for crate::Data {
+    type Error = ();
+
+    fn try_from(c: Capability) -> Result<Self, Self::Error> {
+        match c {
+            Capability::Data(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<Capability> for crate::Handle {
+    type Error = ();
+
+    fn try_from(c: Capability) -> Result<Self, Self::Error> {
+        match c {
+            Capability::Handle(r) => Ok(r),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<Capability> for crate::Unit {
+    type Error = ();
+
+    fn try_from(c: Capability) -> Result<Self, Self::Error> {
+        match c {
+            Capability::Unit(r) => Ok(r),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<Capability> for crate::Router {
+    type Error = ();
+
+    fn try_from(c: Capability) -> Result<Self, Self::Error> {
+        match c {
+            Capability::Router(r) => Ok(r),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<Capability> for SpecificRouter<crate::Dict> {
+    type Error = ();
+
+    fn try_from(c: Capability) -> Result<Self, Self::Error> {
+        match c {
+            Capability::DictionaryRouter(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<Capability> for SpecificRouter<crate::DirEntry> {
+    type Error = ();
+
+    fn try_from(c: Capability) -> Result<Self, Self::Error> {
+        match c {
+            Capability::DirEntryRouter(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<Capability> for SpecificRouter<crate::Connector> {
+    type Error = ();
+
+    fn try_from(c: Capability) -> Result<Self, Self::Error> {
+        match c {
+            Capability::ConnectorRouter(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+
+impl TryFrom<Capability> for SpecificRouter<crate::Data> {
+    type Error = ();
+
+    fn try_from(c: Capability) -> Result<Self, Self::Error> {
+        match c {
+            Capability::DataRouter(c) => Ok(c),
+            _ => Err(()),
+        }
+    }
+}
+
+/// Parent trait implemented by all capability types. Useful for defining interfaces that
+/// generic over a capability type.
+pub trait CapabilityBound: Into<Capability> + TryFrom<Capability> + Send + Sync + 'static {}

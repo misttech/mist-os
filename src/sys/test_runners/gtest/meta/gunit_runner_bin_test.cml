@@ -26,11 +26,4 @@
             from: "#lib_loader_cache",
         },
     ],
-    offer: [
-        {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [ "#lib_loader_cache" ],
-        },
-    ],
 }

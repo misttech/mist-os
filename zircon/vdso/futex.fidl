@@ -24,7 +24,7 @@ closed protocol Futexfuncs {
     /// zx_status_t zx_futex_wait(const zx_futex_t* value_ptr,
     ///                           zx_futex_t current_value,
     ///                           zx_handle_t new_futex_owner,
-    ///                           zx_time_t deadline);
+    ///                           zx_instant_mono_t deadline);
     /// ```
     ///
     /// ## Description
@@ -101,7 +101,7 @@ closed protocol Futexfuncs {
         value_ptr experimental_pointer<Futex>;
         current_value int32;
         new_futex_owner Handle;
-        deadline Time;
+        deadline InstantMono;
     }) -> () error Status;
 
     /// ## Summary

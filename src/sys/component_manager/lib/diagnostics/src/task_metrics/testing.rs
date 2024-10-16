@@ -80,7 +80,7 @@ impl TaskInfo<FakeTask> {
             ) {
                 return;
             }
-            fasync::Timer::new(zx::Duration::from_millis(100).after_now()).await;
+            fasync::Timer::new(zx::MonotonicDuration::from_millis(100).after_now()).await;
         }
     }
 }
@@ -120,8 +120,8 @@ impl ComponentStartedInfo<FakeDiagnosticsContainer, FakeTask> for FakeRuntime {
         }
     }
 
-    fn start_time(&self) -> zx::MonotonicInstant {
-        zx::MonotonicInstant::from_nanos(self.start_time.now())
+    fn start_time(&self) -> zx::BootInstant {
+        zx::BootInstant::from_nanos(self.start_time.now())
     }
 }
 

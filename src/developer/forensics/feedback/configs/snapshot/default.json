@@ -6,6 +6,10 @@
         "build.product",
         "build.version",
         "build.version.previous-boot",
+        "build.platform.version",
+        "build.platform.version.previous-boot",
+        "build.product.version",
+        "build.product.version.previous-boot",
         "device.board-name",
         "device.feedback-id",
         "device.num-cpus",
@@ -32,6 +36,7 @@
         "system.user-activity.current.duration"
     ],
     "attachment_allowlist": [
+        "build.kernel-boot-options.txt",
         "build.snapshot.xml",
         "inspect.json",
         "log.kernel.txt",

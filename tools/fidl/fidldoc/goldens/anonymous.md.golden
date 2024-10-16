@@ -171,7 +171,7 @@ Type: <code>uint32</code>
 <td><h3 id="FunctionApplication.func" class="add-link hide-from-toc">1</h3></td>
             <td><code>func</code></td>
             <td>
-                <code>string[100]</code>
+                <code>string:100</code>
             </td>
             <td></td>
         </tr>
@@ -179,7 +179,7 @@ Type: <code>uint32</code>
 <td><h3 id="FunctionApplication.args" class="add-link hide-from-toc">3</h3></td>
             <td><code>args</code></td>
             <td>
-                <code>vector&lt;<a class='link' href='#Expression'>Expression</a>&gt;[5]</code>
+                <code>vector&lt;<a class='link' href='#Expression'>Expression</a>?&gt;:5</code>
             </td>
             <td></td>
         </tr>
@@ -204,7 +204,7 @@ Type: <code>uint32</code>
 <td><h3 id="TableMember.table_data" class="add-link hide-from-toc">2</h3></td>
             <td><code>table_data</code></td>
             <td>
-                <code>vector&lt;<a class='link' href='#TableData'>TableData</a>&gt;[10]</code>
+                <code>vector&lt;<a class='link' href='#TableData'>TableData</a>&gt;:10</code>
             </td>
             <td></td>
         </tr>

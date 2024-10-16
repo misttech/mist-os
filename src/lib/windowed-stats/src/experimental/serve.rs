@@ -11,7 +11,7 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 use {fuchsia_async as fasync, zx};
 
-use crate::experimental::clock::{TimedSample, Timestamp};
+use crate::experimental::clock::{Timed, Timestamp};
 use crate::experimental::series::{FoldError, Interpolator, MatrixSampler};
 
 /// Capacity of "first come, first serve" slots available to clients of
@@ -19,7 +19,7 @@ use crate::experimental::series::{FoldError, Interpolator, MatrixSampler};
 const TIME_MATRIX_SENDER_BUFFER_SIZE: usize = 10;
 
 /// How often to interpolate time series stats.
-const INTERPOLATE_INTERVAL: zx::Duration = zx::Duration::from_minutes(5);
+const INTERPOLATE_INTERVAL: zx::MonotonicDuration = zx::MonotonicDuration::from_minutes(5);
 
 /// Create a `TimeMatrixClient` and a `Future` server for routine management tasks of time
 /// matrices.
@@ -126,11 +126,11 @@ impl<T> InspectedTimeMatrix<T> {
         Self { name: name.into(), time_matrix }
     }
 
-    pub fn fold(&self, sample: TimedSample<T>) -> Result<(), FoldError> {
+    pub fn fold(&self, sample: Timed<T>) -> Result<(), FoldError> {
         self.time_matrix.lock().fold(sample)
     }
 
-    pub fn fold_or_log_error(&self, sample: TimedSample<T>) {
+    pub fn fold_or_log_error(&self, sample: Timed<T>) {
         if let Err(e) = self.time_matrix.lock().fold(sample) {
             warn!("Failed logging {} sample: {:?}", self.name, e);
         }
@@ -260,8 +260,8 @@ mod tests {
             serve_time_matrix_inspection(inspector.root().create_child("time_series"));
         let time_matrix = MockTimeMatrix::<u64>::default();
         let inspected_time_matrix = client.inspect_time_matrix("blah_blah", time_matrix.clone());
-        assert!(inspected_time_matrix.fold(TimedSample::now(1)).is_ok());
-        assert_eq!(&time_matrix.drain_calls()[..], &[TimeMatrixCall::Fold(TimedSample::now(1))]);
+        assert!(inspected_time_matrix.fold(Timed::now(1)).is_ok());
+        assert_eq!(&time_matrix.drain_calls()[..], &[TimeMatrixCall::Fold(Timed::now(1))]);
     }
 
     #[test]

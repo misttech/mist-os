@@ -209,7 +209,7 @@ class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_prot
   void EnableInterrupts() TA_REQ(mtx_);
   void DisableInterrupts() TA_REQ(mtx_);
 
-  zx_status_t WaitForInhibit(const PresentState mask) const;
+  zx_status_t WaitForInhibit(PresentState mask) const;
   zx_status_t WaitForInternalClockStable() const;
 
   int IrqThread() TA_EXCL(mtx_);

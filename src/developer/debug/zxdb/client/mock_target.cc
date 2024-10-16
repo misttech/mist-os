@@ -17,7 +17,8 @@ void MockTarget::Launch(CallbackWithTimestamp callback) { FX_NOTREACHED(); }
 
 void MockTarget::Kill(Callback callback) { FX_NOTREACHED(); }
 
-void MockTarget::Attach(uint64_t koid, AttachMode mode, CallbackWithTimestamp callback) {
+void MockTarget::Attach(uint64_t koid, debug_ipc::AttachConfig config,
+                        CallbackWithTimestamp callback) {
   FX_NOTREACHED();
 }
 

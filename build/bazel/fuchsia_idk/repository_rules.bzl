@@ -45,8 +45,6 @@
 #
 def _fuchsia_idk_repository(repo_ctx):
     """Create a fuchsia_idk_repository() repository."""
-    build_bazel_content = "# AUTO-GENERATED DO NOT EDIT"
-
     if hasattr(repo_ctx.attr, "content_hash_file"):
         repo_ctx.path(Label(repo_ctx.attr.content_hash_file))
 

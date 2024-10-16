@@ -33,8 +33,8 @@ Objects][vmo-object] (VMOs).
 
 For example, the `aspace` command shows all VMOs in the process:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] aspace
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+aspace
            Start              End  Prot   Size      Koid       Offset  Cmt.Pgs  Name
         0x200000   0x7ffffffff000  ---    127T                                  proc:14629522
         0x200000   0x7ffffffff000  ---    127T                                    root
@@ -57,8 +57,8 @@ contains the specified address. This can be useful to determine where an address
 is in memory, as the names of the VMOs typically indicate what type of region
 that memory address is.
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] aspace 0x6d0d1ad000
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+aspace 0x6d0d1ad000
          Start              End  Prot  Size      Koid  Offset  Cmt.Pgs  Name
       0x200000   0x7ffffffff000  ---   127T                             proc:14629522
       0x200000   0x7ffffffff000  ---   127T                               root
@@ -121,8 +121,8 @@ Note: For more information about dumping unknown memory, see the
 
 This example analyzes `0x42ff9c2fdd30`:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] mem-analyze 0x42ff9c2fdd30
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+mem-analyze 0x42ff9c2fdd30
        Address               Data
 0x42ff9c2fdd30 0x00000000000015f0
 0x42ff9c2fdd38 0x0000000000000008
@@ -152,8 +152,8 @@ can override the default byte size to read with the `-size` (`-s`) option.
 This example show the hex dumps for address `0x42ff9c2fdd30` while only reading
 up to `100` bytes:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] mem-read -s 100 0x42ff9c2fdd30
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+mem-read -s 100 0x42ff9c2fdd30
 0x42ff9c2fdd30:  f0 15 00 00 00 00 00 00-08 00 00 00 00 00 00 00  |
 0x42ff9c2fdd40:  30 a7 a8 01 f4 42 00 00-f8 a9 a8 01 f4 42 00 00  |0    B       B
 0x42ff9c2fdd50:  53 00 00 00 00 00 00 00-6b 9c 46 10 00 00 00 00  |S       k F
@@ -167,8 +167,8 @@ The `mem-read` command also supports an expression that evaluates to an address.
 For example, if the type of the pointer has a known size, the dump automatically
 shows that many bytes:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] mem-read &self->main_waker
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+mem-read &self->main_waker
 0x1605a5d1ed0:  70 1a c8 36 47 04 00 00-68 fe 3d dd 25 01 00 00  |p  6G   h = %
 ```
 
@@ -182,8 +182,8 @@ and stack base pointers of the thread.
 
 For example:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] stack-data
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+stack-data
       Address               Data
 0x1605a5d1428 0x000042a352fca11f ◁ rsp. ▷ _zx_port_wait + 0x1f
 0x1605a5d1430 0x000001605a5d1460 ◁ frame 1 rsp. ▷ inside map "initial-thread"
@@ -215,8 +215,8 @@ or preceding the address and is most often used to tell what a pointer points to
 
 For example:
 
-```none {:.devsite-disable-click-to-copy}
-[zxdb] sym-near 0x125dd3a845e
+```none {: .devsite-terminal data-terminal-prefix="[zxdb]" }
+sym-near 0x125dd3a845e
 0x125dd3a845e, power_manager::main() • main.rs:37
 ```
 

@@ -23,11 +23,6 @@ ThreadHandle::State LinuxThreadHandle::GetState() const {
   return *state;
 }
 
-debug_ipc::ExceptionRecord LinuxThreadHandle::GetExceptionRecord() const {
-  // TODO(brettw) implement this.
-  return debug_ipc::ExceptionRecord();
-}
-
 std::unique_ptr<SuspendHandle> LinuxThreadHandle::Suspend() {
   DEBUG_LOG(Thread) << "Suspending thread " << task_->pid();
   return std::make_unique<LinuxSuspendHandle>(task_);

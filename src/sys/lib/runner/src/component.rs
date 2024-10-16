@@ -350,13 +350,13 @@ pub async fn configure_launcher(
 
     let ll_client_chan = match config_args.loader_proxy_chan {
         None => {
-            // The loader service should only be able to load files from `/pkg/lib`. Giving it a larger
-            // scope is potentially a security vulnerability, as it could make it trivial for parts of
-            // applications to get handles to things the application author didn't intend.
-            let lib_proxy = fuchsia_component::directory::open_directory_no_describe(
+            // The loader service should only be able to load files from `/pkg/lib`. Giving it a
+            // larger scope is potentially a security vulnerability, as it could make it trivial for
+            // parts of applications to get handles to things the application author didn't intend.
+            let lib_proxy = fuchsia_component::directory::open_directory_async(
                 pkg_dir,
                 "lib",
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
+                fio::RX_STAR_DIR,
             )
             .map_err(|e| LaunchError::LibLoadError(e.to_string()))?;
             let (ll_client_chan, ll_service_chan) = zx::Channel::create();

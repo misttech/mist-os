@@ -4,6 +4,7 @@
 
 #include "ramdisk.h"
 
+#include <fidl/fuchsia.hardware.block.volume/cpp/fidl.h>
 #include <zircon/assert.h>
 #include <zircon/types.h>
 
@@ -28,8 +29,9 @@ static std::unique_ptr<fdf_dispatcher_shutdown_observer_t> NewObserver() {
 }
 
 zx::result<std::unique_ptr<Ramdisk>> Ramdisk::Create(
-    fdf::DriverBase* controller, async_dispatcher_t* dispatcher, zx::vmo vmo,
-    const block_server::PartitionInfo& partition_info, component::OutgoingDirectory outgoing) {
+    RamdiskController* controller, async_dispatcher_t* dispatcher, zx::vmo vmo,
+    const block_server::PartitionInfo& partition_info, component::OutgoingDirectory outgoing,
+    int id, bool publish) {
   fzl::OwnedVmoMapper mapping;
   if (zx_status_t status =
           mapping.Map(std::move(vmo), partition_info.block_size * partition_info.block_count);
@@ -53,6 +55,23 @@ zx::result<std::unique_ptr<Ramdisk>> Ramdisk::Create(
       result.is_error()) {
     return result.take_error();
   }
+
+  if (publish) {
+    if (auto result = controller->outgoing()->AddService<fuchsia_hardware_block_volume::Service>(
+            fuchsia_hardware_block_volume::Service::InstanceHandler({
+                .volume =
+                    [ramdisk = ramdisk.get()](
+                        fidl::ServerEnd<fuchsia_hardware_block_volume::Volume> server_end) {
+                      ramdisk->block_server_.Serve(std::move(server_end));
+                    },
+            }),
+            std::to_string(id));
+        result.is_error()) {
+      FDF_LOGL(ERROR, controller->logger(), "Failed to add service: %s", result.status_string());
+      return result.take_error();
+    }
+  }
+
   return zx::ok(std::move(ramdisk));
 }
 

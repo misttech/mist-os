@@ -58,7 +58,7 @@ impl<T> SharedResolver<T> {
     }
 }
 
-const STAT_WINDOW_DURATION: zx::Duration = zx::Duration::from_seconds(60);
+const STAT_WINDOW_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(60);
 const STAT_WINDOW_COUNT: usize = 30;
 
 /// Stats about queries during the last `STAT_WINDOW_COUNT` windows of
@@ -254,8 +254,8 @@ struct QueryWindow {
     start: fasync::MonotonicInstant,
     success_count: u64,
     failure_count: u64,
-    success_elapsed_time: zx::Duration,
-    failure_elapsed_time: zx::Duration,
+    success_elapsed_time: zx::MonotonicDuration,
+    failure_elapsed_time: zx::MonotonicDuration,
     failure_stats: FailureStats,
     address_counts_histogram: BTreeMap<NonZeroUsize, u64>,
 }
@@ -266,14 +266,14 @@ impl QueryWindow {
             start,
             success_count: 0,
             failure_count: 0,
-            success_elapsed_time: zx::Duration::from_nanos(0),
-            failure_elapsed_time: zx::Duration::from_nanos(0),
+            success_elapsed_time: zx::MonotonicDuration::from_nanos(0),
+            failure_elapsed_time: zx::MonotonicDuration::from_nanos(0),
             failure_stats: FailureStats::default(),
             address_counts_histogram: Default::default(),
         }
     }
 
-    fn succeed(&mut self, elapsed_time: zx::Duration, num_addrs: NonZeroUsize) {
+    fn succeed(&mut self, elapsed_time: zx::MonotonicDuration, num_addrs: NonZeroUsize) {
         let QueryWindow {
             success_count,
             success_elapsed_time,
@@ -288,7 +288,7 @@ impl QueryWindow {
         *address_counts.entry(num_addrs).or_default() += 1;
     }
 
-    fn fail(&mut self, elapsed_time: zx::Duration, error: &ResolveErrorKind) {
+    fn fail(&mut self, elapsed_time: zx::MonotonicDuration, error: &ResolveErrorKind) {
         let QueryWindow {
             failure_count,
             failure_elapsed_time,
@@ -1035,7 +1035,7 @@ fn add_query_stats_inspect(
                 }
                 let () = child.record_uint("successful_queries", *success_count);
                 let () = child.record_uint("failed_queries", *failure_count);
-                let record_average = |name: &str, total: zx::Duration, count: u64| {
+                let record_average = |name: &str, total: zx::MonotonicDuration, count: u64| {
                     // Don't record an average if there are no stats.
                     if count == 0 {
                         return;
@@ -2054,7 +2054,7 @@ mod tests {
         exec: &mut fasync::TestExecutor,
         stats: Arc<QueryStats>,
         result: QueryResult<'_>,
-        delay: zx::Duration,
+        delay: zx::MonotonicDuration,
     ) {
         let start_time = fasync::MonotonicInstant::now();
         let () = exec.set_fake_time(fasync::MonotonicInstant::after(delay));
@@ -2077,13 +2077,14 @@ mod tests {
         let inspector = fuchsia_inspect::Inspector::default();
         let _query_stats_inspect_node = add_query_stats_inspect(inspector.root(), stats.clone());
         const SUCCESSFUL_QUERY_COUNT: u64 = 10;
-        const SUCCESSFUL_QUERY_DURATION: zx::Duration = zx::Duration::from_seconds(30);
+        const SUCCESSFUL_QUERY_DURATION: zx::MonotonicDuration =
+            zx::MonotonicDuration::from_seconds(30);
         for _ in 0..SUCCESSFUL_QUERY_COUNT / 2 {
             let () = run_fake_lookup(
                 &mut exec,
                 stats.clone(),
                 Ok(/*addresses*/ NON_ZERO_USIZE_ONE),
-                zx::Duration::from_nanos(0),
+                zx::MonotonicDuration::from_nanos(0),
             );
             let () = run_fake_lookup(
                 &mut exec,
@@ -2137,7 +2138,8 @@ mod tests {
         let inspector = fuchsia_inspect::Inspector::default();
         let _query_stats_inspect_node = add_query_stats_inspect(inspector.root(), stats.clone());
         const FAILED_QUERY_COUNT: u64 = 10;
-        const FAILED_QUERY_DURATION: zx::Duration = zx::Duration::from_millis(500);
+        const FAILED_QUERY_DURATION: zx::MonotonicDuration =
+            zx::MonotonicDuration::from_millis(500);
         for _ in 0..FAILED_QUERY_COUNT {
             let () = run_fake_lookup(
                 &mut exec,
@@ -2182,7 +2184,8 @@ mod tests {
         let inspector = fuchsia_inspect::Inspector::default();
         let _query_stats_inspect_node = add_query_stats_inspect(inspector.root(), stats.clone());
         const FAILED_QUERY_COUNT: u64 = 10;
-        const FAILED_QUERY_DURATION: zx::Duration = zx::Duration::from_millis(500);
+        const FAILED_QUERY_DURATION: zx::MonotonicDuration =
+            zx::MonotonicDuration::from_millis(500);
 
         let mut run_fake_no_records_lookup = |response_code: ResponseCode| {
             run_fake_lookup(
@@ -2253,7 +2256,7 @@ mod tests {
         //  - ...
         //  - 1 occurrence of a response with 99 addresses.
         let address_counts: HashMap<usize, _> = (1..100).zip((1..100).rev()).collect();
-        const QUERY_DURATION: zx::Duration = zx::Duration::from_millis(10);
+        const QUERY_DURATION: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(10);
         for (count, occurrences) in address_counts.iter() {
             for _ in 0..*occurrences {
                 run_fake_lookup(
@@ -2305,7 +2308,7 @@ mod tests {
         let stats = Arc::new(QueryStats::new());
         let inspector = fuchsia_inspect::Inspector::default();
         let _query_stats_inspect_node = add_query_stats_inspect(inspector.root(), stats.clone());
-        const DELAY: zx::Duration = zx::Duration::from_millis(100);
+        const DELAY: zx::MonotonicDuration = zx::MonotonicDuration::from_millis(100);
         for _ in 0..STAT_WINDOW_COUNT {
             let () =
                 run_fake_lookup(&mut exec, stats.clone(), Err(&ResolveErrorKind::Timeout), DELAY);

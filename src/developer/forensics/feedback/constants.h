@@ -62,6 +62,8 @@ constexpr zx::duration kOOMCrashReportingDelay = zx::sec(90);
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 const char kBuildVersionPath[] = "/config/build-info/version";
+const char kBuildPlatformVersionPath[] = "/config/build-info/platform_version";
+const char kBuildProductVersionPath[] = "/config/build-info/product_version";
 const char kBuildBoardPath[] = "/config/build-info/board";
 const char kBuildProductPath[] = "/config/build-info/product";
 const char kBuildCommitDatePath[] = "/config/build-info/latest-commit-date";
@@ -95,7 +97,12 @@ constexpr char kPreviousBootIdPath[] = "/tmp/boot_id.txt";
 constexpr char kCurrentBootIdPath[] = "/data/boot_id.txt";
 constexpr char kPreviousBuildVersionPath[] = "/tmp/build_version.txt";
 constexpr char kCurrentBuildVersionPath[] = "/data/build_version.txt";
+constexpr char kPreviousBuildPlatformVersionPath[] = "/tmp/build_platform_version.txt";
+constexpr char kCurrentBuildPlatformVersionPath[] = "/data/build_platform_version.txt";
+constexpr char kPreviousBuildProductVersionPath[] = "/tmp/build_product_version.txt";
+constexpr char kCurrentBuildProductVersionPath[] = "/data/build_product_version.txt";
 constexpr char kDataRegisterPath[] = "/tmp/data_register.json";
+constexpr char kKernelBootOptionsPath[] = "/boot/kernel/boot-options.txt";
 
 constexpr size_t kRedactionIdCacheCapacity = 1500;
 

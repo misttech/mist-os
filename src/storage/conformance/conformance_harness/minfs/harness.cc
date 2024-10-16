@@ -38,7 +38,7 @@ namespace minfs {
 
 constexpr uint64_t kBlockCount = 1 << 11;
 
-class MinfsHarness : public fidl::Server<fio_test::Io1Harness> {
+class MinfsHarness : public fidl::Server<fio_test::TestHarness> {
  public:
   explicit MinfsHarness() : vfs_loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
     vfs_loop_.StartThread("vfs_thread");
@@ -68,10 +68,9 @@ class MinfsHarness : public fidl::Server<fio_test::Io1Harness> {
   }
 
   void GetConfig(GetConfigCompleter::Sync& completer) final {
-    fio_test::Io1Config config;
+    fio_test::HarnessConfig config;
 
     // Supported options
-    config.supports_open3(true);
     config.supports_get_token(true);
     config.supports_append(true);
     config.supports_modify_directory(true);
@@ -97,6 +96,9 @@ class MinfsHarness : public fidl::Server<fio_test::Io1Harness> {
                   zx_status_get_string(status));
   }
 
+  void GetServiceDir(GetServiceDirCompleter::Sync& completer) final { ZX_PANIC("Not supported."); }
+
+  // NOLINTNEXTLINE(misc-no-recursion): Test-only code, recursion is acceptable here.
   void PopulateDirectory(const std::vector<fidl::Box<fio_test::DirectoryEntry>>& entries,
                          Directory& dir) {
     for (const auto& entry : entries) {
@@ -104,6 +106,7 @@ class MinfsHarness : public fidl::Server<fio_test::Io1Harness> {
     }
   }
 
+  // NOLINTNEXTLINE(misc-no-recursion): Test-only code, recursion is acceptable here.
   void AddEntry(const fio_test::DirectoryEntry& entry, Directory& parent) {
     switch (entry.Which()) {
       case fio_test::DirectoryEntry::Tag::kDirectory: {
@@ -180,7 +183,7 @@ int main(int argc, const char** argv) {
     return EXIT_FAILURE;
   }
 
-  result = outgoing.AddProtocol<fio_test::Io1Harness>(std::make_unique<minfs::MinfsHarness>());
+  result = outgoing.AddProtocol<fio_test::TestHarness>(std::make_unique<minfs::MinfsHarness>());
   if (result.is_error()) {
     FX_LOGS(ERROR) << "Failed to server test harness: " << result.status_string();
     return EXIT_FAILURE;

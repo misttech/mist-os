@@ -21,11 +21,21 @@
 namespace fdf_devicetree {
 
 using Phandle = uint32_t;
+using NodeID = uint32_t;
 
 class Visitor;
 class ReferenceNode;
 class ParentNode;
 class ChildNode;
+
+// Represents who provides the `reg` property for this node. This information will be set and used
+// by the visitors. By default `reg` property of all nodes are considered mmio.
+enum class RegisterType : uint8_t {
+  kMmio,  // Default. Parsed by the mmio visitor.
+  kI2c,   // Register used to represent i2c device address.
+  kSpi,   // Register used to represent spi device address.
+  kSpmi,  // Register used to represent spmi target id and device registers (sub target id).
+};
 
 // Defines interface that an entity managing the Node should implement.
 class NodeManager {
@@ -93,7 +103,11 @@ class Node {
 
   std::optional<Phandle> phandle() const { return phandle_; }
 
-  uint32_t id() const { return id_; }
+  NodeID id() const { return id_; }
+
+  RegisterType register_type() const { return register_type_; }
+
+  void set_register_type(RegisterType type) { register_type_ = type; }
 
  private:
   Node* parent_;
@@ -114,7 +128,7 @@ class Node {
 
   // This is a unique ID we use to match our device group with the correct
   // platform bus node. It is generated at runtime and not stable across boots.
-  uint32_t id_;
+  NodeID id_;
 
   // Boolean to indicate if a composite node spec needs to added.
   bool composite_ = false;
@@ -127,6 +141,8 @@ class Node {
 
   // Valid only when a non platform bus node is published.
   fidl::SyncClient<fuchsia_driver_framework::NodeController> node_controller_;
+
+  RegisterType register_type_ = RegisterType::kMmio;
 };
 
 class ReferenceNode {
@@ -199,6 +215,10 @@ class ChildNode {
   void AddNodeSpec(fuchsia_driver_framework::ParentSpec spec) {
     node_->AddNodeSpec(std::move(spec));
   }
+
+  void set_register_type(RegisterType type) { node_->set_register_type(type); }
+
+  RegisterType register_type() const { return node_->register_type(); }
 
  private:
   Node* node_;

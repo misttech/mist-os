@@ -25,7 +25,7 @@ using fxl::StringPrintf;
 constexpr uint32_t kMaxPendingEvents = 1700u;
 
 uint64_t CurrentTimeUSecs(const std::unique_ptr<timekeeper::Clock>& clock) {
-  return zx::nsec(clock->Now().get()).to_usecs();
+  return zx::nsec(clock->MonotonicNow().get()).to_usecs();
 }
 
 inline bool HasStreamProperty(fuchsia::camera2::CameraStreamType stream_type,
