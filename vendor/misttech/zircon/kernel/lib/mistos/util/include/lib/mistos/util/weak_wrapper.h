@@ -146,7 +146,7 @@ struct ContainerPtrTraits<::util::WeakPtr<T>> {
   using RawPtrType = T*;
   using ConstRawPtrType = const T*;
 
-  static constexpr bool IsManaged = false;
+  static constexpr bool IsManaged = true;
   static constexpr bool CanCopy = true;
 
   static inline T* GetRaw(const PtrType& ptr) { return ptr.get(); }

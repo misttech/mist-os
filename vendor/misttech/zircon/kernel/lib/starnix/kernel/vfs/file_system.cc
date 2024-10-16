@@ -33,7 +33,7 @@
 
 namespace starnix {
 
-FileSystem::~FileSystem() { nodes_.clear_unsafe(); }
+FileSystem::~FileSystem() { nodes_.clear(); }
 
 FileSystemHandle FileSystem::New(const fbl::RefPtr<Kernel>& kernel, CacheMode cache_mode,
                                  FileSystemOps* ops, FileSystemOptions options) {
