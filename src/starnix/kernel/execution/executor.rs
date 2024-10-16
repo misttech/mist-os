@@ -714,6 +714,7 @@ pub fn interrupt_thread(thread: &zx::Thread) {
 ///
 /// When a task exits with a non-zero exit code, this context is logged to help debugging which
 /// system call may have triggered the failure.
+#[derive(Debug)]
 pub struct ErrorContext {
     /// The system call that failed.
     pub syscall: Syscall,
