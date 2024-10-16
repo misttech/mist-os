@@ -24,6 +24,11 @@ pub use implementation::executor::{
 pub use implementation::task::{unblock, JoinHandle, Task};
 pub use implementation::timer::Timer;
 
+// TODO(https://fxbug.dev/328306129): remove alias once we are only exporting the MonotonicDuration
+// type.
+/// A duration in nanoseconds in the monotonic timeline.
+pub type MonotonicDuration = Duration;
+
 #[cfg(not(target_arch = "wasm32"))]
 mod task_group;
 #[cfg(not(target_arch = "wasm32"))]
