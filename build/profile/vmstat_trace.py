@@ -4,6 +4,8 @@
 # found in the LICENSE file.
 """Converts vmstat output to various trace formats.
 
+Expects vmstat to have been invoked with -t for the timestamp column.
+
 Usage:
   vmstat.py [options] INPUT > OUTPUT
 """
@@ -176,41 +178,46 @@ def _parse_data_row(line: str, max_fields: int) -> VmstatEntry:
 def _parse_vmstat_output(lines: Iterable[str]) -> Iterator[VmstatEntry]:
     num_fields = 18
     for line in lines:
-        if line.startswith("#"):  # comment
+        stripped_line = line.strip()
+        if not stripped_line:
             continue
-        if line.startswith("procs"):  # header categories
+        if stripped_line.startswith("#"):  # comment
             continue
-        if line.startswith(
-            " r  b"
+        if stripped_line.startswith("procs"):  # header categories
+            continue
+        if stripped_line.startswith(
+            "r  b"
         ):  # header fields, starting with running/blocked processes
             # treat consecutive whitespace as single separator
-            fields = line.split()
+            fields = stripped_line.split()
             num_fields = len(fields)
             continue
         # else is a line of trace data
-        yield _parse_data_row(line, num_fields)
+        yield _parse_data_row(stripped_line, num_fields)
 
 
 def print_chrome_trace_json(trace: Iterator[VmstatEntry]) -> Iterable[str]:
     yield "["
 
     try:
-        first: VmstatEntry = next(trace)
-    except StopIteration:
-        # if trace is empty, abort
-        yield "]"
-        return
+        try:
+            first: VmstatEntry = next(trace)
+        except StopIteration:
+            # if trace is empty, abort
+            return
 
-    start_time = first.timestamp
-    for line in first.chrome_trace_events_json(start_time):
-        yield f"  {line}"
-
-    # The remainder
-    for t in trace:
-        for line in t.chrome_trace_events_json(start_time):
+        start_time = first.timestamp
+        for line in first.chrome_trace_events_json(start_time):
             yield f"  {line}"
 
-    yield "]"
+        # The remainder
+        for t in trace:
+            for line in t.chrome_trace_events_json(start_time):
+                yield f"  {line}"
+
+    # cleanly close the trace
+    finally:
+        yield "]"
 
 
 def _main_arg_parser() -> argparse.ArgumentParser:
@@ -219,7 +226,7 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         # positional argument
         "input",
         type=Path,
-        help="text file or pipe that represents vmstat output",
+        help="text file of 'vmstat -t' output.  Pass '-' to read from stdin.",
     )
     return parser
 
@@ -229,9 +236,12 @@ _MAIN_ARG_PARSER = _main_arg_parser()
 
 def main(argv: Sequence[str]) -> int:
     args = _MAIN_ARG_PARSER.parse_args(argv)
-    vmstat_text = args.input.read_text()
+    if args.input == Path("-"):
+        vmstat_lines = sys.stdin  # is Iterable[str]
+    else:
+        vmstat_lines = args.input.read_text().splitlines()
 
-    trace = _parse_vmstat_output(vmstat_text.splitlines())
+    trace = _parse_vmstat_output(vmstat_lines)
 
     for line in print_chrome_trace_json(trace):
         print(line)

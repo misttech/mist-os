@@ -5,11 +5,20 @@
 
 # Runs vmstat for the duration of a wrapped command,
 # logging its output to file.
+# This also produces a chrome-tracing formatted version of the
+# same data in the log file name-suffixed with .json.
+
+readonly script="$0"
+# assume script is always with path prefix, e.g. "./$script"
+readonly script_dir="${script%/*}"
+readonly script_basename="${script##*/}"
+
+readonly trace_tool="$script_dir/vmstat_trace.py"
 
 function usage() {
   cat <<EOF
 Usage:
-$0 -o logfile [vmstat_args] -- command...
+$script -o logfile [vmstat_args] -- command...
 EOF
 }
 
@@ -21,7 +30,8 @@ vmstat="$(which vmstat)" || {
 }
 
 # extract script options and vmstat_args first
-vmstat_args=()
+# Always include the timestamp, expected by vmstat_trace.py.
+vmstat_args=(-t)
 prev_opt=
 for opt
 do
@@ -54,18 +64,25 @@ done
 # Everything else after '--' is the command to run.
 cmd=("$@")
 
-rm -f "$logfile"
+rm -f "$logfile" "$logfile.json"
 touch "$logfile"
-"$vmstat" "${vmstat_args[@]}" > "$logfile" &
-vmstat_pid="$!"
+# Launch vmstat in the background, along with any of its output scanners.
+"$vmstat" "${vmstat_args[@]}" | tee "$logfile" | "$trace_tool" - > "$logfile.json" &
 
-cmd_status=0
+vmstat_base="$(basename "$vmstat")"
+# Find the subprocess of this shell for 'vmstat'.
+# Can't use '$!' because that points to the last command in the pipe chain.
+# Terminating the 'vmstat' process should cascade to the other downstream
+# processes via SIGPIPE.
+vmstat_pid="$(ps --ppid "$$" | grep -w "$vmstat_base" | cut -d\  -f 1)"
 
-# terminate vmstat when main command is complete (or interrupted)
+# Terminate vmstat when main command is complete (or interrupted).
 function shutdown() {
   kill "$vmstat_pid"
 }
 trap shutdown EXIT
 
+# Run the wrapped command.
+cmd_status=0
 "${cmd[@]}" || cmd_status="$?"
 exit "$cmd_status"

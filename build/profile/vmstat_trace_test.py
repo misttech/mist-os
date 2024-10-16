@@ -85,6 +85,7 @@ class VmstatEntryTests(unittest.TestCase):
     def test_parse_vmstat_output(self) -> None:
         lines = [
             "# Remember, remember, the 5th of November",  # ignore comment
+            "",  # ignore blank
             "procs -----------memory---------- ---swap-- -----io---- -system-- -------cpu------- -----timestamp-----",
             " r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st gu                 UTC",
             _SAMPLE_VMSTAT_DATA_LINE,
