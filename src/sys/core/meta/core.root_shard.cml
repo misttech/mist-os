@@ -229,6 +229,11 @@
             to: "#core",
         },
         {
+            dictionary: "diagnostics",
+            from: "#bootstrap",
+            to: "#core",
+        },
+        {
             service: [
                 "fuchsia.gpu.magma.Service",
                 "fuchsia.hardware.cpu.ctrl.Service",

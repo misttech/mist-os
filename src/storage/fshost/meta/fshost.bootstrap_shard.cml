@@ -55,6 +55,11 @@
             to: "#fshost",
         },
         {
+            dictionary: "diagnostics",
+            from: "self",
+            to: "#fshost",
+        },
+        {
             protocol: [
                 "fuchsia.inspect.InspectSink",
                 "fuchsia.logger.LogSink",
