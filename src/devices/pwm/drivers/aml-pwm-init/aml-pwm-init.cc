@@ -150,9 +150,10 @@ zx_status_t PwmInitDevice::Init() {
   }
 
   // set GPIO to reset Bluetooth module
-  fidl::WireResult config_result = bt_gpio_->ConfigOut(0);
+  fidl::WireResult config_result =
+      bt_gpio_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputLow);
   if (!config_result.ok()) {
-    FDF_LOG(ERROR, "Failed to send ConfigOut request to bt gpio: %s",
+    FDF_LOG(ERROR, "Failed to send SetBufferMode request to bt gpio: %s",
             config_result.status_string());
     return config_result.status();
   }
@@ -162,9 +163,11 @@ zx_status_t PwmInitDevice::Init() {
     return config_result->error_value();
   }
   usleep(10 * 1000);
-  fidl::WireResult write_result = bt_gpio_->Write(1);
+  fidl::WireResult write_result =
+      bt_gpio_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputHigh);
   if (!write_result.ok()) {
-    FDF_LOG(ERROR, "Failed to send Write request to bt gpio: %s", write_result.status_string());
+    FDF_LOG(ERROR, "Failed to send SetBufferMode request to bt gpio: %s",
+            write_result.status_string());
     return write_result.status();
   }
   if (write_result->is_error()) {

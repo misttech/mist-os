@@ -237,7 +237,7 @@ zx::result<> AmlSdmmc::InitResources(
       incoming()->Connect<fuchsia_hardware_gpio::Service::Device>(kGpioFragmentName);
   if (gpio_result.is_ok() && gpio_result->is_valid()) {
     auto gpio = fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>(std::move(gpio_result.value()));
-    if (gpio->GetName().ok()) {
+    if (gpio->Read().ok()) {
       reset_gpio_ = std::move(gpio);
     }
   }
@@ -888,9 +888,10 @@ void AmlSdmmc::DoTaskAndComplete(fit::function<zx_status_t()> task, fdf::Arena& 
 
 zx_status_t AmlSdmmc::HwResetImpl() {
   if (reset_gpio_.is_valid()) {
-    fidl::WireResult result1 = reset_gpio_->ConfigOut(0);
+    fidl::WireResult result1 =
+        reset_gpio_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputLow);
     if (!result1.ok()) {
-      FDF_LOGL(ERROR, logger(), "Failed to send ConfigOut request to reset gpio: %s",
+      FDF_LOGL(ERROR, logger(), "Failed to send SetBufferMode request to reset gpio: %s",
                result1.status_string());
       return result1.status();
     }
@@ -900,9 +901,10 @@ zx_status_t AmlSdmmc::HwResetImpl() {
       return result1->error_value();
     }
     zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
-    fidl::WireResult result2 = reset_gpio_->ConfigOut(1);
+    fidl::WireResult result2 =
+        reset_gpio_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputHigh);
     if (!result2.ok()) {
-      FDF_LOGL(ERROR, logger(), "Failed to send ConfigOut request to reset gpio: %s",
+      FDF_LOGL(ERROR, logger(), "Failed to send SetBufferMode request to reset gpio: %s",
                result2.status_string());
       return result2.status();
     }
