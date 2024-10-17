@@ -107,6 +107,8 @@ class FakeFlatland : public fuchsia::ui::composition::testing::Allocator_TestBas
 
     status = buffer_collection->Release();
     EXPECT_EQ(status, ZX_OK);
+
+    callback(fuchsia::ui::composition::Allocator_RegisterBufferCollection_Result::WithResponse({}));
   }
 
   // |fuchsia::ui::composition::testing::Flatland|
