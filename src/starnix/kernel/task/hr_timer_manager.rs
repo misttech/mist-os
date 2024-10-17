@@ -4,6 +4,7 @@
 
 use fidl::endpoints::Proxy;
 use fuchsia_inspect::ArrayProperty;
+use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use futures::FutureExt;
 use once_cell::sync::OnceCell;
 use starnix_logging::{log_debug, log_error, log_warn};
@@ -23,6 +24,9 @@ use crate::vfs::timer::TimerOps;
 
 const HRTIMER_DIRECTORY: &str = "/dev/class/hrtimer";
 const HRTIMER_DEFAULT_ID: u64 = 6;
+
+/// Max value for inspect event history.
+const INSPECT_GRAPH_EVENT_BUFFER_SIZE: usize = 128;
 
 fn connect_to_hrtimer() -> Result<fhrtimer::DeviceSynchronousProxy, Errno> {
     let mut dir = std::fs::read_dir(HRTIMER_DIRECTORY)
@@ -80,6 +84,69 @@ fn get_hrtimer_resolution_nsecs(device_proxy: &fhrtimer::DeviceSynchronousProxy)
     }
 }
 
+#[derive(Debug)]
+enum InspectHrTimerEvent {
+    Add,
+    Update,
+    Remove,
+    Expired,
+    // The String inside will be used in fmt. But the compiler does not recognize the use when
+    // formatting with the Debug derivative.
+    Error(#[allow(dead_code)] String),
+}
+
+impl InspectHrTimerEvent {
+    fn retain_err(prev_len: usize, after_len: usize, context: &str) -> InspectHrTimerEvent {
+        InspectHrTimerEvent::Error(format!(
+            "retain the timer heap incorrectly, before len: {}, after len: {}, context: {}",
+            prev_len, after_len, context
+        ))
+    }
+}
+
+impl std::fmt::Display for InspectHrTimerEvent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+struct HrTimerManagerState {
+    /// Binary heap that stores all pending timers, with the sooner deadline having higher priority.
+    timer_heap: BinaryHeap<HrTimerNode>,
+    /// The deadline of the currently running timer on the `HrTimer` device.
+    ///
+    /// This deadline is set from the first timer in the `timer_heap`. It is used to determine when
+    /// the next timer in the heap will be expired.
+    ///
+    /// When the `stop` method is called, the HrTimer device is stopped and the `current_deadline`
+    /// is set to `None`.
+    current_deadline: Option<zx::MonotonicInstant>,
+
+    /// The event that is registered with runner to allow the hrtimer to wake the kernel.
+    wake_event: Option<zx::EventPair>,
+
+    /// Inspect node to record events in the timer heap
+    inspect_node: BoundedListNode,
+}
+
+impl HrTimerManagerState {
+    fn new(parent_node: &fuchsia_inspect::Node) -> Self {
+        Self {
+            inspect_node: BoundedListNode::new(
+                parent_node.create_child("events"),
+                INSPECT_GRAPH_EVENT_BUFFER_SIZE,
+            ),
+            timer_heap: Default::default(),
+            current_deadline: Default::default(),
+            wake_event: Default::default(),
+        }
+    }
+    /// Clears the `EVENT_SIGNALED` signal on the hrtimer event.
+    fn reset_wake_event(&mut self) {
+        self.wake_event.as_ref().map(clear_wake_proxy_signal);
+    }
+}
+
 /// The manager for high-resolution timers.
 ///
 /// This manager is responsible for creating and managing high-resolution timers.
@@ -95,40 +162,17 @@ pub struct HrTimerManager {
 }
 pub type HrTimerManagerHandle = Arc<HrTimerManager>;
 
-#[derive(Default)]
-struct HrTimerManagerState {
-    /// Binary heap that stores all pending timers, with the sooner deadline having higher priority.
-    timer_heap: BinaryHeap<HrTimerNode>,
-    /// The deadline of the currently running timer on the `HrTimer` device.
-    ///
-    /// This deadline is set from the first timer in the `timer_heap`. It is used to determine when
-    /// the next timer in the heap will be expired.
-    ///
-    /// When the `stop` method is called, the HrTimer device is stopped and the `current_deadline`
-    /// is set to `None`.
-    current_deadline: Option<zx::MonotonicInstant>,
-
-    /// The event that is registered with runner to allow the hrtimer to wake the kernel.
-    wake_event: Option<zx::EventPair>,
-}
-
-impl HrTimerManagerState {
-    /// Clears the `EVENT_SIGNALED` signal on the hrtimer event.
-    fn reset_wake_event(&mut self) {
-        self.wake_event.as_ref().map(clear_wake_proxy_signal);
-    }
-}
-
 impl HrTimerManager {
     pub fn new(parent_node: &fuchsia_inspect::Node) -> HrTimerManagerHandle {
+        let inspect_node = parent_node.create_child("hr_timer_manager");
         let new_manager = Arc::new(Self {
             device_proxy: connect_to_hrtimer().ok(),
-            state: Default::default(),
+            state: Mutex::new(HrTimerManagerState::new(&inspect_node)),
             start_next_sender: Default::default(),
         });
         let manager_weak = Arc::downgrade(&new_manager);
         // Create a lazy inspect node to get HrTimerManager info at read-time.
-        parent_node.record_lazy_child("hr_timer", move || {
+        inspect_node.record_lazy_child("heap", move || {
             let manager_ref = manager_weak.upgrade().expect("inner HrTimerManager");
             async move {
                 let inspector = fuchsia_inspect::Inspector::default();
@@ -154,6 +198,7 @@ impl HrTimerManager {
             }
             .boxed()
         });
+        parent_node.record(inspect_node);
         new_manager
     }
 
@@ -253,6 +298,7 @@ impl HrTimerManager {
                     guard.timer_heap.retain(|t| {
                         !(t.deadline == new_deadline && Arc::ptr_eq(&t.hr_timer, &hrtimer_ref))
                     });
+                    self.record_event(&mut guard, InspectHrTimerEvent::Expired, Some(new_deadline));
 
                     if guard.timer_heap.is_empty() && !*hrtimer_ref.is_interval.lock() {
                         // Only clear the timer event if there are no more timers to start.
@@ -295,6 +341,22 @@ impl HrTimerManager {
     #[cfg(test)]
     fn current_deadline(&self) -> Option<zx::MonotonicInstant> {
         self.lock().current_deadline.clone()
+    }
+
+    /// Record the inspect event of the heap.
+    fn record_event(
+        self: &HrTimerManagerHandle,
+        guard: &mut MutexGuard<'_, HrTimerManagerState>,
+        event_type: InspectHrTimerEvent,
+        deadline: Option<zx::MonotonicInstant>,
+    ) {
+        guard.inspect_node.add_entry(move |node| {
+            node.record_string("type", event_type.to_string());
+            node.record_int("created_at", zx::MonotonicInstant::get().into_nanos());
+            if let Some(deadline) = deadline {
+                node.record_int("deadline", deadline.into_nanos());
+            }
+        });
     }
 
     /// Start the front timer in the heap.
@@ -351,13 +413,26 @@ impl HrTimerManager {
         let mut guard = self.lock();
 
         let new_timer_node = HrTimerNode::new(deadline, wake_source, new_timer.clone());
+        let prev_len = guard.timer_heap.len();
         // If the deadline of a timer changes, this function will be called to update the order of
         // the `timer_heap`.
         // Check if the timer already exists and remove it to ensure the `timer_heap` remains
         // ordered by update-to-date deadline.
         guard.timer_heap.retain(|t| !Arc::ptr_eq(&t.hr_timer, new_timer));
         // Add the new timer into the heap.
-        guard.timer_heap.push(new_timer_node);
+        guard.timer_heap.push(new_timer_node.clone());
+
+        // Record the inspect event
+        let after_len = guard.timer_heap.len();
+        let inspect_event_type = if after_len == prev_len {
+            InspectHrTimerEvent::Update
+        } else if after_len == prev_len + 1 {
+            InspectHrTimerEvent::Add
+        } else {
+            InspectHrTimerEvent::retain_err(prev_len, after_len, "adding timer")
+        };
+        self.record_event(&mut guard, inspect_event_type, Some(new_timer_node.deadline));
+
         if let Some(running_timer) = guard.timer_heap.peek() {
             // If the new timer is in front, it has a sooner deadline. (Re)Start the HrTimer device
             // with the new deadline.
@@ -373,14 +448,31 @@ impl HrTimerManager {
         let mut guard = self.lock();
         if let Some(running_timer_node) = guard.timer_heap.peek() {
             if Arc::ptr_eq(&running_timer_node.hr_timer, timer) {
+                let deadline = Some(running_timer_node.deadline);
+                self.record_event(&mut guard, InspectHrTimerEvent::Update, deadline);
                 guard.timer_heap.pop();
                 self.start_next(&mut guard)?;
                 return Ok(());
             }
         }
 
+        let prev_len = guard.timer_heap.len();
         // Find the timer to stop and remove
         guard.timer_heap.retain(|tn| !Arc::ptr_eq(&tn.hr_timer, timer));
+
+        // Record the inspect event
+        let after_len = guard.timer_heap.len();
+        let inspect_event_type = if after_len == prev_len {
+            // There is no-op on the heap
+            None
+        } else if after_len == prev_len - 1 {
+            Some(InspectHrTimerEvent::Remove)
+        } else {
+            Some(InspectHrTimerEvent::retain_err(prev_len, after_len, "removing timer"))
+        };
+        if let Some(inspect_event_type) = inspect_event_type {
+            self.record_event(&mut guard, inspect_event_type, None);
+        }
 
         Ok(())
     }
@@ -585,7 +677,9 @@ mod tests {
         let (_, current_task) = create_kernel_and_task();
         let manager = Arc::new(HrTimerManager {
             device_proxy: Some(proxy),
-            state: Default::default(),
+            state: Mutex::new(HrTimerManagerState::new(
+                fuchsia_inspect::component::inspector().root(),
+            )),
             start_next_sender: Default::default(),
         });
         manager.init(&current_task).expect("");
