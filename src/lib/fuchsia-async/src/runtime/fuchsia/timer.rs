@@ -529,8 +529,12 @@ impl<T: TimeInterface> TimersInterface for Timers<T> {
         let mut inner = self.inner.lock();
         // SAFETY: `inner` is locked.
         let index = unsafe { *timer.index.get() };
-        if let Some(index) = index.get() {
-            if inner.timers.reset(index, nanos) == 0 && index != 0 {
+        if let Some(old_index) = index.get() {
+            if inner.timers.reset(old_index, nanos) == 0 {
+                self.set_timer(&mut inner, nanos);
+            } else if old_index == 0 {
+                // SAFETY: `inner` is locked.
+                let nanos = unsafe { inner.timers.peek().unwrap().nanos() };
                 self.set_timer(&mut inner, nanos);
             }
             timer.state.store(REGISTERED, Ordering::Relaxed);
@@ -657,12 +661,14 @@ impl Heap {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{LocalExecutor, SendExecutor, TestExecutor};
+    use crate::{LocalExecutor, SendExecutor, Task, TestExecutor};
     use assert_matches::assert_matches;
+    use futures::channel::oneshot::channel;
     use futures::future::Either;
     use futures::prelude::*;
     use rand::seq::SliceRandom;
     use rand::{thread_rng, Rng};
+    use std::future::poll_fn;
     use std::pin::pin;
     use zx::MonotonicDuration;
 
@@ -849,5 +855,41 @@ mod test {
         for n in nanos {
             assert_eq!(timers.wake_next_timer(), Some(MonotonicInstant::from_nanos(n)));
         }
+    }
+
+    #[test]
+    fn timer_reset_to_earlier_time() {
+        let mut exec = LocalExecutor::new();
+
+        for _ in 0..100 {
+            let instant = MonotonicInstant::after(MonotonicDuration::from_millis(100));
+            let (sender, receiver) = channel();
+            let task = Task::spawn(async move {
+                let mut timer = pin!(Timer::new(instant));
+                let mut receiver = pin!(receiver.fuse());
+                poll_fn(|cx| loop {
+                    if timer.as_mut().poll_unpin(cx).is_ready() {
+                        return Poll::Ready(());
+                    }
+                    if !receiver.is_terminated() && receiver.poll_unpin(cx).is_ready() {
+                        timer
+                            .as_mut()
+                            .reset(MonotonicInstant::after(MonotonicDuration::from_millis(1)));
+                    } else {
+                        return Poll::Pending;
+                    }
+                })
+                .await;
+            });
+            sender.send(()).unwrap();
+
+            exec.run_singlethreaded(task);
+
+            if MonotonicInstant::after(MonotonicDuration::from_millis(1)) < instant {
+                return;
+            }
+        }
+
+        panic!("Timer fired late in all 100 attempts");
     }
 }
