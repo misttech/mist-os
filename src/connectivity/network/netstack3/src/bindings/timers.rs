@@ -5,12 +5,15 @@
 use std::cmp;
 use std::collections::BinaryHeap;
 use std::fmt::Debug;
+use std::pin::Pin;
 use std::sync::atomic::{self, AtomicI64, AtomicUsize};
 use std::sync::{Arc, Weak};
+use std::task::Poll;
 
 use async_utils::futures::YieldToExecutorOnce;
 use fuchsia_async as fasync;
-use futures::{FutureExt, StreamExt as _};
+use futures::future::FusedFuture;
+use futures::{Future, FutureExt, StreamExt as _};
 use log::{trace, warn};
 use netstack3_core::sync::Mutex as CoreMutex;
 
@@ -100,8 +103,7 @@ impl<T: Clone + Send + Sync + Debug + 'static> TimerDispatcher<T> {
         mut watcher: NeedsDataWatcher,
         inner: Arc<TimerDispatcherInner<T>>,
     ) {
-        let mut timer_scheduled_instant = None;
-        let mut timer = futures::future::pending().left_future();
+        let mut timer = TimerWaiter::new();
         let mut gc_generation = 0;
         loop {
             let mut watcher_next = watcher.next().fuse();
@@ -117,41 +119,11 @@ impl<T: Clone + Send + Sync + Debug + 'static> TimerDispatcher<T> {
             }
 
             let (next_wakeup, heap_len) = Self::check_timer_heap(&mut handler, &inner.state).await;
-            trace!("next wakeup = {:?}, heap_len = {heap_len}", next_wakeup);
+
+            trace!("next wakeup = {:?}, heap_len = {heap_len}", ScheduledInstant::new(next_wakeup));
             // Update our timer to wake at the next wake up time according to
             // the heap.
-            if std::mem::replace(&mut timer_scheduled_instant, next_wakeup) != next_wakeup {
-                if let Some(next_wakeup) = next_wakeup {
-                    let next_wakeup = next_wakeup.into();
-                    match &mut timer {
-                        futures::future::Either::Left(futures::future::Pending { .. }) => {
-                            timer = Box::pin(fasync::Timer::new(next_wakeup)).right_future();
-                        }
-                        futures::future::Either::Right(timer) => {
-                            timer.as_mut().reset(next_wakeup);
-                        }
-                    }
-                } else {
-                    // If we don't have a next wakeup time, it means we don't
-                    // need a timer scheduled. We run this loop whenever a) The
-                    // fuchsia-async timer fires or b) the watcher notifier gets
-                    // pinged. For case (a) we don't need to touch the
-                    // fuchsia-async timer. For case (b), from Timer::schedule
-                    // we know that the notifier doesn't get pinged when
-                    // _descheduling_, meaning some valid timers should be in
-                    // the heap. We can't quite fully assert on the conditions
-                    // here because timers could've been cancelled before we got
-                    // enough time to service the ping. In that case the cheaper
-                    // thing to do is to just allow the fuchsia-async timer to
-                    // fire spuriously in the future in the worst case. This
-                    // should cause less thrash with the global fuchsia-async
-                    // timer heap.
-                    //
-                    // Note that the fuchsia-async timer is simply a wake up
-                    // source, it merely acts as a trigger for us to re-evaluate
-                    // the next timer to fire in the heap.
-                }
-            }
+            timer.set(next_wakeup);
 
             // Our target heap size is the number of timers we have alive,
             // capped to a minimum size to avoid too much GC thrash.
@@ -161,6 +133,7 @@ impl<T: Clone + Send + Sync + Debug + 'static> TimerDispatcher<T> {
             // down to around the target size.
             let target_heap_len =
                 inner.timer_count.load(atomic::Ordering::SeqCst).max(MIN_TARGET_HEAP_SIZE);
+            timer.set_target_heap_size(target_heap_len);
             if heap_len > target_heap_len * 2 {
                 gc_generation += 1;
                 let after = Self::gc_timer_heap(&inner.state, gc_generation);
@@ -210,7 +183,7 @@ impl<T: Clone + Send + Sync + Debug + 'static> TimerDispatcher<T> {
     async fn check_timer_heap<H: FnMut(T, UniqueTimerId<T>)>(
         handler: &mut H,
         inner: &CoreMutex<TimerDispatcherState<T>>,
-    ) -> (Option<ScheduledInstant>, usize) {
+    ) -> (fasync::MonotonicInstant, usize) {
         let mut fired_count = 0;
         loop {
             let (dispatch, unique_id) = {
@@ -219,11 +192,11 @@ impl<T: Clone + Send + Sync + Debug + 'static> TimerDispatcher<T> {
                 let heap_len = heap.len();
                 let Some(front) = heap.peek_mut() else {
                     // Nothing to wait for.
-                    return (None, heap_len);
+                    return (UNSCHEDULED_SENTINEL, heap_len);
                 };
                 if !front.should_fire_at(fasync::MonotonicInstant::now()) {
                     // Wait until the time at the front of the heap to fire.
-                    return (ScheduledInstant::new(front.time), heap_len);
+                    return (front.time, heap_len);
                 }
                 // NB: This is an associated function, probably because
                 // PeekMut implements Deref.
@@ -505,6 +478,143 @@ impl<T> Timer<T> {
 
 const MIN_TARGET_HEAP_SIZE: usize = 10;
 
+/// This provides a means to reuse [`fasync::Timer`] across run loops of
+/// [`TimerDispatcher`], minimizing reallocations and decreasing leaks.
+///
+/// A `fasync::Timer` allocates backing memory that is only freed when the time
+/// it was created with expires.. `TimerWaiter` offers a self-contained reusable
+/// collection of timers that it decides to use based on the desired scheduled
+/// wait time.
+///
+/// It also works around the limitation that an `fasync::Timer` can only be
+/// rescheduled after it has fired.
+struct TimerWaiter {
+    timers: BinaryHeap<TimeAndValue<Pin<Box<fasync::Timer>>>>,
+    selected: Option<TimeAndValue<Pin<Box<fasync::Timer>>>>,
+    wakeup: fasync::MonotonicInstant,
+    /// The target heap size controls when we let go of expired fasync::Timers
+    /// instead of reusing them.
+    target_heap_size: usize,
+}
+
+impl TimerWaiter {
+    /// Creates a new `TimerWaiter`.
+    ///
+    /// In the default state, `TimerWaiter` is scheduled for `INFINITE_FUTURE`.
+    fn new() -> Self {
+        Self {
+            timers: Default::default(),
+            selected: None,
+            wakeup: UNSCHEDULED_SENTINEL,
+            target_heap_size: MIN_TARGET_HEAP_SIZE,
+        }
+    }
+
+    /// Sets the target heap size to `target`.
+    fn set_target_heap_size(&mut self, target: usize) {
+        self.target_heap_size = target;
+    }
+
+    /// Sets the time at which this future will resolve to ready.
+    ///
+    /// Note that an `INFINITE_FUTURE` wakeup time will cause `TimerWaiter` to
+    /// behave like a terminated future, i.e., `FusedFuture::is_terminated` is
+    /// `true` and polling it may panic.
+    fn set(&mut self, new_wakeup: fasync::MonotonicInstant) {
+        let Self { timers, selected, wakeup, target_heap_size: _ } = self;
+        if std::mem::replace(wakeup, new_wakeup) == new_wakeup {
+            return;
+        }
+        // If we have a new wakeup time, always give up on the currently
+        // selected timer and push to the heap.
+        if let Some(selected) = selected.take() {
+            timers.push(selected);
+        }
+
+        // Don't use timers for waiting until infinity. Our `FusedFuture`
+        // implementation will prevent this from being polled when that's the
+        // case.
+        if new_wakeup == UNSCHEDULED_SENTINEL {
+            return;
+        }
+
+        let time_and_value = timers
+            .peek_mut()
+            .and_then(|front| {
+                // This is a good candidate IFF the fasync time is scheduled
+                // before our new wakeup time or it matches it exactly.
+                (front.time <= new_wakeup)
+                    .then(|| std::collections::binary_heap::PeekMut::pop(front))
+            })
+            .unwrap_or_else(|| {
+                // If there are no timers available in the heap then we need to
+                // allocate a new timer.
+                TimeAndValue { time: new_wakeup, value: Box::pin(fasync::Timer::new(new_wakeup)) }
+            });
+
+        *selected = Some(time_and_value);
+    }
+
+    fn maybe_return_fired_timer_to_pool(&mut self, entry: TimeAndValue<Pin<Box<fasync::Timer>>>) {
+        // Place the timer back in the heap if we're not over the threshold.
+        //
+        // We don't store anything special in the heap saying this timer has
+        // already fired because fasync::Timer can be polled to discover that
+        // immediately, and that's resolved in our polling implementation.
+        // Whenever we observe `Ready` from the timer.
+        if self.timers.len() < self.target_heap_size {
+            self.timers.push(entry);
+        }
+    }
+}
+
+impl Future for TimerWaiter {
+    type Output = ();
+
+    fn poll(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> Poll<Self::Output> {
+        let Self { timers: _, selected, wakeup, target_heap_size: _ } = &mut *self;
+        // Must not poll without a selected timer.
+        let mut taken_selected = selected.take().unwrap();
+        match taken_selected.value.poll_unpin(cx) {
+            Poll::Ready(()) => (),
+            Poll::Pending => {
+                // Place it back while pending.
+                *selected = Some(taken_selected);
+                return Poll::Pending;
+            }
+        }
+        if *wakeup <= taken_selected.time {
+            self.maybe_return_fired_timer_to_pool(taken_selected);
+            return Poll::Ready(());
+        }
+        // If our selected timer was scheduled for earlier than our wakeup
+        // reset the timer now that it fired and poll again.
+        taken_selected.value.as_mut().reset(*wakeup);
+        taken_selected.time = *wakeup;
+
+        match taken_selected.value.poll_unpin(cx) {
+            Poll::Ready(()) => {
+                self.maybe_return_fired_timer_to_pool(taken_selected);
+                Poll::Ready(())
+            }
+            Poll::Pending => {
+                // Still pending put it back.
+                *selected = Some(taken_selected);
+                Poll::Pending
+            }
+        }
+    }
+}
+
+impl FusedFuture for TimerWaiter {
+    fn is_terminated(&self) -> bool {
+        self.selected.is_none()
+    }
+}
+
 /// A separate module for [`ScheduledInstant`] so it can't be constructed
 /// violating its invariants.
 mod scheduled_instant {
@@ -516,7 +626,7 @@ mod scheduled_instant {
     ///
     /// It can only be constructed with an [`fasync::MonotonicInstant`] that is not
     /// `INFINITE_FUTURE`.
-    #[derive(Eq, PartialEq, Copy, Clone)]
+    #[derive(Eq, PartialEq)]
     pub(crate) struct ScheduledInstant(fasync::MonotonicInstant);
 
     impl std::fmt::Debug for ScheduledInstant {
@@ -550,15 +660,35 @@ mod scheduled_instant {
 #[cfg(test)]
 mod tests {
     use std::pin::pin;
-    use std::task::Poll;
 
     use crate::bindings::integration_tests::set_logger_for_test;
 
     use futures::channel::mpsc;
-    use futures::Future;
     use test_case::test_case;
 
     use super::*;
+
+    impl TimerWaiter {
+        #[track_caller]
+        fn assert_timers<I: IntoIterator<Item = fasync::MonotonicInstant>>(
+            &self,
+            expect_heap: I,
+            expect_selected: Option<fasync::MonotonicInstant>,
+        ) {
+            let Self { timers, selected, wakeup: _, target_heap_size: _ } = self;
+            // Collect times and compare sorted vecs.
+            let mut expect_heap = expect_heap.into_iter().collect::<Vec<_>>();
+            expect_heap.sort();
+            let mut timers =
+                timers.iter().map(|TimeAndValue { time, value: _ }| *time).collect::<Vec<_>>();
+            timers.sort();
+            assert_eq!(timers, expect_heap);
+            assert_eq!(
+                selected.as_ref().map(|TimeAndValue { time, value: _ }| *time),
+                expect_selected
+            );
+        }
+    }
 
     fn new_test_executor() -> fasync::TestExecutor {
         let executor = fasync::TestExecutor::new_with_fake_time();
@@ -583,6 +713,7 @@ mod tests {
     const T1: fasync::MonotonicInstant = fasync::MonotonicInstant::from_nanos(1);
     const T2: fasync::MonotonicInstant = fasync::MonotonicInstant::from_nanos(2);
     const T3: fasync::MonotonicInstant = fasync::MonotonicInstant::from_nanos(3);
+    const T4: fasync::MonotonicInstant = fasync::MonotonicInstant::from_nanos(4);
 
     #[derive(Debug, Eq, PartialEq, Clone)]
     enum TimerId {
@@ -820,5 +951,99 @@ mod tests {
         assert_eq!(t.dispatcher.inner.timer_count.load(atomic::Ordering::SeqCst), 0);
 
         (t, executor)
+    }
+
+    #[test]
+    fn timer_waiter_starts_terminated() {
+        let tw = TimerWaiter::new();
+        assert_eq!(tw.is_terminated(), true);
+    }
+
+    #[test]
+    fn timer_waiter_reuse_timer() {
+        set_logger_for_test();
+        let mut executor = new_test_executor();
+        let mut tw = TimerWaiter::new();
+        tw.assert_timers([], None);
+        tw.set(T1);
+        tw.assert_timers([], Some(T1));
+        assert_eq!(tw.is_terminated(), false);
+
+        // Timers aren't registered until they're polled, so run the executor first.
+        let _ = executor.run_until_stalled(&mut tw);
+
+        assert_eq!(executor.wake_next_timer(), Some(T1));
+        assert_eq!(executor.run_until_stalled(&mut tw), Poll::Ready(()));
+        assert_eq!(tw.is_terminated(), true);
+        assert_eq!(executor.wake_next_timer(), None);
+        tw.assert_timers([T1], None);
+        // Should be able to reuse the timer here.
+        tw.set(T2);
+        // Initially the timer is still cached to fire at T1, we haven't reset
+        // it.
+        tw.assert_timers([], Some(T1));
+        assert_eq!(executor.wake_next_timer(), None);
+        // Then we'll poll once which will update the timer.
+        assert_eq!(executor.run_until_stalled(&mut tw), Poll::Pending);
+        tw.assert_timers([], Some(T2));
+        // Now unblock the future.
+        assert_eq!(executor.wake_next_timer(), Some(T2));
+        assert_eq!(executor.run_until_stalled(&mut tw), Poll::Ready(()));
+        assert_eq!(tw.is_terminated(), true);
+
+        // We can now do everything again, but let's observe the future resolve
+        // all at once because time is in the future.
+        tw.set(T3);
+        tw.assert_timers([], Some(T2));
+        executor.set_fake_time(T3);
+        assert_eq!(executor.run_until_stalled(&mut tw), Poll::Ready(()));
+        assert_eq!(tw.is_terminated(), true);
+    }
+
+    #[test]
+    fn timer_waiter_cant_reuse() {
+        set_logger_for_test();
+        let mut executor = new_test_executor();
+        let mut tw = TimerWaiter::new();
+        tw.set(T3);
+        tw.assert_timers([], Some(T3));
+        // A time that is earlier than our only available timer will cause us to
+        // create a new timer.
+        tw.set(T2);
+        tw.assert_timers([T3], Some(T2));
+        tw.set(T1);
+        tw.assert_timers([T2, T3], Some(T1));
+        // If we reschedule again to T3, the configuration remains the same
+        // because we always prefer our earliest timer.
+        tw.set(T3);
+        tw.assert_timers([T2, T3], Some(T1));
+
+        // Won't fire until we reach T3.
+        executor.set_fake_time(T1);
+        assert_eq!(executor.run_until_stalled(&mut tw), Poll::Pending);
+        tw.assert_timers([T2, T3], Some(T3));
+        executor.set_fake_time(T3);
+        assert_eq!(executor.run_until_stalled(&mut tw), Poll::Ready(()));
+    }
+
+    #[test]
+    fn timer_waiter_target_heap_size() {
+        set_logger_for_test();
+        let mut executor = new_test_executor();
+        let mut tw = TimerWaiter::new();
+        tw.target_heap_size = 2;
+
+        // Change the scheduled time in reverse to thrash timer creation.
+        tw.set(T4);
+        tw.set(T3);
+        tw.set(T2);
+        tw.set(T1);
+        tw.assert_timers([T2, T3, T4], Some(T1));
+        executor.set_fake_time(T1);
+        assert_eq!(executor.run_until_stalled(&mut tw), Poll::Ready(()));
+        // Timer is not reused because we hit the threshold. Note, however, that
+        // we're still above threshold because removal is only considered when
+        // the timer is observed to have fired.
+        tw.assert_timers([T2, T3, T4], None);
     }
 }
