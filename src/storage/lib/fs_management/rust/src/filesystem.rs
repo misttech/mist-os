@@ -570,10 +570,10 @@ impl ServingMultiVolumeFilesystem {
             return Ok(true);
         }
         let path = format!("volumes/{}", volume);
-        fuchsia_fs::directory::open_node_deprecated(
+        fuchsia_fs::directory::open_node(
             self.exposed_dir.as_ref().unwrap(),
             &path,
-            fio::OpenFlags::NODE_REFERENCE,
+            fio::Flags::PROTOCOL_NODE,
         )
         .await
         .map(|_| true)
@@ -806,10 +806,10 @@ mod tests {
         let content = String::from("test content").into_bytes();
 
         {
-            let test_file = fuchsia_fs::directory::open_file_deprecated(
+            let test_file = fuchsia_fs::directory::open_file(
                 serving.root(),
                 merkle,
-                fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE,
+                fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE,
             )
             .await
             .expect("failed to create test file");
@@ -837,13 +837,10 @@ mod tests {
         serving.shutdown().await.expect("failed to shutdown blobfs the first time");
         let serving = blobfs.serve().await.expect("failed to serve blobfs the second time");
         {
-            let test_file = fuchsia_fs::directory::open_file_deprecated(
-                serving.root(),
-                merkle,
-                fio::OpenFlags::RIGHT_READABLE,
-            )
-            .await
-            .expect("failed to open test file");
+            let test_file =
+                fuchsia_fs::directory::open_file(serving.root(), merkle, fio::PERM_READABLE)
+                    .await
+                    .expect("failed to open test file");
             let read_content =
                 fuchsia_fs::file::read(&test_file).await.expect("failed to read from test file");
             assert_eq!(content, read_content);
@@ -940,10 +937,10 @@ mod tests {
         let content = String::from("test content").into_bytes();
 
         {
-            let test_file = fuchsia_fs::directory::open_file_deprecated(
+            let test_file = fuchsia_fs::directory::open_file(
                 serving.root(),
                 filename,
-                fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE,
+                fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE,
             )
             .await
             .expect("failed to create test file");
@@ -966,13 +963,10 @@ mod tests {
         let serving = minfs.serve().await.expect("failed to serve minfs the second time");
 
         {
-            let test_file = fuchsia_fs::directory::open_file_deprecated(
-                serving.root(),
-                filename,
-                fio::OpenFlags::RIGHT_READABLE,
-            )
-            .await
-            .expect("failed to open test file");
+            let test_file =
+                fuchsia_fs::directory::open_file(serving.root(), filename, fio::PERM_READABLE)
+                    .await
+                    .expect("failed to open test file");
             let read_content =
                 fuchsia_fs::file::read(&test_file).await.expect("failed to read from test file");
             assert_eq!(content, read_content);
@@ -1031,24 +1025,18 @@ mod tests {
 
         let fs = minfs.serve().await.expect("failed to serve fxfs");
         let file = {
-            let file = fuchsia_fs::directory::open_file_deprecated(
+            let file = fuchsia_fs::directory::open_file(
                 fs.root(),
                 test_file_name,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE,
+                fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE | fio::PERM_WRITABLE,
             )
             .await
             .unwrap();
             fuchsia_fs::file::write(&file, test_content).await.unwrap();
             file.close().await.expect("close fidl error").expect("close error");
-            fuchsia_fs::directory::open_file_deprecated(
-                fs.root(),
-                test_file_name,
-                fio::OpenFlags::RIGHT_READABLE,
-            )
-            .await
-            .unwrap()
+            fuchsia_fs::directory::open_file(fs.root(), test_file_name, fio::PERM_READABLE)
+                .await
+                .unwrap()
         };
 
         let exposed_dir = fs.take_exposed_dir();
@@ -1091,10 +1079,10 @@ mod tests {
         let content = String::from("test content").into_bytes();
 
         {
-            let test_file = fuchsia_fs::directory::open_file_deprecated(
+            let test_file = fuchsia_fs::directory::open_file(
                 serving.root(),
                 filename,
-                fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE,
+                fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE,
             )
             .await
             .expect("failed to create test file");
@@ -1119,13 +1107,10 @@ mod tests {
         let serving = f2fs.serve().await.expect("failed to serve f2fs the second time");
 
         {
-            let test_file = fuchsia_fs::directory::open_file_deprecated(
-                serving.root(),
-                filename,
-                fio::OpenFlags::RIGHT_READABLE,
-            )
-            .await
-            .expect("failed to open test file");
+            let test_file =
+                fuchsia_fs::directory::open_file(serving.root(), filename, fio::PERM_READABLE)
+                    .await
+                    .expect("failed to open test file");
             let read_content =
                 fuchsia_fs::file::read(&test_file).await.expect("failed to read from test file");
             assert_eq!(content, read_content);
@@ -1250,24 +1235,18 @@ mod tests {
                 .create_volume("foo", CreateOptions::default(), MountOptions::default())
                 .await
                 .expect("Create volume failed");
-            let file = fuchsia_fs::directory::open_file_deprecated(
+            let file = fuchsia_fs::directory::open_file(
                 vol.root(),
                 test_file_name,
-                fio::OpenFlags::CREATE
-                    | fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE,
+                fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_READABLE | fio::PERM_WRITABLE,
             )
             .await
             .unwrap();
             fuchsia_fs::file::write(&file, test_content).await.unwrap();
             file.close().await.expect("close fidl error").expect("close error");
-            fuchsia_fs::directory::open_file_deprecated(
-                vol.root(),
-                test_file_name,
-                fio::OpenFlags::RIGHT_READABLE,
-            )
-            .await
-            .unwrap()
+            fuchsia_fs::directory::open_file(vol.root(), test_file_name, fio::PERM_READABLE)
+                .await
+                .unwrap()
         };
 
         let exposed_dir = fs.take_exposed_dir();

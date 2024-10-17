@@ -96,11 +96,8 @@ async fn ext4_server_mounts_block_device(
     .unwrap();
 
     for (file_path, expected_hash) in &file_hashes {
-        let file = fuchsia_fs::directory::open_file_no_describe_deprecated(
-            &dir_proxy,
-            file_path,
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
-        )?;
+        let file =
+            fuchsia_fs::directory::open_file_async(&dir_proxy, file_path, fio::PERM_READABLE)?;
         let mut hasher = Sha256::new();
         hasher.update(&fuchsia_fs::file::read(&file).await?);
         assert_eq!(*expected_hash, hex::encode(hasher.finalize()));
@@ -169,11 +166,7 @@ async fn ext4_server_mounts_vmo_one_file() -> Result<(), Error> {
     let result = ext4.mount_vmo(vmo, dir_server).await;
     assert_matches!(result, Ok(MountVmoResult::Success(Success {})));
 
-    let file = fuchsia_fs::directory::open_file_no_describe_deprecated(
-        &dir_proxy,
-        "file1",
-        fuchsia_fs::OpenFlags::RIGHT_READABLE,
-    )?;
+    let file = fuchsia_fs::directory::open_file_async(&dir_proxy, "file1", fio::PERM_READABLE)?;
     assert_eq!("file1 contents.\n".to_string(), fuchsia_fs::file::read_to_string(&file).await?);
     Ok(())
 }
@@ -197,18 +190,11 @@ async fn ext4_server_mounts_vmo_nested_dirs() -> Result<(), Error> {
     let result = ext4.mount_vmo(vmo, dir_server).await;
     assert_matches!(result, Ok(MountVmoResult::Success(Success {})));
 
-    let file1 = fuchsia_fs::directory::open_file_no_describe_deprecated(
-        &dir_proxy,
-        "file1",
-        fuchsia_fs::OpenFlags::RIGHT_READABLE,
-    )?;
+    let file1 = fuchsia_fs::directory::open_file_async(&dir_proxy, "file1", fio::PERM_READABLE)?;
     assert_eq!("file1 contents.\n".to_string(), fuchsia_fs::file::read_to_string(&file1).await?);
 
-    let file2 = fuchsia_fs::directory::open_file_no_describe_deprecated(
-        &dir_proxy,
-        "inner/file2",
-        fuchsia_fs::OpenFlags::RIGHT_READABLE,
-    )?;
+    let file2 =
+        fuchsia_fs::directory::open_file_async(&dir_proxy, "inner/file2", fio::PERM_READABLE)?;
     assert_eq!("file2 contents.\n".to_string(), fuchsia_fs::file::read_to_string(&file2).await?);
     Ok(())
 }
@@ -233,18 +219,11 @@ async fn ext4_unified_service_mounts_vmo() -> Result<(), Error> {
     let result = ext4.mount_vmo(vmo, dir_server).await;
     assert_matches!(result, Ok(MountVmoResult::Success(Success {})));
 
-    let file1 = fuchsia_fs::directory::open_file_no_describe_deprecated(
-        &dir_proxy,
-        "file1",
-        fuchsia_fs::OpenFlags::RIGHT_READABLE,
-    )?;
+    let file1 = fuchsia_fs::directory::open_file_async(&dir_proxy, "file1", fio::PERM_READABLE)?;
     assert_eq!("file1 contents.\n".to_string(), fuchsia_fs::file::read_to_string(&file1).await?);
 
-    let file2 = fuchsia_fs::directory::open_file_no_describe_deprecated(
-        &dir_proxy,
-        "inner/file2",
-        fuchsia_fs::OpenFlags::RIGHT_READABLE,
-    )?;
+    let file2 =
+        fuchsia_fs::directory::open_file_async(&dir_proxy, "inner/file2", fio::PERM_READABLE)?;
     assert_eq!("file2 contents.\n".to_string(), fuchsia_fs::file::read_to_string(&file2).await?);
     Ok(())
 }

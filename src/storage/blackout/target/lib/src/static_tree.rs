@@ -75,10 +75,10 @@ impl distributions::Distribution<FileEntry> for distributions::Standard {
 
 impl FileEntry {
     async fn write_file_at(self, root: &fio::DirectoryProxy) -> Result<(), Error> {
-        let file = fuchsia_fs::directory::open_file_deprecated(
+        let file = fuchsia_fs::directory::open_file(
             root,
             &self.name.to_string(),
-            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE,
+            fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE,
         )
         .await?;
         fuchsia_fs::file::write(&file, &self.contents).await?;
@@ -121,10 +121,10 @@ impl DirectoryEntry {
         root: &'a fio::DirectoryProxy,
     ) -> futures::future::BoxFuture<'a, Result<(), Error>> {
         Box::pin(async {
-            let this = fuchsia_fs::directory::create_directory_deprecated(
+            let this = fuchsia_fs::directory::create_directory(
                 root,
                 &self.get_name(),
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                fio::PERM_READABLE | fio::PERM_WRITABLE,
             )
             .await?;
             for entry in self.entries {

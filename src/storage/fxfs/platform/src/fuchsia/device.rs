@@ -1008,10 +1008,10 @@ mod tests {
                 let content = String::from("Hello world!").into_bytes();
                 let merkle_root_hash = fuchsia_merkle::from_slice(&content).root().to_string();
                 {
-                    let file = fuchsia_fs::directory::open_file_deprecated(
+                    let file = fuchsia_fs::directory::open_file(
                         serving.root(),
                         &merkle_root_hash,
-                        fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE,
+                        fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE,
                     )
                     .await
                     .expect("open file failed");
@@ -1033,10 +1033,10 @@ mod tests {
 
                 let serving = blobfs.serve().await.expect("serve blobfs failed");
                 {
-                    let file = fuchsia_fs::directory::open_file_deprecated(
+                    let file = fuchsia_fs::directory::open_file(
                         serving.root(),
                         &merkle_root_hash,
-                        fio::OpenFlags::RIGHT_READABLE,
+                        fio::PERM_READABLE,
                     )
                     .await
                     .expect("open file failed");

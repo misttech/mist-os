@@ -128,8 +128,7 @@ pub async fn create_hermetic_crypt_service(
 
 pub fn open_dir_at_root(subdir: &str) -> Directory {
     let path = PathBuf::from(MOUNT_PATH).join(subdir);
-    Directory::from_namespace(path, fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::RIGHT_READABLE)
-        .unwrap()
+    Directory::from_namespace(path, fio::PERM_WRITABLE | fio::PERM_READABLE).unwrap()
 }
 
 /// Describes the environment that this stress test will run under.
@@ -214,18 +213,9 @@ impl<FSC: Clone + FSConfig> FsEnvironment<FSC> {
         let mut rng = SmallRng::seed_from_u64(seed);
 
         // Make a home directory for file actor and deletion actor
-        let root_dir = Directory::from_namespace(
-            MOUNT_PATH,
-            fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::RIGHT_READABLE,
-        )
-        .unwrap();
-        root_dir
-            .create_directory(
-                "home1",
-                fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::RIGHT_READABLE,
-            )
-            .await
-            .unwrap();
+        let root_dir =
+            Directory::from_namespace(MOUNT_PATH, fio::PERM_WRITABLE | fio::PERM_READABLE).unwrap();
+        root_dir.create_directory("home1", fio::PERM_WRITABLE | fio::PERM_READABLE).await.unwrap();
         // Home directory must be recovered because SPO occurs in a crash test.
         // Syncronize the home directory to ensure consistency.
         open_dir_at_root("home1").sync_directory().await.unwrap();

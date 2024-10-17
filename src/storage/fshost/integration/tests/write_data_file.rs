@@ -50,10 +50,10 @@ async fn unformatted() {
     let fixture = new_builder().with_disk_from_vmo(vmo).build().await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let secret = fuchsia_fs::directory::open_file_deprecated(
-        &fixture.dir("data", fio::OpenFlags::RIGHT_READABLE),
+    let secret = fuchsia_fs::directory::open_file(
+        &fixture.dir("data", fio::PERM_READABLE),
         SECRET_FILE_NAME,
-        fio::OpenFlags::RIGHT_READABLE,
+        fio::PERM_READABLE,
     )
     .await
     .unwrap();
@@ -91,10 +91,10 @@ async fn no_existing_data_partition() {
 
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let secret = fuchsia_fs::directory::open_file_deprecated(
-        &fixture.dir("data", fio::OpenFlags::RIGHT_READABLE),
+    let secret = fuchsia_fs::directory::open_file(
+        &fixture.dir("data", fio::PERM_READABLE),
         SECRET_FILE_NAME,
-        fio::OpenFlags::RIGHT_READABLE,
+        fio::PERM_READABLE,
     )
     .await
     .unwrap();
@@ -124,10 +124,10 @@ async fn unformatted_netboot() {
 
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let secret = fuchsia_fs::directory::open_file_deprecated(
-        &fixture.dir("data", fio::OpenFlags::RIGHT_READABLE),
+    let secret = fuchsia_fs::directory::open_file(
+        &fixture.dir("data", fio::PERM_READABLE),
         SECRET_FILE_NAME,
-        fio::OpenFlags::RIGHT_READABLE,
+        fio::PERM_READABLE,
     )
     .await
     .unwrap();
@@ -175,10 +175,10 @@ async fn unformatted_small_disk() {
 
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let secret = fuchsia_fs::directory::open_file_deprecated(
-        &fixture.dir("data", fio::OpenFlags::RIGHT_READABLE),
+    let secret = fuchsia_fs::directory::open_file(
+        &fixture.dir("data", fio::PERM_READABLE),
         SECRET_FILE_NAME,
-        fio::OpenFlags::RIGHT_READABLE,
+        fio::PERM_READABLE,
     )
     .await
     .unwrap();
@@ -215,10 +215,10 @@ async fn formatted() {
     // Make sure the original contents in the data partition still exist.
     fixture.check_test_data_file().await;
 
-    let secret = fuchsia_fs::directory::open_file_deprecated(
-        &fixture.dir("data", fio::OpenFlags::RIGHT_READABLE),
+    let secret = fuchsia_fs::directory::open_file(
+        &fixture.dir("data", fio::PERM_READABLE),
         SECRET_FILE_NAME,
-        fio::OpenFlags::RIGHT_READABLE,
+        fio::PERM_READABLE,
     )
     .await
     .unwrap();
@@ -264,10 +264,10 @@ async fn formatted_file_in_root() {
     // Make sure the original contents in the data partition still exist.
     fixture.check_test_data_file().await;
 
-    let secret = fuchsia_fs::directory::open_file_deprecated(
-        &fixture.dir("data", fio::OpenFlags::RIGHT_READABLE),
+    let secret = fuchsia_fs::directory::open_file(
+        &fixture.dir("data", fio::PERM_READABLE),
         "test.txt",
-        fio::OpenFlags::RIGHT_READABLE,
+        fio::PERM_READABLE,
     )
     .await
     .unwrap();
@@ -300,10 +300,10 @@ async fn formatted_netboot() {
     // Make sure the original contents in the data partition still exist.
     fixture.check_test_data_file().await;
 
-    let secret = fuchsia_fs::directory::open_file_deprecated(
-        &fixture.dir("data", fio::OpenFlags::RIGHT_READABLE),
+    let secret = fuchsia_fs::directory::open_file(
+        &fixture.dir("data", fio::PERM_READABLE),
         SECRET_FILE_NAME,
-        fio::OpenFlags::RIGHT_READABLE,
+        fio::PERM_READABLE,
     )
     .await
     .unwrap();

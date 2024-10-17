@@ -25,10 +25,7 @@ pub struct FatDevice {
 impl FatDevice {
     /// Try and create a new FatDevice, searching for partitions in /dev/class/block.
     pub async fn new() -> Result<Option<Self>, Error> {
-        let dir = fuchsia_fs::directory::open_in_namespace_deprecated(
-            BLOCK_DEVICE_DIR,
-            fio::OpenFlags::RIGHT_READABLE,
-        )?;
+        let dir = fuchsia_fs::directory::open_in_namespace(BLOCK_DEVICE_DIR, fio::PERM_READABLE)?;
         Self::new_at(dir).await
     }
 
@@ -223,13 +220,9 @@ pub mod test {
 
         let dir = local.into_proxy().expect("into proxy");
 
-        let dev_dir = fuchsia_fs::directory::open_directory_deprecated(
-            &dir,
-            "dev",
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .expect("open directory");
+        let dev_dir = fuchsia_fs::directory::open_directory(&dir, "dev", fio::PERM_READABLE)
+            .await
+            .expect("open directory");
 
         let result = FatDevice::get_guid_at(&dev_dir, "000").await.expect("get guid succeeds");
         assert_eq!(result.unwrap().value, MICROSOFT_BASIC_DATA_GUID);
@@ -249,13 +242,9 @@ pub mod test {
 
         let dir = local.into_proxy().expect("into proxy");
 
-        let dev_dir = fuchsia_fs::directory::open_directory_deprecated(
-            &dir,
-            "dev",
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .expect("open directory");
+        let dev_dir = fuchsia_fs::directory::open_directory(&dir, "dev", fio::PERM_READABLE)
+            .await
+            .expect("open directory");
 
         let result = FatDevice::find_fat_partition(&dev_dir).await;
         assert_eq!(result.expect("Find partition succeeds"), Some("002".to_owned()));
@@ -275,13 +264,9 @@ pub mod test {
 
         let dir = local.into_proxy().expect("into proxy");
 
-        let dev_dir = fuchsia_fs::directory::open_directory_deprecated(
-            &dir,
-            "dev",
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .expect("open directory");
+        let dev_dir = fuchsia_fs::directory::open_directory(&dir, "dev", fio::PERM_READABLE)
+            .await
+            .expect("open directory");
 
         let result = FatDevice::find_fat_partition(&dev_dir).await;
         assert_eq!(result.expect("Find partition succeeds"), None);

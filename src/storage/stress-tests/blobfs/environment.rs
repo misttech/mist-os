@@ -46,11 +46,7 @@ pub struct BlobfsEnvironment {
 }
 
 pub fn open_blobfs_root() -> Directory {
-    Directory::from_namespace(
-        BLOBFS_MOUNT_PATH,
-        fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::RIGHT_READABLE,
-    )
-    .unwrap()
+    Directory::from_namespace(BLOBFS_MOUNT_PATH, fio::PERM_WRITABLE | fio::PERM_READABLE).unwrap()
 }
 
 impl BlobfsEnvironment {

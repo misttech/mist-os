@@ -248,7 +248,7 @@ async fn data_unformatted() {
         .await
         .expect("get topo path fidl failed")
         .expect("get topo path returned error");
-    let dev_class = fixture.dir("dev-topological/class/block", fio::OpenFlags::empty());
+    let dev_class = fixture.dir("dev-topological/class/block", fio::Flags::empty());
     let matcher = PartitionMatcher {
         parent_device: Some(test_disk_path),
         labels: Some(vec!["data".to_string()]),

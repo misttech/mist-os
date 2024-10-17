@@ -8,7 +8,7 @@
 
 use anyhow::{anyhow, Context as _, Result};
 use async_trait::async_trait;
-use device_watcher::{recursive_wait, recursive_wait_and_open};
+use device_watcher::recursive_wait_and_open;
 use fidl_fuchsia_blackout_test::{ControllerRequest, ControllerRequestStream};
 use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
 use fidl_fuchsia_hardware_block::BlockMarker;
@@ -158,10 +158,8 @@ pub fn generate_content(seed: u64) -> Vec<u8> {
 /// Find the device in /dev/class/block that represents a given topological path. Returns the full
 /// path of the device in /dev/class/block.
 pub async fn find_dev(dev: &str) -> Result<String> {
-    let dev_class_block = fuchsia_fs::directory::open_in_namespace_deprecated(
-        "/dev/class/block",
-        fuchsia_fs::OpenFlags::RIGHT_READABLE,
-    )?;
+    let dev_class_block =
+        fuchsia_fs::directory::open_in_namespace("/dev/class/block", fio::PERM_READABLE)?;
     for entry in readdir(&dev_class_block).await? {
         let path = format!("/dev/class/block/{}", entry.name);
         let proxy = connect_to_protocol_at_path::<ControllerMarker>(&path)?;
@@ -176,19 +174,13 @@ pub async fn find_dev(dev: &str) -> Result<String> {
 
 /// Returns a directory proxy connected to /dev.
 pub fn dev() -> fio::DirectoryProxy {
-    fuchsia_fs::directory::open_in_namespace_deprecated(
-        "/dev",
-        fuchsia_fs::OpenFlags::RIGHT_READABLE,
-    )
-    .expect("failed to open /dev")
+    fuchsia_fs::directory::open_in_namespace("/dev", fio::PERM_READABLE)
+        .expect("failed to open /dev")
 }
 
 fn dev_class_block() -> fio::DirectoryProxy {
-    fuchsia_fs::directory::open_in_namespace_deprecated(
-        "/dev/class/block",
-        fuchsia_fs::OpenFlags::RIGHT_READABLE,
-    )
-    .expect("failed to open /dev/class/block")
+    fuchsia_fs::directory::open_in_namespace("/dev/class/block", fio::PERM_READABLE)
+        .expect("failed to open /dev/class/block")
 }
 
 const RAMDISK_PREFIX: &'static str = "/dev/sys/platform/ram-disk/ramctl";
@@ -245,9 +237,9 @@ pub async fn set_up_partition(
                         .map_err(zx::Status::from_raw)
                         .context("unbind children returned error")?;
                     device_controller = Some(fvm_controller);
-                    owned_device_dir = Some(fuchsia_fs::directory::open_in_namespace_deprecated(
+                    owned_device_dir = Some(fuchsia_fs::directory::open_in_namespace(
                         &fvm_path,
-                        fuchsia_fs::OpenFlags::empty(),
+                        fio::Flags::empty(),
                     )?);
                     break;
                 }
@@ -265,9 +257,7 @@ pub async fn set_up_partition(
     // device to figure out what they can do, but getting the total used bytes from a filesystem
     // doesn't take into account possible expansion.
     let device_size_bytes = {
-        let fvm_block = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
-            BlockMarker,
-        >(device_dir, ".")?;
+        let fvm_block = connect_to_named_protocol_at_dir_root::<BlockMarker>(device_dir, ".")?;
         let info = fvm_block
             .get_info()
             .await
@@ -314,27 +304,12 @@ pub async fn find_partition(
     device_dir: Option<&fio::DirectoryProxy>,
 ) -> Result<ControllerProxy> {
     if let Some(device_dir) = device_dir {
-        match fuchsia_fs::directory::open_no_describe_deprecated::<ControllerMarker>(
+        match connect_to_named_protocol_at_dir_root::<ControllerMarker>(
             device_dir,
             &format!("/fvm/{}-p-1/block/device_controller", partition_label),
-            fuchsia_fs::OpenFlags::empty(),
         ) {
             Ok(partition_controller) => {
                 return Ok(partition_controller);
-            }
-            Err(fuchsia_fs::node::OpenError::OpenError(zx::Status::NOT_FOUND)) => {
-                // If we failed to open that path, it might be because the fvm driver isn't bound yet.
-                let device_controller =
-                    fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
-                        ControllerMarker,
-                    >(device_dir, "device_controller")?;
-                fvm::bind_fvm_driver(&device_controller).await?;
-                recursive_wait(
-                    device_dir,
-                    &format!("/fvm/{}-p-1/block/device_controller", partition_label),
-                )
-                .await
-                .context("recursive_wait on expected fvm path failed")?;
             }
             Err(err) => return Err(err).context("failed to open fvm path"),
         }

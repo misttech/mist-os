@@ -43,6 +43,7 @@ use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
+use vfs::ObjectRequest;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 use {fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio, zx};
 
@@ -823,15 +824,13 @@ impl Component {
                 }
             }),
         )?;
-        self.export_dir.clone().open(
-            self.scope.clone(),
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY
-                | fio::OpenFlags::RIGHT_EXECUTABLE,
-            Path::dot(),
-            outgoing_dir.into(),
-        );
+        let flags = fio::Flags::PROTOCOL_DIRECTORY
+            | fio::PERM_READABLE
+            | fio::PERM_WRITABLE
+            | fio::PERM_EXECUTABLE;
+        ObjectRequest::new3(flags, &fio::Options::default(), outgoing_dir).handle(|request| {
+            self.export_dir.clone().open3(self.scope.clone(), Path::dot(), flags, request)
+        });
         Ok(())
     }
 
@@ -1008,7 +1007,7 @@ impl Component {
             Arc::new(PartitionInterface { partition_index, partition_info, key, fvm: fvm.clone() }),
         ));
 
-        let server_end = server_end.into_channel().into();
+        let server_end = server_end.into_channel();
 
         if let Some(uri) = options.uri {
             // For now we only support URIs of the form: "#meta/<component_name>.cm".
@@ -1064,12 +1063,12 @@ impl Component {
 
             self.mounted.lock().unwrap().insert(partition_index, block_server);
 
-            let _ = exposed_dir.open(
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::POSIX_EXECUTABLE
-                    | fio::OpenFlags::POSIX_WRITABLE,
-                fio::ModeType::empty(),
+            let _ = exposed_dir.open3(
                 ".",
+                fio::PERM_READABLE
+                    | fio::Flags::PERM_INHERIT_EXECUTE
+                    | fio::Flags::PERM_INHERIT_WRITE,
+                &fio::Options::default(),
                 server_end,
             );
         } else {
@@ -1092,15 +1091,13 @@ impl Component {
 
             self.mounted.lock().unwrap().insert(partition_index, block_server.clone());
 
-            outgoing_dir.open(
-                self.scope.clone(),
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::DIRECTORY
-                    | fio::OpenFlags::RIGHT_EXECUTABLE,
-                Path::dot(),
-                server_end,
-            );
+            let flags = fio::Flags::PROTOCOL_DIRECTORY
+                | fio::PERM_READABLE
+                | fio::PERM_WRITABLE
+                | fio::PERM_EXECUTABLE;
+            ObjectRequest::new3(flags, &fio::Options::default(), server_end).handle(|request| {
+                outgoing_dir.open3(self.scope.clone(), Path::dot(), flags, request)
+            });
         }
 
         Ok(())
@@ -1661,7 +1658,7 @@ mod tests {
     use fuchsia_component::client::{
         connect_to_named_protocol_at_dir_root, connect_to_protocol_at_dir_svc,
     };
-    use fuchsia_fs::directory::{open_directory_deprecated, readdir};
+    use fuchsia_fs::directory::{open_directory, readdir};
     use std::collections::HashSet;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
@@ -2061,9 +2058,7 @@ mod tests {
 
         let expected = HashSet::from(["bar".to_string(), "blobfs".to_string(), "data".to_string()]);
         let volumes_dir =
-            open_directory_deprecated(&fixture.outgoing_dir, "volumes", fio::OpenFlags::empty())
-                .await
-                .unwrap();
+            open_directory(&fixture.outgoing_dir, "volumes", fio::Flags::empty()).await.unwrap();
         assert_eq!(
             &readdir(&volumes_dir)
                 .await
@@ -2077,9 +2072,7 @@ mod tests {
         // Check again after a remount.
         let fixture = Fixture::from_fake_server(fixture.take_fake_server()).await;
         let volumes_dir =
-            open_directory_deprecated(&fixture.outgoing_dir, "volumes", fio::OpenFlags::empty())
-                .await
-                .unwrap();
+            open_directory(&fixture.outgoing_dir, "volumes", fio::Flags::empty()).await.unwrap();
         assert_eq!(
             &readdir(&volumes_dir)
                 .await

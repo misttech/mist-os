@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use assert_matches::assert_matches;
-use fidl::endpoints::{create_proxy, ServerEnd, ServiceMarker as _};
+use fidl::endpoints::{create_proxy, ServiceMarker as _};
 use fidl_fuchsia_fxfs::BlobReaderMarker;
 use fuchsia_component::client::connect_to_protocol_at_dir_root;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
@@ -260,20 +260,20 @@ impl TestFixture {
         self.ramdisk_vmo = Some(vmo_clone);
     }
 
-    pub fn dir(&self, dir: &str, flags: fio::OpenFlags) -> fio::DirectoryProxy {
+    pub fn dir(&self, dir: &str, flags: fio::Flags) -> fio::DirectoryProxy {
         let (dev, server) = create_proxy::<fio::DirectoryMarker>().expect("create_proxy failed");
-        let flags = flags | fio::OpenFlags::DIRECTORY;
+        let flags = flags | fio::Flags::PROTOCOL_DIRECTORY;
         self.realm
             .root
             .get_exposed_dir()
-            .open(flags, fio::ModeType::empty(), dir, server.into_channel().into())
+            .open3(dir, flags, &fio::Options::default(), server.into_channel())
             .expect("open failed");
         dev
     }
 
     pub async fn check_fs_type(&self, dir: &str, fs_type: u32) {
         let (status, info) =
-            self.dir(dir, fio::OpenFlags::empty()).query_filesystem().await.expect("query failed");
+            self.dir(dir, fio::Flags::empty()).query_filesystem().await.expect("query failed");
         assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
         assert!(info.is_some());
         let info_type = info.unwrap().fs_type;
@@ -292,15 +292,14 @@ impl TestFixture {
             let (blob, server_end) =
                 create_proxy::<fio::FileMarker>().expect("create_proxy failed");
             let path = &format!("{}", expected_blob_hash);
-            self.dir("blob", fio::OpenFlags::RIGHT_READABLE)
-                .open(
-                    fio::OpenFlags::RIGHT_READABLE,
-                    fio::ModeType::empty(),
+            self.dir("blob", fio::PERM_READABLE)
+                .open3(
                     path,
-                    ServerEnd::new(server_end.into_channel()),
+                    fio::PERM_READABLE,
+                    &fio::Options::default(),
+                    server_end.into_channel(),
                 )
                 .expect("open failed");
-            println!("About to query the blob file");
             blob.query().await.expect("open file failed");
         }
     }
@@ -309,49 +308,24 @@ impl TestFixture {
     /// are placed by the disk builder if it formats the filesystem beforehand.
     pub async fn check_test_data_file(&self) {
         let (file, server) = create_proxy::<fio::NodeMarker>().unwrap();
-        self.dir("data", fio::OpenFlags::RIGHT_READABLE)
-            .open(fio::OpenFlags::RIGHT_READABLE, fio::ModeType::empty(), ".testdata", server)
+        self.dir("data", fio::PERM_READABLE)
+            .open3(".testdata", fio::PERM_READABLE, &fio::Options::default(), server.into_channel())
             .expect("open failed");
         file.get_attr().await.expect("get_attr failed");
 
-        let data = self.dir("data", fio::OpenFlags::RIGHT_READABLE);
-        fuchsia_fs::directory::open_file_deprecated(
-            &data,
-            ".testdata",
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .unwrap();
+        let data = self.dir("data", fio::PERM_READABLE);
+        fuchsia_fs::directory::open_file(&data, ".testdata", fio::PERM_READABLE).await.unwrap();
 
-        fuchsia_fs::directory::open_directory_deprecated(
-            &data,
-            "ssh",
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .unwrap();
-        fuchsia_fs::directory::open_directory_deprecated(
-            &data,
-            "ssh/config",
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .unwrap();
-        fuchsia_fs::directory::open_directory_deprecated(
-            &data,
-            "problems",
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .unwrap();
+        fuchsia_fs::directory::open_directory(&data, "ssh", fio::PERM_READABLE).await.unwrap();
+        fuchsia_fs::directory::open_directory(&data, "ssh/config", fio::PERM_READABLE)
+            .await
+            .unwrap();
+        fuchsia_fs::directory::open_directory(&data, "problems", fio::PERM_READABLE).await.unwrap();
 
-        let authorized_keys = fuchsia_fs::directory::open_file_deprecated(
-            &data,
-            "ssh/authorized_keys",
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .unwrap();
+        let authorized_keys =
+            fuchsia_fs::directory::open_file(&data, "ssh/authorized_keys", fio::PERM_READABLE)
+                .await
+                .unwrap();
         assert_eq!(
             &fuchsia_fs::file::read_to_string(&authorized_keys).await.unwrap(),
             "public key!"
@@ -362,8 +336,8 @@ impl TestFixture {
     /// reformatted.
     pub async fn check_test_data_file_absent(&self) {
         let (file, server) = create_proxy::<fio::NodeMarker>().unwrap();
-        self.dir("data", fio::OpenFlags::RIGHT_READABLE)
-            .open(fio::OpenFlags::RIGHT_READABLE, fio::ModeType::empty(), ".testdata", server)
+        self.dir("data", fio::PERM_READABLE)
+            .open3(".testdata", fio::PERM_READABLE, &fio::Options::default(), server.into_channel())
             .expect("open failed");
         file.get_attr().await.expect_err(".testdata should be absent");
     }
@@ -375,11 +349,11 @@ impl TestFixture {
     pub async fn add_ramdisk(&mut self, vmo: zx::Vmo) {
         let mut ramdisk = pin!(if self.storage_host {
             RamdiskClientBuilder::new_with_vmo(vmo, Some(512)).use_v2().publish().ramdisk_service(
-                self.dir(framdisk::ServiceMarker::SERVICE_NAME, fio::OpenFlags::empty()),
+                self.dir(framdisk::ServiceMarker::SERVICE_NAME, fio::Flags::empty()),
             )
         } else {
             RamdiskClientBuilder::new_with_vmo(vmo, Some(512))
-                .dev_root(self.dir("dev-topological", fio::OpenFlags::empty()))
+                .dev_root(self.dir("dev-topological", fio::Flags::empty()))
         }
         .build()
         .fuse());
