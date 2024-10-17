@@ -317,6 +317,7 @@ mod tests {
     use selectors::parse_log_interest_selector;
 
     const TEST_STR: &str = "[1980-01-01 00:00:03.000][ffx] INFO: Hello world!\u{1b}[m\n";
+    const BOOT_TIMESTAMP: u64 = 57575757;
 
     async fn check_for_message(buffers: &TestBuffers, msg: &str) {
         while buffers.stdout.clone().into_string() != msg {
@@ -515,19 +516,40 @@ ffx log --force-set-severity.
 
     #[fuchsia::test]
     async fn logger_prints_initial_timestamp() {
-        let start_text = "[00000.000000][ffx] INFO: UTC time now: ";
-        let output = logger_dump_string(
-            TestEnvironmentConfig {
-                show_initial_timestamp: true,
-                messages: vec![],
-                ..Default::default()
-            },
-            LogCommand { no_color: true, ..LogCommand::default() },
-        )
-        .await;
-        assert_eq!(output.starts_with(start_text), true);
+        let environment = TestEnvironment::new(TestEnvironmentConfig {
+            show_initial_timestamp: true,
+            boot_timestamp: BOOT_TIMESTAMP,
+            messages: vec![],
+            ..Default::default()
+        });
+        let rcs_connector = environment.rcs_connector().await;
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
+            symbolize: SymbolizeMode::Off,
+            ..LogCommand::default()
+        };
+        let tool = LogTool { cmd, rcs_connector };
+        let buffers = TestBuffers::default();
+        let writer = MachineWriter::<LogEntry>::new_test(Some(Format::Json), &buffers);
+
+        assert_matches!(tool.main(writer).await, Ok(()));
+        let output = buffers.into_stdout_str();
+
+        let json: LogEntry = serde_json::from_str::<LogEntry>(&output).unwrap();
+
+        let target_log = json.data.as_target_log().unwrap();
+        let properties = target_log.payload_keys().unwrap();
+        assert_eq!(target_log.msg().unwrap(), "Logging started");
+
         // Ensure the end has a valid timestamp
-        chrono::DateTime::parse_from_rfc3339(&output[start_text.len()..output.len() - 1]).unwrap();
+        chrono::DateTime::parse_from_rfc3339(
+            properties.get_property("utc_time_now").unwrap().string().unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            properties.get_property("current_boot_timestamp").unwrap().uint().unwrap(),
+            BOOT_TIMESTAMP
+        );
     }
 
     #[fuchsia::test]

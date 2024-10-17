@@ -1218,7 +1218,7 @@ impl LogTextColor {
 }
 
 /// Options for the timezone associated to the timestamp of a log line.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Timezone {
     /// Display a timestamp in terms of the local timezone as reported by the operating system.
     Local,
