@@ -147,10 +147,14 @@ zx::result<> profiler::Sampler::WatchTarget(const JobTarget& target) {
         auto [it, emplaced] = process_watchers_.emplace(pid, std::move(process_watcher));
         if (emplaced) {
           if (zx::result watch_result = it->second->Watch(dispatcher_); watch_result.is_error()) {
-            FX_PLOGS(ERROR, watch_result.status_value()) << "Failed to watch process: " << pid;
-            job_watchers_.clear();
-            process_watchers_.clear();
-            return;
+            if (watch_result.error_value() == ZX_ERR_BAD_STATE) {
+              FX_LOGS(DEBUG) << "Process terminated before being watched.";
+            } else {
+              FX_PLOGS(ERROR, watch_result.status_value()) << "Failed to watch process: " << pid;
+              job_watchers_.clear();
+              process_watchers_.clear();
+              return;
+            }
           }
         }
 
@@ -163,9 +167,13 @@ zx::result<> profiler::Sampler::WatchTarget(const JobTarget& target) {
   auto [it, emplaced] = job_watchers_.emplace(target.job_id, std::move(job_watcher));
   if (emplaced) {
     if (zx::result res = it->second->Watch(dispatcher_); res.is_error()) {
-      FX_PLOGS(ERROR, res.status_value()) << "Failed to watch job : " << target.job_id;
-      job_watchers_.clear();
-      return res;
+      if (res.error_value() == ZX_ERR_BAD_STATE) {
+        FX_LOGS(DEBUG) << "Job terminated before being watched.";
+      } else {
+        FX_PLOGS(ERROR, res.status_value()) << "Failed to watch job : " << target.job_id;
+        job_watchers_.clear();
+        return res;
+      }
     }
   }
   return zx::ok();
