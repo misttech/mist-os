@@ -83,7 +83,7 @@ impl InterestFilter {
             log::set_max_level(log::LevelFilter::from_severity(&new_min_severity));
             let callback_guard = listener.lock().unwrap();
             if let Some(callback) = &*callback_guard {
-                callback.on_changed(&new_min_severity);
+                callback.on_changed(new_min_severity.into());
             }
         }
     }
@@ -151,7 +151,7 @@ mod tests {
     struct InterestChangedListener(mpsc::UnboundedSender<()>);
 
     impl OnInterestChanged for InterestChangedListener {
-        fn on_changed(&self, _: &Severity) {
+        fn on_changed(&self, _: crate::Severity) {
             self.0.unbounded_send(()).unwrap();
         }
     }

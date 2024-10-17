@@ -1,8 +1,8 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-use crate::PublishOptions;
-use fidl_fuchsia_diagnostics::{Interest, Severity};
+use crate::{PublishOptions, Severity};
+use fidl_fuchsia_diagnostics::Interest;
 use fidl_fuchsia_logger::{LogSinkMarker, LogSinkProxy};
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
@@ -40,7 +40,7 @@ use std::{
 /// Callback for interest listeners
 pub trait OnInterestChanged {
     /// Callback for when the interest changes
-    fn on_changed(&self, severity: &Severity);
+    fn on_changed(&self, severity: Severity);
 }
 
 /// Options to configure a `Publisher`.
@@ -172,12 +172,13 @@ pub fn initialize(opts: PublishOptions<'_>) -> Result<(), PublishError> {
 
 /// Sets the global minimum log severity.
 /// IMPORTANT: this function can panic if `initialize` wasn't called before.
-pub fn set_minimum_severity(severity: Severity) {
-    tracing::dispatcher::get_default(|dispatcher| {
+pub fn set_minimum_severity(severity: impl Into<Severity>) {
+    let severity: Severity = severity.into();
+    tracing::dispatcher::get_default(move |dispatcher| {
         let publisher: &Publisher = dispatcher.downcast_ref().unwrap();
         let filter: &InterestFilter =
             (&*publisher.inner as &dyn Subscriber).downcast_ref().unwrap();
-        filter.set_minimum_severity(severity);
+        filter.set_minimum_severity(severity.into());
     });
 }
 

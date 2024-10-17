@@ -1,8 +1,8 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-use crate::PublishOptions;
-use fidl_fuchsia_diagnostics::{Interest, Severity};
+use crate::{PublishOptions, Severity};
+use fidl_fuchsia_diagnostics::Interest;
 use std::collections::HashSet;
 use std::fmt;
 use std::marker::PhantomData;
@@ -70,13 +70,12 @@ fn create_subscriber<W>(opts: &PublishOptions<'_>, w: W) -> Result<HostSubscribe
 where
     W: for<'writer> MakeWriter<'writer> + 'static + Send + Sync,
 {
-    let level = match opts.publisher.interest.min_severity {
-        Some(Severity::Trace) => Level::TRACE,
-        Some(Severity::Debug) => Level::DEBUG,
-        None | Some(Severity::Info) => Level::INFO,
-        Some(Severity::Warn) => Level::WARN,
-        Some(Severity::Error) | Some(Severity::Fatal) => Level::ERROR,
-    };
+    let level = opts
+        .publisher
+        .interest
+        .min_severity
+        .map(|s| Level::from(Severity::from(s)))
+        .unwrap_or(Level::INFO);
     let builder = tracing_subscriber::fmt()
         .with_ansi(false)
         .event_format(HostFormatter {

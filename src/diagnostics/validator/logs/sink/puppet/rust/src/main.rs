@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use diagnostics_log::{OnInterestChanged, TestRecord};
-use fidl_fuchsia_diagnostics::Severity;
+use diagnostics_log::{OnInterestChanged, Severity, TestRecord};
 use fidl_fuchsia_validate_logs::{
     LogSinkPuppetRequest, LogSinkPuppetRequestStream, PuppetInfo, RecordSpec,
 };
@@ -34,7 +33,7 @@ async fn main() {
 struct Listener {}
 
 impl OnInterestChanged for Listener {
-    fn on_changed(&self, severity: &Severity) {
+    fn on_changed(&self, severity: Severity) {
         match severity {
             Severity::Trace => {
                 trace!("Changed severity");

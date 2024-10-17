@@ -13,7 +13,6 @@ rustc_binary("rust-puppet") {
 
   deps = [
     "../../fidl:sink-puppet_rust",
-    "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/rust/zx",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fuchsia",
