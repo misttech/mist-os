@@ -38,7 +38,7 @@ do the following:
 1. Create a new repository:
 
    ```posix-terminal
-   ffx repository create <REPO_PATH>
+   ffx repository create <REPOPATH>
    ```
 
    Replace `REPO_PATH` with the directory path for the new repository.
@@ -114,7 +114,8 @@ Do the following:
     Replace the following:
 
     - `PRODUCT_NAME`: The product name of your target Fuchsia device.
-    - `DOWNLOAD_DIR` The directory where you want to download the product bundle.
+    - `DOWNLOAD_DIR`: The directory where you want to download the product
+      bundle.
 
     For example:
 
