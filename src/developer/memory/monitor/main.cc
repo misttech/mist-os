@@ -56,7 +56,7 @@ int main(int argc, const char** argv) {
 
   FX_LOGS(DEBUG) << argv[0] << ": starting";
 
-  trace::TraceProviderWithFdio trace_provider(loop.dispatcher(), monitor::Monitor::kTraceCategory);
+  trace::TraceProviderWithFdio trace_provider(loop.dispatcher(), monitor::Monitor::kTraceName);
   std::unique_ptr<sys::ComponentContext> startup_context =
       sys::ComponentContext::CreateAndServeOutgoingDirectory();
 

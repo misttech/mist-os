@@ -238,10 +238,6 @@ zx_status_t CaptureMaker::GetCapture(Capture* capture, CaptureLevel level,
     return err;
   }
 
-  if (level == CaptureLevel::KMEM_EXTENDED) {
-    return ZX_OK;
-  }
-
   StarnixCaptureStrategy strategy;
   // We don't have a guarantee on the iteration order of GetProcesses. To be able to filter jobs
   // correctly based on the name of their processes, we need to go through all processes first. We

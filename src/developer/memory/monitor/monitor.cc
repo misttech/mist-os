@@ -51,6 +51,8 @@ using memory::Printer;
 using memory::SORTED;
 using memory::Summary;
 
+const char Monitor::kTraceName[] = "memory_monitor";
+
 namespace {
 // Path to the configuration file for buckets.
 const std::string kBucketConfigPath = "/config/data/buckets.json";
@@ -224,8 +226,8 @@ Monitor::Monitor(std::unique_ptr<sys::ComponentContext> context,
   pressure_notifier_ = std::make_unique<pressure_signaler::PressureNotifier>(
       watch_memory_pressure, send_critical_pressure_crash_reports, component_context_.get(),
       dispatcher, [this](pressure_signaler::Level l) { PressureLevelChanged(l); });
-  memory_debugger_ = std::make_unique<pressure_signaler::MemoryDebugger>(component_context_.get(),
-                                                                         pressure_notifier_.get());
+  memory_debugger_ =
+      std::make_unique<pressure_signaler::MemoryDebugger>(component_context_.get(), pressure_notifier_.get());
   SampleAndPost();
 }
 
@@ -422,66 +424,27 @@ inspect::Inspector Monitor::Inspect(const std::vector<memory::BucketMatch>& buck
 }
 
 void Monitor::SampleAndPost() {
-  CaptureLevel level;
-  if (tracing_) {
-    level = CaptureLevel::KMEM_EXTENDED;
-  } else if (logging_) {
-    level = CaptureLevel::KMEM;
-  } else {
-    assert(!tracing_ && !logging_);
-    return;
-  }
-
-  Capture capture;
-  auto s = capture_maker_->GetCapture(&capture, level);
-  if (s != ZX_OK) {
-    FX_LOGS(ERROR) << "Error getting capture: " << zx_status_get_string(s);
-    return;
-  }
-  if (logging_) {
+  if (logging_ || tracing_) {
+    Capture capture;
+    auto s = capture_maker_->GetCapture(&capture, CaptureLevel::KMEM);
+    if (s != ZX_OK) {
+      FX_LOGS(ERROR) << "Error getting capture: " << zx_status_get_string(s);
+      return;
+    }
     const auto& kmem = capture.kmem();
-    FX_LOGS(INFO) << "Free: " << kmem.free_bytes << " Free Heap: " << kmem.free_heap_bytes
-                  << " VMO: " << kmem.vmo_bytes << " MMU: " << kmem.mmu_overhead_bytes
-                  << " IPC: " << kmem.ipc_bytes;
+    if (logging_) {
+      FX_LOGS(INFO) << "Free: " << kmem.free_bytes << " Free Heap: " << kmem.free_heap_bytes
+                    << " VMO: " << kmem.vmo_bytes << " MMU: " << kmem.mmu_overhead_bytes
+                    << " IPC: " << kmem.ipc_bytes;
+    }
+    if (tracing_) {
+      TRACE_COUNTER(kTraceName, "allocated", 0, "vmo", kmem.vmo_bytes, "mmu_overhead",
+                    kmem.mmu_overhead_bytes, "ipc", kmem.ipc_bytes);
+      TRACE_COUNTER(kTraceName, "free", 0, "free", kmem.free_bytes, "free_heap",
+                    kmem.free_heap_bytes);
+    }
+    async::PostDelayedTask(dispatcher_, [this] { SampleAndPost(); }, delay_);
   }
-  if (tracing_) {
-    constexpr trace_counter_id_t KMEM_STATS_COUNTERID = 0;
-    constexpr trace_counter_id_t KMEM_STATS_COMPRESSION_COUNTERID = 1;
-    const auto& kmem = *capture.kmem_extended();
-    TRACE_COUNTER(                                                                         //
-        kTraceCategory, "kmem_stats", KMEM_STATS_COUNTERID,                                //
-        "total_bytes", TA_UINT64(kmem.total_bytes),                                        //
-        "free_bytes", TA_UINT64(kmem.free_bytes),                                          //
-        "wired_bytes", TA_UINT64(kmem.wired_bytes),                                        //
-        "total_heap_bytes", TA_UINT64(kmem.total_heap_bytes),                              //
-        "free_heap_bytes", TA_UINT64(kmem.free_heap_bytes),                                //
-        "vmo_bytes", TA_UINT64(kmem.vmo_bytes),                                            //
-        "mmu_overhead_bytes", TA_UINT64(kmem.mmu_overhead_bytes),                          //
-        "vmo_pager_total_bytes", TA_UINT64(kmem.vmo_pager_total_bytes),                    //
-        "vmo_pager_oldest_bytes", TA_UINT64(kmem.vmo_pager_oldest_bytes),                  //
-        "vmo_discardable_locked_bytes", TA_UINT64(kmem.vmo_discardable_locked_bytes),      //
-        "vmo_discardable_unlocked_bytes", TA_UINT64(kmem.vmo_discardable_unlocked_bytes),  //
-        "mmu_overhead_bytes", TA_UINT64(kmem.mmu_overhead_bytes),                          //
-        "ipc_bytes", TA_UINT64(kmem.ipc_bytes),                                            //
-        "other_bytes", TA_UINT64(kmem.other_bytes),                                        //
-        "vmo_reclaim_disabled_bytes", TA_UINT64(kmem.vmo_reclaim_disabled_bytes));
-    const auto& kmemc = *capture.kmem_compression();
-    TRACE_COUNTER(                                                                                //
-        kTraceCategory, "kmem_stats_compression", KMEM_STATS_COMPRESSION_COUNTERID,               //
-        "uncompressed_storage_bytes", TA_UINT64(kmemc.uncompressed_storage_bytes),                //
-        "compressed_storage_bytes", TA_UINT64(kmemc.compressed_storage_bytes),                    //
-        "compression_time", TA_UINT64(kmemc.compression_time),                                    //
-        "decompression_time", TA_UINT64(kmemc.decompression_time),                                //
-        "total_page_compression_attempts", TA_UINT64(kmemc.total_page_compression_attempts),      //
-        "failed_page_compression_attempts", TA_UINT64(kmemc.failed_page_compression_attempts),    //
-        "total_page_decompressions", TA_UINT64(kmemc.total_page_decompressions),                  //
-        "compressed_page_evictions", TA_UINT64(kmemc.compressed_page_evictions),                  //
-        "eager_page_compressions", TA_UINT64(kmemc.eager_page_compressions),                      //
-        "memory_pressure_page_compressions", TA_UINT64(kmemc.memory_pressure_page_compressions),  //
-        "critical_memory_page_compressions", TA_UINT64(kmemc.critical_memory_page_compressions),  //
-        "pages_decompressed_unit_ns", TA_UINT64(kmemc.pages_decompressed_unit_ns));
-  }
-  async::PostDelayedTask(dispatcher_, [this] { SampleAndPost(); }, delay_);
 }
 
 void Monitor::MeasureBandwidthAndPost() {
@@ -522,7 +485,7 @@ void Monitor::MeasureBandwidthAndPost() {
             const auto* channels =
                 trace_high_precision_camera ? kRamCameraChannels : kRamDefaultChannels;
             TRACE_VTHREAD_COUNTER(
-                kTraceCategory, "bandwidth_usage", "membw" /*vthread_literal*/, 1 /*vthread_id*/,
+                kTraceName, "bandwidth_usage", "membw" /*vthread_literal*/, 1 /*vthread_id*/,
                 0 /*counter_id*/, TimestampToTicks(info.timestamp), channels[0].name,
                 CounterToBandwidth(info.channels[0].readwrite_cycles, info.frequency,
                                    cycles_to_measure) *
@@ -542,7 +505,7 @@ void Monitor::MeasureBandwidthAndPost() {
                 "other",
                 CounterToBandwidth(other_readwrite_cycles, info.frequency, cycles_to_measure) *
                     info.bytes_per_cycle);
-            TRACE_VTHREAD_COUNTER(kTraceCategory, "bandwidth_free", "membw" /*vthread_literal*/,
+            TRACE_VTHREAD_COUNTER(kTraceName, "bandwidth_free", "membw" /*vthread_literal*/,
                                   1 /*vthread_id*/, 0 /*counter_id*/,
                                   TimestampToTicks(info.timestamp), "value",
                                   CounterToBandwidth(cycles_to_measure - total_readwrite_cycles -
@@ -587,12 +550,22 @@ void Monitor::PeriodicMeasureBandwidth() {
 
 void Monitor::UpdateState() {
   if (trace_state() == TRACE_STARTED) {
-    if (trace_is_category_enabled(kTraceCategory)) {
-      FX_LOGS(INFO) << "Tracing started (category=" << kTraceCategory << ")";
+    if (trace_is_category_enabled(kTraceName)) {
+      FX_LOGS(INFO) << "Tracing started";
       if (!tracing_) {
+        Capture capture;
+        auto s = capture_maker_->GetCapture(&capture, CaptureLevel::KMEM);
+        if (s != ZX_OK) {
+          FX_LOGS(ERROR) << "Error getting capture: " << zx_status_get_string(s);
+          return;
+        }
+        const auto& kmem = capture.kmem();
+        TRACE_COUNTER(kTraceName, "fixed", 0, "total", kmem.total_bytes, "wired", kmem.wired_bytes,
+                      "total_heap", kmem.total_heap_bytes);
         tracing_ = true;
-        SampleAndPost();
-
+        if (!logging_) {
+          SampleAndPost();
+        }
         if (ram_device_.is_bound()) {
           MeasureBandwidthAndPost();
         }
@@ -600,7 +573,7 @@ void Monitor::UpdateState() {
     }
   } else {
     if (tracing_) {
-      FX_LOGS(INFO) << "Tracing stopped (category=" << kTraceCategory << ")";
+      FX_LOGS(INFO) << "Tracing stopped";
       tracing_ = false;
     }
   }
@@ -626,11 +599,10 @@ void Monitor::PressureLevelChanged(pressure_signaler::Level level) {
   if (level == level_) {
     return;
   }
-  FX_LOGS(INFO) << "Memory pressure level changed from " << pressure_signaler::kLevelNames[level_]
-                << " to " << pressure_signaler::kLevelNames[level];
+  FX_LOGS(INFO) << "Memory pressure level changed from " << pressure_signaler::kLevelNames[level_] << " to "
+                << pressure_signaler::kLevelNames[level];
   TRACE_INSTANT("memory_monitor", "MemoryPressureLevelChange", TRACE_SCOPE_THREAD, "from",
-                pressure_signaler::kLevelNames[level_], "to",
-                pressure_signaler::kLevelNames[level]);
+                pressure_signaler::kLevelNames[level_], "to", pressure_signaler::kLevelNames[level]);
 
   level_ = level;
   logger_.SetPressureLevel(level_);

@@ -42,9 +42,6 @@ class Monitor : public fuchsia::memory::inspection::Collector {
           std::unique_ptr<memory::CaptureMaker> capture_maker);
   ~Monitor();
 
-  // Identifier used to report system wide memory metrics provided by the kernel.
-  static constexpr const char* kTraceCategory = "memory:kernel";
-
   // For memory bandwidth measurement, SetRamDevice should be called once
   void SetRamDevice(fuchsia::hardware::ram::metrics::DevicePtr ptr);
 
@@ -56,6 +53,8 @@ class Monitor : public fuchsia::memory::inspection::Collector {
 
   void CollectJsonStatsWithOptions(
       fuchsia::memory::inspection::CollectorCollectJsonStatsWithOptionsRequest request) override;
+
+  static const char kTraceName[];
 
  private:
   void CollectJsonStatsWithOptions(zx::socket socket);
@@ -82,7 +81,7 @@ class Monitor : public fuchsia::memory::inspection::Collector {
   std::unique_ptr<HighWater> high_water_;
   uint64_t prealloc_size_;
   zx::vmo prealloc_vmo_;
-  const bool logging_;
+  bool logging_;
   bool tracing_;
   zx::duration delay_;
   zx_handle_t root_;
