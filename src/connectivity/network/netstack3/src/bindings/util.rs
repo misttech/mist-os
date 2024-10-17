@@ -1271,6 +1271,46 @@ impl TryFromFidl<fnet_interfaces_admin::NudConfiguration> for NudUserConfigUpdat
     }
 }
 
+impl TryFromFidl<fposix_socket::MarkDomain> for netstack3_core::routes::MarkDomain {
+    type Error = Never;
+
+    fn try_from_fidl(fidl: fposix_socket::MarkDomain) -> Result<Self, Self::Error> {
+        Ok(match fidl {
+            fposix_socket::MarkDomain::Mark1 => netstack3_core::routes::MarkDomain::Mark1,
+            fposix_socket::MarkDomain::Mark2 => netstack3_core::routes::MarkDomain::Mark2,
+        })
+    }
+}
+
+impl IntoFidl<fposix_socket::MarkDomain> for netstack3_core::routes::MarkDomain {
+    fn into_fidl(self) -> fposix_socket::MarkDomain {
+        match self {
+            netstack3_core::routes::MarkDomain::Mark1 => fposix_socket::MarkDomain::Mark1,
+            netstack3_core::routes::MarkDomain::Mark2 => fposix_socket::MarkDomain::Mark2,
+        }
+    }
+}
+
+impl TryFromFidl<fposix_socket::OptionalUint32> for netstack3_core::routes::Mark {
+    type Error = Never;
+
+    fn try_from_fidl(fidl: fposix_socket::OptionalUint32) -> Result<Self, Self::Error> {
+        Ok(match fidl {
+            fposix_socket::OptionalUint32::Value(mark) => netstack3_core::routes::Mark(Some(mark)),
+            fposix_socket::OptionalUint32::Unset(_) => netstack3_core::routes::Mark(None),
+        })
+    }
+}
+
+impl IntoFidl<fposix_socket::OptionalUint32> for netstack3_core::routes::Mark {
+    fn into_fidl(self) -> fposix_socket::OptionalUint32 {
+        match self.0 {
+            Some(mark) => fposix_socket::OptionalUint32::Value(mark),
+            None => fposix_socket::OptionalUint32::Unset(fposix_socket::Empty),
+        }
+    }
+}
+
 impl IntoFidl<fnet_interfaces_admin::NudConfiguration> for NudUserConfigUpdate {
     fn into_fidl(self) -> fnet_interfaces_admin::NudConfiguration {
         let NudUserConfigUpdate {

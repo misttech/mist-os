@@ -304,6 +304,19 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
         ),
         body: B,
     ) -> Result<(), Self::SendToError>;
+
+    fn set_mark(
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        domain: netstack3_core::routes::MarkDomain,
+        mark: netstack3_core::routes::Mark,
+    );
+
+    fn get_mark(
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        domain: netstack3_core::routes::MarkDomain,
+    ) -> netstack3_core::routes::Mark;
 }
 
 #[derive(Debug)]
@@ -610,6 +623,23 @@ where
         body: B,
     ) -> Result<(), Self::SendToError> {
         ctx.api().udp().send_to(id, remote_ip, remote_port, body)
+    }
+
+    fn set_mark(
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        domain: netstack3_core::routes::MarkDomain,
+        mark: netstack3_core::routes::Mark,
+    ) {
+        ctx.api().udp().set_mark(id, domain, mark)
+    }
+
+    fn get_mark(
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        domain: netstack3_core::routes::MarkDomain,
+    ) -> netstack3_core::routes::Mark {
+        ctx.api().udp().get_mark(id, domain)
     }
 }
 
@@ -999,6 +1029,23 @@ where
         body: B,
     ) -> Result<(), Self::SendToError> {
         ctx.api().icmp_echo().send_to(id, remote_ip, body)
+    }
+
+    fn set_mark(
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        domain: netstack3_core::routes::MarkDomain,
+        mark: netstack3_core::routes::Mark,
+    ) {
+        ctx.api().icmp_echo().set_mark(id, domain, mark)
+    }
+
+    fn get_mark(
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        domain: netstack3_core::routes::MarkDomain,
+    ) -> netstack3_core::routes::Mark {
+        ctx.api().icmp_echo().get_mark(id, domain)
     }
 }
 
@@ -1737,13 +1784,12 @@ where
             Request::GetIpPacketInfo { responder } => {
                 respond_not_supported!("syncudp::GetIpPacketInfo", responder)
             }
-            Request::SetMark { domain: _, mark: _, responder } => {
-                // TODO(https://fxbug.dev/337134565): Implement socket marks.
-                responder.send(Err(fposix::Errno::Eopnotsupp)).unwrap_or_log("failed to respond")
+            Request::SetMark { domain, mark, responder } => {
+                self.set_mark(domain, mark);
+                responder.send(Ok(())).unwrap_or_log("failed to respond")
             }
-            Request::GetMark { domain: _, responder } => {
-                // TODO(https://fxbug.dev/337134565): Implement socket marks.
-                responder.send(Err(fposix::Errno::Eopnotsupp)).unwrap_or_log("failed to respond")
+            Request::GetMark { domain, responder } => {
+                responder.send(Ok(&self.get_mark(domain))).unwrap_or_log("failed to respond")
             }
         }
         ControlFlow::Continue(None)
@@ -2434,6 +2480,16 @@ where
 
     fn ip_get_receive_type_of_service(self) -> Result<bool, fposix::Errno> {
         Ok(self.data.ip_recv_tos)
+    }
+
+    fn set_mark(self, domain: fposix_socket::MarkDomain, mark: fposix_socket::OptionalUint32) {
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
+        T::set_mark(ctx, id, domain.into_core(), mark.into_core())
+    }
+
+    fn get_mark(self, domain: fposix_socket::MarkDomain) -> fposix_socket::OptionalUint32 {
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
+        T::get_mark(ctx, id, domain.into_core()).into_fidl()
     }
 }
 
