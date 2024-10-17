@@ -155,7 +155,7 @@ mod tests {
     #[fasync::run_until_stalled(test)]
     async fn structured_logger_stream_test() {
         let (sin, sout) = zx::Socket::create_datagram();
-        let timestamp = 107;
+        let timestamp = zx::BootInstant::from_nanos(107);
         let record = Record {
             timestamp,
             severity: StreamSeverity::Fatal.into_primitive(),
@@ -170,7 +170,7 @@ mod tests {
         let encoded = &buffer.get_ref()[..buffer.position() as usize];
 
         let expected_p = diagnostics_data::LogsDataBuilder::new(diagnostics_data::BuilderArgs {
-            timestamp: zx::BootInstant::from_nanos(timestamp),
+            timestamp,
             component_url: Some(TEST_IDENTITY.url.clone()),
             moniker: TEST_IDENTITY.moniker.clone(),
             severity: Severity::Fatal,

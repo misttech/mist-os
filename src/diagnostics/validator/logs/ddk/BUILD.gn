@@ -12,6 +12,7 @@ rustc_library("ddk-log-lib") {
 
   deps = [
     "//sdk/lib/device-watcher/rust",
+    "//sdk/rust/zx",
     "//src/diagnostics/validator/logs/sink/fidl:sink-puppet_rust",
     "//src/lib/diagnostics/log/encoding/rust",
     "//src/lib/diagnostics/reader/rust",

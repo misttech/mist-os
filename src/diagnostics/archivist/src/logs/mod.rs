@@ -501,16 +501,20 @@ mod tests {
     async fn test_structured_log() {
         let logs = vec![
             Record {
-                timestamp: 6,
+                timestamp: zx::BootInstant::from_nanos(6),
                 severity: Severity::Info.into_primitive(),
                 arguments: vec![Argument {
                     name: MESSAGE_LABEL.into(),
                     value: Value::Text("hi".to_string()),
                 }],
             },
-            Record { timestamp: 14, severity: Severity::Error.into_primitive(), arguments: vec![] },
             Record {
-                timestamp: 19,
+                timestamp: zx::BootInstant::from_nanos(13),
+                severity: Severity::Error.into_primitive(),
+                arguments: vec![],
+            },
+            Record {
+                timestamp: zx::BootInstant::from_nanos(19),
                 severity: Severity::Warn.into_primitive(),
                 arguments: vec![
                     Argument { name: PID_LABEL.into(), value: Value::UnsignedInt(0x1d1) },
@@ -524,7 +528,7 @@ mod tests {
                 ],
             },
             Record {
-                timestamp: 21,
+                timestamp: zx::BootInstant::from_nanos(21),
                 severity: Severity::Warn.into_primitive(),
                 arguments: vec![
                     Argument { name: TAG_LABEL.into(), value: Value::Text(String::from("tag-1")) },

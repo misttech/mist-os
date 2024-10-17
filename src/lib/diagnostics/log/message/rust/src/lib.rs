@@ -6,7 +6,6 @@ use crate::error::MessageError;
 use byteorder::{ByteOrder, LittleEndian};
 use diagnostics_data::{
     BuilderArgs, ExtendedMoniker, LogsData, LogsDataBuilder, LogsField, LogsProperty, Severity,
-    Timestamp,
 };
 use diagnostics_log_encoding::{Argument, Value, ValueUnknown};
 use flyweights::FlyStr;
@@ -60,7 +59,7 @@ pub fn from_structured(source: MonikerWithUrl, bytes: &[u8]) -> Result<LogsData,
     let (raw_severity, severity) = Severity::parse_exact(record.severity);
 
     let mut builder = LogsDataBuilder::new(BuilderArgs {
-        timestamp: Timestamp::from_nanos(record.timestamp),
+        timestamp: record.timestamp,
         component_url: Some(source.url),
         moniker: source.moniker,
         severity,

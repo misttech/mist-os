@@ -86,8 +86,8 @@ async fn run_puppet(mut requests: LogSinkPuppetRequestStream) {
                 // tracing 0.2 will let us to emit non-'static events directly, no downcasting
                 tracing::dispatcher::get_default(|dispatcher| {
                     let publisher: &diagnostics_log::Publisher = dispatcher.downcast_ref().unwrap();
-                    if record.timestamp == 0 {
-                        record.timestamp = zx::BootInstant::get().into_nanos();
+                    if record.timestamp == zx::BootInstant::ZERO {
+                        record.timestamp = zx::BootInstant::get();
                     }
                     let test_record = TestRecord::from(&file, line, &record);
                     publisher.event_for_testing(test_record);

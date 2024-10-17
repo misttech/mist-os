@@ -407,7 +407,7 @@ where
                         ),
                     }],
                     severity: Severity::$severity.into_primitive(),
-                    timestamp: 0,
+                    timestamp: zx::BootInstant::ZERO,
                 },
             };
             puppet.proxy.emit_log(&record).await?;
@@ -515,7 +515,7 @@ async fn assert_dot_removal(puppet: &mut Puppet, new_file_line_rules: bool) -> R
                 value: diagnostics_log_encoding::Value::Text("value".to_string()),
             }],
             severity: Severity::Error.into_primitive(),
-            timestamp: 0,
+            timestamp: zx::BootInstant::ZERO,
         },
     };
     puppet.proxy.emit_log(&record).await?;
@@ -546,8 +546,11 @@ struct TestVector {
 
 impl TestVector {
     fn record(&self) -> Record {
-        let mut record =
-            Record { arguments: vec![], severity: self.severity.into_primitive(), timestamp: 0 };
+        let mut record = Record {
+            arguments: vec![],
+            severity: self.severity.into_primitive(),
+            timestamp: zx::BootInstant::ZERO,
+        };
         for (name, value) in &self.args {
             record.arguments.push(Argument { name: name.clone(), value: value.clone() });
         }
@@ -624,7 +627,7 @@ const STUB_ERROR_LINE: u64 = 0x1A4;
 
 #[derive(Debug, PartialEq)]
 struct TestRecord {
-    timestamp: i64,
+    timestamp: zx::BootInstant,
     severity: Severity,
     arguments: BTreeMap<String, Value>,
 }
@@ -704,7 +707,7 @@ impl RecordAssertion {
 
 impl PartialEq<TestRecord> for RecordAssertion {
     fn eq(&self, rhs: &TestRecord) -> bool {
-        self.valid_times.contains(&zx::BootInstant::from_nanos(rhs.timestamp))
+        self.valid_times.contains(&rhs.timestamp)
             && self.severity == rhs.severity
             && self.arguments == rhs.arguments
     }

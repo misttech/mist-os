@@ -347,7 +347,7 @@ mod tests {
 
     fn make_message(msg: &str, tag: Option<&str>, timestamp: zx::BootInstant) -> StoredMessage {
         let mut record = Record {
-            timestamp: timestamp.into_nanos(),
+            timestamp,
             severity: StreamSeverity::Debug.into_primitive(),
             arguments: vec![
                 Argument { name: "pid".to_string(), value: Value::UnsignedInt(1) },

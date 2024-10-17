@@ -203,7 +203,7 @@ mod tests {
 
     fn fake_message_bytes(timestamp: zx::BootInstant) -> StoredMessage {
         let record = Record {
-            timestamp: timestamp.into_nanos(),
+            timestamp,
             severity: StreamSeverity::Debug.into_primitive(),
             arguments: vec![
                 Argument { name: "pid".to_string(), value: Value::UnsignedInt(123) },

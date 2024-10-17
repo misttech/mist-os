@@ -72,6 +72,7 @@ pub(crate) fn try_parse_record(buf: &[u8]) -> ParseResult<'_, Record> {
     let (_, arguments) =
         many0(|input| parse_argument_internal(input, &mut state.borrow_mut()))(args_buf)?;
 
+    let timestamp = zx::BootInstant::from_nanos(timestamp);
     Ok((after_record, Record { timestamp, severity, arguments }))
 }
 
@@ -205,7 +206,7 @@ mod tests {
 
     #[fuchsia::test]
     fn basic_structured_info() {
-        let expected_timestamp = 72;
+        let expected_timestamp = zx::BootInstant::from_nanos(72);
         let record = Record {
             timestamp: expected_timestamp,
             severity: Severity::Error.into_primitive(),
@@ -217,7 +218,7 @@ mod tests {
         let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
 
         let (timestamp, severity) = basic_info(encoded).unwrap();
-        assert_eq!(timestamp, zx::BootInstant::from_nanos(expected_timestamp));
+        assert_eq!(timestamp, expected_timestamp);
         assert_eq!(severity, Severity::Error.into_primitive());
     }
 }

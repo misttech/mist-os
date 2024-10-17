@@ -471,7 +471,7 @@ fn legacy_message_severity() {
 fn test_raw_severity_parsing_and_conversions() {
     let raw_severity: u8 = 0x30 - 2; // INFO-2=DEBUG
     let record = Record {
-        timestamp: 72,
+        timestamp: zx::BootInstant::from_nanos(72),
         severity: raw_severity,
         arguments: vec![
             Argument {
@@ -534,7 +534,7 @@ fn test_raw_severity_parsing_and_conversions() {
 #[fuchsia::test]
 fn test_from_structured() {
     let record = Record {
-        timestamp: 72,
+        timestamp: zx::BootInstant::from_nanos(72),
         severity: StreamSeverity::Error.into_primitive(),
         arguments: vec![
             Argument {
@@ -593,7 +593,7 @@ fn test_from_structured() {
 
     // multiple tags
     let record = Record {
-        timestamp: 72,
+        timestamp: zx::BootInstant::from_nanos(72),
         severity: StreamSeverity::Error.into_primitive(),
         arguments: vec![
             Argument { name: TAG_LABEL.to_string(), value: Value::Text("tag1".to_string()) },
@@ -622,7 +622,7 @@ fn test_from_structured() {
 
     // empty record
     let record = Record {
-        timestamp: 72,
+        timestamp: zx::BootInstant::from_nanos(72),
         severity: StreamSeverity::Error.into_primitive(),
         arguments: vec![],
     };

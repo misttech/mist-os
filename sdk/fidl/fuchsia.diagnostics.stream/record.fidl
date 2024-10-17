@@ -21,8 +21,9 @@ alias RawSeverity = uint8;
 
 /// A record in the diagnostic stream.
 type Record = struct {
-    /// The monotonic time at which the record was generated.
-    timestamp zx.Time;
+    /// The time at which the record was generated measured in nanoseconds since
+    /// boot.
+    timestamp zx.InstantBoot;
     /// Severity of the record.
     severity RawSeverity;
     /// The key-value pairs which make up this record.

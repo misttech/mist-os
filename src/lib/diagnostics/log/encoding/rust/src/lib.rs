@@ -272,8 +272,8 @@ mod tests {
     #[fuchsia::test]
     fn no_args_roundtrip() {
         let mut expected_record = MINIMAL_LOG_HEADER.to_le_bytes().to_vec();
-        let timestamp = 5_000_000i64;
-        expected_record.extend(timestamp.to_le_bytes());
+        let timestamp = zx::BootInstant::from_nanos(5_000_000i64);
+        expected_record.extend(timestamp.into_nanos().to_le_bytes());
 
         assert_roundtrips(
             Record { timestamp, severity: Severity::Info.into_primitive(), arguments: vec![] },
@@ -337,7 +337,7 @@ mod tests {
     fn arg_of_each_type_roundtrips() {
         assert_roundtrips(
             Record {
-                timestamp: zx::BootInstant::get().into_nanos(),
+                timestamp: zx::BootInstant::get(),
                 severity: Severity::Warn.into_primitive(),
                 arguments: vec![
                     Argument { name: String::from("signed"), value: Value::SignedInt(-10) },
@@ -360,7 +360,7 @@ mod tests {
     fn multiple_string_args() {
         assert_roundtrips(
             Record {
-                timestamp: zx::BootInstant::get().into_nanos(),
+                timestamp: zx::BootInstant::get(),
                 severity: Severity::Trace.into_primitive(),
                 arguments: vec![
                     Argument {

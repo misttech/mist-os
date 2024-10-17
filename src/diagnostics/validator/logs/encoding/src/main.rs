@@ -109,7 +109,7 @@ async fn serve_results(mut stream: ValidateResultsIteratorRequestStream) {
 }
 
 fn test_string() -> TestCase {
-    let timestamp = 12;
+    let timestamp = zx::BootInstant::from_nanos(12);
     let arg = Argument { name: String::from("hello"), value: Value::Text("world".to_string()) };
     let record =
         Record { timestamp, severity: Severity::Info.into_primitive(), arguments: vec![arg] };
@@ -138,7 +138,7 @@ fn test_string() -> TestCase {
 }
 
 fn test_multiword_string() -> TestCase {
-    let timestamp = 0x24;
+    let timestamp = zx::BootInstant::from_nanos(0x24);
     let arg =
         Argument { name: String::from("name"), value: Value::Text(String::from("aaaaaaabbb")) };
     let record =
@@ -163,7 +163,7 @@ fn test_multiword_string() -> TestCase {
 }
 
 fn test_empty_string() -> TestCase {
-    let timestamp = 0x24;
+    let timestamp = zx::BootInstant::from_nanos(0x24);
     let arg = Argument { name: String::from("name"), value: Value::Text(String::from("")) };
     let record =
         Record { timestamp, severity: Severity::Warn.into_primitive(), arguments: vec![arg] };
@@ -185,7 +185,7 @@ fn test_empty_string() -> TestCase {
 }
 
 fn test_boolean() -> TestCase {
-    let timestamp = 0x24;
+    let timestamp = zx::BootInstant::from_nanos(0x24);
     let arg = Argument { name: String::from("name"), value: Value::Boolean(true) };
     let record =
         Record { timestamp, severity: Severity::Warn.into_primitive(), arguments: vec![arg] };
@@ -205,7 +205,7 @@ fn test_boolean() -> TestCase {
 }
 
 fn test_float() -> TestCase {
-    let timestamp = 6;
+    let timestamp = zx::BootInstant::from_nanos(6);
     let arg = Argument { name: String::from("name"), value: Value::Floating(3.25) };
     let record =
         Record { timestamp, severity: Severity::Warn.into_primitive(), arguments: vec![arg] };
@@ -222,7 +222,7 @@ fn test_float() -> TestCase {
 }
 
 fn test_unsigned_int() -> TestCase {
-    let timestamp = 6;
+    let timestamp = zx::BootInstant::from_nanos(6);
     let arg = Argument { name: String::from("name"), value: Value::UnsignedInt(3) };
     let record =
         Record { timestamp, severity: Severity::Debug.into_primitive(), arguments: vec![arg] };
@@ -239,7 +239,7 @@ fn test_unsigned_int() -> TestCase {
 }
 
 fn test_unsigned_int_max() -> TestCase {
-    let timestamp = 6;
+    let timestamp = zx::BootInstant::from_nanos(6);
     let arg = Argument { name: String::from("name"), value: Value::UnsignedInt(u64::MAX) };
     let record =
         Record { timestamp, severity: Severity::Debug.into_primitive(), arguments: vec![arg] };
@@ -256,7 +256,7 @@ fn test_unsigned_int_max() -> TestCase {
 }
 
 fn test_signed_int_negative() -> TestCase {
-    let timestamp = 9;
+    let timestamp = zx::BootInstant::from_nanos(9);
     let arg = Argument { name: String::from("name"), value: Value::SignedInt(-7) };
     let record =
         Record { timestamp, severity: Severity::Error.into_primitive(), arguments: vec![arg] };
@@ -273,7 +273,7 @@ fn test_signed_int_negative() -> TestCase {
 }
 
 fn test_signed_int_positive() -> TestCase {
-    let timestamp = 9;
+    let timestamp = zx::BootInstant::from_nanos(9);
     let arg = Argument { name: String::from("name"), value: Value::SignedInt(4) };
     let record =
         Record { timestamp, severity: Severity::Warn.into_primitive(), arguments: vec![arg] };
@@ -290,7 +290,7 @@ fn test_signed_int_positive() -> TestCase {
 }
 
 fn test_multiword_arg_name() -> TestCase {
-    let timestamp = 0x4523;
+    let timestamp = zx::BootInstant::from_nanos(0x4523);
     let arg = Argument { name: String::from("abcdabcdabcd"), value: Value::SignedInt(9) };
     let record =
         Record { timestamp, severity: Severity::Error.into_primitive(), arguments: vec![arg] };
@@ -312,7 +312,7 @@ fn test_multiword_arg_name() -> TestCase {
 }
 
 fn test_word_size_arg_name() -> TestCase {
-    let timestamp = 0x4523;
+    let timestamp = zx::BootInstant::from_nanos(0x4523);
     let arg = Argument { name: String::from("abcdabcd"), value: Value::SignedInt(9) };
     let record =
         Record { timestamp, severity: Severity::Error.into_primitive(), arguments: vec![arg] };
@@ -333,7 +333,7 @@ fn test_word_size_arg_name() -> TestCase {
 }
 
 fn test_no_args() -> TestCase {
-    let timestamp = 0x1234;
+    let timestamp = zx::BootInstant::from_nanos(0x1234);
     let record =
         Record { timestamp, severity: Severity::Error.into_primitive(), arguments: vec![] };
     #[rustfmt::skip]
@@ -347,7 +347,7 @@ fn test_no_args() -> TestCase {
 }
 
 fn test_multiple_args() -> TestCase {
-    let timestamp = 0xabcd;
+    let timestamp = zx::BootInstant::from_nanos(0xabcd);
     let arguments = vec![
         Argument { name: String::from("aa"), value: Value::SignedInt(3) },
         Argument { name: String::from("bbb"), value: Value::UnsignedInt(0x90) },

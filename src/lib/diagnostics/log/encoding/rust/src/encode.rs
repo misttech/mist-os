@@ -547,7 +547,7 @@ impl TestRecord<'_> {
     pub fn from<'a>(file: &'a str, line: u32, record: &'a fstream::Record) -> TestRecord<'a> {
         TestRecord {
             severity: record.severity,
-            timestamp: zx::BootInstant::from_nanos(record.timestamp),
+            timestamp: record.timestamp,
             file: Some(file),
             line: Some(line),
             record_arguments: record.arguments.iter().map(Argument::from).collect(),
@@ -603,7 +603,7 @@ impl RecordFields for fstream::Record {
     }
 
     fn timestamp(&self) -> zx::BootInstant {
-        zx::BootInstant::from_nanos(self.timestamp)
+        self.timestamp
     }
 }
 
@@ -979,7 +979,7 @@ mod tests {
         assert_eq!(
             record,
             fstream::Record {
-                timestamp: 12345,
+                timestamp: zx::BootInstant::from_nanos(12345),
                 severity: Severity::Info.into_primitive(),
                 arguments: vec![
                     fstream::Argument {
@@ -1018,7 +1018,7 @@ mod tests {
         assert_eq!(
             record,
             fstream::Record {
-                timestamp: 12345,
+                timestamp: zx::BootInstant::from_nanos(12345),
                 severity: Severity::Error.into_primitive(),
                 arguments: vec![
                     fstream::Argument {
@@ -1065,7 +1065,7 @@ mod tests {
         assert_eq!(
             record,
             fstream::Record {
-                timestamp: 12345,
+                timestamp: zx::BootInstant::from_nanos(12345),
                 severity: Severity::Warn.into_primitive(),
                 arguments: vec![
                     fstream::Argument {
@@ -1124,7 +1124,7 @@ mod tests {
 
     #[test]
     fn build_record_from_tracing_event() {
-        let before_timestamp = zx::BootInstant::get().into_nanos();
+        let before_timestamp = zx::BootInstant::get();
         let _s = tracing::subscriber::set_default(Registry::default().with(EncoderLayer));
         tracing::info!(
             is_a_str = "hahaha",
@@ -1194,7 +1194,7 @@ mod tests {
 
     #[test]
     fn spans_are_supported() {
-        let before_timestamp = zx::BootInstant::get().into_nanos();
+        let before_timestamp = zx::BootInstant::get();
         let _s = tracing::subscriber::set_default(Registry::default().with(EncoderLayer));
         let span = info_span!("my span", tag = "span_tag", span_field = 42);
         span.in_scope(|| {
