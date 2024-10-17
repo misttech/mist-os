@@ -99,6 +99,7 @@ rustc_binary("bin") {
     "//src/sys/pkg/lib/fuchsia-pkg",
     "//src/sys/pkg/lib/package-directory",
     "//src/sys/pkg/lib/system-image",
+    "//src/sys/service-broker:lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:derivative",
