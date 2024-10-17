@@ -4908,7 +4908,10 @@ async fn tos_tclass_send<
     [fposix_socket::Domain::Ipv4, fposix_socket::Domain::Ipv6],
     [fposix_socket::DatagramSocketProtocol::Udp, fposix_socket::DatagramSocketProtocol::IcmpEcho],
     [fposix_socket::MarkDomain::Mark1, fposix_socket::MarkDomain::Mark2],
-    [fposix_socket::OptionalUint32::Unset(fposix_socket::Empty), fposix_socket::OptionalUint32::Value(0)]
+    [
+        fposix_socket::OptionalUint32::Unset(fposix_socket::Empty),
+        fposix_socket::OptionalUint32::Value(0)
+    ]
 )]
 async fn datagram_socket_mark(
     name: &str,
@@ -4931,21 +4934,25 @@ async fn datagram_socket_mark(
 #[netstack_test]
 #[test_matrix(
     [fposix_socket::Domain::Ipv4, fposix_socket::Domain::Ipv6],
-    [fposix_socket::StreamSocketProtocol::Tcp],
     [fposix_socket::MarkDomain::Mark1, fposix_socket::MarkDomain::Mark2],
-    [fposix_socket::OptionalUint32::Unset(fposix_socket::Empty), fposix_socket::OptionalUint32::Value(0)]
+    [
+        fposix_socket::OptionalUint32::Unset(fposix_socket::Empty),
+        fposix_socket::OptionalUint32::Value(0)
+    ]
 )]
 async fn stream_socket_mark(
     name: &str,
     domain: fposix_socket::Domain,
-    proto: fposix_socket::StreamSocketProtocol,
     mark_domain: fposix_socket::MarkDomain,
     mark: fposix_socket::OptionalUint32,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm =
         sandbox.create_netstack_realm::<Netstack3, _>(name).expect("failed to create client realm");
-    let sock = realm.stream_socket(domain, proto).await.expect("failed to create datagram socket");
+    let sock = realm
+        .stream_socket(domain, fposix_socket::StreamSocketProtocol::Tcp)
+        .await
+        .expect("failed to create datagram socket");
     let channel = fdio::clone_channel(sock).expect("failed to clone channel");
     let proxy = fposix_socket::BaseSocketProxy::new(fidl::AsyncChannel::from_channel(channel));
     proxy.set_mark(mark_domain, &mark).await.expect("fidl error").expect("set mark");
@@ -4960,7 +4967,10 @@ async fn stream_socket_mark(
         fposix_socket_raw::ProtocolAssociation::Associated(0)
     ],
     [fposix_socket::MarkDomain::Mark1, fposix_socket::MarkDomain::Mark2],
-    [fposix_socket::OptionalUint32::Unset(fposix_socket::Empty), fposix_socket::OptionalUint32::Value(0)]
+    [
+        fposix_socket::OptionalUint32::Unset(fposix_socket::Empty),
+        fposix_socket::OptionalUint32::Value(0)
+    ]
 )]
 async fn raw_socket_mark(
     name: &str,
