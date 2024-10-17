@@ -4289,7 +4289,7 @@ mod tests {
         assert!(mapped_addr > UserAddress::default());
         assert!(has(&mapped_addr));
 
-        let node = current_task.lookup_path_from_root("/".into()).unwrap();
+        let node = current_task.lookup_path_from_root(&mut locked, "/".into()).unwrap();
         mm.exec(node).expect("failed to exec memory manager");
 
         assert!(!has(&brk_addr));

@@ -19,7 +19,8 @@ use macro_rules_attribute::apply;
 use ref_cast::RefCast;
 use starnix_logging::log_warn;
 use starnix_sync::{
-    BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, RwLock, Unlocked,
+    BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex,
+    RwLock, Unlocked,
 };
 use starnix_uapi::arc_key::{ArcKey, PtrKey, WeakKey};
 use starnix_uapi::auth::UserAndOrGroupId;
@@ -1059,13 +1060,14 @@ impl NamespaceNode {
     {
         let owner = current_task.as_fscred();
         let mode = current_task.fs().apply_umask(mode);
-        let create_fn = |dir: &FsNodeHandle, mount: &MountInfo, name: &_| {
-            dir.mknod(locked, current_task, mount, name, mode, dev, owner)
-        };
+        let create_fn =
+            |locked: &mut Locked<'_, L>, dir: &FsNodeHandle, mount: &MountInfo, name: &_| {
+                dir.mknod(locked, current_task, mount, name, mode, dev, owner)
+            };
         let entry = if flags.contains(OpenFlags::EXCL) {
-            self.entry.create_entry(current_task, &self.mount, name, create_fn)
+            self.entry.create_entry(locked, current_task, &self.mount, name, create_fn)
         } else {
-            self.entry.get_or_create_entry(current_task, &self.mount, name, create_fn)
+            self.entry.get_or_create_entry(locked, current_task, &self.mount, name, create_fn)
         }?;
         Ok(self.with_new_entry(entry))
     }
@@ -1092,10 +1094,15 @@ impl NamespaceNode {
     {
         let owner = current_task.as_fscred();
         let mode = current_task.fs().apply_umask(mode);
-        let entry =
-            self.entry.create_entry(current_task, &self.mount, name, |dir, mount, name| {
+        let entry = self.entry.create_entry(
+            locked,
+            current_task,
+            &self.mount,
+            name,
+            |locked, dir, mount, name| {
                 dir.mknod(locked, current_task, mount, name, mode, dev, owner)
-            })?;
+            },
+        )?;
         Ok(self.with_new_entry(entry))
     }
 
@@ -1113,10 +1120,15 @@ impl NamespaceNode {
         L: LockBefore<FileOpsCore>,
     {
         let owner = current_task.as_fscred();
-        let entry =
-            self.entry.create_entry(current_task, &self.mount, name, |dir, mount, name| {
+        let entry = self.entry.create_entry(
+            locked,
+            current_task,
+            &self.mount,
+            name,
+            |locked, dir, mount, name| {
                 dir.create_symlink(locked, current_task, mount, name, target, owner)
-            })?;
+            },
+        )?;
         Ok(self.with_new_entry(entry))
     }
 
@@ -1152,10 +1164,13 @@ impl NamespaceNode {
     where
         L: LockBefore<FileOpsCore>,
     {
-        let dir_entry =
-            self.entry.create_entry(current_task, &self.mount, name, |dir, mount, name| {
-                dir.link(locked, current_task, mount, name, child)
-            })?;
+        let dir_entry = self.entry.create_entry(
+            locked,
+            current_task,
+            &self.mount,
+            name,
+            |locked, dir, mount, name| dir.link(locked, current_task, mount, name, child),
+        )?;
         Ok(self.with_new_entry(dir_entry))
     }
 
@@ -1171,8 +1186,12 @@ impl NamespaceNode {
     where
         L: LockBefore<FileOpsCore>,
     {
-        let dir_entry =
-            self.entry.create_entry(current_task, &self.mount, name, |dir, mount, name| {
+        let dir_entry = self.entry.create_entry(
+            locked,
+            current_task,
+            &self.mount,
+            name,
+            |locked, dir, mount, name| {
                 let node = dir.mknod(
                     locked,
                     current_task,
@@ -1188,7 +1207,8 @@ impl NamespaceNode {
                     return error!(ENOTSUP);
                 }
                 Ok(node)
-            })?;
+            },
+        )?;
         Ok(self.with_new_entry(dir_entry))
     }
 
@@ -1223,12 +1243,16 @@ impl NamespaceNode {
     }
 
     /// Traverse down a parent-to-child link in the namespace.
-    pub fn lookup_child(
+    pub fn lookup_child<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         context: &mut LookupContext,
         basename: &FsStr,
-    ) -> Result<NamespaceNode, Errno> {
+    ) -> Result<NamespaceNode, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         if !self.entry.node.is_dir() {
             return error!(ENOTDIR);
         }
@@ -1260,6 +1284,7 @@ impl NamespaceNode {
             }
         } else {
             let mut child = self.with_new_entry(self.entry.component_lookup(
+                locked,
                 current_task,
                 &self.mount,
                 basename,
@@ -1288,6 +1313,7 @@ impl NamespaceNode {
                                     self.clone()
                                 };
                                 current_task.lookup_path(
+                                    locked,
                                     context,
                                     link_directory,
                                     link_target.as_ref(),
@@ -1461,15 +1487,20 @@ impl NamespaceNode {
         mount.unmount(flags, propagate)
     }
 
-    pub fn rename(
+    pub fn rename<L>(
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         old_parent: &NamespaceNode,
         old_name: &FsStr,
         new_parent: &NamespaceNode,
         new_name: &FsStr,
         flags: RenameFlags,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         DirEntry::rename(
+            locked,
             current_task,
             &old_parent.entry,
             &old_parent.mount,
@@ -1734,7 +1765,7 @@ mod test {
         let mut context = LookupContext::default();
         let dev = ns
             .root()
-            .lookup_child(&current_task, &mut context, "dev".into())
+            .lookup_child(&mut locked, &current_task, &mut context, "dev".into())
             .expect("failed to lookup dev");
         dev.mount(WhatToMount::Fs(dev_fs), MountFlags::empty())
             .expect("failed to mount dev root node");
@@ -1742,11 +1773,11 @@ mod test {
         let mut context = LookupContext::default();
         let dev = ns
             .root()
-            .lookup_child(&current_task, &mut context, "dev".into())
+            .lookup_child(&mut locked, &current_task, &mut context, "dev".into())
             .expect("failed to lookup dev");
         let mut context = LookupContext::default();
         let pts = dev
-            .lookup_child(&current_task, &mut context, "pts".into())
+            .lookup_child(&mut locked, &current_task, &mut context, "pts".into())
             .expect("failed to lookup pts");
         let pts_parent =
             pts.parent().ok_or_else(|| errno!(ENOENT)).expect("failed to get parent of pts");
@@ -1776,24 +1807,24 @@ mod test {
         let mut context = LookupContext::default();
         let dev = ns
             .root()
-            .lookup_child(&current_task, &mut context, "dev".into())
+            .lookup_child(&mut locked, &current_task, &mut context, "dev".into())
             .expect("failed to lookup dev");
         dev.mount(WhatToMount::Fs(dev_fs), MountFlags::empty())
             .expect("failed to mount dev root node");
         let mut context = LookupContext::default();
         let new_dev = ns
             .root()
-            .lookup_child(&current_task, &mut context, "dev".into())
+            .lookup_child(&mut locked, &current_task, &mut context, "dev".into())
             .expect("failed to lookup dev again");
         assert!(!Arc::ptr_eq(&dev.entry, &new_dev.entry));
         assert_ne!(&dev, &new_dev);
 
         let mut context = LookupContext::default();
         let _new_pts = new_dev
-            .lookup_child(&current_task, &mut context, "pts".into())
+            .lookup_child(&mut locked, &current_task, &mut context, "pts".into())
             .expect("failed to lookup pts");
         let mut context = LookupContext::default();
-        assert!(dev.lookup_child(&current_task, &mut context, "pts".into()).is_err());
+        assert!(dev.lookup_child(&mut locked, &current_task, &mut context, "pts".into()).is_err());
 
         Ok(())
     }
@@ -1816,7 +1847,7 @@ mod test {
         let mut context = LookupContext::default();
         let dev = ns
             .root()
-            .lookup_child(&current_task, &mut context, "dev".into())
+            .lookup_child(&mut locked, &current_task, &mut context, "dev".into())
             .expect("failed to lookup dev");
         dev.mount(WhatToMount::Fs(dev_fs), MountFlags::empty())
             .expect("failed to mount dev root node");
@@ -1824,11 +1855,11 @@ mod test {
         let mut context = LookupContext::default();
         let dev = ns
             .root()
-            .lookup_child(&current_task, &mut context, "dev".into())
+            .lookup_child(&mut locked, &current_task, &mut context, "dev".into())
             .expect("failed to lookup dev");
         let mut context = LookupContext::default();
         let pts = dev
-            .lookup_child(&current_task, &mut context, "pts".into())
+            .lookup_child(&mut locked, &current_task, &mut context, "pts".into())
             .expect("failed to lookup pts");
 
         assert_eq!("/", ns.root().path_escaping_chroot());
@@ -1844,16 +1875,18 @@ mod test {
         let ns = Namespace::new(root_fs.clone());
         let _foo_node = root_fs.root().create_dir(&mut locked, &current_task, "foo".into())?;
         let mut context = LookupContext::default();
-        let foo_dir = ns.root().lookup_child(&current_task, &mut context, "foo".into())?;
+        let foo_dir =
+            ns.root().lookup_child(&mut locked, &current_task, &mut context, "foo".into())?;
 
         let foofs1 = TmpFs::new_fs(&kernel);
         foo_dir.mount(WhatToMount::Fs(foofs1.clone()), MountFlags::empty())?;
         let mut context = LookupContext::default();
         assert!(Arc::ptr_eq(
-            &ns.root().lookup_child(&current_task, &mut context, "foo".into())?.entry,
+            &ns.root().lookup_child(&mut locked, &current_task, &mut context, "foo".into())?.entry,
             foofs1.root()
         ));
-        let foo_dir = ns.root().lookup_child(&current_task, &mut context, "foo".into())?;
+        let foo_dir =
+            ns.root().lookup_child(&mut locked, &current_task, &mut context, "foo".into())?;
 
         let ns_clone = ns.clone_namespace();
 
@@ -1861,14 +1894,19 @@ mod test {
         foo_dir.mount(WhatToMount::Fs(foofs2.clone()), MountFlags::empty())?;
         let mut context = LookupContext::default();
         assert!(Arc::ptr_eq(
-            &ns.root().lookup_child(&current_task, &mut context, "foo".into())?.entry,
+            &ns.root().lookup_child(&mut locked, &current_task, &mut context, "foo".into())?.entry,
             foofs2.root()
         ));
 
         assert!(Arc::ptr_eq(
             &ns_clone
                 .root()
-                .lookup_child(&current_task, &mut LookupContext::default(), "foo".into())?
+                .lookup_child(
+                    &mut locked,
+                    &current_task,
+                    &mut LookupContext::default(),
+                    "foo".into()
+                )?
                 .entry,
             foofs1.root()
         ));
@@ -1884,7 +1922,8 @@ mod test {
         let ns2 = Namespace::new(root_fs.clone());
         let _foo_node = root_fs.root().create_dir(&mut locked, &current_task, "foo".into())?;
         let mut context = LookupContext::default();
-        let foo_dir = ns1.root().lookup_child(&current_task, &mut context, "foo".into())?;
+        let foo_dir =
+            ns1.root().lookup_child(&mut locked, &current_task, &mut context, "foo".into())?;
 
         let foofs = TmpFs::new_fs(&kernel);
         foo_dir.mount(WhatToMount::Fs(foofs), MountFlags::empty())?;
@@ -1923,7 +1962,8 @@ mod test {
         let _bar_node = root_fs.root().create_dir(&mut locked, &current_task, "bar".into())?;
         let _baz_node = root_fs.root().create_dir(&mut locked, &current_task, "baz".into())?;
         let mut context = LookupContext::default();
-        let foo_dir = ns1.root().lookup_child(&current_task, &mut context, "foo".into())?;
+        let foo_dir =
+            ns1.root().lookup_child(&mut locked, &current_task, &mut context, "foo".into())?;
 
         let foofs = TmpFs::new_fs(&kernel);
         foo_dir.mount(WhatToMount::Fs(foofs), MountFlags::empty())?;
@@ -1932,6 +1972,7 @@ mod test {
         let root = ns1.root();
         assert_eq!(
             NamespaceNode::rename(
+                &mut locked,
                 &current_task,
                 &root,
                 "bar".into(),
@@ -1945,6 +1986,7 @@ mod test {
         // Likewise the other way.
         assert_eq!(
             NamespaceNode::rename(
+                &mut locked,
                 &current_task,
                 &root,
                 "foo".into(),
@@ -1961,6 +2003,7 @@ mod test {
 
         // First rename the directory with the mount.
         NamespaceNode::rename(
+            &mut locked,
             &current_task,
             &root,
             "foo".into(),
@@ -1972,6 +2015,7 @@ mod test {
 
         // Renaming over a directory with a mount should also work.
         NamespaceNode::rename(
+            &mut locked,
             &current_task,
             &root,
             "baz".into(),
@@ -1983,11 +2027,15 @@ mod test {
 
         // "foo" and "baz" should no longer show up in ns1.
         assert_eq!(
-            ns1.root().lookup_child(&current_task, &mut context, "foo".into()).unwrap_err(),
+            ns1.root()
+                .lookup_child(&mut locked, &current_task, &mut context, "foo".into())
+                .unwrap_err(),
             errno!(ENOENT)
         );
         assert_eq!(
-            ns1.root().lookup_child(&current_task, &mut context, "baz".into()).unwrap_err(),
+            ns1.root()
+                .lookup_child(&mut locked, &current_task, &mut context, "baz".into())
+                .unwrap_err(),
             errno!(ENOENT)
         );
 

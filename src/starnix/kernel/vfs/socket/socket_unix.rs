@@ -17,6 +17,7 @@ use crate::vfs::{
     default_ioctl, CheckAccessReason, FdNumber, FileHandle, FileObject, FsNodeHandle, FsStr,
     LookupContext, Message,
 };
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::errors::{Errno, EACCES, EINTR, EPERM};
 use starnix_uapi::file_mode::Access;
@@ -29,10 +30,8 @@ use starnix_uapi::{
     SO_ATTACH_BPF, SO_BROADCAST, SO_ERROR, SO_KEEPALIVE, SO_LINGER, SO_NO_CHECK, SO_PASSCRED,
     SO_PEERCRED, SO_PEERSEC, SO_RCVBUF, SO_REUSEADDR, SO_REUSEPORT, SO_SNDBUF,
 };
-use zerocopy::IntoBytes;
-
-use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use std::sync::Arc;
+use zerocopy::IntoBytes;
 
 // From unix.go in gVisor.
 const SOCKET_MIN_SIZE: usize = 4 << 10;
@@ -527,7 +526,7 @@ impl SocketOps for UnixSocket {
             (None, Some(_), SocketType::SeqPacket) => return error!(ENOTCONN),
             (Some(_), Some(_), _) => return error!(EISCONN),
             (_, Some(SocketAddress::Unix(ref name)), _) => {
-                resolve_unix_socket_address(current_task, name.as_ref())?
+                resolve_unix_socket_address(locked, current_task, name.as_ref())?
             }
             (_, Some(_), _) => return error!(EINVAL),
             (None, None, _) => return error!(ENOTCONN),
@@ -933,23 +932,28 @@ impl UnixSocketInner {
     }
 }
 
-pub fn resolve_unix_socket_address(
+pub fn resolve_unix_socket_address<L>(
+    locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
     name: &FsStr,
-) -> Result<SocketHandle, Errno> {
+) -> Result<SocketHandle, Errno>
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     if name[0] == b'\0' {
         current_task.abstract_socket_namespace.lookup(name)
     } else {
         let mut context = LookupContext::default();
         let (parent, basename) =
-            current_task.lookup_parent_at(&mut context, FdNumber::AT_FDCWD, name)?;
-        let name = parent.lookup_child(current_task, &mut context, basename).map_err(|errno| {
-            if matches!(errno.code, EACCES | EPERM | EINTR) {
-                errno
-            } else {
-                errno!(ECONNREFUSED)
-            }
-        })?;
+            current_task.lookup_parent_at(locked, &mut context, FdNumber::AT_FDCWD, name)?;
+        let name =
+            parent.lookup_child(locked, current_task, &mut context, basename).map_err(|errno| {
+                if matches!(errno.code, EACCES | EPERM | EINTR) {
+                    errno
+                } else {
+                    errno!(ECONNREFUSED)
+                }
+            })?;
         name.check_access(
             current_task,
             Access::WRITE,

@@ -602,6 +602,7 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
     /// initialize is called.
     fn lookup(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         name: &FsStr,
@@ -1034,6 +1035,7 @@ macro_rules! fs_node_impl_not_dir {
     () => {
         fn lookup(
             &self,
+            _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             _node: &starnix_core::vfs::FsNode,
             _current_task: &starnix_core::task::CurrentTask,
             _name: &starnix_core::vfs::FsStr,
@@ -1370,19 +1372,24 @@ impl FsNode {
         }
     }
 
-    pub fn lookup(
+    pub fn lookup<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
-    ) -> Result<FsNodeHandle, Errno> {
+    ) -> Result<FsNodeHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         self.check_access(
             current_task,
             mount,
             Access::EXEC,
             CheckAccessReason::InternalPermissionChecks,
         )?;
-        self.ops().lookup(self, current_task, name)
+        let mut locked = locked.cast_locked::<FileOpsCore>();
+        self.ops().lookup(&mut locked, self, current_task, name)
     }
 
     pub fn mknod<L>(

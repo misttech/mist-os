@@ -107,6 +107,7 @@ impl FsNodeOps for Arc<NetstackDevicesDirectory> {
 
     fn lookup(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,

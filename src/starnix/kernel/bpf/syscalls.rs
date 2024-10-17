@@ -292,13 +292,14 @@ pub fn sys_bpf(
             let path_addr = UserCString::new(UserAddress::from(pin_attr.pathname));
             let pathname = current_task.read_c_string_to_vec(path_addr, PATH_MAX as usize)?;
             let (parent, basename) = current_task.lookup_parent_at(
+                locked,
                 &mut LookupContext::default(),
                 FdNumber::AT_FDCWD,
                 pathname.as_ref(),
             )?;
             let bpf_dir =
                 parent.entry.node.downcast_ops::<BpfFsDir>().ok_or_else(|| errno!(EINVAL))?;
-            bpf_dir.register_pin(current_task, &parent, basename, object)?;
+            bpf_dir.register_pin(locked, current_task, &parent, basename, object)?;
             Ok(SUCCESS)
         }
 
@@ -314,7 +315,7 @@ pub fn sys_bpf(
                 _ => return error!(EINVAL),
             };
             let pathname = current_task.read_c_string_to_vec(path_addr, PATH_MAX as usize)?;
-            let node = current_task.lookup_path_from_root(pathname.as_ref())?;
+            let node = current_task.lookup_path_from_root(locked, pathname.as_ref())?;
             // TODO(tbodt): This might be the wrong error code, write a test program to find out
             let object =
                 node.entry.node.downcast_ops::<BpfFsObject>().ok_or_else(|| errno!(EINVAL))?;

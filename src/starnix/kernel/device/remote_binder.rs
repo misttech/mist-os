@@ -882,12 +882,13 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
     /// Open a remote connection with the binder device at `path`.
     fn open(
         &self,
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         path: FsString,
         process_accessor: ClientEnd<fbinder::ProcessAccessorMarker>,
         process: zx::Process,
     ) -> Result<Arc<RemoteBinderConnection>, Errno> {
-        let node = current_task.lookup_path_from_root(path.as_ref())?;
+        let node = current_task.lookup_path_from_root(locked, path.as_ref())?;
         let device_type = node.entry.node.info().rdev;
         let connection = BinderDriver::open_remote(
             current_task
@@ -968,7 +969,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         loop {
             let interruption = match self.get_next_task(current_task)? {
                 TaskRequest::Open { path, process_accessor, process, responder } => {
-                    let result = self.open(current_task, path, process_accessor, process);
+                    let result = self.open(locked, current_task, path, process_accessor, process);
                     let interruption = must_interrupt(&result);
                     responder.send(result).map_err(|_| errno!(EINVAL))?;
                     interruption
@@ -1107,7 +1108,7 @@ mod tests {
                     )
                     .expect("mkdir dev");
                 let dev = current_task
-                    .lookup_path_from_root("/dev".into())
+                    .lookup_path_from_root(locked, "/dev".into())
                     .expect("lookup_path_from_root");
                 dev.mount(
                     WhatToMount::Fs(

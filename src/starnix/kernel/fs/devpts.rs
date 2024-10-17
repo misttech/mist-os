@@ -233,6 +233,7 @@ impl FsNodeOps for DevPtsRootDir {
 
     fn lookup(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -972,13 +973,17 @@ mod tests {
         file.ioctl(locked, current_task, TIOCSCTTY, steal.into())
     }
 
-    fn lookup_node(
+    fn lookup_node<L>(
+        locked: &mut Locked<'_, L>,
         task: &CurrentTask,
         fs: &FileSystemHandle,
         name: &FsStr,
-    ) -> Result<NamespaceNode, Errno> {
+    ) -> Result<NamespaceNode, Errno>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
         let root = NamespaceNode::new_anonymous(fs.root().clone());
-        root.lookup_child(task, &mut Default::default(), name)
+        root.lookup_child(locked, task, &mut Default::default(), name)
     }
 
     fn open_file_with_flags<L>(
@@ -992,7 +997,7 @@ mod tests {
         L: LockBefore<FileOpsCore>,
         L: LockBefore<DeviceOpen>,
     {
-        let node = lookup_node(current_task, fs, name)?;
+        let node = lookup_node(locked, current_task, fs, name)?;
         node.open(locked, current_task, flags, AccessCheck::default())
     }
 
@@ -1027,9 +1032,9 @@ mod tests {
         let (kernel, task, mut locked) = create_kernel_task_and_unlocked();
         tty_device_init(&mut locked, &task);
         let fs = ensure_devpts(&kernel, Default::default()).expect("create dev_pts_fs");
-        lookup_node(&task, &fs, "0".into()).unwrap_err();
+        lookup_node(&mut locked, &task, &fs, "0".into()).unwrap_err();
         let _ptmx = open_ptmx_and_unlock(&mut locked, &task, &fs).expect("ptmx");
-        lookup_node(&task, &fs, "0".into()).expect("pty");
+        lookup_node(&mut locked, &task, &fs, "0".into()).expect("pty");
     }
 
     #[::fuchsia::test]
@@ -1037,12 +1042,12 @@ mod tests {
         let (kernel, task, mut locked) = create_kernel_task_and_unlocked();
         tty_device_init(&mut locked, &task);
         let fs = ensure_devpts(&kernel, Default::default()).expect("create dev_pts_fs");
-        lookup_node(&task, &fs, "0".into()).unwrap_err();
+        lookup_node(&mut locked, &task, &fs, "0".into()).unwrap_err();
         let ptmx = open_ptmx_and_unlock(&mut locked, &task, &fs).expect("ptmx");
         let _pts = open_file(&mut locked, &task, &fs, "0".into()).expect("open file");
         std::mem::drop(ptmx);
         task.trigger_delayed_releaser();
-        lookup_node(&task, &fs, "0".into()).unwrap_err();
+        lookup_node(&mut locked, &task, &fs, "0".into()).unwrap_err();
     }
 
     #[::fuchsia::test]
@@ -1055,17 +1060,17 @@ mod tests {
         let mut _ptmx1 = open_ptmx_and_unlock(&mut locked, &task, &fs).expect("ptmx");
         let _ptmx2 = open_ptmx_and_unlock(&mut locked, &task, &fs).expect("ptmx");
 
-        lookup_node(&task, &fs, "0".into()).expect("component_lookup");
-        lookup_node(&task, &fs, "1".into()).expect("component_lookup");
-        lookup_node(&task, &fs, "2".into()).expect("component_lookup");
+        lookup_node(&mut locked, &task, &fs, "0".into()).expect("component_lookup");
+        lookup_node(&mut locked, &task, &fs, "1".into()).expect("component_lookup");
+        lookup_node(&mut locked, &task, &fs, "2".into()).expect("component_lookup");
 
         std::mem::drop(_ptmx1);
         task.trigger_delayed_releaser();
 
-        lookup_node(&task, &fs, "1".into()).unwrap_err();
+        lookup_node(&mut locked, &task, &fs, "1".into()).unwrap_err();
 
         _ptmx1 = open_ptmx_and_unlock(&mut locked, &task, &fs).expect("ptmx");
-        lookup_node(&task, &fs, "1".into()).expect("component_lookup");
+        lookup_node(&mut locked, &task, &fs, "1".into()).expect("component_lookup");
     }
 
     #[::fuchsia::test]
@@ -1078,17 +1083,23 @@ mod tests {
         let mount = MountInfo::detached();
         let pts = fs
             .root()
-            .create_entry(&task, &mount, "custom_pts".into(), |dir, mount, name| {
-                dir.mknod(
-                    &mut locked,
-                    &task,
-                    mount,
-                    name,
-                    mode!(IFCHR, 0o666),
-                    DeviceType::new(DEVPTS_FIRST_MAJOR, 0),
-                    FsCred::root(),
-                )
-            })
+            .create_entry(
+                &mut locked,
+                &task,
+                &mount,
+                "custom_pts".into(),
+                |locked, dir, mount, name| {
+                    dir.mknod(
+                        locked,
+                        &task,
+                        mount,
+                        name,
+                        mode!(IFCHR, 0o666),
+                        DeviceType::new(DEVPTS_FIRST_MAJOR, 0),
+                        FsCred::root(),
+                    )
+                },
+            )
             .expect("custom_pts");
         let node = NamespaceNode::new_anonymous(pts.clone());
         assert!(node.open(&mut locked, &task, OpenFlags::RDONLY, AccessCheck::skip()).is_err());
@@ -1159,7 +1170,7 @@ mod tests {
         let fs = ensure_devpts(&kernel, Default::default()).expect("create dev_pts_fs");
         let _ptmx_file = open_file(&mut locked, &task, &fs, "ptmx".into()).expect("open file");
 
-        let pts = lookup_node(&task, &fs, "0".into()).expect("component_lookup");
+        let pts = lookup_node(&mut locked, &task, &fs, "0".into()).expect("component_lookup");
         assert_eq!(
             pts.open(&mut locked, &task, OpenFlags::RDONLY, AccessCheck::default()).map(|_| ()),
             error!(EIO)
@@ -1172,7 +1183,7 @@ mod tests {
         tty_device_init(&mut locked, &task);
         let fs = ensure_devpts(&kernel, Default::default()).expect("create dev_pts_fs");
         let ptmx = open_ptmx_and_unlock(&mut locked, &task, &fs).expect("ptmx");
-        let pts = lookup_node(&task, &fs, "0".into()).expect("component_lookup");
+        let pts = lookup_node(&mut locked, &task, &fs, "0".into()).expect("component_lookup");
 
         // Check that the lock is not set.
         assert_eq!(ioctl::<i32>(&mut locked, &task, &ptmx, TIOCGPTLCK, &0), Ok(0));

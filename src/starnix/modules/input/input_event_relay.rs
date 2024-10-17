@@ -276,7 +276,7 @@ mod test {
     use starnix_core::task::CurrentTask;
     use starnix_core::testing::create_kernel_task_and_unlocked;
     use starnix_core::vfs::{FileHandle, FileObject, VecOutputBuffer};
-    use starnix_sync::{FileOpsCore, LockBefore, Locked};
+    use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked};
     use starnix_uapi::errors::{Errno, EAGAIN};
     use starnix_uapi::input_id;
     use starnix_uapi::open_flags::OpenFlags;
@@ -285,13 +285,15 @@ mod test {
     const INPUT_EVENT_SIZE: usize = std::mem::size_of::<uapi::input_event>();
 
     fn start_touch_input_inspect_and_dimensions(
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         x_max: i32,
         y_max: i32,
         inspector: &fuchsia_inspect::Inspector,
     ) -> (Arc<InputEventsRelay>, Arc<InputDevice>, FileHandle, TouchSourceRequestStream) {
         let input_device = InputDevice::new_touch(x_max, y_max, inspector.root());
-        let input_file = input_device.open_test(current_task).expect("Failed to create input file");
+        let input_file =
+            input_device.open_test(locked, current_task).expect("Failed to create input file");
 
         let (touch_source_client_end, touch_source_stream) =
             fidl::endpoints::create_request_stream::<TouchSourceMarker>()
@@ -391,7 +393,13 @@ mod test {
         let inspector = fuchsia_inspect::Inspector::default();
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let (input_relay, _input_device, input_file, mut touch_source_stream) =
-            start_touch_input_inspect_and_dimensions(&current_task, 700, 1200, &inspector);
+            start_touch_input_inspect_and_dimensions(
+                &mut locked,
+                &current_task,
+                700,
+                1200,
+                &inspector,
+            );
 
         const DEVICE_ID: u32 = 10;
 
@@ -428,7 +436,7 @@ mod test {
         let device_id_10_file_object = FileObject::new(
             Box::new(device_id_10_file),
             current_task
-                .lookup_path_from_root(".".into())
+                .lookup_path_from_root(&mut locked, ".".into())
                 .expect("failed to get namespace node for root"),
             OpenFlags::empty(),
         )

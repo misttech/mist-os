@@ -241,15 +241,23 @@ impl DirEntry {
 
     /// Look up a directory entry with the given name as direct child of this
     /// entry.
-    pub fn component_lookup(
+    pub fn component_lookup<L>(
         self: &DirEntryHandle,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
-    ) -> Result<DirEntryHandle, Errno> {
-        let (node, _) = self.get_or_create_child(current_task, mount, name, |d, mount, name| {
-            d.lookup(current_task, mount, name)
-        })?;
+    ) -> Result<DirEntryHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        let (node, _) = self.get_or_create_child(
+            locked,
+            current_task,
+            mount,
+            name,
+            |locked, d, mount, name| d.lookup(locked, current_task, mount, name),
+        )?;
         Ok(node)
     }
 
@@ -260,15 +268,24 @@ impl DirEntry {
     ///
     /// If the entry already exists, create_node_fn is not called, and EEXIST is
     /// returned.
-    pub fn create_entry(
+    pub fn create_entry<L>(
         self: &DirEntryHandle,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
-        create_node_fn: impl FnOnce(&FsNodeHandle, &MountInfo, &FsStr) -> Result<FsNodeHandle, Errno>,
-    ) -> Result<DirEntryHandle, Errno> {
+        create_node_fn: impl FnOnce(
+            &mut Locked<'_, L>,
+            &FsNodeHandle,
+            &MountInfo,
+            &FsStr,
+        ) -> Result<FsNodeHandle, Errno>,
+    ) -> Result<DirEntryHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let (entry, exists) =
-            self.create_entry_internal(current_task, mount, name, create_node_fn)?;
+            self.create_entry_internal(locked, current_task, mount, name, create_node_fn)?;
         if exists {
             return error!(EEXIST);
         }
@@ -277,25 +294,43 @@ impl DirEntry {
 
     /// Creates a new DirEntry. Works just like create_entry, except if the entry already exists,
     /// it is returned.
-    pub fn get_or_create_entry(
+    pub fn get_or_create_entry<L>(
         self: &DirEntryHandle,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
-        create_node_fn: impl FnOnce(&FsNodeHandle, &MountInfo, &FsStr) -> Result<FsNodeHandle, Errno>,
-    ) -> Result<DirEntryHandle, Errno> {
+        create_node_fn: impl FnOnce(
+            &mut Locked<'_, L>,
+            &FsNodeHandle,
+            &MountInfo,
+            &FsStr,
+        ) -> Result<FsNodeHandle, Errno>,
+    ) -> Result<DirEntryHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let (entry, _exists) =
-            self.create_entry_internal(current_task, mount, name, create_node_fn)?;
+            self.create_entry_internal(locked, current_task, mount, name, create_node_fn)?;
         Ok(entry)
     }
 
-    fn create_entry_internal(
+    fn create_entry_internal<L>(
         self: &DirEntryHandle,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
-        create_node_fn: impl FnOnce(&FsNodeHandle, &MountInfo, &FsStr) -> Result<FsNodeHandle, Errno>,
-    ) -> Result<(DirEntryHandle, bool), Errno> {
+        create_node_fn: impl FnOnce(
+            &mut Locked<'_, L>,
+            &FsNodeHandle,
+            &MountInfo,
+            &FsStr,
+        ) -> Result<FsNodeHandle, Errno>,
+    ) -> Result<(DirEntryHandle, bool), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         if DirEntry::is_reserved_name(name) {
             return error!(EEXIST);
         }
@@ -307,7 +342,7 @@ impl DirEntry {
             return error!(EINVAL);
         }
         let (entry, exists) =
-            self.get_or_create_child(current_task, mount, name, create_node_fn)?;
+            self.get_or_create_child(locked, current_task, mount, name, create_node_fn)?;
         if !exists {
             // An entry was created. Update the ctime and mtime of this directory.
             self.node.update_ctime_mtime();
@@ -343,17 +378,23 @@ impl DirEntry {
         L: starnix_sync::LockBefore<starnix_sync::FileOpsCore>,
     {
         // TODO: apply_umask
-        self.create_entry(current_task, &MountInfo::detached(), name, |dir, mount, name| {
-            dir.mknod(
-                locked,
-                current_task,
-                mount,
-                name,
-                starnix_uapi::file_mode::mode!(IFDIR, 0o777),
-                starnix_uapi::device_type::DeviceType::NONE,
-                FsCred::root(),
-            )
-        })
+        self.create_entry(
+            locked,
+            current_task,
+            &MountInfo::detached(),
+            name,
+            |locked, dir, mount, name| {
+                dir.mknod(
+                    locked,
+                    current_task,
+                    mount,
+                    name,
+                    starnix_uapi::file_mode::mode!(IFDIR, 0o777),
+                    starnix_uapi::device_type::DeviceType::NONE,
+                    FsCred::root(),
+                )
+            },
+        )
     }
 
     /// Creates an anonymous file.
@@ -411,7 +452,7 @@ impl DirEntry {
         let child;
 
         let mut self_children = self.lock_children();
-        child = self_children.component_lookup(current_task, mount, name)?;
+        child = self_children.component_lookup(locked, current_task, mount, name)?;
         let child_children = child.children.read();
 
         child.require_no_mounts(mount)?;
@@ -496,7 +537,8 @@ impl DirEntry {
     /// new_parent.
     ///
     /// old_parent and new_parent must belong to the same file system.
-    pub fn rename(
+    pub fn rename<L>(
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         old_parent: &DirEntryHandle,
         old_mount: &MountInfo,
@@ -505,7 +547,10 @@ impl DirEntry {
         new_mount: &MountInfo,
         new_basename: &FsStr,
         flags: RenameFlags,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         // The nodes we are touching must be part of the same mount.
         if old_mount != new_mount {
             return error!(EXDEV);
@@ -583,7 +628,8 @@ impl DirEntry {
 
             // Now that we know the old_parent child list cannot change, we
             // establish the DirEntry that we are going to try to rename.
-            renamed = state.old_parent().component_lookup(current_task, mount, old_basename)?;
+            renamed =
+                state.old_parent().component_lookup(locked, current_task, mount, old_basename)?;
 
             // Check whether the sticky bit on the old parent prevents us from
             // removing this child.
@@ -604,7 +650,7 @@ impl DirEntry {
             // We need to check if there is already a DirEntry with
             // new_basename in new_parent. If so, there are additional checks
             // we need to perform.
-            match state.new_parent().component_lookup(current_task, mount, new_basename) {
+            match state.new_parent().component_lookup(locked, current_task, mount, new_basename) {
                 Ok(replaced) => {
                     // Set `maybe_replaced` now to ensure it gets dropped in the right order.
                     let replaced = maybe_replaced.insert(replaced);
@@ -745,13 +791,22 @@ impl DirEntry {
         }
     }
 
-    fn get_or_create_child(
+    fn get_or_create_child<L>(
         self: &DirEntryHandle,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
-        create_fn: impl FnOnce(&FsNodeHandle, &MountInfo, &FsStr) -> Result<FsNodeHandle, Errno>,
-    ) -> Result<(DirEntryHandle, bool), Errno> {
+        create_fn: impl FnOnce(
+            &mut Locked<'_, L>,
+            &FsNodeHandle,
+            &MountInfo,
+            &FsStr,
+        ) -> Result<FsNodeHandle, Errno>,
+    ) -> Result<(DirEntryHandle, bool), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         assert!(!DirEntry::is_reserved_name(name));
         // Only directories can have children.
         if !self.node.is_dir() {
@@ -772,8 +827,13 @@ impl DirEntry {
             child.node.fs().did_access_dir_entry(&child);
             (child, CreationResult::Existed { create_fn })
         } else {
-            let (child, create_result) =
-                self.lock_children().get_or_create_child(current_task, mount, name, create_fn)?;
+            let (child, create_result) = self.lock_children().get_or_create_child(
+                locked,
+                current_task,
+                mount,
+                name,
+                create_fn,
+            )?;
             child.node.fs().purge_old_entries();
             (child, create_result)
         };
@@ -788,6 +848,7 @@ impl DirEntry {
                     child.destroy(&current_task.kernel().mounts);
 
                     let (child, create_result) = self.lock_children().get_or_create_child(
+                        locked,
                         current_task,
                         mount,
                         name,
@@ -933,36 +994,53 @@ enum CreationResult<F> {
 }
 
 impl<'a> DirEntryLockedChildren<'a> {
-    fn component_lookup(
+    fn component_lookup<L>(
         &mut self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
-    ) -> Result<DirEntryHandle, Errno> {
+    ) -> Result<DirEntryHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         assert!(!DirEntry::is_reserved_name(name));
         let (node, _) =
-            self.get_or_create_child(current_task, mount, name, |_, _, _| error!(ENOENT))?;
+            self.get_or_create_child(locked, current_task, mount, name, |_, _, _, _| {
+                error!(ENOENT)
+            })?;
         Ok(node)
     }
 
     fn get_or_create_child<
-        F: FnOnce(&FsNodeHandle, &MountInfo, &FsStr) -> Result<FsNodeHandle, Errno>,
+        L,
+        F: FnOnce(
+            &mut Locked<'_, L>,
+            &FsNodeHandle,
+            &MountInfo,
+            &FsStr,
+        ) -> Result<FsNodeHandle, Errno>,
     >(
         &mut self,
+        locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
         create_fn: F,
-    ) -> Result<(DirEntryHandle, CreationResult<F>), Errno> {
-        let create_child = |create_fn: F| {
+    ) -> Result<(DirEntryHandle, CreationResult<F>), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        let create_child = |locked: &mut Locked<'_, L>, create_fn: F| {
             // Before creating the child, check for existence.
-            let (node, create_result) = match self.entry.node.lookup(current_task, mount, name) {
-                Ok(node) => (node, CreationResult::Existed { create_fn }),
-                Err(e) if e == ENOENT => {
-                    (create_fn(&self.entry.node, mount, name)?, CreationResult::Created)
-                }
-                Err(e) => return Err(e),
-            };
+            let (node, create_result) =
+                match self.entry.node.lookup(locked, current_task, mount, name) {
+                    Ok(node) => (node, CreationResult::Existed { create_fn }),
+                    Err(e) if e == ENOENT => {
+                        (create_fn(locked, &self.entry.node, mount, name)?, CreationResult::Created)
+                    }
+                    Err(e) => return Err(e),
+                };
 
             assert!(
                 node.info().mode & FileMode::IFMT != FileMode::EMPTY,
@@ -981,7 +1059,7 @@ impl<'a> DirEntryLockedChildren<'a> {
 
         let (child, create_result) = match self.children.entry(name.to_owned()) {
             Entry::Vacant(entry) => {
-                let (child, create_result) = create_child(create_fn)?;
+                let (child, create_result) = create_child(locked, create_fn)?;
                 entry.insert(Arc::downgrade(&child));
                 (child, create_result)
             }
@@ -993,7 +1071,7 @@ impl<'a> DirEntryLockedChildren<'a> {
                     child.node.fs().did_access_dir_entry(&child);
                     return Ok((child, CreationResult::Existed { create_fn }));
                 }
-                let (child, create_result) = create_child(create_fn)?;
+                let (child, create_result) = create_child(locked, create_fn)?;
                 entry.insert(Arc::downgrade(&child));
                 (child, create_result)
             }

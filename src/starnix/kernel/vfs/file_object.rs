@@ -1913,17 +1913,23 @@ mod tests {
         let mount = MountInfo::detached();
         let root_node = Arc::clone(root_fs.root());
         let file = root_node
-            .create_entry(&current_task, &mount, "test".into(), |dir, mount, name| {
-                dir.mknod(
-                    &mut locked,
-                    &current_task,
-                    mount,
-                    name,
-                    FileMode::IFREG | FileMode::ALLOW_ALL,
-                    DeviceType::NONE,
-                    FsCred::root(),
-                )
-            })
+            .create_entry(
+                &mut locked,
+                &current_task,
+                &mount,
+                "test".into(),
+                |locked, dir, mount, name| {
+                    dir.mknod(
+                        locked,
+                        &current_task,
+                        mount,
+                        name,
+                        FileMode::IFREG | FileMode::ALLOW_ALL,
+                        DeviceType::NONE,
+                        FsCred::root(),
+                    )
+                },
+            )
             .expect("create_node failed");
         let file_handle = file
             .open_anonymous(&mut locked, &current_task, OpenFlags::APPEND | OpenFlags::RDWR)

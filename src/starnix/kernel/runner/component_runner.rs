@@ -185,6 +185,7 @@ pub async fn start_component(
                 let cwd_path =
                     FsString::from(get_program_string(&start_info, "cwd").unwrap_or(&pkg_path));
                 let cwd = current_task.lookup_path(
+                    locked,
                     &mut LookupContext::default(),
                     current_task.fs().root(),
                     cwd_path.as_ref(),
@@ -206,7 +207,7 @@ pub async fn start_component(
                                 errno!(EINVAL)
                             })?;
                         let mount_point =
-                            current_task.lookup_path_from_root(action.path.as_ref())?;
+                            current_task.lookup_path_from_root(locked, action.path.as_ref())?;
                         mount_record.lock().mount(
                             mount_point,
                             WhatToMount::Fs(action.fs),
@@ -334,7 +335,7 @@ where
 {
     // Checking container directory already exists.
     // If this lookup fails, the container might not have the "container" feature enabled.
-    let mount_point = system_task.lookup_path_from_root("/container/component/".into())?;
+    let mount_point = system_task.lookup_path_from_root(locked, "/container/component/".into())?;
 
     // Find /container/component/{random} that doesn't already exist
     let component_path = loop {
@@ -429,7 +430,7 @@ impl MountRecord {
         // The incoming dir_path might not be top level, e.g. it could be /foo/bar.
         // Iterate through each component directory starting from the parent and
         // create it if it doesn't exist.
-        let mut current_node = system_task.lookup_path_from_root(".".into())?;
+        let mut current_node = system_task.lookup_path_from_root(locked, ".".into())?;
         let mut context = LookupContext::default();
 
         // Extract each component using Path::new(path).components(). For example,
@@ -449,7 +450,7 @@ impl MountRecord {
             ) {
                 Ok(node) => node,
                 Err(errno) if errno == EEXIST || errno == ENOTDIR => {
-                    current_node.lookup_child(system_task, &mut context, sub_dir.into())?
+                    current_node.lookup_child(locked, system_task, &mut context, sub_dir.into())?
                 }
                 Err(e) => bail!(e),
             };

@@ -113,11 +113,12 @@ impl FsNodeOps for Arc<TaskDirectory> {
 
     fn lookup(
         &self,
+        locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        self.node_ops.lookup(node, current_task, name)
+        self.node_ops.lookup(locked, node, current_task, name)
     }
 }
 
@@ -348,6 +349,7 @@ impl FsNodeOps for FdDirectory {
 
     fn lookup(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -444,6 +446,7 @@ impl FsNodeOps for NsDirectory {
 
     fn lookup(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -564,6 +567,7 @@ impl FsNodeOps for FdInfoDirectory {
 
     fn lookup(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -628,6 +632,7 @@ impl FsNodeOps for TaskListDirectory {
 
     fn lookup(
         &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
