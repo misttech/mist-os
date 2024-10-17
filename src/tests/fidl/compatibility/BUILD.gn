@@ -76,6 +76,10 @@ test_component_labels = []
 test_harness_labels = []
 foreach(test, fidl_compatibility_tests_categories) {
   # Harness related
+  #
+  # NOTE: The harness package target names are known to the terminal
+  # product configuration, and directly used by it.
+  #
   harness_package_name = "fidl-compatibility-${test}-harness"
   generate_harness_label = "generate_${test}_harness"
   generate_harness_output = "${target_gen_dir}/${test}_harness.cml"
@@ -217,10 +221,4 @@ fuchsia_test_package("fidl_compatibility_test_package") {
 group("compatibility") {
   testonly = true
   deps = [ ":fidl_compatibility_test_package" ]
-}
-
-group("packages") {
-  testonly = true
-  impl_packages = fidl_compatibilty_test_impls
-  deps = impl_packages + test_harness_labels
 }

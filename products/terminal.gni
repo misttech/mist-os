@@ -29,18 +29,8 @@ zedboot_product_assembly_config_label = "//products/zedboot"
 
 include_shell_commands_package = true
 
-legacy_cache_package_labels = []
-
 # Add SDK tools set to "cache" so these tools are automatically available in
 # QEMU images generated for the SDK, but in cache, so they can be updated.
-legacy_cache_package_labels += [ "//sdk/bundles:tools" ]
-
-# Add test validation packages for use in tests.
-# TODO(https://fxbug.dev/42077782): Remove once we support packages in the SDK and we want to put this
-# in the SDK.
-legacy_cache_package_labels += [
-  # This is a group of 11 testing packages
-  "//src/tests/fidl/compatibility:packages",
-]
+legacy_cache_package_labels = [ "//sdk/bundles:tools" ]
 
 discoverable_package_labels = [ "//bundles/tools" ]
