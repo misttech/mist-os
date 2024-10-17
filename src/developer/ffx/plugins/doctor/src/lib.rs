@@ -15,7 +15,9 @@ use ffx_daemon::DaemonConfig;
 use ffx_doctor_args::DoctorCommand;
 use ffx_ssh::{SshKeyErrorKind, SshKeyFiles};
 use ffx_target::get_target_specifier;
-use fho::{FfxMain, FfxTool, SimpleWriter};
+use ffx_target_show::ShowTool;
+use ffx_target_show_args::TargetShow;
+use fho::{FfxMain, FfxTool, FhoEnvironment, SimpleWriter, VerifiedMachineWriter};
 use fidl::endpoints::create_proxy;
 use fidl::prelude::*;
 use fidl_fuchsia_developer_ffx::{
@@ -206,11 +208,48 @@ struct DoctorRecorderParameters {
     recorder: Arc<Mutex<dyn Recorder>>,
 }
 
+pub struct ShowToolWrapper {
+    env: FhoEnvironment,
+    inner: Option<ShowTool>,
+    target_spec: Option<String>,
+}
+
+impl ShowToolWrapper {
+    fn set_target_spec(&mut self, target_spec: Option<String>) {
+        self.target_spec = target_spec;
+    }
+
+    async fn allocate(&mut self) -> fho::Result<()> {
+        self.env.ffx.global.target = self.target_spec.clone();
+        self.inner.replace(ShowTool::from_env(self.env.clone(), TargetShow::default()).await?);
+        Ok(())
+    }
+
+    /// This requires that `allocate` is run first. This is really only to ensure that there are
+    /// two steps in the process for running an invocation of `ffx target show`.
+    async fn run(&mut self) -> fho::Result<(String, String)> {
+        let tool = self.inner.take().unwrap();
+        let buffers = fho::TestBuffers::default();
+        match tool.main(VerifiedMachineWriter::new_test(None, &buffers)).await {
+            Ok(_) => Ok(buffers.into_strings()),
+            Err(e) => Err(fho::user_error!("{}\n\tstderr: {}", e, buffers.into_stderr_str())),
+        }
+    }
+}
+
+#[async_trait(?Send)]
+impl fho::TryFromEnv for ShowToolWrapper {
+    async fn try_from_env(env: &FhoEnvironment) -> fho::Result<Self> {
+        Ok(Self { env: env.clone(), inner: None, target_spec: None })
+    }
+}
+
 #[derive(FfxTool)]
 pub struct DoctorTool {
     #[command]
     cmd: DoctorCommand,
     version_info: VersionInfo,
+    show_tool: ShowToolWrapper,
 }
 
 fho::embedded_plugin!(DoctorTool);
@@ -220,7 +259,12 @@ impl FfxMain for DoctorTool {
     type Writer = SimpleWriter;
 
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
-        doctor_cmd_impl(self.version_info, self.cmd, stdout()).await?;
+        // TODO(b/373720502): This is passing a `Some(self.show_tool)` to make it simpler not to
+        // have to update existing tests that take in a dozen arguments. The proper approach for
+        // this is to refactor `ffx doctor` to make testing things like this less cumbersome.
+        // TODO(b/373723080): Add actual tests for the usage of `ffx target show` within `ffx
+        // doctor`.
+        doctor_cmd_impl(self.version_info, self.cmd, Some(self.show_tool), stdout()).await?;
         Ok(())
     }
 }
@@ -228,6 +272,7 @@ impl FfxMain for DoctorTool {
 pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
     version_info: VersionInfo,
     cmd: DoctorCommand,
+    show_tool: Option<ShowToolWrapper>,
     mut writer: W,
 ) -> Result<()> {
     let node = overnet_core::Router::new(None)
@@ -352,6 +397,7 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
             output_dir,
             recorder: recorder.clone(),
         },
+        show_tool,
     )
     .await?;
 
@@ -430,6 +476,7 @@ async fn doctor<W: Write>(
     target_spec: Result<Option<String>, String>,
     env_context: &EnvironmentContext,
     record_params: DoctorRecorderParameters,
+    show_tool: Option<ShowToolWrapper>,
 ) -> Result<()> {
     if restart_daemon {
         doctor_daemon_restart(daemon_manager, retry_delay, ledger).await?;
@@ -443,6 +490,7 @@ async fn doctor<W: Write>(
         version_info,
         target_spec,
         env_context,
+        show_tool,
         ledger,
     )
     .await?;
@@ -851,6 +899,7 @@ async fn doctor_summary<W: Write>(
     version_info: VersionInfo,
     target_spec: Result<Option<String>, String>,
     env_context: &EnvironmentContext,
+    mut show_tool: Option<ShowToolWrapper>,
     ledger: &mut DoctorLedger<W>,
 ) -> Result<()> {
     match ledger.get_ledger_mode() {
@@ -1345,6 +1394,57 @@ async fn doctor_summary<W: Write>(
                 ledger.close(target_node)?;
                 continue;
             }
+        }
+
+        if let Some(ref mut show_tool) = show_tool.as_mut() {
+            let node = ledger
+                .add_node("Running `ffx target show` against device", LedgerMode::Automatic)?;
+            ledger.set_outcome(node, LedgerOutcome::Info)?;
+            show_tool.set_target_spec(target.nodename.clone());
+            match show_tool.allocate().await {
+                Ok(_) => {
+                    let node = ledger.add(LedgerNode::new(
+                        "Allocating proxies for `target show`".to_string(),
+                        LedgerMode::Verbose,
+                    ))?;
+                    ledger.set_outcome(node, LedgerOutcome::Success)?;
+                    match show_tool.run().await {
+                        Ok((stdout, stderr)) => {
+                            let node = ledger.add(LedgerNode::new(
+                                "Executing `ffx target show`".to_string(),
+                                LedgerMode::Verbose,
+                            ))?;
+                            ledger.set_outcome(node, LedgerOutcome::Success)?;
+                            let node = ledger.add(LedgerNode::new(
+                                format!("stdout:\n\t{}", stdout.replace("\n", "\n\t"),),
+                                LedgerMode::Verbose,
+                            ))?;
+                            ledger.set_outcome(node, LedgerOutcome::Info)?;
+                            if !stderr.is_empty() {
+                                let node = ledger.add(LedgerNode::new(
+                                    format!("stderr:\n\t{}", stderr.replace("\n", "\n\t")),
+                                    LedgerMode::Verbose,
+                                ))?;
+                                ledger.set_outcome(node, LedgerOutcome::Info)?;
+                            }
+                        }
+                        Err(e) => {
+                            let node = ledger.add_node(
+                                &format!("Error executing `target show`: {:?}", e),
+                                LedgerMode::Verbose,
+                            )?;
+                            ledger.set_outcome(node, LedgerOutcome::Failure)?;
+                        }
+                    }
+                }
+                Err(e) => {
+                    let node = ledger.add_node(
+                        &format!("Error while setting up `target show`: {:?}", e),
+                        LedgerMode::Verbose,
+                    )?;
+                    ledger.set_outcome(node, LedgerOutcome::Failure)?;
+                }
+            };
         }
 
         ledger.close(target_node)?;
@@ -2170,6 +2270,7 @@ mod test {
             Ok(Some(NODENAME.to_string())),
             &test_env.context,
             record_params_no_record(),
+            None,
         )
         .await
         .unwrap();
@@ -2234,6 +2335,7 @@ mod test {
             Ok(None),
             &test_env.context,
             record_params_no_record(),
+            None,
         )
         .await
         .unwrap();
@@ -2306,6 +2408,7 @@ mod test {
             Ok(Some("".to_string())),
             &test_env.context,
             record_params_no_record(),
+            None,
         )
         .await
         .unwrap();
@@ -2371,6 +2474,7 @@ mod test {
             Ok(Some("".to_string())),
             &test_env.context,
             record_params_no_record(),
+            None,
         )
         .await
         .unwrap();
@@ -2443,6 +2547,7 @@ mod test {
             Ok(None),
             &test_env.context,
             record_params_no_record(),
+            None,
         )
         .await
         .unwrap();
@@ -2623,6 +2728,7 @@ mod test {
             Ok(None),
             &test_env.context,
             record_params_no_record(),
+            None,
         )
         .await
         .unwrap();
@@ -2842,6 +2948,7 @@ mod test {
             Ok(None),
             &test_env.context,
             record_params_no_record(),
+            None,
         )
         .await
         .unwrap();
@@ -2926,6 +3033,7 @@ mod test {
             Ok(None),
             &test_env.context,
             record_params_no_record(),
+            None,
         )
         .await
         .unwrap();
@@ -3080,6 +3188,7 @@ mod test {
             Ok(None),
             &test_env.context,
             params,
+            None,
         )
         .await
         .unwrap();
@@ -3162,6 +3271,7 @@ mod test {
             Ok(None),
             &test_env.context,
             params,
+            None,
         )
         .await
         .is_err());
@@ -3255,6 +3365,7 @@ mod test {
             Ok(None),
             &test_env.context,
             record_params_no_record(),
+            None,
         )
         .await
         .unwrap();
@@ -3386,6 +3497,7 @@ mod test {
             Ok(None),
             &test_env.context,
             record_params_no_record(),
+            None,
         )
         .await
         .unwrap();
@@ -3461,6 +3573,7 @@ mod test {
             Ok(Some("".to_string())),
             &test_env.context,
             record_params_no_record(),
+            None,
         )
         .await
         .unwrap();
@@ -3552,6 +3665,7 @@ mod test {
             Ok(None),
             &test_env.context,
             record_params_no_record(),
+            None,
         )
         .await
         .unwrap();
