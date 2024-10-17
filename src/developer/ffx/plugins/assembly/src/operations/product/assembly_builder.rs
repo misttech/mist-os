@@ -140,6 +140,7 @@ impl ImageAssemblyConfigBuilder {
             kernel,
             platform: _,
             product: _,
+            board: _,
             packages,
             packages_to_compile,
             shell_commands,

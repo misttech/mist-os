@@ -68,6 +68,13 @@ pub struct DeveloperOverrides {
     #[serde(default)]
     pub product: serde_json::Value,
 
+    /// Developer overrides for the board configuration
+    ///
+    /// This is a 'Value' so that it can be be used to overlay the
+    /// board configuration before that's parsed into it's real type.
+    #[serde(default)]
+    pub board: serde_json::Value,
+
     /// Packages to add to the build.
     #[serde(default)]
     #[file_relative_paths]
