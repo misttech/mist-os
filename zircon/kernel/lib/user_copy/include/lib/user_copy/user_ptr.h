@@ -35,6 +35,9 @@ class user_ptr {
   static_assert(ktl::is_const<T>::value == (Policy == kIn),
                 "In pointers must be const, and Out and InOut pointers must not be const.");
 
+  static_assert(ktl::is_void_v<ValueType> || is_copy_allowed<ValueType>::value,
+                "Type must be ABI-safe.");
+
   explicit user_ptr(T* p) : ptr_(p) {}
 
   // Allow copy.

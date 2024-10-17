@@ -7,6 +7,7 @@
 #ifndef ZIRCON_KERNEL_LIB_SYSCALLS_INCLUDE_LIB_SYSCALLS_SAFE_SYSCALL_ARGUMENT_H_
 #define ZIRCON_KERNEL_LIB_SYSCALLS_INCLUDE_LIB_SYSCALLS_SAFE_SYSCALL_ARGUMENT_H_
 
+#include <lib/user_copy/user_ptr.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -50,6 +51,8 @@ template <typename T, bool Safe>
 struct SafeSyscallArgument {
   // This is the main implementation for handling integer types safely.
   static_assert(Safe);
+
+  static_assert(internal::is_copy_allowed<T>::value, "Type must be ABI-safe.");
 
   // This is the type that generated entry-point wrappers use in the argument
   // declaration.  It's always just a 64-bit integer in a register or stack.

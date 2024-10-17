@@ -9,7 +9,9 @@
 #include <lib/syscalls/zx-syscall-numbers.h>
 #include <lib/user_copy/user_ptr.h>
 #include <zircon/assert.h>
+#include <zircon/syscalls.h>
 #include <zircon/syscalls/port.h>
+#include <zircon/syscalls/smc.h>
 #include <zircon/syscalls/types.h>
 
 #include <arch/x86/hypervisor/vmx_state.h>
