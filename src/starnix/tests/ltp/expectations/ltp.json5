@@ -57,7 +57,6 @@
                 "cve-2020-11494",
                 "cve-2021-4034",
                 "cve-2022-2590",
-                "epoll_wait06",
                 "fallocate04",
 
                 // Fails due to: "No supported filesystems"
