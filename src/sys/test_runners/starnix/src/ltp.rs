@@ -90,13 +90,13 @@ fn start_command(
         },
     ];
 
-    // Copy "environ", "uid", and "seclabel" from `base_start_info`.
+    // Copy "environ", "uid", "seclabel" and "fsseclabel" from `base_start_info`.
     if let Some(fidl_fuchsia_data::Dictionary { entries: Some(entries), .. }) =
         base_start_info.program.as_ref()
     {
         for entry in entries {
             match entry.key.as_str() {
-                "environ" | "uid" | "seclabel" => {
+                "environ" | "uid" | "seclabel" | "fsseclabel" => {
                     program_entries.push(entry.clone());
                 }
                 _ => (),

@@ -56,7 +56,7 @@ fn start_selinux(
     {
         for entry in entries {
             match entry.key.as_str() {
-                "binary" | "uid" | "seclabel" => {
+                "binary" | "uid" | "seclabel" | "fsseclabel" => {
                     program_entries.push(entry.clone());
                 }
                 _ => (),

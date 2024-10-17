@@ -19,6 +19,7 @@ use runner::{get_program_string, get_program_strvec, StartInfoProgramError};
 use starnix_core::execution::execute_task_with_prerun_result;
 use starnix_core::fs::fuchsia::{create_file_from_handle, RemoteFs, SyslogFile};
 use starnix_core::task::{CurrentTask, ExitStatus, Task};
+use starnix_core::vfs::fs_args::MountParams;
 use starnix_core::vfs::{
     FdNumber, FdTable, FileSystemOptions, FsString, LookupContext, NamespaceNode, WhatToMount,
 };
@@ -79,6 +80,10 @@ pub async fn start_component(
 
     let ns = start_info.ns.take().ok_or_else(|| anyhow!("Missing namespace"))?;
 
+    // If the component specifies a filesystem security label then it will be applied to all files
+    // in all directories mounted from the component's namespace.
+    let mount_seclabel = get_program_string(&start_info, "fsseclabel");
+
     let mut maybe_pkg = None;
     let mut maybe_svc = None;
     for entry in ns {
@@ -98,6 +103,7 @@ pub async fn start_component(
                         system_task,
                         &dir_proxy,
                         &dir_path,
+                        mount_seclabel,
                     )?;
                 }
                 _ => {
@@ -107,6 +113,7 @@ pub async fn start_component(
                         system_task,
                         &dir_proxy,
                         &format!("{component_path}/{dir_path}"),
+                        mount_seclabel,
                     )?;
                     if dir_path == "/pkg" {
                         maybe_pkg = Some(dir_proxy);
@@ -423,6 +430,7 @@ impl MountRecord {
         system_task: &CurrentTask,
         directory: &fio::DirectorySynchronousProxy,
         path: &str,
+        mount_seclabel: Option<&str>,
     ) -> Result<(), Error>
     where
         L: LockBefore<FileOpsCore>,
@@ -462,10 +470,18 @@ impl MountRecord {
         let (client_end, server_end) = zx::Channel::create();
         directory.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(server_end))?;
 
+        // If a filesystem security label argument was provided then apply it to all files via
+        // mountpoint-labeling, with a "context=..." mount option.
+        let params = if let Some(security_context) = mount_seclabel {
+            MountParams::parse(format!("context={}", security_context).as_str().into()).unwrap()
+        } else {
+            MountParams::default()
+        };
+
         let fs = RemoteFs::new_fs(
             system_task.kernel(),
             client_end,
-            FileSystemOptions { source: path.into(), ..Default::default() },
+            FileSystemOptions { source: path.into(), params, ..Default::default() },
             rights,
         )?;
 
