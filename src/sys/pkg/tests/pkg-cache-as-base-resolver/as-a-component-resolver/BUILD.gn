@@ -108,6 +108,7 @@ rustc_binary("package_directory_exposer_bin") {
   name = "package_directory_exposer_bin"
   source_root = "package_directory_exposer.rs"
   deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
