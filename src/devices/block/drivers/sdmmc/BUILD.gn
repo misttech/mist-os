@@ -188,10 +188,9 @@ test("sdio-controller-test-bin") {
     ":fake-sdmmc-device",
     ":sdmmc-driver-source",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
-    "//sdk/lib/async_patterns/testing/cpp",
-    "//sdk/lib/driver/testing/cpp:cpp",
-    "//sdk/lib/inspect/testing/cpp:zxtest",
-    "//zircon/system/ulib/zxtest",
+    "//sdk/lib/driver/testing/cpp",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
   ]
 }
 
