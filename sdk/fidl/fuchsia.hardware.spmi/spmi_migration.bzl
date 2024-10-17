@@ -2,4 +2,4 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-spmi_use_new_fidl_methods = 0
+spmi_use_new_fidl_methods = 1

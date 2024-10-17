@@ -1,6 +1,7 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+#include <fidl/fuchsia.hardware.spmi/cpp/test_base.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -9,11 +10,10 @@
 
 #include <zxtest/zxtest.h>
 
-#include "fidl/fuchsia.hardware.spmi/cpp/fidl.h"
 #include "lib/zx/result.h"
 #include "spmi-ctl-impl.h"
 
-class FakeSpmi : public fidl::Server<fuchsia_hardware_spmi::Device>,
+class FakeSpmi : public fidl::testing::TestBase<fuchsia_hardware_spmi::Device>,
                  public fidl::Server<fuchsia_hardware_spmi::Debug> {
  public:
   explicit FakeSpmi(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
@@ -42,6 +42,9 @@ class FakeSpmi : public fidl::Server<fuchsia_hardware_spmi::Device>,
   }
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_spmi::Device> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override {}
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
+    FAIL();
+  }
 
   void ConnectTarget(ConnectTargetRequest& request,
                      ConnectTargetCompleter::Sync& completer) override {
