@@ -927,11 +927,11 @@ open protocol BufferCollection {
     /// [`fuchsia.sysmem2/BufferCollection.AttachLifetimeTracking`] allows a
     /// client to wait until an old buffer collection is fully or mostly
     /// deallocated before attempting allocation of a new buffer collection. The
-    /// eventpair is only signalled when the other buffers have been fully
-    /// deallocated (not just un-referenced by clients, but all the memory
-    /// consumed by those buffers has been fully reclaimed/recycled), or when
-    /// allocation or logical allocation fails for the tree or subtree including
-    /// this [`fuchsia.sysmem2/BufferCollection`].
+    /// eventpair is only signalled when the buffers of this collection have
+    /// been fully deallocated (not just un-referenced by clients, but all the
+    /// memory consumed by those buffers has been fully reclaimed/recycled), or
+    /// when allocation or logical allocation fails for the tree or subtree
+    /// including this [`fuchsia.sysmem2/BufferCollection`].
     ///
     /// The eventpair won't be signalled until allocation or logical allocation
     /// has completed; until then, the collection's current buffer count is
@@ -948,26 +948,46 @@ open protocol BufferCollection {
     /// holders of VMO handles to the buffers have closed those VMO handles.
     /// Therefore, clients should take care not to become blocked forever
     /// waiting for `ZX_EVENTPAIR_PEER_CLOSED` to be signalled if any of the
-    /// participants using the logical buffer collection are less trusted or
-    /// less reliable. Failure to allocate a new/replacement buffer collection
-    /// is much better than getting stuck forever.
+    /// participants using the logical buffer collection (including the waiter
+    /// itself) are less trusted, less reliable, or potentially blocked by the
+    /// wait itself. Waiting asynchronously is recommended. Setting a deadline
+    /// for the client wait may be prudent, depending on details of how the
+    /// collection and/or its VMOs are used or shared. Failure to allocate a
+    /// new/replacement buffer collection is better than getting stuck forever.
     ///
-    /// This mechanism is meant to be compatible with other protocols with a
-    /// similar `AttachLifetimeTracking` message; duplicates of the same
+    /// The sysmem server itself intentionally does not perform any waiting on
+    /// already-failed collections' VMOs to finish cleaning up before attempting
+    /// a new allocation, and the sysmem server intentionally doesn't retry
+    /// allocation if a new allocation fails due to out of memory, even if that
+    /// failure is potentially due to continued existence of an old collection's
+    /// VMOs. This `AttachLifetimeTracking` message is how an initiator can
+    /// mitigate too much overlap of old VMO lifetimes with new VMO lifetimes,
+    /// as long as the waiting client is careful to not create a deadlock.
+    ///
+    /// Continued existence of old collections that are still cleaning up is not
+    /// the only reason that a new allocation may fail due to insufficient
+    /// memory, even if the new allocation is allocating physically contiguous
+    /// buffers. Overall system memory pressure can also be the cause of failure
+    /// to allocate a new collection. See also
+    /// [`fuchsia.memorypressure/Provider`].
+    ///
+    /// `AttachLifetimeTracking` is meant to be compatible with other protocols
+    /// with a similar `AttachLifetimeTracking` message; duplicates of the same
     /// `eventpair` handle (server end) can be sent via more than one
     /// `AttachLifetimeTracking` message to different protocols, and the
     /// `ZX_EVENTPAIR_PEER_CLOSED` will be signalled for the client end when all
     /// the conditions are met (all holders of duplicates have closed their
     /// server end handle(s)). Also, thanks to how eventpair endponts work, the
-    /// client end can be duplicated without preventing the
+    /// client end can (also) be duplicated without preventing the
     /// `ZX_EVENTPAIR_PEER_CLOSED` signal.
     ///
-    /// The server intentionally doesn't "trust" any signals on the
+    /// The server intentionally doesn't "trust" any signals set on the
     /// `server_end`. This mechanism intentionally uses only
-    /// `ZX_EVENTPAIR_PEER_CLOSED` which can't be set "early", and is only set
-    /// when all handles to the server end eventpair are closed. No meaning is
-    /// associated with any of the other signals, and clients should ignore any
-    /// other signal bits on either end of the `eventpair`.
+    /// `ZX_EVENTPAIR_PEER_CLOSED` set on the client end, which can't be set
+    /// "early", and is only set when all handles to the server end eventpair
+    /// are closed. No meaning is associated with any of the other signals, and
+    /// clients should ignore any other signal bits on either end of the
+    /// `eventpair`.
     ///
     /// The `server_end` may lack `ZX_RIGHT_SIGNAL` or `ZX_RIGHT_SIGNAL_PEER`,
     /// but must have `ZX_RIGHT_DUPLICATE` (and must have `ZX_RIGHT_TRANSFER` to
