@@ -125,7 +125,7 @@ pub enum MarkMatcher {
         mask: u32,
         /// Start of the range, inclusive.
         start: u32,
-        /// End of the range, exclusive.
+        /// End of the range, inclusive.
         end: u32,
     },
 }
@@ -142,7 +142,7 @@ impl Matcher<Mark> for MarkMatcher {
         match self {
             MarkMatcher::Unmarked => actual.is_none(),
             MarkMatcher::Marked { mask, start, end } => {
-                actual.is_some_and(|actual| (*start..*end).contains(&(actual & *mask)))
+                actual.is_some_and(|actual| (*start..=*end).contains(&(actual & *mask)))
             }
         }
     }
@@ -453,27 +453,27 @@ mod test {
     #[test_case(MarkMatcher::Marked {
         mask: 1,
         start: 0,
-        end: 1,
+        end: 0,
     }, Mark(None) => false)]
     #[test_case(MarkMatcher::Marked {
         mask: 1,
         start: 0,
-        end: 1,
+        end: 0,
     }, Mark(Some(0)) => true)]
     #[test_case(MarkMatcher::Marked {
         mask: 1,
         start: 0,
-        end: 1,
+        end: 0,
     }, Mark(Some(1)) => false)]
     #[test_case(MarkMatcher::Marked {
         mask: 1,
         start: 0,
-        end: 1,
+        end: 0,
     }, Mark(Some(2)) => true)]
     #[test_case(MarkMatcher::Marked {
         mask: 1,
         start: 0,
-        end: 1,
+        end: 0,
     }, Mark(Some(3)) => false)]
     fn mark_matcher(matcher: MarkMatcher, mark: Mark) -> bool {
         matcher.matches(&mark)
