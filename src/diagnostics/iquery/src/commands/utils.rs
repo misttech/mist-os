@@ -5,7 +5,6 @@
 use crate::commands::types::DiagnosticsProvider;
 use crate::commands::{Command, ListCommand};
 use crate::types::Error;
-use anyhow::format_err;
 use cm_rust::SourceName;
 use component_debug::realm::*;
 use fidl_fuchsia_sys2 as fsys2;
@@ -54,93 +53,77 @@ pub async fn get_selectors_for_manifest<P: DiagnosticsProvider>(
     }
 }
 
-/// Increments the CharIndices iterator and updates the token builder
-/// in order to avoid processing characters being escaped by the selector.
-fn handle_escaped_char(
-    token_builder: &mut String,
-    selection_iter: &mut std::str::CharIndices<'_>,
-) -> Result<(), anyhow::Error> {
-    token_builder.push(selectors::ESCAPE_CHARACTER);
-    let escaped_char_option: Option<(usize, char)> = selection_iter.next();
-    match escaped_char_option {
-        Some((_, escaped_char)) => token_builder.push(escaped_char),
-        None => {
-            return Err(format_err!(
-                "Selecter fails verification due to unmatched escape character",
-            ));
-        }
-    }
-    Ok(())
+enum MonikerOrSelector {
+    Moniker,
+    Selector,
 }
 
-/// Converts a string into a vector of string tokens representing the unparsed
-/// string delimited by the provided delimiter, excluded escaped delimiters.
-fn tokenize_string(
-    untokenized_selector: &str,
-    delimiter: char,
-) -> Result<Vec<String>, anyhow::Error> {
-    let mut token_aggregator = Vec::new();
-    let mut curr_token_builder: String = String::new();
+/// Checks whether the input string is just a moniker or a full selector
+fn moniker_or_selector(untokenized_selector: &str) -> Result<MonikerOrSelector, Error> {
+    if untokenized_selector.is_empty() {
+        return Err(Error::InvalidSelector("selector strings cannot be empty".to_string()));
+    }
+
+    let mut segment_count = 1;
+    let mut found_character_in_current_segment = false;
     let mut unparsed_selector_iter = untokenized_selector.char_indices();
 
     while let Some((_, selector_char)) = unparsed_selector_iter.next() {
         match selector_char {
             escape if escape == selectors::ESCAPE_CHARACTER => {
-                handle_escaped_char(&mut curr_token_builder, &mut unparsed_selector_iter)?;
-            }
-            selector_delimiter if selector_delimiter == delimiter => {
-                if curr_token_builder.is_empty() {
-                    return Err(format_err!(
-                        "Cannot have empty strings delimited by {}",
-                        delimiter
-                    ));
+                if unparsed_selector_iter.next().is_none() {
+                    return Err(Error::InvalidSelector(format!(
+                        "escape character with no escapee: {}",
+                        untokenized_selector
+                    )));
                 }
-                token_aggregator.push(curr_token_builder);
-                curr_token_builder = String::new();
+
+                found_character_in_current_segment = true;
             }
-            _ => curr_token_builder.push(selector_char),
+            selector_delimiter if selector_delimiter == selectors::SELECTOR_DELIMITER => {
+                if !found_character_in_current_segment {
+                    return Err(Error::InvalidSelector(format!(
+                        "cannot have empty strings delimited by {}",
+                        selectors::SELECTOR_DELIMITER
+                    )));
+                }
+                segment_count += 1;
+                found_character_in_current_segment = false;
+            }
+            _ => found_character_in_current_segment = true,
         }
     }
 
-    // Push the last section of the selector into the aggregator since we don't delimit the
-    // end of the selector.
-    if curr_token_builder.is_empty() {
-        return Err(format_err!(
-            "Cannot have empty strings delimited by {}: {}",
-            delimiter,
+    // ensure that a delimiter wasn't the last thing found
+    if !found_character_in_current_segment {
+        return Err(Error::InvalidSelector(format!(
+            "cannot have empty strings delimited by {}: {}",
+            selectors::SELECTOR_DELIMITER,
             untokenized_selector
-        ));
+        )));
     }
 
-    token_aggregator.push(curr_token_builder);
-    return Ok(token_aggregator);
+    if segment_count == 1 {
+        Ok(MonikerOrSelector::Moniker)
+    } else {
+        Ok(MonikerOrSelector::Selector)
+    }
 }
 
 /// Expand selectors.
 pub fn expand_selectors(selectors: Vec<String>) -> Result<Vec<String>, Error> {
     let mut result = vec![];
     for selector in selectors {
-        match tokenize_string(&selector, selectors::SELECTOR_DELIMITER) {
-            Ok(tokens) => {
-                if tokens.len() > 1 {
-                    result.push(selector);
-                } else if tokens.len() == 1 {
-                    result.push(format!("{}:*", selector));
-                } else {
-                    return Err(Error::InvalidArguments(format!(
-                        "Iquery selectors cannot be empty strings: {:?}",
-                        selector
-                    )));
-                }
+        match moniker_or_selector(&selector)? {
+            MonikerOrSelector::Selector => {
+                result.push(selector);
             }
-            Err(e) => {
-                return Err(Error::InvalidArguments(format!(
-                    "Tokenizing a provided selector failed. Error: {:?} Selector: {:?}",
-                    e, selector
-                )));
+            MonikerOrSelector::Moniker => {
+                result.push(format!("{}:*", selector));
             }
         }
     }
+
     Ok(result)
 }
 
