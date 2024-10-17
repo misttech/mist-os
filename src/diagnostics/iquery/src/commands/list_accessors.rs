@@ -19,7 +19,7 @@ pub struct ListAccessorsCommand {}
 impl Command for ListAccessorsCommand {
     type Result = ListAccessorsResult;
 
-    async fn execute<P: DiagnosticsProvider>(&self, provider: &P) -> Result<Self::Result, Error> {
+    async fn execute<P: DiagnosticsProvider>(self, provider: &P) -> Result<Self::Result, Error> {
         let paths = provider.get_accessor_paths().await?;
         Ok(ListAccessorsResult(paths))
     }

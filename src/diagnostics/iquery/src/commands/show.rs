@@ -105,7 +105,7 @@ pub struct ShowCommand {
 impl Command for ShowCommand {
     type Result = ShowResult;
 
-    async fn execute<P: DiagnosticsProvider>(&self, provider: &P) -> Result<Self::Result, Error> {
+    async fn execute<P: DiagnosticsProvider>(self, provider: &P) -> Result<Self::Result, Error> {
         let selectors = utils::get_selectors_for_manifest(
             &self.manifest,
             &self.selectors,

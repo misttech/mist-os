@@ -6,6 +6,7 @@ use crate::commands::*;
 use crate::types::*;
 use argh::FromArgs;
 use async_trait::async_trait;
+use serde::Serialize;
 
 #[derive(FromArgs, PartialEq, Debug)]
 #[argh(subcommand)]
@@ -27,26 +28,10 @@ pub struct CommandLine {
     pub command: SubCommand,
 }
 
-// Once Generic Associated types are implemented we could have something along the lines of
-// `type Result = Box<T: Serialize>` and not rely on this macro.
-macro_rules! execute_and_format {
-    ($self:ident, $provider:ident, [$($command:ident),*]) => {
-        match &$self.command {
-            $(
-                SubCommand::$command(command) => {
-                    let result = command.execute($provider).await?;
-                    match $self.format {
-                        Format::Json => {
-                            serde_json::to_string_pretty(&result)
-                                .map_err(|e| Error::InvalidCommandResponse(e))
-                        }
-                        Format::Text => {
-                            Ok(result.to_string())
-                        }
-                    }
-                }
-            )*
-        }
+fn serialize<T: Serialize + ToString>(format: &Format, input: T) -> Result<String, Error> {
+    match format {
+        Format::Json => serde_json::to_string_pretty(&input).map_err(Error::InvalidCommandResponse),
+        Format::Text => Ok(input.to_string()),
     }
 }
 
@@ -54,7 +39,12 @@ macro_rules! execute_and_format {
 impl Command for CommandLine {
     type Result = String;
 
-    async fn execute<P: DiagnosticsProvider>(&self, provider: &P) -> Result<Self::Result, Error> {
-        execute_and_format!(self, provider, [List, ListAccessors, Selectors, Show])
+    async fn execute<P: DiagnosticsProvider>(self, provider: &P) -> Result<Self::Result, Error> {
+        match self.command {
+            SubCommand::List(c) => serialize(&self.format, c.execute(provider).await?),
+            SubCommand::ListAccessors(c) => serialize(&self.format, c.execute(provider).await?),
+            SubCommand::Selectors(c) => serialize(&self.format, c.execute(provider).await?),
+            SubCommand::Show(c) => serialize(&self.format, c.execute(provider).await?),
+        }
     }
 }

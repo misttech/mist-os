@@ -161,7 +161,7 @@ pub struct ListCommand {
 impl Command for ListCommand {
     type Result = ListResult;
 
-    async fn execute<P: DiagnosticsProvider>(&self, provider: &P) -> Result<Self::Result, Error> {
+    async fn execute<P: DiagnosticsProvider>(self, provider: &P) -> Result<Self::Result, Error> {
         let inspect = provider.snapshot::<Inspect>(&self.accessor, &[]).await?;
         let components = components_from_inspect_data(inspect);
         let results =

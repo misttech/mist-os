@@ -11,7 +11,7 @@ use std::fmt::Display;
 #[async_trait]
 pub trait Command {
     type Result: Serialize + Display;
-    async fn execute<P: DiagnosticsProvider>(&self, provider: &P) -> Result<Self::Result, Error>;
+    async fn execute<P: DiagnosticsProvider>(self, provider: &P) -> Result<Self::Result, Error>;
 }
 
 #[async_trait]
