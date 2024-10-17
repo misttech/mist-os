@@ -146,7 +146,9 @@ impl<R: SeedableRng + Rng> DiagnosticsHierarchyGetter<String> for InspectHierarc
     }
 }
 
+/// [size] must be >1.
 pub fn filled_hierarchy_generator(seed: u64, size: usize) -> InspectHierarchyGenerator<StdRng> {
+    assert!(size > 1, "Generator requires a size greater than 1");
     let inspector = Inspector::default();
     let mut hierarchy_generator =
         InspectHierarchyGenerator::new(StdRng::seed_from_u64(seed), inspector);

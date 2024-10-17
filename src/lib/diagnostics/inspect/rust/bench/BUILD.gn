@@ -3,21 +3,40 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/perf/test.gni")
 
 fuchsia_package("rust-inspect-benchmarks") {
   deps = [
-    "snapshot:snapshot-component",
+    "reader:reader-component",
     "snapshot_filter:snapshot-filter-component",
     "writer:writer-component",
   ]
 }
 
+fuchsia_component_perf_test("rust-inspect-reader-benchmark") {
+  package = ":rust-inspect-benchmarks"
+  component_name = "reader"
+  expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.rust_inspect.reader_benchmarks.txt"
+}
+
+fuchsia_component_perf_test("rust-inspect-snapshot-filter-benchmark") {
+  package = ":rust-inspect-benchmarks"
+  component_name = "snapshot_filter"
+  expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.rust_inspect.selectors.txt"
+}
+
+fuchsia_component_perf_test("rust-inspect-writer-benchmark") {
+  package = ":rust-inspect-benchmarks"
+  component_name = "writer"
+  expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.rust_inspect.benchmarks.txt"
+}
+
 group("bench") {
   testonly = true
   deps = [
-    "snapshot:rust-inspect-snapshot-benchmark",
-    "snapshot_filter:rust-inspect-snapshot-filter-benchmark",
-    "writer:rust-inspect-writer-benchmark",
+    ":rust-inspect-reader-benchmark",
+    ":rust-inspect-snapshot-filter-benchmark",
+    ":rust-inspect-writer-benchmark",
   ]
 }
 

@@ -46,3 +46,8 @@ fuchsia.rust_inspect.reader_benchmarks: UncontendedSnapshotTree/16K
 fuchsia.rust_inspect.reader_benchmarks: UncontendedSnapshotTree/1M
 fuchsia.rust_inspect.reader_benchmarks: UncontendedSnapshotTree/256K
 fuchsia.rust_inspect.reader_benchmarks: UncontendedSnapshotTree/4K
+fuchsia.rust_inspect.reader_benchmarks: SnapshotAndParse/10
+fuchsia.rust_inspect.reader_benchmarks: SnapshotAndParse/100
+fuchsia.rust_inspect.reader_benchmarks: SnapshotAndParse/1000
+fuchsia.rust_inspect.reader_benchmarks: SnapshotAndParse/10000
+fuchsia.rust_inspect.reader_benchmarks: SnapshotAndParse/100000

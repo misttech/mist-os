@@ -5,28 +5,26 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
-rustc_binary("writer-bin") {
-  name = "inspect_rust_writer_benchmarks"
+rustc_binary("reader-bin") {
+  name = "inspect_rust_reader_benchmarks"
   edition = "2018"
+  with_unit_tests = true
 
   source_root = "src/main.rs"
 
   deps = [
     "//src/developer/fuchsia-criterion",
-    "//src/lib/diagnostics/inspect/format/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/diagnostics/inspect/rust/bench/utils:fuchsia_inspect_bench_utils",
     "//src/lib/fuchsia-async",
-    "//third_party/rust_crates:num",
-    "//third_party/rust_crates:paste",
-    "//third_party/rust_crates:rand",
+    "//third_party/rust_crates:futures",
   ]
 
   sources = [ "src/main.rs" ]
 }
 
-fuchsia_component("writer-component") {
-  component_name = "writer"
-  manifest = "meta/writer.cml"
-  deps = [ ":writer-bin" ]
+fuchsia_component("reader-component") {
+  component_name = "reader"
+  manifest = "meta/reader.cml"
+  deps = [ ":reader-bin" ]
 }

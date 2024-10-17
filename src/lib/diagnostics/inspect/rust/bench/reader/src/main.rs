@@ -4,10 +4,13 @@
 
 use fuchsia_async as fasync;
 use fuchsia_criterion::criterion;
+use fuchsia_inspect::hierarchy::DiagnosticsHierarchyGetter;
 use fuchsia_inspect::reader::snapshot::{Snapshot, SnapshotTree};
 use fuchsia_inspect::{Inspector, InspectorConfig, NumericProperty};
 use futures::FutureExt;
 use std::sync::{Arc, Mutex};
+
+const HIERARCHY_GENERATOR_SEED: u64 = 0;
 
 enum InspectorState {
     Running,
@@ -149,6 +152,15 @@ fn reader_snapshot_tree_vmo_bench(b: &mut criterion::Bencher, size: usize, fille
 
     drop(proxy);
     executor.run_singlethreaded(task).unwrap();
+}
+
+fn snapshot_and_parse_bench(b: &mut criterion::Bencher, size: usize) {
+    let hierarchy_generator =
+        fuchsia_inspect_bench_utils::filled_hierarchy_generator(HIERARCHY_GENERATOR_SEED, size);
+
+    b.iter_with_large_drop(|| {
+        let _hierarchy = hierarchy_generator.get_diagnostics_hierarchy();
+    });
 }
 
 fn main() {
@@ -320,6 +332,16 @@ fn main() {
     bench = bench.with_function("SnapshotTree/VMO100PercentFull/32M", move |b| {
         reader_snapshot_tree_vmo_bench(b, 4096 * 256 * 32, 4096 * 256 * 32);
     });
+
+    for exponent in 1..=5 {
+        // This benchmark takes a snapshot of a seedable randomly generated
+        // inspect hierarchy in a vmo and then applies the given selectors
+        // to the snapshot to filter it down.
+        let size = 10i32.pow(exponent);
+        bench = bench.with_function(format!("SnapshotAndParse/{}", size), move |b| {
+            snapshot_and_parse_bench(b, size as usize);
+        });
+    }
 
     c.bench("fuchsia.rust_inspect.reader_benchmarks", bench);
 }

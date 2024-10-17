@@ -4,6 +4,6 @@
 {
     include: [ "//src/lib/diagnostics/inspect/rust/bench/meta/benchmark.shard.cml" ],
     program: {
-        binary: "bin/inspect_rust_snapshot_benchmarks",
+        binary: "bin/inspect_rust_reader_benchmarks",
     },
 }
