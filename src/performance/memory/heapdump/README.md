@@ -12,8 +12,20 @@ point in time and export them in a
   your component's manifest.
 * Add `//src/performance/memory/heapdump/collector` to the `subpackages` of
   your package.
-* Add `#include <heapdump/bind.h>` and call `heapdump_bind_with_fdio()` at the
-  beginning of `main` in your program.
+* C++: Add `#include <heapdump/bind.h>` and call `heapdump_bind_with_fdio()` at
+  the beginning of `main` in your program.
+* Rust: Add the following declaration at the global scope of your main file.
+    ```
+    #[link(name = "heapdump_instrumentation")]
+    extern "C" {
+      fn heapdump_bind_with_fdio();
+    }
+    ```
+    Then, at the beginning of your main, call
+    ```
+    unsafe { heapdump_bind_with_fdio() };
+    ```
+
 * Run your program as usual.
 * Use `ffx profile heapdump snapshot` while your program is running to take a
   snapshot of all the current live allocations. For instance, assuming that your
