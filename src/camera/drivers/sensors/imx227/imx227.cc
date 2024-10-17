@@ -86,9 +86,10 @@ zx_status_t Imx227Device::InitPdev() {
 
   // Set the GPIO to output and set them to their initial values
   // before the power up sequence.
-  fidl::WireResult cam_rst_result = gpio_cam_rst_->ConfigOut(1);
+  fidl::WireResult cam_rst_result =
+      gpio_cam_rst_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputHigh);
   if (!cam_rst_result.ok()) {
-    zxlogf(ERROR, "Failed to send ConfigOut request to gpio_cam_rst: %s",
+    zxlogf(ERROR, "Failed to send SetBufferMode request to gpio_cam_rst: %s",
            cam_rst_result.status_string());
     return cam_rst_result.status();
   }
@@ -98,9 +99,10 @@ zx_status_t Imx227Device::InitPdev() {
     return cam_rst_result->error_value();
   }
 
-  fidl::WireResult vana_enable_result = gpio_vana_enable_->ConfigOut(0);
+  fidl::WireResult vana_enable_result =
+      gpio_vana_enable_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputLow);
   if (!vana_enable_result.ok()) {
-    zxlogf(ERROR, "Failed to send ConfigOut request to gpio_vana_enable: %s",
+    zxlogf(ERROR, "Failed to send SetBufferMode request to gpio_vana_enable: %s",
            vana_enable_result.status_string());
     return vana_enable_result.status();
   }
@@ -110,9 +112,10 @@ zx_status_t Imx227Device::InitPdev() {
     return vana_enable_result->error_value();
   }
 
-  fidl::WireResult vdig_enable_result = gpio_vdig_enable_->ConfigOut(0);
+  fidl::WireResult vdig_enable_result =
+      gpio_vdig_enable_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputLow);
   if (!vdig_enable_result.ok()) {
-    zxlogf(ERROR, "Failed to send ConfigOut request to gpio_vdig_enable: %s",
+    zxlogf(ERROR, "Failed to send SetBufferMode request to gpio_vdig_enable: %s",
            vdig_enable_result.status_string());
     return vdig_enable_result.status();
   }
@@ -242,9 +245,10 @@ zx_status_t Imx227Device::HwInit() {
   TRACE_DURATION("camera", "Imx227Device::HwInit");
 
   // Power up sequence. Reference: Page 51- IMX227-0AQH5-C datasheet.
-  fidl::WireResult vana_enable_result = gpio_vana_enable_->Write(1);
+  fidl::WireResult vana_enable_result =
+      gpio_vana_enable_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputHigh);
   if (!vana_enable_result.ok()) {
-    zxlogf(ERROR, "Failed to send Write request to gpio_vana_enable: %s",
+    zxlogf(ERROR, "Failed to send SetBufferMode request to gpio_vana_enable: %s",
            vana_enable_result.status_string());
     return vana_enable_result.status();
   }
@@ -255,9 +259,10 @@ zx_status_t Imx227Device::HwInit() {
   }
   zx_nanosleep(zx_deadline_after(ZX_MSEC(50)));
 
-  fidl::WireResult vdig_enable_result = gpio_vdig_enable_->Write(1);
+  fidl::WireResult vdig_enable_result =
+      gpio_vdig_enable_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputHigh);
   if (!vdig_enable_result.ok()) {
-    zxlogf(ERROR, "Failed to send Write request to gpio_vdig_enable: %s",
+    zxlogf(ERROR, "Failed to send SetBufferMode request to gpio_vdig_enable: %s",
            vdig_enable_result.status_string());
     return vdig_enable_result.status();
   }
@@ -280,9 +285,10 @@ zx_status_t Imx227Device::HwInit() {
   }
   zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
 
-  fidl::WireResult cam_rst_result = gpio_cam_rst_->Write(0);
+  fidl::WireResult cam_rst_result =
+      gpio_cam_rst_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputLow);
   if (!cam_rst_result.ok()) {
-    zxlogf(ERROR, "Failed to send Write request to gpio_cam_rst: %s",
+    zxlogf(ERROR, "Failed to send SetBufferMode request to gpio_cam_rst: %s",
            cam_rst_result.status_string());
     return cam_rst_result.status();
   }
@@ -301,9 +307,10 @@ zx_status_t Imx227Device::HwInit() {
 zx_status_t Imx227Device::HwDeInit() {
   TRACE_DURATION("camera", "Imx227Device::HwDeInit");
 
-  fidl::WireResult cam_rst_result = gpio_cam_rst_->Write(1);
+  fidl::WireResult cam_rst_result =
+      gpio_cam_rst_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputHigh);
   if (!cam_rst_result.ok()) {
-    zxlogf(ERROR, "Failed to send Write request to gpio_cam_rst: %s",
+    zxlogf(ERROR, "Failed to send SetBufferMode request to gpio_cam_rst: %s",
            cam_rst_result.status_string());
     return cam_rst_result.status();
   }
@@ -325,9 +332,10 @@ zx_status_t Imx227Device::HwDeInit() {
   }
   zx_nanosleep(zx_deadline_after(ZX_MSEC(10)));
 
-  fidl::WireResult vdig_enable_result = gpio_vdig_enable_->Write(0);
+  fidl::WireResult vdig_enable_result =
+      gpio_vdig_enable_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputLow);
   if (!vdig_enable_result.ok()) {
-    zxlogf(ERROR, "Failed to send Write request to gpio_vdig_enable: %s",
+    zxlogf(ERROR, "Failed to send SetBufferMode request to gpio_vdig_enable: %s",
            vdig_enable_result.status_string());
     return vdig_enable_result.status();
   }
@@ -338,9 +346,10 @@ zx_status_t Imx227Device::HwDeInit() {
   }
   zx_nanosleep(zx_deadline_after(ZX_MSEC(50)));
 
-  fidl::WireResult vana_enable_result = gpio_vana_enable_->Write(0);
+  fidl::WireResult vana_enable_result =
+      gpio_vana_enable_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputLow);
   if (!vana_enable_result.ok()) {
-    zxlogf(ERROR, "Failed to send Write request to gpio_vana_enable: %s",
+    zxlogf(ERROR, "Failed to send SetBufferMode request to gpio_vana_enable: %s",
            vana_enable_result.status_string());
     return vana_enable_result.status();
   }
@@ -355,9 +364,10 @@ zx_status_t Imx227Device::HwDeInit() {
 }
 
 zx_status_t Imx227Device::CycleResetOnAndOff() {
-  fidl::WireResult cam_rst_result1 = gpio_cam_rst_->Write(1);
+  fidl::WireResult cam_rst_result1 =
+      gpio_cam_rst_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputHigh);
   if (!cam_rst_result1.ok()) {
-    zxlogf(ERROR, "Failed to send Write request to gpio_cam_rst: %s",
+    zxlogf(ERROR, "Failed to send SetBufferMode request to gpio_cam_rst: %s",
            cam_rst_result1.status_string());
     return cam_rst_result1.status();
   }
@@ -367,9 +377,10 @@ zx_status_t Imx227Device::CycleResetOnAndOff() {
     return cam_rst_result1->error_value();
   }
   zx_nanosleep(zx_deadline_after(ZX_MSEC(50)));
-  fidl::WireResult cam_rst_result2 = gpio_cam_rst_->Write(0);
+  fidl::WireResult cam_rst_result2 =
+      gpio_cam_rst_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputLow);
   if (!cam_rst_result2.ok()) {
-    zxlogf(ERROR, "Failed to send Write request to gpio_cam_rst: %s",
+    zxlogf(ERROR, "Failed to send SetBufferMode request to gpio_cam_rst: %s",
            cam_rst_result2.status_string());
     return cam_rst_result2.status();
   }
