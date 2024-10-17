@@ -303,6 +303,11 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 			if err := t.bootZedboot(ctx, imgs); err != nil {
 				return err
 			}
+		} else if os.Getenv("FUCHSIA_DEVICE_TYPE") == "Kola" {
+			// TODO(https://fxbug.dev/355507826): Remove once ffx supports flashing Kola.
+			if err := t.fastbootFlash(ctx, pbPath, imgs); err != nil {
+				return err
+			}
 		} else {
 			maxAllowedAttempts := 1
 			if t.config.MaxFlashAttempts > maxAllowedAttempts {
@@ -424,6 +429,22 @@ func getImage(imgs []bootserver.Image, label, typ string) *bootserver.Image {
 	return nil
 }
 
+func (t *Device) runFastboot(ctx context.Context, fastbootPath string, cmds [][]string) error {
+	stdout, stderr, flush := botanist.NewStdioWriters(ctx, "fastboot")
+	defer flush()
+	for _, cmdArgs := range cmds {
+		cmdArgs = append([]string{"-s", t.config.FastbootSernum}, cmdArgs...)
+		cmd := exec.CommandContext(ctx, fastbootPath, cmdArgs...)
+		cmd.Stdout = stdout
+		cmd.Stderr = stderr
+		logger.Debugf(ctx, "starting: %v", cmd.Args)
+		if err := cmd.Run(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (t *Device) bootZedboot(ctx context.Context, images []bootserver.Image) error {
 	fastboot := getImageByName(images, "exe.linux-x64_fastboot")
 	if fastboot == nil {
@@ -445,14 +466,47 @@ func (t *Device) bootZedboot(ctx context.Context, images []bootserver.Image) err
 	if err != nil {
 		return err
 	}
-	cmd := exec.CommandContext(ctx, fastboot.Path, "-s", t.config.FastbootSernum, "boot", combinedZBIVBMeta)
-	stdout, stderr, flush := botanist.NewStdioWriters(ctx, "fastboot")
-	defer flush()
-	cmd.Stdout = stdout
-	cmd.Stderr = stderr
-	logger.Debugf(ctx, "starting: %v", cmd.Args)
-	err = cmd.Run()
+	err = t.runFastboot(ctx, fastboot.Path, [][]string{{"boot", combinedZBIVBMeta}})
 	logger.Debugf(ctx, "done booting zedboot")
+	return err
+}
+
+// fastbootFlash runs fastboot commands directly to flash the device.
+// TODO(https://fxbug.dev/355507826): Add support for provisioning SSH keys.
+func (t *Device) fastbootFlash(ctx context.Context, pbPath string, images []bootserver.Image) error {
+	fastboot := getImageByName(images, "exe.linux-x64_fastboot")
+	if fastboot == nil {
+		return errors.New("fastboot not found")
+	}
+
+	zbi, err := t.ffx.GetImageFromPB(ctx, pbPath, "a", "zbi", "")
+	if err != nil {
+		return err
+	}
+	if zbi == nil {
+		return fmt.Errorf("failed to find zbi image from product bundle %s", pbPath)
+	}
+
+	fvmImage, err := t.ffx.GetImageFromPB(ctx, pbPath, "a", "fvm", "")
+	if err != nil {
+		return err
+	}
+	if fvmImage == nil {
+		fvmImage, err = t.ffx.GetImageFromPB(ctx, pbPath, "a", "fxfs", "")
+		if err != nil {
+			return err
+		}
+	}
+	cmds := [][]string{
+		{"flash", "boot_a", zbi.Path},
+		{"flash", "boot_b", zbi.Path},
+	}
+	if fvmImage != nil {
+		cmds = append(cmds, []string{"flash", "super", fvmImage.Path})
+	}
+	cmds = append(cmds, []string{"reboot"})
+	err = t.runFastboot(ctx, fastboot.Path, cmds)
+	logger.Debugf(ctx, "done flashing")
 	return err
 }
 
