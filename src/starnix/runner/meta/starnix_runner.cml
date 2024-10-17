@@ -70,6 +70,8 @@
                 "fuchsia.net.interfaces.admin.Installer",
                 "fuchsia.net.interfaces.State",
                 "fuchsia.net.root.Interfaces",
+                "fuchsia.net.routes.admin.RouteTableProviderV4",
+                "fuchsia.net.routes.admin.RouteTableProviderV6",
                 "fuchsia.net.routes.admin.RouteTableV4",
                 "fuchsia.net.routes.admin.RouteTableV6",
                 "fuchsia.net.routes.StateV4",
