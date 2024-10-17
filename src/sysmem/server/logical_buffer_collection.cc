@@ -1676,6 +1676,36 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo, Error> LogicalBufferColl
     }
   }
 
+  // Notes on memory pressure:
+  //
+  // See fuchsia.sysmem2/BufferCollection.AttachLifetimeTracking for a way for a client to wait for
+  // old/failed collections' VMOs to finish deleting (see also the caveats in the doc comments on
+  // that message). This can be used to avoid overlap between an old collection lifetime and a new
+  // collection lifetime when both collections are known to the same client.
+  //
+  // Currently, we don't detect (here) and wait (async) for any failed collections to be done
+  // deleting their buffers before attempting allocation of this new collection. If we were to do so
+  // here by returning Error::kPending and waiting async, we'd need to use a short deadline because
+  // client threads commonly call WaitForAllBuffersAllocated synchronously, which can prevent that
+  // thread from closing an old VMO handle until after this new allocation succeeds. Such a wait
+  // without a short deadline could create a deadlock. In contrast, with AttachLifetimeTracking, a
+  // client can basically promise (per doc comment warnings) that it won't end up creating such a
+  // deadlock, and/or can set its own deadline to mitigate the possibility.
+  //
+  // Currently we also don't pay attention to fuchsia.memorypressure/Level here. As/when needed, we
+  // potentially could coordinate with zircon to pre-roll a change in fuchsia.memorypressure/Level
+  // before actually attempting to allocate the memory (presumably with a short async wait started
+  // roughly here if the pressure level is increasing). So far, we don't want to intentionally fail
+  // the new allocation here when pressure is WARNING or CRITICAL, since the fuchsia memory pressure
+  // strategy (at least so far) is to use fuchsia.memorypressure signalling to clean up old stuff
+  // ASAP rather than fail new stuff (which this allocation is).
+  //
+  // Old failed sysmem collections that haven't finished cleaning up aren't the only reason that a
+  // new allocation may fail due to insufficient memory, even when the new allocation is allocating
+  // physically-contiguous buffers (or protected buffers), as physically-contiguous pages can be
+  // loaned to zircon when not in use using VMO range decommit, and success of re-commit isn't
+  // guaranteed.
+
   auto combine_result = CombineConstraints(&constraints_list);
   if (!combine_result.is_ok()) {
     // It's impossible to combine the constraints due to incompatible
