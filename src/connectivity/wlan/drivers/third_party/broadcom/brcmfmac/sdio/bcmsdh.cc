@@ -76,20 +76,39 @@ static void brcmf_sdiod_dummy_irqhandler(struct brcmf_sdio_dev* sdiodev) {}
 
 zx_status_t brcmf_sdiod_configure_oob_interrupt(struct brcmf_sdio_dev* sdiodev,
                                                 wifi_config_t* config) {
-  fidl::WireResult cfg_result = sdiodev->fidl_gpios[WIFI_OOB_IRQ_GPIO_INDEX]->ConfigIn(
-      fuchsia_hardware_gpio::GpioFlags::kNoPull);
+  fidl::WireResult cfg_result = sdiodev->fidl_gpios[WIFI_OOB_IRQ_GPIO_INDEX]->SetBufferMode(
+      fuchsia_hardware_gpio::BufferMode::kInput);
   if (!cfg_result.ok()) {
-    BRCMF_ERR("Setting No Pull on IRQ GPIO failed: %s", cfg_result.FormatDescription().c_str());
+    BRCMF_ERR("Setting IRQ GPIO to input failed: %s", cfg_result.FormatDescription().c_str());
     return cfg_result.status();
   }
   if (cfg_result->is_error()) {
-    BRCMF_ERR("Failed to set No Pull on IRQ GPIO: %s",
+    BRCMF_ERR("Failed to set IRQ GPIO to input: %s",
               zx_status_get_string(cfg_result->error_value()));
     return cfg_result->error_value();
   }
 
-  fidl::WireResult irq_result =
-      sdiodev->fidl_gpios[WIFI_OOB_IRQ_GPIO_INDEX]->GetInterrupt(config->oob_irq_mode);
+  const fuchsia_hardware_gpio::InterruptMode interrupt_mode =
+      config->oob_irq_mode == ZX_INTERRUPT_MODE_LEVEL_LOW
+          ? fuchsia_hardware_gpio::InterruptMode::kLevelLow
+          : fuchsia_hardware_gpio::InterruptMode::kLevelHigh;
+
+  fidl::Arena arena;
+  auto interrupt_config = fuchsia_hardware_gpio::wire::InterruptConfiguration::Builder(arena)
+                              .mode(interrupt_mode)
+                              .Build();
+  fidl::WireResult configure_result =
+      sdiodev->fidl_gpios[WIFI_OOB_IRQ_GPIO_INDEX]->ConfigureInterrupt(interrupt_config);
+  if (!configure_result.ok()) {
+    BRCMF_ERR("Configuring IRQ GPIO failed: %s", configure_result.FormatDescription().c_str());
+    return configure_result.status();
+  } else if (configure_result->is_error()) {
+    BRCMF_ERR("Failed to configure IRQ GPIO: %s",
+              zx_status_get_string(configure_result->error_value()));
+    return configure_result->error_value();
+  }
+
+  fidl::WireResult irq_result = sdiodev->fidl_gpios[WIFI_OOB_IRQ_GPIO_INDEX]->GetInterrupt2({});
   if (!irq_result.ok()) {
     BRCMF_ERR("Get Interrupt on IRQ GPIO failed: %s", irq_result.FormatDescription().c_str());
     return irq_result.status();
@@ -100,7 +119,7 @@ zx_status_t brcmf_sdiod_configure_oob_interrupt(struct brcmf_sdio_dev* sdiodev,
               zx_status_get_string(irq_result->error_value()));
     return irq_result->error_value();
   }
-  zx::interrupt gpio_irq_handle = std::move(irq_result.value()->irq);
+  zx::interrupt gpio_irq_handle = std::move(irq_result.value()->interrupt);
   sdiodev->irq_handle = gpio_irq_handle.release();
   return ZX_OK;
 }

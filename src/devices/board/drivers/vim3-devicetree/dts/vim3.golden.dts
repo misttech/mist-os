@@ -750,6 +750,12 @@
 				phandle = <0x1b>;
 				pins = <0x48>;
 			};
+
+			wifi-pins {
+				bias-disable;
+				phandle = <0x38>;
+				pins = <0x3f>;
+			};
 		};
 
 		gpu@ffe40000 {
@@ -1063,5 +1069,6 @@
 		compatible = "broadcom,bcm4359";
 		gpio-names = "WIFI_WAKE_HOST";
 		gpios = <0x06 0x3f 0x00>;
+		pinctrl-0 = <0x38>;
 	};
 };

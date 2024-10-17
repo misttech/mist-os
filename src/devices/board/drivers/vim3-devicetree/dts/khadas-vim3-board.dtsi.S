@@ -194,6 +194,7 @@
 		compatible = "broadcom,bcm4359";
 		gpios = <&gpio A311D_GPIOX(7) 0>;
 		gpio-names = "WIFI_WAKE_HOST";
+		pinctrl-0 = <&wifi_pins>;
 	};
 
 	gpio_header {
@@ -228,6 +229,11 @@
 		pins = <A311D_GPIOAO(8)>;
 		bias-pull-up;
 		output-disable;
+	};
+
+	wifi_pins: wifi-pins {
+		pins = <A311D_GPIOX(7)>;
+		bias-disable;
 	};
 };
 

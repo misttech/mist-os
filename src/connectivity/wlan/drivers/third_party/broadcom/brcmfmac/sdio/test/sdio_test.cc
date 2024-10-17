@@ -228,8 +228,9 @@ TEST_F(SdioTest, IntrRegisterUnregister) {
 
   EXPECT_OK(brcmf_sdiod_intr_register(&sdio_dev, false));
 
-  EXPECT_EQ(wifi_gpio.SyncCall(&fake_gpio::FakeGpio::GetReadFlags),
-            fuchsia_hardware_gpio::GpioFlags::kNoPull);
+  auto wifi_gpio_states = wifi_gpio.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
+  ASSERT_GT(wifi_gpio_states.size(), 0);
+  EXPECT_TRUE(std::holds_alternative<fake_gpio::ReadSubState>(wifi_gpio_states.back().sub_state));
   sdio1.VerifyAndClear();
   sdio2.VerifyAndClear();
 
