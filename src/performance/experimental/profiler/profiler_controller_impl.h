@@ -44,7 +44,7 @@ class ProfilerControllerImpl : public fidl::Server<fuchsia_cpu_profiler::Session
 
   TargetTree targets_;
   std::vector<fuchsia_cpu_profiler::SamplingConfig> sample_specs_;
-  std::unique_ptr<Component> component_target_;
+  std::unique_ptr<ComponentTarget> component_target_;
 };
 }  // namespace profiler
 

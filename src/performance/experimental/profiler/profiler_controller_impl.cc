@@ -333,8 +333,8 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
             moniker = "./core/ffx-laboratory:" + name;
           }
 
-          zx::result<std::unique_ptr<profiler::Component>> res =
-              profiler::Component::Create(dispatcher_, url, moniker);
+          zx::result<std::unique_ptr<profiler::ComponentTarget>> res =
+              profiler::ControlledComponent::Create(dispatcher_, url, moniker);
           if (res.is_error()) {
             FX_PLOGS(INFO, res.error_value())
                 << "No access to fuchsia.sys2.LifecycleController.root. Component launching and attaching is disabled";
@@ -367,8 +367,12 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
 
         case fuchsia_cpu_profiler::AttachConfig::Tag::kAttachToComponentMoniker: {
           auto attach_moniker = attach_config->attach_to_component_moniker();
-          zx::result<std::unique_ptr<profiler::Component>> res =
+          zx::result<std::unique_ptr<profiler::ComponentTarget>> res =
               profiler::UnownedComponent::Create(dispatcher_, attach_moniker, std::nullopt);
+          if (res.is_error()) {
+            FX_PLOGS(ERROR, res.error_value())
+                << "Failed to attach to component: " << attach_moniker.value_or("<unspecified>");
+          }
           if (res.is_error()) {
             completer.Reply(
                 fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
@@ -379,7 +383,7 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
         }
         case fuchsia_cpu_profiler::AttachConfig::Tag::kAttachToComponentUrl: {
           auto attach_url = attach_config->attach_to_component_url();
-          zx::result<std::unique_ptr<profiler::Component>> res =
+          zx::result<std::unique_ptr<profiler::ComponentTarget>> res =
               profiler::UnownedComponent::Create(dispatcher_, std::nullopt, attach_url);
           if (res.is_error()) {
             completer.Reply(

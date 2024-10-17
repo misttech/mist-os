@@ -18,17 +18,16 @@
 namespace profiler {
 
 class TestComponent : public fidl::AsyncEventHandler<fuchsia_test_manager::SuiteController>,
-                      public Component {
+                      public ComponentTarget {
  public:
   using OnStartedHandler = fit::function<void(zx_koid_t job_id, std::string name)>;
 
   explicit TestComponent(async_dispatcher_t* dispatcher, std::string url,
                          std::optional<fuchsia_test_manager::RunSuiteOptions> options)
-      : Component(dispatcher), dispatcher_(dispatcher), options_(std::move(options)) {
-    url_ = std::move(url);
-    component_watcher_ = ComponentWatcher{dispatcher_};
-    needs_destruction_ = false;
-  }
+      : dispatcher_{dispatcher},
+        options_{std::move(options)},
+        url_{std::move(url)},
+        component_watcher_{dispatcher} {}
   TestComponent(TestComponent&&) = delete;
   TestComponent(const TestComponent&) = delete;
 
@@ -36,7 +35,7 @@ class TestComponent : public fidl::AsyncEventHandler<fuchsia_test_manager::Suite
       async_dispatcher_t* dispatcher, std::string url,
       std::optional<fuchsia_test_manager::RunSuiteOptions> options);
 
-  zx::result<> Start(ComponentWatcher::ComponentEventHandler component_handler) override;
+  zx::result<> Start(ComponentWatcher::ComponentEventHandler on_start) override;
   zx::result<> Stop() override;
   zx::result<> Destroy() override;
 
@@ -49,8 +48,10 @@ class TestComponent : public fidl::AsyncEventHandler<fuchsia_test_manager::Suite
   fidl::SyncClient<fuchsia_test_manager::SuiteRunner> suite_runner_;
   fidl::Client<fuchsia_test_manager::SuiteController> suite_controller_;
   std::optional<fuchsia_test_manager::RunSuiteOptions> options_;
+  std::string url_;
 
-  std::string suite_name_;
+  ComponentWatcher component_watcher_;
+  std::optional<ComponentWatcher::ComponentEventHandler> on_start_;
 };
 }  // namespace profiler
 #endif  // SRC_PERFORMANCE_EXPERIMENTAL_PROFILER_TEST_COMPONENT_H_
