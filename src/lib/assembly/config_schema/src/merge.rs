@@ -12,20 +12,30 @@ pub fn try_merge_into<T: DeserializeOwned>(base: Value, overrides: Value) -> Res
 }
 
 fn merge(base: Value, value: Value) -> Value {
-    match (base, value) {
-        (base, Value::Null) => {
+    merge_or_append(base, value, /*append=*/ false)
+}
+
+fn merge_or_append(base: Value, value: Value, append: bool) -> Value {
+    match (base, value, append) {
+        (base, Value::Null, _) => {
             // Override value is nothing, so nothing to do.
             base
         }
-        (Value::Object(mut merged), Value::Object(overrides)) => {
+        (Value::Object(mut merged), Value::Object(overrides), _) => {
             // Both are maps/dicts, so do a key-wise merging.
             for (key, value) in overrides {
+                let (key, append) = if let Some(real_key) = key.strip_prefix("__append_to_") {
+                    (real_key.to_string(), true)
+                } else {
+                    (key, false)
+                };
+
                 // Remove the existing value, so that it can be merged before re-inserting.
                 let existing = merged.remove(&key);
                 match existing {
                     Some(existing) => {
                         // If there's already a value, recursively merge the override value.
-                        merged.insert(key, merge(existing, value));
+                        merged.insert(key, merge_or_append(existing, value, append));
                     }
                     None => {
                         // If there's not an existing value, just use the override value.
@@ -35,7 +45,11 @@ fn merge(base: Value, value: Value) -> Value {
             }
             Value::Object(merged)
         }
-        (_, value) => {
+        (Value::Array(mut merged), Value::Array(mut overrides), /*append=*/ true) => {
+            merged.append(&mut overrides);
+            Value::Array(merged)
+        }
+        (_, value, _) => {
             // Either the override or the base value is a non-mergeable type,
             // so just return the override value.
             value
@@ -196,6 +210,40 @@ mod tests {
                 }),
                 json!({
                   "key2": {}
+                })
+            )
+        );
+    }
+
+    #[test]
+    fn test_merge_override_list() {
+        assert_eq!(
+            json!({
+                "key1": [ "value2" ],
+            }),
+            merge(
+                json!({
+                    "key1": [ "value1" ],
+                }),
+                json!({
+                    "key1": [ "value2" ],
+                })
+            )
+        );
+    }
+
+    #[test]
+    fn test_merge_append_lists() {
+        assert_eq!(
+            json!({
+                "key1": [ "value1", "value2" ],
+            }),
+            merge(
+                json!({
+                    "key1": [ "value1" ],
+                }),
+                json!({
+                    "__append_to_key1": [ "value2" ],
                 })
             )
         );
