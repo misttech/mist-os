@@ -235,7 +235,7 @@ async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
 
     // Try to connect to the repository. This should succeed if we have at least some root metadata
     // in the repository. If none exists, we'll create a new repository.
-    let client = get_client(cmd, &repo).await?;
+    let client = get_client(&repo, cmd.trusted_root.as_ref()).await?;
     let mut repo_builder = if let Some(client) = &client {
         RepoBuilder::from_database(&repo, &repo_trusted_keys, client.database())
     } else {
@@ -315,10 +315,10 @@ async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
 }
 
 async fn get_trusted_root(
-    cmd: &RepoPublishCommand,
     repo: &PmRepository,
+    trusted_root: Option<&Utf8PathBuf>,
 ) -> Result<Option<RawSignedMetadata<Pouf1, RootMetadata>>> {
-    if let Some(trusted_root_path) = &cmd.trusted_root {
+    if let Some(trusted_root_path) = trusted_root {
         let buf = async_fs::read(&trusted_root_path)
             .await
             .with_context(|| format!("reading trusted root {trusted_root_path}"))?;
@@ -357,10 +357,10 @@ async fn get_trusted_root(
 /// Try to connect to the repository. This should succeed if we have at least
 /// some root metadata in the repository.
 async fn get_client<'a>(
-    cmd: &'a RepoPublishCommand,
     repo: &'a PmRepository,
+    trusted_root: Option<&Utf8PathBuf>,
 ) -> Result<Option<RepoClient<&'a PmRepository>>> {
-    let Some(trusted_root) = get_trusted_root(cmd, repo).await? else {
+    let Some(trusted_root) = get_trusted_root(repo, trusted_root).await? else {
         return Ok(None);
     };
 
