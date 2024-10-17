@@ -46,6 +46,11 @@
             scope: "#echo_test_coll",
         },
         {
+            dictionary: "diagnostics",
+            from: "parent",
+            to: "all",
+        },
+        {
             event_stream: [ "capability_requested" ],
             from: "parent",
             to: "#hermetic_test_coll",
