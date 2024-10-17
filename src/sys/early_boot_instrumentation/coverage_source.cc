@@ -8,7 +8,7 @@
 #include <fcntl.h>
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.debugdata/cpp/wire.h>
-#include <fidl/fuchsia.io/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/fdio/io.h>
 #include <lib/fidl/cpp/wire/channel.h>
@@ -197,8 +197,40 @@ zx::result<> ExposeBootDebugdata(fbl::unique_fd& debugdata_root, SinkDirMap& sin
 
 namespace {
 
-class Server : public fidl::WireServer<fuchsia_boot::SvcStash>,
-               public fidl::WireServer<fuchsia_io::Openable>,
+constexpr const char* kPublisherPath = fidl::DiscoverableProtocolName<fuchsia_debugdata::Publisher>;
+
+/// Server which forwards requests for the debugdata.Publisher service to the Connect function.
+class StashPublisherBridge : public fidl::testing::WireTestBase<fuchsia_io::Directory> {
+ public:
+  virtual void Connect(fidl::ServerEnd<fuchsia_debugdata::Publisher> server_end) = 0;
+
+ private:
+  void HandleOpenRequest(std::string_view path, zx::channel channel) {
+    if (path == kPublisherPath) {
+      Connect(fidl::ServerEnd<fuchsia_debugdata::Publisher>{std::move(channel)});
+    } else {
+      FX_LOGS(WARNING) << "Encountered open request to unhandled path: " << path;
+    }
+  }
+
+  void Open(OpenRequestView request, OpenCompleter::Sync& completer) final {
+    HandleOpenRequest(request->path.get(), request->object.TakeChannel());
+  }
+
+  void Open3(Open3RequestView request, Open3Completer::Sync& completer) final {
+    HandleOpenRequest(request->path.get(), std::move(request->object));
+  }
+
+  // We use wire test base to avoid churn when new directory methods are added/removed. These
+  // methods should never be called, since we only support opening a specific path.
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) final {
+    FX_LOGS(ERROR) << "Unsupported method: " << name;
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+};
+
+class Server : public StashPublisherBridge,
+               public fidl::WireServer<fuchsia_boot::SvcStash>,
                public fidl::WireServer<fuchsia_debugdata::Publisher> {
  public:
   explicit Server(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
@@ -236,26 +268,19 @@ class Server : public fidl::WireServer<fuchsia_boot::SvcStash>,
     ++req_id_;
   }
 
-  void Open(OpenRequestView request, OpenCompleter::Sync& completer) override {
-    if (request->path.get() == fidl::DiscoverableProtocolName<fuchsia_debugdata::Publisher>) {
-      FX_LOGS(INFO) << "Encountered open request to debugdata.Publisher";
-      publisher_bindings_.AddBinding(
-          dispatcher_, fidl::ServerEnd<fuchsia_debugdata::Publisher>{request->object.TakeChannel()},
-          this, fidl::kIgnoreBindingClosure);
-    } else {
-      FX_LOGS(INFO) << "Encountered open request to unhandled path: " << request->path.get();
-    }
+  void Connect(fidl::ServerEnd<fuchsia_debugdata::Publisher> server_end) override {
+    FX_LOGS(INFO) << "Encountered open request to " << kPublisherPath;
+    publisher_bindings_.AddBinding(dispatcher_, std::move(server_end), this,
+                                   fidl::kIgnoreBindingClosure);
   }
 
   void Store(StoreRequestView request, StoreCompleter::Sync& completer) override {
     FX_LOGS(INFO) << "Encountered stashed svc handle";
-    fidl::ServerEnd<fuchsia_io::Directory>& directory = request->svc_endpoint;
-    openable_bindings_.AddBinding(dispatcher_,
-                                  fidl::ServerEnd<fuchsia_io::Openable>{directory.TakeChannel()},
-                                  this, [](Server* impl, fidl::UnbindInfo) {
-                                    impl->req_id_ = 0;
-                                    impl->svc_id_++;
-                                  });
+    directory_bindings_.AddBinding(dispatcher_, std::move(request->svc_endpoint), this,
+                                   [](Server* impl, fidl::UnbindInfo) {
+                                     impl->req_id_ = 0;
+                                     impl->svc_id_++;
+                                   });
   }
 
   async_dispatcher_t* const dispatcher_;
@@ -265,7 +290,7 @@ class Server : public fidl::WireServer<fuchsia_boot::SvcStash>,
   int svc_id_ = 0;
   int req_id_ = 0;
 
-  fidl::ServerBindingGroup<fuchsia_io::Openable> openable_bindings_;
+  fidl::ServerBindingGroup<fuchsia_io::Directory> directory_bindings_;
   fidl::ServerBindingGroup<fuchsia_debugdata::Publisher> publisher_bindings_;
 };
 
