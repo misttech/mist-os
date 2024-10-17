@@ -60,9 +60,10 @@ group("blackout_workbench_vim3_unstable") {
 group("blackout_starnix_vim3_unstable") {
   testonly = true
   deps = [
+    # TODO(https://fxbug.dev/374115486): Starnix based suspend-resume will not work anymore after fxr/1128713
     # Fxfs tests
-    ":blackout_fxfs_tree_idle_suspend_timer_resume($host_toolchain)",
-    "//src/storage/blackout/target/fs-tree:blackout-fxfs-tree",
+    # ":blackout_fxfs_tree_idle_suspend_timer_resume($host_toolchain)",
+    # "//src/storage/blackout/target/fs-tree:blackout-fxfs-tree",
   ]
 }
 
@@ -74,9 +75,10 @@ group("blackout_starnix_vim3_stable") {
 group("blackout_starnix_arm64_unstable") {
   testonly = true
   deps = [
+    # TODO(https://fxbug.dev/374115486): Starnix based suspend-resume will not work anymore after fxr/1128713
     # Fxfs tests
-    ":blackout_fxfs_tree_idle_suspend_timer_resume($host_toolchain)",
-    "//src/storage/blackout/target/fs-tree:blackout-fxfs-tree",
+    # ":blackout_fxfs_tree_idle_suspend_timer_resume($host_toolchain)",
+    # "//src/storage/blackout/target/fs-tree:blackout-fxfs-tree",
   ]
 }
 
