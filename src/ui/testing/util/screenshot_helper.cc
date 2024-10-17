@@ -23,6 +23,8 @@
 namespace ui_testing {
 namespace {
 
+using fuchsia::ui::composition::ScreenshotFormat;
+
 constexpr uint64_t kBytesPerPixel = 4;
 constexpr uint8_t kPNGHeaderBytes = 8;
 
@@ -34,7 +36,8 @@ struct libpng_vmo {
 
 }  // namespace
 
-Screenshot::Screenshot(const zx::vmo& screenshot_vmo, uint64_t width, uint64_t height, int rotation)
+Screenshot::Screenshot(const zx::vmo& screenshot_vmo, uint64_t width, uint64_t height, int rotation,
+                       ScreenshotFormat format)
     : width_(width), height_(height) {
   if (rotation == 90 || rotation == 270) {
     std::swap(width_, height_);
@@ -53,7 +56,7 @@ Screenshot::Screenshot(const zx::vmo& screenshot_vmo, uint64_t width, uint64_t h
 
   FX_CHECK(status == ZX_OK);
 
-  ExtractScreenshotFromVMO(vmo_host);
+  ExtractScreenshotFromVMO(vmo_host, format);
 
   // Unmap the pointer.
   uintptr_t address = reinterpret_cast<uintptr_t>(vmo_host);
@@ -265,16 +268,17 @@ std::vector<std::pair<uint32_t, utils::Pixel>> Screenshot::LogHistogramTopPixels
   return top;
 }
 
-void Screenshot::ExtractScreenshotFromVMO(uint8_t* screenshot_vmo) {
+void Screenshot::ExtractScreenshotFromVMO(uint8_t* screenshot_vmo, ScreenshotFormat format) {
   FX_CHECK(screenshot_vmo);
 
   for (size_t i = 0; i < height_; i++) {
     // The head index of the ith row in the screenshot is |i* width_* KbytesPerPixel|.
-    screenshot_.push_back(GetPixelsInRow(screenshot_vmo, i));
+    screenshot_.push_back(GetPixelsInRow(screenshot_vmo, i, format));
   }
 }
 
-std::vector<Pixel> Screenshot::GetPixelsInRow(uint8_t* screenshot_vmo, size_t row_index) {
+std::vector<Pixel> Screenshot::GetPixelsInRow(uint8_t* screenshot_vmo, size_t row_index,
+                                              ScreenshotFormat format) const {
   std::vector<Pixel> row;
 
   for (size_t col_idx = 0; col_idx < static_cast<size_t>(width_ * kBytesPerPixel);
@@ -284,18 +288,21 @@ std::vector<Pixel> Screenshot::GetPixelsInRow(uint8_t* screenshot_vmo, size_t ro
     // kBytesPerPixel| positions.
     auto pixel_start_index = row_index * width_ * kBytesPerPixel;
 
-    // Every |kBytesPerPixel| bytes represents the BGRA values of a pixel. Skip |kBytesPerPixel|
-    // bytes
-    // to get to the BGRA values of the next pixel. Each row in a screenshot has |kBytesPerPixel *
-    // width_| bytes of data.
-    // Example:-
-    // auto data = TakeScreenshot();
-    // data[0-3] -> RGBA of pixel 0.
-    // data[4-7] -> RGBA pf pixel 1.
-    row.emplace_back(screenshot_vmo[pixel_start_index + col_idx],
-                     screenshot_vmo[pixel_start_index + col_idx + 1],
-                     screenshot_vmo[pixel_start_index + col_idx + 2],
-                     screenshot_vmo[pixel_start_index + col_idx + 3]);
+    // Every |kBytesPerPixel| bytes represents the BGRA/RGBA values of a pixel. Skip
+    // |kBytesPerPixel| bytes to get to the BGRA/RGBA values of the next pixel. Each row in a
+    // screenshot has |kBytesPerPixel * width_| bytes of data. Example:- auto data =
+    // TakeScreenshot(); data[0-3] -> RGBA of pixel 0. data[4-7] -> RGBA pf pixel 1.
+    if (format == ScreenshotFormat::RGBA_RAW) {
+      row.emplace_back(screenshot_vmo[pixel_start_index + col_idx + 2],
+                       screenshot_vmo[pixel_start_index + col_idx + 1],
+                       screenshot_vmo[pixel_start_index + col_idx],
+                       screenshot_vmo[pixel_start_index + col_idx + 3]);
+    } else {
+      row.emplace_back(screenshot_vmo[pixel_start_index + col_idx],
+                       screenshot_vmo[pixel_start_index + col_idx + 1],
+                       screenshot_vmo[pixel_start_index + col_idx + 2],
+                       screenshot_vmo[pixel_start_index + col_idx + 3]);
+    }
   }
 
   return row;

@@ -5,12 +5,14 @@
 #include "src/ui/scenic/lib/screenshot/flatland_screenshot.h"
 
 #include <fidl/fuchsia.ui.composition/cpp/hlcpp_conversion.h>
+#include <fuchsia/images2/cpp/fidl.h>
 #include <lib/fdio/directory.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
 #include <optional>
+#include <string>
 
 #include "src/ui/scenic/lib/allocation/allocator.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
@@ -32,6 +34,17 @@ namespace {
 
 constexpr uint32_t kBufferIndex = 0;
 constexpr auto kBytesPerPixel = 4;
+
+fuchsia::images2::PixelFormat CompositionToImages2Format(ScreenshotFormat format) {
+  switch (format) {
+    case ScreenshotFormat::kBgraRaw:
+      return fuchsia::images2::PixelFormat::B8G8R8A8;
+    case ScreenshotFormat::kRgbaRaw:
+      return fuchsia::images2::PixelFormat::R8G8B8A8;
+    default:
+      return fuchsia::images2::PixelFormat::INVALID;
+  }
+}
 
 }  // namespace
 
@@ -66,6 +79,12 @@ FlatlandScreenshot::FlatlandScreenshot(
   FX_DCHECK(status == ZX_OK);
   init_wait_ = std::make_shared<async::WaitOnce>(init_event_.get(), ZX_EVENT_SIGNALED);
 
+  if (display_rotation_ == 90 || display_rotation_ == 270) {
+    std::swap(display_size_.width, display_size_.height);
+  }
+}
+
+void FlatlandScreenshot::AllocateBuffers() {
   // Do all sysmem initialization up front.
   allocation::BufferCollectionImportExportTokens ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
@@ -79,7 +98,7 @@ FlatlandScreenshot::FlatlandScreenshot(
   fuchsia::sysmem2::BufferCollectionTokenDuplicateRequest dup_request;
   dup_request.set_rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
   dup_request.set_token_request(dup_token.NewRequest());
-  status = local_token->Duplicate(std::move(dup_request));
+  zx_status_t status = local_token->Duplicate(std::move(dup_request));
   FX_DCHECK(status == ZX_OK);
   fuchsia::sysmem2::Node_Sync_Result sync_result;
   status = local_token->Sync(&sync_result);
@@ -92,14 +111,11 @@ FlatlandScreenshot::FlatlandScreenshot(
   bind_shared_request.set_buffer_collection_request(buffer_collection.NewRequest());
   sysmem_allocator_->BindSharedCollection(std::move(bind_shared_request));
 
-  if (display_rotation_ == 90 || display_rotation_ == 270) {
-    std::swap(display_size_.width, display_size_.height);
-  }
-
   // We only need 1 buffer since it gets re-used on every Take() call.
   fuchsia::sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
-  set_constraints_request.set_constraints(utils::CreateDefaultConstraints(
-      /*buffer_count=*/1, display_size_.width, display_size_.height));
+  set_constraints_request.set_constraints(
+      utils::CreateDefaultConstraints(/*buffer_count=*/1, display_size_.width, display_size_.height,
+                                      CompositionToImages2Format(raw_format_)));
   buffer_collection->SetConstraints(std::move(set_constraints_request));
 
   fuchsia::sysmem2::NodeSetNameRequest set_name_request;
@@ -152,8 +168,9 @@ FlatlandScreenshot::FlatlandScreenshot(
           return;
         }
         FX_DCHECK(wait_result.is_response());
-        weak_ptr->buffer_collection_info_ =
-            std::move(*wait_result.response().mutable_buffer_collection_info());
+        weak_ptr->buffer_collection_info_.insert(
+            {weak_ptr->raw_format_,
+             std::move(*wait_result.response().mutable_buffer_collection_info())});
         buffer_collection->Release();
 
         weak_ptr->screen_capturer_->Configure(std::move(sc_args),
@@ -187,6 +204,17 @@ void FlatlandScreenshot::Take(fuchsia_ui_composition::ScreenshotTakeRequest para
     return;
   }
 
+  ScreenshotFormat format = raw_format_;
+  if (params.format().has_value()) {
+    format = params.format().value();
+    if (format != ScreenshotFormat::kPng) {
+      raw_format_ = format;
+    }
+  }
+  if (!buffer_collection_info_.contains(raw_format_)) {
+    AllocateBuffers();
+  }
+
   if (!utils::IsEventSignalled(init_event_, ZX_EVENT_SIGNALED)) {
     // Begin to asynchronously wait on the event. Retry the Take() call when the initialization is
     // complete.
@@ -214,10 +242,9 @@ void FlatlandScreenshot::Take(fuchsia_ui_composition::ScreenshotTakeRequest para
   // Wait for the frame to render in an async fashion.
   render_wait_ = std::make_shared<async::WaitOnce>(render_event_.get(), ZX_EVENT_SIGNALED);
   zx_status_t status = render_wait_->Begin(
-      async_get_default_dispatcher(),
-      [this, weak_ptr = weak_factory_.GetWeakPtr(), params = std::move(params)](
-          async_dispatcher_t*, async::WaitOnce*, zx_status_t status,
-          const zx_packet_signal_t*) mutable {
+      async_get_default_dispatcher(), [this, weak_ptr = weak_factory_.GetWeakPtr(), format](
+                                          async_dispatcher_t*, async::WaitOnce*, zx_status_t status,
+                                          const zx_packet_signal_t*) mutable {
         FX_DCHECK(status == ZX_OK || status == ZX_ERR_CANCELED);
         if (!weak_ptr) {
           return;
@@ -225,7 +252,7 @@ void FlatlandScreenshot::Take(fuchsia_ui_composition::ScreenshotTakeRequest para
         FX_DCHECK(take_callback_);
         zx::vmo raw_vmo = weak_ptr->HandleFrameRender();
 
-        if (params.format() == ScreenshotFormat::kPng) {
+        if (format == ScreenshotFormat::kPng) {
           zx::vmo response_vmo;
           zx::vmo response_vmo_copy;
           const auto response_vmo_size =
@@ -287,39 +314,42 @@ zx::vmo FlatlandScreenshot::HandleFrameRender() {
   // is actually a 608x1024 "pixel" buffer, since 2432/4=608. We must account for that 8 byte
   // padding when copying the bytes over to be inspected.
 
-  FX_DCHECK(kBytesPerPixel == utils::GetBytesPerPixel(buffer_collection_info_.settings()));
+  FX_DCHECK(kBytesPerPixel ==
+            utils::GetBytesPerPixel(buffer_collection_info_[raw_format_].settings()));
   const uint32_t pixels_per_row =
-      utils::GetPixelsPerRow(buffer_collection_info_.settings(), display_size_.width);
+      utils::GetPixelsPerRow(buffer_collection_info_[raw_format_].settings(), display_size_.width);
   uint32_t bytes_per_row = pixels_per_row * kBytesPerPixel;
   uint32_t valid_bytes_per_row = display_size_.width * kBytesPerPixel;
 
   // SL4Fs requires vmo to be readable for transfer, so we need to copy into a new one.
   std::vector<uint8_t> buf(4, 0);
   const bool vmo_is_readable =
-      (buffer_collection_info_.buffers()[kBufferIndex].vmo().read(buf.data(), 0, 1) == ZX_OK);
-
+      (buffer_collection_info_[raw_format_].buffers()[kBufferIndex].vmo().read(buf.data(), 0, 1) ==
+       ZX_OK);
   zx::vmo response_vmo;
   if (vmo_is_readable && bytes_per_row == valid_bytes_per_row) {
     // Do not need to map the buffer in this case so cannot use zx_cache_flush on the mapping.
     // Attempt to use the ZX_VMO_OP_CACHE_CLEAN_INVALIDATE, falling back to creating a temporary
     // mapping if the operation fails due to being a physical vmo.
-    zx_status_t status = buffer_collection_info_.buffers()[kBufferIndex].vmo().op_range(
-        ZX_VMO_OP_CACHE_CLEAN_INVALIDATE, 0,
-        buffer_collection_info_.settings().buffer_settings().size_bytes(), nullptr, 0);
+    zx_status_t status =
+        buffer_collection_info_[raw_format_].buffers()[kBufferIndex].vmo().op_range(
+            ZX_VMO_OP_CACHE_CLEAN_INVALIDATE, 0,
+            buffer_collection_info_[raw_format_].settings().buffer_settings().size_bytes(), nullptr,
+            0);
     if (status == ZX_ERR_NOT_SUPPORTED) {
       // Receiving ZX_ERR_NOT_SUPPORTED from ZX_VMO_OP_CACHE_CLEAN_INVALIDATE indicates it is a
       // physical VMO that does not support cache operations. In this case map it in to use
       // zx_cache_flush.
       flatland::MapHostPointer(
-          buffer_collection_info_, kBufferIndex, flatland::HostPointerAccessMode::kReadOnly,
-          [](uint8_t* vmo_host, uint32_t num_bytes) {
+          buffer_collection_info_[raw_format_], kBufferIndex,
+          flatland::HostPointerAccessMode::kReadOnly, [](uint8_t* vmo_host, uint32_t num_bytes) {
             FX_DCHECK(ZX_OK == zx_cache_flush(vmo_host, num_bytes,
                                               ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
           });
     } else {
       FX_DCHECK(status == ZX_OK);
     }
-    status = buffer_collection_info_.buffers()[kBufferIndex].vmo().duplicate(
+    status = buffer_collection_info_[raw_format_].buffers()[kBufferIndex].vmo().duplicate(
         ZX_RIGHT_READ | ZX_RIGHT_MAP | ZX_RIGHT_TRANSFER | ZX_RIGHT_GET_PROPERTY, &response_vmo);
     FX_DCHECK(status == ZX_OK);
   } else {
@@ -330,7 +360,8 @@ zx::vmo FlatlandScreenshot::HandleFrameRender() {
                                                  response_vmo, 0, response_vmo_size,
                                                  reinterpret_cast<uintptr_t*>(&response_vmo_base)));
     flatland::MapHostPointer(
-        buffer_collection_info_, kBufferIndex, flatland::HostPointerAccessMode::kReadOnly,
+        buffer_collection_info_[raw_format_], kBufferIndex,
+        flatland::HostPointerAccessMode::kReadOnly,
         [&response_vmo_base, bytes_per_row, display_size = display_size_, valid_bytes_per_row,
          response_vmo_size](uint8_t* vmo_host, uint32_t num_bytes) {
           FX_CHECK(ZX_OK == zx_cache_flush(vmo_host,
@@ -385,6 +416,17 @@ void FlatlandScreenshot::TakeFile(fuchsia_ui_composition::ScreenshotTakeFileRequ
     return;
   }
 
+  ScreenshotFormat format = raw_format_;
+  if (params.format().has_value()) {
+    format = params.format().value();
+    if (format != ScreenshotFormat::kPng) {
+      raw_format_ = format;
+    }
+  }
+  if (!buffer_collection_info_.contains(raw_format_)) {
+    AllocateBuffers();
+  }
+
   if (!utils::IsEventSignalled(init_event_, ZX_EVENT_SIGNALED)) {
     // Begin to asynchronously wait on the event. Retry the Take() call when the initialization is
     // complete.
@@ -412,10 +454,9 @@ void FlatlandScreenshot::TakeFile(fuchsia_ui_composition::ScreenshotTakeFileRequ
   // Wait for the frame to render in an async fashion.
   render_wait_ = std::make_shared<async::WaitOnce>(render_event_.get(), ZX_EVENT_SIGNALED);
   zx_status_t status = render_wait_->Begin(
-      async_get_default_dispatcher(),
-      [this, weak_ptr = weak_factory_.GetWeakPtr(), params = std::move(params)](
-          async_dispatcher_t*, async::WaitOnce*, zx_status_t status,
-          const zx_packet_signal_t*) mutable {
+      async_get_default_dispatcher(), [this, weak_ptr = weak_factory_.GetWeakPtr(), format](
+                                          async_dispatcher_t*, async::WaitOnce*, zx_status_t status,
+                                          const zx_packet_signal_t*) mutable {
         FX_DCHECK(status == ZX_OK || status == ZX_ERR_CANCELED);
         if (!weak_ptr) {
           return;
@@ -424,7 +465,7 @@ void FlatlandScreenshot::TakeFile(fuchsia_ui_composition::ScreenshotTakeFileRequ
 
         zx::vmo raw_vmo = weak_ptr->HandleFrameRender();
 
-        if (params.format() == ScreenshotFormat::kPng) {
+        if (format == ScreenshotFormat::kPng) {
           zx::vmo response_vmo;
           zx::vmo response_vmo_copy;
           // Make |resonpnse_vmo| large enough to hold any potential PNG encoding of |raw_vmo|.

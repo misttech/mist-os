@@ -1521,6 +1521,11 @@
         "value": "1"
     },
     {
+        "kind": "enum/member",
+        "name": "fuchsia.ui.composition/ScreenshotFormat.RGBA_RAW",
+        "value": "2"
+    },
+    {
         "kind": "enum",
         "name": "fuchsia.ui.composition/ScreenshotFormat",
         "strictness": "flexible",

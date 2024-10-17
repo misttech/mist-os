@@ -7,9 +7,11 @@
 
 #include <fidl/fuchsia.ui.composition/cpp/fidl.h>
 #include <fidl/fuchsia.ui.compression.internal/cpp/fidl.h>
+#include <fuchsia/images2/cpp/fidl.h>
 #include <fuchsia/io/cpp/fidl.h>
 
 #include <optional>
+#include <string>
 
 #include "src/lib/fxl/memory/weak_ptr.h"
 #include "src/ui/scenic/lib/allocation/allocator.h"
@@ -33,6 +35,8 @@ class FlatlandScreenshot : public fidl::Server<fuchsia_ui_composition::Screensho
                      fidl::Client<fuchsia_ui_compression_internal::ImageCompressor> client,
                      fit::function<void(FlatlandScreenshot*)> destroy_instance_function);
   ~FlatlandScreenshot() override = default;
+
+  void AllocateBuffers();
 
   // |fuchsia_ui_composition::Screenshot|
   void Take(TakeRequest& request, TakeCompleter::Sync& completer) override;
@@ -61,8 +65,15 @@ class FlatlandScreenshot : public fidl::Server<fuchsia_ui_composition::Screensho
   // Angle in degrees by which the display is rotated in the clockwise direction.
   int display_rotation_ = 0;
 
-  // The buffer collection where the display gets rendered into.
-  fuchsia::sysmem2::BufferCollectionInfo buffer_collection_info_;
+  // Preferred raw pixel format by Screenshot's client, updated if a new raw format is specified
+  // in a subsequent Take() request.
+  fuchsia_ui_composition::ScreenshotFormat raw_format_ =
+      fuchsia_ui_composition::ScreenshotFormat::kBgraRaw;
+
+  // Maps buffer collections where the display can be rendered into, based on preferred pixel
+  // format.
+  std::map<fuchsia_ui_composition::ScreenshotFormat, fuchsia::sysmem2::BufferCollectionInfo>
+      buffer_collection_info_;
 
   fidl::Client<fuchsia_ui_compression_internal::ImageCompressor> client_;
 
