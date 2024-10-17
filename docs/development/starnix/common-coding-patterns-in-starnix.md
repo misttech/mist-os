@@ -18,6 +18,7 @@ The topics are:
 - [Safe error handling in Starnix](#safe-error-handling-in-starnix)
 - [Creating errors in Starnix](#creating-errors-in-starnix)
 - [Preventing arithmetic overflow in Starnix](#preventing-arithmetic-overflow-in-starnix)
+- [Using FIDL proxies in Starnix](#using-fidl-proxies-in-starnix)
 
 ## Testing Starnix using Linux binaries {:#testing-starnix-using-linux-binaries}
 
@@ -268,6 +269,30 @@ from overflowing arithmetic in the kernel.
   user-supplied value by 2 without checking for potential overflow. If the value
   is large enough, the multiplication could overflow, leading to incorrect results
   or a system crash.
+
+## Using FIDL proxies in Starnix {:#using-fidl-proxies-in-starnix}
+
+This section explains why Starnix, unlike some Fuchsia components, typically
+uses synchronous proxies when interacting with FIDL protocols.
+
+Starnix typically uses synchronous proxies because of its execution model.
+Specifically, when servicing a Linux system call, Starnix code runs on the
+thread of the user program that invoked the Linux system call.
+
+Since the thread belongs to a Linux program, Starnix must perform the requested
+work and then return control back to the Linux program.
+
+This constraint means that the work Starnix is doing needs to be completed
+synchronously before returning control.
+
+Since the work needs to be completed before returning, a synchronous proxy
+is the simplest solution. A synchronous proxy is also more performant, because
+it avoids context switching to another thread and back (using an asynchronous
+proxy would require a separate thread, for the asynchronous executor to use).
+
+To learn more about the execution model for Starnix, please see
+* [Making Linux syscalls in Fuchsia](/docs/concepts/starnix/making-linux-syscalls-in-fuchsia.md)
+* [RFC 0261: Fast and efficient user space kernel emulation](/docs/contribute/governance/rfcs/0261_fast_and_efficient_user_space_kernel_emulation.md)
 
 <!-- Reference links -->
 
