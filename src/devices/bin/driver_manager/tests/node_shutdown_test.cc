@@ -479,6 +479,8 @@ TEST_F(NodeShutdownTest, DriverShutdownWhileWaitingOnChildren) {
 TEST_F(NodeShutdownTest, RemoveAfterBindFailure) {
   AddNodeAndStartDriver("node_a");
   GetNode("node_a")->CompleteBind(zx::error(ZX_ERR_NOT_FOUND));
+  CloseDriverForNode("node_a");
+  VerifyState("node_a", NodeState::kRunning);
   InvokeRemoveNode("node_a");
   VerifyNodeRemovedFromParent("node_a", "root");
 }
@@ -572,7 +574,8 @@ TEST_F(NodeShutdownTest, DriverHostFailure) {
   node_manager->driver_host().set_should_queue_start_callback(true);
   AddNodeAndStartDriver("node_a");
   node_manager->driver_host().InvokeStartCallback("node_a", zx::error(ZX_ERR_INTERNAL));
-
+  CloseDriverForNode("node_a");
+  VerifyState("node_a", NodeState::kRunning);
   InvokeRemoveNode("node_a");
   VerifyNodeRemovedFromParent("node_a", "root");
 }

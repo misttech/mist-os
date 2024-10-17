@@ -349,10 +349,8 @@ TEST_F(DriverHostTest, Start_ReturnError) {
   driver.reset();
   loop().RunUntilIdle();
   fdf_internal_wait_until_all_dispatchers_destroyed();
-  EXPECT_EQ(ZX_OK, loop().RunUntilIdle());
-  // We never started our first driver, so the driver host would not attempt to
-  // quit the loop after the last driver has stopped.
-  EXPECT_EQ(ASYNC_LOOP_RUNNABLE, loop().GetState());
+  EXPECT_EQ(ZX_ERR_CANCELED, loop().RunUntilIdle());
+  EXPECT_EQ(ASYNC_LOOP_QUIT, loop().GetState());
 }
 
 static bool called = false;

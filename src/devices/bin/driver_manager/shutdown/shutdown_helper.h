@@ -33,6 +33,11 @@ enum class ShutdownIntent : uint8_t {
   kRestart,          // Restarts the node and attempts to bind it to a new driver.
   kRebindComposite,  // Removes the composite node from the topology for rebind. Only invoked if the
                      // node is a composite.
+  kQuarantine,       // If a node's driver fails to start, we shutdown the driver but not the node.
+                     // The node should be quarantined, which means we won't start its driver again.
+                     // Eventually if the driver is disabled, the node will restart and be able to
+                     // find a new driver match, or become an orphan until a new driver is
+                     // registered that matches it.
 };
 
 enum class NodeState : uint8_t {
