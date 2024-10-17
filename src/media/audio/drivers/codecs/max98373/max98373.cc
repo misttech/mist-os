@@ -60,9 +60,10 @@ static const audio::DaiSupportedFormats kSupportedDaiFormats = {
 
 zx_status_t Max98373::HardwareReset() {
   if (codec_reset_.is_valid()) {
-    fidl::WireResult write1_result = codec_reset_->Write(0);
+    fidl::WireResult write1_result =
+        codec_reset_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputLow);
     if (!write1_result.ok()) {
-      zxlogf(ERROR, "Failed to send Write request to codec reset gpio: %s",
+      zxlogf(ERROR, "Failed to send SetBufferMode request to codec reset gpio: %s",
              write1_result.status_string());
       return write1_result.status();
     }
@@ -72,9 +73,10 @@ zx_status_t Max98373::HardwareReset() {
       return write1_result->error_value();
     }
     zx_nanosleep(zx_deadline_after(ZX_MSEC(5)));
-    fidl::WireResult write2_result = codec_reset_->Write(1);
+    fidl::WireResult write2_result =
+        codec_reset_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputHigh);
     if (!write2_result.ok()) {
-      zxlogf(ERROR, "Failed to send Write request to codec reset gpio: %s",
+      zxlogf(ERROR, "Failed to send SetBufferMode request to codec reset gpio: %s",
              write2_result.status_string());
       return write2_result.status();
     }

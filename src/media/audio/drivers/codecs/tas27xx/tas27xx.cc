@@ -259,7 +259,23 @@ void Tas27xx::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_
 }
 
 zx::result<DriverIds> Tas27xx::Initialize() {
-  fidl::WireResult result = fault_gpio_->GetInterrupt(ZX_INTERRUPT_MODE_EDGE_LOW);
+  fidl::Arena arena;
+  auto interrupt_config = fuchsia_hardware_gpio::wire::InterruptConfiguration::Builder(arena)
+                              .mode(fuchsia_hardware_gpio::InterruptMode::kEdgeLow)
+                              .Build();
+  fidl::WireResult config_result = fault_gpio_->ConfigureInterrupt(interrupt_config);
+  if (!config_result.ok()) {
+    zxlogf(ERROR, "Failed to send ConfigureInterrupt request to fault gpio: %s",
+           config_result.status_string());
+    return zx::error(config_result.status());
+  }
+  if (config_result->is_error()) {
+    zxlogf(ERROR, "Failed to configure interrupt on fault gpio: %s",
+           zx_status_get_string(config_result->error_value()));
+    return config_result->take_error();
+  }
+
+  fidl::WireResult result = fault_gpio_->GetInterrupt2({});
   if (!result.ok()) {
     zxlogf(ERROR, "Failed to send GetInterrupt request to fault gpio: %s", result.status_string());
     return zx::error(result.status());
@@ -269,7 +285,7 @@ zx::result<DriverIds> Tas27xx::Initialize() {
            zx_status_get_string(result->error_value()));
     return result->take_error();
   }
-  irq_ = std::move(result.value()->irq);
+  irq_ = std::move(result.value()->interrupt);
   irq_handler_.set_object(irq_.get());
   irq_handler_.Begin(dispatcher());
 
