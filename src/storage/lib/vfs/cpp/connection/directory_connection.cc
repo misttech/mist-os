@@ -147,6 +147,7 @@ void DirectoryConnection::SetAttr(SetAttrRequestView request, SetAttrCompleter::
 
 void DirectoryConnection::GetAttributes(fio::wire::Node2GetAttributesRequest* request,
                                         GetAttributesCompleter::Sync& completer) {
+  // TODO(https://fxbug.dev/346585458): This operation should require the GET_ATTRIBUTES right.
   internal::NodeAttributeBuilder builder;
   zx::result attrs = builder.Build(*vnode(), request->query);
   completer.Reply(zx::make_result(attrs.status_value(), attrs.is_ok() ? &*attrs : nullptr));
@@ -168,7 +169,7 @@ void DirectoryConnection::SetFlags(SetFlagsRequestView request,
 }
 
 void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& completer) {
-  // TODO(https://fxbug.dev/324080764): This io1 operation should require the TRAVERSE right.
+  // TODO(https://fxbug.dev/346585458): This operation should require the TRAVERSE right.
   zx_status_t status = [&]() -> zx_status_t {
     std::string_view path(request->path.data(), request->path.size());
     fio::OpenFlags flags = request->flags;
@@ -198,7 +199,9 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
       open_options->flags &= ~fio::OpenFlags::kPosixExecutable;
     }
     // Return ACCESS_DENIED if the client asked for a right the parent connection doesn't have.
-    if (open_options->rights - rights()) {
+    // TODO(https://fxbug.dev/346585458): GET_ATTRIBUTES was unprivileged in io1 so we cannot
+    // enforce that correctly here.
+    if ((open_options->rights & ~fio::Rights::kGetAttributes) - rights()) {
       return ZX_ERR_ACCESS_DENIED;
     }
     // If the request attempts to create a file, ensure this connection allows it.
@@ -303,7 +306,7 @@ void DirectoryConnection::Open3(fuchsia_io::wire::Directory2Open3Request* reques
 
 void DirectoryConnection::Unlink(UnlinkRequestView request, UnlinkCompleter::Sync& completer) {
   FS_PRETTY_TRACE_DEBUG("[DirectoryUnlink] our rights: ", rights(), ", name: ", request->name);
-  // TODO(https://fxbug.dev/324080764): This operation should require ENUMERATE and MODIFY_DIRECTORY
+  // TODO(https://fxbug.dev/346585458): This operation should require ENUMERATE and MODIFY_DIRECTORY
   // rights, instead of WRITE_BYTES.
   if (!(rights() & fuchsia_io::Rights::kWriteBytes)) {
     completer.ReplyError(ZX_ERR_BAD_HANDLE);
@@ -331,7 +334,7 @@ void DirectoryConnection::Unlink(UnlinkRequestView request, UnlinkCompleter::Syn
 void DirectoryConnection::ReadDirents(ReadDirentsRequestView request,
                                       ReadDirentsCompleter::Sync& completer) {
   FS_PRETTY_TRACE_DEBUG("[DirectoryReadDirents] our rights: ", rights());
-  // TODO(https://fxbug.dev/324080764): This io1 operation should require the ENUMERATE right.
+  // TODO(https://fxbug.dev/346585458): This operation should require the ENUMERATE right.
   if (request->max_bytes > fio::wire::kMaxBuf) {
     completer.Reply(ZX_ERR_BAD_HANDLE, fidl::VectorView<uint8_t>());
     return;
@@ -347,14 +350,14 @@ void DirectoryConnection::ReadDirents(ReadDirentsRequestView request,
 
 void DirectoryConnection::Rewind(RewindCompleter::Sync& completer) {
   FS_PRETTY_TRACE_DEBUG("[DirectoryRewind] our rights: ", rights());
-  // TODO(https://fxbug.dev/324080764): This io1 operation should require the ENUMERATE right.
+  // TODO(https://fxbug.dev/346585458): This operation should require the ENUMERATE right.
   dircookie_ = VdirCookie();
   completer.Reply(ZX_OK);
 }
 
 void DirectoryConnection::GetToken(GetTokenCompleter::Sync& completer) {
   FS_PRETTY_TRACE_DEBUG("[DirectoryGetToken] our rights: ", rights());
-  // TODO(https://fxbug.dev/324080764): This io1 operation should need ENUMERATE or another right.
+  // TODO(https://fxbug.dev/346585458): This operation should need ENUMERATE or another right.
   if (!(rights() & fuchsia_io::Rights::kWriteBytes)) {
     completer.Reply(ZX_ERR_BAD_HANDLE, zx::handle());
     return;
@@ -372,7 +375,7 @@ void DirectoryConnection::Rename(RenameRequestView request, RenameCompleter::Syn
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
-  // TODO(https://fxbug.dev/324080764): This operation should require the MODIFY_DIRECTORY right
+  // TODO(https://fxbug.dev/346585458): This operation should require the MODIFY_DIRECTORY right
   // instead of the WRITE_BYTES right.
   if (!(rights() & fuchsia_io::Rights::kWriteBytes)) {
     completer.ReplyError(ZX_ERR_BAD_HANDLE);
@@ -399,7 +402,7 @@ void DirectoryConnection::Link(LinkRequestView request, LinkCompleter::Sync& com
     completer.Reply(ZX_ERR_INVALID_ARGS);
     return;
   }
-  // TODO(https://fxbug.dev/324080764): This operation should require the MODIFY_DIRECTORY right
+  // TODO(https://fxbug.dev/346585458): This operation should require the MODIFY_DIRECTORY right
   // instead of the WRITE_BYTES right.
   if (!(rights() & fuchsia_io::Rights::kWriteBytes)) {
     completer.Reply(ZX_ERR_BAD_HANDLE);
@@ -415,7 +418,7 @@ void DirectoryConnection::Link(LinkRequestView request, LinkCompleter::Sync& com
 
 void DirectoryConnection::Watch(WatchRequestView request, WatchCompleter::Sync& completer) {
   FS_PRETTY_TRACE_DEBUG("[DirectoryWatch] our rights: ", rights());
-  // TODO(https://fxbug.dev/324080764): This io1 operation should require the ENUMERATE right.
+  // TODO(https://fxbug.dev/346585458): This operation should require the ENUMERATE right.
   auto fs = vfs();
   zx_status_t status =
       fs ? vnode()->WatchDir(fs.get(), request->mask, request->options, std::move(request->watcher))

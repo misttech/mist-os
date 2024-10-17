@@ -895,5 +895,3 @@ async fn open3_open_existing_directory() {
         .await
         .expect("failed to open existing entry");
 }
-
-// TODO(https://fxbug.dev/42157659): Add open3 connect tests.
