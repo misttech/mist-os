@@ -468,12 +468,14 @@ mod tests {
     use crate::handler::setting_handler::controller::Handle;
     use crate::handler::setting_handler::ClientImpl;
     use crate::input::input_device_configuration::{InputDeviceConfiguration, SourceState};
+    use crate::inspect::config_logger::InspectConfigLogger;
     use crate::service_context::ServiceContext;
     use crate::storage::{Payload as StoragePayload, StorageRequest, StorageResponse};
     use crate::tests::fakes::service_registry::ServiceRegistry;
     use crate::{service, Address};
 
     use fuchsia_async as fasync;
+    use fuchsia_inspect::component;
     use settings_storage::UpdateState;
 
     use super::*;
@@ -651,9 +653,11 @@ mod tests {
 
         let message_hub = service::MessageHub::create_hub();
         let client_proxy = create_proxy(message_hub).await;
+        let config_logger = InspectConfigLogger::new(component::inspector().root());
         let default_setting = DefaultSetting::new(
             Some(InputConfiguration::default()),
             "/config/data/input_device_config.json",
+            Arc::new(std::sync::Mutex::new(config_logger)),
         );
         let _controller = InputController::create_with(
             client_proxy,

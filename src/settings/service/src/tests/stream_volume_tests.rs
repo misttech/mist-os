@@ -6,17 +6,21 @@ use crate::audio::build_audio_default_settings;
 use crate::audio::types::{AudioInfo, AudioStreamType};
 #[cfg(test)]
 use crate::audio::{create_default_audio_stream, StreamVolumeControl};
+use crate::inspect::config_logger::InspectConfigLogger;
 use crate::message::base::MessengerType;
 use crate::service_context::{ExternalServiceEvent, ServiceContext};
 use crate::tests::fakes::audio_core_service;
 use crate::tests::fakes::service_registry::ServiceRegistry;
 use crate::{clock, event, service};
+use fuchsia_inspect::component;
 use futures::lock::Mutex;
 use futures::StreamExt;
 use std::sync::Arc;
 
 fn default_audio_info() -> AudioInfo {
-    let mut audio_configuration = build_audio_default_settings();
+    let config_logger =
+        Arc::new(std::sync::Mutex::new(InspectConfigLogger::new(component::inspector().root())));
+    let mut audio_configuration = build_audio_default_settings(config_logger);
     audio_configuration
         .load_default_value()
         .expect("config should exist and parse for test")

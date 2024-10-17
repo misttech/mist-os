@@ -4,7 +4,9 @@
 
 use crate::config::default_settings::DefaultSetting;
 use crate::input::types::{DeviceStateSource, InputDeviceType};
+use crate::inspect::config_logger::InspectConfigLogger;
 use serde::Deserialize;
+use std::sync::{Arc, Mutex};
 
 #[derive(PartialEq, Debug, Default, Clone, Deserialize)]
 pub struct InputConfiguration {
@@ -40,10 +42,12 @@ pub struct SourceState {
     /// the bitflags that are set.
     pub state: u64,
 }
-
-pub fn build_input_default_settings() -> DefaultSetting<InputConfiguration, &'static str> {
+pub fn build_input_default_settings(
+    config_logger: Arc<Mutex<InspectConfigLogger>>,
+) -> DefaultSetting<InputConfiguration, &'static str> {
     DefaultSetting::new(
         Some(InputConfiguration::default()),
         "/config/data/input_device_config.json",
+        config_logger,
     )
 }

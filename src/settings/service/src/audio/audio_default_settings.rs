@@ -5,6 +5,7 @@
 use crate::audio::types::{AudioInfo, AudioSettingSource, AudioStream, AudioStreamType};
 use crate::base::SettingInfo;
 use crate::config::default_settings::DefaultSetting;
+use crate::inspect::config_logger::InspectConfigLogger;
 use settings_storage::storage_factory::DefaultLoader;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -49,8 +50,14 @@ pub(crate) const fn create_default_audio_stream(stream_type: AudioStreamType) ->
     }
 }
 
-pub fn build_audio_default_settings() -> DefaultSetting<AudioInfo, &'static str> {
-    DefaultSetting::new(Some(DEFAULT_AUDIO_INFO), "/config/data/audio_config_data.json")
+pub fn build_audio_default_settings(
+    config_logger: Arc<Mutex<InspectConfigLogger>>,
+) -> DefaultSetting<AudioInfo, &'static str> {
+    DefaultSetting::new(
+        Some(DEFAULT_AUDIO_INFO),
+        "/config/data/audio_config_data.json",
+        config_logger,
+    )
 }
 
 /// Returns a default audio [`AudioInfo`] that is derived from
@@ -94,6 +101,7 @@ impl From<AudioInfo> for SettingInfo {
 mod tests {
     use super::*;
     use fuchsia_async::TestExecutor;
+    use fuchsia_inspect::component;
 
     use crate::audio::types::{AudioInfoV1, AudioInfoV2};
     use crate::tests::helpers::move_executor_forward_and_get;
@@ -135,6 +143,13 @@ mod tests {
         modified_counters: None,
     };
 
+    /// Construct default audio settings and its dependencies.
+    fn make_default_settings() -> DefaultSetting<AudioInfo, &'static str> {
+        let config_logger =
+            Arc::new(Mutex::new(InspectConfigLogger::new(component::inspector().root())));
+        build_audio_default_settings(config_logger)
+    }
+
     /// Load default settings from disk.
     fn load_default_settings(
         default_settings: &mut DefaultSetting<AudioInfo, &'static str>,
@@ -147,14 +162,14 @@ mod tests {
 
     #[fuchsia::test(allow_stalls = false)]
     async fn test_audio_config() {
-        let mut settings = build_audio_default_settings();
+        let mut settings = make_default_settings();
         let settings = load_default_settings(&mut settings);
         assert_eq!(CONFIG_AUDIO_INFO, settings);
     }
 
     #[fuchsia::test(allow_stalls = false)]
     async fn test_audio_info_migration_v1_to_v2() {
-        let mut default_settings = build_audio_default_settings();
+        let mut default_settings = make_default_settings();
         let mut v1 = AudioInfoV1::default_value(load_default_settings(&mut default_settings));
         let updated_mic_mute_val = !v1.input.mic_mute;
         v1.input.mic_mute = updated_mic_mute_val;
@@ -170,7 +185,7 @@ mod tests {
     #[fuchsia::test]
     fn test_audio_info_migration_v2_to_current() {
         let mut executor = TestExecutor::new_with_fake_time();
-        let mut default_settings = build_audio_default_settings();
+        let mut default_settings = make_default_settings();
         let settings = load_default_settings(&mut default_settings);
 
         let mut v2 = move_executor_forward_and_get(
@@ -193,7 +208,7 @@ mod tests {
     #[fuchsia::test]
     fn test_audio_info_migration_v1_to_current() {
         let mut executor = TestExecutor::new_with_fake_time();
-        let mut default_settings = build_audio_default_settings();
+        let mut default_settings = make_default_settings();
         let settings = load_default_settings(&mut default_settings);
 
         let mut v1 = move_executor_forward_and_get(

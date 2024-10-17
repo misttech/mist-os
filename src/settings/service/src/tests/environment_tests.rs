@@ -9,6 +9,7 @@ use crate::agent::{
 use crate::base::{Dependency, Entity, SettingType};
 use crate::event::{Event, Payload as EventPayload};
 use crate::ingress::{fidl, registration};
+use crate::inspect::config_logger::InspectConfigLogger;
 use crate::job::source::Error;
 use crate::job::{self, Job};
 use crate::light::build_light_default_settings;
@@ -26,6 +27,7 @@ use assert_matches::assert_matches;
 use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_stash::StoreMarker;
 use fuchsia_async as fasync;
+use fuchsia_inspect::component;
 use futures::future::BoxFuture;
 use futures::{FutureExt, StreamExt};
 use std::sync::Arc;
@@ -202,11 +204,14 @@ async fn migration_error_does_not_cause_early_exit() {
     })
     .detach();
 
+    let config_logger =
+        Arc::new(std::sync::Mutex::new(InspectConfigLogger::new(component::inspector().root())));
+
     let _ = EnvironmentBuilder::new(Arc::new(InMemoryStorageFactory::new()))
         .fidl_interfaces(&[fidl::Interface::Light])
         .store_proxy(store_proxy)
         .storage_dir(directory)
-        .light_configuration(build_light_default_settings())
+        .light_configuration(build_light_default_settings(config_logger))
         .spawn_nested(ENV_NAME)
         .await
         .expect("environment should be built");

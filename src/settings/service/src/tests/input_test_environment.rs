@@ -14,6 +14,7 @@ use crate::input::build_input_default_settings;
 use crate::input::input_controller::InputController;
 use crate::input::input_device_configuration::InputConfiguration;
 use crate::input::types::InputInfoSources;
+use crate::inspect::config_logger::InspectConfigLogger;
 use crate::service::message::Delegate;
 use crate::storage::testing::InMemoryStorageFactory;
 use crate::tests::fakes::camera3_service::Camera3Service;
@@ -23,6 +24,7 @@ use crate::tests::fakes::service_registry::ServiceRegistry;
 use crate::{Environment, EnvironmentBuilder};
 
 use fidl_fuchsia_settings::{InputMarker, InputProxy};
+use fuchsia_inspect::component;
 use futures::lock::Mutex;
 use std::sync::Arc;
 
@@ -148,5 +150,7 @@ impl TestInputEnvironmentBuilder {
 }
 
 pub(super) fn default_settings() -> DefaultSetting<InputConfiguration, &'static str> {
-    build_input_default_settings()
+    let config_logger =
+        Arc::new(std::sync::Mutex::new(InspectConfigLogger::new(component::inspector().root())));
+    build_input_default_settings(config_logger)
 }

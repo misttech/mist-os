@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 
 use crate::config::default_settings::DefaultSetting;
+use crate::inspect::config_logger::InspectConfigLogger;
 use crate::light::types::LightType;
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex};
 
 #[derive(PartialEq, Debug, Clone, Deserialize)]
 pub struct LightHardwareConfiguration {
@@ -48,6 +50,8 @@ pub enum DisableConditions {
     MicSwitch,
 }
 
-pub fn build_light_default_settings() -> DefaultSetting<LightHardwareConfiguration, &'static str> {
-    DefaultSetting::new(None, "/config/data/light_hardware_config.json")
+pub fn build_light_default_settings(
+    config_logger: Arc<Mutex<InspectConfigLogger>>,
+) -> DefaultSetting<LightHardwareConfiguration, &'static str> {
+    DefaultSetting::new(None, "/config/data/light_hardware_config.json", config_logger)
 }

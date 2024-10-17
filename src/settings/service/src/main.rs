@@ -17,6 +17,7 @@ use settings::config::default_settings::DefaultSetting;
 use settings::display::build_display_default_settings;
 use settings::handler::setting_proxy_inspect_info::SettingProxyInspectInfo;
 use settings::input::build_input_default_settings;
+use settings::inspect::config_logger::InspectConfigLogger;
 use settings::inspect::listener_logger::ListenerInspectLogger;
 use settings::light::build_light_default_settings;
 use settings::{
@@ -49,25 +50,31 @@ fn main() -> Result<(), Error> {
     let default_enabled_interfaces_configuration =
         EnabledInterfacesConfiguration::with_interfaces(get_default_interfaces());
 
-    let input_configuration = build_input_default_settings();
+    let config_logger = Arc::new(std::sync::Mutex::new(InspectConfigLogger::new(inspector.root())));
 
-    let light_configuration = build_light_default_settings();
+    let input_configuration = build_input_default_settings(Arc::clone(&config_logger));
+    let light_configuration = build_light_default_settings(Arc::clone(&config_logger));
 
     let enabled_interface_configuration = DefaultSetting::new(
         Some(default_enabled_interfaces_configuration),
         "/config/data/interface_configuration.json",
+        Arc::clone(&config_logger),
     )
     .load_default_value()
     .expect("invalid default enabled interface configuration")
     .expect("no default enabled interfaces configuration");
 
-    let flags =
-        DefaultSetting::new(Some(ServiceFlags::default()), "/config/data/service_flags.json")
-            .load_default_value()
-            .expect("invalid service flag configuration")
-            .expect("no default service flags");
-    let display_configuration = build_display_default_settings();
-    let audio_configuration = build_audio_default_settings();
+    let flags = DefaultSetting::new(
+        Some(ServiceFlags::default()),
+        "/config/data/service_flags.json",
+        Arc::clone(&config_logger),
+    )
+    .load_default_value()
+    .expect("invalid service flag configuration")
+    .expect("no default service flags");
+
+    let display_configuration = build_display_default_settings(Arc::clone(&config_logger));
+    let audio_configuration = build_audio_default_settings(Arc::clone(&config_logger));
 
     // Temporary solution for FEMU to have an agent config without camera agent.
     let agent_config = "/config/data/agent_configuration.json";
@@ -78,6 +85,7 @@ fn main() -> Result<(), Error> {
     let agent_types = DefaultSetting::new(
         Some(AgentConfiguration { agent_types: get_default_agent_types() }),
         agent_configuration_file_path,
+        config_logger,
     )
     .load_default_value()
     .expect("invalid default agent configuration")

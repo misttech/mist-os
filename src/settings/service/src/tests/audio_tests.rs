@@ -8,6 +8,7 @@ use crate::base::SettingType;
 use crate::config::base::AgentType;
 use crate::config::default_settings::DefaultSetting;
 use crate::ingress::fidl::Interface;
+use crate::inspect::config_logger::InspectConfigLogger;
 use crate::storage::testing::InMemoryStorageFactory;
 use crate::tests::fakes::audio_core_service::{self, AudioCoreService};
 use crate::tests::fakes::service_registry::ServiceRegistry;
@@ -18,6 +19,7 @@ use fidl::Error::ClientChannelClosed;
 use fidl_fuchsia_media::AudioRenderUsage;
 use fidl_fuchsia_settings::*;
 use fuchsia_component::server::ProtocolConnector;
+use fuchsia_inspect::component;
 use futures::lock::Mutex;
 use settings_storage::device_storage::DeviceStorage;
 use std::collections::HashMap;
@@ -43,7 +45,9 @@ fn changed_media_stream_settings() -> AudioStreamSettings {
 }
 
 fn default_audio_info() -> DefaultSetting<AudioInfo, &'static str> {
-    build_audio_default_settings()
+    let config_logger =
+        Arc::new(std::sync::Mutex::new(InspectConfigLogger::new(component::inspector().root())));
+    build_audio_default_settings(config_logger)
 }
 
 fn load_default_audio_info(
