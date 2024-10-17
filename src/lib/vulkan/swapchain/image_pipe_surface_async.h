@@ -5,9 +5,9 @@
 #ifndef SRC_LIB_VULKAN_SWAPCHAIN_IMAGE_PIPE_SURFACE_ASYNC_H_
 #define SRC_LIB_VULKAN_SWAPCHAIN_IMAGE_PIPE_SURFACE_ASYNC_H_
 
-#include <fuchsia/sysmem2/cpp/fidl.h>
-#include <fuchsia/ui/composition/cpp/fidl.h>
-#include <fuchsia/ui/views/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
+#include <fidl/fuchsia.ui.composition/cpp/fidl.h>
+#include <fidl/fuchsia.ui.views/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
@@ -15,7 +15,7 @@
 #include <mutex>
 
 #include "image_pipe_surface.h"
-#include "src/lib/ui/flatland-frame-scheduling/src/simple_present_hlcpp.h"
+#include "src/lib/ui/flatland-frame-scheduling/src/simple_present.h"
 
 namespace image_pipe_swapchain {
 
@@ -25,7 +25,7 @@ class ImagePipeSurfaceAsync : public ImagePipeSurface {
   explicit ImagePipeSurfaceAsync(zx_handle_t view_creation_token_handle)
       : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
     loop_.StartThread();
-    view_creation_token_.value = zx::channel(view_creation_token_handle);
+    view_creation_token_.value(zx::channel(view_creation_token_handle));
     std::vector<VkSurfaceFormatKHR> formats(
         {{VK_FORMAT_R8G8B8A8_UNORM, VK_COLORSPACE_SRGB_NONLINEAR_KHR},
          {VK_FORMAT_R8G8B8A8_SRGB, VK_COLORSPACE_SRGB_NONLINEAR_KHR},
@@ -34,16 +34,7 @@ class ImagePipeSurfaceAsync : public ImagePipeSurface {
     supported_image_properties_ = {formats};
   }
 
-  ~ImagePipeSurfaceAsync() override {
-    async::PostTask(loop_.dispatcher(), [this] {
-      // flatland_ and flatland_allocator_ are thread hostile so it must be turn down on the thread
-      // that will use it.
-      flatland_connection_.reset();
-      flatland_allocator_ = nullptr;
-      loop_.Quit();
-    });
-    loop_.JoinThreads();
-  }
+  ~ImagePipeSurfaceAsync() override;
 
   bool Init() override;
 
@@ -80,15 +71,19 @@ class ImagePipeSurfaceAsync : public ImagePipeSurface {
   void PresentNextImageLocked() __attribute__((requires_capability(mutex_)));
   void OnErrorLocked() __attribute__((requires_capability(mutex_)));
 
+  fidl::Client<fuchsia_ui_composition::Flatland>& FlatlandClient() {
+    return flatland_connection_->FlatlandClient();
+  }
+
   async::Loop loop_;
   std::mutex mutex_;
 
   // Can only be accessed from the async loop's thread.
   std::unique_ptr<simple_present::FlatlandConnection> flatland_connection_;
-  fuchsia::ui::composition::AllocatorPtr flatland_allocator_;
-  fuchsia::ui::views::ViewCreationToken view_creation_token_;
+  fidl::Client<fuchsia_ui_composition::Allocator> flatland_allocator_;
+  fuchsia_ui_views::ViewCreationToken view_creation_token_;
 
-  fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
+  fidl::SyncClient<fuchsia_sysmem2::Allocator> sysmem_allocator_;
 
   struct PendingPresent {
     uint32_t image_id;

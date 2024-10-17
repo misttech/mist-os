@@ -26,6 +26,10 @@ class FlatlandConnection final : public fidl::AsyncEventHandler<fuchsia_ui_compo
   // Creates a flatland connection using component::Connect.
   static std::unique_ptr<FlatlandConnection> Create(async::Loop* loop,
                                                     const std::string& debug_name);
+  // Creates a flatland connection using the provided client end.
+  static std::unique_ptr<FlatlandConnection> Create(
+      async_dispatcher_t* dispatcher, fidl::ClientEnd<fuchsia_ui_composition::Flatland> flatland,
+      const std::string& debug_name);
 
   fidl::Client<fuchsia_ui_composition::Flatland>& FlatlandClient();
 
@@ -52,7 +56,8 @@ class FlatlandConnection final : public fidl::AsyncEventHandler<fuchsia_ui_compo
   void Present(fuchsia_ui_composition::PresentArgs present_args, OnFramePresentedCallback callback);
 
  private:
-  FlatlandConnection(async::Loop* loop, fidl::ClientEnd<fuchsia_ui_composition::Flatland> flatland,
+  FlatlandConnection(async_dispatcher_t* dispatcher,
+                     fidl::ClientEnd<fuchsia_ui_composition::Flatland> flatland,
                      const std::string& debug_name);
 
   fidl::Client<fuchsia_ui_composition::Flatland> flatland_;

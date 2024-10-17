@@ -115,6 +115,13 @@ class FakeFlatland : public fuchsia::ui::composition::testing::Allocator_TestBas
   }
 
   // |fuchsia::ui::composition::testing::Flatland|
+  void CreateView(fuchsia::ui::views::ViewCreationToken token,
+                  fidl::InterfaceRequest<fuchsia::ui::composition::ParentViewportWatcher>
+                      parent_viewport_watcher) override {
+    // Do nothing.
+  }
+
+  // |fuchsia::ui::composition::testing::Flatland|
   void CreateView2(fuchsia::ui::views::ViewCreationToken token,
                    fuchsia::ui::views::ViewIdentityOnCreation view_identity,
                    fuchsia::ui::composition::ViewBoundProtocols view_protocols,

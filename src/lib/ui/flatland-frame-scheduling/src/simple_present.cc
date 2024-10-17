@@ -11,10 +11,10 @@
 
 namespace simple_present {
 
-FlatlandConnection::FlatlandConnection(async::Loop* loop,
+FlatlandConnection::FlatlandConnection(async_dispatcher_t* dispatcher,
                                        fidl::ClientEnd<fuchsia_ui_composition::Flatland> flatland,
                                        const std::string& debug_name) {
-  flatland_ = fidl::Client(std::move(flatland), loop->dispatcher(), this);
+  flatland_ = fidl::Client(std::move(flatland), dispatcher, this);
   auto set_debug_name_res = flatland_->SetDebugName({debug_name});
   if (set_debug_name_res.is_error()) {
     FX_LOGS(ERROR) << "Failed to SetDebugName: "
@@ -34,7 +34,15 @@ std::unique_ptr<FlatlandConnection> FlatlandConnection::Create(async::Loop* loop
   }
 
   return std::unique_ptr<FlatlandConnection>(
-      new FlatlandConnection(loop, std::move(connect.value()), debug_name));
+      new FlatlandConnection(loop->dispatcher(), std::move(connect.value()), debug_name));
+}
+
+// static
+std::unique_ptr<FlatlandConnection> FlatlandConnection::Create(
+    async_dispatcher_t* dispatcher, fidl::ClientEnd<fuchsia_ui_composition::Flatland> flatland,
+    const std::string& debug_name) {
+  return std::unique_ptr<FlatlandConnection>(
+      new FlatlandConnection(dispatcher, std::move(flatland), debug_name));
 }
 
 fidl::Client<fuchsia_ui_composition::Flatland>& FlatlandConnection::FlatlandClient() {

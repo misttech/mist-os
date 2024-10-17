@@ -4,29 +4,38 @@
 
 #include "image_pipe_surface_async.h"
 
-#include <fidl/fuchsia.sysmem2/cpp/wire.h>
+#include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
-#include <lib/fdio/directory.h>
+#include <lib/component/incoming/cpp/protocol.h>
+#include <lib/fit/defer.h>
 #include <lib/trace/event.h>
 #include <vk_dispatch_table_helper.h>
-#include <zircon/availability.h>
 
+// May need to fall back to `buffer_collection_token` instead of `buffer_collection_token2`
+// in `Flatland.RegisterBufferCollectionArgs()`.
+#include <zircon/availability.h>
+#if !FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#include <fidl/fuchsia.sysmem/cpp/fidl.h>
+#endif
+
+#include <cinttypes>
 #include <string>
 
 #include <vulkan/vk_layer.h>
 
-#include "fuchsia/sysmem2/cpp/fidl.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/vulkan/swapchain/vulkan_utils.h"
 
-zx::channel allocator_endpoint_for_test;
-zx::channel flatland_endpoint_for_test;
+static fidl::ClientEnd<fuchsia_ui_composition::Allocator> allocator_endpoint_for_test;
+static fidl::ClientEnd<fuchsia_ui_composition::Flatland> flatland_endpoint_for_test;
 
 extern "C" {
 __attribute__((visibility("default"))) bool imagepipe_initialize_service_channel(
     zx::channel allocator_endpoint, zx::channel flatland_endpoint) {
-  allocator_endpoint_for_test = std::move(allocator_endpoint);
-  flatland_endpoint_for_test = std::move(flatland_endpoint);
+  allocator_endpoint_for_test =
+      fidl::ClientEnd<fuchsia_ui_composition::Allocator>(std::move(allocator_endpoint));
+  flatland_endpoint_for_test =
+      fidl::ClientEnd<fuchsia_ui_composition::Flatland>(std::move(flatland_endpoint));
   return true;
 }
 }
@@ -36,79 +45,117 @@ namespace image_pipe_swapchain {
 namespace {
 
 const char* const kTag = "ImagePipeSurfaceAsync";
-const fuchsia::ui::composition::TransformId kRootTransform = {1};
+const fuchsia_ui_composition::TransformId kRootTransform = {1};
 
 const std::string DEBUG_NAME =
     fsl::GetCurrentProcessName() + "-" + std::to_string(fsl::GetCurrentProcessKoid());
 
 const std::string PER_APP_PRESENT_TRACING_NAME = "Flatland::PerAppPresent[" + DEBUG_NAME + "]";
 
+using OneWayResult = fit::result<fidl::OneWayStatus>;
+
 }  // namespace
 
+ImagePipeSurfaceAsync::~ImagePipeSurfaceAsync() {
+  async::PostTask(loop_.dispatcher(), [this] {
+    // flatland_ and flatland_allocator_ are thread hostile so they must be turned down on the
+    // thread that they are used on.
+    flatland_connection_.reset();
+    if (fit::result result = flatland_allocator_.UnbindMaybeGetEndpoint(); result.is_error()) {
+      fprintf(stderr, "%s: Couldn't unbind to fuchsia.ui.composition.Allocator: %s\n", kTag,
+              result.error_value().FormatDescription().c_str());
+    }
+    loop_.Quit();
+  });
+
+  loop_.JoinThreads();
+}
+
 bool ImagePipeSurfaceAsync::Init() {
-  const zx_status_t status = fdio_service_connect(
-      "/svc/fuchsia.sysmem2.Allocator", sysmem_allocator_.NewRequest().TakeChannel().release());
-  if (status != ZX_OK) {
-    fprintf(stderr, "%s: Couldn't connect to Sysmem service: %d\n", kTag, status);
-    return false;
+  {
+    zx::result client_end = component::Connect<fuchsia_sysmem2::Allocator>();
+    if (!client_end.is_ok()) {
+      fprintf(stderr, "%s: Couldn't connect to fuchsia.sysmem2.Allocator: %s\n", kTag,
+              client_end.status_string());
+      return false;
+    }
+    sysmem_allocator_.Bind(std::move(*client_end));
   }
 
-  fuchsia::sysmem2::AllocatorSetDebugClientInfoRequest debug_client_request;
-  debug_client_request.set_name(fsl::GetCurrentProcessName());
-  debug_client_request.set_id(fsl::GetCurrentProcessKoid());
-  sysmem_allocator_->SetDebugClientInfo(std::move(debug_client_request));
+  {
+    OneWayResult result = sysmem_allocator_->SetDebugClientInfo(
+        std::move(fuchsia_sysmem2::AllocatorSetDebugClientInfoRequest()
+                      .name(fsl::GetCurrentProcessName())
+                      .id(fsl::GetCurrentProcessKoid())));
+    if (result.is_error()) {
+      // Fatal because this is a one-way method, therefore subsequent calls would fail too.
+      fprintf(stderr, "%s: Couldn't initialize fuchsia.sysmem2.Allocator: %s\n", kTag,
+              result.error_value().status_string());
+      return false;
+    }
+  }
 
   async::PostTask(loop_.dispatcher(), [this] {
-    if (!view_creation_token_.value.is_valid()) {
-      fprintf(stderr, "%s: ViewCreationToken is invalid.\n", kTag);
-      std::lock_guard<std::mutex> lock(mutex_);
-      OnErrorLocked();
-      return;
-    }
-
-    if (allocator_endpoint_for_test.is_valid()) {
-      flatland_allocator_.Bind(std::move(allocator_endpoint_for_test));
-    } else {
-      const zx_status_t status =
-          fdio_service_connect("/svc/fuchsia.ui.composition.Allocator",
-                               flatland_allocator_.NewRequest().TakeChannel().release());
-      if (status != ZX_OK) {
-        fprintf(stderr, "%s: Couldn't connect to Flatland Allocator: %d\n", kTag, status);
-        std::lock_guard<std::mutex> lock(mutex_);
-        OnErrorLocked();
-        return;
-      }
-    }
-    flatland_allocator_.set_error_handler([this](auto status) {
+    auto error_catcher = fit::defer([this] {
       std::lock_guard<std::mutex> lock(mutex_);
       OnErrorLocked();
     });
 
-    if (flatland_endpoint_for_test.is_valid()) {
-      flatland_connection_ =
-          simple_present::FlatlandConnection::Create(std::move(flatland_endpoint_for_test), kTag);
+    if (!view_creation_token_.value().is_valid()) {
+      fprintf(stderr, "%s: ViewCreationToken is invalid.\n", kTag);
+      return;
+    }
+
+    if (allocator_endpoint_for_test.is_valid()) {
+      flatland_allocator_.Bind(std::move(allocator_endpoint_for_test), loop_.dispatcher());
     } else {
-      flatland_connection_ = simple_present::FlatlandConnection::Create(kTag);
-      if (!flatland_connection_) {
-        fprintf(stderr, "%s: Couldn't connect to Flatland\n", kTag);
-        std::lock_guard<std::mutex> lock(mutex_);
-        OnErrorLocked();
+      zx::result allocator_client_end = component::Connect<fuchsia_ui_composition::Allocator>();
+      if (allocator_client_end.is_error()) {
+        fprintf(stderr, "%s: Couldn't connect to fuchsia.ui.composition.Allocator: %s\n", kTag,
+                allocator_client_end.status_string());
         return;
       }
+
+      flatland_allocator_.Bind(std::move(allocator_client_end.value()), loop_.dispatcher());
     }
+
+    fidl::ClientEnd<fuchsia_ui_composition::Flatland> flatland_client_end;
+    if (flatland_endpoint_for_test.is_valid()) {
+      flatland_client_end = std::move(flatland_endpoint_for_test);
+    } else {
+      zx::result result = component::Connect<fuchsia_ui_composition::Flatland>();
+      if (result.is_error()) {
+        fprintf(stderr, "%s: Couldn't connect to fuchsia.ui.composition.Flatland: %s\n", kTag,
+                result.status_string());
+        return;
+      }
+      flatland_client_end = std::move(result.value());
+    }
+
+    flatland_connection_ = simple_present::FlatlandConnection::Create(
+        loop_.dispatcher(), std::move(flatland_client_end), kTag);
+
     flatland_connection_->SetErrorCallback([this]() {
       std::lock_guard<std::mutex> lock(mutex_);
       OnErrorLocked();
     });
 
-    fidl::InterfacePtr<fuchsia::ui::composition::ParentViewportWatcher> parent_viewport_watcher;
     // This Flatland doesn't need input or any hit regions, so CreateView() is used instead of
     // CreateView2().
-    flatland_connection_->flatland()->CreateView(std::move(view_creation_token_),
-                                                 parent_viewport_watcher.NewRequest());
-    flatland_connection_->flatland()->CreateTransform(kRootTransform);
-    flatland_connection_->flatland()->SetRootTransform(kRootTransform);
-    flatland_connection_->flatland()->SetDebugName(DEBUG_NAME);
+    auto [parent_viewport_watcher_client_end, parent_viewport_watcher_server_end] =
+        fidl::Endpoints<fuchsia_ui_composition::ParentViewportWatcher>::Create();
+    OneWayResult result = FlatlandClient()->CreateView(
+        {std::move(view_creation_token_), std::move(parent_viewport_watcher_server_end)});
+    result = FlatlandClient()->CreateTransform(kRootTransform);
+    result = FlatlandClient()->SetRootTransform(kRootTransform);
+    result = FlatlandClient()->SetDebugName(DEBUG_NAME);
+    if (result.is_error()) {
+      fprintf(stderr, "%s: Couldn't set up Flatland view and root transform: %s\n", kTag,
+              result.error_value().status_string());
+      return;
+    }
+
+    error_catcher.cancel();
   });
 
   return true;
@@ -127,36 +174,39 @@ bool ImagePipeSurfaceAsync::CreateImage(VkDevice device, VkLayerDispatchTable* p
   }
 
   // Allocate token for BufferCollection.
-  fuchsia::sysmem2::BufferCollectionTokenSyncPtr local_token;
-  fuchsia::sysmem2::AllocatorAllocateSharedCollectionRequest local_allocate_request;
-  local_allocate_request.set_token_request(local_token.NewRequest());
-  zx_status_t status =
-      sysmem_allocator_->AllocateSharedCollection(std::move(local_allocate_request));
-  if (status != ZX_OK) {
-    fprintf(stderr, "%s: AllocateSharedCollection failed: %d\n", kTag, status);
-    return false;
+  auto [local_token_client_end, local_token_server_end] =
+      fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
+  fidl::SyncClient local_token{std::move(local_token_client_end)};
+  {
+    fuchsia_sysmem2::AllocatorAllocateSharedCollectionRequest local_allocate_request;
+    local_allocate_request.token_request(std::move(local_token_server_end));
+
+    OneWayResult result =
+        sysmem_allocator_->AllocateSharedCollection(std::move(local_allocate_request));
+    if (result.is_error()) {
+      fprintf(stderr, "%s: AllocateSharedCollection failed: %s\n", kTag,
+              result.error_value().status_string());
+      return false;
+    }
   }
 
   // Duplicate tokens to pass around.
-  fuchsia::sysmem2::BufferCollectionTokenDuplicateSyncRequest scenic_duplicate_request;
-  scenic_duplicate_request.set_rights_attenuation_masks(
-      {ZX_RIGHT_SAME_RIGHTS, ZX_RIGHT_SAME_RIGHTS});
-  fuchsia::sysmem2::BufferCollectionToken_DuplicateSync_Result dup_sync_result;
-  status = local_token->DuplicateSync(std::move(scenic_duplicate_request), &dup_sync_result);
-  if (status != ZX_OK) {
-    fprintf(stderr, "%s: DuplicateSync failed: %d\n", kTag, status);
+  fuchsia_sysmem2::BufferCollectionTokenDuplicateSyncRequest token_duplicate_request;
+  token_duplicate_request.rights_attenuation_masks(
+      std::vector<zx_rights_t>{ZX_RIGHT_SAME_RIGHTS, ZX_RIGHT_SAME_RIGHTS});
+  auto token_duplicate_result = local_token->DuplicateSync(std::move(token_duplicate_request));
+  if (token_duplicate_result.is_error()) {
+    fprintf(stderr, "%s: DuplicateSync failed: %s\n", kTag,
+            token_duplicate_result.error_value().status_string());
     return false;
   }
-  if (dup_sync_result.is_framework_err()) {
-    fprintf(stderr, "%s: Sync failed with framework_err\n", kTag);
-    return false;
-  }
-  auto scenic_token = std::move(dup_sync_result.response().mutable_tokens()->at(0));
-  auto vulkan_token = std::move(dup_sync_result.response().mutable_tokens()->at(1));
 
-  fuchsia::ui::composition::BufferCollectionExportToken export_token;
-  fuchsia::ui::composition::BufferCollectionImportToken import_token;
-  status = zx::eventpair::create(0, &export_token.value, &import_token.value);
+  auto scenic_token = std::move(token_duplicate_result->tokens()->at(0));
+  auto vulkan_token = std::move(token_duplicate_result->tokens()->at(1));
+
+  fuchsia_ui_composition::BufferCollectionExportToken export_token;
+  fuchsia_ui_composition::BufferCollectionImportToken import_token;
+  zx_status_t status = zx::eventpair::create(0, &export_token.value(), &import_token.value());
   if (status != ZX_OK) {
     fprintf(stderr, "%s: Eventpair create failed: %d\n", kTag, status);
     return false;
@@ -165,22 +215,26 @@ bool ImagePipeSurfaceAsync::CreateImage(VkDevice device, VkLayerDispatchTable* p
   async::PostTask(loop_.dispatcher(), [this, scenic_token = std::move(scenic_token),
                                        export_token = std::move(export_token)]() mutable {
     // Pass |scenic_token| to Scenic to collect constraints.
-    if (flatland_allocator_.is_bound()) {
-      fuchsia::ui::composition::RegisterBufferCollectionArgs args = {};
-      args.set_export_token(std::move(export_token));
+    if (flatland_allocator_.is_valid()) {
+      fuchsia_ui_composition::RegisterBufferCollectionArgs args{};
+      args.export_token(std::move(export_token));
 #if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
-      args.set_buffer_collection_token2(std::move(scenic_token));
+      args.buffer_collection_token2(std::move(scenic_token));
 #else
-      args.set_buffer_collection_token(fuchsia::sysmem::BufferCollectionTokenHandle(std::move(scenic_token).TakeChannel()));
+      args.buffer_collection_token(fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(
+          std::move(scenic_token).TakeChannel()));
 #endif
-      args.set_usage(fuchsia::ui::composition::RegisterBufferCollectionUsage::DEFAULT);
-      flatland_allocator_->RegisterBufferCollection(std::move(args), [this](auto result) {
-        if (result.is_err()) {
-          fprintf(stderr, "%s: Flatland Allocator registration failed.\n", kTag);
-          std::lock_guard<std::mutex> lock(mutex_);
-          OnErrorLocked();
-        }
-      });
+      args.usage(fuchsia_ui_composition::RegisterBufferCollectionUsage::kDefault);
+      flatland_allocator_->RegisterBufferCollection(std::move(args))
+          .ThenExactlyOnce(
+              [this](fidl::Result<fuchsia_ui_composition::Allocator::RegisterBufferCollection>&
+                         result) {
+                if (result.is_error()) {
+                  fprintf(stderr, "%s: Flatland Allocator registration failed.\n", kTag);
+                  std::lock_guard<std::mutex> lock(mutex_);
+                  OnErrorLocked();
+                }
+              });
     }
   });
 
@@ -191,10 +245,10 @@ bool ImagePipeSurfaceAsync::CreateImage(VkDevice device, VkLayerDispatchTable* p
       .collectionToken = vulkan_token.TakeChannel().release(),
   };
   VkBufferCollectionFUCHSIA collection;
-  VkResult result =
+  VkResult vk_result =
       pDisp->CreateBufferCollectionFUCHSIA(device, &import_info, pAllocator, &collection);
-  if (result != VK_SUCCESS) {
-    fprintf(stderr, "Failed to import buffer collection: %d\n", result);
+  if (vk_result != VK_SUCCESS) {
+    fprintf(stderr, "Failed to import buffer collection: %d\n", vk_result);
     return false;
   }
   uint32_t image_flags = 0;
@@ -220,11 +274,11 @@ bool ImagePipeSurfaceAsync::CreateImage(VkDevice device, VkLayerDispatchTable* p
   const VkSysmemColorSpaceFUCHSIA kSrgbColorSpace = {
       .sType = VK_STRUCTURE_TYPE_SYSMEM_COLOR_SPACE_FUCHSIA,
       .pNext = nullptr,
-      .colorSpace = static_cast<uint32_t>(fuchsia::images2::ColorSpace::SRGB)};
+      .colorSpace = static_cast<uint32_t>(fuchsia_images2::ColorSpace::kSrgb)};
   const VkSysmemColorSpaceFUCHSIA kYuvColorSpace = {
       .sType = VK_STRUCTURE_TYPE_SYSMEM_COLOR_SPACE_FUCHSIA,
       .pNext = nullptr,
-      .colorSpace = static_cast<uint32_t>(fuchsia::images2::ColorSpace::REC709)};
+      .colorSpace = static_cast<uint32_t>(fuchsia_images2::ColorSpace::kRec709)};
 
   VkImageFormatConstraintsInfoFUCHSIA format_info = {
       .sType = VK_STRUCTURE_TYPE_IMAGE_FORMAT_CONSTRAINTS_INFO_FUCHSIA,
@@ -253,58 +307,69 @@ bool ImagePipeSurfaceAsync::CreateImage(VkDevice device, VkLayerDispatchTable* p
       .flags = 0u,
   };
 
-  result = pDisp->SetBufferCollectionImageConstraintsFUCHSIA(device, collection,
-                                                             &image_constraints_info);
-  if (result != VK_SUCCESS) {
-    fprintf(stderr, "Failed to set buffer collection constraints: %d\n", result);
+  vk_result = pDisp->SetBufferCollectionImageConstraintsFUCHSIA(device, collection,
+                                                                &image_constraints_info);
+  if (vk_result != VK_SUCCESS) {
+    fprintf(stderr, "Failed to set buffer collection constraints: %d\n", vk_result);
     return false;
   }
 
   // Set |image_count| constraints on the |local_token|.
-  fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection;
-  fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_request;
-  bind_request.set_token(std::move(local_token));
-  bind_request.set_buffer_collection_request(buffer_collection.NewRequest());
-  status = sysmem_allocator_->BindSharedCollection(std::move(bind_request));
-  if (status != ZX_OK) {
-    fprintf(stderr, "%s: BindSharedCollection failed: %d\n", kTag, status);
-    return false;
+  auto [sysmem_collection_client, sysmem_collection_server] =
+      fidl::Endpoints<fuchsia_sysmem2::BufferCollection>::Create();
+  fidl::SyncClient sysmem_collection(std::move(sysmem_collection_client));
+  {
+    fuchsia_sysmem2::AllocatorBindSharedCollectionRequest bind_shared_collection_request;
+    bind_shared_collection_request.token({local_token.TakeClientEnd()});
+    bind_shared_collection_request.buffer_collection_request(std::move(sysmem_collection_server));
+
+    OneWayResult result =
+        sysmem_allocator_->BindSharedCollection(std::move(bind_shared_collection_request));
+    if (result.is_error()) {
+      fprintf(stderr, "%s: BindSharedCollection failed: %s\n", kTag,
+              result.error_value().FormatDescription().c_str());
+      return false;
+    }
   }
-  fuchsia::sysmem2::BufferCollectionConstraints constraints;
-  constraints.set_min_buffer_count(image_count);
-  fuchsia::sysmem2::BufferUsage buffer_usage;
-  buffer_usage.set_vulkan(fuchsia::sysmem2::VULKAN_IMAGE_USAGE_SAMPLED);
-  constraints.set_usage(std::move(buffer_usage));
-  fuchsia::sysmem2::BufferCollectionSetConstraintsRequest constraints_request;
-  constraints_request.set_constraints(std::move(constraints));
-  status = buffer_collection->SetConstraints(std::move(constraints_request));
-  if (status != ZX_OK) {
-    fprintf(stderr, "%s: SetConstraints failed: %d %d\n", kTag, image_count, status);
-    return false;
+  {
+    fuchsia_sysmem2::BufferCollectionConstraints constraints;
+    constraints.min_buffer_count(image_count);
+    constraints.usage(std::move(
+        fuchsia_sysmem2::BufferUsage().vulkan(fuchsia_sysmem2::kVulkanImageUsageSampled)));
+
+    fuchsia_sysmem2::BufferCollectionSetConstraintsRequest constraints_request;
+    constraints_request.constraints(std::move(constraints));
+
+    OneWayResult result = sysmem_collection->SetConstraints(std::move(constraints_request));
+    if (result.is_error()) {
+      fprintf(stderr, "%s: SetConstraints failed: %s\n", kTag,
+              result.error_value().FormatDescription().c_str());
+      return false;
+    }
   }
 
   // Wait for buffer to be allocated.
-  fuchsia::sysmem2::BufferCollectionInfo buffer_collection_info;
-  fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_for_buffers_result;
-  status = buffer_collection->WaitForAllBuffersAllocated(&wait_for_buffers_result);
-  if (status != ZX_OK) {
-    fprintf(stderr, "%s: WaitForBuffersAllocated failed: %d\n", kTag, status);
+  auto wait_for_all_buffers_allocated_result = sysmem_collection->WaitForAllBuffersAllocated();
+  if (wait_for_all_buffers_allocated_result.is_error()) {
+    fprintf(stderr, "%s: WaitForBuffersAllocated failed: %s\n", kTag,
+            wait_for_all_buffers_allocated_result.error_value().FormatDescription().c_str());
     return false;
   }
-  if (!wait_for_buffers_result.is_response()) {
-    fprintf(stderr, "%s: WaitForBuffersAllocated failed: %u\n", kTag,
-            static_cast<uint32_t>(wait_for_buffers_result.err()));
-  }
-  if (wait_for_buffers_result.response().buffer_collection_info().buffers().size() < image_count) {
-    fprintf(stderr, "%s: Failed to allocate %d buffers: %d\n", kTag, image_count, status);
+
+  ZX_ASSERT(wait_for_all_buffers_allocated_result.value().buffer_collection_info().has_value());
+  auto& buffer_collection_info =
+      wait_for_all_buffers_allocated_result.value().buffer_collection_info().value();
+  ZX_ASSERT(buffer_collection_info.buffers().has_value());
+  if (buffer_collection_info.buffers()->size() != image_count) {
+    fprintf(stderr, "%s: incorrect image count %" PRIu64 " allocated vs. %d requested\n", kTag,
+            buffer_collection_info.buffers()->size(), image_count);
     return false;
   }
 
   // Insert width and height information while adding images because it wasn't passed in
   // AddBufferCollection().
-  fuchsia::images2::ImageFormat image_format = {};
-  image_format.mutable_size()->width = extent.width;
-  image_format.mutable_size()->height = extent.height;
+  fuchsia_images2::ImageFormat image_format = {};
+  image_format.size(fuchsia_math::SizeU{extent.width, extent.height});
 
   for (uint32_t i = 0; i < image_count; ++i) {
     // Create Vk image.
@@ -315,9 +380,9 @@ bool ImagePipeSurfaceAsync::CreateImage(VkDevice device, VkLayerDispatchTable* p
         .index = i};
     image_create_info.pNext = &image_format_fuchsia;
     VkImage image;
-    result = pDisp->CreateImage(device, &image_create_info, pAllocator, &image);
-    if (result != VK_SUCCESS) {
-      fprintf(stderr, "%s: vkCreateImage failed: %d\n", kTag, result);
+    vk_result = pDisp->CreateImage(device, &image_create_info, pAllocator, &image);
+    if (vk_result != VK_SUCCESS) {
+      fprintf(stderr, "%s: vkCreateImage failed: %d\n", kTag, vk_result);
       return false;
     }
 
@@ -326,8 +391,8 @@ bool ImagePipeSurfaceAsync::CreateImage(VkDevice device, VkLayerDispatchTable* p
     pDisp->GetImageMemoryRequirements(device, image, &memory_requirements);
     VkBufferCollectionPropertiesFUCHSIA properties = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_COLLECTION_PROPERTIES_FUCHSIA};
-    result = pDisp->GetBufferCollectionPropertiesFUCHSIA(device, collection, &properties);
-    if (result != VK_SUCCESS) {
+    vk_result = pDisp->GetBufferCollectionPropertiesFUCHSIA(device, collection, &properties);
+    if (vk_result != VK_SUCCESS) {
       fprintf(stderr, "%s: GetBufferCollectionPropertiesFUCHSIA failed: %d\n", kTag, status);
       return false;
     }
@@ -350,14 +415,14 @@ bool ImagePipeSurfaceAsync::CreateImage(VkDevice device, VkLayerDispatchTable* p
         .memoryTypeIndex = memory_type_index,
     };
     VkDeviceMemory memory;
-    result = pDisp->AllocateMemory(device, &alloc_info, pAllocator, &memory);
-    if (result != VK_SUCCESS) {
-      fprintf(stderr, "%s: vkAllocateMemory failed: %d\n", kTag, result);
+    vk_result = pDisp->AllocateMemory(device, &alloc_info, pAllocator, &memory);
+    if (vk_result != VK_SUCCESS) {
+      fprintf(stderr, "%s: vkAllocateMemory failed: %d\n", kTag, vk_result);
       return false;
     }
-    result = pDisp->BindImageMemory(device, image, memory, 0);
-    if (result != VK_SUCCESS) {
-      fprintf(stderr, "%s: vkBindImageMemory failed: %d\n", kTag, result);
+    vk_result = pDisp->BindImageMemory(device, image, memory, 0);
+    if (vk_result != VK_SUCCESS) {
+      fprintf(stderr, "%s: vkBindImageMemory failed: %d\n", kTag, vk_result);
       return false;
     }
 
@@ -368,9 +433,9 @@ bool ImagePipeSurfaceAsync::CreateImage(VkDevice device, VkLayerDispatchTable* p
     };
     image_info_out->push_back(info);
 
-    fuchsia::ui::composition::BufferCollectionImportToken import_token_dup;
+    fuchsia_ui_composition::BufferCollectionImportToken import_token_dup;
     zx_status_t status =
-        import_token.value.duplicate(ZX_RIGHT_SAME_RIGHTS, &import_token_dup.value);
+        import_token.value().duplicate(ZX_RIGHT_SAME_RIGHTS, &import_token_dup.value());
     if (status != ZX_OK) {
       fprintf(stderr, "%s: Duplicate failed: %d\n", kTag, status);
       return false;
@@ -379,22 +444,38 @@ bool ImagePipeSurfaceAsync::CreateImage(VkDevice device, VkLayerDispatchTable* p
                                          i, extent]() mutable {
       std::lock_guard<std::mutex> lock(mutex_);
       if (!channel_closed_) {
-        fuchsia::ui::composition::ImageProperties image_properties;
-        image_properties.set_size({extent.width, extent.height});
-        flatland_connection_->flatland()->CreateImage({info.image_id}, std::move(import_token_dup),
-                                                      i, std::move(image_properties));
-        flatland_connection_->flatland()->SetImageDestinationSize({info.image_id},
-                                                                  {extent.width, extent.height});
-        // SRC_OVER determines if this image should be blennded with what is behind and does not
-        // ignore alpha channel. It is different than VkCompositeAlphaFlagBitsKHR modes.
-        flatland_connection_->flatland()->SetImageBlendingFunction(
-            {info.image_id}, fuchsia::ui::composition::BlendMode::SRC_OVER);
+        OneWayResult result = fit::ok();
+
+        fuchsia_ui_composition::ImageProperties image_properties;
+        image_properties.size(fuchsia_math::SizeU{extent.width, extent.height});
+        result = FlatlandClient()->CreateImage(
+            {{info.image_id}, std::move(import_token_dup), i, std::move(image_properties)});
+
+        result = FlatlandClient()->SetImageDestinationSize(
+            {{info.image_id}, {extent.width, extent.height}});
+
+        // SRC_OVER determines if this image should be blennded with what is behind and does
+        // not ignore alpha channel. It is different than VkCompositeAlphaFlagBitsKHR modes.
+        result = FlatlandClient()->SetImageBlendingFunction(
+            {{info.image_id}, fuchsia_ui_composition::BlendMode::kSrcOver});
+
+        if (result.is_error()) {
+          fprintf(stderr, "%s: Failed to create image and configure size/blending: %s\n", kTag,
+                  result.error_value().FormatDescription().c_str());
+          OnErrorLocked();
+          return;
+        }
       }
     });
   }
 
   pDisp->DestroyBufferCollectionFUCHSIA(device, collection, pAllocator);
-  buffer_collection->Release();
+  OneWayResult result = sysmem_collection->Release();
+  if (result.is_error()) {
+    fprintf(stderr, "%s: Release failed: %s\n", kTag,
+            result.error_value().FormatDescription().c_str());
+    return false;
+  }
 
   return true;
 }
@@ -416,8 +497,14 @@ void ImagePipeSurfaceAsync::RemoveImage(uint32_t image_id) {
 
   async::PostTask(loop_.dispatcher(), [this, image_id]() {
     std::lock_guard<std::mutex> lock(mutex_);
-    if (!channel_closed_)
-      flatland_connection_->flatland()->ReleaseImage({image_id});
+    if (!channel_closed_) {
+      OneWayResult result = FlatlandClient()->ReleaseImage({image_id});
+      if (result.is_error()) {
+        fprintf(stderr, "%s: ReleaseImage failed: %s\n", kTag,
+                result.error_value().FormatDescription().c_str());
+        OnErrorLocked();
+      }
+    }
   });
 }
 
@@ -490,12 +577,17 @@ void ImagePipeSurfaceAsync::PresentNextImageLocked() {
     // previous frame's |release_fences|.
     previous_present_release_fences_.swap(present.release_fences);
 
-    fuchsia::ui::composition::PresentArgs present_args;
-    present_args.set_requested_presentation_time(presentation_time);
-    present_args.set_acquire_fences(std::move(present.acquire_fences));
-    present_args.set_release_fences(std::move(release_events));
-    present_args.set_unsquashable(true);
-    flatland_connection_->flatland()->SetContent(kRootTransform, {present.image_id});
+    fuchsia_ui_composition::PresentArgs present_args;
+    present_args.requested_presentation_time(presentation_time)
+        .acquire_fences(std::move(present.acquire_fences))
+        .release_fences(std::move(release_events))
+        .unsquashable(true);
+
+    OneWayResult result = FlatlandClient()->SetContent({kRootTransform, {present.image_id}});
+    if (result.is_error()) {
+      fprintf(stderr, "%s: SetContent failed: %s\n", kTag,
+              result.error_value().FormatDescription().c_str());
+    }
     flatland_connection_->Present(std::move(present_args),
                                   // Called on the async loop.
                                   [this, release_fences = std::move(present.release_fences)](
