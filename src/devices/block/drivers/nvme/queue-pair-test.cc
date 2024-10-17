@@ -4,22 +4,22 @@
 
 #include "src/devices/block/drivers/nvme/queue-pair.h"
 
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/driver.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/mmio-ptr/fake.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/bti.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/block/drivers/nvme/commands.h"
 #include "src/devices/block/drivers/nvme/registers.h"
 #include "src/devices/lib/mmio/test-helper.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace nvme {
 
-class QueuePairTest : public zxtest::Test {
+class QueuePairTest : public ::testing::Test {
  public:
   void SetUp() override { ASSERT_OK(fake_bti_create(fake_bti_.reset_and_get_address())); }
 
@@ -76,6 +76,8 @@ class QueuePairTest : public zxtest::Test {
       .Write32 = Write32,
       .Write64 = Write64,
   };
+
+  fdf_testing::ScopedGlobalLogger logger_;
 };
 
 TEST_F(QueuePairTest, TestSubmit) {
@@ -87,11 +89,11 @@ TEST_F(QueuePairTest, TestSubmit) {
   doorbell_ring_ = [&rang, &pair, &doorbell_ring_count](bool is_completion, size_t queue_id,
                                                         uint16_t value) {
     ASSERT_FALSE(is_completion);
-    ASSERT_EQ(0, queue_id);
+    ASSERT_EQ(0u, queue_id);
     ASSERT_EQ(doorbell_ring_count + 1, value);
     doorbell_ring_count++;
     Submission* submissions = static_cast<Submission*>(pair->submission().head());
-    ASSERT_EQ(0x9f, submissions[value - 1].opcode());
+    ASSERT_EQ(0x9fu, submissions[value - 1].opcode());
     sync_completion_signal(&rang);
   };
 
@@ -113,7 +115,7 @@ TEST_F(QueuePairTest, TestCheckCompletionsNothingReady) {
   memset(completions, 0, sizeof(*completions));
 
   doorbell_ring_ = [](bool, size_t, uint16_t) {
-    ASSERT_FALSE(true, "Doorbell should not have been rung");
+    ZX_ASSERT_MSG(false, "Doorbell should not have been rung");
   };
 
   Completion* completion = nullptr;
@@ -126,8 +128,8 @@ TEST_F(QueuePairTest, TestCheckCompletionsOneReady) {
 
   doorbell_ring_ = [](bool is_completion, size_t queue_id, uint16_t new_value) {
     ASSERT_FALSE(is_completion);
-    ASSERT_EQ(0, queue_id);
-    ASSERT_EQ(1, new_value);
+    ASSERT_EQ(0u, queue_id);
+    ASSERT_EQ(1u, new_value);
   };
   Submission s(0);
   ASSERT_OK(pair->Submit(s, std::nullopt, 0, 0));
@@ -140,8 +142,8 @@ TEST_F(QueuePairTest, TestCheckCompletionsOneReady) {
 
   doorbell_ring_ = [](bool is_completion, size_t queue_id, uint16_t new_value) {
     ASSERT_TRUE(is_completion);
-    ASSERT_EQ(0, queue_id);
-    ASSERT_EQ(1, new_value);
+    ASSERT_EQ(0u, queue_id);
+    ASSERT_EQ(1u, new_value);
   };
 
   Completion* completion = nullptr;
@@ -158,13 +160,17 @@ TEST_F(QueuePairTest, TestCheckCompletionsMultipleReady) {
   uint16_t expected_doorbell = 1;
   doorbell_ring_ = [&expected_doorbell](bool is_completion, size_t queue_id, uint16_t new_value) {
     ASSERT_FALSE(is_completion);
-    ASSERT_EQ(0, queue_id);
+    ASSERT_EQ(0u, queue_id);
     ASSERT_EQ(expected_doorbell, new_value);
     expected_doorbell++;
   };
   Submission s(0);
-  { ASSERT_OK(pair->Submit(s, std::nullopt, 0, 0)); }
-  { ASSERT_OK(pair->Submit(s, std::nullopt, 0, 0)); }
+  {
+    ASSERT_OK(pair->Submit(s, std::nullopt, 0, 0));
+  }
+  {
+    ASSERT_OK(pair->Submit(s, std::nullopt, 0, 0));
+  }
 
   Completion* completions = static_cast<Completion*>(pair->completion().head());
   memset(completions, 0, sizeof(*completions) * pair->completion().entry_count());
@@ -178,7 +184,7 @@ TEST_F(QueuePairTest, TestCheckCompletionsMultipleReady) {
   // Expect only a single ring of the doorbell.
   doorbell_ring_ = [](bool is_completion, size_t queue_id, uint16_t new_value) {
     ASSERT_TRUE(is_completion);
-    ASSERT_EQ(0, queue_id);
+    ASSERT_EQ(0u, queue_id);
     ASSERT_EQ(2, new_value);
   };
 
@@ -198,20 +204,22 @@ TEST_F(QueuePairTest, TestSubmitWithDataOnePage) {
 
   doorbell_ring_ = [](bool is_completion, size_t queue_id, uint16_t new_value) {
     ASSERT_FALSE(is_completion);
-    ASSERT_EQ(0, queue_id);
-    ASSERT_EQ(1, new_value);
+    ASSERT_EQ(0u, queue_id);
+    ASSERT_EQ(1u, new_value);
   };
   zx::vmo data_vmo;
   ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &data_vmo));
   Submission s(0xa9);
-  { ASSERT_OK(pair->Submit(s, data_vmo.borrow(), 0, zx_system_get_page_size())); }
+  {
+    ASSERT_OK(pair->Submit(s, data_vmo.borrow(), 0, zx_system_get_page_size()));
+  }
 
   Submission* submitted = static_cast<Submission*>(pair->submission().head());
-  ASSERT_EQ(0, submitted->data_transfer_mode());
-  ASSERT_EQ(0, submitted->fused());
-  ASSERT_EQ(0xa9, submitted->opcode());
-  ASSERT_EQ(FAKE_BTI_PHYS_ADDR, submitted->data_pointer[0]);
-  ASSERT_EQ(0, submitted->data_pointer[1]);
+  ASSERT_EQ(0u, submitted->data_transfer_mode());
+  ASSERT_EQ(0u, submitted->fused());
+  ASSERT_EQ(0xa9u, submitted->opcode());
+  ASSERT_EQ(uint64_t{FAKE_BTI_PHYS_ADDR}, submitted->data_pointer[0]);
+  ASSERT_EQ(0u, submitted->data_pointer[1]);
   TransactionData& txn_data = txn(pair.value().get(), 0);
   ASSERT_FALSE(txn_data.prp_buffer);
   ASSERT_TRUE(txn_data.active);
@@ -223,20 +231,22 @@ TEST_F(QueuePairTest, TestSubmitWithDataTwoPages) {
 
   doorbell_ring_ = [](bool is_completion, size_t queue_id, uint16_t new_value) {
     ASSERT_FALSE(is_completion);
-    ASSERT_EQ(0, queue_id);
-    ASSERT_EQ(1, new_value);
+    ASSERT_EQ(0u, queue_id);
+    ASSERT_EQ(1u, new_value);
   };
   zx::vmo data_vmo;
   ASSERT_OK(zx::vmo::create(zx_system_get_page_size(), 0, &data_vmo));
   Submission s(0xa9);
-  { ASSERT_OK(pair->Submit(s, data_vmo.borrow(), 0, zx_system_get_page_size())); }
+  {
+    ASSERT_OK(pair->Submit(s, data_vmo.borrow(), 0, zx_system_get_page_size()));
+  }
 
   Submission* submitted = static_cast<Submission*>(pair->submission().head());
-  ASSERT_EQ(0, submitted->data_transfer_mode());
-  ASSERT_EQ(0, submitted->fused());
-  ASSERT_EQ(0xa9, submitted->opcode());
-  ASSERT_EQ(FAKE_BTI_PHYS_ADDR, submitted->data_pointer[0]);
-  ASSERT_EQ(0, submitted->data_pointer[1]);
+  ASSERT_EQ(0u, submitted->data_transfer_mode());
+  ASSERT_EQ(0u, submitted->fused());
+  ASSERT_EQ(0xa9u, submitted->opcode());
+  ASSERT_EQ(uint64_t{FAKE_BTI_PHYS_ADDR}, submitted->data_pointer[0]);
+  ASSERT_EQ(0u, submitted->data_pointer[1]);
   TransactionData& txn_data = txn(pair.value().get(), 0);
   ASSERT_FALSE(txn_data.prp_buffer);
   ASSERT_TRUE(txn_data.active);
@@ -249,29 +259,31 @@ TEST_F(QueuePairTest, DISABLED_TestSubmitWithDataManyPages) {
 
   doorbell_ring_ = [](bool is_completion, size_t queue_id, uint16_t new_value) {
     ASSERT_FALSE(is_completion);
-    ASSERT_EQ(0, queue_id);
-    ASSERT_EQ(1, new_value);
+    ASSERT_EQ(0u, queue_id);
+    ASSERT_EQ(1u, new_value);
   };
   zx::vmo data_vmo;
   constexpr size_t kNumPages = 4;
   ASSERT_OK(zx::vmo::create(kNumPages * zx_system_get_page_size(), 0, &data_vmo));
   Submission s(0xa9);
-  { ASSERT_OK(pair->Submit(s, data_vmo.borrow(), 0, kNumPages * zx_system_get_page_size())); }
+  {
+    ASSERT_OK(pair->Submit(s, data_vmo.borrow(), 0, kNumPages * zx_system_get_page_size()));
+  }
 
   Submission* submitted = static_cast<Submission*>(pair->submission().head());
-  ASSERT_EQ(0, submitted->data_transfer_mode());
-  ASSERT_EQ(0, submitted->fused());
-  ASSERT_EQ(0xa9, submitted->opcode());
-  ASSERT_EQ(FAKE_BTI_PHYS_ADDR, submitted->data_pointer[0]);
-  ASSERT_EQ(FAKE_BTI_PHYS_ADDR, submitted->data_pointer[1]);
+  ASSERT_EQ(0u, submitted->data_transfer_mode());
+  ASSERT_EQ(0u, submitted->fused());
+  ASSERT_EQ(0xa9u, submitted->opcode());
+  ASSERT_EQ(uint64_t{FAKE_BTI_PHYS_ADDR}, submitted->data_pointer[0]);
+  ASSERT_EQ(uint64_t{FAKE_BTI_PHYS_ADDR}, submitted->data_pointer[1]);
   TransactionData& txn_data = txn(pair.value().get(), 0);
   ASSERT_TRUE(txn_data.prp_buffer);
   ASSERT_TRUE(txn_data.active);
   uint64_t* prps = static_cast<uint64_t*>(txn_data.prp_buffer->virt());
   for (size_t i = 0; i < kNumPages - 1; i++) {
-    ASSERT_EQ(FAKE_BTI_PHYS_ADDR, prps[i]);
+    ASSERT_EQ(uint64_t{FAKE_BTI_PHYS_ADDR}, prps[i]);
   }
-  ASSERT_EQ(0, prps[kNumPages - 1]);
+  ASSERT_EQ(0u, prps[kNumPages - 1]);
 }
 
 // Not using QueuePair::PreparePrpList() for now. See QueuePair::kMaxTransferPages.
@@ -281,37 +293,31 @@ TEST_F(QueuePairTest, DISABLED_TestSubmitWithMultiPagePrp) {
 
   doorbell_ring_ = [](bool is_completion, size_t queue_id, uint16_t new_value) {
     ASSERT_FALSE(is_completion);
-    ASSERT_EQ(0, queue_id);
-    ASSERT_EQ(1, new_value);
+    ASSERT_EQ(0u, queue_id);
+    ASSERT_EQ(1u, new_value);
   };
   zx::vmo data_vmo;
   const size_t addr_per_page = zx_system_get_page_size() / sizeof(uint64_t);
   const size_t kNumAddresses = addr_per_page + 10;
   ASSERT_OK(zx::vmo::create(zx_system_get_page_size() * kNumAddresses, 0, &data_vmo));
   Submission s(0xa9);
-  { ASSERT_OK(pair->Submit(s, data_vmo.borrow(), 0, zx_system_get_page_size() * kNumAddresses)); }
+  {
+    ASSERT_OK(pair->Submit(s, data_vmo.borrow(), 0, zx_system_get_page_size() * kNumAddresses));
+  }
 
   Submission* submitted = static_cast<Submission*>(pair->submission().head());
-  ASSERT_EQ(0, submitted->data_transfer_mode());
-  ASSERT_EQ(0, submitted->fused());
-  ASSERT_EQ(0xa9, submitted->opcode());
-  ASSERT_EQ(FAKE_BTI_PHYS_ADDR, submitted->data_pointer[0]);
-  ASSERT_EQ(FAKE_BTI_PHYS_ADDR, submitted->data_pointer[1]);
+  ASSERT_EQ(0u, submitted->data_transfer_mode());
+  ASSERT_EQ(0u, submitted->fused());
+  ASSERT_EQ(0xa9u, submitted->opcode());
+  ASSERT_EQ(uint64_t{FAKE_BTI_PHYS_ADDR}, submitted->data_pointer[0]);
+  ASSERT_EQ(uint64_t{FAKE_BTI_PHYS_ADDR}, submitted->data_pointer[1]);
   TransactionData& txn_data = txn(pair.value().get(), 0);
   ASSERT_TRUE(txn_data.prp_buffer);
   ASSERT_TRUE(txn_data.active);
   uint64_t* prps = static_cast<uint64_t*>(txn_data.prp_buffer->virt());
   for (size_t i = 0; i < kNumAddresses; i++) {
-    ASSERT_EQ(FAKE_BTI_PHYS_ADDR, prps[i], "PRP %zu had wrong value", i);
+    ZX_ASSERT_MSG(FAKE_BTI_PHYS_ADDR == prps[i], "PRP %zu had wrong value", i);
   }
-  ASSERT_EQ(0, prps[kNumAddresses]);
+  ASSERT_EQ(0u, prps[kNumAddresses]);
 }
 }  // namespace nvme
-
-static zx_driver_ops_t stub_driver_ops = []() -> zx_driver_ops_t {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  return ops;
-}();
-
-ZIRCON_DRIVER(fake_driver, stub_driver_ops, "zircon", "0.1");

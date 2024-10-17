@@ -4,11 +4,10 @@
 
 #include "src/devices/block/drivers/nvme/fake/fake-admin-commands.h"
 
-#include <lib/ddk/debug.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fzl/vmo-mapper.h>
 
-#include <zxtest/zxtest.h>
+#include <sdk/lib/driver/logging/cpp/logger.h>
 
 #include "src/devices/block/drivers/nvme/commands.h"
 #include "src/devices/block/drivers/nvme/commands/features.h"
@@ -16,6 +15,7 @@
 #include "src/devices/block/drivers/nvme/commands/queue.h"
 #include "src/devices/block/drivers/nvme/fake/fake-controller.h"
 #include "src/devices/block/drivers/nvme/queue-pair.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace fake_nvme {
 using nvme::Completion;
@@ -108,7 +108,7 @@ void FakeAdminCommands::Identify(nvme::Submission& default_submission,
       break;
     }
     default:
-      zxlogf(ERROR, "unsuppoorted identify structure");
+      FDF_LOG(ERROR, "unsupported identify structure");
       completion.set_status_code(GenericStatus::kInvalidField);
       break;
   }

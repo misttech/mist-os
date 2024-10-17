@@ -29,13 +29,15 @@ group("tests") {
 common_deps = [
   ":nvme_bind",
   "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
-  "//src/devices/block/lib/common:common-dfv1",
+  "//sdk/lib/driver/compat/cpp",
+  "//sdk/lib/driver/runtime:driver_runtime_cpp",
+  "//sdk/lib/inspect/component/cpp",
+  "//src/devices/bin/driver_runtime",
+  "//src/devices/block/lib/common",
   "//src/devices/lib/dma-buffer",
-  "//src/devices/lib/driver",
   "//src/devices/lib/mmio",
   "//src/devices/pci/lib/device-protocol-pci",
   "//src/devices/pci/lib/pci",
-  "//src/lib/ddk",
   "//zircon/system/ulib/fbl",
   "//zircon/system/ulib/fzl",
   "//zircon/system/ulib/hwreg",
@@ -48,6 +50,7 @@ fuchsia_driver("nvme-driver") {
   output_name = "nvme"
   configs += [ "//build/config:all_source" ]
   sources = [
+    "export.cc",
     "namespace.cc",
     "nvme.cc",
     "queue-pair.cc",
@@ -76,11 +79,11 @@ test("nvme-queue-tests-bin") {
   deps = [
     ":nvme_bind",
     "//src/devices/lib/dma-buffer",
-    "//src/devices/lib/driver",
     "//src/devices/testing/fake-bti",
-    "//src/lib/ddk",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
-    "//zircon/system/ulib/zxtest",
   ]
 }
 
@@ -97,16 +100,18 @@ test("nvme-queue-pair-tests-bin") {
   ]
   deps = [
     ":nvme_bind",
+    "//sdk/lib/driver/logging/cpp",
+    "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//src/devices/lib/dma-buffer",
-    "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
     "//src/devices/lib/mmio:test_helper",
     "//src/devices/testing/fake-bti",
-    "//src/lib/ddk",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
     "//zircon/system/ulib/sync",
-    "//zircon/system/ulib/zxtest",
   ]
 }
 
@@ -128,10 +133,12 @@ test("nvme-unit-tests-bin") {
     "queue.cc",
   ]
   deps = common_deps + [
-           "//sdk/lib/inspect/testing/cpp:zxtest",
+           "//sdk/lib/driver/testing/cpp",
+           "//sdk/lib/driver/testing/cpp:minimal_compat_environment",
+           "//sdk/lib/inspect/testing/cpp",
            "//src/devices/testing/fake-bti",
-           "//src/devices/testing/mock-ddk",
-           "//zircon/system/ulib/zxtest",
+           "//src/lib/fxl/test:gtest_main",
+           "//src/lib/testing/predicates",
          ]
 }
 

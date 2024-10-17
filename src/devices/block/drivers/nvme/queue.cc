@@ -4,7 +4,6 @@
 
 #include "src/devices/block/drivers/nvme/queue.h"
 
-#include <lib/ddk/debug.h>
 #include <lib/zx/bti.h>
 #include <zircon/syscalls.h>
 

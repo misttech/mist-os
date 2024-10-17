@@ -4,7 +4,6 @@
 
 #include "src/devices/block/drivers/nvme/fake/fake-controller.h"
 
-#include <lib/ddk/debug.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/clock.h>
 
