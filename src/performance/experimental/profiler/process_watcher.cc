@@ -29,8 +29,7 @@ zx::result<> profiler::ProcessWatcher::Watch(async_dispatcher_t* dispatcher) {
 
   wait_.emplace(this, exception_channel_.get(), ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED,
                 /*options=*/0);
-  wait_->Begin(dispatcher);
-  return zx::ok();
+  return zx::make_result(wait_->Begin(dispatcher));
 }
 
 void profiler::ProcessWatcher::HandleException(async_dispatcher_t* dispatcher,

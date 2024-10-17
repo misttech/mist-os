@@ -810,3 +810,38 @@ TEST(ProfilerIntegrationTest, ExitedProcess) {
 
   ASSERT_TRUE(client->Reset().is_ok());
 }
+
+TEST(ProfilerIntegrationTest, ExitedAfterConfigure) {
+  auto lifecycle_client_end = component::Connect<fuchsia_sys2::LifecycleController>();
+  ASSERT_TRUE(lifecycle_client_end.is_ok());
+  const fidl::SyncClient lifecycle_client{std::move(*lifecycle_client_end)};
+
+  zx::result client_end = component::Connect<fprofiler::Session>();
+  ASSERT_TRUE(client_end.is_ok());
+  const fidl::SyncClient client{std::move(*client_end)};
+
+  zx::socket in_socket, outgoing_socket;
+  ASSERT_EQ(zx::socket::create(0u, &in_socket, &outgoing_socket), ZX_OK);
+
+  const std::string name = "demo_target";
+  const std::string url = "demo_target#meta/demo_target.cm";
+  const std::string moniker = "./launchpad:demo_target";
+
+  fprofiler::TargetConfig target_config = fprofiler::TargetConfig::WithComponent(
+      fprofiler::AttachConfig::WithAttachToComponentMoniker(moniker));
+
+  ASSERT_TRUE(RunInstance(lifecycle_client, name, url, moniker).is_ok());
+  ASSERT_TRUE(client
+                  ->Configure({{.output = std::move(outgoing_socket),
+                                .config = fprofiler::Config{{
+                                    .configs = default_sample_configs(),
+                                    .target = std::move(target_config),
+                                }}}})
+                  .is_ok());
+  // Destroy the instance after configuring, but before starting. We should still be able to run the
+  // profiler, though we may not get any samples.
+  ASSERT_TRUE(TearDownInstance(lifecycle_client, name, moniker).is_ok());
+  ASSERT_TRUE(client->Start({{.buffer_results = true}}).is_ok());
+  ASSERT_TRUE(client->Stop().is_ok());
+  ASSERT_TRUE(client->Reset().is_ok());
+}
