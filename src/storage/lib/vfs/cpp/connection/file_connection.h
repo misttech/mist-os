@@ -59,11 +59,11 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
   void GetFlags(GetFlagsCompleter::Sync& completer) override;
   void SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& completer) override;
   void QueryFilesystem(QueryFilesystemCompleter::Sync& completer) final;
-  void GetAttributes(fuchsia_io::wire::Node2GetAttributesRequest* request,
+  void GetAttributes(fuchsia_io::wire::NodeGetAttributesRequest* request,
                      GetAttributesCompleter::Sync& completer) final;
   void UpdateAttributes(fuchsia_io::wire::MutableNodeAttributes* request,
                         UpdateAttributesCompleter::Sync& completer) final;
-  void Reopen(fuchsia_io::wire::Node2ReopenRequest* request,
+  void Reopen(fuchsia_io::wire::NodeReopenRequest* request,
               ReopenCompleter::Sync& completer) final {
     request->object_request.Close(ZX_ERR_NOT_SUPPORTED);
   }

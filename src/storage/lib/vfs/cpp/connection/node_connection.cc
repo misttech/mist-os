@@ -81,7 +81,7 @@ void NodeConnection::SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync&
   completer.Reply(ZX_ERR_BAD_HANDLE);
 }
 
-void NodeConnection::GetAttributes(fio::wire::Node2GetAttributesRequest* request,
+void NodeConnection::GetAttributes(fio::wire::NodeGetAttributesRequest* request,
                                    GetAttributesCompleter::Sync& completer) {
   internal::NodeAttributeBuilder builder;
   zx::result attrs = builder.Build(*vnode(), request->query);

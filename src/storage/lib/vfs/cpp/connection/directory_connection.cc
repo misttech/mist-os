@@ -58,8 +58,8 @@ constexpr zx::result<std::tuple<fio::Rights, fio::Rights>> ValidateRequestRights
   return zx::ok(std::tuple{requested_rights & parent_rights, optional_rights & parent_rights});
 }
 
-void ForwardRequestToRemote(fio::wire::Directory2Open3Request* request,
-                            Vfs::Open2Result open_result, fio::Rights parent_rights) {
+void ForwardRequestToRemote(fio::wire::DirectoryOpen3Request* request, Vfs::Open2Result open_result,
+                            fio::Rights parent_rights) {
   ZX_DEBUG_ASSERT(open_result.vnode()->IsRemote());
   // Update the request path to point only to the remaining segment.
   request->path = fidl::StringView::FromExternal(open_result.path());
@@ -145,7 +145,7 @@ void DirectoryConnection::SetAttr(SetAttrRequestView request, SetAttrCompleter::
   completer.Reply(Connection::NodeUpdateAttributes(update).status_value());
 }
 
-void DirectoryConnection::GetAttributes(fio::wire::Node2GetAttributesRequest* request,
+void DirectoryConnection::GetAttributes(fio::wire::NodeGetAttributesRequest* request,
                                         GetAttributesCompleter::Sync& completer) {
   // TODO(https://fxbug.dev/346585458): This operation should require the GET_ATTRIBUTES right.
   internal::NodeAttributeBuilder builder;
@@ -244,7 +244,7 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
   }
 }
 
-void DirectoryConnection::Open3(fuchsia_io::wire::Directory2Open3Request* request,
+void DirectoryConnection::Open3(fuchsia_io::wire::DirectoryOpen3Request* request,
                                 Open3Completer::Sync& completer) {
   FS_PRETTY_TRACE_DEBUG("[DirectoryConnection::Open3] our rights: ", rights(), ", path: '",
                         request->path, "', flags: ", request->flags, "options: ", request->options);

@@ -14,6 +14,7 @@
 
 #include <gtest/gtest.h>
 
+#include "fidl/fuchsia.io/cpp/wire_types.h"
 #include "src/developer/adb/third_party/adb-file-sync/file_sync_service.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 
@@ -98,13 +99,13 @@ class FakeDirectory : public fidl::testing::WireTestBase<fuchsia_io::Directory> 
   }
   void ExpectGetAttr(fuchsia_io::wire::NodeAttributes attr) { expect_get_attr_.push(attr); }
 
-  void Open(fuchsia_io::wire::OpenableOpenRequest* request,
+  void Open(fuchsia_io::wire::DirectoryOpenRequest* request,
             OpenCompleter::Sync& completer) override {
     file_.BindServer(dispatcher_, request->object.TakeChannel());
   }
   FakeFile file_;  // Only allow one open file at a time for tests. Hardcoded file parameters.
 
-  void ReadDirents(fuchsia_io::wire::Directory1ReadDirentsRequest* request,
+  void ReadDirents(fuchsia_io::wire::DirectoryReadDirentsRequest* request,
                    ReadDirentsCompleter::Sync& completer) override {
     if (expect_read_dirents_.empty()) {
       completer.Reply(ZX_OK, {});

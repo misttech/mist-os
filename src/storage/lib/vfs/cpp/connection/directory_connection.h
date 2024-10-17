@@ -51,11 +51,11 @@ class DirectoryConnection final : public Connection,
   void SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync& completer) final;
   void GetFlags(GetFlagsCompleter::Sync& completer) final;
   void SetFlags(SetFlagsRequestView request, SetFlagsCompleter::Sync& completer) final;
-  void GetAttributes(fuchsia_io::wire::Node2GetAttributesRequest* request,
+  void GetAttributes(fuchsia_io::wire::NodeGetAttributesRequest* request,
                      GetAttributesCompleter::Sync& completer) final;
   void UpdateAttributes(fuchsia_io::wire::MutableNodeAttributes* request,
                         UpdateAttributesCompleter::Sync& completer) final;
-  void Reopen(fuchsia_io::wire::Node2ReopenRequest* request,
+  void Reopen(fuchsia_io::wire::NodeReopenRequest* request,
               ReopenCompleter::Sync& completer) final {
     request->object_request.Close(ZX_ERR_NOT_SUPPORTED);
   }
@@ -83,7 +83,7 @@ class DirectoryConnection final : public Connection,
   //
 
   void Open(OpenRequestView request, OpenCompleter::Sync& completer) final;
-  void Open3(fuchsia_io::wire::Directory2Open3Request* request,
+  void Open3(fuchsia_io::wire::DirectoryOpen3Request* request,
              Open3Completer::Sync& completer) final;
   void Unlink(UnlinkRequestView request, UnlinkCompleter::Sync& completer) final;
   void ReadDirents(ReadDirentsRequestView request, ReadDirentsCompleter::Sync& completer) final;
@@ -94,13 +94,13 @@ class DirectoryConnection final : public Connection,
   void Watch(WatchRequestView request, WatchCompleter::Sync& completer) final;
   void QueryFilesystem(QueryFilesystemCompleter::Sync& completer) final;
 #if FUCHSIA_API_LEVEL_LESS_THAN(23) || FUCHSIA_API_LEVEL_AT_LEAST(PLATFORM)
-  void Open2(fuchsia_io::wire::Directory2Open2Request* request,
+  void Open2(fuchsia_io::wire::DirectoryOpen2Request* request,
              Open2Completer::Sync& completer) final {
     completer.Close(ZX_ERR_NOT_SUPPORTED);
   }
 #endif
 #if FUCHSIA_API_LEVEL_AT_LEAST(18)
-  void CreateSymlink(fuchsia_io::wire::Directory2CreateSymlinkRequest* request,
+  void CreateSymlink(fuchsia_io::wire::DirectoryCreateSymlinkRequest* request,
                      CreateSymlinkCompleter::Sync& completer) final {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }

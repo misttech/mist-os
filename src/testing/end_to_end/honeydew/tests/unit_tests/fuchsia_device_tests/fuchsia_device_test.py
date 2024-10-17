@@ -125,8 +125,8 @@ def _file_read_result(data: f_io.Transfer) -> f_io.ReadableReadResult:
 
 def _file_attr_resp(
     status: fuchsia_controller.ZxStatus, size: int
-) -> f_io.Node1GetAttrResponse:
-    return f_io.Node1GetAttrResponse(
+) -> f_io.NodeGetAttrResponse:
+    return f_io.NodeGetAttrResponse(
         s=status,
         attributes=f_io.NodeAttributes(
             content_size=size,

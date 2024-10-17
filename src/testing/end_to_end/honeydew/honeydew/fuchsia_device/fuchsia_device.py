@@ -985,7 +985,7 @@ class FuchsiaDevice(
 
         # Get file size for verification later.
         try:
-            attr_resp: f_io.Node1GetAttrResponse = asyncio.run(
+            attr_resp: f_io.NodeGetAttrResponse = asyncio.run(
                 file_proxy.get_attr()
             )
             if attr_resp.s != fcp.ZxStatus.ZX_OK:
