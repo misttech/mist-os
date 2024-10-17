@@ -4275,7 +4275,7 @@ assembly_input_bundle("fonts_hermetic") {
   ]
 }
 
-assembly_input_bundle("tee_manager_shard_only") {
+assembly_input_bundle("tee_manager") {
   compiled_packages = [
     {
       name = "core"
@@ -4285,6 +4285,49 @@ assembly_input_bundle("tee_manager_shard_only") {
           shards = [
             "//src/security/bin/tee_manager/meta/tee_manager.core_shard.cml",
           ]
+        },
+      ]
+    },
+    {
+      name = "tee_manager"
+      components = [
+        {
+          component_name = "tee_manager"
+          shards = []
+        },
+      ]
+      contents = [
+        {
+          label = "//src/security/bin/tee_manager:bin"
+          source = "${root_out_dir}/tee_manager"
+          destination = "bin/tee_manager"
+        },
+      ]
+
+      component_includes = [
+        {
+          source = "//sdk/lib/syslog/client.shard.cml"
+          destination = "syslog/client.shard.cml"
+        },
+        {
+          source = "//src/security/bin/tee_manager/meta/tee_manager.base.cml"
+          destination = "tee_manager.base.cml"
+        },
+        {
+          source = "//sdk/lib/inspect/offer.shard.cml"
+          destination = "inspect/offer.shard.cml"
+        },
+        {
+          source = "//sdk/lib/syslog/offer.shard.cml"
+          destination = "syslog/offer.shard.cml"
+        },
+        {
+          source = "//sdk/lib/inspect/use.shard.cml"
+          destination = "inspect/use.shard.cml"
+        },
+        {
+          source = "//sdk/lib/syslog/use.shard.cml"
+          destination = "syslog/use.shard.cml"
         },
       ]
     },

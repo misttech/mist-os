@@ -300,7 +300,7 @@ user_platform_aib_names =
       "zoneinfo",
 
       # Security / Trusted Execution
-      "tee_manager_shard_only",
+      "tee_manager",
     ]
 
 # The names of all userdebug-allowed platform Assembly Input Bundles
