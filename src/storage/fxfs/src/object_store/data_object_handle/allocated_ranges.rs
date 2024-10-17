@@ -59,6 +59,10 @@ impl AllocatedRanges {
         Self { ranges: Mutex::new(ranges) }
     }
 
+    pub fn clear(&self) {
+        self.ranges.lock().unwrap().clear();
+    }
+
     pub fn overlap<'a>(&'a self, query_range: Range<u64>) -> RangeOverlapIter<'a> {
         let ranges = self.ranges.lock().unwrap();
         let index = match ranges.binary_search_by_key(&query_range.start, |r| r.end) {

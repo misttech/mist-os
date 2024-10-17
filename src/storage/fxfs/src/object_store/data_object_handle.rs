@@ -169,6 +169,11 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             FsverityState::Pending(inner) => *mut_fsverity_state = FsverityState::Some(inner),
             FsverityState::Some(_) => panic!("Fsverity state was already set to Some"),
         }
+        // Once we finalize the fsverity state, the file is permanently read-only. The in-memory
+        // overwrite ranges tracking is only used for writing, so we don't need them anymore. This
+        // leaves any uninitialized, but allocated, overwrite regions if there are any, rather than
+        // converting them back to sparse regions.
+        self.overwrite_ranges.clear();
     }
 
     /// Sets `self.fsverity_state` directly to Some without going through the entire state machine.
