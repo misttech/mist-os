@@ -178,6 +178,10 @@ where
     Ok(result.into())
 }
 
+pub fn parse_verbose<'a>(unparsed_selector: &'a str) -> Result<Selector, Error> {
+    parse_selector::<VerboseError>(unparsed_selector)
+}
+
 /// Remove any comments process a quoted line.
 pub fn parse_selector_file<E>(selector_file: &Path) -> Result<Vec<Selector>, Error>
 where

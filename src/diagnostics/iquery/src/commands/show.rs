@@ -7,7 +7,6 @@ use crate::commands::utils;
 use crate::text_formatter;
 use crate::types::Error;
 use argh::{ArgsInfo, FromArgs};
-use async_trait::async_trait;
 use derivative::Derivative;
 use diagnostics_data::{Inspect, InspectData};
 use serde::Serialize;
@@ -99,9 +98,14 @@ pub struct ShowCommand {
     /// means that the command will connect to the `FeedbackArchiveAccecssor`
     /// exposed by `bootstrap/archivist`.
     pub accessor: Option<String>,
+
+    #[argh(option)]
+    /// specifies a tree published by a component by name.
+    ///
+    /// If a selector is also provided, the specified name will be added to the selector.
+    pub name: Option<String>,
 }
 
-#[async_trait]
 impl Command for ShowCommand {
     type Result = ShowResult;
 
@@ -113,10 +117,10 @@ impl Command for ShowCommand {
             provider,
         )
         .await?;
-        let selectors = utils::expand_selectors(selectors)?;
+        let selectors = utils::expand_selectors(selectors, self.name)?;
 
         let inspect_data_iter =
-            provider.snapshot::<Inspect>(&self.accessor, &selectors).await?.into_iter();
+            provider.snapshot::<Inspect>(&self.accessor, selectors).await?.into_iter();
 
         let mut results = inspect_data_iter
             .map(|mut d: InspectData| {

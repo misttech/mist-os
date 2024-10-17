@@ -5,7 +5,6 @@
 use crate::commands::*;
 use crate::types::*;
 use argh::FromArgs;
-use async_trait::async_trait;
 use serde::Serialize;
 
 #[derive(FromArgs, PartialEq, Debug)]
@@ -35,7 +34,6 @@ fn serialize<T: Serialize + ToString>(format: &Format, input: T) -> Result<Strin
     }
 }
 
-#[async_trait]
 impl Command for CommandLine {
     type Result = String;
 

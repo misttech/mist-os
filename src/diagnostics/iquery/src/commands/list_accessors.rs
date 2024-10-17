@@ -5,7 +5,6 @@
 use crate::commands::types::*;
 use crate::types::Error;
 use argh::{ArgsInfo, FromArgs};
-use async_trait::async_trait;
 use serde::Serialize;
 use std::fmt;
 
@@ -15,7 +14,6 @@ use std::fmt;
 #[argh(subcommand, name = "list-accessors")]
 pub struct ListAccessorsCommand {}
 
-#[async_trait]
 impl Command for ListAccessorsCommand {
     type Result = ListAccessorsResult;
 

@@ -6,7 +6,6 @@ use crate::commands::types::DiagnosticsProvider;
 use crate::commands::utils::*;
 use crate::types::Error;
 use anyhow::anyhow;
-use async_trait::async_trait;
 use component_debug::dirs::*;
 use diagnostics_data::{Data, DiagnosticsData};
 use diagnostics_reader::{ArchiveReader, RetryConfig};
@@ -24,22 +23,20 @@ static ROOT_ARCHIVIST_ACCESSOR: &str =
 #[derive(Default)]
 pub struct ArchiveAccessorProvider;
 
-#[async_trait]
 impl DiagnosticsProvider for ArchiveAccessorProvider {
     async fn snapshot<D>(
         &self,
         accessor: &Option<String>,
-        selectors: &[String],
+        selectors: impl IntoIterator<Item = Selector>,
     ) -> Result<Vec<Data<D>>, Error>
     where
         D: DiagnosticsData,
     {
         let archive = connect_to_archivist_selector_str(accessor).await?;
-        let selectors = selectors.iter().map(|s| s.as_ref());
         ArchiveReader::new()
             .with_archive(archive)
             .retry(RetryConfig::never())
-            .add_selectors(selectors)
+            .add_selectors(selectors.into_iter())
             .snapshot::<D>()
             .await
             .map_err(|e| Error::Fetch(e))

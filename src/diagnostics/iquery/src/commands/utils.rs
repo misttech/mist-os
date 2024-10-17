@@ -7,6 +7,7 @@ use crate::commands::{Command, ListCommand};
 use crate::types::Error;
 use cm_rust::SourceName;
 use component_debug::realm::*;
+use fidl_fuchsia_diagnostics::{Selector, TreeNames};
 use fidl_fuchsia_sys2 as fsys2;
 use moniker::Moniker;
 use regex::Regex;
@@ -110,16 +111,64 @@ fn moniker_or_selector(untokenized_selector: &str) -> Result<MonikerOrSelector, 
     }
 }
 
+fn add_tree_name(mut selector: Selector, tree_name: String) -> Selector {
+    match selector.tree_names {
+        None => selector.tree_names = Some(TreeNames::Some(vec![tree_name])),
+        Some(ref mut names) => match names {
+            TreeNames::Some(ref mut names) => {
+                if !names.iter().any(|n| n == &tree_name) {
+                    names.push(tree_name)
+                }
+            }
+            TreeNames::All(_) => {}
+            TreeNames::__SourceBreaking { .. } => {
+                unreachable!("source breaking")
+            }
+        },
+    }
+
+    selector
+}
+
 /// Expand selectors.
-pub fn expand_selectors(selectors: Vec<String>) -> Result<Vec<String>, Error> {
+pub fn expand_selectors(
+    selectors: Vec<String>,
+    tree_name: Option<String>,
+) -> Result<Vec<Selector>, Error> {
     let mut result = vec![];
+
+    if selectors.is_empty() {
+        let Some(tree_name) = tree_name else {
+            return Ok(result);
+        };
+
+        // Safety: "**:*" is a valid selector
+        let mut selector = selectors::parse_verbose("**:*").unwrap();
+        selector.tree_names = Some(TreeNames::Some(vec![tree_name]));
+        return Ok(vec![selector]);
+    }
+
     for selector in selectors {
         match moniker_or_selector(&selector)? {
-            MonikerOrSelector::Selector => {
-                result.push(selector);
-            }
+            MonikerOrSelector::Selector => match selectors::parse_verbose(&selector) {
+                Ok(mut selector) => {
+                    if let Some(tree_name) = &tree_name {
+                        selector = add_tree_name(selector, tree_name.clone());
+                    }
+                    result.push(selector)
+                }
+                Err(e) => return Err(Error::ParseSelector(selector, e.into())),
+            },
             MonikerOrSelector::Moniker => {
-                result.push(format!("{}:*", selector));
+                match selectors::parse_verbose(&format!("{}:*", selector)) {
+                    Ok(mut selector) => {
+                        if let Some(tree_name) = &tree_name {
+                            selector = add_tree_name(selector, tree_name.clone());
+                        }
+                        result.push(selector)
+                    }
+                    Err(e) => return Err(Error::ParseSelector(selector, e.into())),
+                }
             }
         }
     }
@@ -173,6 +222,7 @@ mod test {
     use super::*;
     use assert_matches::assert_matches;
     use iquery_test_support::MockRealmQuery;
+    use selectors::parse_verbose;
     use std::sync::Arc;
 
     #[fuchsia::test]
@@ -194,5 +244,52 @@ mod test {
                 String::from("foo/component:expose:fuchsia.diagnostics.FeedbackArchiveAccessor"),
             ]
         );
+    }
+
+    #[fuchsia::test]
+    fn test_expand_selectors() {
+        let name = Some("abc".to_string());
+
+        let expected = vec![
+            parse_verbose("core/one:[name=abc]*").unwrap(),
+            parse_verbose("core/one:[name=abc]root").unwrap(),
+            parse_verbose("core/one:[name=xyz, name=abc]root").unwrap(),
+        ];
+
+        let actual = expand_selectors(
+            vec![
+                "core/one".to_string(),
+                "core/one:root".to_string(),
+                "core/one:[name=xyz]root".to_string(),
+            ],
+            name.clone(),
+        )
+        .unwrap();
+
+        assert_eq!(actual, expected);
+
+        let expected = vec![
+            parse_verbose("core/one:*").unwrap(),
+            parse_verbose("core/one:root").unwrap(),
+            parse_verbose("core/one:[name=xyz]root").unwrap(),
+        ];
+
+        let actual = expand_selectors(
+            vec![
+                "core/one".to_string(),
+                "core/one:root".to_string(),
+                "core/one:[name=xyz]root".to_string(),
+            ],
+            None,
+        )
+        .unwrap();
+
+        assert_eq!(actual, expected);
+
+        let expected = vec![parse_verbose("**:[name=abc]*").unwrap()];
+        let actual = expand_selectors(vec![], name).unwrap();
+        assert_eq!(actual, expected);
+
+        assert_eq!(expand_selectors(vec![], None).unwrap(), vec![]);
     }
 }
