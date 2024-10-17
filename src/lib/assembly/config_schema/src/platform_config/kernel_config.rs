@@ -51,4 +51,7 @@ pub struct PlatformKernelConfig {
     /// address space and uses more memory for page tables. Valid values range
     /// from 0-36. Default value is 30.
     pub aslr_entropy_bits: Option<u8>,
+    // Upper-bound in megabytes for the system memory.
+    // It simulates a system with less physical memory than it actually has.
+    pub memory_limit_mb: Option<u64>,
 }
