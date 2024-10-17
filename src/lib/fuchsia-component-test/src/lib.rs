@@ -3339,8 +3339,6 @@ mod tests {
         builder
             .add_capability(cm_rust::CapabilityDecl::Dictionary(cm_rust::DictionaryDecl {
                 name: "my_dict".parse().unwrap(),
-                source: None,
-                source_dictionary: None,
                 source_path: None,
             }))
             .await

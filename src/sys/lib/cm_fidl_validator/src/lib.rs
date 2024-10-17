@@ -1517,34 +1517,6 @@ impl<'a> ValidationContext<'a> {
     #[cfg(fuchsia_api_level_at_least = "HEAD")]
     fn validate_dictionary_decl(&mut self, dictionary: &'a fdecl::Dictionary) {
         let decl = DeclType::Dictionary;
-        match dictionary.source.as_ref() {
-            Some(fdecl::Ref::Self_(_)) | Some(fdecl::Ref::Parent(_)) => {
-                check_relative_path(
-                    dictionary.source_dictionary.as_ref(),
-                    decl,
-                    "source_dictionary",
-                    &mut self.errors,
-                );
-            }
-            Some(fdecl::Ref::Child(child)) => {
-                let _ = self.validate_child_ref(decl, "source", &child, OfferType::Static);
-                check_relative_path(
-                    dictionary.source_dictionary.as_ref(),
-                    decl,
-                    "source_dictionary",
-                    &mut self.errors,
-                );
-            }
-            Some(_) => {
-                self.errors.push(Error::invalid_field(decl, "source"));
-            }
-            None => {
-                if dictionary.source_dictionary.is_some() {
-                    self.errors.push(Error::extraneous_field(decl, "source_dictionary"));
-                }
-            }
-        };
-
         if let Some(path) = dictionary.source_path.as_ref() {
             if dictionary.source.is_some() {
                 self.errors.push(Error::extraneous_field(decl, "source"));
@@ -1558,25 +1530,6 @@ impl<'a> ValidationContext<'a> {
                     Some(DependencyNode::Capability(name)),
                 );
             }
-        }
-
-        // The dictionary capability may depend on a dictionary it extends.
-        if let (Some(name), Some(source_dictionary), Some(source)) = (
-            dictionary.name.as_ref(),
-            dictionary.source_dictionary.as_ref(),
-            dictionary.source.as_ref(),
-        ) {
-            self.validate_route_from_self(
-                decl,
-                Some(source),
-                Some(name),
-                Some(source_dictionary),
-                Self::dictionary_checker,
-            );
-            let source =
-                self.source_dependency_from_ref(None, Some(source_dictionary), Some(source));
-            let target = Some(DependencyNode::Capability(name));
-            self.add_strong_dep(source, target);
         }
     }
 
@@ -4575,69 +4528,6 @@ mod tests {
                 Error::dependency_cycle("{{child a -> child b -> capability dict -> child a}}".to_string()),
             ])),
         },
-        test_validate_strong_cycle_with_dictionary_that_extends => {
-            input = fdecl::Component {
-                offers: Some(vec![
-                    fdecl::Offer::Dictionary(fdecl::OfferDictionary {
-                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
-                        source_name: Some("dict".into()),
-                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "a".into(),
-                            collection: None,
-                        })),
-                        target_name: Some("dict".into()),
-                        dependency_type: Some(fdecl::DependencyType::Strong),
-                        ..Default::default()
-                    }),
-                    fdecl::Offer::Protocol(fdecl::OfferProtocol {
-                        source: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "a".into(),
-                            collection: None,
-                        })),
-                        source_name: Some("1".into()),
-                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "b".into(),
-                            collection: None,
-                        })),
-                        target_name: Some("1".into()),
-                        dependency_type: Some(fdecl::DependencyType::Strong),
-                        ..Default::default()
-                    }),
-                ]),
-                children: Some(vec![
-                    fdecl::Child {
-                        name: Some("a".into()),
-                        url: Some("fuchsia-pkg://child".into()),
-                        startup: Some(fdecl::StartupMode::Lazy),
-                        ..Default::default()
-                    },
-                    fdecl::Child {
-                        name: Some("b".into()),
-                        url: Some("fuchsia-pkg://child".into()),
-                        startup: Some(fdecl::StartupMode::Lazy),
-                        ..Default::default()
-                    },
-                ]),
-                capabilities: Some(vec![
-                    fdecl::Capability::Dictionary(fdecl::Dictionary {
-                        name: Some("dict".into()),
-                        source: Some(fdecl::Ref::Child(
-                            fdecl::ChildRef {
-                                name: "b".into(),
-                                collection: None,
-                            },
-                        )),
-                        source_dictionary: Some("d".into()),
-                        ..Default::default()
-                    }),
-                ]),
-                ..Default::default()
-            },
-            result = Err(ErrorList::new(vec![
-                Error::dependency_cycle("{{child a -> child b -> capability dict -> child a}}".to_string()),
-            ])),
-        },
-
         test_validate_use_from_child_offer_to_child_weak_cycle => {
             input = {
                 fdecl::Component {
@@ -7658,8 +7548,6 @@ mod tests {
                 capabilities: Some(vec![
                     fdecl::Capability::Dictionary(fdecl::Dictionary {
                         name: Some("dict".into()),
-                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                        source_dictionary: Some("parent_dict".into()),
                         ..Default::default()
                     }),
                     fdecl::Capability::Dictionary(fdecl::Dictionary {
@@ -9209,19 +9097,11 @@ mod tests {
                         storage_id: Some(fdecl::StorageId::StaticInstanceIdOrMoniker),
                         ..Default::default()
                     }),
-                    fdecl::Capability::Dictionary(fdecl::Dictionary {
-                        name: Some("dict".to_string()),
-                        source: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
-                            name: "invalid".to_string(),
-                        })),
-                        ..Default::default()
-                    }),
                 ]);
                 decl
             },
             result = Err(ErrorList::new(vec![
                 Error::invalid_field(DeclType::Storage, "source"),
-                Error::invalid_field(DeclType::Dictionary, "source"),
             ])),
         },
         test_validate_capabilities_long_identifiers => {
@@ -9382,34 +9262,6 @@ mod tests {
                 Error::duplicate_field(DeclType::Resolver, "name", "resolver"),
             ])),
         },
-        test_validate_capabilities_dictionary_extends_invalid => {
-            input = {
-                let mut decl = new_component_decl();
-                decl.capabilities = Some(vec![
-                    // Source dict from self missing
-                    fdecl::Capability::Dictionary(fdecl::Dictionary {
-                        name: Some("dict1".into()),
-                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
-                        source_dictionary: Some("other_dict/inner".into()),
-                        ..Default::default()
-                    }),
-                    // Dynamic dicts don't support extension
-                    fdecl::Capability::Dictionary(fdecl::Dictionary {
-                        name: Some("dict2".into()),
-                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                        source_dictionary: Some("other_dict/inner".into()),
-                        source_path: Some("/out/dir".into()),
-                        ..Default::default()
-                    }),
-                ]);
-                decl
-            },
-            result = Err(ErrorList::new(vec![
-                Error::invalid_capability(DeclType::Dictionary, "source", "other_dict"),
-                Error::extraneous_field(DeclType::Dictionary, "source"),
-            ])),
-        },
-
         test_validate_invalid_service_aggregation_conflicting_filter => {
             input = {
                 let mut decl = new_component_decl();

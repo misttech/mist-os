@@ -433,9 +433,7 @@ impl ResolvedInstanceState {
             state.get_child_component_output_dictionary_routers();
         let (program_output_dict, declared_dictionaries) = build_program_output_dictionary(
             component,
-            &child_outgoing_dictionary_routers,
             &decl,
-            &component_input,
             &new_program_router,
             &ResolvedInstanceState::make_program_outgoing_router,
         );

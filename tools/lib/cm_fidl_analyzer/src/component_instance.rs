@@ -164,9 +164,7 @@ impl ComponentInstanceForAnalyzer {
             static_children_component_output_dictionary_routers(&self_, &decl);
         let (program_output_dict, declared_dictionaries) = build_program_output_dictionary(
             &self_,
-            &children_component_output_dictionary_routers,
             &decl,
-            &input,
             &new_program_router,
             &new_outgoing_dir_router,
         );

@@ -789,8 +789,6 @@ async fn get_realm(
     test_wrapper_decl.capabilities.push(cm_rust::CapabilityDecl::Dictionary(
         cm_rust::DictionaryDecl {
             name: DIAGNOSTICS_DICTIONARY_NAME.parse().unwrap(),
-            source: None,
-            source_dictionary: None,
             source_path: None,
         },
     ));

@@ -2570,15 +2570,6 @@ pub struct Capability {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub from: Option<CapabilityFromRef>,
 
-    /// (`dictionary` only, optional) The contents to initialize a dictionary with. One of:
-    /// - `parent/<relative_path>`: A path to a dictionary offered by `parent`.
-    /// - `#<child-name>/<relative_path>`: A path to a dictionary exposed by `#<child-name>`.
-    /// - `self/<relative_path>`: A path to a dictionary defined by this component.
-    /// `<relative_path>` may be either a name, identifying a dictionary capability), or
-    /// a path with multiple parts, identifying a nested dictionary.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub extends: Option<DictionaryRef>,
-
     /// (`storage` only) The [name](#name) of the directory capability backing the storage. The
     /// capability must be available from the component referenced in `from`.
     #[serde(skip_serializing_if = "Option::is_none")]

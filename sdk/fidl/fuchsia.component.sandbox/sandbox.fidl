@@ -100,7 +100,7 @@ type DictionaryError = flexible enum {
     /// The Capability is invalid.
     ///
     /// Capabilities must be created by sandbox, via
-    /// `fuchsia.component.sandbox.Factory` or returned from other
+    /// `fuchsia.component.sandbox/CapabilityStore` or returned from other
     /// Component Framework APIs.
     BAD_CAPABILITY = 3;
 

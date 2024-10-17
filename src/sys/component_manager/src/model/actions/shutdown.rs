@@ -7,13 +7,12 @@ use crate::model::component::instance::{InstanceState, ResolvedInstanceState};
 use crate::model::component::ComponentInstance;
 use async_trait::async_trait;
 use cm_rust::{
-    CapabilityDecl, ChildRef, CollectionDecl, DependencyType, DictionaryDecl, DictionarySource,
-    EnvironmentDecl, ExposeDecl, OfferConfigurationDecl, OfferDecl, OfferDictionaryDecl,
-    OfferDirectoryDecl, OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl,
-    OfferSource, OfferStorageDecl, OfferTarget, RegistrationDeclCommon, RegistrationSource,
-    SourcePath, StorageDecl, StorageDirectorySource, UseConfigurationDecl, UseDecl,
-    UseDirectoryDecl, UseEventStreamDecl, UseProtocolDecl, UseRunnerDecl, UseServiceDecl,
-    UseSource, UseStorageDecl,
+    CapabilityDecl, ChildRef, CollectionDecl, DependencyType, DictionaryDecl, EnvironmentDecl,
+    ExposeDecl, OfferConfigurationDecl, OfferDecl, OfferDictionaryDecl, OfferDirectoryDecl,
+    OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl, OfferSource,
+    OfferStorageDecl, OfferTarget, RegistrationDeclCommon, RegistrationSource, SourcePath,
+    StorageDecl, StorageDirectorySource, UseConfigurationDecl, UseDecl, UseDirectoryDecl,
+    UseEventStreamDecl, UseProtocolDecl, UseRunnerDecl, UseServiceDecl, UseSource, UseStorageDecl,
 };
 use cm_types::{IterablePath, Name};
 use errors::ActionError;
@@ -813,41 +812,7 @@ fn get_dependencies_from_capabilities(instance: &impl Component) -> Dependencies
     let mut edges = Dependencies::new();
     for capability in &instance.capabilities() {
         match capability {
-            CapabilityDecl::Dictionary(DictionaryDecl {
-                name,
-                source,
-                source_dictionary,
-                source_path,
-                ..
-            }) => {
-                let source = match source {
-                    Some(DictionarySource::Parent) => None,
-                    Some(DictionarySource::Child(ChildRef { name, collection })) => {
-                        match instance.find_child(name.as_str(), collection.as_ref()) {
-                            Some(child) => Some(child.moniker.clone().into()),
-                            None => {
-                                error!(
-                                    "dictionary source doesn't exist: (name: {:?}, collection: {:?})",
-                                    name, collection
-                                );
-                                None
-                            }
-                        }
-                    }
-                    Some(DictionarySource::Self_) => {
-                        let dictionary = source_dictionary
-                            .as_ref()
-                            .expect("source_dictionary must be set if source is set")
-                            .iter_segments()
-                            .next()
-                            .expect("source_dictionary must contain at least one segment");
-                        Some(ComponentRef::Capability(dictionary.clone()))
-                    }
-                    None => None,
-                };
-                if let Some(source) = source {
-                    edges.insert(source, ComponentRef::Capability(name.clone()));
-                }
+            CapabilityDecl::Dictionary(DictionaryDecl { name, source_path, .. }) => {
                 if let Some(_) = source_path {
                     // Dictionary is backed by the program, so there is an effective dependency
                     // from Self.
@@ -1136,52 +1101,6 @@ mod tests {
                 child("childA") => hashset![capability("dict")],
                 capability("dict") => hashset![child("childB")],
                 child("childB") => hashset![],
-            },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
-        )
-    }
-
-    #[fuchsia::test]
-    fn test_dictionary_dependency_with_extension() {
-        let decl = ComponentDeclBuilder::new()
-            // Chain together two dictionaries with extension.
-            .capability(
-                CapabilityBuilder::dictionary()
-                    .name("dict")
-                    .source_dictionary(DictionarySource::Self_, "other_dict"),
-            )
-            .capability(CapabilityBuilder::dictionary().name("other_dict").source_dictionary(
-                DictionarySource::Child(ChildRef {
-                    name: "childA".parse().unwrap(),
-                    collection: None,
-                }),
-                "remote/dict",
-            ))
-            .offer(
-                OfferBuilder::protocol()
-                    .name("serviceA")
-                    .source_static_child("childB")
-                    .target(OfferTarget::Capability("other_dict".parse().unwrap())),
-            )
-            .offer(
-                OfferBuilder::dictionary()
-                    .name("dict")
-                    .source(OfferSource::Self_)
-                    .target_static_child("childC"),
-            )
-            .child_default("childA")
-            .child_default("childB")
-            .child_default("childC")
-            .build();
-
-        pretty_assertions::assert_eq!(
-            hashmap! {
-                ComponentRef::Self_ => hashset![child("childA"), child("childB"), child("childC")],
-                child("childA") => hashset![capability("other_dict")],
-                child("childB") => hashset![capability("other_dict")],
-                capability("other_dict") => hashset![capability("dict")],
-                capability("dict") => hashset![child("childC")],
-                child("childC") => hashset![],
             },
             process_component_dependencies(&FakeComponent::from_decl(decl))
         )
