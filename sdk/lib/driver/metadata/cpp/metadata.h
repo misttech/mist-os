@@ -49,46 +49,19 @@ struct ObjectDetails {
 };
 
 // Connects to the fuchsia.driver.metadata/Metadata FIDL protocol found within the |incoming|
-// incoming namespace at FIDL service `ddk::ObjectDetails<|FidlType|>::Name` and instance
-// |instance_name|.
-template <typename FidlType>
+// incoming namespace at FIDL service |service_name| and instance |instance_name|.
 zx::result<fidl::ClientEnd<fuchsia_driver_metadata::Metadata>> ConnectToMetadataProtocol(
-    const std::shared_ptr<fdf::Namespace>& incoming,
-    std::string_view instance_name = component::OutgoingDirectory::kDefaultServiceInstance) {
-  static_assert(fidl::IsFidlType<FidlType>::value, "|FidlType| must be a FIDL domain object.");
-
-  static const char* kFidlServiceName = ObjectDetails<FidlType>::Name;
-
-  // The metadata protocol is found within the `kFidlServiceName` service directory and not the
-  // `fuchsia_driver_metadata::Service::Name` directory because that is where
-  // `fdf_metadata::MetadataServer` is expected to serve the fuchsia.driver.metadata/Metadata'
-  // protocol.
-  auto path = std::string{kFidlServiceName}
-                  .append("/")
-                  .append(instance_name)
-                  .append("/")
-                  .append(fuchsia_driver_metadata::Service::Metadata::Name);
-
-  zx::result result =
-      component::ConnectAt<fuchsia_driver_metadata::Metadata>(incoming->svc_dir(), path);
-  if (result.is_error()) {
-    FDF_SLOG(ERROR, "Failed to connect to metadata protocol.", KV("status", result.status_string()),
-             KV("path", path));
-    return result.take_error();
-  }
-
-  return zx::ok(std::move(result.value()));
-}
+    const std::shared_ptr<fdf::Namespace>& incoming, std::string_view service_name,
+    std::string_view instance_name = component::OutgoingDirectory::kDefaultServiceInstance);
 
 // Retrieves metadata from the fuchsia.driver.metadata/Metadata FIDL protocol within the |incoming|
-// incoming namespace found at FIDL service `fdf_metadata::ObjectDetails<|FidlType|>::Name` and
-// instance |instance_name|.
+// incoming namespace found at FIDL service |service_name| and instance |instance_name|.
 //
 // Make sure that the component manifest specifies that it uses the
 // `fdf_metadata::ObjectDetails<|FidlType|>::Name` FIDL service.
 template <typename FidlType>
-zx::result<FidlType> GetMetadata(
-    const std::shared_ptr<fdf::Namespace>& incoming,
+zx::result<FidlType> GetMetadataFromFidlService(
+    const std::shared_ptr<fdf::Namespace>& incoming, std::string_view service_name,
     std::string_view instance_name = component::OutgoingDirectory::kDefaultServiceInstance) {
   static_assert(fidl::IsFidlType<FidlType>::value, "|FidlType| must be a FIDL domain object.");
   static_assert(!fidl::IsResource<FidlType>::value,
@@ -96,7 +69,7 @@ zx::result<FidlType> GetMetadata(
 
   fidl::WireSyncClient<fuchsia_driver_metadata::Metadata> client{};
   {
-    zx::result result = ConnectToMetadataProtocol<FidlType>(incoming, instance_name);
+    zx::result result = ConnectToMetadataProtocol(incoming, service_name, instance_name);
     if (result.is_error()) {
       FDF_SLOG(ERROR, "Failed to connect to metadata server.",
                KV("status", result.status_string()));
@@ -105,7 +78,8 @@ zx::result<FidlType> GetMetadata(
     client.Bind(std::move(result.value()));
   }
 
-  fidl::WireResult metadata_bytes = client->GetMetadata();
+  fidl::WireResult<fuchsia_driver_metadata::Metadata::GetMetadata> metadata_bytes =
+      client->GetMetadata();
   if (!metadata_bytes.ok()) {
     FDF_SLOG(ERROR, "Failed to send GetMetadata request.",
              KV("status", metadata_bytes.status_string()));
@@ -127,12 +101,24 @@ zx::result<FidlType> GetMetadata(
   return zx::ok(metadata.value());
 }
 
+// The same as `fdf_metadata::GetMetadataFromFidlService()` except that the service name is assumed
+// to be `fdf_metadata::ObjectDetails<FidlType>::Name`. Make sure that
+// `fdf_metadata::ObjectDetails<FidlType>::Name` is defined. See `fdf_metadata::ObjectDetails` for
+// more info.
+template <typename FidlType>
+zx::result<FidlType> GetMetadata(
+    const std::shared_ptr<fdf::Namespace>& incoming,
+    std::string_view instance_name = component::OutgoingDirectory::kDefaultServiceInstance) {
+  return GetMetadataFromFidlService<FidlType>(incoming, ObjectDetails<FidlType>::Name,
+                                              instance_name);
+}
+
 // This function is the same as `fdf_metadata::GetMetadata<FidlType>()` except that it will return a
 // `std::nullopt` if there is no metadata FIDL protocol within |device|'s incoming namespace at
 // |instance_name|.
 template <typename FidlType>
-zx::result<std::optional<FidlType>> GetMetadataIfExists(
-    const std::shared_ptr<fdf::Namespace>& incoming,
+zx::result<std::optional<FidlType>> GetMetadataFromFidlServiceIfExists(
+    const std::shared_ptr<fdf::Namespace>& incoming, std::string_view service_name,
     std::string_view instance_name = component::OutgoingDirectory::kDefaultServiceInstance) {
   static_assert(fidl::IsFidlType<FidlType>::value, "|FidlType| must be a FIDL domain object.");
   static_assert(!fidl::IsResource<FidlType>::value,
@@ -140,7 +126,7 @@ zx::result<std::optional<FidlType>> GetMetadataIfExists(
 
   fidl::WireSyncClient<fuchsia_driver_metadata::Metadata> client{};
   {
-    zx::result result = ConnectToMetadataProtocol<FidlType>(incoming, instance_name);
+    zx::result result = ConnectToMetadataProtocol(incoming, service_name, instance_name);
     if (result.is_error()) {
       FDF_SLOG(DEBUG, "Failed to connect to metadata server.",
                KV("status", result.status_string()));
@@ -149,7 +135,8 @@ zx::result<std::optional<FidlType>> GetMetadataIfExists(
     client.Bind(std::move(result.value()));
   }
 
-  fidl::WireResult metadata_bytes = client->GetMetadata();
+  fidl::WireResult<fuchsia_driver_metadata::Metadata::GetMetadata> metadata_bytes =
+      client->GetMetadata();
   if (!metadata_bytes.ok()) {
     FDF_SLOG(DEBUG, "Failed to send GetMetadata request.",
              KV("status", metadata_bytes.status_string()));
@@ -169,6 +156,18 @@ zx::result<std::optional<FidlType>> GetMetadataIfExists(
   }
 
   return zx::ok(metadata.value());
+}
+
+// The same as `fdf_metadata::GetMetadataFromFidlServiceIfExists()` except that the service name is
+// assumed to be `fdf_metadata::ObjectDetails<FidlType>::Name`. Make sure that
+// `fdf_metadata::ObjectDetails<FidlType>::Name` is defined. See `fdf_metadata::ObjectDetails` for
+// more info.
+template <typename FidlType>
+zx::result<std::optional<FidlType>> GetMetadataIfExists(
+    const std::shared_ptr<fdf::Namespace>& incoming,
+    std::string_view instance_name = component::OutgoingDirectory::kDefaultServiceInstance) {
+  return GetMetadataFromFidlServiceIfExists<FidlType>(incoming, ObjectDetails<FidlType>::Name,
+                                                      instance_name);
 }
 
 }  // namespace fdf_metadata
