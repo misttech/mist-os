@@ -11,6 +11,7 @@
 #include <fidl/fuchsia.power.system/cpp/test_base.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/driver/power/cpp/testing/fake_element_control.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
@@ -33,7 +34,6 @@
 #include <zxtest/zxtest.h>
 
 #include "aml-sdmmc-regs.h"
-#include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
 #include "src/devices/lib/mmio/test-helper.h"
 
 namespace aml_sdmmc {
@@ -413,7 +413,7 @@ struct IncomingNamespace {
 
   fdf_testing::TestNode node{"root"};
   fdf_testing::internal::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
-  fake_pdev::FakePDevFidl pdev_server;
+  fdf_fake_platform_device::FakePDev pdev_server;
   FakeClock clock_server;
   zx::event exec_opportunistic, wake_assertive;
   std::optional<FakeSystemActivityGovernor> system_activity_governor;
@@ -456,14 +456,16 @@ class AmlSdmmcWithBanjoTest : public zxtest::Test {
       ASSERT_OK(incoming->env.Initialize(std::move(start_args_result->incoming_directory_server)));
 
       // Serve (fake) pdev_server.
-      fake_pdev::FakePDevFidl::Config config;
-      config.use_fake_irq = true;
+      fdf_fake_platform_device::FakePDev::Config config{.use_fake_irq = true,
+                                                        .device_info = fdf::PDev::DeviceInfo{}};
       zx::vmo dup;
       mmio_buffer_.get_vmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
-      config.mmios[0] =
-          fake_pdev::MmioInfo{std::move(dup), mmio_buffer_.get_offset(), mmio_buffer_.get_size()};
+      config.mmios[0] = fdf::PDev::MmioInfo{
+          .offset = mmio_buffer_.get_offset(),
+          .size = mmio_buffer_.get_size(),
+          .vmo = std::move(dup),
+      };
       config.btis[0] = std::move(bti);
-      config.device_info = pdev_device_info_t{};
       if (supply_power_framework) {
         config.power_elements = GetAllPowerConfigs();
       }

@@ -10,7 +10,6 @@
 #include <inttypes.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>  // TODO(b/301003087): Needed for PDEV_DID_AMLOGIC_SDMMC_A, etc.
-#include <lib/driver/logging/cpp/structured_logger.h>
 #include <lib/driver/power/cpp/element-description-builder.h>
 #include <lib/driver/power/cpp/power-support.h>
 #include <lib/fit/defer.h>
@@ -190,29 +189,22 @@ zx::result<> AmlSdmmc::Start() {
 
 zx::result<> AmlSdmmc::InitResources(
     fidl::ClientEnd<fuchsia_hardware_platform_device::Device> pdev_client) {
-  fidl::WireSyncClient pdev(std::move(pdev_client));
+  fdf::PDev pdev{std::move(pdev_client)};
 
   {
-    const auto result = pdev->GetMmioById(0);
-    if (!result.ok()) {
-      FDF_LOGL(ERROR, logger(), "Call to get MMIO failed: %s", result.status_string());
-      return zx::error(result.status());
+    zx::result mmio_params = pdev.GetMmio(0);
+    if (mmio_params.is_error()) {
+      FDF_LOGL(ERROR, logger(), "Failed to get MMIO: %s", mmio_params.status_string());
+      return mmio_params.take_error();
     }
-    if (!result->is_ok()) {
-      FDF_LOGL(ERROR, logger(), "Failed to get MMIO: %s",
-               zx_status_get_string(result->error_value()));
-      return zx::error(result->error_value());
-    }
-
-    const auto& mmio_params = result->value();
-    if (!mmio_params->has_offset() || !mmio_params->has_size() || !mmio_params->has_vmo()) {
+    if (!mmio_params->vmo || mmio_params->size == 0) {
       FDF_LOGL(ERROR, logger(), "Platform device provided invalid MMIO");
       return zx::error(ZX_ERR_BAD_STATE);
-    };
+    }
 
     auto mmio_result =
-        fdf::MmioBuffer::Create(mmio_params->offset(), mmio_params->size(),
-                                std::move(mmio_params->vmo()), ZX_CACHE_POLICY_UNCACHED_DEVICE);
+        fdf::MmioBuffer::Create(mmio_params->offset, mmio_params->size, std::move(mmio_params->vmo),
+                                ZX_CACHE_POLICY_UNCACHED_DEVICE);
     if (mmio_result.is_error()) {
       FDF_LOGL(ERROR, logger(), "Failed to map MMIO: %s", mmio_result.status_string());
       return mmio_result.take_error();
@@ -222,31 +214,21 @@ zx::result<> AmlSdmmc::InitResources(
   }
 
   {
-    const auto result = pdev->GetInterruptById(0, 0);
-    if (!result.ok()) {
-      FDF_LOGL(ERROR, logger(), "Call to get interrupt failed: %s", result.status_string());
-      return zx::error(result.status());
+    zx::result result = pdev.GetInterrupt(0);
+    if (result.is_error()) {
+      FDF_LOGL(ERROR, logger(), "Failed to get interrupt: %s", result.status_string());
+      return result.take_error();
     }
-    if (!result->is_ok()) {
-      FDF_LOGL(ERROR, logger(), "Failed to get interrupt: %s",
-               zx_status_get_string(result->error_value()));
-      return zx::error(result->error_value());
-    }
-    irq_ = std::move(result->value()->irq);
+    irq_ = std::move(result.value());
   }
 
   {
-    const auto result = pdev->GetBtiById(0);
-    if (!result.ok()) {
-      FDF_LOGL(ERROR, logger(), "Call to get BTI failed: %s", result.status_string());
-      return zx::error(result.status());
+    zx::result result = pdev.GetBti(0);
+    if (result.is_error()) {
+      FDF_LOGL(ERROR, logger(), "Failed to get BTI: %s", result.status_string());
+      return result.take_error();
     }
-    if (!result->is_ok()) {
-      FDF_LOGL(ERROR, logger(), "Failed to get BTI: %s",
-               zx_status_get_string(result->error_value()));
-      return zx::error(result->error_value());
-    }
-    bti_ = std::move(result->value()->bti);
+    bti_ = std::move(result.value());
   }
 
   // Optional protocol.
@@ -286,18 +268,13 @@ zx::result<> AmlSdmmc::InitResources(
   }
 
   {
-    const auto result = pdev->GetNodeDeviceInfo();
-    if (!result.ok()) {
-      FDF_LOGL(ERROR, logger(), "Call to get node device info failed: %s", result.status_string());
-      return zx::error(result.status());
-    }
-    if (!result->is_ok()) {
-      FDF_LOGL(ERROR, logger(), "Failed to get node device info: %s",
-               zx_status_get_string(result->error_value()));
-      return zx::error(result->error_value());
+    zx::result result = pdev.GetDeviceInfo();
+    if (result.is_error()) {
+      FDF_LOGL(ERROR, logger(), "Failed to get device info: %s", result.status_string());
+      return result.take_error();
     }
 
-    zx_status_t status = Init(*result->value());
+    zx_status_t status = Init(result.value());
     if (status != ZX_OK) {
       return zx::error(status);
     }
@@ -313,23 +290,18 @@ zx::result<> AmlSdmmc::InitResources(
   return zx::success();
 }
 
-zx::result<> AmlSdmmc::ConfigurePowerManagement(
-    fidl::WireSyncClient<fuchsia_hardware_platform_device::Device>& pdev) {
+zx::result<> AmlSdmmc::ConfigurePowerManagement(fdf::PDev& pdev) {
   // Get power configs from the board driver.
-  const auto result = pdev->GetPowerConfiguration();
-  if (!result.ok()) {
-    FDF_LOGL(ERROR, logger(), "Call to get power config failed: %s", result.status_string());
-    return zx::error(result.status());
-  }
-  if (result->is_error()) {
-    FDF_LOGL(INFO, logger(), "Was not able to get power config: %s",
-             zx_status_get_string(result->error_value()));
+  zx::result power_configs = pdev.GetPowerConfiguration();
+  if (power_configs.is_error()) {
+    FDF_LOGL(INFO, logger(), "Failed to get power configuration: %s",
+             power_configs.status_string());
     // Some boards and/or instances (e.g., SDIO, SD) may not have power configs. Do not fail driver
     // initialization in this case.
     return zx::success();
   }
 
-  if (result->value()->config.count() == 0) {
+  if (power_configs->empty()) {
     FDF_LOGL(INFO, logger(), "No power configs found.");
     // Do not fail driver initialization if there aren't any power configs.
     return zx::success();
@@ -343,20 +315,7 @@ zx::result<> AmlSdmmc::ConfigurePowerManagement(
   }
 
   // Register power configs with the Power Broker.
-  for (const auto& wire_config : result->value()->config) {
-    fdf_power::PowerElementConfiguration config;
-    {
-      fuchsia_hardware_power::PowerElementConfiguration natural_config =
-          fidl::ToNatural(wire_config);
-      zx::result result = fdf_power::PowerElementConfiguration::FromFidl(natural_config);
-      if (result.is_error()) {
-        FDF_SLOG(ERROR, "Failed to convert power element config from fidl.",
-                 KV("status", result.status_string()));
-        return result.take_error();
-      }
-      config = std::move(result.value());
-    }
-
+  for (const auto& config : power_configs.value()) {
     auto tokens = fdf_power::GetDependencyTokens(*incoming(), config);
     if (tokens.is_error()) {
       FDF_LOGL(ERROR, logger(), "Failed to get power dependency tokens: %u",
@@ -571,21 +530,22 @@ void AmlSdmmc::ClearStatus() {
       .WriteTo(&*mmio_);
 }
 
-void AmlSdmmc::Inspect::Init(
-    const fuchsia_hardware_platform_device::wire::NodeDeviceInfo& device_info,
-    inspect::Node& parent, bool is_power_suspended) {
+void AmlSdmmc::Inspect::Init(const fdf::PDev::DeviceInfo& device_info, inspect::Node& parent,
+                             bool is_power_suspended) {
   std::string root_name = "aml-sdmmc-port";
-  if (device_info.has_did()) {
-    if (device_info.did() == PDEV_DID_AMLOGIC_SDMMC_A) {
+  switch (device_info.did) {
+    case PDEV_DID_AMLOGIC_SDMMC_A:
       root_name += 'A';
-    } else if (device_info.did() == PDEV_DID_AMLOGIC_SDMMC_B) {
+      break;
+    case PDEV_DID_AMLOGIC_SDMMC_B:
       root_name += 'B';
-    } else if (device_info.did() == PDEV_DID_AMLOGIC_SDMMC_C) {
+      break;
+    case PDEV_DID_AMLOGIC_SDMMC_C:
       root_name += 'C';
-    }
-  }
-  if (root_name == "aml-sdmmc-port") {
-    root_name += "-unknown";
+      break;
+    default:
+      root_name += "-unknown";
+      break;
   }
 
   root = parent.CreateChild(root_name);
@@ -1777,8 +1737,7 @@ zx_status_t AmlSdmmc::RequestImpl(const fuchsia_hardware_sdmmc::wire::SdmmcReq& 
   return response.status_value();
 }
 
-zx_status_t AmlSdmmc::Init(
-    const fuchsia_hardware_platform_device::wire::NodeDeviceInfo& device_info) {
+zx_status_t AmlSdmmc::Init(const fdf::PDev::DeviceInfo& device_info) {
   std::lock_guard<std::mutex> lock(lock_);
 
   // The core clock must be enabled before attempting to access the start register.
