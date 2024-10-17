@@ -3,7 +3,7 @@
         avrcp_connection_failures: [
             "INSPECT:core/bt-avrcp:root/metrics:connection_errors",
         ],
-        le_connection_failures: "INSPECT:bootstrap/driver_manager:root/bt-host/adapter/low_energy_connection_manager:recent_connection_failures",
+        le_connection_failures: "INSPECT:core/bluetooth-core/bt-host-collection\\:bt-host*:root/adapter/low_energy_connection_manager:recent_connection_failures",
     },
     act: {
         le_connection_failures: {
