@@ -214,11 +214,11 @@ impl IfaceManagerApi for IfaceManager {
 }
 
 trait DefectReporter {
-    fn defect_sender(&self) -> mpsc::UnboundedSender<Defect>;
+    fn defect_sender(&self) -> mpsc::Sender<Defect>;
 
     fn report_defect(&self, defect: Defect) {
-        let defect_sender = self.defect_sender();
-        if let Err(e) = defect_sender.unbounded_send(defect) {
+        let mut defect_sender = self.defect_sender();
+        if let Err(e) = defect_sender.try_send(defect) {
             warn!("Failed to report defect {:?}: {:?}", defect, e)
         }
     }
@@ -228,14 +228,14 @@ trait DefectReporter {
 pub struct SmeForScan {
     proxy: fidl_sme::ClientSmeProxy,
     iface_id: u16,
-    defect_sender: mpsc::UnboundedSender<Defect>,
+    defect_sender: mpsc::Sender<Defect>,
 }
 
 impl SmeForScan {
     pub fn new(
         proxy: fidl_sme::ClientSmeProxy,
         iface_id: u16,
-        defect_sender: mpsc::UnboundedSender<Defect>,
+        defect_sender: mpsc::Sender<Defect>,
     ) -> Self {
         SmeForScan { proxy, iface_id, defect_sender }
     }
@@ -273,7 +273,7 @@ impl SmeForScan {
 }
 
 impl DefectReporter for SmeForScan {
-    fn defect_sender(&self) -> mpsc::UnboundedSender<Defect> {
+    fn defect_sender(&self) -> mpsc::Sender<Defect> {
         self.defect_sender.clone()
     }
 }
@@ -282,14 +282,14 @@ impl DefectReporter for SmeForScan {
 pub struct SmeForClientStateMachine {
     proxy: fidl_sme::ClientSmeProxy,
     iface_id: u16,
-    defect_sender: mpsc::UnboundedSender<Defect>,
+    defect_sender: mpsc::Sender<Defect>,
 }
 
 impl SmeForClientStateMachine {
     pub fn new(
         proxy: fidl_sme::ClientSmeProxy,
         iface_id: u16,
-        defect_sender: mpsc::UnboundedSender<Defect>,
+        defect_sender: mpsc::Sender<Defect>,
     ) -> Self {
         Self { proxy, iface_id, defect_sender }
     }
@@ -348,7 +348,7 @@ impl SmeForClientStateMachine {
 }
 
 impl DefectReporter for SmeForClientStateMachine {
-    fn defect_sender(&self) -> mpsc::UnboundedSender<Defect> {
+    fn defect_sender(&self) -> mpsc::Sender<Defect> {
         self.defect_sender.clone()
     }
 }
@@ -393,14 +393,14 @@ fn connect_txn_event_name(event: &fidl_sme::ConnectTransactionEvent) -> &'static
 pub struct SmeForApStateMachine {
     proxy: fidl_sme::ApSmeProxy,
     iface_id: u16,
-    defect_sender: mpsc::UnboundedSender<Defect>,
+    defect_sender: mpsc::Sender<Defect>,
 }
 
 impl SmeForApStateMachine {
     pub fn new(
         proxy: fidl_sme::ApSmeProxy,
         iface_id: u16,
-        defect_sender: mpsc::UnboundedSender<Defect>,
+        defect_sender: mpsc::Sender<Defect>,
     ) -> Self {
         Self { proxy, iface_id, defect_sender }
     }
@@ -456,7 +456,7 @@ impl SmeForApStateMachine {
 }
 
 impl DefectReporter for SmeForApStateMachine {
-    fn defect_sender(&self) -> mpsc::UnboundedSender<Defect> {
+    fn defect_sender(&self) -> mpsc::Sender<Defect> {
         self.defect_sender.clone()
     }
 }
@@ -1076,7 +1076,7 @@ mod tests {
             }))) => {
                 let (proxy, _) = create_proxy::<fidl_sme::ClientSmeMarker>()
                     .expect("failed to create scan sme proxy");
-                let (defect_sender, _defect_receiver) = mpsc::unbounded();
+                let (defect_sender, _defect_receiver) = mpsc::channel(100);
                 responder.send(Ok(SmeForScan{proxy, iface_id: 0, defect_sender})).expect("failed to send scan sme proxy");
             }
         );
@@ -1577,7 +1577,7 @@ mod tests {
         // Build an SME specifically for scanning.
         let (proxy, server_end) =
             create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
-        let (defect_sender, _defect_receiver) = mpsc::unbounded();
+        let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let sme = SmeForScan::new(proxy, 0, defect_sender);
         let mut sme_stream = server_end.into_stream().expect("failed to create SME stream");
 
@@ -1610,7 +1610,7 @@ mod tests {
         // Build an SME specifically for scanning.
         let (proxy, _) =
             create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
-        let (defect_sender, mut defect_receiver) = mpsc::unbounded();
+        let (defect_sender, mut defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
         let sme = SmeForScan::new(proxy, iface_id, defect_sender);
@@ -1641,7 +1641,7 @@ mod tests {
         // Create the SmeForScan
         let (proxy, _server) =
             create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
-        let (defect_sender, mut defect_receiver) = mpsc::unbounded();
+        let (defect_sender, mut defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
         let sme = SmeForScan::new(proxy, iface_id, defect_sender);
@@ -1678,7 +1678,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, sme_fut) =
             create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
-        let (defect_sender, _defect_receiver) = mpsc::unbounded();
+        let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
         let sme = SmeForClientStateMachine::new(proxy, iface_id, defect_sender);
@@ -1712,7 +1712,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, _) =
             create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
-        let (defect_sender, _defect_receiver) = mpsc::unbounded();
+        let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
         let sme = SmeForClientStateMachine::new(proxy, iface_id, defect_sender);
@@ -1731,7 +1731,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, _sme_fut) =
             create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
-        let (defect_sender, mut defect_receiver) = mpsc::unbounded();
+        let (defect_sender, mut defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
         let sme = SmeForClientStateMachine::new(proxy, iface_id, defect_sender);
@@ -1775,7 +1775,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, sme_fut) =
             create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
-        let (defect_sender, _defect_receiver) = mpsc::unbounded();
+        let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
         let sme = SmeForClientStateMachine::new(proxy, iface_id, defect_sender);
@@ -1837,7 +1837,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, sme_fut) =
             create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
-        let (defect_sender, _defect_receiver) = mpsc::unbounded();
+        let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
         let sme = SmeForClientStateMachine::new(proxy, iface_id, defect_sender);
@@ -1899,7 +1899,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, _) =
             create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
-        let (defect_sender, _defect_receiver) = mpsc::unbounded();
+        let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
         let sme = SmeForClientStateMachine::new(proxy, iface_id, defect_sender);
@@ -1922,7 +1922,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, _sme_fut) =
             create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create client SME");
-        let (defect_sender, mut defect_receiver) = mpsc::unbounded();
+        let (defect_sender, mut defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
         let sme = SmeForClientStateMachine::new(proxy, iface_id, defect_sender);
@@ -2021,7 +2021,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, sme_fut) =
             create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
-        let (defect_sender, _defect_receiver) = mpsc::unbounded();
+        let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
         let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
@@ -2056,7 +2056,7 @@ mod tests {
 
         // Build an SME wrapper.
         let (proxy, _) = create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
-        let (defect_sender, _defect_receiver) = mpsc::unbounded();
+        let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
         let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
@@ -2076,7 +2076,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, _sme_fut) =
             create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
-        let (defect_sender, mut defect_receiver) = mpsc::unbounded();
+        let (defect_sender, mut defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
         let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
@@ -2110,7 +2110,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, sme_fut) =
             create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
-        let (defect_sender, _defect_receiver) = mpsc::unbounded();
+        let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
         let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
@@ -2144,7 +2144,7 @@ mod tests {
 
         // Build an SME wrapper.
         let (proxy, _) = create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
-        let (defect_sender, _defect_receiver) = mpsc::unbounded();
+        let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
         let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
@@ -2163,7 +2163,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, _sme_fut) =
             create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
-        let (defect_sender, mut defect_receiver) = mpsc::unbounded();
+        let (defect_sender, mut defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
         let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
@@ -2196,7 +2196,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, sme_fut) =
             create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
-        let (defect_sender, _defect_receiver) = mpsc::unbounded();
+        let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
         let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
@@ -2230,7 +2230,7 @@ mod tests {
 
         // Build an SME wrapper.
         let (proxy, _) = create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
-        let (defect_sender, _defect_receiver) = mpsc::unbounded();
+        let (defect_sender, _defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
         let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
@@ -2249,7 +2249,7 @@ mod tests {
         // Build an SME wrapper.
         let (proxy, _sme_fut) =
             create_proxy::<fidl_sme::ApSmeMarker>().expect("failed to create AP SME");
-        let (defect_sender, mut defect_receiver) = mpsc::unbounded();
+        let (defect_sender, mut defect_receiver) = mpsc::channel(100);
         let mut rng = rand::thread_rng();
         let iface_id = rng.gen::<u16>();
         let sme = SmeForApStateMachine::new(proxy, iface_id, defect_sender);
