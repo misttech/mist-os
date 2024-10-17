@@ -1560,7 +1560,7 @@ multiconst!(zx_object_info_topic_t, [
     ZX_INFO_PROCESS_VMOS               = info_topic(14, 2); // zx_info_vmo_t[n]
     ZX_INFO_THREAD_STATS               = 15; // zx_info_thread_stats_t[1]
     ZX_INFO_CPU_STATS                  = 16; // zx_info_cpu_stats_t[n]
-    ZX_INFO_KMEM_STATS                 = 17; // zx_info_kmem_stats_t[1]
+    ZX_INFO_KMEM_STATS                 = info_topic(17, 1); // zx_info_kmem_stats_t[1]
     ZX_INFO_RESOURCE                   = 18; // zx_info_resource_t[1]
     ZX_INFO_HANDLE_COUNT               = 19; // zx_info_handle_count_t[1]
     ZX_INFO_BTI                        = 20; // zx_info_bti_t[1]
@@ -1777,13 +1777,23 @@ struct_decl_macro! {
     pub struct <zx_info_kmem_stats_t> {
         pub total_bytes: u64,
         pub free_bytes: u64,
+        pub free_loaned_bytes: u64,
         pub wired_bytes: u64,
         pub total_heap_bytes: u64,
         pub free_heap_bytes: u64,
         pub vmo_bytes: u64,
         pub mmu_overhead_bytes: u64,
         pub ipc_bytes: u64,
+        pub cache_bytes: u64,
+        pub slab_bytes: u64,
+        pub zram_bytes: u64,
         pub other_bytes: u64,
+        pub vmo_reclaim_total_bytes: u64,
+        pub vmo_reclaim_newest_bytes: u64,
+        pub vmo_reclaim_oldest_bytes: u64,
+        pub vmo_reclaim_disabled_bytes: u64,
+        pub vmo_discardable_locked_bytes: u64,
+        pub vmo_discardable_unlocked_bytes: u64,
     }
 }
 

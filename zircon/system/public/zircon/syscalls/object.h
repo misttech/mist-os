@@ -37,7 +37,8 @@ typedef uint32_t zx_object_info_topic_t;
 #define ZX_INFO_PROCESS_VMOS                __ZX_INFO_TOPIC(14u, 2)        // zx_info_vmo_t[n]
 #define ZX_INFO_THREAD_STATS                ((zx_object_info_topic_t) 15u) // zx_info_thread_stats_t[1]
 #define ZX_INFO_CPU_STATS                   ((zx_object_info_topic_t) 16u) // zx_info_cpu_stats_t[n]
-#define ZX_INFO_KMEM_STATS                  ((zx_object_info_topic_t) 17u) // zx_info_kmem_stats_t[1]
+#define ZX_INFO_KMEM_STATS                  __ZX_INFO_TOPIC(17u, 1)        // zx_info_kmem_stats_t[1]
+#define ZX_INFO_KMEM_STATS_V1               __ZX_INFO_TOPIC(17u, 0)        // zx_info_kmem_stats_v1_t[1]
 #define ZX_INFO_RESOURCE                    ((zx_object_info_topic_t) 18u) // zx_info_resource_t[1]
 #define ZX_INFO_HANDLE_COUNT                ((zx_object_info_topic_t) 19u) // zx_info_handle_count_t[1]
 #define ZX_INFO_BTI                         ((zx_object_info_topic_t) 20u) // zx_info_bti_t[1]
@@ -705,101 +706,130 @@ typedef struct zx_info_cpu_stats {
     uint64_t generic_ipis;
 } zx_info_cpu_stats_t;
 
-// Information about kernel memory usage.
+// Information about memory usage as seen by the kernel.
 // Can be expensive to gather.
 typedef struct zx_info_kmem_stats {
     // The total amount of physical memory available to the system.
+    // Note, the values below may not exactly add up to this total.
     uint64_t total_bytes;
 
-    // The amount of unallocated memory.
+    // The amount of unallocated memory available for general use. This is a
+    // subset of |total_bytes|.
     uint64_t free_bytes;
+
+    // The amount of unallocated memory loaned from VMOs that is available for
+    // allocations that support loaned memory. This is a subset of
+    // |total_bytes| and does not overlap with |free_bytes|.
+    uint64_t free_loaned_bytes;
 
     // The amount of memory reserved by and mapped into the kernel for reasons
     // not covered by other fields in this struct. Typically for readonly data
     // like the ram disk and kernel image, and for early-boot dynamic memory.
+    // This value of this field should not typically change post boot and is a
+    // subset of |total_bytes|.
     uint64_t wired_bytes;
 
-    // The amount of memory allocated to the kernel heap.
+    // The amount of memory allocated to the general kernel heap. This is a
+    // subset of |total_bytes|.
     uint64_t total_heap_bytes;
 
-    // The portion of |total_heap_bytes| that is not in use.
+    // The portion of |total_heap_bytes| that is not holding an allocated
+    // object.
     uint64_t free_heap_bytes;
 
-    // The amount of memory committed to VMOs, both kernel and user.
-    // A superset of all userspace memory.
-    // Does not include certain VMOs that fall under |wired_bytes|.
+    // The amount of memory committed to VMOs created by both kernel and user.
+    // Does not include certain VMOs that fall under |wired_bytes|. This is a
+    // subset of |total_bytes|.
     uint64_t vmo_bytes;
 
     // The amount of memory used for architecture-specific MMU metadata
-    // like page tables.
+    // like page tables for both kernel and user mappings. This is a subset of
+    // |total_bytes|.
     uint64_t mmu_overhead_bytes;
 
-    // The amount of memory in use by IPC.
+    // The amount of memory in use by IPC. This is a subset of |total_bytes|.
     uint64_t ipc_bytes;
 
-    // Non-free memory that isn't accounted for in any other field.
+    // The amount of memory in use by kernel allocation caches. This memory is
+    // not allocated, but is only available for use for specific kernel
+    // allocation requests. This is a subset of |total_bytes|.
+    uint64_t cache_bytes;
+
+    // The amount of memory in use by the kernel in slab allocators for kernel
+    // objects. Unlike the heap there is no measurement for the amount of slab
+    // memory that is not presently in use. This is a subset of |total_bytes|.
+    uint64_t slab_bytes;
+
+    // The amount of memory in use for storing compressed data that would
+    // otherwise be part of VMOs.
+    // Use ZX_INFO_KMEM_STATS_COMPRESSION for more details. This is a subset of
+    // |total_bytes|.
+    uint64_t zram_bytes;
+
+    // Non-free memory that isn't accounted for in any other field. This is a
+    // subset of |total_bytes|.
     uint64_t other_bytes;
-} zx_info_kmem_stats_t;
 
-// Information about kernel memory usage - includes information returned by
-// zx_info_kmem_stats_t plus some additional details.
-// More expensive to gather than zx_info_kmem_stats_t.
-typedef struct zx_info_kmem_stats_extended {
-    // The total amount of physical memory available to the system.
-    uint64_t total_bytes;
+    // The amount of memory committed to VMOs that is reclaimable by the kernel.
+    // This is a subset of |vmo_bytes|.
+    uint64_t vmo_reclaim_total_bytes;
 
-    // The amount of unallocated memory.
-    uint64_t free_bytes;
-
-    // The amount of memory reserved by and mapped into the kernel for reasons
-    // not covered by other fields in this struct. Typically for readonly data
-    // like the ram disk and kernel image, and for early-boot dynamic memory.
-    uint64_t wired_bytes;
-
-    // The amount of memory allocated to the kernel heap.
-    uint64_t total_heap_bytes;
-
-    // The portion of |total_heap_bytes| that is not in use.
-    uint64_t free_heap_bytes;
-
-    // The amount of memory committed to VMOs, both kernel and user.
-    // A superset of all userspace memory.
-    // Does not include certain VMOs that fall under |wired_bytes|.
-    uint64_t vmo_bytes;
-
-    // The amount of memory committed to pager-backed VMOs.
-    uint64_t vmo_pager_total_bytes;
-
-    // The amount of memory committed to pager-backed VMOs, that has been most
+    // The amount of memory committed to reclaimable VMOs, that has been most
     // recently accessed, and would not be eligible for eviction by the kernel
-    // under memory pressure.
-    uint64_t vmo_pager_newest_bytes;
+    // under memory pressure. This is a subset of |vmo_reclaim_total_bytes|.
+    uint64_t vmo_reclaim_newest_bytes;
 
-    // The amount of memory committed to pager-backed VMOs, that has been least
+    // The amount of memory committed to reclaimable VMOs, that has been least
     // recently accessed, and would be the first to be evicted by the kernel
-    // under memory pressure.
-    uint64_t vmo_pager_oldest_bytes;
+    // under memory pressure. This is a subset of |reclaim_total_bytes|.
+    uint64_t vmo_reclaim_oldest_bytes;
+
+    // The amount of memory in VMOs that would otherwise be tracked for
+    // reclamation, but has had reclamation disabled. This is a subset of
+    // |vmo_bytes|.
+    uint64_t vmo_reclaim_disabled_bytes;
 
     // The amount of memory committed to discardable VMOs that is currently
-    // locked, or unreclaimable by the kernel under memory pressure.
+    // locked, or unreclaimable by the kernel under memory pressure. This is a
+    // subset of |vmo_bytes| and some of this count may be included in any other
+    // |vmo_reclaim_*| count.
     uint64_t vmo_discardable_locked_bytes;
 
     // The amount of memory committed to discardable VMOs that is currently
-    // unlocked, or reclaimable by the kernel under memory pressure.
+    // unlocked, or reclaimable by the kernel under memory pressure. This is a
+    // subset of |vmo_bytes| and some of this count may be included in any other
+    // |vmo_reclaim_*| count.
     uint64_t vmo_discardable_unlocked_bytes;
+} zx_info_kmem_stats_t;
 
-    // The amount of memory used for architecture-specific MMU metadata
-    // like page tables.
+typedef struct zx_info_kmem_stats_v1 {
+    uint64_t total_bytes;
+    uint64_t free_bytes;
+    uint64_t wired_bytes;
+    uint64_t total_heap_bytes;
+    uint64_t free_heap_bytes;
+    uint64_t vmo_bytes;
     uint64_t mmu_overhead_bytes;
-
-    // The amount of memory in use by IPC.
     uint64_t ipc_bytes;
-
-    // Non-free memory that isn't accounted for in any other field.
     uint64_t other_bytes;
+} zx_info_kmem_stats_v1_t;
 
-    // The amount of memory in VMOs that would otherwise be tracked for
-    // reclamation, but has had reclamation disabled.
+// Deprecated, see zx_info_kmem_stats_t
+typedef struct zx_info_kmem_stats_extended {
+    uint64_t total_bytes;
+    uint64_t free_bytes;
+    uint64_t wired_bytes;
+    uint64_t total_heap_bytes;
+    uint64_t free_heap_bytes;
+    uint64_t vmo_bytes;
+    uint64_t vmo_pager_total_bytes;
+    uint64_t vmo_pager_newest_bytes;
+    uint64_t vmo_pager_oldest_bytes;
+    uint64_t vmo_discardable_locked_bytes;
+    uint64_t vmo_discardable_unlocked_bytes;
+    uint64_t mmu_overhead_bytes;
+    uint64_t ipc_bytes;
+    uint64_t other_bytes;
     uint64_t vmo_reclaim_disabled_bytes;
 } zx_info_kmem_stats_extended_t;
 

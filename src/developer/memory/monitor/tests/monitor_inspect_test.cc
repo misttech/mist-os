@@ -214,41 +214,41 @@ TEST_F(InspectTest, SecondLaunch) {
                    "high_water_digest", "high_water_digest_previous_boot", "kmem_stats_compression",
                    "values"})));
   EXPECT_THAT(data.GetByPath({"root", "current"}), EqJson(R"json(
-    "Time: 0 VMO: 45B Free: 41B\nkernel<1> 271B\n other 48B\n ipc 47B\n mmu 46B\n vmo 45B\n heap 43B\n wired 42B\n"
+    "Time: 0 VMO: 46B Free: 41B\nkernel<1> 280B\n other 52B\n ipc 48B\n mmu 47B\n vmo 46B\n heap 44B\n wired 43B\n"
   )json"));
   EXPECT_THAT(data.GetByPath({"root", "high_water"}), EqJson(R"json(
-    "Time: 0 VMO: 45B Free: 41B\nkernel<1> 271B\n other 48B\n ipc 47B\n mmu 46B\n vmo 45B\n heap 43B\n wired 42B\n"
+    "Time: 0 VMO: 46B Free: 41B\nkernel<1> 280B\n other 52B\n ipc 48B\n mmu 47B\n vmo 46B\n heap 44B\n wired 43B\n"
   )json"));
   EXPECT_THAT(data.GetByPath({"root", "high_water_previous_boot"}), EqJson(R"json(
-    "Time: 0 VMO: 45B Free: 41B\nkernel<1> 271B\n other 48B\n ipc 47B\n mmu 46B\n vmo 45B\n heap 43B\n wired 42B\n"
+    "Time: 0 VMO: 46B Free: 41B\nkernel<1> 280B\n other 52B\n ipc 48B\n mmu 47B\n vmo 46B\n heap 44B\n wired 43B\n"
   )json"));
   EXPECT_THAT(data.GetByPath({"root", "current_digest"}), EqJson(R"json(
-    "Orphaned: 45B\nKernel: 226B\nFree: 41B\n[Addl]PagerTotal: 46B\n[Addl]PagerNewest: 47B\n[Addl]PagerOldest: 48B\n[Addl]DiscardableLocked: 49B\n[Addl]DiscardableUnlocked: 50B\n[Addl]ZramCompressedBytes: 61B\n"
+    "Orphaned: 46B\nKernel: 234B\nFree: 41B\n[Addl]PagerTotal: 53B\n[Addl]PagerNewest: 54B\n[Addl]PagerOldest: 55B\n[Addl]DiscardableLocked: 57B\n[Addl]DiscardableUnlocked: 58B\n[Addl]ZramCompressedBytes: 61B\n"
   )json"));
   EXPECT_THAT(data.GetByPath({"root", "high_water_digest"}), EqJson(R"json(
-    "Orphaned: 45B\nKernel: 226B\nFree: 41B\n[Addl]PagerTotal: 46B\n[Addl]PagerNewest: 47B\n[Addl]PagerOldest: 48B\n[Addl]DiscardableLocked: 49B\n[Addl]DiscardableUnlocked: 50B\n[Addl]ZramCompressedBytes: 61B\n"
+    "Orphaned: 46B\nKernel: 234B\nFree: 41B\n[Addl]PagerTotal: 53B\n[Addl]PagerNewest: 54B\n[Addl]PagerOldest: 55B\n[Addl]DiscardableLocked: 57B\n[Addl]DiscardableUnlocked: 58B\n[Addl]ZramCompressedBytes: 61B\n"
   )json"));
   EXPECT_THAT(data.GetByPath({"root", "high_water_digest_previous_boot"}), EqJson(R"json(
-    "Orphaned: 45B\nKernel: 226B\nFree: 41B\n[Addl]PagerTotal: 46B\n[Addl]PagerNewest: 47B\n[Addl]PagerOldest: 48B\n[Addl]DiscardableLocked: 49B\n[Addl]DiscardableUnlocked: 50B\n[Addl]ZramCompressedBytes: 61B\n"
+    "Orphaned: 46B\nKernel: 234B\nFree: 41B\n[Addl]PagerTotal: 53B\n[Addl]PagerNewest: 54B\n[Addl]PagerOldest: 55B\n[Addl]DiscardableLocked: 57B\n[Addl]DiscardableUnlocked: 58B\n[Addl]ZramCompressedBytes: 61B\n"
   )json"));
 
   EXPECT_THAT(data.GetByPath({"root", "values"}), EqJson(R"json(
     {
       "total_bytes": 40,
       "free_bytes": 41,
-      "wired_bytes": 42,
-      "total_heap_bytes": 43,
-      "free_heap_bytes": 44,
-      "vmo_bytes": 45,
-      "vmo_pager_total_bytes": 46,
-      "vmo_pager_newest_bytes": 47,
-      "vmo_pager_oldest_bytes": 48,
-      "vmo_discardable_locked_bytes": 49,
-      "vmo_discardable_unlocked_bytes": 50,
-      "mmu_overhead_bytes": 51,
-      "ipc_bytes": 52,
-      "other_bytes": 53,
-      "vmo_reclaim_disabled_bytes": 54
+      "wired_bytes": 43,
+      "total_heap_bytes": 44,
+      "free_heap_bytes": 45,
+      "vmo_bytes": 46,
+      "vmo_pager_total_bytes": 53,
+      "vmo_pager_newest_bytes": 54,
+      "vmo_pager_oldest_bytes": 55,
+      "vmo_discardable_locked_bytes": 57,
+      "vmo_discardable_unlocked_bytes": 58,
+      "mmu_overhead_bytes": 47,
+      "ipc_bytes": 48,
+      "other_bytes": 52,
+      "vmo_reclaim_disabled_bytes": 56
     }
   )json"));
 

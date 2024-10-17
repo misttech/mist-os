@@ -37,29 +37,34 @@ std::unique_ptr<memory::MockOS> CreateMockOS() {
       .size_bytes = 0,
   };
 
-  static const zx_info_kmem_stats_extended_t kmem_stats_ext = {
+  static const zx_info_kmem_stats_t kmem_stats = {
       .total_bytes = 40,
       .free_bytes = 41,
-      .wired_bytes = 42,
-      .total_heap_bytes = 43,
-      .free_heap_bytes = 44,
-      .vmo_bytes = 45,
-      .vmo_pager_total_bytes = 46,
-      .vmo_pager_newest_bytes = 47,
-      .vmo_pager_oldest_bytes = 48,
-      .vmo_discardable_locked_bytes = 49,
-      .vmo_discardable_unlocked_bytes = 50,
-      .mmu_overhead_bytes = 51,
-      .ipc_bytes = 52,
-      .other_bytes = 53,
-      .vmo_reclaim_disabled_bytes = 54,
+      .free_loaned_bytes = 42,
+      .wired_bytes = 43,
+      .total_heap_bytes = 44,
+      .free_heap_bytes = 45,
+      .vmo_bytes = 46,
+      .mmu_overhead_bytes = 47,
+      .ipc_bytes = 48,
+      .cache_bytes = 49,
+      .slab_bytes = 50,
+      .zram_bytes = 51,
+      .other_bytes = 52,
+      .vmo_reclaim_total_bytes = 53,
+      .vmo_reclaim_newest_bytes = 54,
+      .vmo_reclaim_oldest_bytes = 55,
+      .vmo_reclaim_disabled_bytes = 56,
+      .vmo_discardable_locked_bytes = 57,
+      .vmo_discardable_unlocked_bytes = 58,
   };
-  static const memory::GetInfoResponse stat_ext_resp = {.handle = 1,
-                                                        .topic = ZX_INFO_KMEM_STATS_EXTENDED,
-                                                        .values = &kmem_stats_ext,
-                                                        .value_size = sizeof(kmem_stats_ext),
-                                                        .value_count = 1,
-                                                        .ret = ZX_OK};
+
+  static const memory::GetInfoResponse stat_resp = {.handle = 1,
+                                                    .topic = ZX_INFO_KMEM_STATS,
+                                                    .values = &kmem_stats,
+                                                    .value_size = sizeof(kmem_stats),
+                                                    .value_count = 1,
+                                                    .ret = ZX_OK};
 
   static const zx_info_kmem_stats_compression_t kmem_stats_cmp = {
       .uncompressed_storage_bytes = 60,
@@ -88,7 +93,7 @@ std::unique_ptr<memory::MockOS> CreateMockOS() {
   const memory::GetInfoResponse vmo_1_info = {
       handle_process_1, ZX_INFO_PROCESS_VMOS, &_vmo_1, sizeof(_vmo_1), 1, ZX_OK};
   return std::make_unique<memory::MockOS>(
-      memory::OsResponses{.get_info = {vmo_0_info, vmo_1_info, zram_stat, stat_ext_resp}});
+      memory::OsResponses{.get_info = {vmo_0_info, vmo_1_info, zram_stat, stat_resp}});
 }
 }  // namespace
 
