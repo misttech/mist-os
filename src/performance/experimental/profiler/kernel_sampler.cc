@@ -32,6 +32,7 @@ profiler::KernelSamplerSession::CreateAndInit(const zx_sampler_config_t& config)
 
   zx::iob iob;
 
+  FX_LOGS(DEBUG) << "Creating kernel sampler.";
   if (zx_status_t init_status =
           zx_sampler_create(debug_resource.get(), 0, &config, iob.reset_and_get_address());
       init_status != ZX_OK) {
@@ -47,6 +48,7 @@ zx::result<> profiler::KernelSamplerSession::Start() {
   if (running_) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
+  FX_LOGS(DEBUG) << "Starting kernel sampler.";
   running_ = true;
   return zx::make_result(zx_sampler_start(per_cpu_buffers_.get()));
 }
@@ -99,6 +101,7 @@ zx::result<> profiler::KernelSampler::Start(size_t buffer_size_mb) {
   }
   session_ = std::move(session_result).value();
 
+  FX_LOGS(DEBUG) << "Attaching to known tasks and watching for new ones.";
   zx::result known_threads_res = targets_.ForEachProcess(
       [this](cpp20::span<const zx_koid_t> job_path, const ProcessTarget& p) -> zx::result<> {
         TRACE_DURATION("cpu_profiler", "KernelSampler::Start/ForEachProcess");
@@ -181,6 +184,7 @@ zx::result<> profiler::KernelSampler::AddTarget(JobTarget&& target) {
 
 zx::result<> profiler::KernelSampler::Stop() {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
+  FX_LOGS(DEBUG) << "Stopping kernel sampler.";
   if (zx::result res = session_->Stop(); res.is_error()) {
     FX_PLOGS(WARNING, res.error_value()) << "Failed to stop";
     return res;

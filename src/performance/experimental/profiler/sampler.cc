@@ -288,7 +288,7 @@ zx::result<profiler::SymbolizationContext> profiler::Sampler::GetContexts() {
       targets_.ForEachProcess([&contexts](cpp20::span<const zx_koid_t>,
                                           const ProcessTarget& target) mutable -> zx::result<> {
         zx::result<std::vector<profiler::Module>> modules =
-            profiler::GetProcessModules(target.handle.borrow());
+            profiler::GetProcessModules(target.handle.borrow(), target.pid);
         if (modules.is_ok()) {
           contexts[target.pid] = *modules;
         }

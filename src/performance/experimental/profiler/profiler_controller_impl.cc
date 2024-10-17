@@ -110,6 +110,7 @@ zx::result<> PopulateTargets(profiler::TargetTree& tree, TaskFinder::FoundTasks&
 
     profiler::ProcessTarget process_target{std::move(process), pid,
                                            std::unordered_map<zx_koid_t, profiler::ThreadTarget>{}};
+    FX_LOGS(DEBUG) << "Collecting process modules for process " << pid << ".";
     elf_search::ForEachModule(process_target.handle,
                               [&process_target](const elf_search::ModuleInfo& info) {
                                 process_target.unwinder_data->modules.emplace_back(
@@ -207,6 +208,7 @@ zx::result<zx_koid_t> MonikerToJobId(const std::string& moniker) {
 void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
                                                  ConfigureCompleter::Sync& completer) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
+  FX_LOGS(DEBUG) << "Configuring profiler.";
   if (state_ != ProfilingState::Unconfigured) {
     completer.Reply(fit::error(fuchsia_cpu_profiler::SessionConfigureError::kBadState));
     return;
@@ -442,6 +444,7 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
 void profiler::ProfilerControllerImpl::Start(StartRequest& request,
                                              StartCompleter::Sync& completer) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
+  FX_LOGS(DEBUG) << "Starting profiler.";
   if (state_ != ProfilingState::Stopped) {
     completer.Reply(fit::error(fuchsia_cpu_profiler::SessionStartError::kBadState));
     return;
@@ -513,6 +516,7 @@ void profiler::ProfilerControllerImpl::Start(StartRequest& request,
 
 void profiler::ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
+  FX_LOGS(DEBUG) << "Stopping profiler.";
   zx::result<profiler::SymbolizationContext> modules = sampler_->GetContexts();
   if (modules.is_error()) {
     FX_PLOGS(ERROR, modules.status_value()) << "Failed to get modules";
@@ -579,6 +583,7 @@ void profiler::ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
   // full socket.
   completer.Reply(std::move(stats));
 
+  FX_LOGS(DEBUG) << "Sending samples.";
   for (const auto& [pid, samples] : sampler_->GetSamples()) {
     if (!fsl::BlockingCopyFromString(profiler::symbolizer_markup::kReset, socket_)) {
       FX_LOGS(ERROR) << "Failed to write symbolizer markup to socket";

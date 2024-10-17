@@ -165,16 +165,19 @@ zx::result<std::vector<zx_koid_t>> GetChildrenTids(const zx::process& process) {
 
 zx::result<profiler::ProcessTarget> profiler::MakeProcessTarget(zx::process process) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
-  zx::result<std::vector<zx_koid_t>> children = GetChildrenTids(process);
-  if (children.is_error()) {
-    return children.take_error();
-  }
   zx_info_handle_basic_t handle_info;
   zx_status_t res =
       process.get_info(ZX_INFO_HANDLE_BASIC, &handle_info, sizeof(handle_info), nullptr, nullptr);
   if (res != ZX_OK) {
     return zx::error(res);
   }
+  FX_LOGS(DEBUG) << "Creating process target for " << handle_info.koid << ".";
+
+  zx::result<std::vector<zx_koid_t>> children = GetChildrenTids(process);
+  if (children.is_error()) {
+    return children.take_error();
+  }
+
   std::unordered_map<zx_koid_t, profiler::ThreadTarget> threads;
   for (auto child_tid : *children) {
     zx::thread child_thread;
@@ -199,13 +202,6 @@ zx::result<profiler::ProcessTarget> profiler::MakeProcessTarget(zx::process proc
 zx::result<profiler::JobTarget> profiler::MakeJobTarget(zx::job job,
                                                         cpp20::span<const zx_koid_t> ancestry) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
-  size_t num_child_jobs;
-  if (zx_status_t status = job.get_info(ZX_INFO_JOB_CHILDREN, nullptr, 0, nullptr, &num_child_jobs);
-      status != ZX_OK) {
-    FX_PLOGS(WARNING, status) << "failed to query number of job children";
-    return zx::error(status);
-  }
-
   zx_info_handle_basic_t info;
   if (zx_status_t status =
           job.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
@@ -214,6 +210,14 @@ zx::result<profiler::JobTarget> profiler::MakeJobTarget(zx::job job,
     return zx::error(status);
   }
   zx_koid_t job_id = info.koid;
+  FX_LOGS(DEBUG) << "Creating job target  for " << job_id << ".";
+
+  size_t num_child_jobs;
+  if (zx_status_t status = job.get_info(ZX_INFO_JOB_CHILDREN, nullptr, 0, nullptr, &num_child_jobs);
+      status != ZX_OK) {
+    FX_PLOGS(WARNING, status) << "failed to query number of job children";
+    return zx::error(status);
+  }
 
   // Provide each of this job's children their ancestry, which is this job's ancestry, prepended to
   // this job's job id.
