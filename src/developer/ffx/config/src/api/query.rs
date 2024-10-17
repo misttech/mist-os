@@ -117,19 +117,31 @@ impl<'a> ConfigQuery<'a> {
         let ctx = self.get_env_context().map_err(|e| e.into())?;
         T::validate_query(self)?;
 
-        self.get_config(ctx.load().map_err(|e| e.into())?)
-            .map_err(|e| e.into())?
-            .recursive_map(&|val| runtime(&ctx, val))
-            .recursive_map(&|val| cache(&ctx, val))
-            .recursive_map(&|val| data(&ctx, val))
-            .recursive_map(&|val| config(&ctx, val))
-            .recursive_map(&|val| home(&ctx, val))
-            .recursive_map(&|val| build(&ctx, val))
-            .recursive_map(&|val| workspace(&ctx, val))
-            .recursive_map(&|val| env_var(&ctx, val))
-            .recursive_map(&T::handle_arrays)
-            .recursive_map(&validate_type::<T>)
-            .try_into()
+        // The use of `is_strict()` here is not ideal, because we'd like to have strict-specific
+        // library inside the subtool boundary. But when we change to read-only config, this code
+        // will all change: we'll build a single ConfigMap before invoking the subtool, rather than
+        // doing substitutions and layers at query time.
+        if ctx.is_strict() {
+            self.get_config(ctx.load().map_err(|e| e.into())?)
+                .map_err(|e| e.into())?
+                .recursive_map(&T::handle_arrays)
+                .recursive_map(&validate_type::<T>)
+                .try_into()
+        } else {
+            self.get_config(ctx.load().map_err(|e| e.into())?)
+                .map_err(|e| e.into())?
+                .recursive_map(&|val| runtime(&ctx, val))
+                .recursive_map(&|val| cache(&ctx, val))
+                .recursive_map(&|val| data(&ctx, val))
+                .recursive_map(&|val| config(&ctx, val))
+                .recursive_map(&|val| home(&ctx, val))
+                .recursive_map(&|val| build(&ctx, val))
+                .recursive_map(&|val| workspace(&ctx, val))
+                .recursive_map(&|val| env_var(&ctx, val))
+                .recursive_map(&T::handle_arrays)
+                .recursive_map(&validate_type::<T>)
+                .try_into()
+        }
     }
 
     /// Get a value with normal processing, but verifying that it's a file that exists.
@@ -142,19 +154,33 @@ impl<'a> ConfigQuery<'a> {
 
         let ctx = self.get_env_context().map_err(|e| e.into())?;
         T::validate_query(self)?;
-        self.get_config(ctx.load().map_err(|e| e.into())?)
-            .map_err(|e| e.into())?
-            .recursive_map(&|val| runtime(&ctx, val))
-            .recursive_map(&|val| cache(&ctx, val))
-            .recursive_map(&|val| data(&ctx, val))
-            .recursive_map(&|val| config(&ctx, val))
-            .recursive_map(&|val| home(&ctx, val))
-            .recursive_map(&|val| build(&ctx, val))
-            .recursive_map(&|val| workspace(&ctx, val))
-            .recursive_map(&|val| env_var(&ctx, val))
-            .recursive_map(&T::handle_arrays)
-            .recursive_map(&file_check)
-            .try_into()
+        // The use of `is_strict()` here is not ideal, because we'd like to have strict-specific
+        // library inside the subtool boundary. But when we change to read-only config, this code
+        // will all change: we'll build a single ConfigMap before invoking the subtool, rather than
+        // doing substitutions and layers at query time.
+        if ctx.is_strict() {
+            // Don't do any mapping
+
+            self.get_config(ctx.load().map_err(|e| e.into())?)
+                .map_err(|e| e.into())?
+                .recursive_map(&T::handle_arrays)
+                .recursive_map(&file_check)
+                .try_into()
+        } else {
+            self.get_config(ctx.load().map_err(|e| e.into())?)
+                .map_err(|e| e.into())?
+                .recursive_map(&|val| runtime(&ctx, val))
+                .recursive_map(&|val| cache(&ctx, val))
+                .recursive_map(&|val| data(&ctx, val))
+                .recursive_map(&|val| config(&ctx, val))
+                .recursive_map(&|val| home(&ctx, val))
+                .recursive_map(&|val| build(&ctx, val))
+                .recursive_map(&|val| workspace(&ctx, val))
+                .recursive_map(&|val| env_var(&ctx, val))
+                .recursive_map(&T::handle_arrays)
+                .recursive_map(&file_check)
+                .try_into()
+        }
     }
 
     fn validate_write_query(&self) -> Result<(&str, ConfigLevel)> {

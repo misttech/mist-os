@@ -105,15 +105,16 @@ impl EnvironmentContext {
             self_path: std::env::current_exe().unwrap(),
         };
 
-        // This just takes the whole config and makes it a flattened map of "default" and no other
-        // levels. The first pass at verification is for the runtime args, the second is for after
-        // the runtime args have overwritten the default config. The default config is built in, so
-        // this is to allow for a transition period in which the default config doesn't rely on
-        // environment variables, and they can be removed periodically.
+        // This just takes the whole config and makes it a flattened map of
+        // "default" plus "runtime". Since environment variables won't be
+        // expanded even when specified at run-time, we verify that there are no
+        // environment variables specified on the command line.  Values in the
+        // default config that refer to environment variables will be ignored,
+        // so such values will look like unspecified config values, and will
+        // need to be specified on the command-line. For example:
+        // `ffx ... --config ssh.priv=path/to/ssh-key --strict target echo`
         runtime_args.assert_no_env(None, &res)?;
         res.cache.overwrite_default(&runtime_args)?;
-        res.cache
-            .assert_no_env(Some("These errors are from the default config".to_owned()), &res)?;
         // TODO(b/368058956): Print a sanitized config into the logs so we can use it for
         // debugging.
         Ok(res)
