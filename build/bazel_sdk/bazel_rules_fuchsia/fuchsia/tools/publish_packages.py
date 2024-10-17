@@ -80,11 +80,20 @@ class FuchsiaTaskPublish(FuchsiaTask):
         if args.publish_only:
             return
         if (
-            run(args.ffx, "config", "get", "repository.server.enabled")
-            != "true"
+            json.loads(
+                run(
+                    args.ffx,
+                    "--machine",
+                    "json",
+                    "repository",
+                    "server",
+                    "status",
+                )
+            )["state"]
+            != "running"
         ):
             print(
-                "The ffx repository server is not enabled, starting it now..."
+                "The ffx repository server is not running, starting it now..."
             )
             run(args.ffx, "repository", "server", "start")
 
