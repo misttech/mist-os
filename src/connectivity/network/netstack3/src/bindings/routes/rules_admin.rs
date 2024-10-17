@@ -178,6 +178,35 @@ impl<I: Ip> RuleTable<I> {
             BTreeEntry::Vacant(_entry) => Err(fnet_routes_admin::RuleSetError::RuleDoesNotExist),
         }
     }
+
+    pub(super) fn handle_table_removed(
+        &mut self,
+        removed_table_id: routes::TableId<I>,
+    ) -> Vec<InstalledRule<I>> {
+        // TODO(https://github.com/rust-lang/rust/issues/70530): Use `extract_if`.
+        let mut removed = Vec::new();
+        for (priority, set) in self.rule_sets.iter_mut() {
+            set.rules.retain(|index, Rule { matcher, action }| {
+                let table_id = match action {
+                    RuleAction::Unreachable => None,
+                    RuleAction::Lookup(id) => Some(*id),
+                };
+
+                if table_id.is_some_and(|id| id == u32::from(removed_table_id)) {
+                    removed.push(InstalledRule {
+                        priority: *priority,
+                        index: *index,
+                        matcher: matcher.clone().into(),
+                        action: *action,
+                    });
+                    false
+                } else {
+                    true
+                }
+            })
+        }
+        removed
+    }
 }
 
 struct UserRuleSet<I: Ip> {

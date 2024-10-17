@@ -2,13 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::collections::HashSet;
+use std::pin::pin;
+
 use assert_matches::assert_matches;
 use fidl::endpoints::ProtocolMarker;
 use fidl::HandleBased;
 use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
-use fidl_fuchsia_net_routes_ext::rules::FidlRuleAdminIpExt;
+use fidl_fuchsia_net_routes_ext::rules::{FidlRuleAdminIpExt, FidlRuleIpExt};
 use fidl_fuchsia_net_routes_ext::FidlRouteIpExt;
-use fnet_routes_ext::rules::{RuleAction, RuleIndex, RuleMatcher};
+use fnet_routes_ext::rules::{InstalledRule, RuleAction, RuleIndex, RuleMatcher, RuleSetPriority};
 use futures::StreamExt as _;
 use net_types::ip::{GenericOverIp, Ip, IpInvariant};
 use netstack_testing_common::realms::Netstack3;
@@ -233,4 +236,96 @@ async fn bad_route_table_authentication<
         .await,
         Ok(Err(fnet_routes_admin::AuthenticateForRouteTableError::InvalidAuthentication))
     );
+}
+
+#[netstack_test]
+#[variant(I, Ip)]
+async fn table_removal_removes_rules<
+    I: FidlRouteAdminIpExt + FidlRouteIpExt + FidlRuleIpExt + FidlRuleAdminIpExt,
+>(
+    name: &str,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    // We don't support multiple route tables in netstack2.
+    let TestSetup {
+        realm,
+        network: _network,
+        interface: _,
+        route_table,
+        global_route_table: _,
+        state,
+    } = TestSetup::<I>::new::<Netstack3>(&sandbox, name).await;
+    let main_table_id =
+        fnet_routes_ext::admin::get_table_id::<I>(&route_table).await.expect("get table id");
+    let route_table_provider = realm
+        .connect_to_protocol::<I::RouteTableProviderMarker>()
+        .expect("connect to main route table");
+    let user_route_table =
+        fnet_routes_ext::admin::new_route_table::<I>(&route_table_provider, None)
+            .expect("create new user table");
+    let user_table_id =
+        fnet_routes_ext::admin::get_table_id::<I>(&user_route_table).await.expect("get table id");
+    let rule_table =
+        realm.connect_to_protocol::<I::RuleTableMarker>().expect("connect to the rule table");
+    let grant = fnet_routes_ext::admin::get_authorization_for_route_table::<I>(&user_route_table)
+        .await
+        .expect("fidl error");
+    let rule_set = fnet_routes_ext::rules::new_rule_set::<I>(&rule_table, RuleSetPriority::from(0))
+        .expect("new rule set");
+    fnet_routes_ext::rules::authenticate_for_route_table::<I>(
+        &rule_set,
+        grant.table_id,
+        grant.token,
+    )
+    .await
+    .expect("fidl error")
+    .expect("invalid authentication");
+    fnet_routes_ext::rules::add_rule::<I>(
+        &rule_set,
+        RuleIndex::from(0),
+        RuleMatcher::default(),
+        RuleAction::Lookup(user_table_id.get()),
+    )
+    .await
+    .expect("fidl error")
+    .expect("failed to add rule");
+
+    let rule_events =
+        pin!(fnet_routes_ext::rules::rule_event_stream_from_state::<I>(&state)
+            .expect("get rule stream"));
+    let rules = fnet_routes_ext::rules::collect_rules_until_idle::<I, HashSet<_>>(rule_events)
+        .await
+        .expect("failed to collect events");
+    let default_rule = InstalledRule {
+        priority: fnet_routes_ext::rules::DEFAULT_RULE_SET_PRIORITY,
+        index: RuleIndex::from(0),
+        matcher: Default::default(),
+        action: RuleAction::Lookup(main_table_id.get()),
+    };
+    // We have two rules: the one we just added and the default rule that exists from the beginning.
+    assert_eq!(
+        rules,
+        HashSet::from_iter([
+            InstalledRule {
+                priority: RuleSetPriority::from(0),
+                index: RuleIndex::from(0),
+                matcher: Default::default(),
+                action: RuleAction::Lookup(user_table_id.get())
+            },
+            default_rule.clone(),
+        ])
+    );
+
+    fnet_routes_ext::admin::remove_route_table::<I>(&user_route_table)
+        .await
+        .expect("fidl error")
+        .expect("remove table");
+    let rule_events =
+        pin!(fnet_routes_ext::rules::rule_event_stream_from_state::<I>(&state)
+            .expect("get rule stream"));
+    let rules = fnet_routes_ext::rules::collect_rules_until_idle::<I, Vec<_>>(rule_events)
+        .await
+        .expect("failed to collect events");
+    // Now only the default rule should exist.
+    assert_eq!(rules, &[default_rule]);
 }

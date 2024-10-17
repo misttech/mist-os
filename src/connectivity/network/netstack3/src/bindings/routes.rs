@@ -479,9 +479,16 @@ where
                             responder: _,
                         } => None,
                     };
-                    // No new requests will be accepted.
-                    if removing.is_some() {
+                    // No new requests will be accepted. Also remove all the rules that reference
+                    // this table.
+                    if let Some(table_id) = removing {
                         rest.close();
+                        let removed = rules.handle_table_removed(table_id);
+                        for rule in removed {
+                               rule_update_dispatcher
+                               .notify(watcher::Update::Removed(rule))
+                               .expect("failed to update");
+                        }
                     }
                     Self::handle_route_change(
                         &mut ctx,
