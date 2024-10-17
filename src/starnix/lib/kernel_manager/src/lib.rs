@@ -227,6 +227,7 @@ async fn suspend_container(
     Result<fstarnixrunner::ManagerSuspendContainerResponse, fstarnixrunner::SuspendError>,
     Error,
 > {
+    fuchsia_trace::duration!(c"power", c"starnix-runner:suspending-container");
     let Some(container_job) = payload.container_job else {
         return Ok(Err(fstarnixrunner::SuspendError::SuspendFailure));
     };
@@ -237,6 +238,11 @@ async fn suspend_container(
         Ok(handles) => handles,
         Err(e) => {
             warn!("error suspending container {:?}", e);
+            fuchsia_trace::instant!(
+                c"power",
+                c"starnix-runner:suspend-failed-actual",
+                fuchsia_trace::Scope::Process
+            );
             return Ok(Err(fstarnixrunner::SuspendError::SuspendFailure));
         }
     };
@@ -248,6 +254,11 @@ async fn suspend_container(
             Ok(_) => {
                 // There were wake locks active after suspending all processes, resume
                 // and fail the suspend call.
+                fuchsia_trace::instant!(
+                    c"power",
+                    c"starnix-runner:suspend-failed-with-wake-locks",
+                    fuchsia_trace::Scope::Process
+                );
                 return Ok(Err(fstarnixrunner::SuspendError::WakeLocksExist));
             }
             Err(_) => {}
@@ -269,12 +280,15 @@ async fn suspend_container(
     // TODO: We will likely have to handle a larger number of wake sources in the
     // future, at which point we may want to consider a Port-based approach. This
     // would also allow us to unblock this thread.
-    match zx::object_wait_many(&mut wait_items, zx::MonotonicInstant::INFINITE) {
-        Ok(_) => {}
-        Err(e) => {
-            warn!("error waiting for wake event {:?}", e);
-        }
-    };
+    {
+        fuchsia_trace::duration!(c"power", c"starnix-runner:waiting-on-container-wake");
+        match zx::object_wait_many(&mut wait_items, zx::MonotonicInstant::INFINITE) {
+            Ok(_) => {}
+            Err(e) => {
+                warn!("error waiting for wake event {:?}", e);
+            }
+        };
+    }
 
     kernels.acquire_wake_lease(&container_job).await?;
 
@@ -377,17 +391,21 @@ fn start_proxy(proxy: ChannelProxy, resume_events: Arc<Mutex<Vec<zx::EventPair>>
                 },
             ];
 
-            match zx::object_wait_many(&mut wait_items, zx::MonotonicInstant::INFINITE) {
-                Ok(_) => {}
-                Err(e) => {
-                    tracing::warn!("Failed to wait on proxied channels in runner: {:?}", e);
-                    break 'outer;
-                }
-            };
+            {
+                fuchsia_trace::duration!(c"power", c"starnix-runner:proxy-waiting-for-messages");
+                match zx::object_wait_many(&mut wait_items, zx::MonotonicInstant::INFINITE) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        tracing::warn!("Failed to wait on proxied channels in runner: {:?}", e);
+                        break 'outer;
+                    }
+                };
+            }
 
             // Forward messages in both directions. Only messages that are entering the container
             // should signal `proxy.resume_event`, since those are the only messages that should
             // wake the container if it's suspended.
+            fuchsia_trace::duration!(c"power", c"starnix-runner:proxy-forwarding-messages");
             if forward_message(
                 &wait_items[CONTAINER_CHANNEL_INDEX],
                 &proxy.container_channel,
