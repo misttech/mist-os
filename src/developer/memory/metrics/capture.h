@@ -46,7 +46,7 @@ struct Vmo {
   std::vector<zx_koid_t> children;
 };
 
-enum class CaptureLevel : uint8_t { KMEM, PROCESS, VMO };
+enum class CaptureLevel : uint8_t { KMEM, KMEM_EXTENDED, PROCESS, VMO };
 
 // OS is an abstract interface to Zircon OS calls.
 class OS {
