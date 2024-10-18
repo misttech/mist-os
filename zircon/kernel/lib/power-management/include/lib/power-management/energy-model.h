@@ -327,12 +327,35 @@ class PowerDomainRegistry {
   //  // `cpu_num` is a valid cpu number that falls within `cpu_set_t` bits.
   //  // `new_domain` new `PowerDomain` for `cpu_num`. If `nullptr` then
   //  //  current domain should be cleared.
-  //  void operator()(size_t cpu_num, fbl::RefPtr<PowerDomain>& new_domain)
+  //  //  void operator()(size_t cpu_num, fbl::RefPtr<PowerDomain>& new_domain)
   //
   template <typename CpuPowerDomainAccessor>
   zx::result<> Register(fbl::RefPtr<PowerDomain> power_domain,
                         CpuPowerDomainAccessor&& update_domain) {
     return UpdateRegistry(std::move(power_domain), update_domain);
+  }
+
+  // Register `power_domain` with this registry.
+  //
+  // A `CpuPowerDomainAccessor` must provide the following contract:
+  //
+  //  // `cpu_num` is a valid cpu number that falls within `cpu_set_t` bits.
+  //  //  current domain should be cleared.
+  //  //  void operator()(size_t cpu_num)
+  template <typename CpuPowerDomainAccessor>
+  zx::result<> Unregister(uint32_t domain_id, CpuPowerDomainAccessor&& clear_domain) {
+    return RemoveFromRegistry(domain_id, clear_domain);
+  }
+
+  // Returns a reference to a `PowerDomain` whose id matches `domain_id`.
+  // Returns `nullptr` if there is no match.
+  fbl::RefPtr<PowerDomain> Find(uint32_t domain_id) const {
+    for (auto& domain : domains_) {
+      if (domain.id() == domain_id) {
+        return fbl::RefPtr(const_cast<PowerDomain*>(&domain));
+      }
+    }
+    return nullptr;
   }
 
   // Visit each registered `PowerDomain`.
@@ -352,6 +375,10 @@ class PowerDomainRegistry {
   zx::result<> UpdateRegistry(
       fbl::RefPtr<PowerDomain> power_domain,
       fit::inline_function<void(size_t, fbl::RefPtr<PowerDomain>)> update_cpu_power_domain);
+
+  // Dissociates `domain_id` from all the cpus and removes it from the registry.
+  zx::result<> RemoveFromRegistry(uint32_t domain_id,
+                                  fit::inline_function<void(size_t)> clear_domain);
 
   fbl::SinglyLinkedList<fbl::RefPtr<PowerDomain>> domains_;
 };

@@ -12,12 +12,12 @@
 #include <zircon/types.h>
 
 #include <cstddef>
-#include <cstdint>
 
 #include <fbl/ref_ptr.h>
 #include <gtest/gtest.h>
 
 #include "test-helper.h"
+#include "zircon/errors.h"
 
 namespace {
 
@@ -313,6 +313,71 @@ TEST(PowerDomainRegistryTest, RegisterUniquePowerDomains) {
   EXPECT_EQ(domains, registed_domains.size());
   EXPECT_EQ(cpu_domains.size(), 9u);
   EXPECT_EQ(cpus, 9);
+}
+
+TEST(PowerDomainRegistryTest, FindDOmain) {
+  PowerDomainRegistry registry;
+  std::map<size_t, fbl::RefPtr<PowerDomain>> registed_domains;
+  registed_domains[0] = MakePowerDomainHelper(0, 1, 2, 3);
+  registed_domains[1] = MakePowerDomainHelper(1, 4, 5, 6);
+  registed_domains[2] = MakePowerDomainHelper(2, 7, 8, 9);
+
+  auto domain_update = [](size_t num, auto domain) {};
+
+  for (auto& [domain_id, domain] : registed_domains) {
+    EXPECT_EQ(domain->total_normalized_utilization(), 0u);
+    ASSERT_TRUE(registry.Register(domain, domain_update).is_ok());
+  }
+
+  EXPECT_EQ(registry.Find(0).get(), registed_domains[0].get());
+  EXPECT_EQ(registry.Find(1).get(), registed_domains[1].get());
+  EXPECT_EQ(registry.Find(2).get(), registed_domains[2].get());
+  EXPECT_EQ(registry.Find(112345567).get(), nullptr);
+}
+
+TEST(PowerDomainRegistryTest, UnregisterDomain) {
+  PowerDomainRegistry registry;
+  std::map<size_t, fbl::RefPtr<PowerDomain>> registed_domains;
+  registed_domains[0] = MakePowerDomainHelper(0, 1, 2, 3);
+  registed_domains[1] = MakePowerDomainHelper(1, 4, 5, 6);
+  registed_domains[2] = MakePowerDomainHelper(2, 7, 8, 9);
+
+  std::map<size_t, fbl::RefPtr<PowerDomain>> cpu_domains;
+  auto domain_update = [&cpu_domains](size_t num, auto domain) {
+    cpu_domains[num] = std::move(domain);
+  };
+
+  for (auto& [domain_id, domain] : registed_domains) {
+    EXPECT_EQ(domain->total_normalized_utilization(), 0u);
+    ASSERT_TRUE(registry.Register(domain, domain_update).is_ok());
+  }
+
+  auto check_registry = [&](size_t current_domain, size_t current_cpus) {
+    size_t domains = 0;
+    size_t cpus = 0;
+    registry.Visit([&cpus, &domains, &registed_domains, &cpu_domains](const PowerDomain& domain) {
+      domains++;
+      auto& expected = registed_domains[domain.id()];
+      EXPECT_EQ(expected.get(), &domain);
+      ForEachCpuIn(domain.cpus(), [&domain, &cpu_domains, &cpus](size_t num_cpu) {
+        EXPECT_EQ(&domain, cpu_domains[num_cpu].get());
+        cpus++;
+      });
+    });
+    EXPECT_EQ(domains, current_domain);
+    EXPECT_EQ(cpu_domains.size(), current_cpus);
+    EXPECT_EQ(cpus, current_cpus);
+  };
+
+  auto clear_domain = [&cpu_domains](size_t num) { cpu_domains.erase(num); };
+
+  EXPECT_EQ(registry.Unregister(12345, clear_domain).status_value(), ZX_ERR_NOT_FOUND);
+  EXPECT_TRUE(registry.Unregister(0, clear_domain).is_ok());
+  check_registry(2, 6);
+  EXPECT_TRUE(registry.Unregister(1, clear_domain).is_ok());
+  check_registry(1, 3);
+  EXPECT_TRUE(registry.Unregister(2, clear_domain).is_ok());
+  check_registry(0, 0);
 }
 
 // The purpose of this test is to demonstrate the process for updating immutable characteristics of
