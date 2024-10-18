@@ -20,6 +20,9 @@ from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, TypeAlias
 # Directory where to find Starlark input files.
 _STARLARK_DIR = os.path.join(os.path.dirname(__file__), "..", "starlark")
 
+# Directory where to find templated files.
+_TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "..", "templates")
+
 # A type for the JSON-decoded content describing the @gn_targets repository.
 GnTargetsManifest: TypeAlias = List[Dict[str, Any]]
 
@@ -42,12 +45,12 @@ _BAZEL_ROOT_WORKSPACE_NAME = "main"
 # between build invocations anyway, so this is safe.
 #
 _BAZEL_BUILTIN_REPOSITORIES = (
-    "@bazel_tools//",
-    "@local_config_cc//",
-    "@local_config_platform//",
+    "bazel_tools",
+    "local_config_cc",
+    "local_config_platform",
     # The two repositories below were added by Bazel 7.2.
-    "@host_platform//",
-    "@internal_platforms_do_not_use//",
+    "host_platform",
+    "internal_platforms_do_not_use",
 )
 
 # A list of file extensions for files that should be ignored from depfiles.
@@ -67,9 +70,9 @@ _IGNORED_FILE_SUFFIXES = (
 # I.e. their implementation should already record the right dependencies to
 # their input files.
 _BAZEL_NO_CONTENT_HASH_REPOSITORIES = (
-    "@fuchsia_build_config//",
-    "@fuchsia_build_info//",
-    "@gn_targets//",
+    "fuchsia_build_config",
+    "fuchsia_build_info",
+    "gn_targets",
 )
 
 # Technical notes on input (source and build files) located in Bazel external
@@ -600,6 +603,7 @@ class BazelLabelMapper(object):
         #    //<package>:<target>
         #    @//<package>:<target>
         #    @<name>//<package>:<target>
+        #    @@<name>//<package>:<target>
         #    @@<name>.<version>//<package>:<target>
         #
         repository, sep, package_label = label.partition("//")
@@ -642,7 +646,9 @@ class BazelLabelMapper(object):
                 "@"
             ), f"Invalid repository name in source label {label}"
 
-            repository_dir = self._external_dir_prefix + repository[1:]
+            # @@ is used with canonical repo names, so remove both @@ and @.
+            repository_name = repository.removeprefix("@@").removeprefix("@")
+            repository_dir = self._external_dir_prefix + repository_name
             from_external_repository = True
 
         package, colon, target = package_label.partition(":")
@@ -713,9 +719,7 @@ def verify_unknown_gn_targets(
     missing_ninja_packages = set()
     build_dirs: Set[str] = set()
     for error_line in build_files_error:
-        if not (
-            error_line.startswith("ERROR:") and "@gn_targets//" in error_line
-        ):
+        if not ("ERROR: " in error_line and "@gn_targets//" in error_line):
             continue
 
         pos = error_line.find("@@gn_targets//")
@@ -811,33 +815,31 @@ Then ensure that the GN target depends on them transitively.
         )
 
     print(_ERROR, file=sys.stderr)
-    print(
-        "=================== ORIGINAL BAZEL ERROR MESSAGE ================",
-        file=sys.stderr,
-    )
-    max_error_lines = 10
-    for line in build_files_error[:max_error_lines]:
-        print(line, file=sys.stderr)
-    if len(build_files_error) > max_error_lines:
-        print("...", file=sys.stderr)
-    print(
-        "--------------------- END OF BAZEL ERROR MESSAGE ----------------\n",
-        file=sys.stderr,
-    )
     return 1
+
+
+def repository_name(label: str) -> str:
+    """Returns repository name of the input label.
+
+    Supports both canonical repository names (starts with @@) and apparent
+    repository names (starts with @).
+    """
+    repository, sep, _ = label.partition("//")
+    assert sep == "//", f"Missing // in label: {label}"
+    return repository.removeprefix("@@").removeprefix("@")
 
 
 def is_ignored_input_label(label: str) -> bool:
     """Return True if the label of a build or source file should be ignored."""
-    return label.startswith(_BAZEL_BUILTIN_REPOSITORIES) or label.endswith(
-        _IGNORED_FILE_SUFFIXES
-    )
+    is_builtin = repository_name(label) in _BAZEL_BUILTIN_REPOSITORIES
+    is_ignored = label.endswith(_IGNORED_FILE_SUFFIXES)
+    return is_builtin or is_ignored
 
 
 def label_requires_content_hash(label: str) -> bool:
     """Return True if the label or source file belongs to a repository
-    that does not require a content hash file."""
-    return not label.startswith(_BAZEL_NO_CONTENT_HASH_REPOSITORIES)
+    that requires a content hash file."""
+    return not (repository_name(label) in _BAZEL_NO_CONTENT_HASH_REPOSITORIES)
 
 
 def list_to_pairs(l: Iterable[Any]) -> Iterable[Tuple[Any, Any]]:
@@ -1194,62 +1196,95 @@ def main() -> int:
     # See https://bazel.build/query/language#set
     query_targets = "set(%s)" % " ".join(args.bazel_targets)
 
-    # Consistency checks before running the command.
-    if args.command == "build":
-        # This query lists all BUILD.bazel and .bzl files, because the
-        # buildfiles() operator cannot be used in the cquery below.
-        #
-        # --config=quiet is used to remove Bazel verbose output.
-        #
-        # "--output label" ensures the output contains one label per line,
-        # which will be followed by '(null)' for source files (or more
-        # generally by a build configuration name or hex value for non-source
-        # targets which should not be returned by this cquery).
-        #
-        # NOTE: This query might fail
-        ret = run_bazel_query(
-            "query",
-            [
-                "--config=quiet",
-                "--output",
-                "label",
-                f"buildfiles(deps({query_targets}))",
-            ],
-            ignore_errors=True,
-        )
+    # Generate the genquery target for listing all build files that we need to
+    # include in the depfile for this target, i.e. any changes in these build
+    # files should trigger a rebuild of this target.
+    genquery_tmpl = os.path.join(_TEMPLATE_DIR, "template.genrule.bazel")
+    output_build_file = os.path.join(
+        args.workspace_dir, "buildfiles_genquery", "BUILD.bazel"
+    )
+    os.makedirs(os.path.dirname(output_build_file), exist_ok=True)
+    with open(genquery_tmpl, "r") as tmpl:
+        with open(output_build_file, "w") as out:
+            out.write(
+                tmpl.read().format(
+                    query_expression=f"buildfiles(deps({query_targets}))",
+                    query_scopes=",".join(
+                        (f'"{s}"' for s in args.bazel_targets)
+                    ),
+                    query_opts='"--output=label"',
+                )
+            )
 
-        if ret.returncode != 0:
-            # Detect the error message corresponding to a Bazel target
-            # referencing a @gn_targets//<dir>:<name> label
-            # that does not exist. This happens when the GN bazel_action()
-            # fails to depend on the proper bazel_input_file() or
-            # bazel_input_directory() dependency.
-            #
-            # (There is no need to add these to the global list though).
+    cmd = [args.bazel_launcher, args.command]
+
+    if args.bazel_build_events_log_json:
+        # Create parent directory to avoid Bazel complaining it cannot
+        # write the events log file.
+        os.makedirs(
+            os.path.dirname(args.bazel_build_events_log_json), exist_ok=True
+        )
+        cmd += [
+            "--build_event_json_file="
+            + os.path.abspath(args.bazel_build_events_log_json),
+        ]
+
+    cmd += configured_args
+    cmd += ["//buildfiles_genquery:genquery"]
+    cmd += args.bazel_targets
+    # Always use --verbose_failures to get relevant information when
+    # Bazel commands fail. This is necessary to make the log output of
+    # CQ/CI bots usable.
+    cmd += ["--verbose_failures"]
+
+    if any(
+        entry.copy_debug_symbols
+        for entry in args.package_outputs + args.directory_outputs
+    ):
+        # Ensure the build_id directories are produced.
+        cmd += ["--output_groups=+build_id_dirs"]
+
+    if jobs:
+        cmd += [f"--jobs={jobs}"]
+
+    if _DEBUG:
+        debug("BUILD_CMD: " + " ".join(shlex.quote(c) for c in cmd))
+
+    # NOTE: It is important to NOT capture output from this subprocess, to make
+    # sure console output from Bazel are correctly printed out by Ninja.
+    ret = subprocess.run(cmd)
+    if ret.returncode != 0:
+        # Detect the error message corresponding to a Bazel target
+        # referencing a @gn_targets//<dir>:<name> label
+        # that does not exist. This happens when the GN bazel_action()
+        # fails to depend on the proper bazel_input_file() or
+        # bazel_input_directory() dependency.
+        #
+        # NOTE: Path to command.log should be stable, because we explicitly set
+        # output_base. See https://bazel.build/run/scripts#command-log.
+        with open(os.path.join(bazel_output_base_dir, "command.log"), "r") as f:
             if verify_unknown_gn_targets(
-                ret.stderr.splitlines(),
+                f.read().splitlines(),
                 args.gn_target_label,
                 args.bazel_targets,
             ):
                 return 1
 
-            # This is a different error, just print it as is.
-            print(
-                "BAZEL_ACTION_ERROR: Error when calling build files Bazel query:\n%s\n"
-                % ret.stderr,
-                file=sys.stderr,
-            )
-            return 1
+        # This is a different error, just print it as is.
+        print(
+            "\nERROR when calling Bazel. To reproduce, run this in the Ninja output directory:\n\n  %s\n"
+            % " ".join(shlex.quote(c) for c in cmd),
+            file=sys.stderr,
+        )
+        return 1
 
-        build_files = ret.stdout.splitlines()
+    if args.command == "build":
+        build_files_query_output = os.path.join(
+            args.workspace_dir, "bazel-bin", "buildfiles_genquery", "genquery"
+        )
+        with open(build_files_query_output, "r") as f:
+            build_files = f.read().splitlines()
 
-        # This cquery lists all source files. The output is one label per line
-        # which will be followed by '(null)' for source files.
-        #
-        # (More generally this would be a build configuration name or hex
-        # value for non-source targets which should not be returned by this
-        # cquery).
-        #
         bazel_source_files = get_bazel_query_output(
             "cquery",
             [
@@ -1269,46 +1304,6 @@ def main() -> int:
 
         # Remove the ' (null)' suffix of each result line.
         source_files = [l.partition(" (null)")[0] for l in bazel_source_files]
-
-    cmd = [args.bazel_launcher, args.command]
-
-    if args.bazel_build_events_log_json:
-        # Create parent directory to avoid Bazel complaining it cannot
-        # write the events log file.
-        os.makedirs(
-            os.path.dirname(args.bazel_build_events_log_json), exist_ok=True
-        )
-        cmd += [
-            "--build_event_json_file="
-            + os.path.abspath(args.bazel_build_events_log_json),
-        ]
-
-    # Always use --verbose_failures to get relevant information when
-    # Bazel commands fail. This is necessary to make the log output of
-    # CQ/CI bots usable.
-    cmd += configured_args + args.bazel_targets + ["--verbose_failures"]
-
-    if any(
-        entry.copy_debug_symbols
-        for entry in args.package_outputs + args.directory_outputs
-    ):
-        # Ensure the build_id directories are produced.
-        cmd += ["--output_groups=+build_id_dirs"]
-
-    if jobs:
-        cmd += [f"--jobs={jobs}"]
-
-    if _DEBUG:
-        debug("BUILD_CMD: " + " ".join(shlex.quote(c) for c in cmd))
-
-    ret2 = subprocess.run(cmd)
-    if ret2.returncode != 0:
-        print(
-            "ERROR when calling Bazel. To reproduce, run this in the Ninja output directory:\n\n  %s\n"
-            % " ".join(shlex.quote(c) for c in cmd),
-            file=sys.stderr,
-        )
-        return 1
 
     file_copies = []
     unwanted_dirs = []
