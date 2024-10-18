@@ -12,7 +12,7 @@ use netlink_packet_core::{NetlinkDeserializable, NetlinkHeader, NetlinkSerializa
 use netlink_packet_generic::GenlMessage;
 use std::convert::{TryFrom, TryInto};
 use std::sync::Arc;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 use wlan_common::bss::BssDescription;
 use wlan_common::channel::{Cbw, Channel};
 use wlan_telemetry::{self, TelemetryEvent, TelemetrySender};
@@ -1061,7 +1061,7 @@ async fn handle_nl80211_message<I: IfaceManager>(
                 .context("Failed to send scan results")?;
         }
         Nl80211Cmd::GetStation => {
-            info!("Nl80211Cmd::GetStation");
+            debug!("Nl80211Cmd::GetStation");
             use crate::nl80211::Nl80211StaInfoAttr;
             // GetStation also has a MAC address attribute. We don't check whether it
             // matches the connected network BSSID and simply assume that it does.
