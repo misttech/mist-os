@@ -163,6 +163,10 @@ closed protocol Sampler {
     ///
     /// ## Errors
     ///
+    /// `ZX_ERR_BAD_STATE` The requested `thread` to be sampled is not in a
+    /// state where it can be sampled. It is either ZX_THREAD_STATE_DYING or
+    /// ZX_THREAD_STATE_DEAD.
+    ///
     /// `ZX_ERR_NOT_SUPPORTED`  `kernel.enable-debugging-syscalls` is not set to `true`
     /// on the kernel command line or the experimental_thread_sampler_enabled
     /// build param is not set to true.

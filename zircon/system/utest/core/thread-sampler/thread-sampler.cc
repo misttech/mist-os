@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/fit/defer.h>
 #include <lib/fxt/fields.h>
 #include <lib/standalone-test/standalone.h>
 #include <lib/zx/event.h>
@@ -26,6 +27,7 @@
 #include <zxtest/zxtest.h>
 
 #include "../needs-next.h"
+#include "../threads/thread-functions/thread-functions.h"
 
 #ifdef EXPERIMENTAL_THREAD_SAMPLER_ENABLED
 constexpr bool sampler_enabled = EXPERIMENTAL_THREAD_SAMPLER_ENABLED;
@@ -45,6 +47,37 @@ void TestFn(zx::unowned_event event) {
       break;
     }
   }
+}
+
+zx::result<size_t> CountRecords(const zx::iob& sampler, size_t buffer_size) {
+  zx_info_iob_t info;
+  zx_status_t res = sampler.get_info(ZX_INFO_IOB, &info, sizeof(info), nullptr, nullptr);
+  if (res != ZX_OK) {
+    return zx::error(res);
+  }
+  size_t record_count{0};
+  for (uint32_t i = 0; i < info.region_count; i++) {
+    zx_vaddr_t addr;
+    size_t offset = 0;
+    res = zx::vmar::root_self()->map_iob(ZX_VM_PERM_READ, 0, sampler, i, 0, buffer_size, &addr);
+    if (res != ZX_OK) {
+      return zx::error(res);
+    }
+    auto d = fit::defer([buffer_size, addr]() { zx::vmar::root_self()->unmap(addr, buffer_size); });
+    while (offset < buffer_size) {
+      uint64_t header = *reinterpret_cast<uint64_t*>(addr + offset);
+      if (header == 0) {
+        break;
+      }
+      record_count += 1;
+      size_t record_words = fxt::RecordFields::RecordSize::Get<size_t>(header);
+      if (record_words == 0) {
+        return zx::error(ZX_ERR_OUT_OF_RANGE);
+      }
+      offset += record_words * 8;
+    }
+  }
+  return zx::ok(record_count);
 }
 
 TEST(ThreadSampler, StartStop) {
@@ -89,27 +122,9 @@ TEST(ThreadSampler, StartStop) {
   ASSERT_OK(event.signal(0, ZX_USER_SIGNAL_1));
   sample_thread.join();
 
-  zx_info_iob_t info;
-  ASSERT_OK(sampler.get_info(ZX_INFO_IOB, &info, sizeof(info), nullptr, nullptr));
-  size_t record_count{0};
-  for (uint32_t i = 0; i < info.region_count; i++) {
-    zx_vaddr_t addr;
-    size_t offset = 0;
-    ASSERT_OK(
-        zx::vmar::root_self()->map_iob(ZX_VM_PERM_READ, 0, sampler, i, 0, buffer_size, &addr));
-    while (offset < buffer_size) {
-      uint64_t header = *reinterpret_cast<uint64_t*>(addr + offset);
-      if (header == 0) {
-        break;
-      }
-      record_count += 1;
-      size_t record_words = fxt::RecordFields::RecordSize::Get<size_t>(header);
-      ASSERT_TRUE(record_words > 0);
-      offset += record_words * 8;
-    }
-    zx::vmar::root_self()->unmap(addr, buffer_size);
-  }
-  ASSERT_GE(record_count, 10);
+  zx::result<size_t> record_count = CountRecords(sampler, buffer_size);
+  ASSERT_OK(record_count.status_value());
+  ASSERT_GE(*record_count, 10);
 }
 
 TEST(ThreadSampler, SamplerLifetime) {
@@ -202,27 +217,9 @@ TEST(ThreadSampler, DroppedSampler) {
   ASSERT_OK(event.signal(0, ZX_USER_SIGNAL_1));
   sample_thread.join();
 
-  zx_info_iob_t info;
-  ASSERT_OK(sampler.get_info(ZX_INFO_IOB, &info, sizeof(info), nullptr, nullptr));
-  size_t record_count{0};
-  for (uint32_t i = 0; i < info.region_count; i++) {
-    zx_vaddr_t addr;
-    size_t offset = 0;
-    ASSERT_OK(
-        zx::vmar::root_self()->map_iob(ZX_VM_PERM_READ, 0, sampler, i, 0, buffer_size, &addr));
-    while (offset < buffer_size) {
-      uint64_t header = *reinterpret_cast<uint64_t*>(addr + offset);
-      if (header == 0) {
-        break;
-      }
-      record_count += 1;
-      size_t record_words = fxt::RecordFields::RecordSize::Get<size_t>(header);
-      ASSERT_TRUE(record_words > 0);
-      offset += record_words * 8;
-    }
-    zx::vmar::root_self()->unmap(addr, buffer_size);
-  }
-  ASSERT_GE(record_count, 10);
+  zx::result<size_t> record_count = CountRecords(sampler, buffer_size);
+  ASSERT_OK(record_count.status_value());
+  ASSERT_GE(*record_count, 10);
 }
 
 TEST(ThreadSampler, BadIob) {
@@ -408,6 +405,71 @@ TEST(ThreadSampler, ClosedHandleReadBuffers) {
     zx::vmar::root_self()->unmap(addrs[i], buffer_size);
   }
   ASSERT_GE(record_count, 10);
+}
+
+// We should be able to attach to a started but not running thread. If we do, we should be able to
+// get samples from it once it actually starts.
+TEST(ThreadSampler, NonRunningThread) {
+  NEEDS_NEXT_SKIP(zx_sampler_create);
+
+  zxr_thread_t zxr_thread;
+  ASSERT_OK(zxr_thread_create(zx_process_self(), "test-thread", false, &zxr_thread));
+  zx_handle_t thread = zxr_thread_get_handle(&zxr_thread);
+
+  size_t buffer_size = ZX_PAGE_SIZE;
+  zx_sampler_config_t config{
+      .period = zx::msec(1).get(),
+      .buffer_size = buffer_size,
+  };
+  zx::iob sampler;
+
+  zx::unowned_resource system_resource = standalone::GetSystemResource();
+  zx::result<zx::resource> result =
+      standalone::GetSystemResourceWithBase(system_resource, ZX_RSRC_SYSTEM_DEBUG_BASE);
+  ASSERT_OK(result.status_value());
+  zx::resource debug_resource = std::move(result.value());
+
+  // Create the thread, but defer starting the thread until after we've attached to it.
+  zx_status_t create_res =
+      zx_sampler_create(debug_resource.get(), 0, &config, sampler.reset_and_get_address());
+  if constexpr (!sampler_enabled) {
+    ASSERT_EQ(create_res, ZX_ERR_NOT_SUPPORTED);
+    return;
+  }
+  ASSERT_OK(zx_sampler_attach(sampler.get(), thread));
+
+  ASSERT_OK(create_res);
+
+  zx::event event;
+  ASSERT_EQ(zx::event::create(0, &event), ZX_OK);
+  ASSERT_OK(zx_sampler_start(sampler.get()));
+
+  zx_handle_t event_handle = event.get();
+
+  zx::vmo stack_handle_;
+  size_t stack_size = size_t{256} << 10;
+  ASSERT_OK(zx::vmo::create(stack_size, ZX_VMO_RESIZABLE, &stack_handle_));
+  ASSERT_NE(stack_handle_.get(), ZX_HANDLE_INVALID);
+
+  uintptr_t thread_stack;
+  ASSERT_OK(zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, stack_handle_, 0,
+                                       stack_size, &thread_stack));
+  auto d = fit::defer(
+      [thread_stack, stack_size]() { zx::vmar::root_self()->unmap(thread_stack, stack_size); });
+  // Now we actually start the thread. Our request to sample it from earlier should carry over to
+  // the now running thread.
+  ASSERT_OK(zxr_thread_start(&zxr_thread, thread_stack, stack_size, threads_test_wait_loop,
+                             &event_handle));
+  ASSERT_OK(event.wait_one(ZX_USER_SIGNAL_0, zx::time::infinite(), nullptr));
+
+  zx::nanosleep(zx::deadline_after(zx::sec(1)));
+  ASSERT_OK(zx_sampler_stop(sampler.get()));
+  ASSERT_OK(event.signal(0, ZX_USER_SIGNAL_1));
+  ASSERT_OK(zxr_thread_join(&zxr_thread));
+
+  zx::result<size_t> record_count = CountRecords(sampler, buffer_size);
+  ASSERT_OK(record_count.status_value());
+  ASSERT_GE(*record_count, size_t{10});
 }
 
 }  // namespace

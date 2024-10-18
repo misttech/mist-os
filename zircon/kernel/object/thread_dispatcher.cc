@@ -879,11 +879,23 @@ zx_status_t ThreadDispatcher::SetSoftAffinity(cpu_mask_t mask) {
 
 zx_status_t ThreadDispatcher::EnableStackSampling(uint64_t sampler_id) {
   Guard<CriticalMutex> guard{get_lock()};
-  if ((state_.lifecycle() == ThreadState::Lifecycle::INITIAL) ||
-      (state_.lifecycle() == ThreadState::Lifecycle::DYING) ||
+  // While there is nothing "bad" about attaching to a dead or dying thread,
+  // we'll never get any samples from it so it's a useless operation. Presumably
+  // if the caller is requesting samples, they expect to get samples, so let's
+  // let them know they're not going to get any.
+  if ((state_.lifecycle() == ThreadState::Lifecycle::DYING) ||
       (state_.lifecycle() == ThreadState::Lifecycle::DEAD)) {
     return ZX_ERR_BAD_STATE;
   }
+  // The thread could be in `ThreadState::Lifecycle::INITIAL` here. We'll take a
+  // similar strategy to suspending here: if you catch the thread too early,
+  // it'll look the same as if you catch it running.
+  //
+  // A thread won't be sampled unless it's actually running on a cpu when the
+  // sampling interrupt fires. Thus, if we catch a thread in the not yet running,
+  // we can mark it as enabled to be sampled, and then once it finishes
+  // initializing and is actually scheduled, if it happens to be scheduled when
+  // the interrupt fires, we can sample it as usual.
   sampler_id_ = sampler_id;
   return ZX_OK;
 }
