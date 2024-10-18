@@ -609,8 +609,6 @@ template("fidl_library") {
   }
 
   if (defined(invoker.sdk_category)) {
-    sdk_category = invoker.sdk_category
-
     # Process sources.
     file_base = "fidl/$library_name"
     all_files = []
@@ -680,7 +678,7 @@ template("fidl_library") {
 
       id = "sdk://fidl/$library_name"
 
-      category = sdk_category
+      category = invoker.sdk_category
 
       if (is_stable) {
         if (defined(invoker.api)) {
@@ -715,13 +713,16 @@ template("fidl_library") {
         fidl_json = [ rebase_path(invoker.fidl_ir_json, root_build_dir) ]
         generated_sources = fidl_json
 
-        # Metadata for FIDL SDK files.
-        if (defined(invoker.sdk_category)) {
+        # For libraries included in an IDK, add the metadata to the list used to
+        # generate documentation.
+        # Historically, libraries in the  "partner_internal" SDK category have
+        # also been published, so include them as well.
+        if (is_sdk_included_publishable || category == "partner_internal") {
           sdk_fidl_json_data = [
             {
               name = library_name
               ir = rebase_path(invoker.fidl_ir_json, root_build_dir)
-              category = invoker.sdk_category
+              category = category
             },
           ]
         }
