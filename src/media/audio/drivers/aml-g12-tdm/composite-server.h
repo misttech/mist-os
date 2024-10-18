@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.clock/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.gpio/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.pin/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/trace/event.h>
@@ -31,6 +32,11 @@ struct Engine {
   std::unique_ptr<RingBufferServer> ring_buffer;
   fuchsia_hardware_audio::Format ring_buffer_format;
   metadata::AmlConfig config;
+};
+
+struct SclkPin {
+  fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio;
+  fidl::WireSyncClient<fuchsia_hardware_pin::Pin> pin;
 };
 
 class RingBufferServer final : public fidl::Server<fuchsia_hardware_audio::RingBuffer> {
@@ -103,13 +109,12 @@ class AudioCompositeServer final
   friend class RingBufferServer;
 
  public:
-  AudioCompositeServer(
-      std::array<std::optional<fdf::MmioBuffer>, kNumberOfTdmEngines> mmios, zx::bti bti,
-      async_dispatcher_t* dispatcher, metadata::AmlVersion aml_version,
-      fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_client,
-      fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client,
-      std::vector<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> gpio_sclk_clients,
-      std::unique_ptr<Recorder> recorder);
+  AudioCompositeServer(std::array<std::optional<fdf::MmioBuffer>, kNumberOfTdmEngines> mmios,
+                       zx::bti bti, async_dispatcher_t* dispatcher,
+                       metadata::AmlVersion aml_version,
+                       fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_client,
+                       fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client,
+                       std::vector<SclkPin> sclk_clients, std::unique_ptr<Recorder> recorder);
 
   async_dispatcher_t* dispatcher() { return dispatcher_; }
   zx::bti& bti() { return bti_; }
@@ -199,7 +204,7 @@ class AudioCompositeServer final
 
   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_;
   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_;
-  std::vector<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> gpio_sclk_clients_;
+  std::vector<SclkPin> sclk_clients_;
   bool first_ring_buffer_has_been_created_ = false;
   bool soc_power_started_ = false;
   zx::time last_started_time_;

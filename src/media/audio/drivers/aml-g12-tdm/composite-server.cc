@@ -49,13 +49,12 @@ AudioCompositeServer::AudioCompositeServer(
     async_dispatcher_t* dispatcher, metadata::AmlVersion aml_version,
     fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clock_gate_client,
     fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client,
-    std::vector<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> gpio_sclk_clients,
-    std::unique_ptr<Recorder> recorder)
+    std::vector<SclkPin> sclk_clients, std::unique_ptr<Recorder> recorder)
     : dispatcher_(dispatcher),
       bti_(std::move(bti)),
       clock_gate_(std::move(clock_gate_client)),
       pll_(std::move(pll_client)),
-      gpio_sclk_clients_(std::move(gpio_sclk_clients)),
+      sclk_clients_(std::move(sclk_clients)),
       recorder_(std::move(recorder)) {
   for (const fuchsia_hardware_audio::ElementId& dai : kDaiIds) {
     element_completers_[dai].first_response_sent = false;
@@ -565,9 +564,15 @@ zx_status_t AudioCompositeServer::StartSocPower(bool wait_for_completion) {
   if (wait_for_completion) {
     zx::nanosleep(zx::deadline_after(kTimeToStabilizePll));
   }
-  for (auto& gpio_sclk_client : gpio_sclk_clients_) {
-    constexpr uint32_t kSclkAltFunction = 1;
-    fidl::WireResult result = gpio_sclk_client->SetAltFunction(kSclkAltFunction);
+
+  constexpr uint32_t kSclkAltFunction = 1;
+
+  fidl::Arena arena;
+  const auto sclk_function_config =
+      fuchsia_hardware_pin::wire::Configuration::Builder(arena).function(kSclkAltFunction).Build();
+
+  for (auto& sclk_client : sclk_clients_) {
+    fidl::WireResult result = sclk_client.pin->Configure(sclk_function_config);
     if (!result.ok()) {
       FDF_LOG(ERROR, "Failed to send request to set GPIO function: %s", result.status_string());
       TRACE_INSTANT("power-audio", "aml-g12-audio-composite::StartSocPower exit",
@@ -599,9 +604,15 @@ zx_status_t AudioCompositeServer::StopSocPower() {
     return ZX_OK;
   }
   FDF_LOG(INFO, "Stopping SoC power");
-  for (auto& gpio_sclk_client : gpio_sclk_clients_) {
-    constexpr uint32_t kGpioAltFunction = 0;
-    fidl::WireResult alt_function_result = gpio_sclk_client->SetAltFunction(kGpioAltFunction);
+
+  constexpr uint32_t kGpioAltFunction = 0;
+
+  fidl::Arena arena;
+  const auto gpio_function_config =
+      fuchsia_hardware_pin::wire::Configuration::Builder(arena).function(kGpioAltFunction).Build();
+
+  for (auto& sclk_client : sclk_clients_) {
+    fidl::WireResult alt_function_result = sclk_client.pin->Configure(gpio_function_config);
     if (!alt_function_result.ok()) {
       FDF_LOG(ERROR, "Failed to send request to set GPIO function: %s",
               alt_function_result.status_string());
@@ -610,7 +621,8 @@ zx_status_t AudioCompositeServer::StopSocPower() {
                     "Could not set GPIO function");
       return alt_function_result.status();
     }
-    fidl::WireResult config_out_result = gpio_sclk_client->ConfigOut(0);
+    fidl::WireResult config_out_result =
+        sclk_client.gpio->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputLow);
     if (!config_out_result.ok()) {
       FDF_LOG(ERROR, "Failed to send request to set GPIO output: %s",
               config_out_result.status_string());

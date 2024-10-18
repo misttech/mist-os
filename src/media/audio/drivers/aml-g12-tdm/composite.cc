@@ -125,7 +125,7 @@ zx::result<> Driver::Start() {
       "gpio-tdm-b-sclk",
       "gpio-tdm-c-sclk",
   };
-  std::vector<fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>> gpio_sclk_clients;
+  std::vector<SclkPin> sclk_clients;
   for (auto& sclk_gpio_name : sclk_gpio_names) {
     zx::result gpio_result =
         incoming()->Connect<fuchsia_hardware_gpio::Service::Device>(sclk_gpio_name);
@@ -133,13 +133,22 @@ zx::result<> Driver::Start() {
       FDF_LOG(ERROR, "Connect to GPIO %s failed: %s", sclk_gpio_name, gpio_result.status_string());
       return zx::error(gpio_result.error_value());
     }
-    fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio_sclk_client(
-        std::move(gpio_result.value()));
-    // Only save the GPIO client if we can communicate with it (we use a method with no side
+
+    zx::result pin_result =
+        incoming()->Connect<fuchsia_hardware_pin::Service::Device>(sclk_gpio_name);
+    if (pin_result.is_error() || !pin_result->is_valid()) {
+      FDF_LOG(ERROR, "Connect to Pin %s failed: %s", sclk_gpio_name, pin_result.status_string());
+      return zx::error(pin_result.error_value());
+    }
+
+    SclkPin sclk_pin{fidl::WireSyncClient(*std::move(gpio_result)),
+                     fidl::WireSyncClient(*std::move(pin_result))};
+    // Only save the clients if we can communicate with them (we use methods with no side
     // effects) since optional nodes are valid even if they are not configured in the board driver.
-    auto gpio_name_result = gpio_sclk_client->GetName();
-    if (gpio_name_result.ok()) {
-      gpio_sclk_clients.emplace_back(std::move(gpio_sclk_client));
+    auto gpio_read_result = sclk_pin.gpio->Read();
+    auto pin_configure_result = sclk_pin.pin->Configure({});
+    if (gpio_read_result.ok() && pin_configure_result.ok()) {
+      sclk_clients.emplace_back(std::move(sclk_pin));
     }
   }
 
@@ -209,8 +218,7 @@ zx::result<> Driver::Start() {
 
   server_ = std::make_unique<AudioCompositeServer>(
       std::move(mmios), std::move((*get_bti_result)->bti), dispatcher(), aml_version,
-      std::move(gate_client), std::move(pll_client), std::move(gpio_sclk_clients),
-      std::move(recorder));
+      std::move(gate_client), std::move(pll_client), std::move(sclk_clients), std::move(recorder));
 
   auto result = outgoing()->component().AddUnmanagedProtocol<fuchsia_hardware_audio::Composite>(
       bindings_.CreateHandler(server_.get(), dispatcher(), fidl::kIgnoreBindingClosure),

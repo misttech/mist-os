@@ -588,9 +588,11 @@ void AmlG12TdmStream::ShutdownHook() {
   StopAllCodecs();
 
   if (enable_gpio_.is_valid()) {
-    fidl::WireResult result = enable_gpio_->Write(0);
+    fidl::WireResult result =
+        enable_gpio_->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputLow);
     if (!result.ok()) {
-      zxlogf(ERROR, "Failed to send Write request to enable gpio: %s", result.status_string());
+      zxlogf(ERROR, "Failed to send SetBufferMode request to enable gpio: %s",
+             result.status_string());
     } else if (result->is_error()) {
       zxlogf(ERROR, "Failed to write to enable gpio: %s",
              zx_status_get_string(result->error_value()));
