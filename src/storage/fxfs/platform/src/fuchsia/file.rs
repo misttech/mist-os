@@ -221,6 +221,16 @@ impl FxFile {
             });
         }
     }
+
+    async fn wrapping_key_id(&self) -> Result<Option<u128>, zx::Status> {
+        if !self.handle.store().is_encrypted() {
+            return Ok(None);
+        } else {
+            let wrapped_keys =
+                self.handle.store().get_keys(self.object_id()).await.map_err(map_to_status)?;
+            Ok(Some(wrapped_keys[0].1.wrapping_key_id))
+        }
+    }
 }
 
 impl Drop for FxFile {
@@ -291,6 +301,7 @@ impl vfs::node::Node for FxFile {
                     .get_inline_selinux_context()
                     .await
                     .map_err(map_to_status)?,
+                wrapping_key_id: self.wrapping_key_id().await?.map(|x| x.to_le_bytes()),
             },
             Immutable {
                 protocols: fio::NodeProtocolKinds::FILE,

@@ -739,6 +739,7 @@ mod tests {
                     &mut transaction,
                     HandleOptions::default(),
                     None,
+                    None,
                 )
                 .await
                 .expect("create_object failed")
@@ -853,6 +854,7 @@ mod tests {
                 &mut transaction,
                 HandleOptions::default(),
                 None,
+                None,
             )
             .await
             .expect("create_object failed");
@@ -921,6 +923,7 @@ mod tests {
                 &mut transaction,
                 HandleOptions::default(),
                 None,
+                None,
             )
             .await
             .expect("create_object failed");
@@ -983,6 +986,7 @@ mod tests {
                 &mut transaction,
                 HandleOptions::default(),
                 None,
+                None,
             )
             .await
             .expect("create_object failed");
@@ -1035,10 +1039,15 @@ mod tests {
             .await
             .expect("new_transaction failed");
         let store = fs.root_parent_store();
-        let handle =
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed");
+        let handle = ObjectStore::create_object(
+            &store,
+            &mut transaction,
+            HandleOptions::default(),
+            None,
+            None,
+        )
+        .await
+        .expect("create_object failed");
         transaction.commit().await.expect("commit failed");
 
         store
@@ -1058,6 +1067,7 @@ mod tests {
                 &root_store,
                 &mut transaction,
                 HandleOptions::default(),
+                None,
                 None,
             )
             .await

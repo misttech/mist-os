@@ -55,6 +55,7 @@ pub struct ObjectProperties {
     pub posix_attributes: Option<PosixAttributes>,
     /// True if this is a directory that has casefolding enabled.
     pub casefold: bool,
+    pub wrapping_key_id: Option<u128>,
 }
 
 #[async_trait]

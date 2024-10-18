@@ -32,6 +32,7 @@ const SECTOR_SIZE: u64 = 512;
 
 pub type KeyBytes = [u8; KEY_SIZE];
 
+#[derive(Debug)]
 pub struct UnwrappedKey {
     key: KeyBytes,
 }
@@ -237,6 +238,36 @@ impl XtsCipherSet {
             cipher.encrypt_block(GenericArray::from_mut_slice(tweak.as_mut_bytes()));
             cipher.decrypt_with_backend(XtsProcessor::new(tweak, sector));
             sector_offset += 1;
+        }
+        Ok(())
+    }
+
+    /// Encrypts the filename contained in `buffer`.
+    /// TODO(https://fxbug.dev/356896315): Implement encryption for filenames.
+    pub fn encrypt_filename(&self, _key_id: u64, buffer: &mut Vec<u8>) -> Result<(), Error> {
+        // Pad the buffer such that its length is a multiple of 32.
+        if buffer.len() % 32 != 0 {
+            let remainder = 32 - (buffer.len() % 32);
+            for _ in 1..=remainder {
+                buffer.push(0);
+            }
+        }
+        for byte in buffer {
+            *byte = *byte + 1;
+        }
+        Ok(())
+    }
+
+    /// Decrypts the filename contained in `buffer`.
+    /// TODO(https://fxbug.dev/356896315): Implement decryption for filenames.
+    pub fn decrypt_filename(&self, _key_id: u64, buffer: &mut Vec<u8>) -> Result<(), Error> {
+        for byte in &mut *buffer {
+            *byte = *byte - 1;
+        }
+        // Remove the padding
+        if let Some(i) = buffer.iter().rposition(|x| *x != 0) {
+            let new_len = i + 1;
+            buffer.truncate(new_len);
         }
         Ok(())
     }

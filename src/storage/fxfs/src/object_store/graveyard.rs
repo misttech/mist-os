@@ -502,6 +502,7 @@ mod tests {
             &mut transaction,
             HandleOptions::default(),
             None,
+            None,
         )
         .await
         .expect("failed to create object");
@@ -571,6 +572,7 @@ mod tests {
             &root_store,
             &mut transaction,
             HandleOptions::default(),
+            None,
             None,
         )
         .await
@@ -647,6 +649,7 @@ mod tests {
             &root_store,
             &mut transaction,
             HandleOptions::default(),
+            None,
             None,
         )
         .await

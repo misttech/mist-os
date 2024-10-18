@@ -9,6 +9,8 @@ use crate::fuchsia::node::{FxNode, GetResult, OpenedNode};
 use crate::fuchsia::symlink::FxSymlink;
 use crate::fuchsia::volume::{info_to_filesystem_info, FxVolume, RootDir};
 use anyhow::{bail, Error};
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::engine::Engine as _;
 use either::{Left, Right};
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
@@ -251,7 +253,7 @@ impl FxDirectory {
                 self.directory.create_child_dir(transaction, name).await?,
             ));
             if let Some(attrs) = create_attributes {
-                dir.directory().update_attributes(transaction, Some(&attrs), 0, None).await?;
+                dir.directory().handle().update_attributes(transaction, Some(&attrs), None).await?;
             }
             Ok(dir as Arc<dyn FxNode>)
         } else {
@@ -562,7 +564,7 @@ impl MutableDirectory for FxDirectory {
         if let Some(casefold) = attributes.casefold {
             self.directory.set_casefold(casefold).await.map_err(map_to_status)?;
         }
-        let mut transaction = fs
+        let transaction = fs
             .clone()
             .new_transaction(
                 lock_keys![LockKey::object(
@@ -573,12 +575,12 @@ impl MutableDirectory for FxDirectory {
             )
             .await
             .map_err(map_to_status)?;
+
         // TODO(https://fxbug.dev/298128836): atime can be updated but is not properly supported.
         self.directory
-            .update_attributes(&mut transaction, Some(&attributes), 0, Some(Timestamp::now()))
+            .update_attributes(transaction, Some(&attributes), 0, Some(Timestamp::now()))
             .await
             .map_err(map_to_status)?;
-        transaction.commit().await.map_err(map_to_status)?;
         Ok(())
     }
 
@@ -700,6 +702,7 @@ impl vfs::node::Node for FxDirectory {
                     .get_inline_selinux_context()
                     .await
                     .map_err(map_to_status)?,
+                wrapping_key_id: props.wrapping_key_id.map(|a| a.to_le_bytes()),
             },
             Immutable {
                 protocols: fio::NodeProtocolKinds::DIRECTORY,
@@ -854,52 +857,118 @@ impl VfsDirectory for FxDirectory {
             return Ok((TraversalPosition::End, sink.seal()));
         }
 
-        let starting_name = match pos {
-            TraversalPosition::Start => {
-                // Synthesize a "." entry if we're at the start of the stream.
-                match sink
-                    .append(&EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory), ".")
-                {
-                    AppendResult::Ok(new_sink) => sink = new_sink,
-                    AppendResult::Sealed(sealed) => {
-                        // Note that the VFS should have yielded an error since the first entry
-                        // didn't fit. This is defensive in case the VFS' behaviour changes, so that
-                        // we return a reasonable value.
-                        return Ok((TraversalPosition::Start, sealed));
-                    }
-                }
-                ""
-            }
-            TraversalPosition::Name(name) => name,
-            _ => unreachable!(),
-        };
-
         let layer_set = self.store().tree().layer_set();
         let mut merger = layer_set.merger();
-        let mut iter =
-            self.directory.iter_from(&mut merger, starting_name).await.map_err(map_to_status)?;
-        while let Some((name, object_id, object_descriptor)) = iter.get() {
-            let entry_type = match object_descriptor {
-                ObjectDescriptor::File => fio::DirentType::File,
-                ObjectDescriptor::Directory => fio::DirentType::Directory,
-                ObjectDescriptor::Symlink => fio::DirentType::Symlink,
-                ObjectDescriptor::Volume => return Err(zx::Status::IO_DATA_INTEGRITY),
-            };
-            let info = EntryInfo::new(object_id, entry_type);
-            match sink.append(&info, name) {
-                AppendResult::Ok(new_sink) => sink = new_sink,
-                AppendResult::Sealed(sealed) => {
-                    // We did *not* add the current entry to the sink (e.g. because the sink was
-                    // full), so mark |name| as the next position so that it's the first entry we
-                    // process on a subsequent call of read_dirents.
-                    // Note that entries inserted between the previous entry and this entry before
-                    // the next call to read_dirents would not be included in the results (but
-                    // there's no requirement to include them anyways).
-                    return Ok((TraversalPosition::Name(name.to_string()), sealed));
+        if self.directory.wrapping_key_id().is_some() {
+            let starting_name = match pos {
+                TraversalPosition::Start => {
+                    // Synthesize a "." entry if we're at the start of the stream.
+                    match sink
+                        .append(&EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory), ".")
+                    {
+                        AppendResult::Ok(new_sink) => sink = new_sink,
+                        AppendResult::Sealed(sealed) => {
+                            // Note that the VFS should have yielded an error since the first entry
+                            // didn't fit. This is defensive in case the VFS' behaviour changes, so
+                            // that we return a reasonable value.
+                            return Ok((TraversalPosition::Start, sealed));
+                        }
+                    }
+                    vec![]
                 }
+                TraversalPosition::Bytes(bytes) => bytes.clone(),
+                _ => unreachable!(),
+            };
+            let mut iter = self
+                .directory
+                .iter_from_encrypted(&mut merger, starting_name)
+                .await
+                .map_err(map_to_status)?;
+            while let Some((name_bytes, object_id, object_descriptor)) = iter.get() {
+                let entry_type = match object_descriptor {
+                    ObjectDescriptor::File => fio::DirentType::File,
+                    ObjectDescriptor::Directory => fio::DirentType::Directory,
+                    ObjectDescriptor::Symlink => return Err(zx::Status::NOT_SUPPORTED),
+                    ObjectDescriptor::Volume => return Err(zx::Status::IO_DATA_INTEGRITY),
+                };
+                let mut name_bytes_mut = name_bytes.clone();
+                let name = match self.directory.get_keys().await {
+                    Ok(Some(keys)) => {
+                        // TODO(https://fxbug.dev/361656831): Change key_id to 1.
+                        keys.decrypt_filename(0, name_bytes_mut.as_mut()).map_err(map_to_status)?;
+                        String::from_utf8(name_bytes_mut).map_err(|_| Err(zx::Status::BAD_STATE))?
+                    }
+                    Ok(None) => BASE64_STANDARD.encode(name_bytes_mut),
+                    Err(e) => {
+                        return Err(map_to_status(e));
+                    }
+                };
+
+                let info = EntryInfo::new(object_id, entry_type);
+                match sink.append(&info, &name) {
+                    AppendResult::Ok(new_sink) => sink = new_sink,
+                    AppendResult::Sealed(sealed) => {
+                        // We did *not* add the current entry to the sink (e.g. because the sink was
+                        // full), so mark |name| as the next position so that it's the first entry
+                        // we process on a subsequent call of read_dirents. Note that entries
+                        // inserted between the previous entry and this entry before the next call
+                        // to read_dirents would not be included in the results (but there's no
+                        // requirement to include them anyways).
+                        return Ok((TraversalPosition::Bytes(name_bytes), sealed));
+                    }
+                }
+                iter.advance().await.map_err(map_to_status)?;
             }
-            iter.advance().await.map_err(map_to_status)?;
+        } else {
+            let starting_name = match pos {
+                TraversalPosition::Start => {
+                    // Synthesize a "." entry if we're at the start of the stream.
+                    match sink
+                        .append(&EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::Directory), ".")
+                    {
+                        AppendResult::Ok(new_sink) => sink = new_sink,
+                        AppendResult::Sealed(sealed) => {
+                            // Note that the VFS should have yielded an error since the first entry
+                            // didn't fit. This is defensive in case the VFS' behaviour changes, so that
+                            // we return a reasonable value.
+                            return Ok((TraversalPosition::Start, sealed));
+                        }
+                    }
+                    ""
+                }
+                TraversalPosition::Name(name) => name,
+                _ => unreachable!(),
+            };
+            let mut iter = self
+                .directory
+                .iter_from(&mut merger, starting_name)
+                .await
+                .map_err(map_to_status)?;
+            while let Some((name, object_id, object_descriptor)) = iter.get() {
+                let entry_type = match object_descriptor {
+                    ObjectDescriptor::File => fio::DirentType::File,
+                    ObjectDescriptor::Directory => fio::DirentType::Directory,
+                    ObjectDescriptor::Symlink => fio::DirentType::Symlink,
+                    ObjectDescriptor::Volume => return Err(zx::Status::IO_DATA_INTEGRITY),
+                };
+
+                let info = EntryInfo::new(object_id, entry_type);
+                match sink.append(&info, &name) {
+                    AppendResult::Ok(new_sink) => sink = new_sink,
+                    AppendResult::Sealed(sealed) => {
+                        // We did *not* add the current entry to the sink (e.g. because the sink was
+                        // full), so mark |name| as the next position so that it's the first entry we
+                        // process on a subsequent call of read_dirents.
+                        // Note that entries inserted between the previous entry and this entry before
+                        // the next call to read_dirents would not be included in the results (but
+                        // there's no requirement to include them anyways).
+                        return Ok((TraversalPosition::Name(name.to_string()), sealed));
+                    }
+                }
+                iter.advance().await.map_err(map_to_status)?;
+            }
         }
+
         Ok((TraversalPosition::End, sink.seal()))
     }
 
@@ -960,11 +1029,14 @@ mod tests {
         open_dir_checked, open_file, open_file_checked, TestFixture, TestFixtureOptions,
     };
     use assert_matches::assert_matches;
+    use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+    use base64::engine::Engine as _;
     use fidl::endpoints::{create_proxy, ClientEnd, Proxy, ServerEnd};
     use fuchsia_fs::directory::{DirEntry, DirentKind};
     use fuchsia_fs::file;
     use futures::StreamExt;
     use fxfs::object_store::Timestamp;
+    use fxfs_insecure_crypto::InsecureCrypt;
     use rand::Rng;
     use std::os::fd::AsRawFd;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -1626,6 +1698,534 @@ mod tests {
         assert_eq!(expected_entries, parse_entries(&buf));
 
         close_dir_checked(parent).await;
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_unlock_directory_during_readdir() {
+        let fixture = TestFixture::new().await;
+        let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
+        let root = fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "foo",
+            )
+        };
+
+        let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
+        let wrapping_key_id = 2;
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        parent
+            .update_attributes(&fio::MutableNodeAttributes {
+                wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
+                ..Default::default()
+            })
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+
+        // Need enough entries such that multiple read_dirents calls are required to drain all the
+        // entries.
+        for i in 0..300 {
+            let dir = open_dir_checked(
+                parent.as_ref(),
+                fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
+                &format!("fee_{}", i),
+            )
+            .await;
+            close_dir_checked(dir).await;
+        }
+
+        close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
+        let device = fixture.close().await;
+        let new_fixture = TestFixture::new_with_device(device).await;
+        let crypt: Arc<InsecureCrypt> = new_fixture.crypt().unwrap();
+        let root = new_fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
+                "foo",
+            )
+        };
+        let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
+
+        let readdir = |dir: Arc<fio::DirectoryProxy>| async move {
+            let (status, buf) = dir.read_dirents(fio::MAX_BUF).await.expect("FIDL call failed");
+            zx::Status::ok(status).expect("read_dirents failed");
+            let mut entries = vec![];
+            for res in fuchsia_fs::directory::parse_dir_entries(&buf) {
+                entries.push(res.expect("Failed to parse entry"));
+            }
+            entries
+        };
+
+        let encrypted_entries = readdir(Arc::clone(&parent)).await;
+        for entry in encrypted_entries {
+            if entry.name == ".".to_owned() {
+                continue;
+            } else {
+                assert!(entry.name.len() >= 32);
+                assert!(!entry.name.contains("fee"));
+                assert!(entry.kind == DirentKind::Directory)
+            }
+        }
+        crypt.add_wrapping_key(2, [1; 32]);
+        let unencrypted_entries = readdir(Arc::clone(&parent)).await;
+        for entry in unencrypted_entries {
+            if entry.name == ".".to_owned() {
+                continue;
+            } else {
+                assert!(entry.name.contains("fee"));
+                assert!(entry.kind == DirentKind::Directory)
+            }
+        }
+
+        close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
+        new_fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_readdir_locked_directory() {
+        let fixture = TestFixture::new().await;
+        let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
+        let root = fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "foo",
+            )
+        };
+
+        let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
+        let wrapping_key_id = 2;
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        parent
+            .update_attributes(&fio::MutableNodeAttributes {
+                wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
+                ..Default::default()
+            })
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+        let dir = open_dir_checked(
+            parent.as_ref(),
+            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
+            "fee",
+        )
+        .await;
+
+        let subdir =
+            open_dir_checked(&dir, fio::OpenFlags::CREATE | fio::OpenFlags::DIRECTORY, "fo").await;
+        close_dir_checked(dir).await;
+        close_dir_checked(subdir).await;
+
+        let readdir = |dir: Arc<fio::DirectoryProxy>| async move {
+            let status = dir.rewind().await.expect("FIDL call failed");
+            zx::Status::ok(status).expect("rewind failed");
+            let (status, buf) = dir.read_dirents(fio::MAX_BUF).await.expect("FIDL call failed");
+            zx::Status::ok(status).expect("read_dirents failed");
+            let mut entries = vec![];
+            for res in fuchsia_fs::directory::parse_dir_entries(&buf) {
+                entries.push(res.expect("Failed to parse entry"));
+            }
+            entries
+        };
+
+        let mut expected_entries =
+            vec![DirEntry { name: ".".to_owned(), kind: DirentKind::Directory }];
+
+        expected_entries.push(DirEntry { name: "fee".to_owned(), kind: DirentKind::Directory });
+        expected_entries.sort_unstable();
+        assert_eq!(expected_entries, readdir(Arc::clone(&parent)).await);
+
+        close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
+        let device = fixture.close().await;
+        let new_fixture = TestFixture::new_with_device(device).await;
+        let root = new_fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
+                "foo",
+            )
+        };
+        let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
+
+        let encrypted_entries = readdir(Arc::clone(&parent)).await;
+        let mut encrypted_name = String::new();
+        for entry in encrypted_entries {
+            if entry.name == ".".to_owned() {
+                continue;
+            } else {
+                assert!(entry.name.len() >= 32);
+                encrypted_name = entry.name;
+                assert!(entry.kind == DirentKind::Directory)
+            }
+        }
+
+        let encrypted_dir = Arc::new(
+            open_dir_checked(parent.as_ref(), fio::OpenFlags::DIRECTORY, &encrypted_name).await,
+        );
+
+        let encrypted_subdir_entries = readdir(Arc::clone(&encrypted_dir)).await;
+        for entry in encrypted_subdir_entries {
+            if entry.name == ".".to_owned() {
+                continue;
+            } else {
+                assert!(entry.name.len() >= 32);
+                assert!(entry.kind == DirentKind::Directory)
+            }
+        }
+        close_dir_checked(Arc::try_unwrap(encrypted_dir).unwrap()).await;
+        close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
+        new_fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_stat_locked_file() {
+        let fixture = TestFixture::new().await;
+        let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
+        let root = fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "foo",
+            )
+        };
+        let parent = Arc::new(open_dir().await);
+        let wrapping_key_id = 2;
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        parent
+            .update_attributes(&fio::MutableNodeAttributes {
+                wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
+                ..Default::default()
+            })
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+
+        let file = open_file_checked(
+            parent.as_ref(),
+            fio::OpenFlags::CREATE | fio::OpenFlags::NOT_DIRECTORY,
+            "file",
+        )
+        .await;
+
+        close_file_checked(file).await;
+        close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
+
+        let device = fixture.close().await;
+        let new_fixture = TestFixture::new_with_device(device).await;
+        let root = new_fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
+                "foo",
+            )
+        };
+        let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
+        let (status, buf) = parent.read_dirents(fio::MAX_BUF).await.expect("FIDL call failed");
+        zx::Status::ok(status).expect("read_dirents failed");
+        let mut encrypted_entries = vec![];
+        for res in fuchsia_fs::directory::parse_dir_entries(&buf) {
+            encrypted_entries.push(res.expect("Failed to parse entry"));
+        }
+        let mut encrypted_name = String::new();
+        for entry in encrypted_entries {
+            if entry.name == ".".to_owned() {
+                continue;
+            } else {
+                assert!(entry.name.len() >= 32);
+                encrypted_name = entry.name;
+                assert!(entry.kind == DirentKind::File)
+            }
+        }
+
+        let file =
+            open_file_checked(parent.as_ref(), fio::OpenFlags::NOT_DIRECTORY, &encrypted_name)
+                .await;
+        let (_mutable_attributes, _immutable_attributes) = file
+            .get_attributes(
+                fio::NodeAttributesQuery::CONTENT_SIZE
+                    | fio::NodeAttributesQuery::STORAGE_SIZE
+                    | fio::NodeAttributesQuery::LINK_COUNT
+                    | fio::NodeAttributesQuery::MODIFICATION_TIME
+                    | fio::NodeAttributesQuery::CHANGE_TIME,
+            )
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::Status::from_raw)
+            .expect("get_attributes failed");
+        close_file_checked(file).await;
+        new_fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_unlink_locked_directory() {
+        let fixture = TestFixture::new().await;
+        let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
+        let root = fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "foo",
+            )
+        };
+
+        let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
+        let wrapping_key_id = 2;
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        parent
+            .update_attributes(&fio::MutableNodeAttributes {
+                wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
+                ..Default::default()
+            })
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+        let dir = open_dir_checked(
+            parent.as_ref(),
+            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
+            "fee",
+        )
+        .await;
+
+        close_dir_checked(dir).await;
+        close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
+        let device = fixture.close().await;
+        let new_fixture = TestFixture::new_with_device(device).await;
+        let root = new_fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "foo",
+            )
+        };
+        let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
+
+        let readdir = |dir: Arc<fio::DirectoryProxy>| async move {
+            let status = dir.rewind().await.expect("FIDL call failed");
+            zx::Status::ok(status).expect("rewind failed");
+            let (status, buf) = dir.read_dirents(fio::MAX_BUF).await.expect("FIDL call failed");
+            zx::Status::ok(status).expect("read_dirents failed");
+            let mut entries = vec![];
+            for res in fuchsia_fs::directory::parse_dir_entries(&buf) {
+                entries.push(res.expect("Failed to parse entry"));
+            }
+            entries
+        };
+
+        let encrypted_entries = readdir(Arc::clone(&parent)).await;
+        let mut encrypted_name = String::new();
+        for entry in encrypted_entries {
+            if entry.name == ".".to_owned() {
+                continue;
+            } else {
+                assert!(entry.name.len() >= 32);
+                encrypted_name = entry.name;
+                assert!(entry.kind == DirentKind::Directory)
+            }
+        }
+
+        parent
+            .unlink(&encrypted_name, &fio::UnlinkOptions::default())
+            .await
+            .expect("FIDL call failed")
+            .expect("unlink failed");
+
+        let encrypted_entries = readdir(Arc::clone(&parent)).await;
+        let mut count = 0;
+        for entry in encrypted_entries {
+            if entry.name == ".".to_owned() {
+                continue;
+            } else {
+                assert!(entry.name.len() >= 32);
+                assert!(entry.kind == DirentKind::Directory)
+            }
+            count += 1;
+        }
+        assert_eq!(count, 0);
+        close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
+        new_fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_rename_within_locked_encrypted_directory() {
+        let fixture = TestFixture::new().await;
+        let crypt: Arc<InsecureCrypt> = fixture.crypt().unwrap();
+        let root = fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "foo",
+            )
+        };
+
+        let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
+        let wrapping_key_id = 2;
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        parent
+            .update_attributes(&fio::MutableNodeAttributes {
+                wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
+                ..Default::default()
+            })
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::ok)
+            .expect("update_attributes failed");
+        let dir = open_dir_checked(
+            parent.as_ref(),
+            fio::OpenFlags::CREATE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
+            "fee",
+        )
+        .await;
+
+        close_dir_checked(dir).await;
+        close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
+        let device = fixture.close().await;
+        let new_fixture = TestFixture::new_with_device(device).await;
+        let crypt: Arc<InsecureCrypt> = new_fixture.crypt().unwrap();
+        let root = new_fixture.root();
+        let open_dir = || {
+            open_dir_checked(
+                &root,
+                fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::DIRECTORY,
+                "foo",
+            )
+        };
+        let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
+
+        let readdir = |dir: Arc<fio::DirectoryProxy>| async move {
+            let status = dir.rewind().await.expect("FIDL call failed");
+            zx::Status::ok(status).expect("rewind failed");
+            let (status, buf) = dir.read_dirents(fio::MAX_BUF).await.expect("FIDL call failed");
+            zx::Status::ok(status).expect("read_dirents failed");
+            let mut entries = vec![];
+            for res in fuchsia_fs::directory::parse_dir_entries(&buf) {
+                entries.push(res.expect("Failed to parse entry"));
+            }
+            entries
+        };
+
+        let encrypted_entries = readdir(Arc::clone(&parent)).await;
+        let mut encrypted_name = String::new();
+        for entry in encrypted_entries {
+            if entry.name == ".".to_owned() {
+                continue;
+            } else {
+                assert!(entry.name.len() >= 32);
+                encrypted_name = entry.name;
+                assert!(entry.kind == DirentKind::Directory)
+            }
+        }
+
+        let (status, dst_token) = parent.get_token().await.expect("FIDL call failed");
+        zx::Status::ok(status).expect("get_token failed");
+        let new_encrypted_name = BASE64_STANDARD.encode("new_encrypted_name");
+        parent
+            .rename(&encrypted_name, zx::Event::from(dst_token.unwrap()), &new_encrypted_name)
+            .await
+            .expect("FIDL call failed")
+            .expect_err("rename should fail on a locked directory");
+        let (status, dst_token) = parent.get_token().await.expect("FIDL call failed");
+        zx::Status::ok(status).expect("get_token failed");
+        crypt.add_wrapping_key(2, [1; 32]);
+        parent
+            .rename("fee", zx::Event::from(dst_token.unwrap()), "new_fee")
+            .await
+            .expect("FIDL call failed")
+            .expect("rename should fail on a locked directory");
+
+        let _dir = open_dir_checked(parent.as_ref(), fio::OpenFlags::DIRECTORY, "new_fee").await;
+        close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
+        new_fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_set_attrs() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+
+        let dir = open_dir_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::DIRECTORY,
+            "foo",
+        )
+        .await;
+
+        let (status, initial_attrs) = dir.get_attr().await.expect("FIDL call failed");
+        zx::Status::ok(status).expect("get_attr failed");
+
+        let crtime = initial_attrs.creation_time ^ 1u64;
+        let mtime = initial_attrs.modification_time ^ 1u64;
+
+        let mut attrs = initial_attrs.clone();
+        attrs.creation_time = crtime;
+        attrs.modification_time = mtime;
+        let status = dir
+            .set_attr(fio::NodeAttributeFlags::CREATION_TIME, &attrs)
+            .await
+            .expect("FIDL call failed");
+        zx::Status::ok(status).expect("set_attr failed");
+
+        let mut expected_attrs = initial_attrs.clone();
+        expected_attrs.creation_time = crtime; // Only crtime is updated so far.
+        let (status, attrs) = dir.get_attr().await.expect("FIDL call failed");
+        zx::Status::ok(status).expect("get_attr failed");
+        assert_eq!(expected_attrs, attrs);
+
+        let mut attrs = initial_attrs.clone();
+        attrs.creation_time = 0u64; // This should be ignored since we don't set the flag.
+        attrs.modification_time = mtime;
+        let status = dir
+            .set_attr(fio::NodeAttributeFlags::MODIFICATION_TIME, &attrs)
+            .await
+            .expect("FIDL call failed");
+        zx::Status::ok(status).expect("set_attr failed");
+
+        let mut expected_attrs = initial_attrs.clone();
+        expected_attrs.creation_time = crtime;
+        expected_attrs.modification_time = mtime;
+        let (status, attrs) = dir.get_attr().await.expect("FIDL call failed");
+        zx::Status::ok(status).expect("get_attr failed");
+        assert_eq!(expected_attrs, attrs);
+
+        close_dir_checked(dir).await;
         fixture.close().await;
     }
 

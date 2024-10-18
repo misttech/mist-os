@@ -1189,6 +1189,7 @@ impl Journal {
             SuperBlockInstance::A.object_id(),
             HandleOptions::default(),
             None,
+            None,
         )
         .await
         .context("create super block")?;
@@ -1201,6 +1202,7 @@ impl Journal {
             &mut transaction,
             SuperBlockInstance::B.object_id(),
             HandleOptions::default(),
+            None,
             None,
         )
         .await
@@ -1215,6 +1217,7 @@ impl Journal {
             &root_parent,
             &mut transaction,
             journal_handle_options(),
+            None,
             None,
         )
         .await

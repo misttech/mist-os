@@ -15,6 +15,7 @@ use fxfs::filesystem::{FxFilesystem, FxFilesystemBuilder, OpenFxFilesystem};
 use fxfs::fsck::errors::FsckIssue;
 use fxfs::fsck::{fsck_volume_with_options, fsck_with_options, FsckOptions};
 use fxfs::object_store::volume::root_volume;
+use fxfs_crypto::Crypt;
 use fxfs_insecure_crypto::InsecureCrypt;
 use std::sync::{Arc, Weak};
 use storage_device::fake_device::FakeDevice;
@@ -33,7 +34,7 @@ struct State {
 
 pub struct TestFixture {
     state: Option<State>,
-    encrypted: bool,
+    encrypted: Option<Arc<InsecureCrypt>>,
 }
 
 pub struct TestFixtureOptions {
@@ -79,6 +80,19 @@ impl TestFixture {
         .await
     }
 
+    pub async fn new_with_device(device: DeviceHolder) -> Self {
+        Self::open(
+            device,
+            TestFixtureOptions {
+                encrypted: true,
+                as_blob: false,
+                format: false,
+                serve_volume: false,
+            },
+        )
+        .await
+    }
+
     pub async fn new_unencrypted() -> Self {
         Self::open(
             DeviceHolder::new(FakeDevice::new(16384, 512)),
@@ -93,14 +107,12 @@ impl TestFixture {
     }
 
     pub async fn open(device: DeviceHolder, options: TestFixtureOptions) -> Self {
+        let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
         let (filesystem, volume, volumes_directory) = if options.format {
             let filesystem = FxFilesystemBuilder::new().format(true).open(device).await.unwrap();
             let root_volume = root_volume(filesystem.clone()).await.unwrap();
             let store = root_volume
-                .new_volume(
-                    "vol",
-                    if options.encrypted { Some(Arc::new(InsecureCrypt::new())) } else { None },
-                )
+                .new_volume("vol", if options.encrypted { Some(crypt.clone()) } else { None })
                 .await
                 .unwrap();
             let store_object_id = store.store_object_id();
@@ -120,10 +132,7 @@ impl TestFixture {
             let filesystem = FxFilesystemBuilder::new().open(device).await.unwrap();
             let root_volume = root_volume(filesystem.clone()).await.unwrap();
             let store = root_volume
-                .volume(
-                    "vol",
-                    if options.encrypted { Some(Arc::new(InsecureCrypt::new())) } else { None },
-                )
+                .volume("vol", if options.encrypted { Some(crypt.clone()) } else { None })
                 .await
                 .unwrap();
             let store_object_id = store.store_object_id();
@@ -162,9 +171,10 @@ impl TestFixture {
         } else {
             None
         };
+        let encrypted = if options.encrypted { Some(crypt.clone()) } else { None };
         Self {
             state: Some(State { filesystem, volume, volume_out_dir, root, volumes_directory }),
-            encrypted: options.encrypted,
+            encrypted,
         }
     }
 
@@ -221,14 +231,14 @@ impl TestFixture {
             ..Default::default()
         };
         fsck_with_options(filesystem.clone(), &options).await.expect("fsck failed");
-        fsck_volume_with_options(
-            filesystem.as_ref(),
-            &options,
-            store_id,
-            if self.encrypted { Some(Arc::new(InsecureCrypt::new())) } else { None },
-        )
-        .await
-        .expect("fsck_volume failed");
+        let encrypted = if let Some(crypt) = &self.encrypted {
+            Some(crypt.clone() as Arc<dyn Crypt>)
+        } else {
+            None
+        };
+        fsck_volume_with_options(filesystem.as_ref(), &options, store_id, encrypted)
+            .await
+            .expect("fsck_volume failed");
 
         filesystem.close().await.expect("close filesystem failed");
         let device = ensure_unique_or_poison(filesystem.take_device().await);
@@ -239,6 +249,10 @@ impl TestFixture {
 
     pub fn root(&self) -> &fio::DirectoryProxy {
         &self.state.as_ref().unwrap().root
+    }
+
+    pub fn crypt(&self) -> Option<Arc<InsecureCrypt>> {
+        self.encrypted.clone()
     }
 
     pub fn fs(&self) -> &Arc<FxFilesystem> {

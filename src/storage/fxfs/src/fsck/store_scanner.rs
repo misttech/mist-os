@@ -196,6 +196,7 @@ impl<'a> ScannedStore<'a> {
                         );
                     }
                     ObjectValue::Object {
+                        // TODO: https://fxbug.dev/356897866: Add validation for fscrypt.
                         kind: ObjectKind::Directory { sub_dirs, casefold, .. },
                         attributes: ObjectAttributes { project_id, allocated_size, .. },
                     } => {
@@ -563,6 +564,7 @@ impl<'a> ScannedStore<'a> {
         object_descriptor: &ObjectDescriptor,
         casefold: bool,
     ) -> Result<(), Error> {
+        // TODO: https://fxbug.dev/356897866: Add validation for fscrypt.
         if let Some(ScannedObject::Directory(dir)) = self.objects.get(&parent_id) {
             if dir.casefold != casefold {
                 self.fsck.error(FsckError::CasefoldInconsistency(
@@ -852,6 +854,11 @@ async fn scan_extents_and_directory_children<'a>(
             }
             ItemRef {
                 key: ObjectKey { object_id, data: ObjectKeyData::Child { .. } },
+                value: ObjectValue::Child(ChildValue { object_id: child_id, object_descriptor }),
+                ..
+            }
+            | ItemRef {
+                key: ObjectKey { object_id, data: ObjectKeyData::EncryptedChild { .. } },
                 value: ObjectValue::Child(ChildValue { object_id: child_id, object_descriptor }),
                 ..
             } => scanned.process_child(*object_id, *child_id, object_descriptor, false)?,

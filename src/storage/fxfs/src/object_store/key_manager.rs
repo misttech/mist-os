@@ -3,9 +3,8 @@
 // found in the LICENSE file.
 
 use crate::log::*;
-use anyhow::{anyhow, bail, Error};
+use anyhow::Error;
 use event_listener::Event;
-use fuchsia_async as fasync;
 use futures::future;
 use fxfs_crypto::{Crypt, UnwrappedKeys, WrappedKeys, XtsCipherSet};
 use scopeguard::ScopeGuard;
@@ -16,6 +15,7 @@ use std::future::Future;
 use std::pin::pin;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use {fuchsia_async as fasync, zx_status as zx};
 
 /// This timeout controls when entries are moved from `hash` to `pending_purge` and then dumped.
 /// Entries will remain in the cache until they remain inactive from between PURGE_TIMEOUT and 2 *
@@ -109,7 +109,7 @@ impl Inner {
 
 struct UnwrapResult {
     event: Event,
-    error: UnsafeCell<bool>,
+    error: UnsafeCell<zx::Status>,
     // Protected by the mutex on Inner.
     cancelled: UnsafeCell<bool>,
 }
@@ -118,7 +118,7 @@ impl UnwrapResult {
     fn new() -> Arc<Self> {
         Arc::new(UnwrapResult {
             event: Event::new(),
-            error: UnsafeCell::new(false),
+            error: UnsafeCell::new(zx::Status::OK),
             cancelled: UnsafeCell::new(false),
         })
     }
@@ -129,22 +129,22 @@ impl UnwrapResult {
         inner: &Arc<Mutex<Inner>>,
         object_id: u64,
         permanent: bool,
-        result: Result<Option<Arc<XtsCipherSet>>, Error>,
+        result: Result<Option<Arc<XtsCipherSet>>, zx::Status>,
     ) -> bool {
         let mut guard = inner.lock().unwrap();
         // SAFETY: Safe because we hold the lock on `inner`.
         let cancelled = unsafe { *self.cancelled.get() };
-        let set_error = || {
+        let set_error = |error| {
             // SAFETY: This is safe because we have exclusive access until we call notify below.
             unsafe {
-                *self.error.get() = true;
+                *self.error.get() = error;
             }
         };
         if cancelled {
-            set_error();
+            set_error(zx::Status::CANCELED);
         } else if let Err(error) = &result {
             error!(?error, oid = object_id, "Failed to unwrap keys");
-            set_error();
+            set_error(*error);
         }
         if let Entry::Occupied(o) = guard.unwrapping.entry(object_id) {
             if std::ptr::eq(Arc::as_ptr(o.get()), self) {
@@ -196,20 +196,25 @@ impl KeyManager {
             };
             listener.await;
             // SAFETY: This is safe because there can be no mutations happening at this point.
-            if unsafe { *unwrap_result.error.get() } {
-                bail!("Failed to unwrap keys");
+            let error = unsafe { *unwrap_result.error.get().clone() };
+            match error {
+                zx::Status::OK => {}
+                zx::Status::NOT_FOUND => return Ok(None),
+                _ => return Err(error.into()),
             }
         }
     }
 
     /// This retrieves keys from the cache or initiates unwrapping if they are not in the cache.
+    /// Returns an Option. None indicates that at least one of the wrapping keys used to wrap
+    /// `wrapped_keys` was NOT_FOUND.
     pub fn get_or_insert(
         &self,
         object_id: u64,
         crypt: Arc<dyn Crypt>,
         wrapped_keys: impl Future<Output = Result<WrappedKeys, Error>>,
         permanent: bool,
-    ) -> impl Future<Output = Result<Arc<XtsCipherSet>, Error>> {
+    ) -> impl Future<Output = Result<Option<Arc<XtsCipherSet>>, Error>> {
         let inner = self.inner.clone();
         async move {
             let mut wrapped_keys = pin!(future::maybe_done(wrapped_keys));
@@ -219,7 +224,7 @@ impl KeyManager {
                     let mut inner = inner.lock().unwrap();
 
                     if let Some(keys) = inner.keys.get(object_id) {
-                        return Ok(keys.clone());
+                        return Ok(Some(keys.clone()));
                     }
 
                     match inner.unwrapping.entry(object_id) {
@@ -239,9 +244,11 @@ impl KeyManager {
                     listener.await;
                     // SAFETY: This is safe because there can be no mutations happening at this
                     // point.
-                    if !unsafe { *unwrap_result.error.get() } {
-                        // Loop around and try and get the key.
-                        continue;
+                    let error = unsafe { *unwrap_result.error.get().clone() };
+                    match error {
+                        zx::Status::OK => {}
+                        zx::Status::NOT_FOUND => return Ok(None),
+                        _ => return Err(error.into()),
                     }
                 } else {
                     // Use a guard in case we're dropped.
@@ -262,19 +269,27 @@ impl KeyManager {
                                         permanent,
                                         Ok(Some(keys.clone())),
                                     ) {
-                                        Err(anyhow!("Cancelled"))
+                                        Err(zx::Status::CANCELED.into())
                                     } else {
-                                        Ok(keys)
+                                        Ok(Some(keys))
                                     };
                                 }
                                 Err(e) => e.into(),
                             }
                         }
-                        Err(_) => wrapped_keys.take_output().unwrap().unwrap_err(),
+                        Err(_) => wrapped_keys
+                            .take_output()
+                            .unwrap()
+                            .map_err(|_| zx::Status::INTERNAL)
+                            .unwrap_err(),
                     };
                     *result = Err(error);
+                    if error == zx::Status::NOT_FOUND {
+                        return Ok(None);
+                    } else {
+                        return Err(error.into());
+                    }
                 }
-                bail!("Failed to unwrap keys");
             }
         }
     }
@@ -449,6 +464,7 @@ mod tests {
                 .get_or_insert(1, crypt1, async { Ok(wrapped_keys()) }, false)
                 .await
                 .expect("get_or_insert failed")
+                .expect("missing wrapping key")
                 .decrypt(0, 0, &mut buf)
                 .expect("decrypt failed");
             assert_eq!(&buf, PLAIN_TEXT);
@@ -459,6 +475,7 @@ mod tests {
                 .get_or_insert(1, crypt2, async { Ok(wrapped_keys()) }, false)
                 .await
                 .expect("get_or_insert failed")
+                .expect("missing wrapping key")
                 .decrypt(0, 0, &mut buf)
                 .expect("decrypt failed");
             assert_eq!(&buf, PLAIN_TEXT);

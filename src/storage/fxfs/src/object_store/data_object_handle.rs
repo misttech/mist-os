@@ -1342,6 +1342,15 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         node_attributes: Option<&fio::MutableNodeAttributes>,
         change_time: Option<Timestamp>,
     ) -> Result<(), Error> {
+        // This codepath is only called by files, whose wrapping key id users cannot directly set
+        // as per fscrypt.
+        ensure!(
+            !matches!(
+                node_attributes,
+                Some(fio::MutableNodeAttributes { wrapping_key_id: Some(_), .. })
+            ),
+            FxfsError::BadPath
+        );
         self.handle.update_attributes(transaction, node_attributes, change_time).await
     }
 
@@ -1490,6 +1499,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 sub_dirs: 0,
                 posix_attributes,
                 casefold: false,
+                wrapping_key_id: None,
             }),
             _ => bail!(FxfsError::NotFile),
         }
@@ -1781,10 +1791,15 @@ mod tests {
             .await
             .expect("new_transaction failed");
 
-        object =
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), crypt)
-                .await
-                .expect("create_object failed");
+        object = ObjectStore::create_object(
+            &store,
+            &mut transaction,
+            HandleOptions::default(),
+            crypt,
+            None,
+        )
+        .await
+        .expect("create_object failed");
 
         let root_directory =
             Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
@@ -1973,10 +1988,15 @@ mod tests {
             .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
-        let object2 =
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed");
+        let object2 = ObjectStore::create_object(
+            &store,
+            &mut transaction,
+            HandleOptions::default(),
+            None,
+            None,
+        )
+        .await
+        .expect("create_object failed");
         transaction.commit().await.expect("commit failed");
         let mut ef_buffer = object.allocate_buffer(block_size).await;
         ef_buffer.as_mut_slice().fill(0xef);
@@ -2483,9 +2503,15 @@ mod tests {
             .expect("new_transaction failed");
         let store = fs.root_store();
         let object = Arc::new(
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed"),
+            ObjectStore::create_object(
+                &store,
+                &mut transaction,
+                HandleOptions::default(),
+                None,
+                None,
+            )
+            .await
+            .expect("create_object failed"),
         );
 
         transaction.commit().await.unwrap();
@@ -2525,6 +2551,7 @@ mod tests {
             &root_store,
             &mut transaction,
             HandleOptions::default(),
+            None,
             None,
         )
         .await
@@ -2576,6 +2603,7 @@ mod tests {
             &root_store,
             &mut transaction,
             HandleOptions::default(),
+            None,
             None,
         )
         .await
@@ -2663,9 +2691,15 @@ mod tests {
             .expect("new_transaction failed");
         let store = fs.root_store();
         let object = Arc::new(
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed"),
+            ObjectStore::create_object(
+                &store,
+                &mut transaction,
+                HandleOptions::default(),
+                None,
+                None,
+            )
+            .await
+            .expect("create_object failed"),
         );
 
         transaction.commit().await.unwrap();
@@ -2701,10 +2735,15 @@ mod tests {
             .await
             .expect("new_transaction failed");
         let store = fs.root_store();
-        handle =
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed");
+        handle = ObjectStore::create_object(
+            &store,
+            &mut transaction,
+            HandleOptions::default(),
+            None,
+            None,
+        )
+        .await
+        .expect("create_object failed");
 
         // As of writing, an empty filesystem has two 512kiB superblock extents and a little over
         // 256kiB of additional allocations (journal, etc) so we start use a 'magic' starting point
@@ -3165,9 +3204,15 @@ mod tests {
             .expect("new_transaction failed");
         let store = fs.root_store();
         object = Arc::new(
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed"),
+            ObjectStore::create_object(
+                &store,
+                &mut transaction,
+                HandleOptions::default(),
+                None,
+                None,
+            )
+            .await
+            .expect("create_object failed"),
         );
         transaction.commit().await.expect("commit failed");
         for _ in 0..100 {
@@ -3438,10 +3483,15 @@ mod tests {
             .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
-        let object2 =
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create_object failed");
+        let object2 = ObjectStore::create_object(
+            &store,
+            &mut transaction,
+            HandleOptions::default(),
+            None,
+            None,
+        )
+        .await
+        .expect("create_object failed");
         transaction.commit().await.expect("commit failed");
 
         object2

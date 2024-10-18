@@ -433,6 +433,7 @@ impl Directory for CFDirectory {
                 TraversalPosition::Index(_) => unreachable!(
                     "API contract says if we don't create a ::Index we shouldn't be passed one."
                 ),
+                TraversalPosition::Bytes(_) => unreachable!(),
                 TraversalPosition::Name(_) | TraversalPosition::End => &[],
             };
 
@@ -480,7 +481,7 @@ impl Directory for CFDirectory {
                     (&mut skip_iter) as &mut dyn Iterator<Item = _>
                 }
                 TraversalPosition::Start | TraversalPosition::Name(_) => &mut iter,
-                TraversalPosition::Index(_) => unreachable!(),
+                TraversalPosition::Index(_) | TraversalPosition::Bytes(_) => unreachable!(),
                 TraversalPosition::End => &mut empty_iter,
             };
 

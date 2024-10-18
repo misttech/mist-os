@@ -191,6 +191,11 @@ impl ObjectKey {
         }
     }
 
+    /// Creates an ObjectKey for an encrypted child.
+    pub fn encrypted_child(object_id: u64, name: Vec<u8>) -> Self {
+        Self { object_id, data: ObjectKeyData::EncryptedChild { name } }
+    }
+
     /// Creates a graveyard entry for an object.
     pub fn graveyard_entry(graveyard_object_id: u64, object_id: u64) -> Self {
         Self { object_id: graveyard_object_id, data: ObjectKeyData::GraveyardEntry { object_id } }

@@ -258,7 +258,7 @@ impl FxVolume {
             )
             .await?;
         Ok(match internal_dir.directory().lookup(PROFILE_DIRECTORY).await? {
-            Some((object_id, _)) => Directory::open_unchecked(self.clone(), object_id, false),
+            Some((object_id, _)) => Directory::open_unchecked(self.clone(), object_id, None, false),
             None => {
                 let new_dir = internal_dir
                     .directory()
@@ -298,8 +298,14 @@ impl FxVolume {
         let mut transaction =
             self.store().filesystem().new_transaction(lock_keys![], Options::default()).await?;
         let recording_handle = Box::new(
-            ObjectStore::create_object(self, &mut transaction, HandleOptions::default(), None)
-                .await?,
+            ObjectStore::create_object(
+                self,
+                &mut transaction,
+                HandleOptions::default(),
+                None,
+                None,
+            )
+            .await?,
         );
         let recording_object = recording_handle.object_id();
         self.store.add_to_graveyard(&mut transaction, recording_object);
@@ -1128,6 +1134,7 @@ mod tests {
                 &mut transaction,
                 HandleOptions::default(),
                 None,
+                None,
             )
             .await
             .expect("create_object failed")
@@ -1218,6 +1225,7 @@ mod tests {
                 &volume,
                 &mut transaction,
                 HandleOptions::default(),
+                None,
                 None,
             )
             .await
@@ -1331,6 +1339,7 @@ mod tests {
                 &volume,
                 &mut transaction,
                 HandleOptions::default(),
+                None,
                 None,
             )
             .await

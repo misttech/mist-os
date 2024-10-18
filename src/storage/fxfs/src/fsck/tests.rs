@@ -12,7 +12,7 @@ use crate::lsm_tree::types::{Item, ItemRef, Key, LayerIterator, LayerWriter, Val
 use crate::lsm_tree::Query;
 use crate::object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle, INVALID_OBJECT_ID};
 use crate::object_store::allocator::{AllocatorKey, AllocatorValue, CoalescingIterator};
-use crate::object_store::directory::{self, Directory};
+use crate::object_store::directory::{self, Directory, MutableAttributesInternal};
 use crate::object_store::transaction::{self, lock_keys, LockKey, ObjectStoreMutation, Options};
 use crate::object_store::volume::root_volume;
 use crate::object_store::{
@@ -137,6 +137,7 @@ async fn install_items_in_store<K: Key, V: Value>(
         &mut transaction,
         HandleOptions::default(),
         store.crypt().as_deref(),
+        None,
     )
     .await
     .expect("create_object failed");
@@ -334,6 +335,7 @@ async fn test_malformed_allocation() {
             &root_store,
             &mut transaction,
             HandleOptions::default(),
+            None,
             None,
         )
         .await
@@ -692,9 +694,15 @@ async fn test_too_few_object_refs() {
             .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
-        ObjectStore::create_object(&root_store, &mut transaction, HandleOptions::default(), None)
-            .await
-            .expect("create_object failed");
+        ObjectStore::create_object(
+            &root_store,
+            &mut transaction,
+            HandleOptions::default(),
+            None,
+            None,
+        )
+        .await
+        .expect("create_object failed");
         transaction.commit().await.expect("commit failed");
     }
 
@@ -716,7 +724,7 @@ async fn test_missing_object_tree_layer_file() {
             .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
-        ObjectStore::create_object(&volume, &mut transaction, HandleOptions::default(), None)
+        ObjectStore::create_object(&volume, &mut transaction, HandleOptions::default(), None, None)
             .await
             .expect("create_object failed");
         transaction.commit().await.expect("commit failed");
@@ -1570,8 +1578,8 @@ async fn test_orphaned_link_cycle() {
             .await
             .expect("new_transaction failed");
 
-        let dir1 = Directory::create(&mut transaction, &store).await.expect("create failed");
-        let dir2 = Directory::create(&mut transaction, &store).await.expect("create failed");
+        let dir1 = Directory::create(&mut transaction, &store, None).await.expect("create failed");
+        let dir2 = Directory::create(&mut transaction, &store, None).await.expect("create failed");
 
         dir1.insert_child(&mut transaction, "dir2", dir2.object_id(), ObjectDescriptor::Directory)
             .await
@@ -1787,10 +1795,15 @@ async fn test_file_length_mismatch() {
             .new_transaction(lock_keys![], Options::default())
             .await
             .expect("new_transaction failed");
-        let handle =
-            ObjectStore::create_object(&store, &mut transaction, HandleOptions::default(), None)
-                .await
-                .expect("create object failed");
+        let handle = ObjectStore::create_object(
+            &store,
+            &mut transaction,
+            HandleOptions::default(),
+            None,
+            None,
+        )
+        .await
+        .expect("create object failed");
         transaction.commit().await.expect("commit transaction failed");
 
         let mut transaction = fs
@@ -2510,6 +2523,7 @@ async fn test_full_disk() {
             &mut transaction,
             HandleOptions::default(),
             None,
+            None,
         )
         .await
         .expect("create_object failed");
@@ -2692,7 +2706,7 @@ async fn test_casefold() {
             .expect("new_transaction failed");
 
         // Manually add a child entry so we can add the wrong ObjectKeyData child type.
-        let handle = Directory::create_with_options(&mut transaction, &store, true)
+        let handle = Directory::create_with_options(&mut transaction, &store, None, true)
             .await
             .expect("create_directory");
         transaction.add(
@@ -2704,14 +2718,10 @@ async fn test_casefold() {
         );
         let now = Timestamp::now();
         child_dir
-            .update_attributes(
+            .update_dir_attributes_internal(
                 &mut transaction,
-                Some(&fio::MutableNodeAttributes {
-                    modification_time: Some(now.as_nanos()),
-                    ..Default::default()
-                }),
-                1,
-                Some(now),
+                child_dir.object_id(),
+                MutableAttributesInternal::new(1, Some(now), Some(now.as_nanos()), None),
             )
             .await
             .expect("update attributes");

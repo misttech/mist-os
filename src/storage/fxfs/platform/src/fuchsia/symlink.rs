@@ -78,6 +78,8 @@ impl FxSymlink {
                 sub_dirs: 0,
                 posix_attributes,
                 casefold: false,
+                // TODO: https://fxbug.dev/360171961: Add fscrypt support for symlinks
+                wrapping_key_id: None,
             }),
             ObjectValue::None => Err(FxfsError::NotFound.into()),
             _ => Err(FxfsError::NotFile.into()),
