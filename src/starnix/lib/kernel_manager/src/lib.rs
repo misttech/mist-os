@@ -327,6 +327,7 @@ pub async fn serve_starnix_manager(
                     remote_channel: Some(remote_channel),
                     container_channel: Some(container_channel),
                     resume_event: Some(resume_event),
+                    name: Some(name),
                     ..
                 } = payload
                 else {
@@ -338,7 +339,7 @@ pub async fn serve_starnix_manager(
                     proxy.resume_event.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("failed"),
                 );
 
-                start_proxy(proxy, suspend_context.resume_events.clone());
+                start_proxy(proxy, suspend_context.resume_events.clone(), name);
             }
             fstarnixrunner::ManagerRequest::Resume { .. } => {
                 resume_kernels(&suspend_context.suspended_processes)
@@ -364,11 +365,11 @@ struct ChannelProxy {
 /// `proxy.remote_channel`. The thread will exit when either of the channels' peer is closed.
 ///
 /// When the proxy exits, `proxy.resume_event` will be removed from `resume_events`.
-fn start_proxy(proxy: ChannelProxy, resume_events: Arc<Mutex<Vec<zx::EventPair>>>) {
+fn start_proxy(proxy: ChannelProxy, resume_events: Arc<Mutex<Vec<zx::EventPair>>>, name: String) {
     // TODO: We will likely have to handle a larger number of wake sources in the future,
     // at which point we may want to consider a Port-based approach, and reduce the number
     // of threads.
-    std::thread::spawn(move || {
+    let _ = std::thread::Builder::new().name(format!("proxy_thread_{:?}", name)).spawn(move || {
         let mut bounce_bytes = [MaybeUninit::uninit(); zx::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize];
         let mut bounce_handles =
             [const { MaybeUninit::uninit() }; zx::sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize];
@@ -587,7 +588,7 @@ mod test {
             remote_channel: remote_client,
             resume_event,
         };
-        start_proxy(channel_proxy, Default::default());
+        start_proxy(channel_proxy, Default::default(), "test".to_string());
 
         std::mem::drop(local_client);
 
@@ -607,7 +608,7 @@ mod test {
             remote_channel: remote_client,
             resume_event,
         };
-        start_proxy(channel_proxy, Default::default());
+        start_proxy(channel_proxy, Default::default(), test.to_string());
 
         std::mem::drop(remote_server);
 

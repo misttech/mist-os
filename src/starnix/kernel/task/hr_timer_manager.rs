@@ -238,8 +238,13 @@ impl HrTimerManager {
         let hrtimer_proxy =
             connect_to_hrtimer_async().expect("connection of hrtimer device async proxy");
 
-        let (device_channel, wake_event) =
-            create_proxy_for_wake_events(hrtimer_proxy.into_channel().expect("F").into());
+        let (device_channel, wake_event) = create_proxy_for_wake_events(
+            hrtimer_proxy
+                .into_channel()
+                .expect("Failed to convert hrtimer proxy to channel")
+                .into(),
+            "hrtimer".to_string(),
+        );
         self.lock().wake_event = Some(wake_event);
         let device_async_proxy =
             fhrtimer::DeviceProxy::new(fidl::AsyncChannel::from_channel(device_channel));

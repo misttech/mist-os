@@ -719,7 +719,10 @@ pub fn clear_wake_proxy_signal(event: &zx::EventPair) {
 ///
 /// The proxying is done by the Starnix runner, and allows messages on the channel to wake
 /// the container.
-pub fn create_proxy_for_wake_events(remote_channel: zx::Channel) -> (zx::Channel, zx::EventPair) {
+pub fn create_proxy_for_wake_events(
+    remote_channel: zx::Channel,
+    name: String,
+) -> (zx::Channel, zx::EventPair) {
     let (local_proxy, kernel_channel) = zx::Channel::create();
     let (resume_event, local_resume_event) = zx::EventPair::create();
 
@@ -735,6 +738,7 @@ pub fn create_proxy_for_wake_events(remote_channel: zx::Channel) -> (zx::Channel
             container_channel: Some(kernel_channel),
             remote_channel: Some(remote_channel),
             resume_event: Some(resume_event),
+            name: Some(name),
             ..Default::default()
         })
         .expect("Failed to create proxy");

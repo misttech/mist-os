@@ -16,7 +16,9 @@ use starnix_core::vfs::{
     FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeInfo, FsNodeOps, FsStr,
     InputBuffer, OutputBuffer, VecDirectory, VecDirectoryEntry,
 };
-use starnix_logging::{log_error, log_warn, track_stub};
+use starnix_logging::{
+    log_error, log_warn, trace_instant, track_stub, TraceScope, CATEGORY_STARNIX,
+};
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
@@ -59,6 +61,7 @@ pub fn clear_wake_proxy_signal(event: &zx::EventPair, outstanding_reads: i32) {
 
     // We always want to raise the kernel signal so that we will get more FIDL messages.
     let set_mask = KERNEL_PROXY_EVENT_SIGNAL;
+    trace_instant!(CATEGORY_STARNIX, c"functionfs-signal", TraceScope::Process, "clear_mask" => clear_mask.bits(), "set_mask" => set_mask.bits());
     match event.signal_peer(clear_mask, set_mask) {
         Ok(_) => (),
         Err(e) => log_warn!("Failed to reset wake event state {:?}", e),
@@ -288,7 +291,7 @@ fn connect_to_device(
         AdbProxyMode::None => (adb_proxy, None),
         AdbProxyMode::WakeContainer => {
             let (adb_proxy, adb_proxy_resume_event) =
-                create_proxy_for_wake_events(adb_proxy.into_channel());
+                create_proxy_for_wake_events(adb_proxy.into_channel(), "adb".to_string());
             let adb_proxy = fadb::UsbAdbImpl_SynchronousProxy::from_channel(adb_proxy);
             (adb_proxy, Some(adb_proxy_resume_event))
         }

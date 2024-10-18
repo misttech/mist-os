@@ -208,8 +208,10 @@ impl InputDevice {
 
                 let (local_listener_stream, local_resume_event) = match event_proxy_mode {
                     EventProxyMode::WakeContainer => {
-                        let (local_channel, local_resume_event) =
-                            create_proxy_for_wake_events(remote_server.into_channel());
+                        let (local_channel, local_resume_event) = create_proxy_for_wake_events(
+                            remote_server.into_channel(),
+                            "buttons".to_string(),
+                        );
                         let local_listener_stream =
                             fuipolicy::MediaButtonsListenerRequestStream::from_channel(
                                 fidl::AsyncChannel::from_channel(local_channel),

@@ -122,7 +122,7 @@ impl InputEventsRelay {
                     // Proxy the touch events through the Starnix runner. This allows touch events to
                     // wake the container when it is suspended.
                     let (touch_source_channel, resume_event) =
-                    create_proxy_for_wake_events(touch_source_client_end.into_channel());
+                    create_proxy_for_wake_events(touch_source_client_end.into_channel(), "touch".to_string());
                     (
                         fuipointer::TouchSourceProxy::new(fidl::AsyncChannel::from_channel(
                             touch_source_channel,
