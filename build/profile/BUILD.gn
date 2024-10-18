@@ -8,10 +8,22 @@ import("//build/python/python_library.gni")
 group("tests") {
   testonly = true
 
-  deps = [ ":vmstat_trace_test($host_toolchain)" ]
+  deps = [
+    ":ifconfig_trace_test($host_toolchain)",
+    ":vmstat_trace_test($host_toolchain)",
+  ]
 }
 
 if (is_host) {
+  python_library("ifconfig_trace") {
+    enable_mypy = true
+    sources = [ "ifconfig_trace.py" ]
+  }
+  python_host_test("ifconfig_trace_test") {
+    enable_mypy = true
+    main_source = "ifconfig_trace_test.py"
+    sources = [ "ifconfig_trace.py" ]
+  }
   python_library("vmstat_trace") {
     enable_mypy = true
     sources = [ "vmstat_trace.py" ]
