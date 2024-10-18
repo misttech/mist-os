@@ -267,6 +267,25 @@ pub fn pipe_half() -> Result<(File, zx::Socket), zx::Status> {
     Ok((f, zx::Socket::from(handle)))
 }
 
+/// Creates a transferrable object and returns one end as a zx::Channel.
+pub fn create_transferrable() -> Result<(File, zx::Channel), zx::Status> {
+    // We expect fdio to initialize this to a legal value.
+    let mut fd = MaybeUninit::new(-1);
+    // We expect fdio to initialize this to a legal value.
+    let mut handle = MaybeUninit::new(zx::Handle::invalid().raw_handle());
+    let status: i32 =
+        { unsafe { fdio_sys::fdio_transferable_fd(fd.as_mut_ptr(), handle.as_mut_ptr()) } };
+    zx::Status::ok(status)?;
+
+    let fd = unsafe { fd.assume_init() };
+    debug_assert!(fd >= 0, "{} >= 0", fd);
+    let file = unsafe { File::from_raw_fd(fd) };
+    let handle = unsafe { handle.assume_init() };
+    let handle = unsafe { zx::Handle::from_raw(handle) };
+    debug_assert!(!handle.is_invalid(), "({:?}).is_invalid()", handle);
+    Ok((file, zx::Channel::from(handle)))
+}
+
 bitflags! {
     /// Options to allow some or all of the environment of the running process
     /// to be shared with the process being spawned.

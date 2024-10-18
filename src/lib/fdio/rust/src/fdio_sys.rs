@@ -185,6 +185,12 @@ extern "C" {
 extern "C" {
     pub fn fdio_get_vmo_exec(fd: ::std::os::raw::c_int, out_vmo: *mut zx_handle_t) -> zx_status_t;
 }
+extern "C" {
+    pub fn fdio_transferable_fd(
+        out_fd: *mut ::std::os::raw::c_int,
+        out_handle: *mut zx_handle_t,
+    ) -> zx_status_t;
+}
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct fdio_namespace {
