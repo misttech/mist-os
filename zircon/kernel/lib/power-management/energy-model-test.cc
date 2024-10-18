@@ -8,7 +8,9 @@
 
 #include <lib/stdcompat/array.h>
 #include <lib/stdcompat/utility.h>
+#include <zircon/errors.h>
 #include <zircon/syscalls-next.h>
+#include <zircon/time.h>
 #include <zircon/types.h>
 
 #include <cstddef>
@@ -17,7 +19,6 @@
 #include <gtest/gtest.h>
 
 #include "test-helper.h"
-#include "zircon/errors.h"
 
 namespace {
 
@@ -83,7 +84,7 @@ TEST(PowerLevelTransitionTest, Ctor) {
 
   power_management::PowerLevelTransition transition(kTransition);
 
-  EXPECT_EQ(transition.latency(), zx::duration(kTransition.latency));
+  EXPECT_EQ(transition.latency(), zx_duration_from_nsec(kTransition.latency));
   EXPECT_EQ(transition.energy_cost_nj(), kTransition.energy_nj);
 }
 

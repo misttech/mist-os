@@ -12,13 +12,13 @@
 #include <lib/stdcompat/span.h>
 #include <lib/stdcompat/utility.h>
 #include <lib/zx/result.h>
-#include <lib/zx/time.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls-next.h>
+#include <zircon/time.h>
 #include <zircon/types.h>
 
 #include <atomic>
@@ -165,10 +165,11 @@ class PowerLevelTransition {
 
   constexpr PowerLevelTransition() = default;
   explicit constexpr PowerLevelTransition(const zx_processor_power_level_transition_t& transition)
-      : latency_(transition.latency), energy_cost_nj_(transition.energy_nj) {}
+      : latency_(zx_duration_from_nsec(transition.latency)),
+        energy_cost_nj_(transition.energy_nj) {}
 
   // Latency for transitioning from a given level to another.
-  constexpr zx::duration latency() const { return latency_; }
+  constexpr zx_duration_t latency() const { return latency_; }
 
   // Energy cost in nano joules(nj) for transition from a given level to another.
   constexpr uint64_t energy_cost_nj() const { return energy_cost_nj_; }
@@ -181,7 +182,7 @@ class PowerLevelTransition {
  private:
   // Time required for the transition to take effect. In some cases it may mean for the actual
   // voltage to stabilize.
-  zx::duration latency_ = zx::duration::infinite();
+  zx_duration_t latency_ = ZX_TIME_INFINITE;
 
   // Amount of energy consumed to perform the transition.
   uint64_t energy_cost_nj_ = std::numeric_limits<uint64_t>::max();
