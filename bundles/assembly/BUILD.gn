@@ -541,6 +541,7 @@ assembly_input_bundle("bootstrap_eng") {
     "//src/devices/power/bin/lspwr:bootfs",
     "//src/devices/ram/bin/ram-info:bootfs",
     "//src/devices/registers/bin/register-util:bootfs",
+    "//src/devices/serial/bin/serialutil:bootfs",
     "//src/devices/spi/bin/spiutil:bootfs",
     "//src/devices/spmi/bin/spmi-ctl:bootfs",
     "//src/devices/suspend/bin/suspendctl:bootfs",
