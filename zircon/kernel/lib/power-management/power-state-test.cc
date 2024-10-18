@@ -111,6 +111,18 @@ TEST(PowerStateTest, SetOrUpdateDomainClearsPowerLevelWhenDifferentModelId) {
   ASSERT_FALSE(state.desired_active_power_level());
 }
 
+TEST(PowerStateTest, SetOrUpdateDomainNullptrClearsState) {
+  auto domain = MakePowerDomainHelper(kModelId, 1, 2, 3, 4, 5, 6);
+  PowerState state(domain, std::nullopt, 2, 2);
+
+  // No previous domain.
+  ASSERT_EQ(state.SetOrUpdateDomain(nullptr), domain);
+
+  ASSERT_EQ(state.domain(), nullptr);
+  ASSERT_FALSE(state.active_power_level());
+  ASSERT_FALSE(state.desired_active_power_level());
+}
+
 TEST(PowerStateTest, TransitionWhenModelIsUnknown) {
   PowerState state;
   EXPECT_FALSE(state.RequestTransition(1, 8));

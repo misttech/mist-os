@@ -18,7 +18,7 @@
 namespace power_management {
 
 fbl::RefPtr<PowerDomain> PowerState::SetOrUpdateDomain(fbl::RefPtr<PowerDomain> domain) {
-  if (domain_ && domain->id() != domain_->id()) {
+  if (!domain || (domain_ && domain->id() != domain_->id())) {
     idle_power_level_ = std::nullopt;
     active_power_level_ = std::nullopt;
     desired_active_power_level_ = std::nullopt;
