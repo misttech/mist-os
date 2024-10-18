@@ -88,33 +88,6 @@ group("bazel_sdk_tests") {
   }
 }
 
-foreach(cpu, idk_target_cpus) {
-  # This target runs the test suite against a locally-generated IDK
-  # (which includes support for all target architectures), but only
-  # for target_cpu. E.g. `bazel_sdk_tests_arm64` will run the
-  # test suite with a build configuration that generates Fuchsia/arm64
-  # binaries.
-  #
-  # Note that the IDK does _not_ contain //sdk:driver atoms.
-  # (see //sdk:final_fuchsia_idk definition for details).
-  run_fuchsia_bazel_sdk_tests("bazel_sdk_tests_idk_${cpu}") {
-    target_cpu = cpu
-    idk_exported_path = "$root_build_dir/sdk/exported/fuchsia_idk"
-    idk_exported_target = "//sdk:final_fuchsia_idk.exported"
-  }
-}
-
-# This target runs the test suite against each target architecture
-# supported by the IDK. Currently, this runs multiple instances of
-# the test suite, one per target cpu.
-group("bazel_sdk_tests_idk") {
-  testonly = true
-  deps = []
-  foreach(cpu, idk_target_cpus) {
-    deps += [ ":bazel_sdk_tests_idk_${cpu}" ]
-  }
-}
-
 group("tests") {
   testonly = true
   deps = [ ":bazel_sdk_tests" ]
