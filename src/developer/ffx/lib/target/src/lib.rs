@@ -38,8 +38,8 @@ pub use discovery::query::TargetInfoQuery;
 pub use fidl_pipe::{create_overnet_socket, FidlPipe};
 pub use overnet_connector::{OvernetConnection, OvernetConnectionError, OvernetConnector};
 pub use resolve::{
-    maybe_locally_resolve_target_spec, resolve_target_address, resolve_target_query_to_info,
-    resolve_target_query_with, Resolution,
+    get_discovery_stream, maybe_locally_resolve_target_spec, resolve_target_address,
+    resolve_target_query_to_info, resolve_target_query_with, Resolution,
 };
 
 /// Re-export of [`fidl_fuchsia_developer_ffx::TargetProxy`] for ease of use

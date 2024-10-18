@@ -12,8 +12,7 @@ use ffx_target::{KnockError, TargetInfoQuery};
 use fho::{daemon_protocol, deferred, Deferred, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
 use fidl_fuchsia_developer_ffx as ffx;
 use fuchsia_async::TimeoutExt;
-use futures::future::join_all;
-use futures::TryStreamExt;
+use futures::{StreamExt, TryStreamExt};
 use std::time::Duration;
 
 mod target_formatter;
@@ -151,6 +150,17 @@ async fn get_target_info(
     Ok((ffx::RemoteControlState::Down, None, None))
 }
 
+async fn handle_res_to_info(
+    context: &EnvironmentContext,
+    handle: Result<discovery::TargetHandle>,
+    connect_to_target: bool,
+) -> Result<ffx::TargetInfo> {
+    match handle {
+        Ok(h) => handle_to_info(context, h, connect_to_target).await,
+        Err(e) => async { Err(e) }.await,
+    }
+}
+
 async fn handle_to_info(
     context: &EnvironmentContext,
     handle: discovery::TargetHandle,
@@ -210,15 +220,12 @@ async fn local_list_targets(
 ) -> Result<Vec<ffx::TargetInfo>> {
     let name = cmd.nodename.clone();
     let query = TargetInfoQuery::from(name);
-    let handles =
-        ffx_target::resolve_target_query_with(query, ctx, !cmd.no_usb, !cmd.no_mdns).await?;
     let connect = do_connect_to_target(ctx, cmd).await;
-    // Connect to all targets in parallel
-    let targets =
-        join_all(handles.into_iter().map(|t| async { handle_to_info(ctx, t, connect).await }))
-            .await;
+    let stream = ffx_target::get_discovery_stream(query, !cmd.no_usb, !cmd.no_mdns, ctx).await?;
+    let info_futures = stream.then(|t| handle_res_to_info(ctx, t, connect));
+    let infos: Vec<Result<ffx::TargetInfo>> = info_futures.collect().await;
     // Fail if any results are Err
-    let targets = targets.into_iter().collect::<Result<Vec<ffx::TargetInfo>>>()?;
+    let targets = infos.into_iter().collect::<Result<Vec<ffx::TargetInfo>>>()?;
     Ok(targets)
 }
 
