@@ -87,8 +87,8 @@ class FakeGpio : public fidl::WireServer<Gpio>,
     completer.ReplySuccess();
   }
   void Write(WriteRequestView request, WriteCompleter::Sync& completer) override {}
-  void GetInterrupt2(GetInterrupt2RequestView request,
-                     GetInterrupt2Completer::Sync& completer) override {
+  void GetInterrupt(GetInterruptRequestView request,
+                    GetInterruptCompleter::Sync& completer) override {
     if (client_got_interrupt_) {
       return completer.ReplyError(ZX_ERR_ALREADY_BOUND);
     }
@@ -109,8 +109,8 @@ class FakeGpio : public fidl::WireServer<Gpio>,
     mock_get_interrupt_.Call();
     completer.ReplySuccess(std::move(interrupt));
   }
-  void GetInterrupt(GetInterruptRequestView request,
-                    GetInterruptCompleter::Sync& completer) override {}
+  void GetInterrupt2(GetInterrupt2RequestView request,
+                     GetInterrupt2Completer::Sync& completer) override {}
   void ConfigureInterrupt(fuchsia_hardware_gpio::wire::GpioConfigureInterruptRequest* request,
                           ConfigureInterruptCompleter::Sync& completer) override {
     ASSERT_TRUE(request->config.has_mode());

@@ -275,7 +275,7 @@ zx::result<DriverIds> Tas27xx::Initialize() {
     return config_result->take_error();
   }
 
-  fidl::WireResult result = fault_gpio_->GetInterrupt2({});
+  fidl::WireResult result = fault_gpio_->GetInterrupt({});
   if (!result.ok()) {
     zxlogf(ERROR, "Failed to send GetInterrupt request to fault gpio: %s", result.status_string());
     return zx::error(result.status());

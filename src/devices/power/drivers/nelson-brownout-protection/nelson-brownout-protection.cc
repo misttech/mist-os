@@ -137,7 +137,7 @@ zx_status_t NelsonBrownoutProtection::Create(void* ctx, zx_device_t* parent,
     return configure_result->error_value();
   }
 
-  fidl::WireResult alert_interrupt = alert_gpio->GetInterrupt2({});
+  fidl::WireResult alert_interrupt = alert_gpio->GetInterrupt({});
   if (!alert_interrupt.ok()) {
     zxlogf(ERROR, "Failed to send GetInterrupt request: %s", alert_interrupt.status_string());
     return alert_interrupt.status();

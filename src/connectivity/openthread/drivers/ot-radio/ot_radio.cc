@@ -251,7 +251,7 @@ zx_status_t OtRadioDevice::Init() {
     return configure_interrupt_result->error_value();
   }
 
-  fidl::WireResult interrupt_result = gpio_[OT_RADIO_INT_PIN]->GetInterrupt2({});
+  fidl::WireResult interrupt_result = gpio_[OT_RADIO_INT_PIN]->GetInterrupt({});
   if (!interrupt_result.ok()) {
     zxlogf(ERROR, "Failed to send GetInterrupt request to interrupt gpio: %s",
            interrupt_result.status_string());

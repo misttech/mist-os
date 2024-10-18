@@ -726,7 +726,7 @@ zx_status_t Tcs3400Device::Bind() {
     return configure_result->error_value();
   }
 
-  fidl::WireResult interrupt_result = gpio_->GetInterrupt2({});
+  fidl::WireResult interrupt_result = gpio_->GetInterrupt({});
   if (!interrupt_result.ok()) {
     zxlogf(ERROR, "Failed to send GetInterrupt request to gpio: %s",
            interrupt_result.status_string());

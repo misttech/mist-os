@@ -314,7 +314,7 @@ zx_status_t Gt92xxDevice::Init() {
     }
   }
 
-  fidl::WireResult interrupt_result = int_gpio_->GetInterrupt2({});
+  fidl::WireResult interrupt_result = int_gpio_->GetInterrupt({});
   if (!interrupt_result.ok()) {
     zxlogf(ERROR, "Failed to send GetInterrupt request to interrupt gpio: %s",
            interrupt_result.status_string());

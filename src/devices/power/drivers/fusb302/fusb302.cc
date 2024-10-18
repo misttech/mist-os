@@ -160,7 +160,7 @@ zx::result<> Fusb302Device::Start() {
                           : result.FormatDescription().c_str());
     }
 
-    if (auto result = fidl::WireCall(gpio)->GetInterrupt2({}); !result.ok() || result->is_error()) {
+    if (auto result = fidl::WireCall(gpio)->GetInterrupt({}); !result.ok() || result->is_error()) {
       FDF_LOG(ERROR, "GPIO GetInterrupt() failed: %s",
               result.ok() ? zx_status_get_string(result->error_value())
                           : result.FormatDescription().c_str());

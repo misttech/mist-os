@@ -97,7 +97,7 @@ void GpioDevice::GetInterrupt(GetInterruptRequestView request,
       .ThenExactlyOnce(
           fit::inline_callback<
               void(fdf::WireUnownedResult<fuchsia_hardware_pinimpl::PinImpl::GetInterrupt>&),
-              sizeof(GetInterrupt2Completer::Async)>(
+              sizeof(GetInterruptCompleter::Async)>(
               [completer = completer.ToAsync()](auto& result) mutable {
                 if (!result.ok()) {
                   completer.ReplyError(result.status());

@@ -108,7 +108,7 @@ zx_status_t brcmf_sdiod_configure_oob_interrupt(struct brcmf_sdio_dev* sdiodev,
     return configure_result->error_value();
   }
 
-  fidl::WireResult irq_result = sdiodev->fidl_gpios[WIFI_OOB_IRQ_GPIO_INDEX]->GetInterrupt2({});
+  fidl::WireResult irq_result = sdiodev->fidl_gpios[WIFI_OOB_IRQ_GPIO_INDEX]->GetInterrupt({});
   if (!irq_result.ok()) {
     BRCMF_ERR("Get Interrupt on IRQ GPIO failed: %s", irq_result.FormatDescription().c_str());
     return irq_result.status();
