@@ -986,6 +986,23 @@ impl Visitor {
                             .map(|(_, x)| x)
                             .ok_or(Exception::NoSuchObjectKey(key).into_err())
                     }
+                    Value::Union(_ty, field, v) => {
+                        if let Value::String(key) = key {
+                            if key == field {
+                                Ok(*v)
+                            } else {
+                                Err(Exception::NoSuchObjectKey(key).into())
+                            }
+                        } else if let Ok(key) = key.try_usize() {
+                            if key == 0 {
+                                Ok(*v)
+                            } else {
+                                Err(Exception::ListIndexOutOfRange.into())
+                            }
+                        } else {
+                            Err(Exception::BadUnionKey.into())
+                        }
+                    }
                     _ => Err(Exception::LookupNotSupported.into()),
                 }
             }

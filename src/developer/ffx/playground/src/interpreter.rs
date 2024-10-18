@@ -31,6 +31,8 @@ pub enum Exception {
     NonStringObjectKey,
     #[error("List index must be a positive integer")]
     NonPositiveIntegerListKey,
+    #[error("Index into a FIDL union must be either the member name or `0`")]
+    BadUnionKey,
     #[error("List index out of range")]
     ListIndexOutOfRange,
     #[error("Value does not have members or elements")]
