@@ -51,9 +51,9 @@ async fn filter_map_filename(
 async fn serve_file_over_socket(file: fio::FileProxy, socket: zx::Socket) {
     let mut socket = fasync::Socket::from_socket(socket);
 
-    // We keep a buffer of 4.8 MB while reading the file
-    let num_bytes: u64 = 1024 * 48;
-    let (mut sender, mut recv) = mpsc::channel(100);
+    // We keep a buffer of 20 MB (2MB buffer * channel size 10) while reading the file
+    let num_bytes: u64 = 1024 * 1024 * 2;
+    let (mut sender, mut recv) = mpsc::channel(10);
     let _file_read_task = fasync::Task::spawn(async move {
         loop {
             let bytes = fuchsia_fs::file::read_num_bytes(&file, num_bytes).await.unwrap();
@@ -63,7 +63,7 @@ async fn serve_file_over_socket(file: fio::FileProxy, socket: zx::Socket) {
                 break;
             }
             if len != usize::try_from(num_bytes).unwrap() {
-                // done reading file
+                // This is EOF as fuchsia.io.Readable does not return short reads
                 break;
             }
         }

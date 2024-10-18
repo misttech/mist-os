@@ -20,7 +20,7 @@ pub use crate::diagnostics::LogStream;
 mod diagnostics;
 
 thread_local! {
-    static BUFFER: RefCell<[u8; 1024*48]> = RefCell::new([0; 1024*48]);
+    static BUFFER: RefCell<Vec<u8>> = RefCell::new(vec![0; 1024*1024*2]);
 }
 
 /// Future that executes a function when bytes are available on a socket.
