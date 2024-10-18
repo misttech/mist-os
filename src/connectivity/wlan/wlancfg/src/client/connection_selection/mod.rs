@@ -27,7 +27,7 @@ use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 use wlan_common::security::SecurityAuthenticator;
 use wlan_common::sequestered::Sequestered;
-use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync};
 
 pub mod bss_selection;
 pub mod network_selection;

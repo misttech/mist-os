@@ -23,6 +23,7 @@ use crate::input_handler::InputHandlerStatus;
 use crate::keyboard_binding::KeyboardEvent;
 use crate::metrics;
 use anyhow::{anyhow, Context, Result};
+use fidl_fuchsia_settings as fsettings;
 use fidl_fuchsia_ui_input3::{self as finput3, KeyEventType, KeyMeaning};
 use fuchsia_async::{MonotonicInstant, Task, Timer};
 use fuchsia_inspect::health::Reporter;
@@ -32,7 +33,6 @@ use metrics_registry::*;
 use std::cell::RefCell;
 use std::rc::Rc;
 use zx::MonotonicDuration;
-use {fidl_fuchsia_settings as fsettings, zx};
 
 /// The value range reserved for the modifier key meanings.  See the documentation for
 /// `fuchsia.ui.input3/NonPrintableKey` for details.

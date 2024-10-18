@@ -45,7 +45,7 @@ use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
 use vfs::ObjectRequest;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
-use {fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio, zx};
+use {fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio};
 
 // See //src/storage/fvm/format.h for a detailed description of the FVM format.
 

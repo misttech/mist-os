@@ -25,7 +25,7 @@ use netstack3_core::socket::{
     ConnectError, NotDualStackCapableError, SetDualStackEnabledError, SetMulticastMembershipError,
 };
 use netstack3_core::{tcp, udp};
-use {fidl_fuchsia_net as fnet, fidl_fuchsia_posix_socket as psocket, zx};
+use {fidl_fuchsia_net as fnet, fidl_fuchsia_posix_socket as psocket};
 
 use crate::bindings::devices::{
     BindingId, DeviceIdAndName, DeviceSpecificInfo, Devices, DynamicCommonInfo,

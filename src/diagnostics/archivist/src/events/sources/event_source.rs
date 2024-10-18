@@ -60,11 +60,11 @@ pub mod tests {
     use super::*;
     use crate::events::types::*;
     use crate::identity::ComponentIdentity;
+    use fuchsia_async as fasync;
     use futures::channel::mpsc::UnboundedSender;
     use futures::StreamExt;
     use moniker::ExtendedMoniker;
     use std::collections::BTreeSet;
-    use {fuchsia_async as fasync, zx};
 
     #[fuchsia::test]
     async fn event_stream() {

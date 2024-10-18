@@ -35,7 +35,7 @@ use vfs::directory::entry_container::Directory;
 use vfs::directory::helper::DirectlyMutable;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
-use {fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 const FXFS_INFO_NAME: &'static str = "fxfs";
 
@@ -505,7 +505,7 @@ mod tests {
     use std::pin::Pin;
     use storage_device::block_device::BlockDevice;
     use storage_device::DeviceHolder;
-    use {fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     async fn run_test(
         callback: impl Fn(&fio::DirectoryProxy, LifecycleProxy) -> BoxFuture<'static, ()>,

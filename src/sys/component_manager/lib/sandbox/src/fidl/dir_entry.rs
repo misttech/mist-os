@@ -106,13 +106,13 @@ mod tests {
     use super::*;
     use crate::Capability;
     use fidl::endpoints::{self, ServerEnd};
+    use fidl_fuchsia_io as fio;
     use test_util::Counter;
     use vfs::directory::entry::{EntryInfo, GetEntryInfo, OpenRequest};
     use vfs::execution_scope::ExecutionScope;
     use vfs::path::Path;
     use vfs::remote::RemoteLike;
     use vfs::ToObjectRequest;
-    use {fidl_fuchsia_io as fio, zx};
 
     struct MockDir(Counter);
     impl DirectoryEntry for MockDir {

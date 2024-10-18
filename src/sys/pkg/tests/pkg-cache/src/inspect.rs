@@ -9,12 +9,12 @@ use crate::{
 use assert_matches::assert_matches;
 use diagnostics_assertions::{assert_data_tree, tree_assertion, AnyProperty};
 use diagnostics_hierarchy::DiagnosticsHierarchy;
+use fidl_fuchsia_io as fio;
 use fidl_fuchsia_pkg::{self as fpkg, BlobInfo, NeededBlobsMarker, PackageCacheMarker};
 use fidl_fuchsia_pkg_ext::BlobId;
 use fuchsia_pkg_testing::{PackageBuilder, SystemImageBuilder};
 use futures::prelude::*;
 use std::collections::HashMap;
-use {fidl_fuchsia_io as fio, zx};
 
 #[fuchsia::test]
 async fn system_image_hash_present() {

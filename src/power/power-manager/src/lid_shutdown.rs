@@ -23,7 +23,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::Rc;
 use tracing::*;
-use {fidl_fuchsia_hardware_hidbus as fhidbus, fuchsia_async as fasync, serde_json as json, zx};
+use {fidl_fuchsia_hardware_hidbus as fhidbus, fuchsia_async as fasync, serde_json as json};
 
 /// Node: LidShutdown
 ///

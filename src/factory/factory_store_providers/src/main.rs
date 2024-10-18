@@ -33,7 +33,7 @@ use vfs::directory::{self};
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::vmo::read_only;
 use vfs::tree_builder::TreeBuilder;
-use {fidl_fuchsia_hardware_block as fhardware_block, fidl_fuchsia_io as fio, zx};
+use {fidl_fuchsia_hardware_block as fhardware_block, fidl_fuchsia_io as fio};
 
 const CONCURRENT_LIMIT: usize = 10_000;
 const DEFAULT_BOOTFS_FACTORY_ITEM_EXTRA: u32 = 0;

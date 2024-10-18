@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::format_err;
+use fuchsia_async as fasync;
 use fuchsia_async::DurationExt;
 use fuchsia_sync::RwLock;
 use futures::future::FutureExt;
@@ -13,7 +14,6 @@ use rand::Rng;
 use std::collections::HashSet;
 use std::sync::Arc;
 use tracing::{error, info, trace, warn};
-use {fuchsia_async as fasync, zx};
 
 mod notification_stream;
 

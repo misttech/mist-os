@@ -13,9 +13,9 @@ use cm_rust::*;
 use cm_rust_testing::*;
 use cm_util::TaskGroup;
 use errors::CapabilityProviderError;
+use fidl_fuchsia_io as fio;
 use vfs::directory::entry::OpenRequest;
 use vfs::remote::remote_dir;
-use {fidl_fuchsia_io as fio, zx};
 
 #[fuchsia::test]
 async fn offer_increasing_rights() {

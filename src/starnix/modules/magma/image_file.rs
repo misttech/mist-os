@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_fuchsia_ui_composition as fuicomp;
 use magma::magma_image_info_t;
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::task::CurrentTask;
@@ -11,7 +12,6 @@ use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::open_flags::OpenFlags;
 use std::sync::Arc;
 use zx::{AsHandleRef, HandleBased};
-use {fidl_fuchsia_ui_composition as fuicomp, zx};
 
 pub struct ImageInfo {
     /// The magma image info associated with the `memory`.

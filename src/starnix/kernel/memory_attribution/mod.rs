@@ -10,10 +10,10 @@ use std::sync::{mpsc, Arc, Weak};
 
 use attribution_server::{AttributionServer, AttributionServerHandle};
 use fidl::AsHandleRef;
+use fidl_fuchsia_memory_attribution as fattribution;
 use starnix_sync::Mutex;
 use starnix_uapi::pid_t;
 use zx::HandleBased;
-use {fidl_fuchsia_memory_attribution as fattribution, zx};
 
 use crate::mm::MemoryManager;
 use crate::task::{Kernel, ThreadGroup};

@@ -6,6 +6,7 @@ use fidl::Socket;
 use fidl_fuchsia_component::{
     CreateChildArgs, ExecutionControllerEvent, RealmMarker, StartChildArgs, StoppedPayload,
 };
+use fidl_fuchsia_component_decl as fdecl;
 use fidl_fuchsia_tracing_controller::{
     ProvisionerMarker as TracingProvisionerMarker, SessionMarker as TracingSessionMarker,
     SessionProxy as TracingSessionProxy, StartOptions, TraceConfig,
@@ -16,7 +17,6 @@ use futures::StreamExt;
 use std::collections::BTreeMap;
 use std::path::Path;
 use tracing::info;
-use {fidl_fuchsia_component_decl as fdecl, zx};
 
 const COLLECTION_NAME: &str = "dynamic";
 const CHILD_NAME: &str = "provider_puppet";

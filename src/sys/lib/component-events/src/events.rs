@@ -8,7 +8,7 @@ use fuchsia_component::client::connect_to_protocol_at_path;
 use lazy_static::lazy_static;
 use std::collections::VecDeque;
 use thiserror::Error;
-use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, zx};
+use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio};
 
 lazy_static! {
     /// The path of the static event stream that, by convention, synchronously listens for

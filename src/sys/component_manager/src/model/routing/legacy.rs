@@ -12,6 +12,7 @@ use ::routing::RouteRequest;
 use cm_rust::{
     CapabilityTypeName, ExposeDecl, UseDirectoryDecl, UseEventStreamDecl, UseStorageDecl,
 };
+use fidl_fuchsia_io as fio;
 use router_error::Explain;
 use sandbox::{Capability, DirEntry, Directory};
 use std::sync::Arc;
@@ -20,7 +21,6 @@ use vfs::directory::entry::{
     serve_directory, DirectoryEntry, DirectoryEntryAsync, EntryInfo, GetEntryInfo, OpenRequest,
 };
 use vfs::execution_scope::ExecutionScope;
-use {fidl_fuchsia_io as fio, zx};
 
 pub trait RouteRequestExt {
     fn into_capability(self, target: &Arc<ComponentInstance>) -> Capability;

@@ -6,6 +6,7 @@ use crate::metrics_util::tuf_error_as_update_tuf_client_event_code;
 use crate::repository::filesystem_repository::RWRepository;
 use crate::{clock, error, inspect_util, TCP_KEEPALIVE_TIMEOUT};
 use anyhow::anyhow;
+use cobalt_sw_delivery_registry as metrics;
 use fidl_contrib::protocol_connector::ProtocolSender;
 use fidl_fuchsia_metrics::MetricEvent;
 use fidl_fuchsia_pkg_ext::MirrorConfig;
@@ -24,7 +25,6 @@ use tuf::error::Error as TufError;
 use tuf::metadata::{Metadata, TargetDescription, TargetPath};
 use tuf::pouf::Pouf1;
 use tuf::repository::{RepositoryProvider, RepositoryStorageProvider};
-use {cobalt_sw_delivery_registry as metrics, zx};
 
 type TufClient = tuf::client::Client<
     Pouf1,

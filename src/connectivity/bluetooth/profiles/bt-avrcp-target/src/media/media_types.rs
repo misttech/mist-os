@@ -6,7 +6,7 @@ use fidl_fuchsia_bluetooth_avrcp::{self as fidl_avrcp, MediaAttributes, PlayStat
 use fidl_fuchsia_media::{self as fidl_media_types, Metadata, TimelineFunction};
 use fidl_table_validation::ValidFidlTable;
 use tracing::{debug, trace, warn};
-use {fidl_fuchsia_media_sessions2 as fidl_media, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_media_sessions2 as fidl_media, fuchsia_async as fasync};
 
 /// Converts time (i64, in nanoseconds) to milliseconds (u32).
 fn time_nanos_to_millis(t: i64) -> u32 {

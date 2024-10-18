@@ -11,6 +11,7 @@ use cm_types::Name;
 use cm_util::TaskGroup;
 use errors::CapabilityProviderError;
 use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_component as fcomponent;
 use futures::TryStreamExt;
 use lazy_static::lazy_static;
 use moniker::{ExtendedMoniker, Moniker};
@@ -19,7 +20,6 @@ use routing::error::RoutingError;
 use routing::policy::PolicyError;
 use tracing::warn;
 use vfs::directory::entry::OpenRequest;
-use {fidl_fuchsia_component as fcomponent, zx};
 
 use crate::capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider};
 use crate::model::component::WeakComponentInstance;

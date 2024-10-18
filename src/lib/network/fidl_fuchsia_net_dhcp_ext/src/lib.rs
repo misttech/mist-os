@@ -434,8 +434,8 @@ pub fn merged_configuration_stream(
 /// Contains types used when testing the DHCP client.
 pub mod testutil {
     use super::*;
+    use fuchsia_async as fasync;
     use futures::future::ready;
-    use {fuchsia_async as fasync, zx};
 
     /// Task for polling the DHCP client.
     pub struct DhcpClientTask {

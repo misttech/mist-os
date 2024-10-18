@@ -265,7 +265,7 @@ async fn handle_case_iterator(
 mod tests {
     use super::*;
     use fidl::endpoints::{create_request_stream, ClientEnd};
-    use {fuchsia_async as fasync, zx};
+    use fuchsia_async as fasync;
 
     /// Returns a `ftest::CaseIteratorProxy` that is served by `super::handle_case_iterator`.
     ///

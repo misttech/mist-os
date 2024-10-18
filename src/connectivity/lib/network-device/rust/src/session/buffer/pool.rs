@@ -20,9 +20,9 @@ use std::sync::Arc;
 use std::task::Poll;
 
 use explicit::ResultExt as _;
+use fidl_fuchsia_hardware_network as netdev;
 use fuchsia_runtime::vmar_root_self;
 use futures::channel::oneshot::{channel, Receiver, Sender};
-use {fidl_fuchsia_hardware_network as netdev, zx};
 
 use super::{ChainLength, DescId, DescRef, DescRefMut, Descriptors};
 use crate::error::{Error, Result};

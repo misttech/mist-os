@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use assert_matches::assert_matches;
+use fidl_fidl_examples_routing_echo as fecho;
 use fuchsia_component::client;
 use tracing::info;
-use {fidl_fidl_examples_routing_echo as fecho, zx};
 
 #[fuchsia::main]
 async fn main() {

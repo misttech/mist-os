@@ -4,13 +4,13 @@
 
 use anyhow::{anyhow, Error};
 use core::mem::size_of;
+use fidl_fuchsia_boot as fboot;
 use fuchsia_zbi::ZbiType::BootloaderFile;
 use fuchsia_zbi::{ZbiParser, ZbiParserError, ZbiResult};
 use futures::prelude::*;
 use std::collections::HashMap;
 use std::str::from_utf8;
 use std::sync::Arc;
-use {fidl_fuchsia_boot as fboot, zx};
 
 pub struct Items {
     zbi_parser: ZbiParser,

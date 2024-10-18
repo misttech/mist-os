@@ -14,6 +14,7 @@ use fidl_fuchsia_diagnostics::{LogSettingsMarker, StreamParameters};
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
 use fidl_fuchsia_sys2::RealmQueryMarker;
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path};
+use log_command as log_utils;
 use log_command::log_formatter;
 use log_formatter::{
     dump_logs_from_socket as read_logs_from_socket, DefaultLogFormatter, LogEntry, Symbolize,
@@ -22,7 +23,6 @@ use log_formatter::{
 use log_utils::log_formatter::BootTimeAccessor;
 use log_utils::{LogCommand, LogSubCommand};
 use std::io::Write;
-use {log_command as log_utils, zx};
 
 /// Target-side symbolizer implementation.
 /// Does nothing as no symbols are available on the target.

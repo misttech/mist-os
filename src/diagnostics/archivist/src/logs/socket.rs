@@ -3,12 +3,12 @@
 
 use super::stats::LogStreamStats;
 use crate::logs::stored_message::StoredMessage;
+use fuchsia_async as fasync;
 use futures::Stream;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use {fuchsia_async as fasync, zx};
 
 /// An `Encoding` is able to parse a `Message` from raw bytes.
 pub trait Encoding {

@@ -1113,6 +1113,7 @@ mod tests {
     };
     use fidl::endpoints::{create_proxy, create_proxy_and_stream};
     use fidl::prelude::*;
+    use fidl_fuchsia_wlan_policy as fidl_policy;
     use futures::task::Poll;
     use futures::Future;
     use ieee80211::MacAddrBytes;
@@ -1121,7 +1122,6 @@ mod tests {
     use std::pin::pin;
     use wlan_common::{assert_variant, random_fidl_bss_description};
     use wlan_metrics_registry::PolicyDisconnectionMigratedMetricDimensionReason;
-    use {fidl_fuchsia_wlan_policy as fidl_policy, zx};
 
     lazy_static! {
         pub static ref TEST_PASSWORD: Credential = Credential::Password(b"password".to_vec());

@@ -685,6 +685,7 @@ impl StorageAdmin {
 mod tests {
     use super::{DirType, StorageAdmin, StorageError};
     use fidl::endpoints::ServerEnd;
+    use fidl_fuchsia_io as fio;
     use std::fmt::Formatter;
     use std::path::PathBuf;
     use std::sync::Arc;
@@ -696,7 +697,6 @@ mod tests {
     use vfs::execution_scope::ExecutionScope;
     use vfs::path::Path;
     use vfs::{ObjectRequestRef, ToObjectRequest};
-    use {fidl_fuchsia_io as fio, zx};
 
     #[test_case(
         "aabbccddeeff11223344556677889900aabbccddeeff11223344556677889900",

@@ -22,12 +22,12 @@ use fidl_fuchsia_input_report::{
     SensorReportingState,
 };
 use fidl_fuchsia_lightsensor::{SensorMarker, SensorProxy, SensorRequestStream};
+use fuchsia_async as fasync;
 use futures::StreamExt;
 use std::cell::RefCell;
 use std::rc::Rc;
 use test_case::test_case;
 use zx::MonotonicInstant;
-use {fuchsia_async as fasync, zx};
 
 const VENDOR_ID: u32 = 1;
 const PRODUCT_ID: u32 = 2;

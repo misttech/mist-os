@@ -12,6 +12,7 @@ use anyhow::{anyhow, Error};
 use arrayref::{array_refs, mut_array_refs};
 use async_trait::async_trait;
 use event_listener::{EventListener, Listener as _};
+use fuchsia_async as fasync;
 use fuchsia_hash::Hash;
 use fxfs::drop_event::DropEvent;
 use fxfs::errors::FxfsError;
@@ -26,7 +27,6 @@ use std::mem::size_of;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use storage_device::buffer::{Buffer, BufferRef};
-use {fuchsia_async as fasync, zx};
 
 const FILE_OPEN_MARKER: u64 = u64::MAX;
 const REPLAY_THREADS: usize = 2;

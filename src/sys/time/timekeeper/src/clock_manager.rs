@@ -659,10 +659,10 @@ mod tests {
     use crate::time_source::{Event as TimeSourceEvent, FakePushTimeSource, Sample};
     use crate::{make_test_config, make_test_config_with_delay};
     use fidl_fuchsia_time_external::{self as ftexternal, Status};
+    use fuchsia_async as fasync;
     use lazy_static::lazy_static;
     use std::pin::pin;
     use test_util::{assert_geq, assert_gt, assert_leq, assert_lt, assert_near};
-    use {fuchsia_async as fasync, zx};
 
     const NANOS_PER_SECOND: i64 = 1_000_000_000;
     const TEST_ROLE: Role = Role::Primary;

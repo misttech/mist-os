@@ -8,7 +8,7 @@ use omaha_client::version::Version;
 use serde::{Deserialize, Serialize};
 
 #[cfg(target_os = "fuchsia")]
-use {fidl_fuchsia_io as fio, futures::stream::StreamExt as _, std::collections::HashSet, zx};
+use {fidl_fuchsia_io as fio, futures::stream::StreamExt as _, std::collections::HashSet};
 
 #[cfg(target_os = "fuchsia")]
 const EAGER_PACKAGE_CONFIG_PATH: &str = "/config/data/eager_package_config.json";

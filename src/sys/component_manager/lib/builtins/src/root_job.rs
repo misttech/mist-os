@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::Error;
+use fidl_fuchsia_kernel as fkernel;
 use fuchsia_runtime::job_default;
 use futures::TryStreamExt;
-use {fidl_fuchsia_kernel as fkernel, zx};
 
 /// An implementation of the `fuchsia.kernel.RootJob` protocol.
 pub struct RootJob;

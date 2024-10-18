@@ -518,12 +518,12 @@ mod test {
         DirectoryEntryType, DirentSink, FileSystemOptions, FsStr, LookupContext, Namespace,
         SymlinkMode, SymlinkTarget,
     };
+    use fidl_fuchsia_io as fio;
     use starnix_uapi::errors::Errno;
     use starnix_uapi::file_mode::{AccessCheck, FileMode};
     use starnix_uapi::open_flags::OpenFlags;
     use starnix_uapi::{ino_t, off_t};
     use std::collections::{HashMap, HashSet};
-    use {fidl_fuchsia_io as fio, zx};
 
     #[::fuchsia::test]
     async fn test_read_image() {

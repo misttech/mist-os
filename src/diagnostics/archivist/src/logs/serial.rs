@@ -6,6 +6,7 @@ use crate::logs::repository::LogsRepository;
 use anyhow::Error;
 use diagnostics_data::{Data, Logs};
 use fidl_fuchsia_diagnostics::{Selector, StreamMode};
+use fuchsia_trace as ftrace;
 use futures::StreamExt;
 use selectors::FastError;
 use std::borrow::Cow;
@@ -14,7 +15,6 @@ use std::fmt::Display;
 use std::io::{self, Write};
 use std::sync::Arc;
 use tracing::warn;
-use {fuchsia_trace as ftrace, zx};
 
 const MAX_SERIAL_WRITE_SIZE: usize = 256;
 

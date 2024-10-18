@@ -11,6 +11,7 @@ use crate::fuchsia::volume::{info_to_filesystem_info, FxVolume, RootDir};
 use anyhow::{bail, Error};
 use either::{Left, Right};
 use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_io as fio;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use fxfs::errors::FxfsError;
@@ -34,7 +35,6 @@ use vfs::directory::watchers::Watchers;
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
 use vfs::{attributes, symlink, ObjectRequest, ObjectRequestRef, ProtocolsExt, ToObjectRequest};
-use {fidl_fuchsia_io as fio, zx};
 
 #[derive(ToWeakNode)]
 pub struct FxDirectory {
@@ -976,7 +976,7 @@ mod tests {
     use vfs::node::Node;
     use vfs::path::Path;
     use vfs::ObjectRequest;
-    use {fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     #[fuchsia::test]
     async fn test_open_root_dir() {

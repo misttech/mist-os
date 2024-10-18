@@ -12,6 +12,7 @@ use archivist_lib::archivist::Archivist;
 use archivist_lib::component_lifecycle;
 use archivist_lib::severity_filter::KlogSeverityFilter;
 use diagnostics_log::PublishOptions;
+use fuchsia_async as fasync;
 use fuchsia_component::server::{MissingStartupHandle, ServiceFs};
 use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
@@ -20,7 +21,6 @@ use tracing_subscriber::fmt::format::{self, FormatEvent, FormatFields};
 use tracing_subscriber::fmt::FmtContext;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::registry::LookupSpan;
-use {fuchsia_async as fasync, zx};
 
 const INSPECTOR_SIZE: usize = 2 * 1024 * 1024 /* 2MB */;
 

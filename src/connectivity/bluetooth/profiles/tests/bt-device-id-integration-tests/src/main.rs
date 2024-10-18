@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_fuchsia_bluetooth_bredr as bredr;
 use fidl_fuchsia_bluetooth_deviceid::*;
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_component_test::{Capability, RealmInstance};
@@ -10,7 +11,6 @@ use futures::{Future, FutureExt, StreamExt};
 use mock_piconet_client::{BtProfileComponent, PiconetHarness, PiconetMember};
 use std::pin::pin;
 use tracing::info;
-use {fidl_fuchsia_bluetooth_bredr as bredr, zx};
 
 const DEVICE_ID_URL: &str =
     "fuchsia-pkg://fuchsia.com/bt-device-id-integration-tests#meta/bt-device-id.cm";

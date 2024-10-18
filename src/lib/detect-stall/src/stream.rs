@@ -5,6 +5,7 @@
 //! Support for running FIDL request streams until stalled.
 
 use fidl::endpoints::RequestStream;
+use fuchsia_async as fasync;
 use fuchsia_sync::Mutex;
 use futures::channel::oneshot::{self, Receiver};
 use futures::{ready, Stream, StreamExt};
@@ -14,7 +15,6 @@ use std::pin::Pin;
 use std::sync::{Arc, Weak};
 use std::task::{Context, Poll};
 use zx::MonotonicDuration;
-use {fuchsia_async as fasync, zx};
 
 /// [`until_stalled`] wraps a FIDL request stream of type [`RS`] into another
 /// stream yielding the same requests, but could complete prematurely if it
@@ -174,7 +174,7 @@ mod tests {
     use fidl::AsHandleRef;
     use futures::{FutureExt, TryStreamExt};
     use std::pin::pin;
-    use {fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     #[fuchsia::test(allow_stalls = false)]
     async fn no_message() {

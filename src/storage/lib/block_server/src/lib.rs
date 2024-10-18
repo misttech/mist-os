@@ -557,7 +557,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
     use std::task::{Context, Poll};
     use zx::{AsHandleRef as _, HandleBased as _};
-    use {fidl_fuchsia_hardware_block_volume as fvolume, fuchsia_async as fasync, zx};
+    use {fidl_fuchsia_hardware_block_volume as fvolume, fuchsia_async as fasync};
 
     #[derive(Default)]
     struct MockInterface {

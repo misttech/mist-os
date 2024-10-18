@@ -712,7 +712,7 @@ mod tests {
     use fidl::endpoints;
     use fidl::endpoints::{create_endpoints, create_proxy};
     use routing_test_helpers::component_id_index::make_index_file;
-    use {fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, zx};
+    use {fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio};
 
     fn is_closed(handle: impl fidl::AsHandleRef) -> bool {
         handle

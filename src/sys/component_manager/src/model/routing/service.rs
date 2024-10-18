@@ -11,6 +11,7 @@ use cm_rust::{CapabilityTypeName, ChildRef, ComponentDecl, ExposeDecl, ExposeDec
 use cm_types::{IterablePath, Name, RelativePath};
 use cm_util::TaskGroup;
 use errors::{CapabilityProviderError, ModelError, OpenError};
+use fidl_fuchsia_io as fio;
 use flyweights::FlyStr;
 use fuchsia_async::{DurationExt, TimeoutExt};
 use futures::channel::oneshot;
@@ -43,7 +44,6 @@ use vfs::directory::immutable::simple::{
 use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
 use vfs::ToObjectRequest;
-use {fidl_fuchsia_io as fio, zx};
 
 /// Timeout for opening a service capability when aggregating.
 const OPEN_SERVICE_TIMEOUT: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(5);

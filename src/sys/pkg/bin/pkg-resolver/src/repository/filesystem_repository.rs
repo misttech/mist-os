@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use anyhow::{anyhow, Context as _, Error};
+use fidl_fuchsia_io as fio;
 use fuchsia_fs::file::AsyncReader;
 use futures::future::BoxFuture;
 use futures::prelude::*;
@@ -11,7 +12,6 @@ use std::path::Path;
 use tuf::metadata::{MetadataPath, MetadataVersion, TargetPath};
 use tuf::pouf::Pouf;
 use tuf::repository::{RepositoryProvider, RepositoryStorage};
-use {fidl_fuchsia_io as fio, zx};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {

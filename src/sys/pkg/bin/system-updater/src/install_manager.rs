@@ -16,7 +16,7 @@ use futures::select;
 use futures::stream::FusedStream;
 use std::time::Duration;
 use tracing::{error, warn};
-use {fuchsia_async as fasync, fuchsia_inspect as inspect, zx};
+use {fuchsia_async as fasync, fuchsia_inspect as inspect};
 
 const INSPECT_STATUS_NODE_NAME: &str = "status";
 // Suspend is allowed at most 7 days, after that update will automatically resume.

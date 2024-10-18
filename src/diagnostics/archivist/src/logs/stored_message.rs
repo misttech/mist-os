@@ -11,12 +11,12 @@ use diagnostics_log_encoding::encode::{
     Encoder, EncoderOpts, EncodingError, MutableBuffer, RecordEvent, WriteEventParams,
 };
 use diagnostics_message::LoggerMessage;
+use fidl_fuchsia_diagnostics as fdiagnostics;
 use fidl_fuchsia_diagnostics_stream::RawSeverity;
 use fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES;
 use std::fmt::Debug;
 use std::io::Cursor;
 use std::sync::Arc;
-use {fidl_fuchsia_diagnostics as fdiagnostics, zx};
 
 #[derive(Debug)]
 pub struct StoredMessage {

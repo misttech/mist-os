@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fuchsia_async as fasync;
 use futures::channel::mpsc;
 use futures::{FutureExt, Stream, StreamExt};
-use {fuchsia_async as fasync, zx};
 
 use crate::sink::UnboundedSink;
 

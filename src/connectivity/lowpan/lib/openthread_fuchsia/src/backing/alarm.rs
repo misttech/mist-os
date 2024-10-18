@@ -4,7 +4,7 @@
 
 use super::*;
 use crate::Platform;
-use {fuchsia_async as fasync, zx};
+use fuchsia_async as fasync;
 //use futures::channel::mpsc as fmpsc;
 use std::task::{Context, Poll};
 

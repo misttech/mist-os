@@ -10,9 +10,9 @@ use fidl::endpoints::{
 };
 use fidl_fuchsia_component::{RealmMarker, RealmProxy};
 use fidl_fuchsia_component_decl::ChildRef;
+use fidl_fuchsia_io as fio;
 use std::borrow::Borrow;
 use std::marker::PhantomData;
-use {fidl_fuchsia_io as fio, zx};
 
 use crate::directory::AsRefDirectory;
 use crate::DEFAULT_SERVICE_INSTANCE;

@@ -7,13 +7,13 @@ use crate::message::base::MessengerType;
 use crate::{clock, service};
 use anyhow::{format_err, Error};
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy};
+use fuchsia_async as fasync;
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path};
 use futures::future::{BoxFuture, OptionFuture};
 use glob::glob;
 use std::borrow::Cow;
 use std::fmt::Debug;
 use std::future::Future;
-use {fuchsia_async as fasync, zx};
 
 pub type GenerateService =
     Box<dyn Fn(&str, zx::Channel) -> BoxFuture<'static, Result<(), Error>> + Send + Sync>;

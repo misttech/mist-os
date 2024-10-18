@@ -71,6 +71,7 @@ pub(crate) mod testing {
     use fidl_fuchsia_stash::{
         StoreAccessorMarker, StoreAccessorProxy, StoreAccessorRequest, Value,
     };
+    use fuchsia_async as fasync;
     use fuchsia_inspect::component;
     use futures::lock::Mutex;
     use futures::prelude::*;
@@ -83,7 +84,6 @@ pub(crate) mod testing {
     use std::any::Any;
     use std::collections::HashMap;
     use std::sync::Arc;
-    use {fuchsia_async as fasync, zx};
 
     #[derive(PartialEq)]
     pub(crate) enum StashAction {

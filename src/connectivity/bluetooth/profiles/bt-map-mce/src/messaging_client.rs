@@ -5,6 +5,7 @@
 use anyhow::format_err;
 use bt_map::Error;
 use fidl::endpoints::{ClientEnd, ControlHandle, DiscoverableProtocolMarker, RequestStream};
+use fidl_fuchsia_bluetooth_bredr as bredr;
 use fidl_fuchsia_bluetooth_map::{
     AccessorMarker, AccessorRequest, AccessorRequestStream, MessagingClientMarker,
     MessagingClientRequest, MessagingClientRequestStream, MessagingClientWatchAccessorResponder,
@@ -20,7 +21,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::task::{Poll, Waker};
 use tracing::{trace, warn};
-use {fidl_fuchsia_bluetooth_bredr as bredr, zx};
 
 use crate::message_access_service::MasInstance;
 use crate::message_notification_service::Session;

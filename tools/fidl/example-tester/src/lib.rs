@@ -8,10 +8,10 @@ use component_events::matcher::*;
 use component_events::sequence::*;
 use diagnostics_data::{Data, Logs};
 use diagnostics_reader::ArchiveReader;
+use fuchsia_async as fasync;
 use fuchsia_component_test::{Capability, ChildOptions, ChildRef, RealmBuilder, Ref, Route};
 use regex::Regex;
 use std::future::Future;
-use {fuchsia_async as fasync, zx};
 
 /// Represents a component under test. The `name` is the test-local name assigned to the component,
 /// whereas the path is the relative path to its component manifest (ex: "#meta/client.cm").

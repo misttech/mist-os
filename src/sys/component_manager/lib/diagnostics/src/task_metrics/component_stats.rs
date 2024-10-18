@@ -5,10 +5,10 @@
 use crate::task_metrics::measurement::Measurement;
 use crate::task_metrics::runtime_stats_source::RuntimeStatsSource;
 use crate::task_metrics::task_info::TaskInfo;
+use fuchsia_inspect as inspect;
 use futures::lock::Mutex;
 use std::fmt::Debug;
 use std::sync::Arc;
-use {fuchsia_inspect as inspect, zx};
 
 /// Tracks the tasks associated to some component and provides utilities for measuring them.
 pub struct ComponentStats<T: RuntimeStatsSource + Debug> {

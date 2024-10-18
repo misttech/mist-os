@@ -178,7 +178,7 @@ mod tests {
     use vfs::remote::RemoteLike;
     use vfs::{path, pseudo_directory};
     use zx::AsHandleRef;
-    use {fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
+    use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     fn connector_cap() -> Capability {
         let (sender, _receiver) = multishot();

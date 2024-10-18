@@ -27,7 +27,7 @@ use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
 use vfs::ToObjectRequest;
 use zx::AsHandleRef;
-use {fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 pub fn take_handle_as_stream<P: ProtocolMarker>(channel: zx::Channel) -> P::RequestStream {
     let channel = AsyncChannel::from_channel(channel);

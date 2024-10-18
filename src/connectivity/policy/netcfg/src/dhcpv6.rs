@@ -364,7 +364,7 @@ impl PrefixProviderHandler {
 
 #[cfg(test)]
 mod tests {
-    use {fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin, zx};
+    use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 
     use const_unwrap::const_unwrap_option;
     use net_declare::{fidl_socket_addr_v6, net_subnet_v6};

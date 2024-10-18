@@ -17,7 +17,7 @@ use key_bag::{Aes256Key, KeyBagManager, WrappingKey, AES128_KEY_SIZE, AES256_KEY
 use std::ops::Deref;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
-use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, zx};
+use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio};
 
 async fn unwrap_or_create_keys(
     mut keybag: KeyBagManager,

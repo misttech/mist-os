@@ -11,6 +11,7 @@ use crate::vfs::{
 };
 use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl::HandleBased;
+use fidl_fuchsia_io as fio;
 use fuchsia_runtime::UtcInstant;
 use futures::future::BoxFuture;
 use starnix_logging::{log_error, track_stub};
@@ -28,7 +29,6 @@ use vfs::directory::{self};
 use vfs::{
     attributes, execution_scope, file, path, ObjectRequestRef, ProtocolsExt, ToObjectRequest,
 };
-use {fidl_fuchsia_io as fio, zx};
 
 /// Returns a handle implementing a fuchsia.io.Node delegating to the given `file`.
 pub fn serve_file(

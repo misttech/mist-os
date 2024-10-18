@@ -22,7 +22,7 @@ use std::sync::Mutex;
 use vfs::execution_scope::ExecutionScope;
 use vfs::file::File;
 use vfs::node::Node;
-use {fidl_fuchsia_hardware_block as block, fidl_fuchsia_io as fio, zx};
+use {fidl_fuchsia_hardware_block as block, fidl_fuchsia_io as fio};
 
 // Multiple Block I/O request may be sent as a group.
 // Notes:
@@ -597,11 +597,11 @@ mod tests {
     use fidl_fuchsia_device::ControllerMarker;
     use fidl_fuchsia_hardware_block::BlockMarker;
     use fidl_fuchsia_hardware_block_volume::VolumeAndNodeMarker;
+    use fidl_fuchsia_io as fio;
     use fs_management::filesystem::Filesystem;
     use fs_management::Blobfs;
     use futures::join;
     use rustc_hash::FxHashSet as HashSet;
-    use {fidl_fuchsia_io as fio, zx};
 
     #[fuchsia::test(threads = 10)]
     async fn test_block_server() {

@@ -178,8 +178,8 @@ mod test {
         generate_channel, generate_random_bss, generate_random_saved_network_data,
         generate_random_scanned_candidate, random_connection_data,
     };
+    use fuchsia_async as fasync;
     use test_util::assert_gt;
-    use {fuchsia_async as fasync, zx};
 
     fn connect_failure_with_bssid(bssid: types::Bssid) -> ConnectFailure {
         ConnectFailure {

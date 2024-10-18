@@ -114,9 +114,9 @@ mod tests {
 
     use std::sync::Arc;
 
+    use fuchsia_async as fasync;
     use fuchsia_sync::Mutex;
     use fuchsia_wayland_core::{Interface, IntoMessage};
-    use {fuchsia_async as fasync, zx};
 
     use crate::display::Display;
     use crate::object::RequestDispatcher;

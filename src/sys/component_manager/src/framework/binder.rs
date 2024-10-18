@@ -118,6 +118,7 @@ mod tests {
     use cm_util::TaskGroup;
     use fidl::client::Client;
     use fidl::handle::AsyncChannel;
+    use fidl_fuchsia_io as fio;
     use futures::lock::Mutex;
     use futures::StreamExt;
     use hooks::EventType;
@@ -127,7 +128,6 @@ mod tests {
     use vfs::execution_scope::ExecutionScope;
     use vfs::path::Path as VfsPath;
     use vfs::ToObjectRequest;
-    use {fidl_fuchsia_io as fio, zx};
 
     struct BinderCapabilityTestFixture {
         builtin_environment: Arc<Mutex<BuiltinEnvironment>>,

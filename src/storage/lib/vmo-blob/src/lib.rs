@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error};
+use fidl_fuchsia_io as fio;
 use std::sync::{Arc, OnceLock};
 use tracing::error;
 use vfs::directory::entry::{EntryInfo, GetEntryInfo};
 use vfs::file::{File, FileOptions, GetVmo, SyncMode};
 use vfs::immutable_attributes;
-use {fidl_fuchsia_io as fio, zx};
 
 /// Mimics the c++ blobfs block size.
 const BLOCK_SIZE: u64 = 8192;

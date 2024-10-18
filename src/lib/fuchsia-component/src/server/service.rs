@@ -5,8 +5,8 @@
 //! The `Service` trait and its trait-object wrappers.
 
 use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream, ServerEnd, ServiceRequest};
+use fuchsia_async as fasync;
 use std::marker::PhantomData;
-use {fuchsia_async as fasync, zx};
 
 /// `Service` connects channels to service instances.
 ///

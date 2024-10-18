@@ -999,6 +999,7 @@ mod tests {
     use crate::epitaph::{self, ChannelEpitaphExt};
     use anyhow::{Context as _, Error};
     use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
     use fuchsia_async::{DurationExt, TimeoutExt};
     use futures::channel::oneshot;
     use futures::stream::FuturesUnordered;
@@ -1008,7 +1009,6 @@ mod tests {
     use std::future::pending;
     use std::thread;
     use zx::AsHandleRef;
-    use {fuchsia_async as fasync, zx};
 
     const SEND_ORDINAL_HIGH_BYTE: u8 = 42;
     const SEND_ORDINAL: u64 = 42 << 32;

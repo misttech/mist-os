@@ -767,13 +767,13 @@ fn get_or_create_loop_device(
 mod tests {
     use super::*;
     use fidl::endpoints::Proxy;
+    use fidl_fuchsia_io as fio;
     use starnix_core::fs::fuchsia::new_remote_file;
     use starnix_core::testing::*;
     use starnix_core::vfs::buffers::*;
     use starnix_core::vfs::{
         Anon, DynamicFile, DynamicFileBuf, DynamicFileSource, FdFlags, FsNodeOps,
     };
-    use {fidl_fuchsia_io as fio, zx};
 
     #[derive(Clone)]
     struct PassthroughTestFile(Vec<u8>);

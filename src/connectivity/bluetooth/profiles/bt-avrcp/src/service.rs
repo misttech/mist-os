@@ -6,6 +6,7 @@ use anyhow::{format_err, Error};
 use fidl::prelude::*;
 use fidl_fuchsia_bluetooth_avrcp::*;
 use fidl_fuchsia_bluetooth_avrcp_test::*;
+use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_component::server::{ServiceFs, ServiceObj};
 use futures::channel::mpsc;
@@ -13,7 +14,6 @@ use futures::future::{FutureExt, TryFutureExt};
 use futures::stream::{StreamExt, TryStreamExt};
 use futures::Future;
 use tracing::{info, warn};
-use {fuchsia_async as fasync, zx};
 
 use crate::peer::Controller;
 use crate::peer_manager::ServiceRequest;

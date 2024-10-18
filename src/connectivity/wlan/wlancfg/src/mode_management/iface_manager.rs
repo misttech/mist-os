@@ -33,7 +33,7 @@ use std::pin::pin;
 use std::sync::Arc;
 use std::unimplemented;
 use tracing::{debug, error, info, warn};
-use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_wlan_common as fidl_common, fuchsia_async as fasync};
 
 // Maximum allowed interval between scans when attempting to reconnect client interfaces.  This
 // value is taken from legacy state machine.

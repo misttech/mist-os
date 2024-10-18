@@ -7,6 +7,7 @@ use crate::fuchsia::errors::map_to_status;
 use crate::fuchsia::node::FxNode;
 use crate::fuchsia::volume::{info_to_filesystem_info, FxVolume};
 use anyhow::Error;
+use fidl_fuchsia_io as fio;
 use fxfs::errors::FxfsError;
 use fxfs::object_handle::{ObjectHandle, ObjectProperties};
 use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
@@ -22,7 +23,6 @@ use vfs::directory::entry_container::MutableDirectory;
 use vfs::name::Name;
 use vfs::node::Node;
 use vfs::symlink::Symlink;
-use {fidl_fuchsia_io as fio, zx};
 
 #[derive(ToWeakNode)]
 pub struct FxSymlink {

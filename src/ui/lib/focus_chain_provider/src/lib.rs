@@ -18,12 +18,12 @@ use fidl_fuchsia_ui_focus::{
     self as focus, FocusChainProviderWatchFocusKoidChainResponder, FocusKoidChain,
 };
 use fidl_fuchsia_ui_focus_ext::FocusChainExt;
+use fuchsia_async as fasync;
 use futures::lock::Mutex;
 use futures::stream::TryStreamExt;
 use futures::TryFutureExt;
 use std::sync::Arc;
 use tracing::error;
-use {fuchsia_async as fasync, zx};
 
 // Local shorthand type aliases
 type HangingGetNotifyFn =

@@ -38,7 +38,7 @@ use std::sync::Arc;
 use time_metrics_registry::TimeMetricDimensionExperiment;
 use tracing::{debug, error, info, warn};
 use zx::MonotonicTimeline;
-use {fidl_fuchsia_time as ftime, fidl_fuchsia_time_test as fftt, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_time as ftime, fidl_fuchsia_time_test as fftt, fuchsia_async as fasync};
 
 // TODO(https://fxbug.dev/356911500) switch to boot timeline
 type UtcTransform = time_util::Transform<MonotonicTimeline, UtcTimeline>;
@@ -555,12 +555,12 @@ mod tests {
     use crate::enums::WriteRtcOutcome;
     use crate::rtc::FakeRtc;
     use crate::time_source::{Event as TimeSourceEvent, FakePushTimeSource, Sample};
+    use fidl_fuchsia_time_external as ftexternal;
     use fuchsia_runtime::{UtcClockUpdate, UtcInstant};
     use lazy_static::lazy_static;
     use std::matches;
     use std::pin::pin;
     use test_case::test_case;
-    use {fidl_fuchsia_time_external as ftexternal, zx};
 
     const NANOS_PER_SECOND: i64 = 1_000_000_000;
     const OFFSET: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(1111_000);

@@ -5,12 +5,12 @@
 use crate::filesystems::{BlobFilesystem, Blobfs, CacheClearableFilesystem, DeliveryBlob, Fxblob};
 use async_trait::async_trait;
 use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl_fuchsia_io as fio;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use futures::future::FutureExt;
 use std::path::Path;
 use storage_benchmarks::{BlockDeviceFactory, Filesystem, FilesystemConfig};
 use vfs::directory::entry_container::Directory as _;
-use {fidl_fuchsia_io as fio, zx};
 /// Config object for starting a `PkgDirInstance`. The `PkgDirInstance` allows blob benchmarks to
 /// open and read a blob through its package directory as opposed to talking directly to the
 /// filesystem.

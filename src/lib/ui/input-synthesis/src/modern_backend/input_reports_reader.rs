@@ -80,8 +80,8 @@ mod tests {
     use anyhow::{Context as _, Error};
     use fidl::endpoints;
     use fidl_fuchsia_input_report::{InputReportsReaderMarker, MAX_DEVICE_REPORT_COUNT};
+    use fuchsia_async as fasync;
     use futures::future;
-    use {fuchsia_async as fasync, zx};
 
     mod report_count {
         use super::*;

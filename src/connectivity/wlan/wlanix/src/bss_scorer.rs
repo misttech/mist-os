@@ -7,7 +7,7 @@ use ieee80211::Bssid;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use wlan_common::bss::BssDescription;
-use {fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_async as fasync};
 
 /// Only connect failures that were RECENT_CONNECT_FAILURE_WINDOW from now would
 /// contribute to score penalty.
@@ -112,8 +112,8 @@ impl BssScorerInner {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
     use wlan_common::fake_bss_description;
-    use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, zx};
 
     const BSSID: [u8; 6] = [1, 3, 3, 7, 4, 2];
 

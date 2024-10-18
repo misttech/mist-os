@@ -4,10 +4,10 @@
 use crate::handler::base::{GenerateHandler, Request};
 use crate::handler::setting_handler::{reply, Command, Payload, SettingHandlerResult, State};
 use anyhow::Error;
+use fuchsia_async as fasync;
 use futures::future::BoxFuture;
 use futures::lock::Mutex;
 use std::sync::Arc;
-use {fuchsia_async as fasync, zx};
 
 /// Trait for providing a service.
 pub(crate) trait Service {

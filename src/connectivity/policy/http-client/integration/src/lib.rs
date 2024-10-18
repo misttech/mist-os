@@ -13,7 +13,7 @@ use std::future::Future;
 use std::net::SocketAddr;
 use std::pin::pin;
 use test_case::test_case;
-use {fidl_fuchsia_net_http as http, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_net_http as http, fuchsia_async as fasync};
 
 const ROOT_DOCUMENT: &str = "Root document\n";
 

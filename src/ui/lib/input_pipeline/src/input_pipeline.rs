@@ -21,7 +21,7 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, LazyLock};
-use {fidl_fuchsia_io as fio, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 /// Use a self incremental u32 unique id for device_id.
 ///
@@ -755,6 +755,7 @@ mod tests {
     };
     use diagnostics_assertions::AnyProperty;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream};
+    use fuchsia_async as fasync;
     use futures::FutureExt;
     use pretty_assertions::assert_eq;
     use rand::Rng;
@@ -763,7 +764,6 @@ mod tests {
     use vfs::execution_scope::ExecutionScope;
     use vfs::path::Path;
     use vfs::{pseudo_directory, service as pseudo_fs_service};
-    use {fuchsia_async as fasync, zx};
 
     const COUNTS_PER_MM: u32 = 12;
 

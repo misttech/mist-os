@@ -2278,7 +2278,7 @@ mod tests {
     };
     use std::time::Duration;
     use test_case::test_case;
-    use {fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_async as fasync, zx};
+    use {fidl_fuchsia_io as fio, fidl_fuchsia_mem as fmem, fuchsia_async as fasync};
 
     /// Assert that two ComponentTrees are equivalent.
     ///

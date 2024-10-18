@@ -6,7 +6,7 @@ use crate::{dirs_to_test, PackageSource};
 use anyhow::{anyhow, Context as _, Error};
 use fidl::endpoints::Proxy as _;
 use fidl::AsHandleRef as _;
-use {fidl_fuchsia_io as fio, zx};
+use fidl_fuchsia_io as fio;
 
 #[fuchsia::test]
 async fn get_attributes() {

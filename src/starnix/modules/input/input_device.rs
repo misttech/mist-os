@@ -418,7 +418,7 @@ mod test {
     use test_case::test_case;
     use test_util::assert_near;
     use zerocopy::FromBytes as _;
-    use {fidl_fuchsia_ui_pointer as fuipointer, fidl_fuchsia_ui_policy as fuipolicy, zx}; // for `read_from()`
+    use {fidl_fuchsia_ui_pointer as fuipointer, fidl_fuchsia_ui_policy as fuipolicy}; // for `read_from()`
 
     const INPUT_EVENT_SIZE: usize = std::mem::size_of::<uapi::input_event>();
 

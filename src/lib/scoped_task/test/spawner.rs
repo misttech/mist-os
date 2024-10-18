@@ -7,6 +7,7 @@
 use anyhow::{format_err, Context};
 use argh::FromArgs;
 use fdio::SpawnOptions;
+use fuchsia_runtime as runtime;
 use std::any::Any;
 use std::ffi::{CStr, CString};
 use std::fs::File;
@@ -14,7 +15,6 @@ use std::io::Write;
 use std::os::unix::io::FromRawFd;
 use std::sync::mpsc;
 use std::{env, panic, thread};
-use {fuchsia_runtime as runtime, zx};
 
 /// Spawns a subprocess in a configurable way. Used by the scoped_task test.
 #[derive(FromArgs, Clone, Copy, Debug)]

@@ -380,11 +380,11 @@ mod tests {
     use crate::GptManager;
     use block_client::{BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient};
     use fake_block_server::{FakeServer, FakeServerOptions};
+    use fidl_fuchsia_hardware_block_volume as fvolume;
     use futures::FutureExt as _;
     use gpt_testing::{format_gpt, Guid, PartitionInfo};
     use std::ops::Range;
     use std::sync::Arc;
-    use {fidl_fuchsia_hardware_block_volume as fvolume, zx};
 
     #[fuchsia::test]
     async fn load_unformatted_gpt() {

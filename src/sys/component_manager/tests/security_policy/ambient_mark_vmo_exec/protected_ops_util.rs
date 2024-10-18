@@ -4,9 +4,9 @@
 
 use anyhow::Error;
 use fidl_test_policy::{ProtectedOperationsRequest, ProtectedOperationsRequestStream};
+use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use futures::prelude::*;
-use {fuchsia_async as fasync, zx};
 
 #[fasync::run_singlethreaded]
 async fn main() {

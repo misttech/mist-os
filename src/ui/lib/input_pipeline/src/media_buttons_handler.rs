@@ -338,7 +338,7 @@ mod tests {
     use futures::channel::oneshot;
     use pretty_assertions::assert_eq;
     use std::task::Poll;
-    use {fidl_fuchsia_input_report as fidl_input_report, fuchsia_async as fasync, zx};
+    use {fidl_fuchsia_input_report as fidl_input_report, fuchsia_async as fasync};
 
     fn spawn_device_listener_registry_server(
         handler: Rc<MediaButtonsHandler>,

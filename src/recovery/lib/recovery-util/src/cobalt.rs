@@ -8,11 +8,11 @@ use fidl_fuchsia_metrics::{
     MetricEventLoggerFactoryMarker, MetricEventLoggerFactoryProxy, MetricEventLoggerProxy,
     ProjectSpec,
 };
+use fuchsia_async as fasync;
 use fuchsia_component::client::{connect_channel_to_protocol, connect_to_protocol};
 #[cfg(test)]
 use mockall::automock;
 use tracing::error;
-use {fuchsia_async as fasync, zx};
 
 #[cfg_attr(test, automock)]
 pub trait Cobalt {

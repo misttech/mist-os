@@ -190,9 +190,9 @@ mod tests {
 
     use crate::input_handler::InputHandler;
     use crate::{keyboard_binding, testing_utilities};
+    use fuchsia_async as fasync;
     use pretty_assertions::assert_eq;
     use std::convert::TryFrom as _;
-    use {fuchsia_async as fasync, zx};
 
     fn input_event_from(
         keyboard_event: keyboard_binding::KeyboardEvent,

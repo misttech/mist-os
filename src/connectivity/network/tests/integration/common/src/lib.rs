@@ -29,7 +29,7 @@ use futures::future::FutureExt as _;
 use futures::stream::{Stream, StreamExt as _, TryStreamExt as _};
 use futures::{select, Future};
 use std::pin::pin;
-use {fidl_fuchsia_io as fio, fidl_fuchsia_netemul as fnetemul, zx};
+use {fidl_fuchsia_io as fio, fidl_fuchsia_netemul as fnetemul};
 
 use crate::realms::TestSandboxExt as _;
 

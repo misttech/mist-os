@@ -5,12 +5,12 @@
 use anyhow::{anyhow, Context, Result};
 use fidl_fuchsia_device::ControllerProxy;
 use fidl_fuchsia_hardware_block_partition::{PartitionMarker, PartitionProxy};
+use fidl_fuchsia_io as fio;
 use fs_management::format::{detect_disk_format, DiskFormat};
 use fuchsia_component::client::connect_to_protocol_at_path;
 use fuchsia_fs::directory::{WatchEvent, Watcher};
 use futures::TryStreamExt;
 use std::path::{Path, PathBuf};
-use {fidl_fuchsia_io as fio, zx};
 
 pub mod fvm;
 pub mod zxcrypt;

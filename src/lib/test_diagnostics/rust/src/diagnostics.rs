@@ -129,8 +129,8 @@ mod tests {
         use fidl_fuchsia_diagnostics::{
             BatchIteratorMarker, BatchIteratorRequest, FormattedContent, ReaderError,
         };
+        use fidl_fuchsia_mem as fmem;
         use futures::TryStreamExt;
-        use {fidl_fuchsia_mem as fmem, zx};
 
         fn create_log_stream() -> Result<(LogStream, ftest_manager::LogsIterator), fidl::Error> {
             let (stream, iterator) = BatchLogStream::new()?;

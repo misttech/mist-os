@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_fuchsia_bluetooth_internal_a2dp as a2dp;
 use fuchsia_bluetooth::types::PeerId;
 use futures::{Future, FutureExt, StreamExt};
 use tracing::warn;
-use {fidl_fuchsia_bluetooth_internal_a2dp as a2dp, zx};
 
 /// A client for fuchsia.bluetooth.internal.a2dp.
 

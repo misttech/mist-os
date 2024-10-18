@@ -6,13 +6,13 @@
 
 use std::time::Duration;
 
+use fuchsia_async as fasync;
 use futures::channel::mpsc;
 use futures::future::BoxFuture;
 use futures::stream::SelectAll;
 use futures::{Future, FutureExt as _, Stream, StreamExt};
 use log::{debug, error, info, warn};
 use netstack3_core::sync::DynDebugReferences;
-use {fuchsia_async as fasync, zx};
 
 /// The interval at which [`ResourceRemovalWorker`] generates reports for each
 /// pending resource.

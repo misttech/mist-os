@@ -7,7 +7,7 @@ use crate::{
     ControllerCreationError, ControllerId, PushChangesError,
 };
 use fidl::marker::SourceBreaking;
-use {fidl_fuchsia_net_filter as fnet_filter, zx};
+use fidl_fuchsia_net_filter as fnet_filter;
 
 /// A controller for filtering state with blocking methods.
 pub struct Controller {

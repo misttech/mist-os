@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_fuchsia_fdomain as proto;
 use zx::{AsHandleRef, HandleBased, Peered};
-use {fidl_fuchsia_fdomain as proto, zx};
 
 /// Amount of buffer space we allocate for reading from handles in order to
 /// serve read requests.

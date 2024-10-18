@@ -6,12 +6,12 @@ use anyhow::Error;
 use fidl::prelude::*;
 use fidl::AsyncChannel;
 use fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream};
+use fuchsia_async as fasync;
 use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
 use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
 use futures::TryStreamExt;
 use tracing::{debug, info};
-use {fuchsia_async as fasync, zx};
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {

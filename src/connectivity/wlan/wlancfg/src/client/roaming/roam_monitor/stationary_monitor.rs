@@ -11,7 +11,7 @@ use crate::telemetry::{TelemetryEvent, TelemetrySender};
 use crate::util::pseudo_energy::EwmaSignalData;
 use std::sync::Arc;
 use tracing::info;
-use {fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync};
 
 /// Minimum wait time between roam scans if there are no new roam reasons. The time between roam
 /// scans increases with a backoff, since subsequent scans are unlikely to have a different result.

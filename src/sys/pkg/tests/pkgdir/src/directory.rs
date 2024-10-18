@@ -7,13 +7,13 @@ use anyhow::{anyhow, Context as _, Error};
 use assert_matches::assert_matches;
 use fidl::endpoints::{create_proxy, Proxy as _};
 use fidl::AsHandleRef as _;
+use fidl_fuchsia_io as fio;
 use fuchsia_fs::directory::{open_directory_deprecated, DirEntry, DirentKind};
 use futures::future::Future;
 use futures::StreamExt;
 use itertools::Itertools as _;
 use pretty_assertions::assert_eq;
 use std::collections::HashSet;
-use {fidl_fuchsia_io as fio, zx};
 
 #[fuchsia::test]
 async fn open() {

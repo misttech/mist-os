@@ -30,7 +30,7 @@ use std::borrow::Cow;
 use std::sync::{Arc, Mutex, Weak};
 use std::{env, fs, io};
 use thiserror::Error;
-use {rust_icu_common as icu, rust_icu_ucal as ucal, rust_icu_udata as udata, zx};
+use {rust_icu_common as icu, rust_icu_ucal as ucal, rust_icu_udata as udata};
 
 lazy_static! {
     // The storage for the loaded ICU data.  At most one may be loaded at any given time.

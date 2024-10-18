@@ -4,6 +4,7 @@
 
 use anyhow::{format_err, Context, Error};
 use fidl::endpoints::{create_proxy, create_request_stream, Responder};
+use fidl_fuchsia_bluetooth_avrcp as fidl_avrcp;
 use fidl_fuchsia_media_sessions2::{
     DiscoveryMarker, DiscoveryProxy, SessionControlProxy, SessionInfoDelta, SessionsWatcherRequest,
     SessionsWatcherRequestStream, WatchOptions,
@@ -15,7 +16,6 @@ use futures::{future, Future, TryStreamExt};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{trace, warn};
-use {fidl_fuchsia_bluetooth_avrcp as fidl_avrcp, zx};
 
 use crate::media::media_state::{
     MediaState, MEDIA_SESSION_ADDRESSED_PLAYER_ID, MEDIA_SESSION_DISPLAYABLE_NAME,

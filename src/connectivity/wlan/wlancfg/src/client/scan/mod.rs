@@ -468,7 +468,7 @@ mod tests {
     use wlan_common::test_utils::fake_frames::fake_unknown_rsne;
     use wlan_common::test_utils::fake_stas::IesOverrides;
     use wlan_common::{assert_variant, fake_bss_description, random_fidl_bss_description};
-    use {fidl_fuchsia_wlan_common_security as fidl_security, fuchsia_async as fasync, zx};
+    use {fidl_fuchsia_wlan_common_security as fidl_security, fuchsia_async as fasync};
 
     fn active_sme_req(ssids: Vec<&str>, channels: Vec<u8>) -> fidl_sme::ScanRequest {
         fidl_sme::ScanRequest::Active(fidl_sme::ActiveScanRequest {

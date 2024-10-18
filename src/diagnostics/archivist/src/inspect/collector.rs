@@ -7,11 +7,11 @@ use diagnostics_data::InspectHandleName;
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
 use fidl_fuchsia_inspect::{TreeMarker, TreeProxy};
 use fidl_fuchsia_inspect_deprecated::{InspectMarker, InspectProxy};
+use fidl_fuchsia_io as fio;
 use futures::stream::StreamExt;
 use std::pin::pin;
 use std::sync::{Arc, Weak};
 use tracing::error;
-use {fidl_fuchsia_io as fio, zx};
 
 /// Pairs a diagnostics data-object's name to the underlying encoding of that data.
 pub type InspectHandleDeque = std::collections::VecDeque<(Option<InspectHandleName>, InspectData)>;
@@ -178,12 +178,12 @@ mod tests {
     use assert_matches::assert_matches;
     use diagnostics_assertions::assert_data_tree;
     use fidl::endpoints::create_request_stream;
+    use fuchsia_async as fasync;
     use fuchsia_component::server::ServiceFs;
     use fuchsia_inspect::{reader, Inspector};
     use inspect_runtime::service::spawn_tree_server_with_stream;
     use inspect_runtime::TreeServerSendPreference;
     use zx::Peered;
-    use {fuchsia_async as fasync, zx};
 
     fn get_vmo(text: &[u8]) -> zx::Vmo {
         let vmo = zx::Vmo::create(4096).unwrap();

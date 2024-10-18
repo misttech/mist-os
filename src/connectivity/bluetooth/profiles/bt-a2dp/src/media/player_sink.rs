@@ -429,7 +429,7 @@ mod tests {
     use futures::task::Poll;
     use std::pin::pin;
     use std::sync::{Arc, RwLock};
-    use {fidl_fuchsia_metrics as cobalt, fuchsia_inspect as inspect, zx};
+    use {fidl_fuchsia_metrics as cobalt, fuchsia_inspect as inspect};
 
     fn fake_cobalt_sender() -> (bt_metrics::MetricsLogger, cobalt::MetricEventLoggerRequestStream) {
         let (c, s) = fidl::endpoints::create_proxy_and_stream::<cobalt::MetricEventLoggerMarker>()

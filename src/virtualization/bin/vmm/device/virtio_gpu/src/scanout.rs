@@ -23,7 +23,7 @@ use futures::{select, StreamExt};
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use {fidl_fuchsia_math as fmath, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_math as fmath, fuchsia_async as fasync};
 
 const BACKGROUND_COLOR: ColorRgba = ColorRgba { red: 0.5, green: 0.5, blue: 0.5, alpha: 1.0 };
 

@@ -8,7 +8,7 @@ use futures::channel::oneshot;
 use futures::prelude::*;
 use std::rc::Weak;
 use tracing::warn;
-use {fidl_fuchsia_ui_composition as ui_comp, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_ui_composition as ui_comp, fuchsia_async as fasync};
 
 /// Unbounded sender used for presentation messages.
 pub type PresentationSender = UnboundedSender<oneshot::Sender<()>>;

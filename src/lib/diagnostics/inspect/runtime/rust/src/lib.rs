@@ -14,7 +14,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tracing::error;
-use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync};
 
 #[cfg(fuchsia_api_level_at_least = "HEAD")]
 pub use finspect::EscrowToken;

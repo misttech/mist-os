@@ -21,6 +21,7 @@ use fidl_fuchsia_update::{
 use fidl_fuchsia_update_channel::{ProviderRequest, ProviderRequestStream};
 use fidl_fuchsia_update_channelcontrol::{ChannelControlRequest, ChannelControlRequestStream};
 use fidl_fuchsia_update_ext::AttemptOptions;
+use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::{ServiceFs, ServiceObjLocal};
 use futures::future::BoxFuture;
@@ -35,7 +36,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 use tracing::{error, info, warn};
-use {fuchsia_async as fasync, zx};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct State {

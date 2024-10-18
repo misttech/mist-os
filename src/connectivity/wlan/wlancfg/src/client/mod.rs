@@ -17,7 +17,7 @@ use futures::select;
 use futures::stream::FuturesUnordered;
 use std::sync::Arc;
 use tracing::{error, info, warn};
-use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy, zx};
+use {fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_policy as fidl_policy};
 
 pub mod connection_selection;
 pub mod roaming;

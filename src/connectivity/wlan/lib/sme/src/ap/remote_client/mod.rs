@@ -15,7 +15,7 @@ use wlan_common::mac::{Aid, CapabilityInfo};
 use wlan_common::timer::EventId;
 use wlan_rsn::key::exchange::Key;
 use wlan_rsn::key::Tk;
-use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme, zx};
+use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_mlme as fidl_mlme};
 
 pub struct RemoteClient {
     pub addr: MacAddr,

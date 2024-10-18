@@ -5,8 +5,8 @@
 //! common functions to be used by Criterion or integration test for SAG.
 
 use anyhow::Result;
+use fidl_fuchsia_power_system as fsystem;
 use fuchsia_component::client::connect_to_protocol_sync;
-use {fidl_fuchsia_power_system as fsystem, zx};
 
 use std::sync::Arc;
 

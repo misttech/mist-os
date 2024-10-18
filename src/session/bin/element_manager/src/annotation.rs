@@ -11,7 +11,7 @@ use futures::TryStreamExt;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tracing::error;
-use {fidl_fuchsia_element as felement, fidl_fuchsia_mem as fmem, zx};
+use {fidl_fuchsia_element as felement, fidl_fuchsia_mem as fmem};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 struct Key {
@@ -372,7 +372,7 @@ mod tests {
     use futures::{StreamExt, TryStreamExt};
     use std::cmp::Ordering;
     use std::sync::{Arc, Mutex};
-    use {fidl_fuchsia_element as felement, fuchsia_async as fasync, zx};
+    use {fidl_fuchsia_element as felement, fuchsia_async as fasync};
 
     fn make_annotation_key(namespace: &str, value: &str) -> felement::AnnotationKey {
         felement::AnnotationKey { namespace: namespace.to_string(), value: value.to_string() }

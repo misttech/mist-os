@@ -6,6 +6,7 @@ use anyhow::{format_err, Error};
 use diagnostics_assertions::{assert_data_tree, AnyProperty};
 use diagnostics_hierarchy::DiagnosticsHierarchy;
 use diagnostics_reader::{ArchiveReader, ComponentSelector, Inspect};
+use fidl_fuchsia_wlan_policy as fidl_policy;
 use fidl_test_wlan_realm::WlanConfig;
 use ieee80211::Bssid;
 use lazy_static::lazy_static;
@@ -14,7 +15,6 @@ use wlan_common::bss::Protection;
 use wlan_common::channel::{Cbw, Channel};
 use wlan_hw_sim::event::{action, Handler};
 use wlan_hw_sim::*;
-use {fidl_fuchsia_wlan_policy as fidl_policy, zx};
 
 lazy_static! {
     static ref BSSID: Bssid = Bssid::from([0x62, 0x73, 0x73, 0x66, 0x6f, 0x6f]);

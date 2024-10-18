@@ -4,7 +4,7 @@
 
 use anyhow::Error;
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy, ServiceMarker};
-use {fuchsia_async as fasync, zx};
+use fuchsia_async as fasync;
 
 /// Represents a component launched by an Element Manager.
 ///

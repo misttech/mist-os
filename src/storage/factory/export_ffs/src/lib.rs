@@ -11,10 +11,10 @@ use block_client::cache::Cache;
 use block_client::RemoteBlockClientSync;
 use byteorder::{LittleEndian, WriteBytesExt};
 use fidl_fuchsia_hardware_block::BlockMarker;
+use fidl_fuchsia_io as fio;
 use fuchsia_fs::directory::{readdir_recursive, DirEntry, DirentKind};
 use futures::StreamExt;
 use std::io::Write;
-use {fidl_fuchsia_io as fio, zx};
 
 const FACTORYFS_MAGIC: u64 = 0xa55d3ff91e694d21;
 const BLOCK_SIZE: u32 = 4096;

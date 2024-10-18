@@ -186,6 +186,7 @@ mod tests {
         WeaveFactoryStoreProviderRequestStream, WidevineFactoryStoreProviderRequest,
         WidevineFactoryStoreProviderRequestStream,
     };
+    use fuchsia_async as fasync;
     use fuchsia_component::server as fserver;
     use fuchsia_component_test::{
         Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
@@ -195,7 +196,6 @@ mod tests {
     use vfs::execution_scope::ExecutionScope;
     use vfs::file::vmo::read_only;
     use vfs::tree_builder::TreeBuilder;
-    use {fuchsia_async as fasync, zx};
 
     const ALPHA_TXT_FILE_NAME: &str = "txt/alpha.txt";
     const CAST_TXT_FILE_NAME: &str = "txt/cast.txt";

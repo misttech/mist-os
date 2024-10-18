@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 
 use futures::AsyncWriteExt;
-use {fidl_fuchsia_kernel as fkernel, fidl_fuchsia_memory_attribution_plugin as fplugin, zx};
+use {fidl_fuchsia_kernel as fkernel, fidl_fuchsia_memory_attribution_plugin as fplugin};
 
 use crate::attribution_client::{
     AttributionState, LocalPrincipalIdentifier, PrincipalDescription, PrincipalType,

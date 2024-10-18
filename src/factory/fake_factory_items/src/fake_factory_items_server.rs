@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 use crate::config::ConfigMapValue;
 use fidl_fuchsia_boot::{FactoryItemsRequest, FactoryItemsRequestStream};
+use fuchsia_async as fasync;
 use futures::prelude::*;
 use std::sync::{Arc, RwLock};
-use {fuchsia_async as fasync, zx};
 
 type ConfigMap = Arc<RwLock<ConfigMapValue>>;
 

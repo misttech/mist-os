@@ -11,7 +11,7 @@ use std::ptr::NonNull;
 use std::{mem, slice};
 use tracing::error;
 use wlan_fidl_ext::{TryUnpack, WithName};
-use {fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, wlan_trace as wtrace, zx};
+use {fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, wlan_trace as wtrace};
 
 // Defined as an opaque type as suggested by
 // https://doc.rust-lang.org/nomicon/ffi.html#representing-opaque-structs.

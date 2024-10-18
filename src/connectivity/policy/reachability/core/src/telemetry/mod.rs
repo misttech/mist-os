@@ -21,7 +21,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tracing::{info, warn};
 use windowed_stats::aggregations::SumAndCount;
-use {fuchsia_async as fasync, network_policy_metrics_registry as metrics, zx};
+use {fuchsia_async as fasync, network_policy_metrics_registry as metrics};
 
 pub async fn create_metrics_logger(
     factory_proxy: fidl_fuchsia_metrics::MetricEventLoggerFactoryProxy,

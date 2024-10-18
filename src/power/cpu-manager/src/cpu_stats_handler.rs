@@ -320,10 +320,10 @@ pub mod tests {
     use crate::types::Seconds;
     use async_utils::PollExt;
     use diagnostics_assertions::assert_data_tree;
+    use fuchsia_async as fasync;
     use futures::TryStreamExt;
     use std::collections::VecDeque;
     use std::ops::Add;
-    use {fuchsia_async as fasync, zx};
 
     const TEST_NUM_CORES: u32 = 4;
 

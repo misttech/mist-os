@@ -4,12 +4,12 @@
 
 use anyhow::{Context, Error};
 use fidl_fuchsia_update::{CommitStatusProviderMarker, CommitStatusProviderProxy};
+use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use futures::future::FusedFuture;
 use futures::prelude::*;
 use std::pin::pin;
 use std::time::Duration;
-use {fuchsia_async as fasync, zx};
 
 const WARNING_DURATION: Duration = Duration::from_secs(30);
 

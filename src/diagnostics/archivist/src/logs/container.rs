@@ -31,7 +31,7 @@ use std::collections::BTreeMap;
 use std::sync::atomic::AtomicUsize;
 use std::sync::Arc;
 use tracing::{debug, error, warn};
-use {fuchsia_async as fasync, fuchsia_inspect as inspect, fuchsia_trace as ftrace, zx};
+use {fuchsia_async as fasync, fuchsia_inspect as inspect, fuchsia_trace as ftrace};
 
 #[derive(Derivative)]
 #[derivative(Debug)]

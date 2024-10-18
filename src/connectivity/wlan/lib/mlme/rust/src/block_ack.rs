@@ -15,6 +15,7 @@
 //! See IEEE Std 802.11-2016, 10.24.
 
 use crate::error::Error;
+use fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211;
 use tracing::error;
 use wlan_common::append::Append;
 use wlan_common::buffer_reader::BufferReader;
@@ -23,7 +24,6 @@ use wlan_common::{frame_len, mac};
 use wlan_frame_writer::append_frame_to;
 use wlan_statemachine::*;
 use zerocopy::{Ref, SplitByteSlice};
-use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, zx};
 
 pub const ADDBA_REQ_FRAME_LEN: usize = frame_len!(mac::MgmtHdr, mac::ActionHdr, mac::AddbaReqHdr);
 pub const ADDBA_RESP_FRAME_LEN: usize = frame_len!(mac::MgmtHdr, mac::ActionHdr, mac::AddbaRespHdr);
@@ -411,7 +411,7 @@ mod tests {
     use super::*;
     use wlan_common::append::TrackedAppend;
     use wlan_common::assert_variant;
-    use {wlan_statemachine as statemachine, zx};
+    use wlan_statemachine as statemachine;
 
     /// A STA that can send ADDBA frames (implements the `BlockAckTx` trait).
     enum Station {

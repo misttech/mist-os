@@ -646,6 +646,7 @@ mod tests {
     use async_trait::async_trait;
     use cm_rust_testing::{ChildBuilder, ComponentDeclBuilder};
     use errors::ModelError;
+    use fuchsia_async as fasync;
     use futures::channel::mpsc;
     use futures::stream::FuturesUnordered;
     use futures::{FutureExt, StreamExt};
@@ -654,7 +655,6 @@ mod tests {
     use routing::bedrock::structured_dict::ComponentInput;
     use routing::resolving::ComponentAddress;
     use std::sync::{Mutex, Weak};
-    use {fuchsia_async as fasync, zx};
 
     // Child name for test child components instantiated during tests.
     const TEST_CHILD_NAME: &str = "child";

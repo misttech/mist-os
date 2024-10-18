@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl_fuchsia_wlan_policy as fidl_policy;
 use fidl_test_wlan_realm::WlanConfig;
 use ieee80211::Bssid;
 use wlan_common::bss::Protection;
 use wlan_hw_sim::*;
-use {fidl_fuchsia_wlan_policy as fidl_policy, zx};
 
 /// Test a client can connect to a network with no protection by simulating an AP that sends out
 /// hard coded authentication and association response frames.

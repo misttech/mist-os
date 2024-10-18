@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fidl::HandleBased;
-use {fuchsia_async as fasync, zx};
+use fuchsia_async as fasync;
 
 /// DropNotifier allows a client to be notified when is is dropped.
 ///

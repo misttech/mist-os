@@ -428,8 +428,8 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use diagnostics_assertions::assert_data_tree;
+    use fuchsia_async as fasync;
     use std::path::Path;
-    use {fuchsia_async as fasync, zx};
 
     fn mock_vmo(vmo_size: u64, buffer_size: u64) -> mem::Buffer {
         mem::Buffer { vmo: zx::Vmo::create(vmo_size).unwrap(), size: buffer_size }

@@ -8,9 +8,9 @@
 
 use anyhow::{format_err, Error};
 use fidl::endpoints::create_proxy;
+use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use futures::FutureExt;
-use {fuchsia_async as fasync, zx};
 
 use std::{env, str};
 

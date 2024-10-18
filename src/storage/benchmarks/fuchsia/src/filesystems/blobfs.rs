@@ -5,11 +5,11 @@
 use crate::filesystems::{BlobFilesystem, DeliveryBlob, FsManagementFilesystemInstance};
 use async_trait::async_trait;
 use delivery_blob::delivery_blob_path;
+use fidl_fuchsia_io as fio;
 use std::path::Path;
 use storage_benchmarks::{
     BlockDeviceConfig, BlockDeviceFactory, CacheClearableFilesystem, Filesystem, FilesystemConfig,
 };
-use {fidl_fuchsia_io as fio, zx};
 
 /// Config object for starting Blobfs instances.
 #[derive(Clone)]

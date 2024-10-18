@@ -14,6 +14,7 @@ use fidl_fuchsia_bluetooth_hfp::{
     PeerHandlerWatchNetworkInformationResponder, PeerHandlerWatchNextCallResponder, SignalStrength,
 };
 use fidl_fuchsia_bluetooth_hfp_test::{ConnectionBehavior, HfpTestMarker, HfpTestProxy};
+use fuchsia_async as fasync;
 use fuchsia_component::client;
 use futures::lock::Mutex;
 use futures::stream::StreamExt;
@@ -22,7 +23,6 @@ use serde::Serialize;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use tracing::*;
-use {fuchsia_async as fasync, zx};
 
 type CallId = u64;
 type Number = String;

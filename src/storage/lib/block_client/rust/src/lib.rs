@@ -857,6 +857,7 @@ mod tests {
     };
     use block_server::{BlockServer, PartitionInfo};
     use fidl::endpoints::RequestStream as _;
+    use fidl_fuchsia_hardware_block as block;
     use fuchsia_async::{self as fasync, FifoReadable as _, FifoWritable as _};
     use futures::future::{AbortHandle, Abortable, TryFutureExt as _};
     use futures::join;
@@ -866,7 +867,6 @@ mod tests {
     use std::borrow::Cow;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
-    use {fidl_fuchsia_hardware_block as block, zx};
 
     const RAMDISK_BLOCK_SIZE: u64 = 1024;
     const RAMDISK_BLOCK_COUNT: u64 = 1024;

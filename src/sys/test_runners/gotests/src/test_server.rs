@@ -26,7 +26,7 @@ use test_runners_lib::launch;
 use test_runners_lib::logs::{LogError, LogStreamReader, LoggerStream, SocketLogWriter};
 use tracing::{debug, error};
 use zx::HandleBased as _;
-use {fidl_fuchsia_process as fproc, fuchsia_async as fasync, zx};
+use {fidl_fuchsia_process as fproc, fuchsia_async as fasync};
 
 /// Implements `fuchsia.test.Suite` and runs provided test.
 pub struct TestServer {

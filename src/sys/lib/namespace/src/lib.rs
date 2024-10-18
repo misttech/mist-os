@@ -321,8 +321,8 @@ impl TryFrom<process_builder::NamespaceEntry> for Entry {
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
+    use fuchsia_async as fasync;
     use zx::{AsHandleRef, Peered};
-    use {fuchsia_async as fasync, zx};
 
     fn ns_path(str: &str) -> NamespacePath {
         str.parse().unwrap()

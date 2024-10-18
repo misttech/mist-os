@@ -11,7 +11,7 @@ use namespace::Namespace;
 use runtime::{HandleInfo, HandleType};
 use thiserror::Error;
 use zx::{AsHandleRef, HandleBased, Process, Rights, Task};
-use {fidl_fuchsia_process as fproc, fuchsia_runtime as runtime, zx};
+use {fidl_fuchsia_process as fproc, fuchsia_runtime as runtime};
 
 /// Error encountered while launching a component.
 #[derive(Debug, Error)]

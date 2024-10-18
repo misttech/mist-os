@@ -7,11 +7,11 @@ use crate::mode_management::iface_manager_api::IfaceManagerApi;
 use crate::mode_management::phy_manager::PhyManagerApi;
 use anyhow::format_err;
 use fidl::endpoints::create_proxy;
+use fidl_fuchsia_wlan_common as fidl_common;
 use fidl_fuchsia_wlan_device_service::{DeviceMonitorProxy, DeviceWatcherEvent};
 use futures::lock::Mutex;
 use std::sync::Arc;
 use tracing::{error, info};
-use {fidl_fuchsia_wlan_common as fidl_common, zx};
 
 pub struct Listener {
     proxy: DeviceMonitorProxy,

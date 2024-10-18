@@ -4,7 +4,7 @@
 
 use std::fmt::Display;
 
-use {fidl_fuchsia_device as fdev, fidl_fuchsia_hardware_network as fhwnet, zx};
+use {fidl_fuchsia_device as fdev, fidl_fuchsia_hardware_network as fhwnet};
 
 use anyhow::Context as _;
 
