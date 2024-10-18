@@ -147,9 +147,11 @@ template("fidl_library") {
       defined(invoker.sdk_category) && invoker.sdk_category != "internal"
 
   # All publishable libraries must have compatibility tests.
-  # All such libraries are publishable except for those in partner_internal.
+  # All such libraries are publishable except for those in "cts" and
+  # "partner_internal".
   is_sdk_included_publishable =
-      requires_compatibility_tests && invoker.sdk_category != "partner_internal"
+      requires_compatibility_tests && invoker.sdk_category != "cts" &&
+      invoker.sdk_category != "partner_internal"
 
   if (is_unversioned_vendor_sdk) {
     # Override the values set above to account for this special case as
