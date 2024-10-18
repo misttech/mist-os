@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -44,14 +45,20 @@ type FuchsiaDevice struct {
 	Name string
 }
 
+type ffxAddress struct {
+	IP      string `json:"ip"`
+	SSHPort int    `json:"ssh_port"`
+}
+
 // deviceInfo represents targets that the ffx daemon currently has in memory.
 type deviceInfo struct {
-	Nodename    string   `json:"nodename"`
-	RCSState    string   `json:"rcs_state"`
-	Serial      string   `json:"serial"`
-	TargetType  string   `json:"target_type"`
-	TargetState string   `json:"target_state"`
-	Addresses   []string `json:"addresses"`
+	Nodename    string       `json:"nodename"`
+	RCSState    string       `json:"rcs_state"`
+	Serial      string       `json:"serial"`
+	TargetType  string       `json:"target_type"`
+	TargetState string       `json:"target_state"`
+	Addresses   []ffxAddress `json:"addresses"`
+	IsDefault   bool         `json:"is_default"`
 }
 
 // GCSImage is used to return the bucket, name and version of a prebuilt.
@@ -405,7 +412,7 @@ func (sdk SDKProperties) listDevicesWithFFX() ([]*deviceInfo, error) {
 		return discoveredDevices, nil
 	}
 	if err := json.Unmarshal([]byte(output), &discoveredDevices); err != nil {
-		return nil, fmt.Errorf("Unable to unmarshal device info from ffx, please try running 'ffx doctor': %v", err)
+		return nil, fmt.Errorf("Unable to unmarshal device info from ffx, please try running 'ffx doctor': %v\n __%s__", err, output)
 	}
 
 	return discoveredDevices, nil
@@ -524,7 +531,7 @@ func (sdk SDKProperties) RunSFTPCommandContext(ctx context.Context, targetAddres
 		return errors.New("target address must be specified")
 	}
 	// SFTP needs the [] around the ipv6 address, which is different than ssh.
-	if strings.Contains(targetAddress, ":") {
+	if strings.Contains(targetAddress, ":") && !strings.HasPrefix(targetAddress, "[") {
 		targetAddress = fmt.Sprintf("[%v]", targetAddress)
 	}
 	cmdArgs = append(cmdArgs, targetAddress)
@@ -1152,10 +1159,22 @@ func (sdk SDKProperties) ResolveTargetAddress(deviceIP string, deviceName string
 	}
 
 	if targetAddress == "" {
-		return DeviceConfig{}, fmt.Errorf(`Cannot get target address for %v.
-		Try running 'ffx target list'.`, deviceName)
+		// try running ffx
+		if targetList, err := sdk.listDevicesWithFFX(); err != nil {
+			return DeviceConfig{}, fmt.Errorf(`Error running ffx %q.`, err)
+		} else {
+			for _, target := range targetList {
+				if target.Nodename == deviceName {
+					if len(target.Addresses) > 0 {
+						config.DeviceIP = target.Addresses[0].IP
+						config.SSHPort = strconv.Itoa(target.Addresses[0].SSHPort)
+						return config, nil
+					}
+				}
+			}
+			return DeviceConfig{}, fmt.Errorf(`Cannot get target address for %v.`, deviceName)
+		}
 	}
-
 	return config, nil
 }
 
