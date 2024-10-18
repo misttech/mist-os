@@ -140,6 +140,11 @@ async fn handle_adb(
                         };
 
                         outstanding_reads.replace_with(|&mut old| old - 1);
+
+                        resume_event.as_ref().map(|e| {
+                            clear_wake_proxy_signal(e, *outstanding_reads.borrow());
+                        });
+
                         response_sender
                             .send(response)
                             .map_err(|e| log_error!("Failed to send to main thread: {:#?}", e))
