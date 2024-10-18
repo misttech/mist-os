@@ -155,7 +155,7 @@ zx::result<> HotPlugDetection::Init() {
             set_buffer_mode_result.status_string());
     return zx::error(set_buffer_mode_result.status());
   }
-  fidl::WireResultUnwrapType<fuchsia_hardware_gpio::Gpio::ConfigIn>& set_buffer_mode_response =
+  fidl::WireResultUnwrapType<fuchsia_hardware_gpio::Gpio::SetBufferMode>& set_buffer_mode_response =
       set_buffer_mode_result.value();
   if (set_buffer_mode_response.is_error()) {
     FDF_LOG(ERROR, "Failed to configure hpd gpio to input: %s",
