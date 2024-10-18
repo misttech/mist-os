@@ -83,7 +83,6 @@ system-update-committer
 ?system_image
 ?system_recovery_fdr
 ?tee-clients
-?tee_manager
 ?text_manager
 ?time-zone-info-service
 ?timekeeper

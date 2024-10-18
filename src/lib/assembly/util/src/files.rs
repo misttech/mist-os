@@ -222,29 +222,21 @@ pub enum CompiledPackageDestination {
 
 /// A blobfs package that assembly is allowed to compiled then include.
 #[derive(Debug, Clone, EnumIter, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum BlobfsCompiledPackageDestination {
     /// The compiled core package.
-    #[serde(rename = "core")]
     Core,
     /// The compiled diagnostics package.
-    #[serde(rename = "diagnostics")]
     Diagnostics,
     /// The compiled network package.
-    #[serde(rename = "network")]
     Network,
     /// The compiled system update realm package.
-    #[serde(rename = "system-update-realm")]
     SystemUpdateRealm,
     /// The compiled toolbox package.
-    #[serde(rename = "toolbox")]
     Toolbox,
     /// The tee clients package, of components which depend on TEE
     /// protocols.
-    #[serde(rename = "tee-clients")]
     TeeClients,
-    /// The tee manager package
-    #[serde(rename = "tee_manager")]
-    TeeManager,
 }
 
 /// A blobfs package that assembly is allowed to compiled then include.
