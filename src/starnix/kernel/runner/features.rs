@@ -197,13 +197,14 @@ pub fn run_container_features(
             &kernel,
             EventProxyMode::WakeContainer,
             touch_source_client,
+            keyboard,
+            view_ref,
+            registry_proxy,
             touch_device.open_files.clone(),
+            keyboard_device.open_files.clone(),
         );
 
         register_uinput_device(locked, &kernel.kthreads.system_task(), input_events_relay);
-
-        keyboard_device.start_keyboard_relay(&kernel, keyboard, view_ref);
-        keyboard_device.start_button_relay(&kernel, registry_proxy, EventProxyMode::WakeContainer);
 
         // Channel we use to inform the relay of changes to `touch_standby`
         let (touch_standby_sender, touch_standby_receiver) = channel::<bool>();

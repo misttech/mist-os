@@ -249,7 +249,7 @@ impl UinputDeviceFile {
                     None => return error!(EINVAL),
                 };
 
-                let open_files = Arc::new(Mutex::new(Vec::new()));
+                let open_files: OpenedFiles = Default::default();
 
                 let registered_device_id = match device_type {
                     DeviceType::Keyboard => {

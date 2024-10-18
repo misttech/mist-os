@@ -2,13 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{FuchsiaTouchEventToLinuxTouchEventConverter, InputFile};
-use fidl::endpoints::ClientEnd;
+use crate::{
+    parse_fidl_button_event, parse_fidl_keyboard_event_to_linux_input_event,
+    FuchsiaTouchEventToLinuxTouchEventConverter, InputFile,
+};
+use fidl::endpoints::{ClientEnd, RequestStream};
+use fidl_fuchsia_ui_input3::{
+    KeyEventStatus, KeyboardListenerMarker, KeyboardListenerRequest, KeyboardSynchronousProxy,
+};
 use fidl_fuchsia_ui_pointer::{
     TouchEvent as FidlTouchEvent, TouchPointerSample, TouchResponse as FidlTouchResponse,
     TouchResponseType, {self as fuipointer},
 };
-use fuchsia_async as fasync;
+use futures::StreamExt as _;
 use starnix_core::power::{clear_wake_proxy_signal, create_proxy_for_wake_events};
 use starnix_core::task::Kernel;
 use starnix_logging::log_warn;
@@ -17,7 +23,11 @@ use starnix_uapi::uapi;
 use starnix_uapi::vfs::FdEvents;
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Weak};
+use {
+    fidl_fuchsia_ui_policy as fuipolicy, fidl_fuchsia_ui_views as fuiviews, fuchsia_async as fasync,
+};
 
+#[derive(Clone, Copy)]
 pub enum EventProxyMode {
     /// Don't proxy input events at all.
     None,
@@ -86,18 +96,38 @@ impl InputEventsRelay {
         self.devices.lock().remove(&device_id);
     }
 
+    // TODO(https://fxbug.dev/373844683): Use 1 thread for all relays instead of 1 thread
+    // per type of device.
+    // TODO(https://fxbug.dev/371602479): Use `fuchsia.ui.SupportedInputDevices` to create
+    // relays.
     pub fn start_relays(
         self: &Arc<Self>,
         kernel: &Kernel,
         event_proxy_mode: EventProxyMode,
         touch_source_client_end: ClientEnd<fuipointer::TouchSourceMarker>,
+        keyboard: KeyboardSynchronousProxy,
+        view_ref: fuiviews::ViewRef,
+        registry_proxy: fuipolicy::DeviceListenerRegistrySynchronousProxy,
         default_touch_device_opened_files: OpenedFiles,
+        default_keyboard_device_opened_files: OpenedFiles,
     ) {
         self.start_touch_relay(
             kernel,
             event_proxy_mode,
             touch_source_client_end,
             default_touch_device_opened_files,
+        );
+        self.start_keyboard_relay(
+            kernel,
+            keyboard,
+            view_ref,
+            default_keyboard_device_opened_files.clone(),
+        );
+        self.start_button_relay(
+            kernel,
+            registry_proxy,
+            event_proxy_mode,
+            default_keyboard_device_opened_files,
         );
     }
 
@@ -186,12 +216,10 @@ impl InputEventsRelay {
                                 continue;
                             }
 
-                            let mut files = dev.open_files.lock();
-
-                            // TODO(https://fxbug.dev/364891772): we don't need to collect files here.
-                            let filtered_files: Vec<Arc<InputFile>> =
-                                files.drain(..).flat_map(|f| f.upgrade()).collect();
-                            for file in filtered_files {
+                            dev.open_files.lock().retain(|f| {
+                                let Some(file) = f.upgrade() else {
+                                    return false;
+                                };
                                 let mut inner = file.inner.lock();
                                 match &inner.inspect_status {
                                     Some(inspect_status) => {
@@ -215,8 +243,8 @@ impl InputEventsRelay {
                                     inner.waiters.notify_fd_events(FdEvents::POLLIN);
                                 }
 
-                                files.push(Arc::downgrade(&file));
-                            }
+                                true
+                            });
                         }
                     }
                     Err(e) => {
@@ -226,6 +254,196 @@ impl InputEventsRelay {
                 };
             }});
         });
+    }
+
+    fn start_keyboard_relay(
+        self: &Arc<Self>,
+        kernel: &Kernel,
+        keyboard: KeyboardSynchronousProxy,
+        view_ref: fuiviews::ViewRef,
+        default_keyboard_device_opened_files: OpenedFiles,
+    ) {
+        let slf = self.clone();
+        kernel.kthreads.spawn(move |_lock_context, _current_task| {
+            fasync::LocalExecutor::new().run_singlethreaded(async {
+                let mut default_keyboard_device = DeviceState {
+                    device_type: InputDeviceType::Keyboard,
+                    open_files: default_keyboard_device_opened_files,
+                };
+                let (keyboard_listener, mut event_stream) =
+                    fidl::endpoints::create_request_stream::<KeyboardListenerMarker>()
+                        .expect("Failed to create keyboard proxy and stream");
+                if keyboard
+                    .add_listener(view_ref, keyboard_listener, zx::MonotonicInstant::INFINITE)
+                    .is_err()
+                {
+                    log_warn!("Could not register keyboard listener");
+                }
+                while let Some(Ok(request)) = event_stream.next().await {
+                    match request {
+                        KeyboardListenerRequest::OnKeyEvent { event, responder } => {
+                            let new_events = parse_fidl_keyboard_event_to_linux_input_event(&event);
+
+                            let mut devs = slf.devices.lock();
+
+                            let dev = match event.device_id {
+                                Some(device_id) => {
+                                    devs.get_mut(&device_id).unwrap_or(&mut default_keyboard_device)
+                                }
+                                None => &default_keyboard_device,
+                            };
+
+                            dev.open_files.lock().retain(|f| {
+                                let Some(file) = f.upgrade() else {
+                                    return false;
+                                };
+                                let mut inner = file.inner.lock();
+
+                                if !new_events.is_empty() {
+                                    inner.events.extend(new_events.clone());
+                                    inner.waiters.notify_fd_events(FdEvents::POLLIN);
+                                }
+
+                                true
+                            });
+
+                            responder.send(KeyEventStatus::Handled).expect("");
+                        }
+                    }
+                }
+            })
+        });
+    }
+
+    fn start_button_relay(
+        self: &Arc<Self>,
+        kernel: &Kernel,
+        registry_proxy: fuipolicy::DeviceListenerRegistrySynchronousProxy,
+        event_proxy_mode: EventProxyMode,
+        default_keyboard_device_opened_files: OpenedFiles,
+    ) {
+        let slf: Arc<InputEventsRelay> = self.clone();
+        kernel.kthreads.spawn(move |_lock_context, _current_task| {
+            fasync::LocalExecutor::new().run_singlethreaded(async {
+                let (remote_client, remote_server) =
+                    fidl::endpoints::create_endpoints::<fuipolicy::MediaButtonsListenerMarker>();
+                if let Err(e) =
+                    registry_proxy.register_listener(remote_client, zx::MonotonicInstant::INFINITE)
+                {
+                    log_warn!("Failed to register media buttons listener: {:?}", e);
+                    return;
+                }
+
+                let (local_listener_stream, local_resume_event) = match event_proxy_mode {
+                    EventProxyMode::WakeContainer => {
+                        let (local_channel, local_resume_event) = create_proxy_for_wake_events(
+                            remote_server.into_channel(),
+                            "buttons".to_string(),
+                        );
+                        let local_listener_stream =
+                            fuipolicy::MediaButtonsListenerRequestStream::from_channel(
+                                fidl::AsyncChannel::from_channel(local_channel),
+                            );
+                        (local_listener_stream, Some(local_resume_event))
+                    }
+                    EventProxyMode::None => {
+                        (remote_server.into_stream().expect("Failed to create event stream"), None)
+                    }
+                };
+                slf.button_relay_loop(
+                    local_listener_stream,
+                    default_keyboard_device_opened_files,
+                    local_resume_event,
+                )
+                .await;
+            })
+        });
+    }
+
+    async fn button_relay_loop(
+        &self,
+        mut local_listener_stream: fuipolicy::MediaButtonsListenerRequestStream,
+        default_keyboard_device_opened_files: OpenedFiles,
+        local_resume_event: Option<zx::EventPair>,
+    ) {
+        let mut power_was_pressed = false;
+        let mut function_was_pressed = false;
+
+        let mut default_keyboard_device = DeviceState {
+            device_type: InputDeviceType::Keyboard,
+            open_files: default_keyboard_device_opened_files,
+        };
+
+        loop {
+            let next_event_future = local_listener_stream.next();
+
+            local_resume_event.as_ref().map(clear_wake_proxy_signal);
+
+            match next_event_future.await {
+                Some(Ok(fuipolicy::MediaButtonsListenerRequest::OnEvent { event, responder })) => {
+                    let (new_events, power_is_pressed, function_is_pressed) =
+                        parse_fidl_button_event(&event, power_was_pressed, function_was_pressed);
+                    power_was_pressed = power_is_pressed;
+                    function_was_pressed = function_is_pressed;
+
+                    let (converted_events, ignored_events, generated_events) = match new_events
+                        .len()
+                    {
+                        0 => (0u64, 1u64, 0u64),
+                        len => {
+                            if len % 2 == 1 {
+                                log_warn!("unexpectedly received {} events: there should always be an even number of non-empty events.", len);
+                            }
+                            (1u64, 0u64, len as u64)
+                        }
+                    };
+
+                    let mut devs = self.devices.lock();
+
+                    let dev = match event.device_id {
+                        Some(device_id) => {
+                            devs.get_mut(&device_id).unwrap_or(&mut default_keyboard_device)
+                        }
+                        None => &default_keyboard_device,
+                    };
+
+                    dev.open_files.lock().retain(|f| {
+                        let Some(file) = f.upgrade() else {
+                            return false;
+                        };
+                        let mut inner = file.inner.lock();
+                        match &inner.inspect_status {
+                            Some(inspect_status) => {
+                                inspect_status.count_received_events(1);
+                                inspect_status.count_ignored_events(ignored_events);
+                                inspect_status.count_converted_events(converted_events);
+                                inspect_status.count_generated_events(generated_events);
+                            }
+                            None => (),
+                        }
+
+                        if !new_events.is_empty() {
+                            inner.events.extend(new_events.clone());
+                            inner.waiters.notify_fd_events(FdEvents::POLLIN);
+                        }
+
+                        true
+                    });
+
+                    responder.send().expect("media buttons responder failed to respond");
+                }
+                Some(Ok(_)) => { /* Ignore deprecated OnMediaButtonsEvent */ }
+                Some(Err(e)) => {
+                    log_warn!("Received an error while listening for events on MediaButtonsListener: {:?}", e);
+                    break;
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+
+        log_warn!("MediaButtonsListener request stream has ended");
     }
 }
 
@@ -268,11 +486,12 @@ mod test {
     use super::*;
     use crate::InputDevice;
     use anyhow::anyhow;
+    use fidl_fuchsia_ui_input::MediaButtonsEvent;
+    use fidl_fuchsia_ui_input3 as fuiinput;
     use fuipointer::{
         EventPhase, TouchEvent, TouchInteractionId, TouchPointerSample, TouchResponse,
         TouchSourceMarker, TouchSourceRequest, TouchSourceRequestStream,
     };
-    use futures::StreamExt as _;
     use starnix_core::task::CurrentTask;
     use starnix_core::testing::create_kernel_task_and_unlocked;
     use starnix_core::vfs::{FileHandle, FileObject, VecOutputBuffer};
@@ -284,30 +503,64 @@ mod test {
 
     const INPUT_EVENT_SIZE: usize = std::mem::size_of::<uapi::input_event>();
 
-    fn start_touch_input_inspect_and_dimensions(
+    fn start_input_relays(
         locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
-        x_max: i32,
-        y_max: i32,
-        inspector: &fuchsia_inspect::Inspector,
-    ) -> (Arc<InputEventsRelay>, Arc<InputDevice>, FileHandle, TouchSourceRequestStream) {
-        let input_device = InputDevice::new_touch(x_max, y_max, inspector.root());
-        let input_file =
-            input_device.open_test(locked, current_task).expect("Failed to create input file");
+    ) -> (
+        Arc<InputEventsRelay>,
+        Arc<InputDevice>,
+        Arc<InputDevice>,
+        FileHandle,
+        FileHandle,
+        TouchSourceRequestStream,
+        fuiinput::KeyboardRequestStream,
+        fuipolicy::DeviceListenerRegistryRequestStream,
+    ) {
+        let inspector = fuchsia_inspect::Inspector::default();
+
+        let touch_device = InputDevice::new_touch(700, 1200, inspector.root());
+        let touch_file =
+            touch_device.open_test(locked, current_task).expect("Failed to create input file");
+
+        let keyboard_device = InputDevice::new_keyboard(inspector.root());
+        let keyboard_file =
+            keyboard_device.open_test(locked, current_task).expect("Failed to create input file");
 
         let (touch_source_client_end, touch_source_stream) =
             fidl::endpoints::create_request_stream::<TouchSourceMarker>()
                 .expect("failed to create TouchSource channel");
+
+        let (keyboard_proxy, keyboard_stream) =
+            fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>()
+                .expect("failed to create Keyboard channel");
+        let view_ref_pair =
+            fuchsia_scenic::ViewRefPair::new().expect("Failed to create ViewRefPair");
+        let (device_registry_proxy, device_listener_stream) =
+            fidl::endpoints::create_sync_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>()
+                .expect("Failed to create DeviceListenerRegistry proxy and stream.");
 
         let relay = InputEventsRelay::new();
         relay.start_relays(
             &current_task.kernel(),
             EventProxyMode::None,
             touch_source_client_end,
-            input_device.open_files.clone(),
+            keyboard_proxy,
+            view_ref_pair.view_ref,
+            device_registry_proxy,
+            touch_device.open_files.clone(),
+            keyboard_device.open_files.clone(),
         );
 
-        (relay, input_device, input_file, touch_source_stream)
+        (
+            relay,
+            touch_device,
+            keyboard_device,
+            touch_file,
+            keyboard_file,
+            touch_source_stream,
+            keyboard_stream,
+            device_listener_stream,
+        )
     }
 
     // Waits for a `Watch()` request to arrive on `request_stream`, and responds with
@@ -390,16 +643,17 @@ mod test {
     #[::fuchsia::test]
     async fn route_touch_event_by_device_id() {
         // Set up resources.
-        let inspector = fuchsia_inspect::Inspector::default();
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let (input_relay, _input_device, input_file, mut touch_source_stream) =
-            start_touch_input_inspect_and_dimensions(
-                &mut locked,
-                &current_task,
-                700,
-                1200,
-                &inspector,
-            );
+        let (
+            input_relay,
+            _touch_device,
+            _keyboard_device,
+            input_file,
+            _keyboard_file,
+            mut touch_source_stream,
+            _keyboard_stream,
+            _device_listener_stream,
+        ) = start_input_relays(&mut locked, &current_task);
 
         const DEVICE_ID: u32 = 10;
 
@@ -461,5 +715,170 @@ mod test {
         let events = read_uapi_events(&mut locked, &device_id_10_file_object, &current_task);
         // file of device id 10 should receive events.
         assert_ne!(events.len(), 0);
+    }
+
+    #[::fuchsia::test]
+    async fn route_key_event_by_device_id() {
+        // Set up resources.
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (
+            input_relay,
+            _touch_device,
+            _keyboard_device,
+            _touch_file,
+            keyboard_file,
+            _touch_source_stream,
+            mut keyboard_stream,
+            _device_listener_stream,
+        ) = start_input_relays(&mut locked, &current_task);
+
+        const DEVICE_ID: u32 = 10;
+
+        let keyboard_listener = match keyboard_stream.next().await {
+            Some(Ok(fuiinput::KeyboardRequest::AddListener {
+                view_ref: _,
+                listener,
+                responder,
+            })) => {
+                let _ = responder.send();
+                listener.into_proxy().expect("Failed to create proxy")
+            }
+            _ => {
+                panic!("Failed to get event");
+            }
+        };
+
+        let key_event = fuiinput::KeyEvent {
+            timestamp: Some(0),
+            type_: Some(fuiinput::KeyEventType::Pressed),
+            key: Some(fidl_fuchsia_input::Key::A),
+            device_id: Some(DEVICE_ID),
+            ..Default::default()
+        };
+
+        let _ = keyboard_listener.on_key_event(&key_event).await;
+
+        let events = read_uapi_events(&mut locked, &keyboard_file, &current_task);
+        // Default device should receive events because no device device id is 10.
+        assert_ne!(events.len(), 0);
+
+        // add a device, mock uinput.
+        let open_files: OpenedFiles = Arc::new(Mutex::new(vec![]));
+        input_relay.add_keyboard_device(DEVICE_ID, open_files.clone());
+        let device_id_10_file = Arc::new(InputFile::new_keyboard(
+            input_id { bustype: 0, vendor: 0, product: 0, version: 0 },
+            None,
+        ));
+        open_files.lock().push(Arc::downgrade(&device_id_10_file));
+        let device_id_10_file_object = FileObject::new(
+            Box::new(device_id_10_file),
+            current_task
+                .lookup_path_from_root(&mut locked, ".".into())
+                .expect("failed to get namespace node for root"),
+            OpenFlags::empty(),
+        )
+        .expect("FileObject::new failed");
+
+        let _ = keyboard_listener.on_key_event(&key_event).await;
+
+        let events = read_uapi_events(&mut locked, &keyboard_file, &current_task);
+        // Default device should not receive events because they matched device id 10.
+        assert_eq!(events.len(), 0);
+
+        let events = read_uapi_events(&mut locked, &device_id_10_file_object, &current_task);
+        // file of device id 10 should receive events.
+        assert_ne!(events.len(), 0);
+
+        std::mem::drop(keyboard_stream); // Close Zircon channel.
+        std::mem::drop(keyboard_listener); // Close Zircon channel.
+    }
+
+    #[::fuchsia::test]
+    async fn route_button_event_by_device_id() {
+        // Set up resources.
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (
+            input_relay,
+            _touch_device,
+            _keyboard_device,
+            _touch_file,
+            keyboard_file,
+            _touch_source_stream,
+            _keyboard_stream,
+            mut device_listener_stream,
+        ) = start_input_relays(&mut locked, &current_task);
+
+        const DEVICE_ID: u32 = 10;
+
+        let buttons_listener = match device_listener_stream.next().await {
+            Some(Ok(fuipolicy::DeviceListenerRegistryRequest::RegisterListener {
+                listener,
+                responder,
+            })) => {
+                let _ = responder.send();
+                listener.into_proxy().expect("Failed to create proxy")
+            }
+            _ => {
+                panic!("Failed to get event");
+            }
+        };
+
+        let power_pressed_event = MediaButtonsEvent {
+            volume: Some(0),
+            mic_mute: Some(false),
+            pause: Some(false),
+            camera_disable: Some(false),
+            power: Some(true),
+            function: Some(false),
+            device_id: Some(DEVICE_ID),
+            ..Default::default()
+        };
+
+        let _ = buttons_listener.on_event(&power_pressed_event).await;
+
+        let events = read_uapi_events(&mut locked, &keyboard_file, &current_task);
+        // Default device should receive events because no device device id is 10.
+        assert_ne!(events.len(), 0);
+
+        // add a device, mock uinput.
+        let open_files: OpenedFiles = Arc::new(Mutex::new(vec![]));
+        input_relay.add_keyboard_device(DEVICE_ID, open_files.clone());
+        let device_id_10_file = Arc::new(InputFile::new_keyboard(
+            input_id { bustype: 0, vendor: 0, product: 0, version: 0 },
+            None,
+        ));
+        open_files.lock().push(Arc::downgrade(&device_id_10_file));
+        let device_id_10_file_object = FileObject::new(
+            Box::new(device_id_10_file),
+            current_task
+                .lookup_path_from_root(&mut locked, ".".into())
+                .expect("failed to get namespace node for root"),
+            OpenFlags::empty(),
+        )
+        .expect("FileObject::new failed");
+
+        let power_released_event = MediaButtonsEvent {
+            volume: Some(0),
+            mic_mute: Some(false),
+            pause: Some(false),
+            camera_disable: Some(false),
+            power: Some(false),
+            function: Some(false),
+            device_id: Some(DEVICE_ID),
+            ..Default::default()
+        };
+
+        let _ = buttons_listener.on_event(&power_released_event).await;
+
+        let events = read_uapi_events(&mut locked, &keyboard_file, &current_task);
+        // Default device should not receive events because they matched device id 10.
+        assert_eq!(events.len(), 0);
+
+        let events = read_uapi_events(&mut locked, &device_id_10_file_object, &current_task);
+        // file of device id 10 should receive events.
+        assert_ne!(events.len(), 0);
+
+        std::mem::drop(buttons_listener); // Close Zircon channel.
+        std::mem::drop(device_listener_stream); // Close Zircon channel.
     }
 }

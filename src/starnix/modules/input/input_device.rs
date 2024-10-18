@@ -2,32 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::input_event_relay::{DeviceId, EventProxyMode, OpenedFiles};
-use crate::{parse_fidl_keyboard_event_to_linux_input_event, InputFile};
-use fidl::endpoints::RequestStream;
-use fidl_fuchsia_ui_input::MediaButtonsEvent;
-use futures::StreamExt as _;
+use crate::input_event_relay::{DeviceId, OpenedFiles};
+use crate::InputFile;
 use starnix_core::device::kobject::DeviceMetadata;
 use starnix_core::device::{DeviceMode, DeviceOps};
 use starnix_core::fs::sysfs::DeviceDirectory;
-use starnix_core::power::{clear_wake_proxy_signal, create_proxy_for_wake_events};
-use starnix_core::task::{CurrentTask, Kernel};
+use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{FileOps, FsNode, FsString};
-use starnix_logging::log_warn;
 #[cfg(test)]
 use starnix_sync::Unlocked;
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::device_type::{DeviceType, INPUT_MAJOR};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::time::timeval_from_time;
-use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{input_id, BUS_VIRTUAL};
 use std::sync::Arc;
-use {
-    fidl_fuchsia_ui_input3 as fuiinput, fidl_fuchsia_ui_policy as fuipolicy,
-    fidl_fuchsia_ui_views as fuiviews, fuchsia_async as fasync, starnix_uapi as uapi, zx,
-};
 
 // Add a fuchsia-specific vendor ID. 0xf1ca is currently not allocated
 // to any vendor in the USB spec.
@@ -144,161 +133,6 @@ impl InputDevice {
         );
     }
 
-    pub fn start_keyboard_relay(
-        self: &Arc<Self>,
-        kernel: &Kernel,
-        keyboard: fuiinput::KeyboardSynchronousProxy,
-        view_ref: fuiviews::ViewRef,
-    ) {
-        let slf = self.clone();
-        kernel.kthreads.spawn(move |_lock_context, _current_task| {
-            fasync::LocalExecutor::new().run_singlethreaded(async {
-                let (keyboard_listener, mut event_stream) =
-                    fidl::endpoints::create_request_stream::<fuiinput::KeyboardListenerMarker>()
-                        .expect("Failed to create keyboard proxy and stream");
-                if keyboard
-                    .add_listener(view_ref, keyboard_listener, zx::MonotonicInstant::INFINITE)
-                    .is_err()
-                {
-                    log_warn!("Could not register keyboard listener");
-                }
-                while let Some(Ok(request)) = event_stream.next().await {
-                    match request {
-                        fuiinput::KeyboardListenerRequest::OnKeyEvent { event, responder } => {
-                            let new_events = parse_fidl_keyboard_event_to_linux_input_event(&event);
-                            slf.open_files.lock().retain(|f| {
-                                let Some(file) = f.upgrade() else {
-                                    return false;
-                                };
-
-                                let mut inner = file.inner.lock();
-
-                                if !new_events.is_empty() {
-                                    inner.events.extend(new_events.clone());
-                                    inner.waiters.notify_fd_events(FdEvents::POLLIN);
-                                }
-
-                                return true;
-                            });
-                            responder.send(fuiinput::KeyEventStatus::Handled).expect("");
-                        }
-                    }
-                }
-            })
-        });
-    }
-
-    pub fn start_button_relay(
-        self: &Arc<Self>,
-        kernel: &Kernel,
-        registry_proxy: fuipolicy::DeviceListenerRegistrySynchronousProxy,
-        event_proxy_mode: EventProxyMode,
-    ) {
-        let slf = self.clone();
-        kernel.kthreads.spawn(move |_lock_context, _current_task| {
-            fasync::LocalExecutor::new().run_singlethreaded(async {
-                let (remote_client, remote_server) =
-                    fidl::endpoints::create_endpoints::<fuipolicy::MediaButtonsListenerMarker>();
-                if let Err(e) =
-                    registry_proxy.register_listener(remote_client, zx::MonotonicInstant::INFINITE)
-                {
-                    log_warn!("Failed to register media buttons listener: {:?}", e);
-                    return;
-                }
-
-                let (local_listener_stream, local_resume_event) = match event_proxy_mode {
-                    EventProxyMode::WakeContainer => {
-                        let (local_channel, local_resume_event) = create_proxy_for_wake_events(
-                            remote_server.into_channel(),
-                            "buttons".to_string(),
-                        );
-                        let local_listener_stream =
-                            fuipolicy::MediaButtonsListenerRequestStream::from_channel(
-                                fidl::AsyncChannel::from_channel(local_channel),
-                            );
-                        (local_listener_stream, Some(local_resume_event))
-                    }
-                    EventProxyMode::None => {
-                        (remote_server.into_stream().expect("Failed to create event stream"), None)
-                    }
-                };
-                slf.button_relay_loop(local_listener_stream, local_resume_event).await;
-            })
-        });
-    }
-
-    async fn button_relay_loop(
-        &self,
-        mut local_listener_stream: fuipolicy::MediaButtonsListenerRequestStream,
-        local_resume_event: Option<zx::EventPair>,
-    ) {
-        let mut power_was_pressed = false;
-        let mut function_was_pressed = false;
-
-        loop {
-            let next_event_future = local_listener_stream.next();
-
-            local_resume_event.as_ref().map(clear_wake_proxy_signal);
-
-            match next_event_future.await {
-                Some(Ok(fuipolicy::MediaButtonsListenerRequest::OnEvent { event, responder })) => {
-                    let (new_events, power_is_pressed, function_is_pressed) =
-                        parse_fidl_button_event(&event, power_was_pressed, function_was_pressed);
-                    power_was_pressed = power_is_pressed;
-                    function_was_pressed = function_is_pressed;
-
-                    let (converted_events, ignored_events, generated_events) = match new_events
-                        .len()
-                    {
-                        0 => (0u64, 1u64, 0u64),
-                        len => {
-                            if len % 2 == 1 {
-                                log_warn!("unexpectedly received {} events: there should always be an even number of non-empty events.", len);
-                            }
-                            (1u64, 0u64, len as u64)
-                        }
-                    };
-
-                    self.open_files.lock().retain(|f| {
-                        let Some(file) = f.upgrade() else {
-                            return false;
-                        };
-
-                        let mut inner = file.inner.lock();
-                        match &inner.inspect_status {
-                            Some(inspect_status) => {
-                                inspect_status.count_received_events(1);
-                                inspect_status.count_ignored_events(ignored_events);
-                                inspect_status.count_converted_events(converted_events);
-                                inspect_status.count_generated_events(generated_events);
-                            }
-                            None => (),
-                        }
-
-                        if !new_events.is_empty() {
-                            inner.events.extend(new_events.clone());
-                            inner.waiters.notify_fd_events(FdEvents::POLLIN);
-                        }
-
-                        return true;
-                    });
-
-                    responder.send().expect("media buttons responder failed to respond");
-                }
-                Some(Ok(_)) => { /* Ignore deprecated OnMediaButtonsEvent */ }
-                Some(Err(e)) => {
-                    log_warn!("Received an error while listening for events on MediaButtonsListener: {:?}", e);
-                    break;
-                }
-                None => {
-                    break;
-                }
-            }
-        }
-
-        log_warn!("MediaButtonsListener request stream has ended");
-    }
-
     #[cfg(test)]
     pub fn open_test(
         &self,
@@ -362,65 +196,37 @@ impl DeviceOps for InputDevice {
     }
 }
 
-fn parse_fidl_button_event(
-    fidl_event: &MediaButtonsEvent,
-    power_was_pressed: bool,
-    function_was_pressed: bool,
-) -> (Vec<uapi::input_event>, bool /* power_is_pressed */, bool /* function_is_pressed */) {
-    let time = timeval_from_time(zx::MonotonicInstant::get());
-    let mut events = vec![];
-    let sync_event = uapi::input_event {
-        // See https://www.kernel.org/doc/Documentation/input/event-codes.rst.
-        time,
-        type_: uapi::EV_SYN as u16,
-        code: uapi::SYN_REPORT as u16,
-        value: 0,
-    };
-
-    let power_is_pressed = fidl_event.power.unwrap_or(false);
-    let function_is_pressed = fidl_event.function.unwrap_or(false);
-    for (then, now, key_code) in [
-        (power_was_pressed, power_is_pressed, uapi::KEY_POWER),
-        (function_was_pressed, function_is_pressed, uapi::KEY_SCREENSAVER),
-    ] {
-        // Button state changed. Send an event.
-        if then != now {
-            events.push(uapi::input_event {
-                time,
-                type_: uapi::EV_KEY as u16,
-                code: key_code as u16,
-                value: now as i32,
-            });
-            events.push(sync_event);
-        }
-    }
-
-    (events, power_is_pressed, function_is_pressed)
-}
-
 #[cfg(test)]
 mod test {
     #![allow(clippy::unused_unit)] // for compatibility with `test_case`
 
     use super::*;
-    use crate::input_event_relay;
+    use crate::input_event_relay::{self, EventProxyMode};
     use anyhow::anyhow;
     use assert_matches::assert_matches;
     use diagnostics_assertions::assert_data_tree;
+    use fidl_fuchsia_ui_input::MediaButtonsEvent;
     use fuipointer::{
         EventPhase, TouchEvent, TouchInteractionId, TouchPointerSample, TouchResponse,
         TouchSourceMarker, TouchSourceRequest,
     };
+    use futures::StreamExt as _;
     use pretty_assertions::assert_eq;
     use starnix_core::task::{EventHandler, Waiter};
     use starnix_core::testing::create_kernel_task_and_unlocked;
     use starnix_core::vfs::buffers::VecOutputBuffer;
     use starnix_core::vfs::FileHandle;
     use starnix_uapi::errors::EAGAIN;
+    use starnix_uapi::time::timeval_from_time;
+    use starnix_uapi::uapi;
+    use starnix_uapi::vfs::FdEvents;
     use test_case::test_case;
     use test_util::assert_near;
     use zerocopy::FromBytes as _;
-    use {fidl_fuchsia_ui_pointer as fuipointer, fidl_fuchsia_ui_policy as fuipolicy}; // for `read_from()`
+    use {
+        fidl_fuchsia_ui_input3 as fuiinput, fidl_fuchsia_ui_pointer as fuipointer,
+        fidl_fuchsia_ui_policy as fuipolicy,
+    };
 
     const INPUT_EVENT_SIZE: usize = std::mem::size_of::<uapi::input_event>();
 
@@ -455,12 +261,26 @@ mod test {
             fidl::endpoints::create_request_stream::<TouchSourceMarker>()
                 .expect("failed to create TouchSource channel");
 
+        let (keyboard_proxy, _keyboard_stream) =
+            fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>()
+                .expect("failed to create Keyboard channel");
+        let view_ref_pair =
+            fuchsia_scenic::ViewRefPair::new().expect("Failed to create ViewRefPair");
+
+        let (device_registry_proxy, _device_listener_stream) =
+            fidl::endpoints::create_sync_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>()
+                .expect("Failed to create DeviceListenerRegistry proxy and stream.");
+
         let relay = input_event_relay::InputEventsRelay::new();
         relay.start_relays(
             &current_task.kernel(),
             EventProxyMode::None,
             touch_source_client_end,
+            keyboard_proxy,
+            view_ref_pair.view_ref,
+            device_registry_proxy,
             input_device.open_files.clone(),
+            Default::default(),
         );
 
         (input_device, input_file, touch_source_stream)
@@ -480,10 +300,24 @@ mod test {
         let view_ref_pair =
             fuchsia_scenic::ViewRefPair::new().expect("Failed to create ViewRefPair");
 
-        input_device.start_keyboard_relay(
+        let (device_registry_proxy, _device_listener_stream) =
+            fidl::endpoints::create_sync_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>()
+                .expect("Failed to create DeviceListenerRegistry proxy and stream.");
+
+        let (touch_source_client_end, _touch_source_stream) =
+            fidl::endpoints::create_request_stream::<TouchSourceMarker>()
+                .expect("failed to create TouchSource channel");
+
+        let relay = input_event_relay::InputEventsRelay::new();
+        relay.start_relays(
             current_task.kernel(),
+            EventProxyMode::None,
+            touch_source_client_end,
             keyboard_proxy,
             view_ref_pair.view_ref,
+            device_registry_proxy,
+            Default::default(),
+            input_device.open_files.clone(),
         );
 
         (input_device, input_file, keyboard_stream)
@@ -508,10 +342,26 @@ mod test {
         let (device_registry_proxy, device_listener_stream) =
         fidl::endpoints::create_sync_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>()
             .expect("Failed to create DeviceListenerRegistry proxy and stream.");
-        input_device.start_button_relay(
+
+        let (touch_source_client_end, _touch_source_stream) =
+            fidl::endpoints::create_request_stream::<TouchSourceMarker>()
+                .expect("failed to create TouchSource channel");
+        let (keyboard_proxy, _keyboard_stream) =
+            fidl::endpoints::create_sync_proxy_and_stream::<fuiinput::KeyboardMarker>()
+                .expect("failed to create Keyboard channel");
+        let view_ref_pair =
+            fuchsia_scenic::ViewRefPair::new().expect("Failed to create ViewRefPair");
+
+        let relay = input_event_relay::InputEventsRelay::new();
+        relay.start_relays(
             current_task.kernel(),
-            device_registry_proxy,
             EventProxyMode::None,
+            touch_source_client_end,
+            keyboard_proxy,
+            view_ref_pair.view_ref,
+            device_registry_proxy,
+            Default::default(),
+            input_device.open_files.clone(),
         );
         (input_device, input_file, device_listener_stream)
     }

@@ -4,6 +4,7 @@
 
 use crate::uinput;
 use fidl_fuchsia_input::Key;
+use fidl_fuchsia_ui_input::MediaButtonsEvent;
 use fidl_fuchsia_ui_pointer::{
     EventPhase as FidlEventPhase, TouchEvent as FidlTouchEvent, TouchPointerSample,
 };
@@ -1514,6 +1515,42 @@ fn init_key_map() -> KeyMap {
     m.insert(0x020b, Key::Unknown020B);
 
     m
+}
+
+pub fn parse_fidl_button_event(
+    fidl_event: &MediaButtonsEvent,
+    power_was_pressed: bool,
+    function_was_pressed: bool,
+) -> (Vec<uapi::input_event>, bool /* power_is_pressed */, bool /* function_is_pressed */) {
+    let time = timeval_from_time(zx::MonotonicInstant::get());
+    let mut events = vec![];
+    let sync_event = uapi::input_event {
+        // See https://www.kernel.org/doc/Documentation/input/event-codes.rst.
+        time,
+        type_: uapi::EV_SYN as u16,
+        code: uapi::SYN_REPORT as u16,
+        value: 0,
+    };
+
+    let power_is_pressed = fidl_event.power.unwrap_or(false);
+    let function_is_pressed = fidl_event.function.unwrap_or(false);
+    for (then, now, key_code) in [
+        (power_was_pressed, power_is_pressed, uapi::KEY_POWER),
+        (function_was_pressed, function_is_pressed, uapi::KEY_SCREENSAVER),
+    ] {
+        // Button state changed. Send an event.
+        if then != now {
+            events.push(uapi::input_event {
+                time,
+                type_: uapi::EV_KEY as u16,
+                code: key_code as u16,
+                value: now as i32,
+            });
+            events.push(sync_event);
+        }
+    }
+
+    (events, power_is_pressed, function_is_pressed)
 }
 
 #[cfg(test)]
