@@ -25,7 +25,6 @@ use {
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_root as fnet_root,
     fidl_fuchsia_net_routes_admin as fnet_routes_admin, fidl_fuchsia_net_test_realm as fntr,
     fidl_fuchsia_posix_socket as fposix_socket, fidl_fuchsia_posix_socket_ext as fposix_socket_ext,
-    zx,
 };
 
 /// URL for the realm that contains the hermetic network components with a

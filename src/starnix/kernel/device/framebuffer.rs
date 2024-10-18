@@ -27,7 +27,7 @@ use zerocopy::IntoBytes;
 use {
     fidl_fuchsia_io as fio, fidl_fuchsia_math as fmath,
     fidl_fuchsia_ui_composition as fuicomposition, fidl_fuchsia_ui_display_singleton as fuidisplay,
-    fidl_fuchsia_ui_views as fuiviews, zx,
+    fidl_fuchsia_ui_views as fuiviews,
 };
 
 #[derive(Default, Debug)]

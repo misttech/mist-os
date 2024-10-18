@@ -13,9 +13,7 @@ use fidl_fidl_examples_routing_echo::EchoMarker;
 use futures::TryStreamExt;
 use routing_test_helpers::RoutingTestModel;
 use std::path::PathBuf;
-use {
-    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync, zx,
-};
+use {fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 #[fuchsia::test]
 async fn use_protocol_from_dictionary() {

@@ -14,7 +14,7 @@ use {
     fidl_fuchsia_hardware_cpu_ctrl as fcpu_ctrl, fidl_fuchsia_kernel as fkernel,
     fidl_fuchsia_powermanager_driver_temperaturecontrol as ftemperaturecontrol,
     fidl_fuchsia_sys2 as fsys2, fidl_fuchsia_testing as ftesting, fuchsia_async as fasync,
-    serde_json as json, zx,
+    serde_json as json,
 };
 
 const DEADLINE_ID: DeadlineId<'static> = DeadlineId::new("power-manager", "thermal-policy-timer");

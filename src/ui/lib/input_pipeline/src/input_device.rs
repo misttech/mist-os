@@ -21,7 +21,7 @@ use metrics_registry::*;
 use std::path::PathBuf;
 use {
     fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_io as fio,
-    fuchsia_async as fasync, fuchsia_trace as ftrace, zx,
+    fuchsia_async as fasync, fuchsia_trace as ftrace,
 };
 
 pub use input_device_constants::InputDeviceType;

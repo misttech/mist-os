@@ -20,7 +20,7 @@ use test_runners_lib::elf::{BuilderArgs, Component};
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio,
-    fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync, zx,
+    fidl_fuchsia_test_manager as ftest_manager, fuchsia_async as fasync,
 };
 
 #[derive(PartialEq, Debug)]

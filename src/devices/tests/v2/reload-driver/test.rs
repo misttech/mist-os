@@ -11,7 +11,7 @@ use futures::{StreamExt, TryStreamExt};
 use std::collections::HashMap;
 use {
     fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_test as fdt,
-    fidl_fuchsia_reloaddriver_test as ft, fuchsia_async as fasync, zx,
+    fidl_fuchsia_reloaddriver_test as ft, fuchsia_async as fasync,
 };
 
 const WAITER_NAME: &'static str = "waiter";

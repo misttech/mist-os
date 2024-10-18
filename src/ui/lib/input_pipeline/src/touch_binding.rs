@@ -16,7 +16,7 @@ use metrics_registry::*;
 use std::collections::{HashMap, HashSet};
 use {
     fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_ui_input as fidl_ui_input,
-    fidl_fuchsia_ui_pointerinjector as pointerinjector, zx,
+    fidl_fuchsia_ui_pointerinjector as pointerinjector,
 };
 
 /// A [`TouchScreenEvent`] represents a set of contacts and the phase those contacts are in.

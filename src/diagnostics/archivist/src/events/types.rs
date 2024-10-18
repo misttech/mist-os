@@ -11,7 +11,7 @@ use moniker::ExtendedMoniker;
 use std::sync::Arc;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_inspect as finspect,
-    fidl_fuchsia_logger as flogger, zx,
+    fidl_fuchsia_logger as flogger,
 };
 
 /// Event types that contain singleton data. When these events are cloned, their singleton data

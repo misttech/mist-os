@@ -1134,7 +1134,7 @@ mod handle_driver_event_tests {
     use wlan_common::{assert_variant, fake_fidl_bss_description};
     use {
         fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
-        fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_async as fasync, zx,
+        fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_async as fasync,
     };
 
     fn create_bss_descriptions() -> fidl_common::BssDescription {

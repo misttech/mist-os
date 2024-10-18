@@ -556,7 +556,7 @@ mod tests {
     use futures::stream::StreamExt;
     use {
         fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr,
-        fuchsia_async as fasync, zx,
+        fuchsia_async as fasync,
     };
 
     const REMOTE_ID_VAL: u8 = 1;

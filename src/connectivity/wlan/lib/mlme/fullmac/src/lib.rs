@@ -24,7 +24,7 @@ use wlan_sme::serve::create_sme;
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_async as fasync, zx,
+    fuchsia_async as fasync,
 };
 
 #[derive(thiserror::Error, Debug)]

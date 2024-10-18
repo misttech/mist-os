@@ -19,7 +19,7 @@ use diagnostics_assertions::{
 use {
     fidl_fuchsia_io as fio, fidl_fuchsia_posix_socket as fposix_socket,
     fidl_fuchsia_posix_socket_packet as fposix_socket_packet,
-    fidl_fuchsia_posix_socket_raw as fposix_socket_raw, fuchsia_async as fasync, zx,
+    fidl_fuchsia_posix_socket_raw as fposix_socket_raw, fuchsia_async as fasync,
 };
 
 use const_unwrap::const_unwrap_option;

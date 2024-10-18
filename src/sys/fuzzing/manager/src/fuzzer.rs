@@ -12,8 +12,7 @@ use std::rc::Rc;
 use test_manager::{Artifact, LaunchError, RunControllerProxy, SuiteControllerProxy};
 use tracing::warn;
 use {
-    fidl_fuchsia_fuzzer as fuzz, fidl_fuchsia_test_manager as test_manager,
-    fuchsia_async as fasync, zx,
+    fidl_fuchsia_fuzzer as fuzz, fidl_fuchsia_test_manager as test_manager, fuchsia_async as fasync,
 };
 
 /// Represents the what stage of its lifecycle a fuzzer is currently in.

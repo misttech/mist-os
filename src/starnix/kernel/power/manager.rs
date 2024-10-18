@@ -25,7 +25,7 @@ use zx::{HandleBased, Peered};
 use {
     fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_observability as fobs,
     fidl_fuchsia_power_system as fsystem, fidl_fuchsia_session_power as fpower,
-    fidl_fuchsia_starnix_runner as frunner, fuchsia_inspect as inspect, zx,
+    fidl_fuchsia_starnix_runner as frunner, fuchsia_inspect as inspect,
 };
 
 cfg_if::cfg_if! {

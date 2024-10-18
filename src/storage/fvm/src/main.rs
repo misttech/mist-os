@@ -1664,7 +1664,7 @@ mod tests {
     use std::sync::Arc;
     use {
         fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio,
-        fuchsia_async as fasync, zx,
+        fuchsia_async as fasync,
     };
 
     struct Fixture {

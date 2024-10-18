@@ -428,7 +428,7 @@ mod tests {
     use {
         fidl_fuchsia_hardware_block_partition as fpartition,
         fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio,
-        fidl_fuchsia_storagehost as fstoragehost, zx,
+        fidl_fuchsia_storagehost as fstoragehost,
     };
 
     fn setup(

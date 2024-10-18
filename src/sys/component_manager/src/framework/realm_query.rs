@@ -29,7 +29,7 @@ use vfs::ToObjectRequest;
 use zx::sys::ZX_CHANNEL_MAX_MSG_BYTES;
 use {
     fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_component_runner as fcrunner,
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, zx,
+    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
 };
 
 lazy_static! {

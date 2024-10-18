@@ -37,7 +37,7 @@ use {
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_masquerade as fnet_masquerade, fidl_fuchsia_net_name as fnet_name,
     fidl_fuchsia_net_routes_admin as fnet_routes_admin, fidl_fuchsia_net_stack as fnet_stack,
-    fidl_fuchsia_net_virtualization as fnet_virtualization, fuchsia_async as fasync, zx,
+    fidl_fuchsia_net_virtualization as fnet_virtualization, fuchsia_async as fasync,
 };
 
 use anyhow::{anyhow, Context as _};

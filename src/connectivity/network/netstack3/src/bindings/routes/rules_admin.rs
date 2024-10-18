@@ -19,7 +19,7 @@ use futures::TryStreamExt as _;
 use net_types::ip::{Ip, Subnet};
 use {
     fidl_fuchsia_net_routes_admin as fnet_routes_admin,
-    fidl_fuchsia_net_routes_ext as fnet_routes_ext, zx,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext,
 };
 
 use crate::bindings::util::TaskWaitGroupSpawner;

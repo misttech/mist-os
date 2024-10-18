@@ -363,7 +363,7 @@ mod tests {
     use test_battery_manager::TestBatteryManager;
     use {
         fidl_fuchsia_bluetooth as bt, fidl_fuchsia_bluetooth_bredr as bredr,
-        fidl_fuchsia_power_battery as fpower, fuchsia_async as fasync, zx,
+        fidl_fuchsia_power_battery as fpower, fuchsia_async as fasync,
     };
 
     use crate::audio::TestAudioControl;

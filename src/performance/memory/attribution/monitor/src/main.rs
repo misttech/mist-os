@@ -15,7 +15,7 @@ use tracing::{error, warn};
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_kernel as fkernel,
     fidl_fuchsia_memory_attribution as fattribution,
-    fidl_fuchsia_memory_attribution_plugin as fattribution_plugin, zx,
+    fidl_fuchsia_memory_attribution_plugin as fattribution_plugin,
 };
 
 mod attribution_client;

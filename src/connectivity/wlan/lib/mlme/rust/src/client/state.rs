@@ -31,7 +31,7 @@ use zerocopy::SplitByteSlice;
 use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
     fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_softmac as fidl_softmac,
-    wlan_trace as wtrace, zx,
+    wlan_trace as wtrace,
 };
 
 /// Reconnect timeout in Beacon periods.

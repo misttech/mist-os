@@ -13,7 +13,7 @@ use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcp as net_dhcp,
     fidl_fuchsia_net_dhcpv6 as net_dhcpv6, fidl_fuchsia_net_ext as fnet_ext,
-    fidl_fuchsia_net_name as net_name, fidl_fuchsia_testing as ftesting, zx,
+    fidl_fuchsia_net_name as net_name, fidl_fuchsia_testing as ftesting,
 };
 
 use futures::future::{self, FusedFuture, Future, FutureExt as _};

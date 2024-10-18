@@ -30,7 +30,7 @@ use std::sync::Arc;
 use tracing::{debug, error, info, trace, warn};
 use {
     bt_avdtp as avdtp, fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr,
-    fidl_fuchsia_media_sessions2 as sessions2, fuchsia_inspect as inspect, zx,
+    fidl_fuchsia_media_sessions2 as sessions2, fuchsia_inspect as inspect,
 };
 
 mod avrcp_relay;

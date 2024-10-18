@@ -37,7 +37,7 @@ use wlan_ffi_transport::{EthernetTxEvent, EthernetTxEventSender, WlanRxEvent, Wl
 use wlan_fidl_ext::{ResponderExt, SendResultExt};
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_softmac as fidl_softmac,
-    fuchsia_trace as trace, wlan_trace as wtrace, zx,
+    fuchsia_trace as trace, wlan_trace as wtrace,
 };
 pub use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, wlan_common as common};
 

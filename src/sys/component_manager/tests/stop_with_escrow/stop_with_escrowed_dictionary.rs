@@ -11,7 +11,7 @@ use futures::{StreamExt, TryStreamExt};
 use std::pin::pin;
 use {
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_process_lifecycle as flifecycle,
-    fuchsia_async as fasync, zx,
+    fuchsia_async as fasync,
 };
 
 /// See the `stop_with_escrowed_dictionary` test case.

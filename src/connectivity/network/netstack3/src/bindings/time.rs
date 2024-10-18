@@ -10,7 +10,7 @@ use fuchsia_async as fasync;
 use netstack3_core::{AtomicInstant, Instant};
 
 use crate::bindings::util::IntoFidl;
-use crate::bindings::{zx, InspectableValue, Inspector};
+use crate::bindings::{InspectableValue, Inspector};
 
 /// A thin wrapper around `fuchsia_async::MonotonicInstant` that implements `core::Instant`.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Copy, Clone, Debug)]

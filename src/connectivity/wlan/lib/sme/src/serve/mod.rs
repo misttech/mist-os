@@ -21,7 +21,7 @@ use tracing::{error, info, warn};
 use wlan_common::timer::{self, ScheduledEvent};
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fidl_fuchsia_wlan_sme as fidl_sme, zx,
+    fidl_fuchsia_wlan_sme as fidl_sme,
 };
 
 pub type ClientSmeServer = mpsc::UnboundedSender<client::Endpoint>;

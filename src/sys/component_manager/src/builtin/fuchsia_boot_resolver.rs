@@ -21,7 +21,7 @@ use system_image::{Bootfs, PathHashMapping};
 use version_history::AbiRevision;
 use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
-    fidl_fuchsia_io as fio, zx,
+    fidl_fuchsia_io as fio,
 };
 
 pub const SCHEME: &str = "fuchsia-boot";

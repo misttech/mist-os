@@ -13,7 +13,7 @@ use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use {
     fidl_fuchsia_net as net, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
-    fidl_fuchsia_net_routes_ext as fnet_routes_ext, zx,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext,
 };
 
 use anyhow::Context as _;

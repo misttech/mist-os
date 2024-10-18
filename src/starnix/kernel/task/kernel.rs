@@ -54,7 +54,7 @@ use std::sync::{Arc, Weak};
 use zx::AsHandleRef;
 use {
     fidl_fuchsia_io as fio, fidl_fuchsia_memory_attribution as fattribution,
-    fuchsia_async as fasync, zx,
+    fuchsia_async as fasync,
 };
 
 #[derive(Debug, Default, Clone, Copy)]

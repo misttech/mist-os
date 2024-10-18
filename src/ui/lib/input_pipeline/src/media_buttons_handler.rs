@@ -18,7 +18,7 @@ use zx::AsHandleRef;
 use {
     fidl_fuchsia_input_interaction_observation as interaction_observation,
     fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_ui_input as fidl_ui_input,
-    fidl_fuchsia_ui_policy as fidl_ui_policy, fuchsia_async as fasync, zx,
+    fidl_fuchsia_ui_policy as fidl_ui_policy, fuchsia_async as fasync,
 };
 
 /// A [`MediaButtonsHandler`] tracks MediaButtonListeners and sends media button events to them.

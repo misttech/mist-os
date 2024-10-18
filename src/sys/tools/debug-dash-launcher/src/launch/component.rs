@@ -10,7 +10,7 @@ use moniker::Moniker;
 use tracing::warn;
 use {
     fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_dash as fdash,
-    fidl_fuchsia_hardware_pty as pty, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, zx,
+    fidl_fuchsia_hardware_pty as pty, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
 };
 
 pub async fn explore_over_socket(

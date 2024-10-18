@@ -14,7 +14,7 @@ use std::rc::Rc;
 use tracing::{error, info};
 use {
     fidl_fuchsia_hardware_network as fhwnet, fidl_fuchsia_power_metrics as fmetrics,
-    fuchsia_async as fasync, zx,
+    fuchsia_async as fasync,
 };
 
 // TODO(didis): Use netstack API after https://fxbug.dev/42062536 is implemented.

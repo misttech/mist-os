@@ -58,7 +58,7 @@ use {
     fidl_fuchsia_hardware_network as fhardware_network,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_multicast_admin as fnet_multicast_admin,
-    fidl_fuchsia_net_routes_admin as fnet_routes_admin, fuchsia_async as fasync, zx,
+    fidl_fuchsia_net_routes_admin as fnet_routes_admin, fuchsia_async as fasync,
 };
 
 use devices::{

@@ -36,7 +36,7 @@ use vfs::execution_scope::ExecutionScope;
 use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
     fidl_fuchsia_data as fdata, fidl_fuchsia_logger as flogger, fidl_fuchsia_mem as fmem,
-    fidl_fuchsia_process as fprocess, zx,
+    fidl_fuchsia_process as fprocess,
 };
 
 /// Starts a component instance.

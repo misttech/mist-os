@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use zx::HandleBased;
 use {
     fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_partition as fpartition,
-    fidl_fuchsia_hardware_block_volume as fvolume, fuchsia_async as fasync, zx,
+    fidl_fuchsia_hardware_block_volume as fvolume, fuchsia_async as fasync,
 };
 
 pub mod async_interface;

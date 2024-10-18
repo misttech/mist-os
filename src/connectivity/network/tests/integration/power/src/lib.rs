@@ -30,7 +30,7 @@ use {
     fidl_fuchsia_netemul as fnetemul, fidl_fuchsia_posix_socket as fposix_socket,
     fidl_fuchsia_power_broker as fpower_broker, fidl_fuchsia_power_system as fpower_system,
     fidl_test_sagcontrol as fsagcontrol, fidl_test_suspendcontrol as ftest_suspendcontrol,
-    fuchsia_async as fasync, zx,
+    fuchsia_async as fasync,
 };
 
 // TODO(https://fxbug.dev/372010366): Revisit this test as we consider better integrating

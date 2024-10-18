@@ -26,7 +26,7 @@ use vfs::path::Path;
 use vfs::ToObjectRequest;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_io as fio, fuchsia_async as fasync, zx,
+    fidl_fuchsia_io as fio, fuchsia_async as fasync,
 };
 
 lazy_static! {

@@ -14,7 +14,7 @@ use zx::HandleBased;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_io as fio, fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_session as fsession,
-    fidl_fuchsia_session_power as fpower, zx,
+    fidl_fuchsia_session_power as fpower,
 };
 
 /// Maximum number of concurrent connections to the protocols served by `SessionManager`.

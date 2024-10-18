@@ -29,7 +29,7 @@ use std::sync::Arc;
 use {
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_element as felement,
     fidl_fuchsia_io as fio, fidl_fuchsia_memory_attribution as fattribution,
-    fidl_fuchsia_starnix_container as fstarcontainer, zx,
+    fidl_fuchsia_starnix_container as fstarcontainer,
 };
 
 use super::start_component;

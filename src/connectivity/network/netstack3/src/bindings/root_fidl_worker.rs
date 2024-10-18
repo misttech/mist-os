@@ -11,7 +11,6 @@ use log::debug;
 use net_types::ip::{Ipv4, Ipv6};
 use {
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin, fidl_fuchsia_net_root as fnet_root,
-    zx,
 };
 
 use crate::bindings::devices::{BindingId, DeviceSpecificInfo, LOOPBACK_MAC};

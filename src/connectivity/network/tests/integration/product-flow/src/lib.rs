@@ -10,7 +10,7 @@ use futures::{AsyncReadExt as _, AsyncWriteExt as _, FutureExt as _, StreamExt a
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcp as fnet_dhcp,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
-    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, zx,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
 };
 
 use assert_matches::assert_matches;

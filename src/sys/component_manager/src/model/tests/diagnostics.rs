@@ -32,7 +32,7 @@ mod tests {
     use zx::AsHandleRef;
     use {
         fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-        fuchsia_inspect as inspect, fuchsia_sync as fsync, zx,
+        fuchsia_inspect as inspect, fuchsia_sync as fsync,
     };
 
     fn get_data(

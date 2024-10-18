@@ -6,9 +6,7 @@ use anyhow::{Context, Result};
 use fidl::endpoints::Proxy as _;
 use fuchsia_component_test::{RealmBuilder, RealmInstance};
 use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
-use {
-    fidl_fuchsia_driver_test as fdt, fidl_fuchsia_rebind_test as frt, fuchsia_async as fasync, zx,
-};
+use {fidl_fuchsia_driver_test as fdt, fidl_fuchsia_rebind_test as frt, fuchsia_async as fasync};
 
 async fn start_driver_test_realm() -> Result<RealmInstance> {
     const ROOT_DRIVER_URL: &str = "fuchsia-boot:///dtr#meta/test-parent-sys.cm";

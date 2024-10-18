@@ -11,9 +11,7 @@ use futures::prelude::*;
 use std::collections::HashMap;
 use std::sync::{Arc, Weak};
 use tracing::warn;
-use {
-    fidl_fuchsia_io as fio, fidl_fuchsia_test_runner as ftestrunner, fuchsia_async as fasync, zx,
-};
+use {fidl_fuchsia_io as fio, fidl_fuchsia_test_runner as ftestrunner, fuchsia_async as fasync};
 
 /// maps vmo key with vmo result.
 type VmoKeyMap = HashMap<String, (i32, Option<zx::Vmo>)>;

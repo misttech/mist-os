@@ -24,7 +24,7 @@ use zerocopy::SplitByteSlice;
 use zx::{HandleBased, Peered};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_posix as fposix,
-    fidl_fuchsia_posix_socket as fposix_socket, fidl_fuchsia_posix_socket_raw as fpraw, zx,
+    fidl_fuchsia_posix_socket as fposix_socket, fidl_fuchsia_posix_socket_raw as fpraw,
 };
 
 use crate::bindings::socket::queue::{BodyLen, MessageQueue};

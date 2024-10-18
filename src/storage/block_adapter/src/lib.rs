@@ -20,8 +20,7 @@ use vfs::node::Node;
 use vfs::path::Path;
 use vfs::{immutable_attributes, pseudo_directory, ObjectRequestRef};
 use {
-    fidl_fuchsia_hardware_block as fhardware_block, fidl_fuchsia_io as fio,
-    fuchsia_async as fasync, zx,
+    fidl_fuchsia_hardware_block as fhardware_block, fidl_fuchsia_io as fio, fuchsia_async as fasync,
 };
 
 struct BlockFile {

@@ -22,7 +22,7 @@ use {
     fidl_fuchsia_net_masquerade as fnet_masquerade, fidl_fuchsia_net_root as fnet_root,
     fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
     fidl_fuchsia_net_routes_ext as fnet_routes_ext,
-    fidl_fuchsia_netemul_network as fnetemul_network, zx,
+    fidl_fuchsia_netemul_network as fnetemul_network,
 };
 
 use anyhow::Context as _;

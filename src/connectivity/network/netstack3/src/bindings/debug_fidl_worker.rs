@@ -7,9 +7,7 @@
 use fidl::endpoints::{ProtocolMarker as _, ServerEnd};
 use futures::{SinkExt as _, StreamExt as _, TryStreamExt as _};
 use log::{debug, error, warn};
-use {
-    fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net_debug as fnet_debug, zx,
-};
+use {fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net_debug as fnet_debug};
 
 use crate::bindings::devices::BindingId;
 use crate::bindings::{DeviceIdExt as _, DeviceSpecificInfo};

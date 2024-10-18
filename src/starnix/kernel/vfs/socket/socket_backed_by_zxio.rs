@@ -28,7 +28,7 @@ use syncio::{ControlMessage, RecvMessageInfo, ServiceConnector, Zxio, ZxioErrorC
 use {
     fidl_fuchsia_posix_socket as fposix_socket,
     fidl_fuchsia_posix_socket_packet as fposix_socket_packet,
-    fidl_fuchsia_posix_socket_raw as fposix_socket_raw, zx,
+    fidl_fuchsia_posix_socket_raw as fposix_socket_raw,
 };
 
 /// Connects to the appropriate `fuchsia_posix_socket_*::Provider` protocol.

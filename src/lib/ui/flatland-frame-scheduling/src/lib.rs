@@ -11,9 +11,7 @@ use std::cell::RefCell;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll, Waker};
-use {
-    fidl_fuchsia_scenic_scheduling as frame_scheduling, fidl_fuchsia_ui_composition as flatland, zx,
-};
+use {fidl_fuchsia_scenic_scheduling as frame_scheduling, fidl_fuchsia_ui_composition as flatland};
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub struct PresentationInfo {

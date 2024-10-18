@@ -13,7 +13,7 @@ use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use tracing::{info, warn};
 use {
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
-    fidl_fuchsia_power_system as fsystem, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync, zx,
+    fidl_fuchsia_power_system as fsystem, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
 };
 
 pub fn new_mocks_provider(

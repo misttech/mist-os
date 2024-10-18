@@ -20,7 +20,7 @@ use std::sync::Arc;
 use tracing::{info, warn};
 use {
     fidl_fuchsia_wlan_policy as fidl_policy, fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_async as fasync, zx,
+    fuchsia_async as fasync,
 };
 
 pub struct FakeSavedNetworksManager {

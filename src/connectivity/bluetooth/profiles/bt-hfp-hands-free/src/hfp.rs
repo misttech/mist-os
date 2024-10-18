@@ -16,7 +16,7 @@ use std::pin::Pin;
 use tracing::{debug, info, warn};
 use {
     fidl_fuchsia_bluetooth_bredr as bredr, fidl_fuchsia_bluetooth_hfp as fidl_hfp,
-    fuchsia_async as fasync, zx,
+    fuchsia_async as fasync,
 };
 
 use crate::config::HandsFreeFeatureSupport;

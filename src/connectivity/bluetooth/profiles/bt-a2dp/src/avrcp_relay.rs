@@ -19,7 +19,7 @@ use tracing::{debug, info, trace};
 use zx::MonotonicDuration;
 use {
     fidl_fuchsia_bluetooth_avrcp as avrcp, fidl_fuchsia_media as media,
-    fidl_fuchsia_media_sessions2 as sessions2, fuchsia_async as fasync, zx,
+    fidl_fuchsia_media_sessions2 as sessions2, fuchsia_async as fasync,
 };
 
 // Typically, AVRCP peer responds to requests within 0.2s.

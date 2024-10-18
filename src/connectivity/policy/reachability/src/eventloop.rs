@@ -34,7 +34,7 @@ use tracing::{debug, error, info, warn};
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net_debug as fnet_debug,
     fidl_fuchsia_net_interfaces as fnet_interfaces, fidl_fuchsia_net_neighbor as fnet_neighbor,
-    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_ext as fnet_routes_ext, zx,
+    fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_ext as fnet_routes_ext,
 };
 
 const REPORT_PERIOD: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(60);

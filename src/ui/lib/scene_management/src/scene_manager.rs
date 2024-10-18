@@ -31,7 +31,7 @@ use {
     fidl_fuchsia_accessibility_scene as a11y_scene, fidl_fuchsia_math as math,
     fidl_fuchsia_ui_app as ui_app, fidl_fuchsia_ui_display_singleton as singleton_display,
     fidl_fuchsia_ui_views as ui_views, fuchsia_async as fasync, fuchsia_scenic as scenic,
-    fuchsia_trace as trace, math as fmath, zx,
+    fuchsia_trace as trace, math as fmath,
 };
 
 /// Presentation messages.

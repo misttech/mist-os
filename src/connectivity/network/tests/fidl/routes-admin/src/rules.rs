@@ -19,7 +19,7 @@ use netstack_testing_macros::netstack_test;
 use routes_common::TestSetup;
 use {
     fidl_fuchsia_net_routes_admin as fnet_routes_admin,
-    fidl_fuchsia_net_routes_ext as fnet_routes_ext, zx,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext,
 };
 
 fn rule_set_err_stream<I: FidlRuleAdminIpExt>(

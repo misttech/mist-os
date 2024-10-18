@@ -25,7 +25,7 @@ use netstack3_core::types::WorkQueueReport;
 
 use {
     fidl_fuchsia_hardware_network as fhardware_network,
-    fidl_fuchsia_net_interfaces as fnet_interfaces, zx,
+    fidl_fuchsia_net_interfaces as fnet_interfaces,
 };
 
 use crate::bindings::power::TransmitSuspensionHandler;

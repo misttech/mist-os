@@ -15,7 +15,7 @@ use wlan_common::tx_vector::{
 };
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_minstrel as fidl_minstrel,
-    fidl_fuchsia_wlan_softmac as fidl_softmac, zx,
+    fidl_fuchsia_wlan_softmac as fidl_softmac,
 };
 
 // TODO(https://fxbug.dev/42103418): Enable CBW40 support once its information is available from AssocCtx.

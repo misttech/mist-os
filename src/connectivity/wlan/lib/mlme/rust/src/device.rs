@@ -19,7 +19,7 @@ use wlan_common::{tx_vector, TimeUnit};
 use wlan_ffi_transport::{EthernetRx, EthernetTx, FfiEthernetTx, FfiWlanRx, WlanRx, WlanTx};
 use {
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, wlan_trace as wtrace, zx,
+    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_trace as trace, wlan_trace as wtrace,
 };
 
 pub use test_utils::*;

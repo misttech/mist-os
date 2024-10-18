@@ -19,7 +19,7 @@ use std::sync::Weak;
 use tracing::warn;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_sys2 as fsys, zx,
+    fidl_fuchsia_sys2 as fsys,
 };
 
 lazy_static! {

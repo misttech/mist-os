@@ -14,7 +14,7 @@ use std::mem;
 use zx::AsHandleRef;
 use {
     fidl_fuchsia_images2 as fimages2, fidl_fuchsia_sysmem2 as fsysmem2,
-    fidl_fuchsia_ui_composition as fuicomp, vk_sys as vk, zx,
+    fidl_fuchsia_ui_composition as fuicomp, vk_sys as vk,
 };
 
 /// `BufferCollectionTokens` contains all the buffer collection tokens required to initialize a

@@ -18,7 +18,7 @@ use tracing::warn;
 use vfs::execution_scope::ExecutionScope;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_sandbox as fsandbox,
-    fuchsia_async as fasync, zx,
+    fuchsia_async as fasync,
 };
 
 lazy_static! {

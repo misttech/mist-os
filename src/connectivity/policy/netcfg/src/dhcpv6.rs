@@ -8,7 +8,7 @@ use std::num::NonZeroU64;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6,
     fidl_fuchsia_net_dhcpv6_ext as fnet_dhcpv6_ext, fidl_fuchsia_net_ext as fnet_ext,
-    fidl_fuchsia_net_name as fnet_name, zx,
+    fidl_fuchsia_net_name as fnet_name,
 };
 
 use anyhow::Context as _;

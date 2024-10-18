@@ -23,7 +23,7 @@ use {
     fidl_fuchsia_hardware_network as fhwnet, fidl_fuchsia_net as fnet,
     fidl_fuchsia_net_ext as fnetext, fidl_fuchsia_net_interfaces_admin as fnetifadmin,
     fidl_fuchsia_net_interfaces_ext as fnetifext, fidl_fuchsia_net_stack as fnetstack,
-    fidl_fuchsia_net_tun as ftun, zx,
+    fidl_fuchsia_net_tun as ftun,
 };
 
 const TUN_PORT_ID: u8 = 0;
