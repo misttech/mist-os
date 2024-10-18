@@ -16,9 +16,13 @@ import enum
 import json
 import logging
 import pathlib
-from typing import Any, Iterable, Sequence
+from typing import Any, Dict, Iterable, List, Sequence, Union
 
 from trace_processing import trace_model
+
+JsonType = Union[
+    None, int, float, str, bool, List["JsonType"], Dict[str, "JsonType"]
+]
 
 _LOGGER: logging.Logger = logging.getLogger("Performance")
 
@@ -121,7 +125,6 @@ class MetricsProcessor(abc.ABC):
     def name(self) -> str:
         return self.__class__.__name__
 
-    @abc.abstractmethod
     def process_metrics(
         self, model: trace_model.Model
     ) -> Sequence[TestCaseResult]:
@@ -133,6 +136,21 @@ class MetricsProcessor(abc.ABC):
         Returns:
             list[TestCaseResult]: The generated metrics.
         """
+        return []
+
+    def process_freeform_metrics(self, model: trace_model.Model) -> JsonType:
+        """Computes freeform metrics as JSON.
+
+        This can output structured data, as opposite to `process_metrics` which return as list.
+        These metrics are in addition to those produced by process_metrics()
+
+        Args:
+            model: trace events to be processed.
+
+        Returns:
+            JsonType: structure holding aggregated metrics, or None if not supported.
+        """
+        return None
 
     def process_and_save_metrics(
         self,
@@ -157,32 +175,19 @@ class MetricsProcessor(abc.ABC):
 class ConstantMetricsProcessor(MetricsProcessor):
     """A metrics processor that return a constant list of result."""
 
-    def __init__(self, results: Sequence[TestCaseResult]):
+    # TODO(b/373899149): rename `result` into metrics.
+    def __init__(
+        self,
+        results: Sequence[TestCaseResult] = (),
+        freeform_metrics: JsonType = None,
+    ):
         self.results = results
+        self.freeform_metrics = freeform_metrics
 
     def process_metrics(
         self, model: trace_model.Model
     ) -> Sequence[TestCaseResult]:
         return self.results
 
-
-class MetricsProcessorsSet(MetricsProcessor):
-    """A processor that aggregates N sub-processors."""
-
-    def __init__(self, sub_processors: Sequence[MetricsProcessor]):
-        self.sub_processors = sub_processors
-
-    def process_metrics(
-        self, model: trace_model.Model
-    ) -> Sequence[TestCaseResult]:
-        results: list[TestCaseResult] = []
-        _LOGGER.info(
-            f"Combining metrics from {len(self.sub_processors)} subprocessors..."
-        )
-        for sub_proc in self.sub_processors:
-            sub_results = sub_proc.process_metrics(model)
-            _LOGGER.info(
-                f"Got {len(sub_results)} results from subprocessor {sub_proc.name}"
-            )
-            results.extend(sub_results)
-        return results
+    def process_freeform_metrics(self, model: trace_model.Model) -> JsonType:
+        return self.freeform_metrics

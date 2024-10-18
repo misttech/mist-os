@@ -20,6 +20,7 @@ python_library("trace_processing") {
     "metrics/cpu_breakdown.py",
     "metrics/fps.py",
     "metrics/input_latency.py",
+    "metrics/memory.py",
     "metrics/power.py",
     "metrics/scenic.py",
     "metrics/suspend.py",

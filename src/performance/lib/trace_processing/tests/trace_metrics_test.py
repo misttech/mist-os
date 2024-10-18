@@ -102,41 +102,46 @@ class MetricProcessorsTest(unittest.TestCase):
                 _EMPTY_MODEL, test_suite, output_path
             )
             actual_output = json.loads(output_path.read_text())
-            self.assertEqual(
+            self.assertSequenceEqual(
                 actual_output, [r.to_json(test_suite) for r in expected_results]
             )
 
-    def test_constant_processor(self) -> None:
+    def test_constant_processor_metrics(self) -> None:
         expected_results = [
             TCR(label="test", unit=U.countBiggerIsBetter, values=[1234, 5678])
         ]
         processor = trace_metrics.ConstantMetricsProcessor(
             results=expected_results
         )
-        actual_results = processor.process_metrics(_EMPTY_MODEL)
-
-        self.assertEqual(actual_results, expected_results)
-
-    def test_processors_set(self) -> None:
-        expected_results1 = [
-            TCR(label="l1", unit=U.countBiggerIsBetter, values=[1234, 5678])
-        ]
-        expected_results2 = [
-            TCR(label="l2", unit=U.framesPerSecond, values=[29.9])
-        ]
-
-        processor = trace_metrics.MetricsProcessorsSet(
-            sub_processors=[
-                trace_metrics.ConstantMetricsProcessor(
-                    results=expected_results1
-                ),
-                trace_metrics.ConstantMetricsProcessor(
-                    results=expected_results2
-                ),
-            ]
+        self.assertSequenceEqual(
+            processor.process_metrics(_EMPTY_MODEL), expected_results
         )
-        actual_results = processor.process_metrics(_EMPTY_MODEL)
-        self.assertEqual(actual_results, expected_results1 + expected_results2)
+        self.assertEqual(processor.process_freeform_metrics(_EMPTY_MODEL), None)
+
+    def test_constant_processor_freeform(self) -> None:
+        freeform_metrics: trace_metrics.JsonType = ["hello"]
+        processor = trace_metrics.ConstantMetricsProcessor(
+            freeform_metrics=freeform_metrics
+        )
+        self.assertSequenceEqual(processor.process_metrics(_EMPTY_MODEL), [])
+        self.assertEqual(
+            processor.process_freeform_metrics(_EMPTY_MODEL), freeform_metrics
+        )
+
+    def test_constant_processor_both(self) -> None:
+        freeform_metrics: trace_metrics.JsonType = ["hello"]
+        metrics = [
+            TCR(label="test", unit=U.countBiggerIsBetter, values=[1234, 5678])
+        ]
+        processor = trace_metrics.ConstantMetricsProcessor(
+            results=metrics, freeform_metrics=freeform_metrics
+        )
+        self.assertSequenceEqual(
+            processor.process_metrics(_EMPTY_MODEL), metrics
+        )
+        self.assertEqual(
+            processor.process_freeform_metrics(_EMPTY_MODEL), freeform_metrics
+        )
 
     @parameterized.expand(
         [
