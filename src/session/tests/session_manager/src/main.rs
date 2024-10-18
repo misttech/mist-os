@@ -385,7 +385,7 @@ async fn take_power_lease_and_suspend() -> anyhow::Result<()> {
     let mut await_suspend = Box::pin(test.suspend_device.await_suspend().fuse());
     select! {
         suspended = &mut await_suspend => panic!("Unexpected suspend event {suspended:?}"),
-        _ = fasync::Timer::new(fasync::Duration::from_millis(400)).fuse() => {},
+        _ = fasync::Timer::new(fasync::MonotonicDuration::from_millis(400)).fuse() => {},
     };
     let stats = test.sag_realm.connect_to_protocol::<fsuspend::StatsMarker>().await?;
     let current_stats = stats.watch().await?;
@@ -443,7 +443,7 @@ async fn take_power_lease_and_restart() -> anyhow::Result<()> {
     let mut await_suspend = Box::pin(test.suspend_device.await_suspend().fuse());
     select! {
         suspended = &mut await_suspend => panic!("Unexpected suspend event {suspended:?}"),
-        _ = fasync::Timer::new(fasync::Duration::from_millis(400)).fuse() => {},
+        _ = fasync::Timer::new(fasync::MonotonicDuration::from_millis(400)).fuse() => {},
     };
     let stats = test.sag_realm.connect_to_protocol::<fsuspend::StatsMarker>().await?;
     let current_stats = stats.watch().await?;

@@ -4,7 +4,7 @@
 
 use anyhow::{format_err, Error};
 use fidl::endpoints::{ProtocolMarker, Proxy};
-use fuchsia_async::{Duration, Task};
+use fuchsia_async::{MonotonicDuration, Task};
 use fuchsia_inspect::{Inspector, Node as InspectNode};
 use fuchsia_inspect_contrib::auto_persist;
 use futures::channel::mpsc;
@@ -195,7 +195,7 @@ async fn start<D: DeviceOps + 'static>(
         fidl_common::WlanMacRole::Client => {
             info!("Running wlansoftmac with client role");
             let config = wlan_mlme::client::ClientConfig {
-                ensure_on_channel_time: Duration::from_millis(500).into_nanos(),
+                ensure_on_channel_time: MonotonicDuration::from_millis(500).into_nanos(),
             };
             Box::pin(wlan_mlme::mlme_main_loop::<wlan_mlme::client::ClientMlme<D>>(
                 mlme_init_sender,

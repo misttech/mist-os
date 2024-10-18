@@ -490,7 +490,7 @@ async fn test_add_external_route() {
         };
         assert_eq!(driver.register_external_route(x.clone()).await, Ok(()));
 
-        fuchsia_async::Timer::new(fuchsia_async::Duration::from_millis(50)).await;
+        fuchsia_async::Timer::new(fuchsia_async::MonotonicDuration::from_millis(50)).await;
 
         assert_eq!(
             driver

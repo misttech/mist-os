@@ -255,7 +255,7 @@ async fn connect_to_vsock(
         if let Ok(socket) = system_task.kernel().default_abstract_vsock_namespace.lookup(&port) {
             break socket;
         };
-        fasync::Timer::new(fasync::Duration::from_millis(100).after_now()).await;
+        fasync::Timer::new(fasync::MonotonicDuration::from_millis(100).after_now()).await;
     };
 
     let pipe =

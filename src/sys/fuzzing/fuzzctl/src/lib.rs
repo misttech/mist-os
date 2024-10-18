@@ -18,7 +18,7 @@ pub use self::artifact::{save_artifact, Artifact};
 pub use self::controller::Controller;
 pub use self::corpus::{get_name as get_corpus_name, get_type as get_corpus_type};
 pub use self::diagnostics::{Forwarder, SocketForwarder};
-pub use self::duration::{deadline_after, Duration};
+pub use self::duration::{deadline_after, MonotonicDuration};
 pub use self::input::{save_input, Input, InputPair};
 pub use self::manager::Manager;
 pub use self::util::{

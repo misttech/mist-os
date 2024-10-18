@@ -1829,7 +1829,7 @@ mod tests {
     use crate::object_store::volume::root_volume;
     use crate::object_store::{lock_keys, HandleOptions, LockKey, ObjectStore};
     use fuchsia_async as fasync;
-    use fuchsia_async::Duration;
+    use fuchsia_async::MonotonicDuration;
     use storage_device::fake_device::FakeDevice;
     use storage_device::DeviceHolder;
 
@@ -2106,7 +2106,7 @@ mod tests {
             }
 
             // Allow the journal to flush, but we don't want to sync.
-            fasync::Timer::new(Duration::from_millis(10)).await;
+            fasync::Timer::new(MonotonicDuration::from_millis(10)).await;
             // Because we're not gracefully closing the filesystem, a Discard record will be
             // emitted.
             fs.device().snapshot().expect("snapshot failed")

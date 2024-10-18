@@ -387,7 +387,7 @@ impl FrameVmo {
     }
 
     /// Frames from duration, based on the current frames per second of the ringbuffer.
-    fn frames_from_duration(&self, duration: fasync::Duration) -> usize {
+    fn frames_from_duration(&self, duration: fasync::MonotonicDuration) -> usize {
         frames_from_duration(self.frames_per_second as usize, duration)
     }
 
@@ -395,7 +395,7 @@ impl FrameVmo {
     /// This means that partial nanoseconds will be rounded up, so that
     /// [time, time + duration_from_frames(n)] is guaranteed to include n audio frames.
     /// Only defined for positive numbers of frames.
-    fn duration_from_frames(&self, frames: usize) -> fasync::Duration {
+    fn duration_from_frames(&self, frames: usize) -> fasync::MonotonicDuration {
         let fps = self.frames_per_second as i64;
         let secs = frames as i64 / fps;
         let leftover_frames = frames as i64 % fps;
@@ -419,7 +419,8 @@ mod tests {
     const TEST_FPS: u32 = 48000;
     const TEST_FRAMES: usize = TEST_FPS as usize / 2;
     // Duration of the whole VMO.
-    const TEST_VMO_DURATION: fasync::Duration = fasync::Duration::from_millis(500);
+    const TEST_VMO_DURATION: fasync::MonotonicDuration =
+        fasync::MonotonicDuration::from_millis(500);
 
     // At 48kHz, each frame is 20833 and 1/3 nanoseconds. We add one nanosecond
     // so that the one and two frames are completely within the time.

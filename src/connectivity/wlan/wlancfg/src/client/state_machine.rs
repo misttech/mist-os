@@ -2834,7 +2834,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Set time to indicate a decent uptime before the disconnect so the AP is retried
-        exec.set_fake_time(start_time + fasync::Duration::from_hours(24));
+        exec.set_fake_time(start_time + fasync::MonotonicDuration::from_hours(24));
 
         // SME notifies Policy of disconnection
         let is_sme_reconnecting = true;

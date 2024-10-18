@@ -5,7 +5,7 @@
 use component_events::events::{DebugStarted, EventStream, Stopped};
 use component_events::matcher::EventMatcher;
 use fidl_fuchsia_io as fio;
-use fuchsia_async::{Duration, MonotonicInstant, Task, Timer};
+use fuchsia_async::{MonotonicDuration, MonotonicInstant, Task, Timer};
 use fuchsia_component_test::ScopedInstance;
 use fuchsia_fs::directory::open_file_no_describe_deprecated;
 use std::mem;
@@ -64,7 +64,7 @@ async fn test_debug_started() {
     // time of the Stopped event.
     let _task = Task::spawn(async move {
         // Drop break_on_start after 20 milliseconds.
-        Timer::new(Duration::from_millis(20)).await;
+        Timer::new(MonotonicDuration::from_millis(20)).await;
 
         // We only need to drop payload.break_on_start but it's a reference.
         mem::drop(event);

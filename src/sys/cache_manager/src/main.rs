@@ -253,7 +253,7 @@ mod tests {
     use fidl::endpoints::{ClientEnd, ServerEnd};
     use fidl_fuchsia_metrics::{MetricEvent, MetricEventLoggerRequest, MetricEventPayload};
     use fidl_fuchsia_sys2 as fsys;
-    use fuchsia_async::{self as fasync, Duration, TestExecutor};
+    use fuchsia_async::{self as fasync, MonotonicDuration, TestExecutor};
     use futures::channel::mpsc::{self as mpsc, UnboundedReceiver};
     use futures::{StreamExt, TryStreamExt};
     use std::future::Future;
@@ -306,7 +306,7 @@ mod tests {
     ) -> (
         UnboundedReceiver<CallType>,
         TestExecutor,
-        Duration,
+        MonotonicDuration,
         fsys::StorageAdminProxy,
         Config,
         fidl_fuchsia_metrics::MetricEventLoggerProxy,
@@ -314,7 +314,7 @@ mod tests {
     ) {
         let (calls_tx, calls_rx) = futures::channel::mpsc::unbounded::<CallType>();
         let exec = TestExecutor::new_with_fake_time();
-        let time_step = Duration::from_millis(5000);
+        let time_step = MonotonicDuration::from_millis(5000);
         let config = Config {
             cache_clearing_threshold: 20,
             storage_checking_frequency: time_step.clone().into_millis().try_into().unwrap(),
@@ -331,7 +331,7 @@ mod tests {
     }
 
     /// Advance the TestExecutor by |time_step| and wake expired timers.
-    fn advance_time_and_wake(exec: &mut TestExecutor, time_step: &Duration) {
+    fn advance_time_and_wake(exec: &mut TestExecutor, time_step: &MonotonicDuration) {
         let new_time = fasync::MonotonicInstant::from_nanos(
             exec.now().into_nanos() + time_step.clone().into_nanos(),
         );

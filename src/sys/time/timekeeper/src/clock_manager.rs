@@ -1061,12 +1061,12 @@ mod tests {
         let _ = executor.run_until_stalled(&mut fut);
 
         // Half a second in, nothing to wake.
-        executor.set_fake_time(start_time + fasync::Duration::from_millis(550));
+        executor.set_fake_time(start_time + fasync::MonotonicDuration::from_millis(550));
         let _ = executor.run_until_stalled(&mut fut);
         assert_eq!(false, executor.wake_expired_timers());
 
         // One second in, there is something to wake.
-        executor.set_fake_time(start_time + fasync::Duration::from_millis(1050));
+        executor.set_fake_time(start_time + fasync::MonotonicDuration::from_millis(1050));
         assert_eq!(true, executor.wake_expired_timers());
     }
 

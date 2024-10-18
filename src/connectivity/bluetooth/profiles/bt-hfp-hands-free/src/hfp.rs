@@ -26,8 +26,8 @@ use crate::peer::Peer;
 mod tests;
 
 pub const SEARCH_RESULT_CONNECT_DELAY_SECONDS: i64 = 1;
-const SEARCH_RESULT_CONNECT_DELAY_DURATION: fasync::Duration =
-    fasync::Duration::from_seconds(SEARCH_RESULT_CONNECT_DELAY_SECONDS);
+const SEARCH_RESULT_CONNECT_DELAY_DURATION: fasync::MonotonicDuration =
+    fasync::MonotonicDuration::from_seconds(SEARCH_RESULT_CONNECT_DELAY_SECONDS);
 
 type SearchResultTimer = Pin<Box<dyn Future<Output = (PeerId, Option<Vec<ProtocolDescriptor>>)>>>;
 

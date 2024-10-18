@@ -1452,8 +1452,8 @@ impl Controller {
 }
 
 async fn time_skew_watchdog() {
-    const TICK: fasync::Duration = fasync::Duration::from_seconds(1);
-    const WARN_THRESHOLD: fasync::Duration = fasync::Duration::from_seconds(2);
+    const TICK: fasync::MonotonicDuration = fasync::MonotonicDuration::from_seconds(1);
+    const WARN_THRESHOLD: fasync::MonotonicDuration = fasync::MonotonicDuration::from_seconds(2);
     let mut timer = pin!(fasync::Timer::new(fasync::MonotonicInstant::now()));
     (&mut timer).await;
     loop {

@@ -612,7 +612,7 @@ where
                 mac_address: Some(MacAddress { octets: x.ext_address().into_array() }),
                 short_address: Some(x.rloc16()),
                 age: Some(
-                    fuchsia_async::Duration::from_seconds(x.age().into())
+                    fuchsia_async::MonotonicDuration::from_seconds(x.age().into())
                         .into_nanos()
                         .try_into()
                         .unwrap(),

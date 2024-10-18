@@ -10287,9 +10287,9 @@ mod tests {
         let mut error_logger = ThrottledErrorLogger::new(MINUTES_BETWEEN_COBALT_SYSLOG_WARNINGS);
 
         // Set the fake time to 61 minutes past 0 time to ensure that messages will be logged.
-        exec.set_fake_time(fasync::MonotonicInstant::after(fasync::Duration::from_minutes(
-            MINUTES_BETWEEN_COBALT_SYSLOG_WARNINGS + 1,
-        )));
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            fasync::MonotonicDuration::from_minutes(MINUTES_BETWEEN_COBALT_SYSLOG_WARNINGS + 1),
+        ));
 
         // Log an error and verify that no record of it was retained (ie: the error was emitted
         // immediately).
@@ -10302,9 +10302,9 @@ mod tests {
 
         // Advance time again and log another error to verify that the counter resets (ie: log was
         // emitted).
-        exec.set_fake_time(fasync::MonotonicInstant::after(fasync::Duration::from_minutes(
-            MINUTES_BETWEEN_COBALT_SYSLOG_WARNINGS + 1,
-        )));
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            fasync::MonotonicDuration::from_minutes(MINUTES_BETWEEN_COBALT_SYSLOG_WARNINGS + 1),
+        ));
         error_logger.throttle_error(Err(format_err!("")));
         assert!(!error_logger.suppressed_errors.contains_key(&String::from("")));
 

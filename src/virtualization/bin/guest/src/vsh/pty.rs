@@ -200,7 +200,7 @@ mod test {
         std::thread::spawn(move || drop(raw_pty));
 
         const TIMEOUT: i64 = 5000;
-        let mut timeout = pin!(fasync::Timer::new(fasync::Duration::from_millis(TIMEOUT)));
+        let mut timeout = pin!(fasync::Timer::new(fasync::MonotonicDuration::from_millis(TIMEOUT)));
 
         futures::select_biased! {
             result = mock_pty.run().fuse() => result.expect("MockPty::run terminated with failure"),

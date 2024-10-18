@@ -20,12 +20,18 @@ use tracing::{info, warn};
 
 // A long amount of time that a scan should be able to finish within. If a scan takes longer than
 // this is indicates something is wrong.
-const SCAN_TIMEOUT: fuchsia_async::Duration = fuchsia_async::Duration::from_seconds(60);
-const CONNECT_TIMEOUT: fuchsia_async::Duration = fuchsia_async::Duration::from_seconds(30);
-const DISCONNECT_TIMEOUT: fuchsia_async::Duration = fuchsia_async::Duration::from_seconds(10);
-const START_AP_TIMEOUT: fuchsia_async::Duration = fuchsia_async::Duration::from_seconds(30);
-const STOP_AP_TIMEOUT: fuchsia_async::Duration = fuchsia_async::Duration::from_seconds(10);
-const AP_STATUS_TIMEOUT: fuchsia_async::Duration = fuchsia_async::Duration::from_seconds(10);
+const SCAN_TIMEOUT: fuchsia_async::MonotonicDuration =
+    fuchsia_async::MonotonicDuration::from_seconds(60);
+const CONNECT_TIMEOUT: fuchsia_async::MonotonicDuration =
+    fuchsia_async::MonotonicDuration::from_seconds(30);
+const DISCONNECT_TIMEOUT: fuchsia_async::MonotonicDuration =
+    fuchsia_async::MonotonicDuration::from_seconds(10);
+const START_AP_TIMEOUT: fuchsia_async::MonotonicDuration =
+    fuchsia_async::MonotonicDuration::from_seconds(30);
+const STOP_AP_TIMEOUT: fuchsia_async::MonotonicDuration =
+    fuchsia_async::MonotonicDuration::from_seconds(10);
+const AP_STATUS_TIMEOUT: fuchsia_async::MonotonicDuration =
+    fuchsia_async::MonotonicDuration::from_seconds(10);
 
 #[async_trait]
 pub trait IfaceManagerApi {
@@ -1657,7 +1663,7 @@ mod tests {
 
         // Advance the clock so that the timeout expires.
         exec.set_fake_time(fasync::MonotonicInstant::after(
-            SCAN_TIMEOUT + fasync::Duration::from_seconds(1),
+            SCAN_TIMEOUT + fasync::MonotonicDuration::from_seconds(1),
         ));
 
         // Verify that the future returns and that a defect is logged.
@@ -1743,7 +1749,7 @@ mod tests {
 
         // Advance the clock beyond the timeout.
         exec.set_fake_time(fasync::MonotonicInstant::after(
-            DISCONNECT_TIMEOUT + fasync::Duration::from_seconds(1),
+            DISCONNECT_TIMEOUT + fasync::MonotonicDuration::from_seconds(1),
         ));
 
         // Verify that the future returns and that a defect is logged.
@@ -1938,7 +1944,7 @@ mod tests {
 
         // Advance the clock beyond the timeout.
         exec.set_fake_time(fasync::MonotonicInstant::after(
-            CONNECT_TIMEOUT + fasync::Duration::from_seconds(1),
+            CONNECT_TIMEOUT + fasync::MonotonicDuration::from_seconds(1),
         ));
 
         // Verify that the future returns and that a defect is logged.
@@ -2089,7 +2095,7 @@ mod tests {
 
         // Advance the clock beyond the timeout.
         exec.set_fake_time(fasync::MonotonicInstant::after(
-            START_AP_TIMEOUT + fasync::Duration::from_seconds(1),
+            START_AP_TIMEOUT + fasync::MonotonicDuration::from_seconds(1),
         ));
 
         // Verify that the future returns and that a defect is logged.
@@ -2175,7 +2181,7 @@ mod tests {
 
         // Advance the clock beyond the timeout.
         exec.set_fake_time(fasync::MonotonicInstant::after(
-            START_AP_TIMEOUT + fasync::Duration::from_seconds(1),
+            START_AP_TIMEOUT + fasync::MonotonicDuration::from_seconds(1),
         ));
 
         // Verify that the future returns and that a defect is logged.
@@ -2261,7 +2267,7 @@ mod tests {
 
         // Advance the clock beyond the timeout.
         exec.set_fake_time(fasync::MonotonicInstant::after(
-            AP_STATUS_TIMEOUT + fasync::Duration::from_seconds(1),
+            AP_STATUS_TIMEOUT + fasync::MonotonicDuration::from_seconds(1),
         ));
 
         // Verify that the future returns and that a defect is logged.

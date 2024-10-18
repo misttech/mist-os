@@ -205,8 +205,8 @@ impl DhcpV6Pd {
             // helps make sure that the prefix update is in good shape.
 
             // Set our refresh duration to 15 minutes.
-            const REFRESH_DURATION: fuchsia_async::Duration =
-                fuchsia_async::Duration::from_minutes(15);
+            const REFRESH_DURATION: fuchsia_async::MonotonicDuration =
+                fuchsia_async::MonotonicDuration::from_minutes(15);
 
             loop {
                 // Wait for the refresh duration.

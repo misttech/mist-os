@@ -687,7 +687,7 @@ async fn wait_for_init_file(
 ) -> Result<(), Error> {
     // TODO(https://fxbug.dev/42178400): Use inotify machinery to wait for the file.
     loop {
-        fasync::Timer::new(fasync::Duration::from_millis(100).after_now()).await;
+        fasync::Timer::new(fasync::MonotonicDuration::from_millis(100).after_now()).await;
         let root = current_task.fs().root();
         let mut context = LookupContext::default();
         match current_task.lookup_path(

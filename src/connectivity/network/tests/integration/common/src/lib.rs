@@ -243,7 +243,7 @@ pub async fn get_deprecated_netstack2_inspect_data(
                 println!("Failed to load hierarchy, retrying. Error: {err:?}")
             }
         }
-        fasync::Timer::new(fasync::Duration::from_millis(100)).await;
+        fasync::Timer::new(fasync::MonotonicDuration::from_millis(100)).await;
     }
 }
 

@@ -8,8 +8,7 @@ use crate::task::{
     TimerId, TimerWakeup,
 };
 use crate::vfs::timer::TimerOps;
-use fuchsia_async::Duration;
-
+use fuchsia_async::MonotonicDuration;
 use futures::stream::AbortHandle;
 use starnix_logging::{log_error, log_trace, log_warn, track_stub};
 use starnix_sync::Mutex;
@@ -293,7 +292,7 @@ impl IntervalTimer {
 
         TimerRemaining {
             remainder: std::cmp::max(
-                Duration::ZERO,
+                MonotonicDuration::ZERO,
                 guard
                     .target_time
                     .delta(&self.timeline.now())

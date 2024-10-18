@@ -2459,14 +2459,14 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn test_watchdog() {
         use super::Watchdog;
-        use fuchsia_async::{Duration, MonotonicInstant, TestExecutor};
+        use fuchsia_async::{MonotonicDuration, MonotonicInstant, TestExecutor};
         use std::sync::mpsc::channel;
 
         TestExecutor::advance_to(make_time(0)).await;
         let (sender, receiver) = channel();
 
         fn make_time(time_secs: i64) -> MonotonicInstant {
-            MonotonicInstant::from_nanos(0) + Duration::from_seconds(time_secs)
+            MonotonicInstant::from_nanos(0) + MonotonicDuration::from_seconds(time_secs)
         }
 
         {

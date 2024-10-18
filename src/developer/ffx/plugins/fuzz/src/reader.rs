@@ -214,7 +214,7 @@ pub mod test_fixtures {
     use anyhow::{bail, Result};
     use async_trait::async_trait;
     use fuchsia_async as fasync;
-    use fuchsia_fuzzctl::{deadline_after, Duration};
+    use fuchsia_fuzzctl::{deadline_after, MonotonicDuration};
     use futures::channel::mpsc;
     use futures::{SinkExt, StreamExt};
     use std::collections::LinkedList;
@@ -222,8 +222,8 @@ pub mod test_fixtures {
     /// The ScriptReader represents canned input for a unit test.
     pub struct ScriptReader {
         commands: LinkedList<String>,
-        sender: mpsc::UnboundedSender<Duration>,
-        receiver: mpsc::UnboundedReceiver<Duration>,
+        sender: mpsc::UnboundedSender<MonotonicDuration>,
+        receiver: mpsc::UnboundedReceiver<MonotonicDuration>,
     }
 
     impl ScriptReader {
@@ -232,7 +232,7 @@ pub mod test_fixtures {
         /// This object is similar to `CommandReader` except that it allows commands to be `add`ed
         /// to by unit test after its creation.
         pub fn new() -> Self {
-            let (sender, receiver) = mpsc::unbounded::<Duration>();
+            let (sender, receiver) = mpsc::unbounded::<MonotonicDuration>();
             Self { commands: LinkedList::new(), sender, receiver }
         }
 
@@ -242,7 +242,7 @@ pub mod test_fixtures {
         }
 
         /// Indicates a call to `until_enter` should return `after` a certain duration.
-        pub async fn interrupt(&mut self, after: Duration) {
+        pub async fn interrupt(&mut self, after: MonotonicDuration) {
             self.sender.send(after).await.expect("failed to send interrupt");
         }
     }

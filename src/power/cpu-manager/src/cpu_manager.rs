@@ -108,7 +108,7 @@ impl CpuManager {
     ) -> Result<Rc<dyn Node>, Error> {
         let node_name = json_data["name"].clone();
         let _log_warning_task = fasync::Task::local(async move {
-            fasync::Timer::new(fasync::Duration::from_seconds(30)).await;
+            fasync::Timer::new(fasync::MonotonicDuration::from_seconds(30)).await;
             warn!("Creating {} not complete after 30s", node_name);
         });
 
@@ -151,7 +151,7 @@ impl CpuManager {
         join_all(self.nodes.iter().map(|node| async move {
             let node_name = node.0.clone();
             let _log_warning_task = fasync::Task::local(async move {
-                fasync::Timer::new(fasync::Duration::from_seconds(30)).await;
+                fasync::Timer::new(fasync::MonotonicDuration::from_seconds(30)).await;
                 warn!("Init {} not complete after 30s", node_name);
             });
             node.1.init().await.context(format!("Failed to init node: {}", node.0))

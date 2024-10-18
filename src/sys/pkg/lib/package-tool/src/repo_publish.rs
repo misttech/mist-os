@@ -101,7 +101,7 @@ async fn lock_repository(dir: &Utf8Path) -> Result<Lockfile> {
     let _log_warning_task = fasync::Task::local({
         let lock_path = lock_path.clone();
         async move {
-            fasync::Timer::new(fasync::Duration::from_secs(30)).await;
+            fasync::Timer::new(fasync::MonotonicDuration::from_secs(30)).await;
             warn!("Obtaining a lock at {} not complete after 30s", &lock_path.display());
         }
     });
@@ -568,7 +568,7 @@ mod tests {
 
     // Waits for the repo to be unlocked.
     async fn ensure_repo_unlocked(repo_path: &Utf8Path) {
-        fasync::Timer::new(fasync::Duration::from_millis(100)).await;
+        fasync::Timer::new(fasync::MonotonicDuration::from_millis(100)).await;
         lock_repository(repo_path).await.unwrap().unlock().unwrap();
     }
 

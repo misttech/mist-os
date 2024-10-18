@@ -9,7 +9,7 @@ mod util;
 use anyhow::{anyhow, Context, Result};
 use blocking::Unblock;
 use fidl_fuchsia_virtualization::{GuestMarker, HostVsockEndpointMarker};
-use fuchsia_async::{self as fasync, Duration, Timer};
+use fuchsia_async::{self as fasync, MonotonicDuration, Timer};
 use futures::future::Fuse;
 use futures::{pin_mut, select, AsyncReadExt, AsyncWriteExt, FutureExt};
 use guest_cli::platform::{GuestConsole, PlatformServices, UnbufferedStdio};
@@ -295,7 +295,7 @@ pub async fn handle_vsh<P: PlatformServices>(
     // Inject penguin helper function when connecting to the default login shell of the VM.
     if !is_container && is_login_shell {
         // Inserting a sleep here gives the prompt a chance to render before we insert keystrokes
-        Timer::new(Duration::from_millis(100)).await;
+        Timer::new(MonotonicDuration::from_millis(100)).await;
         if let Err(e) = stdin_message(
             &mut socket_in,
             b"function penguin() { lxc exec penguin -- login -f machina ; } \n\n".to_vec(),

@@ -202,7 +202,7 @@ async fn flash_plugin_impl<W: Write>(
 
                 // Warn the user
                 if MonotonicInstant::now() - start
-                    > fuchsia_async::Duration::from_secs(WAIT_WARN_SECS)
+                    > fuchsia_async::MonotonicDuration::from_secs(WAIT_WARN_SECS)
                 {
                     once.call_once(|| {
                         let _ = writeln!(

@@ -294,7 +294,8 @@ impl Isolate {
         let daemon = ffx_daemon::run_daemon(self.env_context()).await?;
         const DAEMON_WAIT_TIME: u64 = 2000;
         // Wait a bit to make sure the daemon has had a chance to start up.
-        fuchsia_async::Timer::new(fuchsia_async::Duration::from_millis(DAEMON_WAIT_TIME)).await;
+        fuchsia_async::Timer::new(fuchsia_async::MonotonicDuration::from_millis(DAEMON_WAIT_TIME))
+            .await;
         Ok(daemon)
     }
 

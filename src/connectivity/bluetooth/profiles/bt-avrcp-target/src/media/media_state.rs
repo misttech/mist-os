@@ -597,7 +597,9 @@ pub(crate) mod tests {
         assert_eq!(media_state.session_info().get_play_status(), expected_play_status);
 
         // Fast forward time by a little bit.
-        exec.set_fake_time(fasync::MonotonicInstant::after(fasync::Duration::from_seconds(7)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            fasync::MonotonicDuration::from_seconds(7),
+        ));
 
         let expected_play_status =
             ValidPlayStatus::new(Some(123), Some(7055), Some(fidl_avrcp::PlaybackStatus::Playing));
@@ -630,7 +632,9 @@ pub(crate) mod tests {
         assert_eq!(media_state.session_info().get_play_status(), expected_play_status);
 
         // After a couple seocnds, it should still be paused.
-        exec.set_fake_time(fasync::MonotonicInstant::after(fasync::Duration::from_seconds(7)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            fasync::MonotonicDuration::from_seconds(7),
+        ));
 
         assert_eq!(media_state.session_info().get_play_status(), expected_play_status);
     }
@@ -707,7 +711,9 @@ pub(crate) mod tests {
         }
 
         // As time passes, the position notification will change too.
-        exec.set_fake_time(fasync::MonotonicInstant::after(fasync::Duration::from_seconds(7)));
+        exec.set_fake_time(fasync::MonotonicInstant::after(
+            fasync::MonotonicDuration::from_seconds(7),
+        ));
 
         let updated_pos: fidl_avrcp::Notification = media_state
             .session_info()

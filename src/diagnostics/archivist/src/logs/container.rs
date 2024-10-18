@@ -624,7 +624,7 @@ mod tests {
     use crate::logs::budget::BudgetManager;
     use fidl_fuchsia_diagnostics::{ComponentSelector, Severity, StringSelector};
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkProxy};
-    use fuchsia_async::Duration;
+    use fuchsia_async::MonotonicDuration;
     use futures::channel::mpsc::UnboundedReceiver;
     use moniker::ExtendedMoniker;
 
@@ -669,7 +669,7 @@ mod tests {
             Task::spawn(async move { log_sink_clone.wait_for_interest_change().await });
         // Wait for the background task to get blocked to test the blocking case
         loop {
-            fuchsia_async::Timer::new(Duration::from_millis(200)).await;
+            fuchsia_async::Timer::new(MonotonicDuration::from_millis(200)).await;
             {
                 let test_state = container.hanging_get_test_state.lock();
                 if *test_state == TestState::Blocked {
@@ -690,7 +690,7 @@ mod tests {
         // Since spawn is async we need to wait for first future to block before starting second
         // Fuchsia Rust provides no ordering guarantees with respect to async tasks
         loop {
-            fuchsia_async::Timer::new(Duration::from_millis(200)).await;
+            fuchsia_async::Timer::new(MonotonicDuration::from_millis(200)).await;
             {
                 let test_state = container.hanging_get_test_state.lock();
                 if *test_state == TestState::Blocked {

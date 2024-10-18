@@ -67,7 +67,7 @@ impl TimestampExt for Timestamp {
 }
 
 /// A vector in time.
-pub type Duration = fuchsia_async::Duration;
+pub type Duration = fuchsia_async::MonotonicDuration;
 
 pub trait DurationExt {
     /// The unit duration.

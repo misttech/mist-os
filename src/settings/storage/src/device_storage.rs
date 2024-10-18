@@ -8,7 +8,7 @@ use crate::storage_factory::{DefaultLoader, NoneT};
 use crate::UpdateState;
 use anyhow::{format_err, Context, Error};
 use fidl_fuchsia_stash::{StoreAccessorProxy, Value};
-use fuchsia_async::{Duration, MonotonicInstant, Task, Timer};
+use fuchsia_async::{MonotonicDuration, MonotonicInstant, Task, Timer};
 use futures::channel::mpsc::UnboundedSender;
 use futures::future::OptionFuture;
 use futures::lock::{Mutex, MutexGuard};
@@ -26,7 +26,7 @@ const SETTINGS_PREFIX: &str = "settings";
 /// Minimum amount of time between Flush calls to Stash, in milliseconds. The Flush call triggers
 /// file I/O which is slow. If we call flush too often, we can overwhelm Stash, which eventually
 /// causes the kernel to crash our service due to filling up the channel.
-const MIN_FLUSH_INTERVAL: Duration = Duration::from_millis(500);
+const MIN_FLUSH_INTERVAL: MonotonicDuration = MonotonicDuration::from_millis(500);
 
 /// Stores device level settings in persistent storage.
 /// User level settings should not use this.
@@ -957,7 +957,8 @@ mod tests {
         assert_matches!(executor.run_until_stalled(&mut flush_future), Poll::Pending);
 
         // Advance time to 1ms before the flush triggers.
-        executor.set_fake_time(start_time + (MIN_FLUSH_INTERVAL - Duration::from_millis(1)));
+        executor
+            .set_fake_time(start_time + (MIN_FLUSH_INTERVAL - MonotonicDuration::from_millis(1)));
 
         // TextExecutor is still waiting on the time to finish.
         assert_matches!(executor.run_until_stalled(&mut flush_future), Poll::Pending);

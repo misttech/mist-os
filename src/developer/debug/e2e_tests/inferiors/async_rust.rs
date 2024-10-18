@@ -51,5 +51,5 @@ async fn baz(i: i64) {
     if i == 21 {
         panic!();
     }
-    fasync::Timer::new(fasync::Duration::from_seconds(i)).await;
+    fasync::Timer::new(fasync::MonotonicDuration::from_seconds(i)).await;
 }

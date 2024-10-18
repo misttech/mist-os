@@ -374,7 +374,7 @@ fn calculate_redirect(
 
 async fn loader_server(
     stream: net_http::LoaderRequestStream,
-    idle_timeout: fasync::Duration,
+    idle_timeout: fasync::MonotonicDuration,
 ) -> Result<(), anyhow::Error> {
     let background_tasks = vfs::execution_scope::ExecutionScope::new();
     let (stream, unbind_if_stalled) = detect_stall::until_stalled(stream, idle_timeout);
@@ -461,9 +461,9 @@ pub async fn main() -> Result<(), anyhow::Error> {
 
     let config = Config::take_from_startup_handle();
     let idle_timeout = if config.stop_on_idle_timeout_millis >= 0 {
-        fasync::Duration::from_millis(config.stop_on_idle_timeout_millis)
+        fasync::MonotonicDuration::from_millis(config.stop_on_idle_timeout_millis)
     } else {
-        fasync::Duration::INFINITE
+        fasync::MonotonicDuration::INFINITE
     };
 
     let mut fs = ServiceFs::new();

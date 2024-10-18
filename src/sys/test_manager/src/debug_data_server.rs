@@ -88,7 +88,7 @@ pub(crate) async fn serve_directory(
     {
         let file_stream = fuchsia_fs::directory::readdir_recursive(
             &directory,
-            Some(fasync::Duration::from_seconds(DEBUG_DATA_TIMEOUT_SECONDS)),
+            Some(fasync::MonotonicDuration::from_seconds(DEBUG_DATA_TIMEOUT_SECONDS)),
         )
         .filter_map(|entry| filter_map_filename(entry, dir_path));
         pin_mut!(file_stream);
@@ -118,7 +118,7 @@ pub(crate) async fn serve_directory_for_suite(
     {
         let file_stream = fuchsia_fs::directory::readdir_recursive(
             &directory,
-            Some(fasync::Duration::from_seconds(DEBUG_DATA_TIMEOUT_SECONDS)),
+            Some(fasync::MonotonicDuration::from_seconds(DEBUG_DATA_TIMEOUT_SECONDS)),
         )
         .filter_map(|entry| filter_map_filename(entry, dir_path));
         pin_mut!(file_stream);
@@ -148,7 +148,7 @@ pub(crate) async fn serve_iterator(
 ) -> Result<(), Error> {
     let file_stream = fuchsia_fs::directory::readdir_recursive(
         &directory,
-        Some(fasync::Duration::from_seconds(DEBUG_DATA_TIMEOUT_SECONDS)),
+        Some(fasync::MonotonicDuration::from_seconds(DEBUG_DATA_TIMEOUT_SECONDS)),
     )
     .filter_map(|entry| filter_map_filename(entry, dir_path));
     pin_mut!(file_stream);

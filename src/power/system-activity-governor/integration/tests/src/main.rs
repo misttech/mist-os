@@ -1746,7 +1746,7 @@ async fn test_activity_governor_blocks_for_on_suspend_started() -> Result<()> {
     on_suspend_started_rx.next().await.unwrap();
 
     // Give SAG some time to take any further suspend actions.
-    fasync::Timer::new(fasync::Duration::from_millis(1000)).await;
+    fasync::Timer::new(fasync::MonotonicDuration::from_millis(1000)).await;
 
     // Verify that SAG did _not_ suspend the hardware (because we did not
     // respond to the callback).

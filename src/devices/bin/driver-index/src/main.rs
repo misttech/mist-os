@@ -255,7 +255,7 @@ async fn run_driver_registrar_server(
 async fn run_index_server_with_timeout(
     indexer: Rc<Indexer>,
     stream: DriverIndexRequestStream,
-    idle_timeout: fasync::Duration,
+    idle_timeout: fasync::MonotonicDuration,
 ) -> Result<()> {
     let (stream, unbind_if_stalled) = detect_stall::until_stalled(stream, idle_timeout);
     stream
@@ -355,7 +355,7 @@ async fn run_load_base_drivers(
 
 async fn run_driver_index(
     index: &Rc<Indexer>,
-    idle_timeout: fasync::Duration,
+    idle_timeout: fasync::MonotonicDuration,
     full_resolver: Option<fresolution::ResolverProxy>,
     lifecycle_control_handle: flifecycle::LifecycleControlHandle,
     capability_store: fsandbox::CapabilityStoreProxy,
@@ -554,10 +554,10 @@ async fn main() -> Result<()> {
     }
 
     let idle_timeout = if config.stop_on_idle_timeout_millis >= 0 {
-        fasync::Duration::from_millis(config.stop_on_idle_timeout_millis)
+        fasync::MonotonicDuration::from_millis(config.stop_on_idle_timeout_millis)
     } else {
         // Negative value means no timeout.
-        fasync::Duration::INFINITE
+        fasync::MonotonicDuration::INFINITE
     };
 
     let index = create_and_setup_index(boot_drivers, &config);

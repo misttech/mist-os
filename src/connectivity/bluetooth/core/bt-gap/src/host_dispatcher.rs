@@ -105,7 +105,7 @@ pub enum DiscoveryState {
 impl DiscoveryState {
     // Idempotently end the discovery session.
     // Returns the duration of a session, if one was ended.
-    fn stop_discovery_session(&mut self) -> Option<fasync::Duration> {
+    fn stop_discovery_session(&mut self) -> Option<fasync::MonotonicDuration> {
         if let DiscoveryState::Discovering {
             discovery_proxy,
             started,

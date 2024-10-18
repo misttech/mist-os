@@ -32,7 +32,7 @@ struct ClientPhy<N> {
 
 // TODO(https://fxbug.dev/42172646) - Added to help investigate hw-sim test. Remove later
 async fn canary(mut finish_receiver: oneshot::Receiver<()>) {
-    let mut interval_stream = fasync::Interval::new(fasync::Duration::from_seconds(1));
+    let mut interval_stream = fasync::Interval::new(fasync::MonotonicDuration::from_seconds(1));
     loop {
         futures::select! {
             _ = interval_stream.next() => {

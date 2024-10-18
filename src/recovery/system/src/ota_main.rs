@@ -62,12 +62,12 @@ where
     let ota_done: &AtomicBool = &AtomicBool::new(false);
     let progress_future = async move {
         // TODO(b/245415603) Send false progress updates until actual progress is reported
-        use fuchsia_async::Duration;
+        use fuchsia_async::MonotonicDuration;
         use futures::StreamExt;
         let duration = 7 * 60 * 1000; // 7 minutes (ms)
         let num_updates = 100;
         let mut interval_timer =
-            fasync::Interval::new(Duration::from_millis(duration / num_updates));
+            fasync::Interval::new(MonotonicDuration::from_millis(duration / num_updates));
 
         let mut progress = 0;
         while let Some(_) = interval_timer.next().await {
