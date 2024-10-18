@@ -23,8 +23,6 @@
 # but each entry needs a ticket assigned to the assembly team with an agreed
 # upon solution for how to address the tech-debt.
 
-include_shell_commands_package = true
-
 discoverable_package_labels = [ "//bundles/tools" ]
 
 # Use the product assembly config target to specify the product configuration.

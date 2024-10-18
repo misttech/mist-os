@@ -26,6 +26,4 @@
 fuchsia_product_assembly_config_label = "//products/core"
 zedboot_product_assembly_config_label = "//products/zedboot"
 
-include_shell_commands_package = true
-
 discoverable_package_labels = [ "//bundles/tools" ]

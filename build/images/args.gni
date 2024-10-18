@@ -163,10 +163,6 @@ declare_args() {
   # is meant solely for developer debugging.
   verbose_image_assembly = false
 
-  # Include the shell commands package.  Used as a parameter to
-  # assembled_system().  See documentation there.
-  include_shell_commands_package = false
-
   # If true, the images.json build API modules will only include images
   # identified by bazel_product_bundle_target and its dependencies.
   #

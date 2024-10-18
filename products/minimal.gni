@@ -30,8 +30,6 @@
 # team ship a mechanism for updating Fuchsia that does not require IP networking, that functionality
 # should be moved to a higher-level product definition.
 
-include_shell_commands_package = true
-
 bazel_product_bundle_prefix = "//products/minimal:product_bundle"
 
 # Packages to be published to universe that do not go through assembly.
