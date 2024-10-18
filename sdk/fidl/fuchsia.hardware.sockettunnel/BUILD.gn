@@ -5,7 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.sockettunnel") {
-  sdk_category = "internal"
   sources = [ "socket_tunnel.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }

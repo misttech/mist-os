@@ -8,8 +8,6 @@ fidl("fuchsia.ui.focus") {
   # TODO(https://fxbug.dev/42111344): Remove lint exclusions by fixing known FIDL lint violations in this target
   excluded_checks = [ "vector-bounds-not-specified" ]
 
-  sdk_category = "internal"
-
   sources = [ "focus_chain.fidl" ]
 
   public_deps = [

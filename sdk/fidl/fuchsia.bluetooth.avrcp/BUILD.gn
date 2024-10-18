@@ -5,8 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.bluetooth.avrcp") {
-  sdk_category = "internal"
-
   sources = [
     "controller.fidl",
     "target.fidl",

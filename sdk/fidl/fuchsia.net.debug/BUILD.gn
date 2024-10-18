@@ -5,8 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.net.debug") {
-  sdk_category = "internal"
-
   sources = [
     "diagnostics.fidl",
     "interfaces.fidl",

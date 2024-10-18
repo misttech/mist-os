@@ -5,7 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.recovery.policy") {
-  sdk_category = "internal"
   name = "fuchsia.recovery.policy"
   sources = [
     "device.fidl",

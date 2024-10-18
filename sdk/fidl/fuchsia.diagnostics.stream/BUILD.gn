@@ -4,7 +4,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.diagnostics.stream") {
-  sdk_category = "internal"
   sources = [
     "record.fidl",
     "source.fidl",

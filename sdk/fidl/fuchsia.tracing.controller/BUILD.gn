@@ -5,7 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.tracing.controller") {
-  sdk_category = "internal"
   sources = [ "trace_controller.fidl" ]
 
   public_deps = [

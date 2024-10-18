@@ -5,8 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.ui.display.color") {
-  sdk_category = "internal"
-
   sources = [ "color_converter.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 

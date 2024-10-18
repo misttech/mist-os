@@ -5,8 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.gpu.virtio") {
-  sdk_category = "internal"
-
   sources = [ "virtio.fidl" ]
 
   public_deps = [ "//zircon/vdso/zx" ]

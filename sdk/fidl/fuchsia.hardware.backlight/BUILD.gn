@@ -5,7 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.backlight") {
-  sdk_category = "internal"
   sources = [ "backlight.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
 }

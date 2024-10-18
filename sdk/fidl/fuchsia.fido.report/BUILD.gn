@@ -5,8 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.fido.report") {
-  sdk_category = "internal"
-
   sources = [ "key.fidl" ]
 
   public_deps = [ "//zircon/vdso/zx" ]

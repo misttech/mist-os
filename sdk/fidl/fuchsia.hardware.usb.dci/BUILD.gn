@@ -5,7 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.usb.dci") {
-  sdk_category = "internal"
   sources = [ "usb-dci.fidl" ]
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.usb.descriptor",

@@ -5,8 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.ui.test.conformance") {
-  sdk_category = "internal"
-
   sources = [ "puppet.fidl" ]
 
   public_deps = [

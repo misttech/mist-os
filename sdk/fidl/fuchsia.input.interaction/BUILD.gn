@@ -5,8 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.input.interaction") {
-  sdk_category = "internal"
-
   sources = [
     "notifier.fidl",
     "state.fidl",

@@ -5,8 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.accessibility") {
-  sdk_category = "internal"
-
   sources = [
     "color_transform.fidl",
     "magnifier.fidl",

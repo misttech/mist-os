@@ -4,10 +4,9 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.ui.compression.internal") {
-  sources = [ "image_compression.fidl" ]
+  # Do not include in an SDK (by adding `sdk_category`).
 
-  # Keep "internal", do not include in SDK.
-  sdk_category = "internal"
+  sources = [ "image_compression.fidl" ]
 
   public_deps = [
     "//sdk/fidl/fuchsia.math",

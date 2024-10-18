@@ -5,6 +5,5 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.gpu.amlogic") {
-  sdk_category = "internal"
   sources = [ "metadata.fidl" ]
 }

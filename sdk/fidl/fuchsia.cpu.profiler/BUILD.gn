@@ -5,7 +5,6 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.cpu.profiler") {
-  sdk_category = "internal"
   sources = [ "profiler.fidl" ]
 
   public_deps = [
