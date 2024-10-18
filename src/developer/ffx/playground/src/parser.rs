@@ -425,21 +425,67 @@ fn ex_tag<'a>(s: &'a str) -> impl FnMut(ESpan<'a>) -> IResult<'a, ()> + 'a {
     move |x| alt((map(tag(s.as_str()), |_| ()), err_note(format!("Expected '{}'", s))))(x)
 }
 
+/// Inner state of [`DeferredError`].
+struct DeferredErrorInner<'a, O> {
+    orig_location: ESpan<'a>,
+    output: (ESpan<'a>, O),
+}
+
+/// Storage for an error that we didn't allow to be handled but might want to later.
+struct DeferredError<'a, O>(RefCell<Option<DeferredErrorInner<'a, O>>>);
+
+impl<'a, O> DeferredError<'a, O> {
+    /// Create a new [`DeferredError`].
+    fn new() -> Self {
+        DeferredError(RefCell::new(None))
+    }
+
+    /// Parser wrapper that will defer error handling for the wrapped parser.
+    /// I.e. if the parser handles a new error and returns normally, this will
+    /// turn that handled error into a hard failure, but save the parse result
+    /// with the handled error for later use.
+    fn defer<'b>(
+        &'b self,
+        mut f: impl FnMut(ESpan<'a>) -> IResult<'a, O> + 'b,
+    ) -> impl FnMut(ESpan<'a>) -> IResult<'a, O> + 'b {
+        move |input| {
+            let err = input.extra.1.clone();
+            let res = f(input.clone())?;
+            let err_new = res.0.extra.1.clone();
+
+            match (err, err_new) {
+                (None, None) => Ok(res),
+                (Some(x), Some(y)) if Rc::ptr_eq(&x, &y) => Ok(res),
+                (Some(_), None) => unreachable!("Parsing further *removed* errors?!"),
+                (_, Some(_)) => {
+                    *self.0.borrow_mut() =
+                        Some(DeferredErrorInner { orig_location: input, output: res });
+                    Err(nom::Err::Error(Error))
+                }
+            }
+        }
+    }
+
+    /// If a previous call to `defer` suppressed an error, this parser will
+    /// immediately return that error provided the location is the same.
+    fn restore<'b>(&'b self) -> impl FnMut(ESpan<'a>) -> IResult<'a, O> + 'b {
+        |input| {
+            if let Some(inner) = self.0.borrow_mut().take() {
+                if inner.orig_location == input {
+                    return Ok(inner.output);
+                }
+            }
+
+            Err(nom::Err::Error(Error))
+        }
+    }
+}
+
 /// Runs the passed parser but does not allow it to emit errors.
 fn no_errors<'a, X>(
     mut f: impl FnMut(ESpan<'a>) -> IResult<'a, X>,
 ) -> impl FnMut(ESpan<'a>) -> IResult<'a, X> {
-    move |input| {
-        let err = input.extra.1.clone();
-        let res = f(input)?;
-        let err_new = res.0.extra.1.clone();
-
-        match (err, err_new) {
-            (None, None) => Ok(res),
-            (Some(x), Some(y)) if Rc::ptr_eq(&x, &y) => Ok(res),
-            _ => Err(nom::Err::Error(Error)),
-        }
-    }
+    move |input| DeferredError::new().defer(&mut f)(input)
 }
 
 /// Match optional whitespace before the given combinator.
@@ -1484,25 +1530,38 @@ fn program<'a>(input: ESpan<'a>) -> IResult<'a, Vec<Node<'a>>> {
     let mut input_next = input;
     let mut vec = Vec::new();
 
-    while let Ok((tail, (node, terminator))) = preceded(
-        cond(!vec.is_empty(), opt(whitespace)),
-        alt((
-            pair(
-                alt((import, function_decl)),
-                map(opt(ws_before(one_of(";&"))), |x| x.or(Some(';'))),
-            ),
-            pair(
+    fn program_item<'a>(
+        is_first: bool,
+    ) -> impl FnMut(ESpan<'a>) -> IResult<'a, (Node<'a>, Option<char>)> {
+        move |input| {
+            let defer_expr = DeferredError::new();
+            let defer = defer_expr.defer(expression);
+            let mut parser = preceded(
+                cond(!is_first, opt(whitespace)),
                 alt((
-                    variable_decl,
-                    short_function_decl,
-                    preceded(peek(not(ws_before(alt((recognize(chr('}')), eof))))), expression),
-                    no_errors(expression),
+                    pair(
+                        alt((import, function_decl)),
+                        map(opt(ws_before(one_of(";&"))), |x| x.or(Some(';'))),
+                    ),
+                    pair(
+                        alt((
+                            variable_decl,
+                            short_function_decl,
+                            defer,
+                            preceded(
+                                peek(not(ws_before(alt((recognize(chr('}')), eof))))),
+                                defer_expr.restore(),
+                            ),
+                        )),
+                        opt(ws_before(one_of(";&"))),
+                    ),
                 )),
-                opt(ws_before(one_of(";&"))),
-            ),
-        )),
-    )(input_next.clone())
-    {
+            );
+            parser(input)
+        }
+    }
+
+    while let Ok((tail, (node, terminator))) = program_item(vec.is_empty())(input_next.clone()) {
         let node = if let Some('&') = terminator {
             if let Node::FunctionDecl { identifier, parameters, body } = node {
                 Node::FunctionDecl { identifier, parameters, body: Box::new(Node::Async(body)) }
@@ -1579,6 +1638,42 @@ mod test {
     /// Quick constructor for a string literal node.
     fn string(s: &str) -> Node<'_> {
         Node::String(vec![StringElement::Body(sp(s))])
+    }
+
+    #[test]
+    fn deferred() {
+        fn parser<'a>(input: ESpan<'a>) -> IResult<'a, ESpan<'a>> {
+            let defer = DeferredError::new();
+            // This will never match just because we'll never try to parse what it matches. It's not actually a parser that never matches.
+            let never_match = defer.defer(preceded(ex_tag("never_match"), tag("")));
+
+            let mut parser = alt((tag("abc"), never_match, tag("def"), defer.restore()));
+            parser(input)
+        }
+
+        let abc = ESpan::new_extra("abc", (Rc::new(RefCell::new(ParseState::new())), None));
+        let abc = parser(abc).unwrap();
+        assert!(abc.0.fragment().is_empty());
+        let abc = abc.1;
+        assert!(*abc.fragment() == "abc");
+        assert!(abc.extra.1.is_none());
+
+        let def = ESpan::new_extra("def", (Rc::new(RefCell::new(ParseState::new())), None));
+        let def = parser(def).unwrap();
+        assert!(def.0.fragment().is_empty());
+        let def = def.1;
+        assert!(*def.fragment() == "def");
+        assert!(def.extra.1.is_none());
+
+        let ghi = ESpan::new_extra("ghi", (Rc::new(RefCell::new(ParseState::new())), None));
+        let ghi = parser(ghi).unwrap();
+        assert!(*ghi.0.fragment() == "ghi");
+        let ghi = ghi.1;
+        assert!(*ghi.fragment() == "");
+        let error = ghi.extra.1.unwrap();
+        assert!(error.next.is_none());
+        assert!(error.span.fragment().is_empty());
+        assert_eq!("Expected 'never_match'", error.msg);
     }
 
     #[test]
