@@ -329,17 +329,14 @@ mod tests {
     use crate::subsystems::ConfigurationBuilderImpl;
     use assembly_config_schema::product_config::TeeClientFeatures;
     use assembly_file_relative_path::FileRelativePathBuf;
-    use camino::Utf8PathBuf;
     use std::collections::BTreeMap;
-    use tempfile::TempDir;
 
     #[test]
     // This test is a change detector, but we actually want to observe changes
     // in this type of code, which is dynamically generating CML for
     // components which might have security implications.
     fn test_tee_clients() {
-        let temp_dir = TempDir::new().unwrap();
-        let (context, tee_client_config, tee_trusted_app_guids, mut builder) = setup_test(temp_dir);
+        let (context, tee_client_config, tee_trusted_app_guids, mut builder) = setup_test();
 
         TeeClientsConfig::define_configuration(
             &context,
@@ -474,8 +471,7 @@ mod tests {
 
     #[test]
     fn test_tee_manager() {
-        let temp_dir = TempDir::new().unwrap();
-        let (context, tee_client_config, tee_trusted_app_guids, mut builder) = setup_test(temp_dir);
+        let (context, tee_client_config, tee_trusted_app_guids, mut builder) = setup_test();
         TeeClientsConfig::define_configuration(
             &context,
             &(&tee_client_config, &tee_trusted_app_guids),
@@ -581,16 +577,13 @@ mod tests {
         );
     }
 
-    fn setup_test(
-        gendir: TempDir,
-    ) -> (
+    fn setup_test() -> (
         ConfigurationContext<'static>,
         Vec<ProductTeeClient>,
         Vec<uuid::Uuid>,
         ConfigurationBuilderImpl,
     ) {
-        let gendir = Utf8PathBuf::from_path_buf(gendir.path().to_path_buf()).unwrap();
-        let context = ConfigurationContext { gendir, ..ConfigurationContext::default_for_tests() };
+        let context = ConfigurationContext::default_for_tests();
 
         let tee_client_config = vec![ProductTeeClient {
             component_url: "fuchsia-pkg://fuchsia.com/tee-clients/test-app#meta/test-app.cm"
