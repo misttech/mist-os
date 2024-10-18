@@ -14,7 +14,7 @@ use fidl_fuchsia_io as fio;
 use std::borrow::Borrow;
 use std::marker::PhantomData;
 
-use crate::directory::AsRefDirectory;
+use crate::directory::{open_directory_async, AsRefDirectory};
 use crate::DEFAULT_SERVICE_INSTANCE;
 
 /// Path to the service directory in an application's root namespace.
@@ -215,8 +215,9 @@ pub fn connect_to_protocol_at_dir_svc<P: DiscoverableProtocolMarker>(
     directory: &impl AsRefDirectory,
 ) -> Result<P::Proxy, Error> {
     let protocol_path = format!("{}/{}", SVC_DIR, P::PROTOCOL_NAME);
-    // TODO(https://fxbug.dev/42068248): Remove the following line when component
-    // manager no longer mishandles leading slashes.
+    // TODO(https://fxbug.dev/42068248): Some Directory implementations require relative paths,
+    // even though they aren't technically supposed to, so strip the leading slash until that's
+    // resolved one way or the other.
     let protocol_path = protocol_path.strip_prefix('/').unwrap();
     connect_to_named_protocol_at_dir_root::<P>(directory, &protocol_path)
 }
@@ -296,6 +297,14 @@ pub fn connect_to_service_at_dir<S: ServiceMarker>(
     connect_to_service_instance_at_dir::<S>(directory, DEFAULT_SERVICE_INSTANCE)
 }
 
+/// Connect to the "default" instance of a FIDL service hosted in the service subdirectory under
+/// the directory protocol channel `directory`, in the `svc/` subdir.
+pub fn connect_to_service_at_dir_svc<S: ServiceMarker>(
+    directory: &impl AsRefDirectory,
+) -> Result<S::Proxy, Error> {
+    connect_to_service_instance_at_dir_svc::<S>(directory, DEFAULT_SERVICE_INSTANCE)
+}
+
 /// Connect to a named instance of a FIDL service hosted in the service subdirectory under the
 /// directory protocol channel `directory`
 // NOTE: We would like to use impl AsRef<T> to accept a wide variety of string-like
@@ -311,6 +320,20 @@ pub fn connect_to_service_instance_at_dir<S: ServiceMarker>(
         &service_path,
         fio::OpenFlags::empty(),
     )?;
+    Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(directory_proxy))))
+}
+
+/// Connect to an instance of a FIDL service hosted in `directory`, in the `svc/` subdir.
+pub fn connect_to_service_instance_at_dir_svc<S: ServiceMarker>(
+    directory: &impl AsRefDirectory,
+    instance: impl AsRef<str>,
+) -> Result<S::Proxy, Error> {
+    let service_path = format!("{SVC_DIR}/{}/{}", S::SERVICE_NAME, instance.as_ref());
+    // TODO(https://fxbug.dev/42068248): Some Directory implementations require relative paths,
+    // even though they aren't technically supposed to, so strip the leading slash until that's
+    // resolved one way or the other.
+    let service_path = service_path.strip_prefix('/').unwrap();
+    let directory_proxy = open_directory_async(directory, service_path, fio::Rights::empty())?;
     Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(directory_proxy))))
 }
 

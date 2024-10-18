@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use cm_types::NamespacePath;
+use crate::Incoming;
 use namespace::Namespace;
-
 use zx::Status;
 
 use fdf::DispatcherRef;
@@ -19,7 +18,7 @@ pub struct DriverContext {
     pub start_args: DriverStartArgs,
     /// The incoming namespace constructed from [`DriverStartArgs::incoming`]. Since producing this
     /// consumes the incoming namespace from [`Self::start_args`], that will always be [`None`].
-    pub incoming: Namespace,
+    pub incoming: Incoming,
     #[doc(hidden)]
     _private: (),
 }
@@ -29,30 +28,24 @@ impl DriverContext {
         root_dispatcher: DispatcherRef<'static>,
         mut start_args: DriverStartArgs,
     ) -> Result<Self, Status> {
-        let incoming = start_args
+        let incoming_namespace: Namespace = start_args
             .incoming
             .take()
             .unwrap_or_else(|| vec![])
             .try_into()
             .map_err(|_| Status::INVALID_ARGS)?;
+        let incoming = incoming_namespace.try_into().map_err(|_| Status::INVALID_ARGS)?;
         Ok(DriverContext { root_dispatcher, start_args, incoming, _private: () })
     }
 
     pub(crate) fn start_logging(&self, driver_name: &str) -> Result<(), Status> {
-        let Some(svc_path) =
-            self.incoming.get(&NamespacePath::new("/svc").expect("/svc is a valid path"))
-        else {
-            // just bail if there is no service path
-            eprintln!("Warning: no service path offered to driver, proceeding without logging initialized");
-            return Ok(());
+        let log_proxy = match self.incoming.protocol().connect() {
+            Ok(log_proxy) => log_proxy,
+            Err(err) => {
+                eprintln!("Error connecting to log sink proxy at driver startup: {err}. Continuing without logging.");
+                return Ok(());
+            }
         };
-        let log_proxy = fuchsia_component::client::connect_to_protocol_at_dir_root::<
-            fidl_fuchsia_logger::LogSinkMarker,
-        >(svc_path)
-        .map_err(|err| {
-            eprintln!("Error connecting to log sink proxy at driver startup: {err}");
-            Status::INVALID_ARGS
-        })?;
 
         diagnostics_log::initialize(
             diagnostics_log::PublishOptions::default()

@@ -13,20 +13,31 @@ rustc_library("rust") {
 
   deps = [
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_rust",
-    "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/lib/driver/runtime/rust",
     "//sdk/lib/driver/runtime/rust/fdf_sys",
     "//sdk/rust/zx",
     "//src/lib/diagnostics/log/rust",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/sys/lib/cm_types",
     "//src/sys/lib/namespace",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:tracing",
+  ]
+
+  test_deps = [
+    "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_rust",
+    "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_rust",
+    "//src/lib/fuchsia",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
   ]
 
   sources = [
     "src/context.rs",
+    "src/incoming.rs",
     "src/lib.rs",
     "src/macros.rs",
     "src/server.rs",
