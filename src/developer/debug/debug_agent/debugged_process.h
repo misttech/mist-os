@@ -51,6 +51,16 @@ struct DebuggedProcessCreateInfo {
   // may be hidden for some time. "Weak" attaches allow the client to defer loading modules (and not
   // blocking the console) until something interesting happened.
   bool weak = false;
+
+  // Do not attempt to attach to the process exception channel. This is typically used in
+  // conjunction with attaching to the parent job of this process, so that this process (or possibly
+  // us later) may bind to this process's exception channel. In this case, we wait until any
+  // unhandled exception is passed up the job tree to the parent job of this process, meaning no
+  // lower level exception handler handled the exception such that the process could continue.
+  //
+  // The client may issue an explicit attach request for this process to claim the exception
+  // channel (it can still fail if it's already bound).
+  bool deferred_attach = false;
 };
 
 class DebuggedProcess : public ProcessHandleObserver {
@@ -76,6 +86,11 @@ class DebuggedProcess : public ProcessHandleObserver {
 
   // The object is not usable if |Init| is not called or fails.
   debug::Status Init(DebuggedProcessCreateInfo create_info);
+
+  // After a process has been initialized, but hasn't bound this object to the process' exception
+  // channel (i.e. initialized with |deferred_attach| set to true), use this to attach.
+  debug::Status AttachNow();
+  bool IsAttached() const;
 
   void SetStdout(OwnedStdioHandle handle);
   void SetStderr(OwnedStdioHandle handle);

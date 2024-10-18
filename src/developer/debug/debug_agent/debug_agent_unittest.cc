@@ -31,7 +31,7 @@ bool HasAttachedProcessWithKoid(DebugAgent* debug_agent, zx_koid_t koid) {
     return false;
 
   // All of our process handles should be mock ones.
-  return static_cast<MockProcessHandle&>(proc->process_handle()).is_attached();
+  return static_cast<MockProcessHandle&>(proc->process_handle()).IsAttached();
 }
 
 // Setup -------------------------------------------------------------------------------------------
@@ -575,6 +575,176 @@ TEST_F(DebugAgentTests, RecursiveFilterAppliesImplicitFilter) {
   EXPECT_EQ(harness.stream_backend()->component_starts().size(), 1u);
   EXPECT_EQ(harness.stream_backend()->component_starts()[0].component.url, kSubpackageUrl);
   EXPECT_EQ(harness.stream_backend()->component_starts()[0].component.moniker, kSubpackageMoniker);
+}
+
+TEST_F(DebugAgentTests, AttachToExistingJob) {
+  MockDebugAgentHarness harness;
+  RemoteAPI* remote_api = harness.debug_agent();
+
+  constexpr zx_koid_t kJobKoid = 8;
+  constexpr zx_koid_t kProcessKoid = 9;
+
+  debug_ipc::AttachRequest request;
+  request.koid = kJobKoid;
+  request.config.target = debug_ipc::AttachConfig::Target::kJob;
+  request.config.weak = true;
+
+  debug_ipc::AttachReply reply;
+  remote_api->OnAttach(request, &reply);
+
+  // Because we didn't inject all of the notifications.
+  auto debugged_job = harness.debug_agent()->GetDebuggedJob(kJobKoid);
+  ASSERT_TRUE(debugged_job);
+
+  // Simply attaching to a job won't necessarily create the DebuggedProcess objects (i.e. the client
+  // issued a direct attach command to an already running component instead of installing a filter
+  // and waiting for a matching component to start).
+  EXPECT_FALSE(harness.debug_agent()->GetDebuggedProcess(kProcessKoid));
+}
+
+TEST_F(DebugAgentTests, JobOnlyFilter) {
+  MockDebugAgentHarness harness;
+  RemoteAPI* remote_api = harness.debug_agent();
+
+  // Matches the default job tree in MockSystemInterface.
+  constexpr zx_koid_t kJobKoid = 25;
+  constexpr zx_koid_t kProcessKoid = 26;
+  constexpr char kComponentRootMoniker[] = "fixed/moniker";
+
+  debug_ipc::UpdateFilterRequest request;
+  auto& filter = request.filters.emplace_back();
+  filter.type = debug_ipc::Filter::Type::kComponentMonikerSuffix;
+  filter.pattern = kComponentRootMoniker;
+  filter.config.job_only = true;
+  // By specifying a strong attach, we'll claim the job's exception channel, not the debugger
+  // exception channel.
+  filter.config.weak = false;
+
+  debug_ipc::UpdateFilterReply reply;
+  // We don't need to worry about the contents of the reply, it will have all of the child processes
+  // under the component. In a real system, the client will choose what to attach to.
+  remote_api->OnUpdateFilter(request, &reply);
+
+  // Send the notification that the process under this job started.
+  harness.debug_agent()->OnProcessChanged(
+      DebugAgent::ProcessChangedHow::kStarting,
+      harness.debug_agent()->system_interface().GetProcess(kProcessKoid));
+
+  // We should now have both a DebuggedJob and a DebuggedProcess for this job and process. The
+  // process should *not* have the exception channel bound, because the filter was configured as
+  // job_only.
+  EXPECT_EQ(harness.stream_backend()->process_starts().size(), 1u);
+  EXPECT_TRUE(harness.debug_agent()->GetDebuggedJob(kJobKoid));
+  EXPECT_TRUE(harness.debug_agent()->GetDebuggedProcess(kProcessKoid));
+  EXPECT_FALSE(harness.debug_agent()->GetDebuggedProcess(kProcessKoid)->IsAttached());
+}
+
+TEST_F(DebugAgentTests, JobOnlyFilterDoesNotAttachToChildJobs) {
+  MockDebugAgentHarness harness;
+  RemoteAPI* remote_api = harness.debug_agent();
+
+  // Matches the default job tree in MockSystemInterface. This is "job1".
+  constexpr zx_koid_t kJobKoid = 8;
+  // Direct child process of "job1".
+  constexpr zx_koid_t kProcessKoid = 9;
+  // This is a child job of the above, "job11".
+  constexpr zx_koid_t kSecondJobKoid = 13;
+  // Child of job11.
+  constexpr zx_koid_t kSecondProcessKoid = 14;
+
+  // Component moniker associated with all above jobs.
+  constexpr char kComponentRootMoniker[] = "/moniker";
+
+  debug_ipc::UpdateFilterRequest request;
+  auto& filter = request.filters.emplace_back();
+  filter.type = debug_ipc::Filter::Type::kComponentMonikerSuffix;
+  filter.pattern = kComponentRootMoniker;
+  filter.config.job_only = true;
+  // By specifying a strong attach, we'll claim the job's exception channel, not the debugger
+  // exception channel.
+  filter.config.weak = false;
+
+  debug_ipc::UpdateFilterReply reply;
+  // We don't need to worry about the contents of the reply, it will have all of the child processes
+  // under the component. In a real system, the client will choose what to attach to.
+  remote_api->OnUpdateFilter(request, &reply);
+
+  // Send the notification that the child process of "job1" started. This one will always start
+  // first. This should cause us to attach to the root job of the component matching this process,
+  // i.e. "job1".
+  harness.debug_agent()->OnProcessChanged(
+      DebugAgent::ProcessChangedHow::kStarting,
+      harness.debug_agent()->system_interface().GetProcess(kProcessKoid));
+
+  // Send the notification that the child process of "job11" started. This should _not_ attach to
+  harness.debug_agent()->OnProcessChanged(
+      DebugAgent::ProcessChangedHow::kStarting,
+      harness.debug_agent()->system_interface().GetProcess(kSecondProcessKoid));
+
+  // We should now have both processes specified above. Neither process should have the exception
+  // channel bound, because the filter was configured as job_only. Furthermore, the parent job
+  // _should_ be attached (i.e. we'll have a DebuggedJob object for it) and the child job should
+  // _not_ be attached.
+  EXPECT_EQ(harness.stream_backend()->process_starts().size(), 2u);
+  EXPECT_TRUE(harness.debug_agent()->GetDebuggedJob(kJobKoid));
+  // We are _not_ attached to this second job, even though it would also match the component filter.
+  EXPECT_FALSE(harness.debug_agent()->GetDebuggedJob(kSecondJobKoid));
+}
+
+// This test is very similar to the above test. The difference is in the component structure. This
+// test's filter matches multiple components, which respectively in a real system would have unique
+// job_ids, and therefore return multiple results in the filter matching logic. This is different
+// from the above situation where one component (and its corresponding job) contains multiple jobs
+// but no child components.
+TEST_F(DebugAgentTests, DoNotAttachToChildJobs) {
+  MockDebugAgentHarness harness;
+  RemoteAPI* remote_api = harness.debug_agent();
+
+  // From the default MockSystemInterface.
+  constexpr zx_koid_t kParentJobKoid = 35;
+  constexpr zx_koid_t kChildJobKoid = 38;
+
+  // This realm has two ELF components, one is the realm's root, the other is a child. They each
+  // have distinctive job_ids.
+  constexpr char kMonikerPrefix[] = "/some";
+
+  debug_ipc::UpdateFilterRequest request;
+  auto& filter = request.filters.emplace_back();
+  filter.type = debug_ipc::Filter::Type::kComponentMonikerPrefix;
+  filter.pattern = kMonikerPrefix;
+  filter.config.job_only = true;
+  // By specifying a strong attach, we'll claim the job's exception channel, not the debugger
+  // exception channel.
+  filter.config.weak = false;
+
+  debug_ipc::UpdateFilterReply reply;
+  remote_api->OnUpdateFilter(request, &reply);
+
+  // Two filters should have matched.
+  ASSERT_EQ(reply.matched_processes_for_filter.size(), 1u);
+  auto found_job_filter = reply.matched_processes_for_filter[0];
+  auto matched_job_koids = found_job_filter.matched_pids;
+
+  // Two components with unique job_ids match the filter. Both match the moniker prefix filter, but
+  // we should only attach to the parent.
+  EXPECT_EQ(matched_job_koids.size(), 2u);
+  auto parent_job = std::find(matched_job_koids.begin(), matched_job_koids.end(), kParentJobKoid);
+  ASSERT_NE(parent_job, matched_job_koids.end());
+  auto child_job = std::find(matched_job_koids.begin(), matched_job_koids.end(), kChildJobKoid);
+  ASSERT_NE(child_job, matched_job_koids.end());
+
+  // Process starting events will trigger automatic attaching.
+  auto job5_p1 = std::make_unique<MockProcessHandle>(36);
+  job5_p1->set_job_koid(kParentJobKoid);
+  auto job51_p1 = std::make_unique<MockProcessHandle>(39);
+  job51_p1->set_job_koid(kChildJobKoid);
+  harness.debug_agent()->OnProcessChanged(DebugAgent::ProcessChangedHow::kStarting,
+                                          std::move(job5_p1));
+  harness.debug_agent()->OnProcessChanged(DebugAgent::ProcessChangedHow::kStarting,
+                                          std::move(job51_p1));
+
+  EXPECT_TRUE(harness.debug_agent()->GetDebuggedJob(*parent_job));
+  EXPECT_FALSE(harness.debug_agent()->GetDebuggedJob(*child_job));
 }
 
 }  // namespace debug_agent

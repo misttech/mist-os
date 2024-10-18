@@ -106,6 +106,8 @@ class ProcessHandle {
   // multiple times will replace the observer pointer.
   virtual debug::Status Attach(ProcessHandleObserver* observer) = 0;
 
+  virtual bool IsAttached() const = 0;
+
   // Unregisters for process notifications. See Attach(). It is legal to call Detach() multiple
   // times or when not already attached.
   virtual void Detach() = 0;

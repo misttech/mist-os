@@ -26,8 +26,11 @@
 #include "src/developer/debug/debug_agent/process_breakpoint.h"
 #include "src/developer/debug/debug_agent/system_interface.h"
 #include "src/developer/debug/debug_agent/time.h"
+#include "src/developer/debug/ipc/filter_utils.h"
 #include "src/developer/debug/ipc/protocol.h"
+#include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/shared/logging/logging.h"
+#include "src/developer/debug/shared/status.h"
 
 #if defined(__linux__)
 #include <unistd.h>
@@ -59,6 +62,11 @@ std::string LogResumeRequest(const debug_ipc::ResumeRequest& request) {
     ss << ", Range: [" << std::hex << request.range_begin << ", " << request.range_end << "]";
 
   return ss.str();
+}
+
+bool ShouldDeferSendingModules(const debug_ipc::AttachConfig& config) {
+  // Attaching to a job should always defer modules, regardless of |weak|.
+  return config.weak || config.target == debug_ipc::AttachConfig::Target::kJob;
 }
 
 }  // namespace
@@ -299,10 +307,18 @@ void DebugAgent::OnDetach(const debug_ipc::DetachRequest& request, debug_ipc::De
   if (debug_process) {
     RemoveDebuggedProcess(request.koid);
     reply->status = debug::Status();
-  } else {
-    reply->status = debug::Status("Not currently attached to process " +
-                                  std::to_string(request.koid) + " to detach from.");
+    return;
   }
+
+  auto debugged_job = GetDebuggedJob(request.koid);
+  if (debugged_job) {
+    jobs_.erase(request.koid);
+    reply->status = debug::Status();
+    return;
+  }
+
+  reply->status = debug::Status("Not currently attached to " + std::to_string(request.koid) +
+                                " to detach from.");
 }
 
 void DebugAgent::OnPause(const debug_ipc::PauseRequest& request, debug_ipc::PauseReply* reply) {
@@ -627,6 +643,22 @@ std::vector<debug_ipc::ProcessThreadId> DebugAgent::ClientSuspendAll(zx_koid_t e
   return affected;
 }
 
+bool DebugAgent::IsAttachedToParentOrAncestorOf(const ProcessHandle* process) {
+  zx_koid_t parent_koid = system_interface().GetParentJobKoid(process->GetJobKoid());
+
+  while (parent_koid != root_job_->koid()) {
+    auto debugged_job = GetDebuggedJob(parent_koid);
+    if (debugged_job && debugged_job->type() == JobExceptionChannelType::kException) {
+      // We are already attached to a parent job between the process and the root job.
+      return true;
+    }
+
+    parent_koid = system_interface().GetParentJobKoid(parent_koid);
+  }
+
+  return false;
+}
+
 debug::Status DebugAgent::AddDebuggedJob(DebuggedJobCreateInfo&& create_info, DebuggedJob** added) {
   *added = nullptr;
 
@@ -689,12 +721,29 @@ void DebugAgent::OnAttach(const debug_ipc::AttachRequest& request, debug_ipc::At
   DEBUG_LOG(Agent) << "Attemping to attach to process " << request.koid;
   reply->timestamp = GetNowTimestamp();
 
-  // See if we're already attached to this process.
-  for (auto& [koid, proc] : procs_) {
-    if (koid == request.koid) {
-      reply->status = debug::Status(debug::Status::kAlreadyExists,
-                                    "Already attached to process " + std::to_string(proc->koid()));
-      DEBUG_LOG(Agent) << reply->status.message();
+  // See if we already have a DebuggedProcess for this koid. If we do and we're not already attached
+  // (we could be attached to the parent job already), try to attach. This might fail if another
+  // process eagerly claimed the exception channel before us.
+  if (request.config.target == debug_ipc::AttachConfig::Target::kProcess) {
+    if (auto found = procs_.find(request.koid); found != procs_.end()) {
+      DebuggedProcess* proc = found->second.get();
+      if (proc->IsAttached()) {
+        reply->status =
+            debug::Status(debug::Status::kAlreadyExists,
+                          "Already attached to process " + std::to_string(proc->koid()));
+        DEBUG_LOG(Agent) << reply->status.message();
+        return;
+      }
+
+      // If we get here it means we deferred binding the exception channel of this process, and the
+      // client has requested explicitly to attach.
+      reply->status = proc->AttachNow();
+      if (reply->status.has_error()) {
+        DEBUG_LOG(Agent) << std::format("Could not attach to process {}", proc->koid())
+                         << reply->status.message();
+      }
+
+      DEBUG_LOG(Agent) << std::format("Attached to process {}", proc->koid());
       return;
     }
   }
@@ -706,6 +755,14 @@ void DebugAgent::OnAttach(const debug_ipc::AttachRequest& request, debug_ipc::At
       return;
 
     DEBUG_LOG(Agent) << "Could not attach to process in limbo: " << reply->status.message();
+  }
+
+  if (request.config.target == debug_ipc::AttachConfig::Target::kJob) {
+    reply->status = AttachToExistingJob(request.koid, request.config, reply);
+    if (reply->status.ok())
+      return;
+
+    DEBUG_LOG(Agent) << "Could not attach to job: " << reply->status.message();
   }
 
   // Attempt to attach to an existing process. Sends the appropriate replies/notifications.
@@ -783,6 +840,7 @@ debug::Status DebugAgent::AttachToExistingProcess(zx_koid_t process_koid,
   DebuggedProcess* process = nullptr;
   DebuggedProcessCreateInfo create_info(std::move(process_handle));
   create_info.weak = config.weak;
+  create_info.deferred_attach = config.target == debug_ipc::AttachConfig::Target::kJob;
   if (auto status = AddDebuggedProcess(std::move(create_info), &process); status.has_error())
     return status;
 
@@ -798,7 +856,7 @@ debug::Status DebugAgent::AttachToExistingProcess(zx_koid_t process_koid,
           return;
         if (DebuggedProcess* process = weak_this->GetDebuggedProcess(koid)) {
           process->PopulateCurrentThreads();
-          if (!config.weak)
+          if (!ShouldDeferSendingModules(config))
             process->SuspendAndSendModules();
         }
       });
@@ -818,6 +876,36 @@ debug::Status DebugAgent::AttachToRootJob() {
   // root job.
   FX_DCHECK(status.ok());
   FX_DCHECK(root_job_ != nullptr);
+
+  return status;
+}
+
+debug::Status DebugAgent::AttachToExistingJob(zx_koid_t job_koid,
+                                              const debug_ipc::AttachConfig& config,
+                                              debug_ipc::AttachReply* reply) {
+  DebuggedJob* debugged_job;
+  DebuggedJobCreateInfo info(system_interface().GetJob(job_koid));
+  info.type =
+      config.weak ? JobExceptionChannelType::kDebugger : JobExceptionChannelType::kException;
+
+  // Check the validity of the JobHandle here. We don't pass the job's koid to |AddDebuggedJob|, so
+  // it can only get the koid by dereferencing the JobHandle, so we can print a better error message
+  // here.
+  if (info.handle == nullptr) {
+    return debug::Status(std::format("Job with koid {} not found", job_koid));
+  }
+
+  auto status = AddDebuggedJob(std::move(info), &debugged_job);
+
+  if (status.has_error()) {
+    return status;
+  }
+
+  // Won't have a reply object to fill out if this comes from a filter.
+  if (reply) {
+    reply->components = system_interface().GetComponentManager().FindComponentInfo(job_koid);
+    reply->koid = job_koid;
+  }
 
   return status;
 }
@@ -886,6 +974,34 @@ void DebugAgent::OnProcessChanged(ProcessChangedHow how,
 #endif
   }
 
+  bool weak = matched_filter ? matched_filter->config.weak : false;
+  bool job_only = matched_filter ? matched_filter->config.job_only : false;
+
+  // If we have a job only filter then we only watch for exceptions from the parent job and do not
+  // attach to the process (but we do create a DebuggedProcess object for it below).
+  if (job_only) {
+    // There's nothing to stop a user from installing a filter that matches a child component with
+    // its own unique job_id and then another filter that matches a parent, so this won't completely
+    // stop you from attaching to multiple jobs in the job tree. If this happens, releasing an
+    // exception reported from the child job job will result in us catching it again at the next job
+    // in the tree we're attached to, which could be confusing.
+    if (!IsAttachedToParentOrAncestorOf(process_handle.get())) {
+      debug_ipc::AttachConfig config;
+      config.weak = matched_filter->config.weak;
+
+      auto status = AttachToExistingJob(process_handle->GetJobKoid(), config, nullptr);
+      if (status.has_error()) {
+        LOGS(Warn) << "AttachToJob failed for job " << process_handle->GetJobKoid() << ": "
+                   << status.message();
+      }
+    }
+
+    // We can't return yet because we need to tell the front end about this process and its threads
+    // because the front end needs to be able to associate all exceptions with a process and thread.
+    // Importantly, the DebuggedProcessCreateInfo will defer claiming the process's exception
+    // channel.
+  }
+
   DEBUG_LOG(Process) << "Process starting, koid: " << process_handle->GetKoid();
 
   // Prepare the notification but don't send yet because |process_handle| will be moved and
@@ -898,11 +1014,10 @@ void DebugAgent::OnProcessChanged(ProcessChangedHow how,
   notify.components = system_interface_->GetComponentManager().FindComponentInfo(*process_handle);
   notify.filter_id = matched_filter ? matched_filter->id : debug_ipc::kInvalidFilterId;
 
-  bool weak = matched_filter ? matched_filter->config.weak : false;
-
   DebuggedProcessCreateInfo create_info(std::move(process_handle));
   create_info.stdio = std::move(stdio);
   create_info.weak = weak;
+  create_info.deferred_attach = job_only;
 
   DebuggedProcess* new_process = nullptr;
   debug::Status status = AddDebuggedProcess(std::move(create_info), &new_process);
@@ -916,12 +1031,12 @@ void DebugAgent::OnProcessChanged(ProcessChangedHow how,
 
   new_process->PopulateCurrentThreads();
 
-  // If this wasn't a weak attach, we need to send modules here. We cannot wait for the client to
+  // If this is a strong attach, we need to send modules here. We cannot wait for the client to
   // request all the modules later because we won't be able to load symbols early enough to set
   // breakpoints on things like _dl_start, which will resolve from the first modules being sent
   // now. The rest of the modules will be sent later on when the client requests them or we hit the
   // loader breakpoint.
-  if (!weak) {
+  if (!debug_ipc::FilterDefersModules(matched_filter)) {
     new_process->SuspendAndSendModules();
   }
 }

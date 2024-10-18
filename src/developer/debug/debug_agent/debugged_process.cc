@@ -122,9 +122,13 @@ void DebuggedProcess::DetachFromProcess() {
 }
 
 debug::Status DebuggedProcess::Init(DebuggedProcessCreateInfo create_info) {
-  // Watch for process events.
-  if (debug::Status status = create_info.handle->Attach(this); status.has_error())
-    return status;
+  if (!create_info.deferred_attach) {
+    // When we defer attaching, we explicitly do not attempt to claim the process's exception
+    // channels. Typically this means we're attached to the parent job and watching for exceptions
+    // there, giving other tools the ability to attach to the process's exception channel directly.
+    if (debug::Status status = create_info.handle->Attach(this); status.has_error())
+      return status;
+  }
 
   process_handle_ = std::move(create_info.handle);
   from_limbo_ = create_info.from_limbo;
@@ -166,6 +170,20 @@ debug::Status DebuggedProcess::Init(DebuggedProcessCreateInfo create_info) {
 #endif
 
   return debug::Status();
+}
+
+debug::Status DebuggedProcess::AttachNow() {
+  // This object should have already been initialized.
+  FX_DCHECK(process_handle_);
+
+  return process_handle_->Attach(this);
+}
+
+bool DebuggedProcess::IsAttached() const {
+  // This object should have already been initialized.
+  FX_DCHECK(process_handle_);
+
+  return process_handle_->IsAttached();
 }
 
 void DebuggedProcess::OnResume(const debug_ipc::ResumeRequest& request) {

@@ -126,6 +126,8 @@ debug::Status ZirconProcessHandle::Attach(ProcessHandleObserver* observer) {
   return debug::Status();
 }
 
+bool ZirconProcessHandle::IsAttached() const { return process_watch_handle_.watching(); }
+
 void ZirconProcessHandle::Detach() {
   observer_ = nullptr;
 

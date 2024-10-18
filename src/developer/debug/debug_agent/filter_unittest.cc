@@ -71,7 +71,7 @@ TEST(Filter, ApplyToJob) {
   debug_ipc::Filter filter{.type = debug_ipc::Filter::Type::kProcessName, .pattern = "root-p1"};
   EXPECT_EQ(1ull, Filter(filter).ApplyToJob(*root, *system_interface).size());
   filter = {.type = debug_ipc::Filter::Type::kProcessNameSubstr, .pattern = "p1"};
-  EXPECT_EQ(5ull, Filter(filter).ApplyToJob(*root, *system_interface).size());
+  EXPECT_EQ(9ull, Filter(filter).ApplyToJob(*root, *system_interface).size());
   filter = {.type = debug_ipc::Filter::Type::kProcessNameSubstr, .pattern = "p1", .job_koid = 8};
   EXPECT_EQ(3ull, Filter(filter).ApplyToJob(*root, *system_interface).size());
   filter = {.type = debug_ipc::Filter::Type::kComponentName, .pattern = "component.cm"};

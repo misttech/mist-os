@@ -17,6 +17,11 @@
 
 namespace debug_agent {
 
+bool Filter::MatchesJob(const JobHandle& job, SystemInterface& system_interface) const {
+  const auto& components = system_interface.GetComponentManager().FindComponentInfo(job.GetKoid());
+  return debug_ipc::FilterMatches(filter_, job.GetName(), components);
+}
+
 bool Filter::MatchesProcess(const ProcessHandle& process, SystemInterface& system_interface) const {
   if (filter_.job_koid) {
     zx_koid_t job_koid = process.GetJobKoid();
@@ -48,9 +53,17 @@ std::vector<zx_koid_t> Filter::ApplyToJob(const JobHandle& job,
                                           SystemInterface& system_interface) const {
   std::vector<zx_koid_t> res;
   std::function<void(const JobHandle& job)> visit_each_job = [&](const JobHandle& job) {
-    for (const auto& process : job.GetChildProcesses()) {
-      if (MatchesProcess(*process, system_interface)) {
-        res.push_back(process->GetKoid());
+    if (filter_.config.job_only) {
+      // Don't add the root job.
+      if (job.GetKoid() != system_interface.GetRootJob()->GetKoid() &&
+          MatchesJob(job, system_interface)) {
+        res.push_back(job.GetKoid());
+      }
+    } else {
+      for (const auto& process : job.GetChildProcesses()) {
+        if (MatchesProcess(*process, system_interface)) {
+          res.push_back(process->GetKoid());
+        }
       }
     }
     for (const auto& child : job.GetChildJobs()) {

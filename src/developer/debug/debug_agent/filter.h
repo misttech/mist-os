@@ -23,6 +23,10 @@ class Filter {
 
   const debug_ipc::Filter& filter() const { return filter_; }
 
+  // Returns whether the job matches the filter. SystemInterface is needed here
+  // to fetch the component info about the job.
+  bool MatchesJob(const JobHandle& process, SystemInterface& system_interface) const;
+
   // Returns whether the process matches the filter. SystemInterface is needed here to fetch
   // the component info about a process and get the parent job of a process.
   bool MatchesProcess(const ProcessHandle& process, SystemInterface& system_interface) const;

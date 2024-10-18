@@ -38,7 +38,7 @@ bool FilterMatches(const Filter& filter, const std::string& process_name,
     return false;
   }
 
-  return std::any_of(components.cbegin(), components.cend(), [&](const auto& component) {
+  return std::any_of(components.cbegin(), components.cend(), [&](const ComponentInfo& component) {
     switch (filter.type) {
       case Filter::Type::kComponentName:
         return component.url.substr(component.url.find_last_of('/') + 1) == filter.pattern;
@@ -54,6 +54,12 @@ bool FilterMatches(const Filter& filter, const std::string& process_name,
         return false;
     }
   });
+}
+
+bool FilterDefersModules(const Filter* filter) {
+  if (filter == nullptr)
+    return false;
+  return filter->config.weak || filter->config.job_only;
 }
 
 }  // namespace debug_ipc

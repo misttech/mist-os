@@ -245,8 +245,9 @@ zx_status_t MessageLoopFuchsia::WatchJobExceptions(WatchJobConfig config,
   }
 
   // Create and track the exception handle.
-  zx_status_t status =
-      AddChannelExceptionHandler(watch_id, config.job_handle, ZX_EXCEPTION_CHANNEL_DEBUGGER, &info);
+  zx_status_t status;
+  uint32_t options = config.use_debugger_channel ? ZX_EXCEPTION_CHANNEL_DEBUGGER : 0;
+  status = AddChannelExceptionHandler(watch_id, config.job_handle, options, &info);
   if (status != ZX_OK)
     return status;
 
