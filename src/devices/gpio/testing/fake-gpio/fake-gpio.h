@@ -65,8 +65,6 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
   FakeGpio();
 
   // fidl::testing::WireTestBase<fuchsia_hardware_gpu::Gpio>
-  void GetInterrupt2(GetInterrupt2RequestView request,
-                     GetInterrupt2Completer::Sync& completer) override;
   void GetInterrupt(GetInterruptRequestView request,
                     GetInterruptCompleter::Sync& completer) override;
   void ConfigureInterrupt(ConfigureInterruptRequestView request,

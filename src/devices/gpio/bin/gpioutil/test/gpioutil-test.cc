@@ -109,8 +109,6 @@ class FakeGpio : public fidl::WireServer<Gpio>,
     mock_get_interrupt_.Call();
     completer.ReplySuccess(std::move(interrupt));
   }
-  void GetInterrupt2(GetInterrupt2RequestView request,
-                     GetInterrupt2Completer::Sync& completer) override {}
   void ConfigureInterrupt(fuchsia_hardware_gpio::wire::GpioConfigureInterruptRequest* request,
                           ConfigureInterruptCompleter::Sync& completer) override {
     ASSERT_TRUE(request->config.has_mode());

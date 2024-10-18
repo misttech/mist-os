@@ -45,29 +45,6 @@ FakeGpio::FakeGpio() : set_buffer_mode_callback_(DefaultSetBufferModeCallback) {
   interrupt_ = zx::ok(std::move(interrupt));
 }
 
-void FakeGpio::GetInterrupt2(GetInterrupt2RequestView request,
-                             GetInterrupt2Completer::Sync& completer) {
-  if (interrupt_.is_error()) {
-    completer.ReplyError(interrupt_.error_value());
-    return;
-  }
-
-  if (interrupt_used_.exchange(/*desired=*/true, std::memory_order_relaxed)) {
-    completer.ReplyError(ZX_ERR_ALREADY_BOUND);
-    return;
-  }
-
-  auto sub_state = state_log_.empty() ? ReadSubState{} : state_log_.back().sub_state;
-  state_log_.emplace_back(State{
-      .interrupt_options = request->options,
-      .sub_state = sub_state,
-  });
-
-  zx::interrupt interrupt;
-  ZX_ASSERT(interrupt_.value().duplicate(ZX_RIGHT_SAME_RIGHTS, &interrupt) == ZX_OK);
-  completer.ReplySuccess(std::move(interrupt));
-}
-
 void FakeGpio::GetInterrupt(GetInterruptRequestView request,
                             GetInterruptCompleter::Sync& completer) {
   if (interrupt_.is_error()) {

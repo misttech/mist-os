@@ -109,26 +109,6 @@ void GpioDevice::GetInterrupt(GetInterruptRequestView request,
               }));
 }
 
-void GpioDevice::GetInterrupt2(GetInterrupt2RequestView request,
-                               GetInterrupt2Completer::Sync& completer) {
-  fdf::Arena arena('GPIO');
-  pinimpl_.buffer(arena)
-      ->GetInterrupt(pin_, request->options)
-      .ThenExactlyOnce(
-          fit::inline_callback<
-              void(fdf::WireUnownedResult<fuchsia_hardware_pinimpl::PinImpl::GetInterrupt>&),
-              sizeof(GetInterrupt2Completer::Async)>(
-              [completer = completer.ToAsync()](auto& result) mutable {
-                if (!result.ok()) {
-                  completer.ReplyError(result.status());
-                } else if (result->is_error()) {
-                  completer.ReplyError(result->error_value());
-                } else {
-                  completer.ReplySuccess(std::move(result->value()->interrupt));
-                }
-              }));
-}
-
 void GpioDevice::ConfigureInterrupt(
     fuchsia_hardware_gpio::wire::GpioConfigureInterruptRequest* request,
     ConfigureInterruptCompleter::Sync& completer) {

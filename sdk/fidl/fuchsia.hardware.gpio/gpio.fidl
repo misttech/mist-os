@@ -59,13 +59,6 @@ open protocol Gpio {
         interrupt zx.Handle:INTERRUPT;
     }) error zx.Status;
 
-    // TODO(42082459): Remove this after completing the transition to `GetInterrupt()`.
-    strict GetInterrupt2(struct {
-        options InterruptOptions;
-    }) -> (resource struct {
-        interrupt zx.Handle:INTERRUPT;
-    }) error zx.Status;
-
     /// Configures the polarity of an interrupt and whether it is edge- or level-triggered. Only the
     /// client with the interrupt can call `ConfigureInterrupt()`, unless no client has an
     /// interrupt.
