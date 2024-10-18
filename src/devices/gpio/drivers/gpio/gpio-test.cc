@@ -214,11 +214,12 @@ TEST_F(GpioTest, TestGpioAll) {
   driver_test().runtime().Run();
   driver_test().runtime().ResetQuit();
 
-  gpio_client->Write(11).ThenExactlyOnce(
-      [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::Write>& result) {
-        EXPECT_OK(result.status());
-        driver_test().runtime().Quit();
-      });
+  gpio_client->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputHigh)
+      .ThenExactlyOnce(
+          [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::SetBufferMode>& result) {
+            EXPECT_OK(result.status());
+            driver_test().runtime().Quit();
+          });
   driver_test().runtime().Run();
   driver_test().runtime().ResetQuit();
 
@@ -246,26 +247,6 @@ TEST_F(GpioTest, TestGpioAll) {
 
   EXPECT_EQ(pin_state(1).mode, MockPinImpl::PinState::kOut);
   EXPECT_TRUE(pin_state(1).value);
-
-  gpio_client->SetDriveStrength(2000).ThenExactlyOnce(
-      [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::SetDriveStrength>& result) {
-        ASSERT_OK(result.status());
-        EXPECT_EQ(result->value()->actual_ds_ua, 2000ul);
-        driver_test().runtime().Quit();
-      });
-  driver_test().runtime().Run();
-  driver_test().runtime().ResetQuit();
-
-  EXPECT_EQ(pin_state(1).drive_strength, 2000ul);
-
-  gpio_client->GetDriveStrength().ThenExactlyOnce(
-      [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::GetDriveStrength>& result) {
-        ASSERT_OK(result.status());
-        EXPECT_EQ(result->value()->result_ua, 2000ul);
-        driver_test().runtime().Quit();
-      });
-  driver_test().runtime().Run();
-  driver_test().runtime().ResetQuit();
 
   fidl::Arena arena;
   auto interrupt_config = [&arena](fuchsia_hardware_gpio::InterruptMode mode) {
@@ -390,6 +371,15 @@ TEST_F(GpioTest, TestPinAll) {
 
         ASSERT_TRUE(result->value()->new_config.has_function());
         EXPECT_EQ(result->value()->new_config.function(), 1u);
+
+        ASSERT_TRUE(result->value()->new_config.has_drive_strength_ua());
+        EXPECT_EQ(result->value()->new_config.drive_strength_ua(), 2000u);
+      });
+
+  pin_client->Configure({}).ThenExactlyOnce(
+      [&](fidl::WireUnownedResult<fuchsia_hardware_pin::Pin::Configure>& result) {
+        ASSERT_TRUE(result.ok());
+        ASSERT_TRUE(result->is_ok());
 
         ASSERT_TRUE(result->value()->new_config.has_drive_strength_ua());
         EXPECT_EQ(result->value()->new_config.drive_strength_ua(), 2000u);
@@ -758,7 +748,7 @@ TEST_F(GpioTest, SchedulerRole) {
 
     // The GPIO driver should be bound on a different dispatcher, so a sync client should work here.
     fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio_client(*std::move(client_end));
-    auto result = gpio_client->Write(true);
+    auto result = gpio_client->SetBufferMode(fuchsia_hardware_gpio::BufferMode::kOutputHigh);
     ASSERT_TRUE(result.ok());
     EXPECT_TRUE(result->is_ok());
   }
