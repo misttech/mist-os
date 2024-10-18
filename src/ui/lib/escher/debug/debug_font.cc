@@ -350,6 +350,15 @@ std::unique_ptr<uint8_t[]> DebugFont::GetFontPixels() {
   // == 11111 10000 11110 10000 10000
   glyph_bits[int32_t{'F'}] = 0x1F87A10;
 
+  // ‘H’
+  // 1...1
+  // 1...1
+  // 11111
+  // 1...1
+  // 1...1
+  // == 10001 10001 11111 10001 10001
+  glyph_bits[int32_t{'H'}] = 0x118FE31;
+
   // TODO(https://fxbug.dev/42152489): glyphs for ASCII 0x47 - 0x48
 
   // ‘I’
