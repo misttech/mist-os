@@ -60,7 +60,7 @@ class TaskEnumerator {
                                 zx_koid_t parent_koid) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  virtual zx_status_t OnThread(int depth, zx_handle_t process, zx_koid_t koid,
+  virtual zx_status_t OnThread(int depth, zx_handle_t thread, zx_koid_t koid,
                                zx_koid_t parent_koid) {
     return ZX_ERR_NOT_SUPPORTED;
   }
