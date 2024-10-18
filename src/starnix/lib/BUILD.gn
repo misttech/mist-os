@@ -4,6 +4,7 @@
 
 group("lib") {
   deps = [
+    "kernel_manager",
     "linux_uapi",
     "magma",
     "starnix-lifecycle",
@@ -20,6 +21,7 @@ group("tests") {
     "ebpf:tests",
     "expando:tests",
     "extended_pstate:tests",
+    "kernel_manager:tests",
     "range_map:tests",
     "selinux:tests",
     "starnix-lifecycle:tests",

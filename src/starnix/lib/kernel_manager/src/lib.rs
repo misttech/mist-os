@@ -362,7 +362,8 @@ struct ChannelProxy {
 }
 
 /// Starts a thread that proxies messages between `proxy.container_channel` and
-/// `proxy.remote_channel`. The thread will exit when either of the channels' peer is closed.
+/// `proxy.remote_channel`. The thread will exit when either of the channels' peer is closed, or
+/// if `proxy.resume_event`'s peer is closed.
 ///
 /// When the proxy exits, `proxy.resume_event` will be removed from `resume_events`.
 fn start_proxy(proxy: ChannelProxy, resume_events: Arc<Mutex<Vec<zx::EventPair>>>, name: String) {
@@ -470,8 +471,15 @@ fn forward_message(
         if let Some(event) = event {
             // Wait for the kernel endpoint to signal that the event has been handled, and
             // that it is now safe to suspend the container again.
-            match event.wait_handle(KERNEL_SIGNAL, zx::MonotonicInstant::INFINITE) {
-                Ok(_) => {}
+            match event.wait_handle(
+                KERNEL_SIGNAL | zx::Signals::EVENTPAIR_PEER_CLOSED,
+                zx::MonotonicInstant::INFINITE,
+            ) {
+                Ok(signals) => {
+                    if signals.contains(zx::Signals::EVENTPAIR_PEER_CLOSED) {
+                        return Err(anyhow!("Proxy eventpair was closed"));
+                    }
+                }
                 Err(e) => {
                     tracing::warn!("Failed to wait on proxied channels in runner: {:?}", e);
                     return Err(anyhow!("Failed to wait on signal from kernel"));
@@ -608,9 +616,31 @@ mod test {
             remote_channel: remote_client,
             resume_event,
         };
-        start_proxy(channel_proxy, Default::default(), test.to_string());
+        start_proxy(channel_proxy, Default::default(), "test".to_string());
 
         std::mem::drop(remote_server);
+
+        assert!(local_client
+            .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::MonotonicInstant::INFINITE)
+            .is_ok());
+    }
+
+    #[fuchsia::test]
+    async fn test_peer_closed_event() {
+        let (local_client, local_server) = zx::Channel::create();
+        let (remote_client, remote_server) = zx::Channel::create();
+        let (resume_event, local_resume_event) = zx::EventPair::create();
+
+        let channel_proxy = ChannelProxy {
+            container_channel: local_server,
+            remote_channel: remote_client,
+            resume_event,
+        };
+        start_proxy(channel_proxy, Default::default(), "test".to_string());
+
+        std::mem::drop(local_resume_event);
+
+        assert!(remote_server.write(&[0x0, 0x1, 0x2], &mut []).is_ok());
 
         assert!(local_client
             .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::MonotonicInstant::INFINITE)

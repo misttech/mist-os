@@ -6,6 +6,12 @@ import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 import("//src/starnix/kernel/args.gni")
 
+group("tests") {
+  testonly = true
+
+  deps = [ ":starnix_kernel_manager-tests" ]
+}
+
 rustc_library("kernel_manager") {
   edition = "2021"
   sources = [
