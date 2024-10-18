@@ -15,6 +15,7 @@
 #include <lib/fidl/cpp/binding.h>
 #include <lib/inspect/cpp/reader.h>
 #include <lib/inspect/testing/cpp/inspect.h>
+#include <lib/sync/cpp/completion.h>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -197,6 +198,7 @@ class DriverHostTest : public testing::Test {
     fidl::BindServer(loop().dispatcher(), std::move(driver_host_endpoints->server), &driver_host());
     fidl::Client client(std::move(driver_host_endpoints->client), loop().dispatcher());
     zx_status_t epitaph = ZX_ERR_BAD_STATE;
+    libsync::Completion start_callback;
     {
       fdata::Dictionary dictionary = {{.entries = std::move(program_entries)}};
 
@@ -212,20 +214,23 @@ class DriverHostTest : public testing::Test {
           .Then([&](auto result) {
             if (result.is_ok()) {
               epitaph = ZX_OK;
-              loop().Quit();
+              start_callback.Signal();
               return;
             }
             if (result.error_value().is_framework_error()) {
               epitaph = result.error_value().framework_error().status();
-              loop().Quit();
+              start_callback.Signal();
               return;
             }
             epitaph = result.error_value().domain_error();
-            loop().Quit();
+            start_callback.Signal();
           });
     }
-    EXPECT_EQ(ZX_ERR_CANCELED, loop().Run());
-    loop().ResetQuit();
+
+    while (!start_callback.signaled()) {
+      loop().RunUntilIdle();
+    }
+
     EXPECT_EQ(expected_epitaph, epitaph);
 
     return {
@@ -346,8 +351,6 @@ TEST_F(DriverHostTest, Start_ReturnError) {
   };
   auto [driver, outgoing_dir] = StartDriver(std::move(symbols), nullptr, error);
 
-  driver.reset();
-  loop().RunUntilIdle();
   fdf_internal_wait_until_all_dispatchers_destroyed();
   EXPECT_EQ(ZX_ERR_CANCELED, loop().RunUntilIdle());
   EXPECT_EQ(ASYNC_LOOP_QUIT, loop().GetState());
