@@ -35,6 +35,13 @@ class ThreadGroup;
 class Task;
 class WaitingOptions;
 
+namespace internal {
+// ProcessGroupMutableState
+struct ProcessGroupTag {};
+// ThreadGroupMutableState
+struct ThreadGroupTag {};
+}  // namespace internal
+
 // Represents the exit information of a process
 struct ProcessExitInfo {
   ExitStatus status;
@@ -161,7 +168,8 @@ class ProcessSelector {
 class ThreadGroupMutableState {
  public:
   using BTreeMapTaskContainer = fbl::WAVLTree<pid_t, ktl::unique_ptr<TaskContainer>>;
-  using BTreeMapThreadGroup = fbl::WAVLTree<pid_t, util::WeakPtr<ThreadGroup>>;
+  using BTreeMapThreadGroup =
+      fbl::TaggedWAVLTree<pid_t, util::WeakPtr<ThreadGroup>, internal::ThreadGroupTag>;
 
  private:
   // The parent thread group.
@@ -330,8 +338,11 @@ class ThreadGroupMutableState {
 /// `pid` as the `tgid` is called the thread group leader.
 ///
 /// Thread groups are destroyed when the last task in the group exits.
-class ThreadGroup : public fbl::RefCountedUpgradeable<ThreadGroup>,
-                    public fbl::WAVLTreeContainable<util::WeakPtr<ThreadGroup>> {
+class ThreadGroup
+    : public fbl::RefCountedUpgradeable<ThreadGroup>,
+      public fbl::ContainableBaseClasses<
+          fbl::TaggedWAVLTreeContainable<util::WeakPtr<ThreadGroup>, internal::ProcessGroupTag>,
+          fbl::TaggedWAVLTreeContainable<util::WeakPtr<ThreadGroup>, internal::ThreadGroupTag>> {
  private:
   /// Weak reference to the `OwnedRef` of this `ThreadGroup`. This allows to retrieve the
   /// `TempRef` from a raw `ThreadGroup`.
@@ -435,15 +446,16 @@ class ThreadGroup : public fbl::RefCountedUpgradeable<ThreadGroup>,
   const KernelHandle<ProcessDispatcher>& process() const { return process_; }
   pid_t leader() const { return leader_; }
 
-  ~ThreadGroup();
-
   // WAVL-tree Index
   pid_t GetKey() const { return leader_; }
 
+  ~ThreadGroup();
+
  private:
-  ThreadGroup(fbl::RefPtr<Kernel> kernel, KernelHandle<ProcessDispatcher> process,
-              ktl::optional<starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent,
-              pid_t leader, fbl::RefPtr<ProcessGroup> process_group);
+  ThreadGroup(
+      fbl::RefPtr<Kernel> kernel, KernelHandle<ProcessDispatcher> process,
+      ktl::optional<starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard>& parent,
+      pid_t leader, fbl::RefPtr<ProcessGroup> process_group);
 };
 
 }  // namespace starnix
