@@ -34,6 +34,7 @@ zx_library("starnix_core") {
     "task/syscalls.cc",
     "task/task.cc",
     "task/thread_group.cc",
+    "task/waiter.cc",
     "testing.cc",
     "vfs/anon_node.cc",
     "vfs/buffers/io_buffers.cc",
