@@ -537,7 +537,7 @@ template("fidl_library") {
 
         # Avoid clobbering existing FIDL sources.
         gen_dir = "$target_gen_dir/$level"
-        json_representation = "$gen_dir/$target_name.fidl.json"
+        json_representation = "${gen_dir}/${main_target_name}.fidl.json"
         out_json_summary = "$gen_dir/$library_name.api_summary.json"
       }
       sdk_atom_deps += [ ":$fidl_ir_target_name" ]
