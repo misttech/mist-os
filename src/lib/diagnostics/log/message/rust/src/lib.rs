@@ -7,7 +7,7 @@ use byteorder::{ByteOrder, LittleEndian};
 use diagnostics_data::{
     BuilderArgs, ExtendedMoniker, LogsData, LogsDataBuilder, LogsField, LogsProperty, Severity,
 };
-use diagnostics_log_encoding::{Argument, Value, ValueUnknown};
+use diagnostics_log_encoding::{Argument, Value};
 use flyweights::FlyStr;
 
 use libc::{c_char, c_int};
@@ -69,53 +69,37 @@ pub fn from_structured(source: MonikerWithUrl, bytes: &[u8]) -> Result<LogsData,
     }
 
     // Raw value from the client that we don't trust (not yet sanitized)
-    for Argument { name, value } in record.arguments {
-        let label = LogsField::from(name);
-        match (value, label) {
-            (Value::SignedInt(v), LogsField::Dropped) => {
-                builder = builder.set_dropped(v as u64);
+    for argument in record.arguments {
+        match argument {
+            Argument::Tag(tag) => {
+                builder = builder.add_tag(tag.as_str());
             }
-            (Value::UnsignedInt(v), LogsField::Dropped) => {
-                builder = builder.set_dropped(v);
+            Argument::Pid(pid) => {
+                builder = builder.set_pid(pid.raw_koid());
             }
-            (Value::Floating(f), LogsField::Dropped) => {
-                return Err(MessageError::ExpectedInteger {
-                    value: format!("{:?}", f),
-                    found: "float",
-                })
+            Argument::Tid(tid) => {
+                builder = builder.set_tid(tid.raw_koid());
             }
-            (Value::Text(t), LogsField::Dropped) => {
-                return Err(MessageError::ExpectedInteger { value: t, found: "text" });
+            Argument::Dropped(dropped) => {
+                builder = builder.set_dropped(dropped);
             }
-            (Value::Text(text), LogsField::Tag) => {
-                builder = builder.add_tag(text);
+            Argument::File(file) => {
+                builder = builder.set_file(file.as_str());
             }
-            (_, LogsField::Tag) => {
-                return Err(MessageError::UnrecognizedValue);
+            Argument::Line(line) => {
+                builder = builder.set_line(line);
             }
-            (Value::UnsignedInt(v), LogsField::ProcessId) => {
-                builder = builder.set_pid(v);
+            Argument::Message(msg) => {
+                builder = builder.set_message(msg.as_str());
             }
-            (Value::UnsignedInt(v), LogsField::ThreadId) => {
-                builder = builder.set_tid(v);
-            }
-            (Value::Text(v), LogsField::Msg) => {
-                builder = builder.set_message(v);
-            }
-            (Value::Text(v), LogsField::FilePath) => {
-                builder = builder.set_file(v);
-            }
-            (Value::UnsignedInt(v), LogsField::LineNumber) => {
-                builder = builder.set_line(v);
-            }
-            (value, label) => {
+            Argument::Other { value, name } => {
+                let name = LogsField::Other(name.to_string());
                 builder = builder.add_key(match value {
-                    Value::SignedInt(v) => LogsProperty::Int(label, v),
-                    Value::UnsignedInt(v) => LogsProperty::Uint(label, v),
-                    Value::Floating(v) => LogsProperty::Double(label, v),
-                    Value::Text(v) => LogsProperty::String(label, v),
-                    Value::Boolean(v) => LogsProperty::Bool(label, v),
-                    ValueUnknown!() => return Err(MessageError::UnrecognizedValue),
+                    Value::SignedInt(v) => LogsProperty::Int(name, v),
+                    Value::UnsignedInt(v) => LogsProperty::Uint(name, v),
+                    Value::Floating(v) => LogsProperty::Double(name, v),
+                    Value::Text(v) => LogsProperty::String(name, v.to_string()),
+                    Value::Boolean(v) => LogsProperty::Bool(name, v),
                 })
             }
         }

@@ -8,10 +8,10 @@ use fidl_fuchsia_validate_logs::{
 };
 use fuchsia_async::Task;
 use fuchsia_component::server::ServiceFs;
-use fuchsia_runtime as rt;
 use futures::prelude::*;
 use tracing::*;
 use zx::{self as zx, AsHandleRef};
+use {diagnostics_log_validator_utils as utils, fuchsia_runtime as rt};
 
 #[fuchsia::main(always_log_file_line = true)]
 async fn main() {
@@ -80,8 +80,9 @@ async fn run_puppet(mut requests: LogSinkPuppetRequestStream) {
             }
             LogSinkPuppetRequest::EmitLog {
                 responder,
-                spec: RecordSpec { file, line, mut record },
+                spec: RecordSpec { file, line, record },
             } => {
+                let mut record = utils::fidl_to_record(record);
                 // tracing 0.2 will let us to emit non-'static events directly, no downcasting
                 tracing::dispatcher::get_default(|dispatcher| {
                     let publisher: &diagnostics_log::Publisher = dispatcher.downcast_ref().unwrap();

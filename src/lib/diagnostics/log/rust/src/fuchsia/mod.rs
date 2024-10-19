@@ -464,7 +464,7 @@ pub fn get_now() -> i64 {
 macro_rules! log_every_n_seconds {
     ($seconds:expr, $severity:expr, $($arg:tt)*) => {
         use std::{time::Duration, sync::atomic::{Ordering, AtomicI64}};
-        use diagnostics_log::{paste, fuchsia::get_now};
+        use $crate::{paste, fuchsia::get_now};
 
         let now = get_now();
 

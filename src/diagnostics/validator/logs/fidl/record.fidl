@@ -1,8 +1,11 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-library fuchsia.diagnostics.stream;
+
+library fuchsia.validate.logs;
+
 using zx;
+using fuchsia.diagnostics;
 
 /// Maximum number of arguments that can be encoded per record, as specified by the tracing format:
 ///
@@ -16,16 +19,13 @@ const MAX_ARG_NAME_LENGTH uint32 = 256;
 /// The maximum string length which we can encode into the tracing format.
 const MAX_TEXT_ARG_LENGTH uint32 = 32768;
 
-/// Type alias for logging severity.
-alias RawSeverity = uint8;
-
 /// A record in the diagnostic stream.
 type Record = struct {
     /// The time at which the record was generated measured in nanoseconds since
     /// boot.
     timestamp zx.InstantBoot;
     /// Severity of the record.
-    severity RawSeverity;
+    severity fuchsia.diagnostics.Severity;
     /// The key-value pairs which make up this record.
     arguments vector<Argument>:MAX_ARGS;
 };

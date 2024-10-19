@@ -4,9 +4,10 @@
 
 //! Encoding diagnostic records using the Fuchsia Tracing format.
 
-use crate::{ArgType, Header, Metatag, SeverityExt, StringRef};
+use crate::{
+    ArgType, Argument, Header, Metatag, RawSeverity, Record, SeverityExt, StringRef, Value,
+};
 use fidl_fuchsia_diagnostics::Severity;
-use fidl_fuchsia_diagnostics_stream as fstream;
 use std::array::TryFromSliceError;
 use std::borrow::Borrow;
 use std::fmt::Debug;
@@ -86,40 +87,37 @@ where
         T: AsRef<str>,
     {
         let WriteEventParams { event, tags, metatags, pid, tid, dropped } = params;
-        let severity = event.severity();
+        let severity = event.raw_severity();
         self.write_inner(event.timestamp(), severity, |this| {
-            this.write_argument(Argument { name: "pid", value: pid.into() })?;
-            this.write_argument(Argument { name: "tid", value: tid.into() })?;
+            this.write_argument(Argument::pid(pid))?;
+            this.write_argument(Argument::tid(tid))?;
             if dropped > 0 {
-                this.write_argument(Argument { name: "num_dropped", value: dropped.into() })?;
+                this.write_argument(Argument::dropped(dropped))?;
             }
             if this.options.always_log_file_line || severity >= Severity::Error.into_primitive() {
                 // If the severity is ERROR or higher, we add the file and line information.
                 if let Some(mut file) = event.file() {
                     let split = file.split("../");
                     file = split.last().unwrap();
-                    this.write_argument(Argument { name: "file", value: Value::Text(file) })?;
+                    this.write_argument(Argument::file(file))?;
                 }
 
                 if let Some(line) = event.line() {
-                    this.write_argument(Argument { name: "line", value: line.into() })?;
+                    this.write_argument(Argument::line(line as u64))?;
                 }
             }
 
             // Write the metatags as tags (if any were given)
             for metatag in metatags {
                 match metatag {
-                    Metatag::Target => this.write_argument(Argument {
-                        name: "tag",
-                        value: Value::Text(event.target()),
-                    })?,
+                    Metatag::Target => this.write_argument(Argument::tag(event.target()))?,
                 }
             }
 
             event.write_arguments(this)?;
 
             for tag in tags {
-                this.write_argument(Argument { name: "tag", value: Value::Text(tag.as_ref()) })?;
+                this.write_argument(Argument::tag(tag.as_ref()))?;
             }
             Ok(())
         })?;
@@ -131,13 +129,15 @@ where
     where
         R: RecordFields,
     {
-        self.write_inner(record.timestamp(), record.severity(), |this| record.write_arguments(this))
+        self.write_inner(record.timestamp(), record.raw_severity(), |this| {
+            record.write_arguments(this)
+        })
     }
 
     fn write_inner<F>(
         &mut self,
         timestamp: zx::BootInstant,
-        severity: fstream::RawSeverity,
+        severity: RawSeverity,
         write_args: F,
     ) -> Result<(), EncodingError>
     where
@@ -175,30 +175,30 @@ where
 
         let mut header = Header(0);
 
-        self.write_string(argument.name)?;
-        header.set_name_ref(StringRef::for_str(argument.name).mask());
+        self.write_string(argument.name())?;
+        header.set_name_ref(StringRef::from(argument.name()).mask());
 
-        match &argument.value {
+        match argument.value() {
             Value::SignedInt(s) => {
                 header.set_type(ArgType::I64 as u8);
-                self.write_i64(*s)
+                self.write_i64(s)
             }
             Value::UnsignedInt(u) => {
                 header.set_type(ArgType::U64 as u8);
-                self.write_u64(*u)
+                self.write_u64(u)
             }
             Value::Floating(f) => {
                 header.set_type(ArgType::F64 as u8);
-                self.write_f64(*f)
+                self.write_f64(f)
             }
             Value::Text(t) => {
                 header.set_type(ArgType::String as u8);
-                header.set_value_ref(StringRef::for_str(t).mask());
-                self.write_string(t)
+                header.set_value_ref(t.mask());
+                self.write_string(t.as_str())
             }
             Value::Boolean(b) => {
                 header.set_type(ArgType::Bool as u8);
-                header.set_bool_val(*b);
+                header.set_bool_val(b);
                 Ok(())
             }
         }?;
@@ -219,7 +219,7 @@ where
     ) -> Result<(), EncodingError> {
         let name = field.name();
         if !matches!(name, "log.target" | "log.module_path" | "log.file" | "log.line") {
-            self.write_argument(Argument { name, value: value.into() })?;
+            self.write_argument(Argument::other(name, value.into()))?;
         }
         Ok(())
     }
@@ -325,76 +325,10 @@ impl<B: MutableBuffer> Visit for Encoder<B> {
     }
 }
 
-/// An argument for the logging format.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Argument<'a> {
-    /// The name of the logging argument.
-    pub name: &'a str,
-    /// The value of the logging argument.
-    pub value: Value<'a>,
-}
-
-/// The value of a logging argument.
-#[derive(Clone, Debug, PartialEq)]
-pub enum Value<'a> {
-    /// A signed integer value for a logging argument.
-    SignedInt(i64),
-    /// An unsigned integer value for a logging argument.
-    UnsignedInt(u64),
-    /// A floating point value for a logging argument.
-    Floating(f64),
-    /// A boolean value for a logging argument.
-    Boolean(bool),
-    /// A string value for a logging argument.
-    Text(&'a str),
-}
-
-impl From<i64> for Value<'_> {
-    fn from(number: i64) -> Value<'static> {
-        Value::SignedInt(number)
-    }
-}
-
-impl From<u64> for Value<'_> {
-    fn from(number: u64) -> Value<'static> {
-        Value::UnsignedInt(number)
-    }
-}
-
-impl From<u32> for Value<'_> {
-    fn from(number: u32) -> Value<'static> {
-        Value::UnsignedInt(number as u64)
-    }
-}
-
-impl From<zx::Koid> for Value<'_> {
-    fn from(koid: zx::Koid) -> Value<'static> {
-        Value::UnsignedInt(koid.raw_koid())
-    }
-}
-
-impl From<f64> for Value<'_> {
-    fn from(number: f64) -> Value<'static> {
-        Value::Floating(number)
-    }
-}
-
-impl<'a> From<&'a str> for Value<'a> {
-    fn from(text: &'a str) -> Value<'a> {
-        Value::Text(text)
-    }
-}
-
-impl From<bool> for Value<'static> {
-    fn from(boolean: bool) -> Value<'static> {
-        Value::Boolean(boolean)
-    }
-}
-
 /// Trait implemented by types which can be written by the Encoder.
 pub trait RecordEvent {
     /// Returns the record severity.
-    fn severity(&self) -> u8;
+    fn raw_severity(&self) -> RawSeverity;
     /// Returns the name of the file where the record was emitted.
     fn file(&self) -> Option<&str>;
     /// Returns the number of the line in the file where the record was emitted.
@@ -413,7 +347,7 @@ pub trait RecordEvent {
 /// Trait implemented by complete Records.
 pub trait RecordFields {
     /// Returns the record severity.
-    fn severity(&self) -> u8;
+    fn raw_severity(&self) -> RawSeverity;
 
     /// Returns the timestamp associated to this record.
     fn timestamp(&self) -> zx::BootInstant;
@@ -485,7 +419,7 @@ impl<'a, S> RecordEvent for TracingEvent<'a, S>
 where
     for<'lookup> S: Subscriber + LookupSpan<'lookup>,
 {
-    fn severity(&self) -> fstream::RawSeverity {
+    fn raw_severity(&self) -> RawSeverity {
         self.metadata.raw_severity()
     }
 
@@ -531,7 +465,7 @@ where
 /// Arguments to create a record for testing purposes.
 pub struct TestRecord<'a> {
     /// Severity of the log
-    pub severity: fstream::RawSeverity,
+    pub severity: RawSeverity,
     /// Timestamp of the test record.
     pub timestamp: zx::BootInstant,
     /// File that emitted the log.
@@ -544,19 +478,19 @@ pub struct TestRecord<'a> {
 
 impl TestRecord<'_> {
     /// Creates a test record from a record.
-    pub fn from<'a>(file: &'a str, line: u32, record: &'a fstream::Record) -> TestRecord<'a> {
+    pub fn from<'a>(file: &'a str, line: u32, record: &'a Record<'a>) -> TestRecord<'a> {
         TestRecord {
             severity: record.severity,
             timestamp: record.timestamp,
             file: Some(file),
             line: Some(line),
-            record_arguments: record.arguments.iter().map(Argument::from).collect(),
+            record_arguments: record.arguments.clone(),
         }
     }
 }
 
 impl RecordEvent for TestRecord<'_> {
-    fn severity(&self) -> fstream::RawSeverity {
+    fn raw_severity(&self) -> RawSeverity {
         self.severity
     }
 
@@ -587,8 +521,8 @@ impl RecordEvent for TestRecord<'_> {
     }
 }
 
-impl RecordFields for fstream::Record {
-    fn severity(&self) -> u8 {
+impl RecordFields for Record<'_> {
+    fn raw_severity(&self) -> RawSeverity {
         self.severity
     }
 
@@ -597,34 +531,13 @@ impl RecordFields for fstream::Record {
         writer: &mut Encoder<B>,
     ) -> Result<(), EncodingError> {
         for arg in &self.arguments {
-            writer.write_argument(Argument::from(arg))?;
+            writer.write_argument(arg)?;
         }
         Ok(())
     }
 
     fn timestamp(&self) -> zx::BootInstant {
         self.timestamp
-    }
-}
-
-impl<'a> PartialEq<fstream::Argument> for Argument<'a> {
-    fn eq(&self, other: &fstream::Argument) -> bool {
-        let arg = Argument::from(other);
-        *self == arg
-    }
-}
-
-impl<'a> From<&'a fstream::Argument> for Argument<'a> {
-    fn from(arg: &'a fstream::Argument) -> Argument<'a> {
-        let value = match &arg.value {
-            fstream::Value::SignedInt(value) => Value::SignedInt(*value),
-            fstream::Value::UnsignedInt(value) => Value::UnsignedInt(*value),
-            fstream::Value::Floating(value) => Value::Floating(*value),
-            fstream::Value::Text(value) => Value::Text(value.as_str()),
-            fstream::Value::Boolean(value) => Value::Boolean(*value),
-            _ => unreachable!("we should have covered all values"),
-        };
-        Argument { name: arg.name.as_str(), value }
     }
 }
 
@@ -962,7 +875,7 @@ mod tests {
         encoder
             .write_event(WriteEventParams::<_, &str, _> {
                 event: TestRecord {
-                    severity: Severity::Info.into_primitive(),
+                    severity: Severity::Info as u8,
                     timestamp: zx::BootInstant::from_nanos(12345),
                     file: None,
                     line: None,
@@ -978,18 +891,12 @@ mod tests {
         let (record, _) = parse_record(encoder.inner().get_ref()).expect("wrote valid record");
         assert_eq!(
             record,
-            fstream::Record {
+            Record {
                 timestamp: zx::BootInstant::from_nanos(12345),
-                severity: Severity::Info.into_primitive(),
+                severity: Severity::Info as u8,
                 arguments: vec![
-                    fstream::Argument {
-                        name: "pid".to_string(),
-                        value: fstream::Value::UnsignedInt(0)
-                    },
-                    fstream::Argument {
-                        name: "tid".to_string(),
-                        value: fstream::Value::UnsignedInt(0)
-                    }
+                    Argument::pid(zx::Koid::from_raw(0)),
+                    Argument::tid(zx::Koid::from_raw(0)),
                 ]
             }
         );
@@ -1001,7 +908,7 @@ mod tests {
         encoder
             .write_event(WriteEventParams::<_, &str, _> {
                 event: TestRecord {
-                    severity: Severity::Error.into_primitive(),
+                    severity: Severity::Error as u8,
                     timestamp: zx::BootInstant::from_nanos(12345),
                     file: Some("foo.rs"),
                     line: Some(10),
@@ -1017,26 +924,14 @@ mod tests {
         let (record, _) = parse_record(encoder.inner().get_ref()).expect("wrote valid record");
         assert_eq!(
             record,
-            fstream::Record {
+            Record {
                 timestamp: zx::BootInstant::from_nanos(12345),
-                severity: Severity::Error.into_primitive(),
+                severity: Severity::Error as u8,
                 arguments: vec![
-                    fstream::Argument {
-                        name: "pid".to_string(),
-                        value: fstream::Value::UnsignedInt(0)
-                    },
-                    fstream::Argument {
-                        name: "tid".to_string(),
-                        value: fstream::Value::UnsignedInt(0)
-                    },
-                    fstream::Argument {
-                        name: "file".to_string(),
-                        value: fstream::Value::Text("foo.rs".into())
-                    },
-                    fstream::Argument {
-                        name: "line".to_string(),
-                        value: fstream::Value::UnsignedInt(10)
-                    },
+                    Argument::pid(zx::Koid::from_raw(0)),
+                    Argument::tid(zx::Koid::from_raw(0)),
+                    Argument::file("foo.rs"),
+                    Argument::line(10),
                 ]
             }
         );
@@ -1048,7 +943,7 @@ mod tests {
         encoder
             .write_event(WriteEventParams::<_, &str, _> {
                 event: TestRecord {
-                    severity: Severity::Warn.into_primitive(),
+                    severity: Severity::Warn as u8,
                     timestamp: zx::BootInstant::from_nanos(12345),
                     file: None,
                     line: None,
@@ -1064,22 +959,13 @@ mod tests {
         let (record, _) = parse_record(encoder.inner().get_ref()).expect("wrote valid record");
         assert_eq!(
             record,
-            fstream::Record {
+            Record {
                 timestamp: zx::BootInstant::from_nanos(12345),
-                severity: Severity::Warn.into_primitive(),
+                severity: Severity::Warn as u8,
                 arguments: vec![
-                    fstream::Argument {
-                        name: "pid".to_string(),
-                        value: fstream::Value::UnsignedInt(0)
-                    },
-                    fstream::Argument {
-                        name: "tid".to_string(),
-                        value: fstream::Value::UnsignedInt(0)
-                    },
-                    fstream::Argument {
-                        name: "num_dropped".to_string(),
-                        value: fstream::Value::UnsignedInt(7)
-                    },
+                    Argument::pid(zx::Koid::from_raw(0)),
+                    Argument::tid(zx::Koid::from_raw(0)),
+                    Argument::dropped(7),
                 ]
             }
         );
@@ -1141,52 +1027,20 @@ mod tests {
         assert!(record.timestamp > before_timestamp);
         assert_eq!(
             record,
-            fstream::Record {
+            Record {
                 timestamp: record.timestamp,
-                severity: Severity::Info.into_primitive(),
+                severity: Severity::Info as u8,
                 arguments: vec![
-                    fstream::Argument {
-                        name: "pid".to_string(),
-                        value: fstream::Value::UnsignedInt(0)
-                    },
-                    fstream::Argument {
-                        name: "tid".to_string(),
-                        value: fstream::Value::UnsignedInt(0)
-                    },
-                    fstream::Argument {
-                        name: "tag".to_string(),
-                        value: fstream::Value::Text(
-                            "diagnostics_log_encoding_lib_test::encode::tests".into()
-                        ),
-                    },
-                    fstream::Argument {
-                        name: "message".to_string(),
-                        value: fstream::Value::Text("blarg this is a message".into())
-                    },
-                    fstream::Argument {
-                        name: "is_a_str".to_string(),
-                        value: fstream::Value::Text("hahaha".into())
-                    },
-                    fstream::Argument {
-                        name: "is_debug".to_string(),
-                        value: fstream::Value::Text("PrintMe(5)".into())
-                    },
-                    fstream::Argument {
-                        name: "is_signed".to_string(),
-                        value: fstream::Value::SignedInt(-500)
-                    },
-                    fstream::Argument {
-                        name: "is_unsigned".to_string(),
-                        value: fstream::Value::UnsignedInt(1000)
-                    },
-                    fstream::Argument {
-                        name: "is_bool".to_string(),
-                        value: fstream::Value::Boolean(false)
-                    },
-                    fstream::Argument {
-                        name: "tag".to_string(),
-                        value: fstream::Value::Text("a-tag".into(),)
-                    },
+                    Argument::pid(zx::Koid::from_raw(0)),
+                    Argument::tid(zx::Koid::from_raw(0)),
+                    Argument::tag("diagnostics_log_encoding_lib_test::encode::tests"),
+                    Argument::message("blarg this is a message"),
+                    Argument::other("is_a_str", "hahaha"),
+                    Argument::other("is_debug", "PrintMe(5)"),
+                    Argument::other("is_signed", -500),
+                    Argument::other("is_unsigned", 1000u64),
+                    Argument::other("is_bool", false),
+                    Argument::tag("a-tag"),
                 ]
             }
         );
@@ -1211,52 +1065,20 @@ mod tests {
         assert!(record.timestamp > before_timestamp);
         assert_eq!(
             record,
-            fstream::Record {
+            Record {
                 timestamp: record.timestamp,
-                severity: Severity::Info.into_primitive(),
+                severity: Severity::Info as u8,
                 arguments: vec![
-                    fstream::Argument {
-                        name: "pid".to_string(),
-                        value: fstream::Value::UnsignedInt(0)
-                    },
-                    fstream::Argument {
-                        name: "tid".to_string(),
-                        value: fstream::Value::UnsignedInt(0)
-                    },
-                    fstream::Argument {
-                        name: "tag".to_string(),
-                        value: fstream::Value::Text(
-                            "diagnostics_log_encoding_lib_test::encode::tests".into()
-                        ),
-                    },
-                    fstream::Argument {
-                        name: "tag".to_string(),
-                        value: fstream::Value::Text("span_tag".into(),),
-                    },
-                    fstream::Argument {
-                        name: "span_field".to_string(),
-                        value: fstream::Value::SignedInt(42),
-                    },
-                    fstream::Argument {
-                        name: "tag".to_string(),
-                        value: fstream::Value::Text("nested_span_tag".into(),),
-                    },
-                    fstream::Argument {
-                        name: "nested_span_field".to_string(),
-                        value: fstream::Value::Text("hello".into()),
-                    },
-                    fstream::Argument {
-                        name: "message".to_string(),
-                        value: fstream::Value::Text("a log in spans".into())
-                    },
-                    fstream::Argument {
-                        name: "is_bool".to_string(),
-                        value: fstream::Value::Boolean(true)
-                    },
-                    fstream::Argument {
-                        name: "tag".to_string(),
-                        value: fstream::Value::Text("a-tag".into(),)
-                    },
+                    Argument::pid(zx::Koid::from_raw(0)),
+                    Argument::tid(zx::Koid::from_raw(0)),
+                    Argument::tag("diagnostics_log_encoding_lib_test::encode::tests"),
+                    Argument::tag("span_tag"),
+                    Argument::other("span_field", 42),
+                    Argument::tag("nested_span_tag"),
+                    Argument::other("nested_span_field", "hello"),
+                    Argument::message("a log in spans"),
+                    Argument::other("is_bool", true,),
+                    Argument::tag("a-tag",),
                 ]
             }
         );

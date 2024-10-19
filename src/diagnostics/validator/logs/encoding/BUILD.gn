@@ -13,9 +13,8 @@ rustc_binary("bin") {
   with_unit_tests = true
   deps = [
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
-    "//sdk/fidl/fuchsia.diagnostics.stream:fuchsia.diagnostics.stream_rust",
     "//sdk/rust/zx",
-    "//src/diagnostics/validator/logs/encoding/fidl:validate_rust",
+    "//src/diagnostics/validator/logs/fidl:fuchsia.validate.logs_rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
@@ -48,7 +47,7 @@ rustc_test("test_bin") {
   source_root = "src/test.rs"
   sources = [ "src/test.rs" ]
   deps = [
-    "//src/diagnostics/validator/logs/encoding/fidl:validate_rust",
+    "//src/diagnostics/validator/logs/fidl:fuchsia.validate.logs_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",

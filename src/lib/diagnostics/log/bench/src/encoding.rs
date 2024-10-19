@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use diagnostics_log_encoding::encode::{
-    Argument, Encoder, EncoderOpts, TracingEvent, Value, WriteEventParams,
-};
+use diagnostics_log_encoding::encode::{Encoder, EncoderOpts, TracingEvent, WriteEventParams};
+use diagnostics_log_encoding::{Argument, Value};
 use fidl_fuchsia_logger::MAX_DATAGRAM_LEN_BYTES;
 use fuchsia_criterion::{criterion, FuchsiaCriterion};
 use std::io::Cursor;
@@ -26,7 +25,7 @@ fn bench_argument(
 ) -> impl FnMut(&mut criterion::Bencher) + 'static {
     let value = value.into();
     move |b: &mut criterion::Bencher| {
-        let arg = Argument { name: "foo", value: value.clone() };
+        let arg = Argument::new("foo", value.clone());
         b.iter_batched_ref(
             || encoder(),
             |encoder| encoder.write_argument(&arg),

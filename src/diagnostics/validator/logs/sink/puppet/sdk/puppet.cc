@@ -125,31 +125,31 @@ class Puppet : public fuchsia::validate::logs::LogSinkPuppet {
 
   void EmitLog(fuchsia::validate::logs::RecordSpec spec, EmitLogCallback callback) override {
     fuchsia_syslog::LogBuffer buffer;
-    BeginRecord(&buffer, spec.record.severity, spec.file.data(), spec.line,
+    BeginRecord(&buffer, static_cast<uint8_t>(spec.record.severity), spec.file.data(), spec.line,
                 std::nullopt /* message */);
     for (auto& arg : spec.record.arguments) {
       switch (arg.value.Which()) {
-        case fuchsia::diagnostics::stream::Value::kUnknown:
-        case fuchsia::diagnostics::stream::Value::Invalid:
+        case fuchsia::validate::logs::Value::kUnknown:
+        case fuchsia::validate::logs::Value::Invalid:
           break;
-        case fuchsia::diagnostics::stream::Value::kFloating:
+        case fuchsia::validate::logs::Value::kFloating:
           buffer.WriteKeyValue(arg.name.data(), arg.value.floating());
           break;
-        case fuchsia::diagnostics::stream::Value::kSignedInt:
+        case fuchsia::validate::logs::Value::kSignedInt:
           buffer.WriteKeyValue(arg.name.data(), arg.value.signed_int());
           break;
-        case fuchsia::diagnostics::stream::Value::kUnsignedInt:
+        case fuchsia::validate::logs::Value::kUnsignedInt:
           buffer.WriteKeyValue(arg.name.data(), arg.value.unsigned_int());
           break;
-        case fuchsia::diagnostics::stream::Value::kText:
+        case fuchsia::validate::logs::Value::kText:
           buffer.WriteKeyValue(arg.name.data(), arg.value.text().data());
           break;
-        case fuchsia::diagnostics::stream::Value::kBoolean:
+        case fuchsia::validate::logs::Value::kBoolean:
           buffer.WriteKeyValue(arg.name.data(), arg.value.boolean());
           break;
       }
     }
-    if (spec.record.severity >= min_log_level_) {
+    if (static_cast<uint8_t>(spec.record.severity) >= min_log_level_) {
       buffer.FlushRecord();
     }
     callback();

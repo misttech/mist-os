@@ -12,8 +12,9 @@ rustc_binary("rust-puppet") {
   sources = [ "src/main.rs" ]
 
   deps = [
-    "../../fidl:sink-puppet_rust",
     "//sdk/rust/zx",
+    "//src/diagnostics/validator/logs/fidl:fuchsia.validate.logs_rust",
+    "//src/diagnostics/validator/logs/rust/utils",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",

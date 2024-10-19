@@ -4,7 +4,6 @@
 library fuchsia.validate.logs;
 
 using fuchsia.mem;
-using fuchsia.diagnostics.stream;
 
 type PuppetError = strict enum {
     UnsupportedRecord = 1;
@@ -15,7 +14,7 @@ closed protocol EncodingPuppet {
     /// Log takes a record and converts it into a buffer.
     /// Returns an error if record contains unsupported type
     strict Encode(struct {
-        record fuchsia.diagnostics.stream.Record;
+        record Record;
     }) -> (resource struct {
         result fuchsia.mem.Buffer;
     }) error PuppetError;

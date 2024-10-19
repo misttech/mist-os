@@ -37,7 +37,6 @@ source_set("cpp-log-tester") {
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.diagnostics.stream:fuchsia.diagnostics.stream_cpp",
     "//sdk/lib/async:async-cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/fdio",

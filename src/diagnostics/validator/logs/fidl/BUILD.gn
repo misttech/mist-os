@@ -4,18 +4,25 @@
 
 import("//build/fidl/fidl.gni")
 
-fidl("sink-puppet") {
+fidl("fuchsia.validate.logs") {
   testonly = true
-  name = "fuchsia.validate.logs"
 
-  sources = [ "sink-puppet.test.fidl" ]
+  sources = [
+    "encoding.fidl",
+    "record.fidl",
+    "sink.fidl",
+  ]
 
   public_deps = [
-    "//sdk/fidl/fuchsia.diagnostics.stream",
+    "//sdk/fidl/fuchsia.diagnostics",
+    "//sdk/fidl/fuchsia.mem",
     "//zircon/vdso/zx",
   ]
 
-  excluded_checks = [ "string-bounds-not-specified" ]
+  excluded_checks = [
+    "string-bounds-not-specified",
+    "invalid-case-for-constant",
+  ]
 
   enable_hlcpp = true
 }

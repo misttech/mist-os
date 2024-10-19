@@ -137,7 +137,7 @@ mod tests {
     use crate::testing::TEST_IDENTITY;
     use diagnostics_data::{LogsData, Severity};
     use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
-    use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
+    use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity};
     use fidl_fuchsia_diagnostics::StreamMode;
     use fuchsia_trace as ftrace;
     use futures::{Stream, StreamExt};
@@ -206,8 +206,8 @@ mod tests {
             timestamp,
             severity: StreamSeverity::Debug.into_primitive(),
             arguments: vec![
-                Argument { name: "pid".to_string(), value: Value::UnsignedInt(123) },
-                Argument { name: "tid".to_string(), value: Value::UnsignedInt(456) },
+                Argument::pid(zx::Koid::from_raw(123)),
+                Argument::tid(zx::Koid::from_raw(456)),
             ],
         };
         let mut buffer = Cursor::new(vec![0u8; 1024]);

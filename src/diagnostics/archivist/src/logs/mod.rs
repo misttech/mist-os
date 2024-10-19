@@ -23,8 +23,7 @@ mod tests {
     use crate::identity::ComponentIdentity;
     use crate::logs::testing::*;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
-    use diagnostics_data::{DROPPED_LABEL, MESSAGE_LABEL, PID_LABEL, TAG_LABEL, TID_LABEL};
-    use diagnostics_log_encoding::{Argument, Record, Severity, Value};
+    use diagnostics_log_encoding::{Argument, Record, Severity};
     use fidl_fuchsia_logger::{LogFilterOptions, LogLevelFilter, LogMessage};
 
     use moniker::ExtendedMoniker;
@@ -503,10 +502,7 @@ mod tests {
             Record {
                 timestamp: zx::BootInstant::from_nanos(6),
                 severity: Severity::Info.into_primitive(),
-                arguments: vec![Argument {
-                    name: MESSAGE_LABEL.into(),
-                    value: Value::Text("hi".to_string()),
-                }],
+                arguments: vec![Argument::message("hi")],
             },
             Record {
                 timestamp: zx::BootInstant::from_nanos(13),
@@ -517,23 +513,17 @@ mod tests {
                 timestamp: zx::BootInstant::from_nanos(19),
                 severity: Severity::Warn.into_primitive(),
                 arguments: vec![
-                    Argument { name: PID_LABEL.into(), value: Value::UnsignedInt(0x1d1) },
-                    Argument { name: TID_LABEL.into(), value: Value::UnsignedInt(0x1d2) },
-                    Argument { name: DROPPED_LABEL.into(), value: Value::UnsignedInt(23) },
-                    Argument { name: TAG_LABEL.into(), value: Value::Text(String::from("tag")) },
-                    Argument {
-                        name: MESSAGE_LABEL.into(),
-                        value: Value::Text(String::from("message")),
-                    },
+                    Argument::pid(zx::Koid::from_raw(0x1d1)),
+                    Argument::tid(zx::Koid::from_raw(0x1d2)),
+                    Argument::dropped(23),
+                    Argument::tag("tag"),
+                    Argument::message("message"),
                 ],
             },
             Record {
                 timestamp: zx::BootInstant::from_nanos(21),
                 severity: Severity::Warn.into_primitive(),
-                arguments: vec![
-                    Argument { name: TAG_LABEL.into(), value: Value::Text(String::from("tag-1")) },
-                    Argument { name: TAG_LABEL.into(), value: Value::Text(String::from("tag-2")) },
-                ],
+                arguments: vec![Argument::tag("tag-1"), Argument::tag("tag-2")],
             },
         ];
 

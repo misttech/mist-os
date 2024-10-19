@@ -246,13 +246,13 @@ impl LogWriter for LogPacketWriter {
 }
 
 impl LogWriter for StructuredMessageWriter {
-    type Packet = Record;
+    type Packet = Record<'static>;
 
     fn connect(log_sink: &LogSinkProxy, sin: zx::Socket) {
         log_sink.connect_structured(sin).expect("unable to connect out socket to log sink");
     }
 
-    fn write(sin: &zx::Socket, record: &Record) {
+    fn write(sin: &zx::Socket, record: &Record<'_>) {
         let mut buffer = Cursor::new(vec![0; MAX_DATAGRAM_LEN]);
         let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
         encoder.write_record(record).unwrap();

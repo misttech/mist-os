@@ -13,7 +13,7 @@
 use anyhow::{Context, Error, Result};
 use diagnostics_hierarchy::Property;
 use diagnostics_log::{OnInterestChanged, Publisher, PublisherOptions, TestRecord};
-use diagnostics_log_encoding::encode::{Argument, Value};
+use diagnostics_log_encoding::Argument;
 use fidl::endpoints::create_request_stream;
 use fidl_table_validation::ValidFidlTable;
 use fuchsia_async::{TaskGroup, Timer};
@@ -278,10 +278,7 @@ async fn handle_puppet_request(
                             timestamp: zx::BootInstant::from_nanos(time),
                             file: None,
                             line: None,
-                            record_arguments: vec![Argument {
-                                name: "message",
-                                value: Value::Text(&message),
-                            }],
+                            record_arguments: vec![Argument::message(message.as_str())],
                         };
                         publisher.event_for_testing(record);
                     });

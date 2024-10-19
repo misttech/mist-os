@@ -23,7 +23,7 @@ source_set("common") {
   sources = [ "log-tester.cc" ]
   public_deps = [
     ":log-test-driver-bind",
-    "//src/diagnostics/validator/logs/sink/fidl:sink-puppet_cpp",
+    "//src/diagnostics/validator/logs/fidl:fuchsia.validate.logs_cpp",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",

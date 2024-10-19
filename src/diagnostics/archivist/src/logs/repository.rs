@@ -477,7 +477,7 @@ mod tests {
     use super::*;
     use crate::logs::stored_message::StoredMessage;
     use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
-    use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
+    use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity};
     use fidl_fuchsia_logger::LogSinkMarker;
 
     use moniker::ExtendedMoniker;
@@ -610,9 +610,9 @@ mod tests {
             timestamp,
             severity: StreamSeverity::Debug.into_primitive(),
             arguments: vec![
-                Argument { name: "pid".to_string(), value: Value::UnsignedInt(1) },
-                Argument { name: "tid".to_string(), value: Value::UnsignedInt(2) },
-                Argument { name: "message".to_string(), value: Value::Text(msg.to_string()) },
+                Argument::pid(zx::Koid::from_raw(1)),
+                Argument::tid(zx::Koid::from_raw(2)),
+                Argument::message(msg),
             ],
         };
         let mut buffer = Cursor::new(vec![0u8; 1024]);

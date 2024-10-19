@@ -221,9 +221,6 @@ template("fidl_library") {
     # TODO(https://fxbug.dev/330947474): Resolve fdio dependency on library.
     "fuchsia.device",
 
-    # TODO(https://fxbug.dev/364293789): Resolve SDK prebuilt package dependencies on library.
-    "fuchsia.diagnostics.stream",
-
     # TODO(https://fxbug.dev/364294648): Resolve heapdump instrumentation dependency on library.
     "fuchsia.memory.heapdump.process",
 

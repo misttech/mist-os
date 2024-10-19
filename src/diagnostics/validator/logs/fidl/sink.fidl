@@ -4,11 +4,6 @@
 library fuchsia.validate.logs;
 
 using zx;
-using fuchsia.diagnostics.stream;
-
-/// A small(ish) limit on the length of argument names is used because argument names are expected
-/// to be used repeatedly, many times.
-const MAX_ARG_NAME_LENGTH uint32 = 256;
 
 type PuppetInfo = struct {
     tag string:optional;
@@ -19,7 +14,7 @@ type PuppetInfo = struct {
 type RecordSpec = struct {
     file string:MAX_ARG_NAME_LENGTH;
     line uint32;
-    record fuchsia.diagnostics.stream.Record;
+    record Record;
 };
 
 @discoverable

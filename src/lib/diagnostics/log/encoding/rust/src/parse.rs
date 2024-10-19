@@ -5,9 +5,7 @@
 //! Parse diagnostic records from streams, returning FIDL-generated structs that match expected
 //! diagnostic service APIs.
 
-use crate::{ArgType, Header, StringRef};
-use fidl_fuchsia_diagnostics_stream::{Argument, RawSeverity, Record, Value};
-
+use crate::{ArgType, Argument, Header, RawSeverity, Record, StringRef, Value};
 use nom::bytes::complete::take;
 use nom::multi::many0;
 use nom::number::complete::{le_f64, le_i64, le_u64};
@@ -31,7 +29,7 @@ pub fn basic_info(buf: &[u8]) -> Result<(zx::BootInstant, RawSeverity), nom::Err
 
 /// Attempt to parse a diagnostic record from the head of this buffer, returning the record and any
 /// unused portion of the buffer if successful.
-pub fn parse_record(buf: &[u8]) -> Result<(Record, &[u8]), ParseError> {
+pub fn parse_record<'a>(buf: &'a [u8]) -> Result<(Record<'a>, &'a [u8]), ParseError> {
     match try_parse_record(buf) {
         Ok((remainder, record)) => Ok((record, remainder)),
         Err(Err::Incomplete(n)) => Err(ParseError::Incomplete(n)),
@@ -50,7 +48,7 @@ enum ParseState {
     InArguments,
 }
 
-pub(crate) fn try_parse_record(buf: &[u8]) -> ParseResult<'_, Record> {
+pub(crate) fn try_parse_record<'a>(buf: &'a [u8]) -> ParseResult<'a, Record<'a>> {
     let (after_header, header) = parse_header(buf)?;
 
     if header.raw_type() != crate::TRACING_FORMAT_LOG_RECORD_TYPE {
@@ -84,12 +82,15 @@ fn parse_header(buf: &[u8]) -> ParseResult<'_, Header> {
 }
 
 /// Parses an argument
-pub fn parse_argument(buf: &[u8]) -> ParseResult<'_, Argument> {
+pub fn parse_argument<'a>(buf: &'a [u8]) -> ParseResult<'a, Argument<'a>> {
     let mut state = ParseState::Initial;
     parse_argument_internal(buf, &mut state)
 }
 
-fn parse_argument_internal<'a>(buf: &'a [u8], state: &mut ParseState) -> ParseResult<'a, Argument> {
+fn parse_argument_internal<'a>(
+    buf: &'a [u8],
+    state: &mut ParseState,
+) -> ParseResult<'a, Argument<'a>> {
     let (after_header, header) = parse_header(buf)?;
     let arg_ty = ArgType::try_from(header.raw_type()).map_err(nom::Err::Failure)?;
 
@@ -116,7 +117,7 @@ fn parse_argument_internal<'a>(buf: &'a [u8], state: &mut ParseState) -> ParseRe
         ArgType::String => {
             let (rem, s) =
                 string_ref(header.value_ref(), after_name, matches!(state, ParseState::InMessage))?;
-            (Value::Text(s.to_string()), rem)
+            (Value::Text(s), rem)
         }
         ArgType::Bool => (Value::Boolean(header.bool_val()), after_name),
         ArgType::Pointer | ArgType::Koid | ArgType::I32 | ArgType::U32 => {
@@ -127,7 +128,7 @@ fn parse_argument_internal<'a>(buf: &'a [u8], state: &mut ParseState) -> ParseRe
         *state = ParseState::InArguments;
     }
 
-    Ok((after_value, Argument { name: name.to_string(), value }))
+    Ok((after_value, Argument::new(name, value)))
 }
 
 fn string_ref(
@@ -209,7 +210,7 @@ mod tests {
         let expected_timestamp = zx::BootInstant::from_nanos(72);
         let record = Record {
             timestamp: expected_timestamp,
-            severity: Severity::Error.into_primitive(),
+            severity: Severity::Error as u8,
             arguments: vec![],
         };
         let mut buffer = Cursor::new(vec![0u8; 1000]);
