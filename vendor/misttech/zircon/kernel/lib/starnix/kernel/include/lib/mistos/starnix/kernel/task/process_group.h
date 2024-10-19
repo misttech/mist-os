@@ -23,9 +23,14 @@ namespace starnix {
 
 class ThreadGroup;
 
+namespace internal {
+struct ProcessGroupTag;
+}  // namespace internal
+
 class ProcessGroupMutableState {
  private:
-  using BTreeMapThreadGroup = fbl::WAVLTree<pid_t, util::WeakPtr<ThreadGroup>>;
+  using BTreeMapThreadGroup =
+      fbl::TaggedWAVLTree<pid_t, util::WeakPtr<ThreadGroup>, internal::ProcessGroupTag>;
 
   /// The thread_groups in the process group.
   ///
@@ -110,6 +115,9 @@ class ProcessGroup : public fbl::RefCountedUpgradeable<ProcessGroup>,
 
   // Accessor for the leader
   pid_t leader() const { return leader_; }
+
+  // WAVL-tree Index
+  pid_t GetKey() const { return leader_; }
 
   ~ProcessGroup();
 
