@@ -28,7 +28,7 @@ async fn explore_over_handles(
     command: Option<String>,
     mut name_infos: Vec<fproc::NameInfo>,
     process_name: String,
-    package_resolver: &crate::package_resolver::PackageResolver,
+    package_resolver: &mut crate::package_resolver::PackageResolver,
 ) -> Result<zx::Process, LauncherError> {
     // In addition to tools binaries requested by the user, add the built-in binaries of the
     // debug-dash-launcher package, creating `#!resolve` trampolines for all.

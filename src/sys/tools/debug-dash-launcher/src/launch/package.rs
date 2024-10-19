@@ -50,7 +50,7 @@ pub async fn explore_over_handles(
     tool_urls: Vec<String>,
     command: Option<String>,
 ) -> Result<zx::Process, fdash::LauncherError> {
-    let package_resolver = crate::package_resolver::PackageResolver::new(fuchsia_pkg_resolver)?;
+    let mut package_resolver = crate::package_resolver::PackageResolver::new(fuchsia_pkg_resolver);
     let dir = package_resolver
         .resolve_subpackage(url, subpackages)
         .await
@@ -62,11 +62,9 @@ pub async fn explore_over_handles(
 
     // Set a name for the dash process of the package we're exploring that is easy to find. If
     // the url is `fuchsia-pkg://fuchsia.example/update`, the process name is `sh-update`.
-    let process_name = if let Ok(url) = fuchsia_url::AbsolutePackageUrl::parse(url) {
-        url.name().to_string()
-    } else {
-        url.replace('/', "-").into()
-    };
+    let process_name =
+        (|| url::Url::parse(url).ok()?.path_segments()?.next().map(|s| s.to_owned()))()
+            .unwrap_or_else(|| url.replace('/', "-"));
     let process_name = format!("sh-{process_name}");
 
     super::explore_over_handles(
@@ -77,7 +75,7 @@ pub async fn explore_over_handles(
         command,
         name_infos,
         process_name,
-        &crate::package_resolver::PackageResolver::new(fuchsia_pkg_resolver)?,
+        &mut crate::package_resolver::PackageResolver::new(fuchsia_pkg_resolver),
     )
     .await
 }

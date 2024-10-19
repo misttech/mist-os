@@ -208,6 +208,18 @@
                 ],
             },
             {
+                source_moniker: "<component_manager>",
+                source: "component",
+                source_name: "fuchsia.pkg.PackageResolver-boot",
+                capability: "protocol",
+                target_monikers: [
+                    // debug-dash-launcher is used in engineering builds to launch
+                    // dash shells. It uses PackageResolver to add tool package directories
+                    // into the dash environment.
+                    "/core/debug-dash-launcher",
+                ],
+            },
+            {
                 source_moniker: "/bootstrap/fshost",
                 source: "component",
                 source_name: "bin",

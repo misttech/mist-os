@@ -82,7 +82,7 @@ async fn explore_over_handles(
         command,
         name_infos,
         process_name,
-        &crate::package_resolver::PackageResolver::new(fdash::FuchsiaPkgResolver::Full)?,
+        &mut crate::package_resolver::PackageResolver::new(fdash::FuchsiaPkgResolver::Full),
     )
     .await
 }

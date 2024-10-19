@@ -40,6 +40,11 @@
             to: "#debug-dash-launcher",
         },
         {
+            protocol: "fuchsia.pkg.PackageResolver-boot",
+            from: "parent",
+            to: "#debug-dash-launcher",
+        },
+        {
             protocol: "fuchsia.process.Launcher",
             from: "parent",
             to: "#debug-dash-launcher",
