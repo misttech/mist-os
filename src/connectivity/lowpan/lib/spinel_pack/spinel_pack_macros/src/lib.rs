@@ -13,7 +13,7 @@ use std::str::Chars;
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, DeriveInput, GenericParam, LifetimeDef, LitStr, Token};
+use syn::{parse_macro_input, DeriveInput, GenericParam, LifetimeParam, LitStr, Token};
 
 const SPINEL_DATATYPE_VOID_C: char = '.';
 const SPINEL_DATATYPE_BOOL_C: char = 'b';
@@ -206,7 +206,7 @@ pub fn spinel_packed(
         // And add our buffer lifetime to `generic_params`, so that it gets
         // added to the rest of the traits.
         generics_params
-            .insert(0, GenericParam::Lifetime(LifetimeDef::new(buffer_lifetime.clone())));
+            .insert(0, GenericParam::Lifetime(LifetimeParam::new(buffer_lifetime.clone())));
     }
 
     // A TokenStream of comma-separated field identifiers. This is filled
@@ -237,7 +237,7 @@ pub fn spinel_packed(
             Some(x) => x,
             None => {
                 let msg = format!("Missing field for spinel format {:?}", format);
-                return syn::Error::new(last_token_span, msg).to_compile_error().into();
+                return syn::Error::new(last_token_span.join(), msg).to_compile_error().into();
             }
         };
 
