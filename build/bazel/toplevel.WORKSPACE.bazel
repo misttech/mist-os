@@ -273,9 +273,12 @@ fuchsia_sdk_repository(
     buildifier = "//:prebuilt/third_party/buildifier/%s/buildifier" % fuchsia_host_tag,
 )
 
+# A repository used to expose SDK atoms that are not yet ready to be
+# distributed to partners, but required by some Fuchsia in-tree targets.
+# TODO(https://fxbug.dev/333907192): Remove this
 fuchsia_sdk_repository(
     name = "internal_sdk",
-    local_paths = ["%s/sdk/exported/platform" % ninja_output_dir],
+    local_paths = ["%s/sdk/exported/bazel_internal_only_idk" % ninja_output_dir],
     # LINT.IfChange
     local_sdk_version_file = "//:fuchsia_build_generated/internal_sdk.hash",
     # LINT.ThenChange(scripts/update_workspace.py)
