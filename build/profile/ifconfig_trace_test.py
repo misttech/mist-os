@@ -9,16 +9,7 @@ from pathlib import Path
 from unittest import mock
 
 import ifconfig_trace
-
-
-class EventJsonTests(unittest.TestCase):
-    def test_basic(self) -> None:
-        text = ifconfig_trace.event_json("marbles", "fun", 5000, "count", 12)
-        self.assertEqual(
-            text,
-            """{"name": "marbles", "cat": "fun", "ph": "C", "pid": 1, "tid": 1, "ts": 5000, "args": {"count": "12"} },""",
-        )
-
+import trace_tools
 
 _SAMPLE_IFCONFIG_TIMES = [
     datetime.datetime(
@@ -129,23 +120,24 @@ class IfConfigEntryTests(unittest.TestCase):
         self.assertEqual(entries, _EXPECTED_IFCONFIG_DATA_STREAM)
 
     def test_print_chrome_trace_json_empty(self) -> None:
-        lines = list(ifconfig_trace.print_chrome_trace_json(iter([])))
-        self.assertEqual(lines, ["[", "]"])
+        fmt = trace_tools.Formatter()
+        lines = list(ifconfig_trace.print_chrome_trace_json(fmt, iter([])))
+        self.assertEqual(lines, [])
 
     def test_print_chrome_trace_json_nonempty(self) -> None:
+        fmt = trace_tools.Formatter()
         lines = list(
             ifconfig_trace.print_chrome_trace_json(
-                iter(_EXPECTED_IFCONFIG_DATA_STREAM)
+                fmt, iter(_EXPECTED_IFCONFIG_DATA_STREAM)
             )
         )
 
         def expected_event(name: str, time: int, value: int) -> str:
-            return f"""  {{"name": "{name}", "cat": "network", "ph": "C", "pid": 1, "tid": 1, "ts": {time}, "args": {{"count": "{value}"}} }},"""
+            return f"""{{"name": "{name}", "cat": "network", "ph": "C", "pid": 1, "tid": 1, "ts": {time}, "args": {{"count": "{value}"}} }},"""
 
         self.assertEqual(
             lines,
             [
-                "[",
                 expected_event("docker0.rx.packets", 0, 0),
                 expected_event("docker0.rx.bytes", 0, 0),
                 expected_event("docker0.tx.packets", 0, 0),
@@ -162,7 +154,6 @@ class IfConfigEntryTests(unittest.TestCase):
                 expected_event("ens4.rx.bytes", 5000000, 282565),
                 expected_event("ens4.tx.packets", 5000000, 1129),
                 expected_event("ens4.tx.bytes", 5000000, 280703),
-                "]",
             ],
         )
 

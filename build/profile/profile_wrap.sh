@@ -100,6 +100,10 @@ function subprocess_pid() {
 
 shutdown_pids=()
 
+# Tag json with the unique fx build id, if it is set.  Print to stdout.
+trace_preamble_args=()
+[[ -z "${FX_BUILD_UUID+x}" ]] || trace_preamble_args=( --metadata="FX_BUILD_UUID:$FX_BUILD_UUID" )
+
 if [[ -n "$vmstat_logfile" ]]
 then
   rm -f "$vmstat_logfile" "$vmstat_logfile.json"
@@ -108,7 +112,8 @@ then
   # Launch vmstat in the background, along with any output scanners.
   "$vmstat" "${vmstat_args[@]}" "$interval" | \
     tee "$vmstat_logfile" | \
-    "$vmstat_trace_tool" - > "$vmstat_logfile.json" &
+    "$vmstat_trace_tool" "${trace_preamble_args[@]}" - \
+    > "$vmstat_logfile.json" &
 
   # Terminating the 'vmstat' process should cascade to the other downstream
   # processes via SIGPIPE.
@@ -124,7 +129,8 @@ then
   # Launch ifconfig in the background, along with any output scanners.
   "$ifconfig_loop" -n "$interval" "${ifconfig_args[@]}" | \
     tee "$ifconfig_logfile" | \
-    "$ifconfig_trace_tool" - > "$ifconfig_logfile.json" &
+    "$ifconfig_trace_tool" "${trace_preamble_args[@]}" - \
+    > "$ifconfig_logfile.json" &
 
   # Terminating the 'ifconfig_loop.sh' process should cascade to its
   # subprocess and the rest of the pipe.

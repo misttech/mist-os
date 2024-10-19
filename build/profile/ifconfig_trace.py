@@ -11,6 +11,7 @@ Currently, this outputs in chrome-trace format only.
 
 Usage:
   ifconfig_trace.py [options] INPUT > OUTPUT
+  INPUT can be '-' to operate as a streamed pipe.
 """
 
 import argparse
@@ -18,16 +19,11 @@ import dataclasses
 import datetime
 import sys
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, Sequence
+from typing import Dict, Iterable, Iterator, Sequence
+
+import trace_tools
 
 _SCRIPT_BASENAME = Path(__file__).name
-
-
-def event_json(
-    name: str, category: str, time: int, value_type: str, value: Any
-) -> str:
-    """Formats JSON for a single event's value."""
-    return f"""{{"name": "{name}", "cat": "{category}", "ph": "C", "pid": 1, "tid": 1, "ts": {time}, "args": {{"{value_type}": "{value}"}} }},"""
 
 
 @dataclasses.dataclass
@@ -49,7 +45,7 @@ class TransmissionData:
         )
 
         def event(name: str, value_type: str, value: int) -> str:
-            return event_json(
+            return trace_tools.event_json(
                 f"{self.interface_name}.{name}",
                 "network",
                 tdelta_us,
@@ -129,41 +125,42 @@ def _parse_ifconfig_loop_output(
         # else: drop other data we don't care about
 
 
-def print_chrome_trace_json(trace: Iterator[TransmissionData]) -> Iterable[str]:
-    yield "["
-
+def print_chrome_trace_json(
+    formatter: trace_tools.Formatter,
+    trace: Iterator[TransmissionData],
+) -> Iterable[str]:
     prev: Dict[str, TransmissionData] = {}
     try:
-        try:
-            first: TransmissionData = next(trace)
-        except StopIteration:
-            # if trace is empty, abort
-            return
+        first: TransmissionData = next(trace)
+    except StopIteration:
+        # if trace is empty, abort
+        return
 
-        # Keep track of previous by interface name, so we can report the
-        # numeric differences.
-        prev[first.interface_name] = first
-        start_time = first.timestamp
-        for line in first.chrome_trace_events_json(start_time, first):
-            yield f"  {line}"
+    # Keep track of previous by interface name, so we can report the
+    # numeric differences.
+    prev[first.interface_name] = first
+    start_time = first.timestamp
+    for line in first.chrome_trace_events_json(start_time, first):
+        yield f"{formatter.indent}{line}"
 
-        # The remainder
-        for t in trace:
-            if t.interface_name not in prev:  # first occurrence
-                prev[t.interface_name] = t
-            for line in t.chrome_trace_events_json(
-                start_time, prev[t.interface_name]
-            ):
-                yield f"  {line}"
+    # Stream the remainder
+    for t in trace:
+        if t.interface_name not in prev:  # first occurrence
             prev[t.interface_name] = t
-
-    # cleanly close the trace
-    finally:
-        yield "]"
+        for line in t.chrome_trace_events_json(
+            start_time, prev[t.interface_name]
+        ):
+            yield f"{formatter.indent}{line}"
+        prev[t.interface_name] = t
 
 
 def _main_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--metadata",
+        type=str,
+        help="Metadata in the form: KEY1:VALUE1,KEY2:VALUE2,...",
+    )
     parser.add_argument(
         # positional argument
         "input",
@@ -185,7 +182,17 @@ def main(argv: Sequence[str]) -> int:
 
     trace = _parse_ifconfig_loop_output(ifconfig_lines)
 
-    for line in print_chrome_trace_json(trace):
+    def event_generator(fmt: trace_tools.Formatter) -> Iterable[str]:
+        yield from print_chrome_trace_json(fmt, trace)
+
+    formatter = trace_tools.Formatter()
+    output = trace_tools.stream_trace(
+        formatter=formatter,
+        metadata=trace_tools.metadata_arg_to_dict(args.metadata),
+        event_generator=event_generator,
+    )
+
+    for line in output:
         print(line)
 
     return 0
