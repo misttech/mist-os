@@ -358,6 +358,15 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   fit::result<Errno, size_t> zero(UserAddress addr, size_t length) const final;
 
   // C++
+
+  starnix_sync::RwLock<TaskMutableState>::RwLockReadGuard Read() const {
+    return mutable_state_.Read();
+  }
+
+  starnix_sync::RwLock<TaskMutableState>::RwLockWriteGuard Write() const {
+    return mutable_state_.Write();
+  }
+
   pid_t id() const { return id_; }
 
   const fbl::RefPtr<ThreadGroup>& thread_group() const { return thread_group_; }
