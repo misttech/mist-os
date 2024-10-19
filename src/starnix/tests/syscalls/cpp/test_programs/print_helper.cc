@@ -57,7 +57,7 @@ bool HasCapabilityAmbient(int cap) {
   return res == 1;
 }
 
-bool HasCapabilityBounded(int cap) {
+bool HasCapabilityBounding(int cap) {
   int res = prctl(PR_CAPBSET_READ, cap, 0, 0, 0);
   if (res == -1) {
     err(EXIT_FAILURE, "prctl PR_CAPBSET_READ");
@@ -85,14 +85,14 @@ int MaxCapabilitySupported() {
 }
 
 void PrintCapabilities() {
-  fprintf(stdout, "CAP_NUM,EFFECTIVE,PERMITTED,INHERITABLE,BOUNDED,AMBIENT\n");
+  fprintf(stdout, "CAP_NUM,EFFECTIVE,PERMITTED,INHERITABLE,BOUNDING,AMBIENT\n");
 
   const int cap_last_cap = MaxCapabilitySupported();
 
   for (int capability = 0; capability <= cap_last_cap; capability++) {
     fprintf(stdout, "%d,%d,%d,%d,%d,%d\n", capability, b2d(HasCapabilityEffective(capability)),
             b2d(HasCapabilityPermitted(capability)), b2d(HasCapabilityInheritable(capability)),
-            b2d(HasCapabilityBounded(capability)), b2d(HasCapabilityAmbient(capability)));
+            b2d(HasCapabilityBounding(capability)), b2d(HasCapabilityAmbient(capability)));
   }
 }
 

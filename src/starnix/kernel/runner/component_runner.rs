@@ -160,6 +160,7 @@ pub async fn start_component(
         credentials.cap_permitted = capabilities;
         credentials.cap_effective = capabilities;
         credentials.cap_inheritable = capabilities;
+        credentials.cap_ambient = capabilities;
     }
 
     run_component_features(system_task.kernel(), &component_features, maybe_svc).unwrap_or_else(
