@@ -248,27 +248,24 @@ fbl::RefPtr<ThreadGroup> ThreadGroup::New(
     ktl::optional<starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent,
     pid_t leader, fbl::RefPtr<ProcessGroup> process_group) {
   fbl::AllocChecker ac;
-  fbl::RefPtr<ThreadGroup> thread_group = fbl::AdoptRef(new (&ac) ThreadGroup(
-      ktl::move(kernel), ktl::move(process), ktl::move(parent), leader, process_group));
+  fbl::RefPtr<ThreadGroup> thread_group = fbl::AdoptRef(
+      new (&ac) ThreadGroup(ktl::move(kernel), ktl::move(process), parent, leader, process_group));
   ASSERT(ac.check());
 
-  thread_group->weak_thread_group_ = util::WeakPtr<ThreadGroup>(thread_group.get());
-
-  auto lock = thread_group->mutable_state_.Write();
-  if (lock->parent_.has_value()) {
+  if (parent.has_value()) {
     // thread_group.next_seccomp_filter_id.reset(parent.base.next_seccomp_filter_id.get());
-    lock->children_.insert(thread_group->weak_thread_group_);
-    // process_group->insert(thread_group);
+    parent.value()->children_.insert(thread_group->weak_thread_group_);
+    process_group->insert(thread_group);
   }
-
   return ktl::move(thread_group);
 }
 
 ThreadGroup::ThreadGroup(
-    fbl::RefPtr<Kernel> _kernel, KernelHandle<ProcessDispatcher> process,
-    ktl::optional<starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard> parent,
+    fbl::RefPtr<Kernel> kernel, KernelHandle<ProcessDispatcher> process,
+    ktl::optional<starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard>& parent,
     pid_t leader, fbl::RefPtr<ProcessGroup> process_group)
-    : kernel_(ktl::move(_kernel)),
+    : weak_thread_group_(util::WeakPtr<ThreadGroup>(this)),
+      kernel_(ktl::move(kernel)),
       process_(ktl::move(process)),
       leader_(leader),
       stop_state_(AtomicStopState(StopState::Awake)) {
