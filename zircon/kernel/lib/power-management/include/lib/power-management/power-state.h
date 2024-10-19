@@ -10,6 +10,7 @@
 #include <stdint.h>
 #include <zircon/errors.h>
 #include <zircon/syscalls-next.h>
+#include <zircon/syscalls/port.h>
 
 #include <atomic>
 #include <cstdint>
@@ -25,6 +26,21 @@ namespace power_management {
 
 // Represents a requested power level update to be executed at a later stage.
 struct PowerLevelUpdateRequest {
+  constexpr zx_port_packet port_packet() const {
+    return {.key = domain_id,
+            .type = ZX_PKT_TYPE_PROCESSOR_POWER_LEVEL_TRANSITION_REQUEST,
+            .status = ZX_OK,
+            .processor_power_level_transition = {
+                .domain_id = target_id,
+                .options = options,
+                .control_interface = static_cast<uint64_t>(control),
+                .control_argument = control_argument,
+            }};
+  }
+
+  // Domain ID where the request is originating from.
+  uint32_t domain_id;
+
   // Target ID of the device or domain that should be transitioned.
   uint32_t target_id;
 

@@ -94,6 +94,7 @@ zx::result<PowerModel> PowerModel::Create(
   }
 
   size_t idle_levels = 0;
+  // We assert below, because all the space required for these operation has been preallocated.
   for (size_t i = 0; i < levels.size(); ++i) {
     power_levels.push_back(PowerLevel(static_cast<uint8_t>(i), levels[i]), &ac);
     // These were preallocated above.
