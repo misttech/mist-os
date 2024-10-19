@@ -16,50 +16,25 @@ import("//build/sdk/sdk_collection.gni")
 
 # The list of target cpu architectures supported by @fuchsia_sdk.
 if (bazel_fuchsia_sdk_all_cpus) {
-  _fuchsia_sdk_target_cpus = idk_target_cpus
+  _bazel_in_tree_idk_cpus = idk_target_cpus
 } else {
-  _fuchsia_sdk_target_cpus = [ target_cpu ]
+  _bazel_in_tree_idk_cpus = [ target_cpu ]
 }
 
-# Ensure that the //build/bazel/bazel_sdk:idk target
-# populates `$OUTPUT_DIR/sdk/exported/bazel_fuchsia_sdk_idk`.
-idk("idk") {
-  output_name = "bazel_fuchsia_sdk_idk"
-  sdk_collection_label = "//sdk:core"
+# Generate a Bazel SDK directly from the content of ://sdk:bazel_in_tree_idk
+# and verify that it matches the content of @fuchsia_sdk. This is performed
+# using Bazel actions, to verify that there are no differences between
+# the Starlark and Python executions of generated_sdk_build_rules.{bzl,py}.
 
-  # Ensure sub-builds are shared with the Core IDK (https://fxbug.dev/342695881)
-  # since they use the same set of atoms, but for different sets of
-  # (target_cpu, api_level) combos.
-  idk_subbuilds_label = "//sdk:core_idk_subbuilds"
-
-  target_cpus = _fuchsia_sdk_target_cpus
-
-  api_levels = []
-  if (bazel_fuchsia_sdk_all_api_levels) {
-    api_levels = platform_version.idk_buildable_api_levels
-  }
-
-  # TODO(https://fxbug.dev/306723826): Deal with the fact that the mac builders
-  # are too slow to enable this setting, and therefore the mac IDK won't have
-  # per-api-level prebuilts.
-  if (host_os == "mac") {
-    api_levels = []
-  }
-}
-
-# Generate a Bazel SDK directly from the content of :idk and verify that
-# it matches the content of @fuchsia_sdk. Doing this ensures that there are
-# no differences between the Starlark and Python executions of
-# generated_sdk_build_rules.{bzl,py}.
-bazel_input_directory("idk.bazel_input") {
-  generator = ":idk"
-  output_directory = "$root_build_dir/sdk/exported/bazel_fuchsia_sdk_idk"
+bazel_input_directory("bazel_in_tree_idk.bazel_input") {
+  generator = "//sdk:bazel_in_tree_idk"
+  output_directory = "$root_build_dir/sdk/exported/bazel_in_tree_idk"
 }
 
 bazel_action("verify_fuchsia_sdk_repository") {
   command = "build"
   bazel_targets = [ ":verify_fuchsia_sdk_repository" ]
-  deps = [ ":idk.bazel_input" ]
+  deps = [ ":bazel_in_tree_idk.bazel_input" ]
   copy_outputs = [
     {
       bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}"
@@ -68,7 +43,12 @@ bazel_action("verify_fuchsia_sdk_repository") {
   ]
 }
 
-foreach(cpu, _fuchsia_sdk_target_cpus) {
+# Run the Bazel SDK test suite against the content of the @fuchsia_sdk
+# repository. This launches in a separate Bazel workspace, as many
+# times as the number of CPU architectures used to populate the
+# //sdk:bazel_in_tree_idk target.
+
+foreach(cpu, _bazel_in_tree_idk_cpus) {
   # Run the test suite against the internal IDK used to populate
   # @fuchsia_sdk, for the current target cpu only.
   run_fuchsia_bazel_sdk_tests("bazel_sdk_tests_${cpu}") {
@@ -76,14 +56,10 @@ foreach(cpu, _fuchsia_sdk_target_cpus) {
   }
 }
 
-# Run the test suite against hte internal IDK used to populate
-# @fuchsia_sdk, once per supported target CPU architecture, if
-# bazel_fuchsia_sdk_all_cpus is set, otherwise only against
-# the current target_cpu value.
 group("bazel_sdk_tests") {
   testonly = true
   deps = []
-  foreach(cpu, _fuchsia_sdk_target_cpus) {
+  foreach(cpu, _bazel_in_tree_idk_cpus) {
     deps += [ ":bazel_sdk_tests_${cpu}" ]
   }
 }

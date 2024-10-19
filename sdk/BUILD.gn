@@ -859,7 +859,91 @@ sdk_molecule("core_licenses") {
   ]
 }
 
+#
+# BEGIN @fuchsia_sdk
+#
+# The following is relevant to the Ninja-generated IDK used to
+# populate the @fuchsia_sdk repository for the in-tree Bazel
+# workspace.
+#
+# This only contains the targets necessary to generate this IDK,
+# as validation is performed in both Ninja and Bazel targets
+# defined in //build/bazel/bazel_sdk/BUILD.gn
+
 if (current_toolchain == default_toolchain) {
+  # The list of target cpu architectures supported by //sdk:bazel_in_tree_idk
+  if (bazel_fuchsia_sdk_all_cpus) {
+    _bazel_in_tree_idk_cpus = idk_target_cpus
+  } else {
+    _bazel_in_tree_idk_cpus = [ target_cpu ]
+  }
+
+  # An IDK used to expose the SDK atoms in the partner category
+  # to the in-tree Bazel workspace's `@fuchsia_sdk` repository.
+  #
+  # This exposes the same set of atoms as the `core` collection,
+  # but by default only provides binaries for the current target_cpu
+  # architecture, and the HEAD API level.
+  #
+  idk("bazel_in_tree_idk") {
+    visibility += [
+      "//build/bazel:*",
+      "//build/bazel/bazel_sdk:*",
+    ]
+    output_name = "bazel_in_tree_idk"
+    sdk_collection_label = "//sdk:core"
+
+    # Ensure sub-builds are shared with the "core' IDK (https://fxbug.dev/342695881)
+    # since they use the same set of atoms, but for different sets of
+    # (target_cpu, api_level) combos.
+    idk_subbuilds_label = "//sdk:core_idk_subbuilds"
+
+    target_cpus = _bazel_in_tree_idk_cpus
+
+    api_levels = []
+    if (bazel_fuchsia_sdk_all_api_levels) {
+      api_levels = platform_version.idk_buildable_api_levels
+    }
+
+    # TODO(https://fxbug.dev/306723826): Deal with the fact that the mac builders
+    # are too slow to enable this setting, and therefore the mac IDK won't have
+    # per-api-level prebuilts.
+    if (host_os == "mac") {
+      api_levels = []
+    }
+  }
+
+  # Run the Bazel SDK test suite against the content of
+  # //sdk:bazel_in_tree_idk. This is only useful for development,
+  # as the content of the @fuchsia_sdk repository, populated
+  # from the same IDK, is already checked by a different suite
+  # of tests defined under //build/bazel/bazel_sdk.
+
+  foreach(cpu, _bazel_in_tree_idk_cpus) {
+    run_fuchsia_bazel_sdk_tests("bazel_in_tree_idk_tests_${cpu}") {
+      target_cpu = cpu
+      idk_exported_target = "//sdk:bazel_in_tree_idk"
+      idk_exported_path = "$root_build_dir/sdk/exported/bazel_in_tree_idk"
+    }
+  }
+
+  group("bazel_in_tree_idk_tests") {
+    testonly = true
+    deps = []
+    foreach(cpu, _bazel_in_tree_idk_cpus) {
+      deps += [ ":bazel_in_tree_idk_tests_${cpu}" ]
+    }
+
+    # For now, nothing should depend on this except
+    # //:root_targets to ensure it can be launched manually
+    # with  `fx build //sdk:bazel_in_tree_idk_tests`
+    visibility = []
+    visibility = [ "//:root_targets" ]
+  }
+
+  #
+  # END @fuchsia_sdk
+
   #
   # BEGIN @internal_sdk
   # DO NOT ADD anything here! This will soon be removed.

@@ -50,12 +50,12 @@ py_binary(
 )
 
 generate_bazel_sdk(
-    name = "bazel_sdk",
-    idk_export_dir = "@gn_targets//build/bazel/bazel_sdk:idk",
+    name = "bazel_in_tree_sdk",
+    idk_export_dir = "@gn_targets//sdk:bazel_in_tree_idk",
 )
 
 compare_bazel_sdk_contents(
     name = "verify_fuchsia_sdk_repository",
     first_sdk = "@fuchsia_sdk//:WORKSPACE.bazel",
-    second_sdk = ":bazel_sdk",
+    second_sdk = ":bazel_in_tree_sdk",
 )

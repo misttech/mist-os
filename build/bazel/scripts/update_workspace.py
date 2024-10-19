@@ -908,8 +908,8 @@ common --enable_bzlmod=false
 
     # Content hash file for @fuchsia_sdk.
     sdk_root = os.path.join(gn_output_dir, "sdk", "exported")
-    all_fuchsia_idk_metas = all_sdk_metas(
-        os.path.join(sdk_root, "bazel_fuchsia_sdk_idk")
+    all_in_tree_idk_metas = all_sdk_metas(
+        os.path.join(sdk_root, "bazel_in_tree_idk")
     )
 
     # Content hash file for @internal_sdk
@@ -1059,11 +1059,11 @@ common --enable_bzlmod=false
     # LINT.ThenChange(//build/info/info.gni)
 
     # LINT.IfChange
-    generated_repositories_inputs["fuchsia_sdk"] = all_fuchsia_idk_metas
+    generated_repositories_inputs["fuchsia_sdk"] = all_in_tree_idk_metas
     # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
 
     # LINT.IfChange
-    generated_repositories_inputs["fuchsia_idk"] = all_fuchsia_idk_metas
+    generated_repositories_inputs["fuchsia_in_tree_idk"] = all_in_tree_idk_metas
     # LINT.ThenChange(../toplevel.WORKSPACE.bazel)
 
     # LINT.IfChange

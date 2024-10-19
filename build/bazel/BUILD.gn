@@ -69,7 +69,7 @@ action("generate_main_workspace") {
   ]
 
   # This dependency is needed to properly populate the @fuchsia_sdk repository.
-  deps = [ "//build/bazel/bazel_sdk:idk" ]
+  deps = [ "//sdk:bazel_in_tree_idk" ]
 
   # This dependency is needed to properly populate the @internal_sdk repository.
   # (see https://fxbug.dev/42063353).
