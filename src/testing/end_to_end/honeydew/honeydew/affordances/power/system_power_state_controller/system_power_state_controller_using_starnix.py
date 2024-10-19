@@ -809,9 +809,6 @@ class SystemPowerStateControllerUsingStarnix(
         #                         "execution_state": {
         #                             "power_level": 2
         #                         },
-        #                         "full_wake_handling": {
-        #                             "power_level": 0
-        #                         },
         #                         "wake_handling": {
         #                             "power_level": 0
         #                         }

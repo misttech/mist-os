@@ -7,8 +7,7 @@ use async_utils::hanging_get::server::HangingGet;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus};
 use fidl_fuchsia_power_system::{
-    self as fsystem, ApplicationActivityLevel, ExecutionStateLevel, FullWakeHandlingLevel,
-    WakeHandlingLevel,
+    self as fsystem, ApplicationActivityLevel, ExecutionStateLevel, WakeHandlingLevel,
 };
 use fuchsia_component::client as fclient;
 use fuchsia_component::client::connect_to_protocol;
@@ -50,18 +49,16 @@ async fn lease(controller: &PowerElementContext, level: u8) -> Result<fbroker::L
 
 pub struct SystemActivityGovernorControl {
     application_activity_controller: Arc<PowerElementContext>,
-    full_wake_handling_controller: Arc<PowerElementContext>,
-    wake_handling_controller: Arc<PowerElementContext>,
 
     hanging_get: RefCell<StateHangingGet>,
 
     application_activity_lease: RefCell<Option<fbroker::LeaseControlProxy>>,
-    wake_handling_lease: RefCell<Option<fbroker::LeaseControlProxy>>,
-    full_wake_handling_lease: RefCell<Option<fbroker::LeaseControlProxy>>,
 
     boot_complete: Rc<Mutex<bool>>,
     current_state: Rc<Mutex<fctrl::SystemActivityGovernorState>>,
     required_state: Rc<Mutex<fctrl::SystemActivityGovernorState>>,
+    sag_proxy: Arc<fsystem::ActivityGovernorProxy>,
+    suspending_token: RefCell<Option<fsystem::LeaseToken>>,
 }
 
 impl SystemActivityGovernorControl {
@@ -69,60 +66,7 @@ impl SystemActivityGovernorControl {
         let topology = connect_to_protocol::<fbroker::TopologyMarker>().unwrap();
         let sag = connect_to_protocol::<fsystem::ActivityGovernorMarker>().unwrap();
         let sag_power_elements = sag.get_power_elements().await.unwrap();
-
-        let wh_token =
-            sag_power_elements.wake_handling.unwrap().assertive_dependency_token.unwrap();
-        let wake_handling_controller = Arc::new(
-            PowerElementContext::builder(&topology, "wake_controller", &[0, 1])
-                .dependencies(vec![fbroker::LevelDependency {
-                    dependency_type: fbroker::DependencyType::Assertive,
-                    dependent_level: 1,
-                    requires_token: wh_token,
-                    requires_level_by_preference: vec![1],
-                }])
-                .build()
-                .await
-                .unwrap(),
-        );
-        let whc_context = wake_handling_controller.clone();
-        fasync::Task::local(async move {
-            run_power_element(
-                &whc_context.name(),
-                &whc_context.required_level,
-                0,    /* initial_level */
-                None, /* inspect_node */
-                basic_update_fn_factory(&whc_context),
-            )
-            .await;
-        })
-        .detach();
-
-        let fwh_token =
-            sag_power_elements.full_wake_handling.unwrap().assertive_dependency_token.unwrap();
-        let full_wake_handling_controller = Arc::new(
-            PowerElementContext::builder(&topology, "full_wake_controller", &[0, 1])
-                .dependencies(vec![fbroker::LevelDependency {
-                    dependency_type: fbroker::DependencyType::Assertive,
-                    dependent_level: 1,
-                    requires_token: fwh_token,
-                    requires_level_by_preference: vec![1],
-                }])
-                .build()
-                .await
-                .unwrap(),
-        );
-        let fwh_context = full_wake_handling_controller.clone();
-        fasync::Task::local(async move {
-            run_power_element(
-                &fwh_context.name(),
-                &fwh_context.required_level,
-                0,    /* initial_level */
-                None, /* inspect_node */
-                basic_update_fn_factory(&fwh_context),
-            )
-            .await;
-        })
-        .detach();
+        let sag_proxy = Arc::new(sag);
 
         let aa_token =
             sag_power_elements.application_activity.unwrap().assertive_dependency_token.unwrap();
@@ -181,12 +125,6 @@ impl SystemActivityGovernorControl {
         )
         .unwrap();
 
-        let fwh_status = status_endpoints.remove("full_wake_handling").unwrap();
-        let initial_full_wake_handling_level = FullWakeHandlingLevel::from_primitive(
-            fwh_status.watch_power_level().await.unwrap().unwrap(),
-        )
-        .unwrap();
-
         let wh_status = status_endpoints.remove("wake_handling").unwrap();
         let initial_wake_handling_level = WakeHandlingLevel::from_primitive(
             wh_status.watch_power_level().await.unwrap().unwrap(),
@@ -196,7 +134,6 @@ impl SystemActivityGovernorControl {
         let state = fctrl::SystemActivityGovernorState {
             execution_state_level: Some(initial_execution_state_level),
             application_activity_level: Some(initial_application_activity_level),
-            full_wake_handling_level: Some(initial_full_wake_handling_level),
             wake_handling_level: Some(initial_wake_handling_level),
             ..Default::default()
         };
@@ -267,24 +204,6 @@ impl SystemActivityGovernorControl {
         let required_state_clone = required_state.clone();
         fasync::Task::local(async move {
             loop {
-                let new_status = FullWakeHandlingLevel::from_primitive(
-                    fwh_status.watch_power_level().await.unwrap().unwrap(),
-                )
-                .unwrap();
-                current_state_clone.lock().await.full_wake_handling_level.replace(new_status);
-                let state = current_state_clone.lock().await.clone();
-                if state == *required_state_clone.lock().await {
-                    publisher.set(state);
-                }
-            }
-        })
-        .detach();
-
-        let publisher = state_publisher.clone();
-        let current_state_clone = current_state.clone();
-        let required_state_clone = required_state.clone();
-        fasync::Task::local(async move {
-            loop {
                 let new_status = WakeHandlingLevel::from_primitive(
                     wh_status.watch_power_level().await.unwrap().unwrap(),
                 )
@@ -300,15 +219,13 @@ impl SystemActivityGovernorControl {
 
         Rc::new(Self {
             application_activity_controller: application_activity_controller.into(),
-            full_wake_handling_controller: full_wake_handling_controller.into(),
-            wake_handling_controller: wake_handling_controller.into(),
             hanging_get: RefCell::new(hanging_get),
             application_activity_lease: RefCell::new(None),
-            wake_handling_lease: RefCell::new(None),
-            full_wake_handling_lease: RefCell::new(None),
             boot_complete,
             current_state,
             required_state,
+            sag_proxy,
+            suspending_token: RefCell::new(None),
         })
     }
 
@@ -351,35 +268,6 @@ impl SystemActivityGovernorControl {
             );
     }
 
-    async fn handle_full_partial_wake_handling_changes(
-        self: &Rc<Self>,
-        required_full_wake_handling_level: FullWakeHandlingLevel,
-        required_wake_handling_level: WakeHandlingLevel,
-    ) -> Result<()> {
-        // Take any wake_handling/full_wake_handling lease before dropping any to prevent a suspend
-        // in between.
-        // Only take a new lease if it doesn't already exist.
-        if required_full_wake_handling_level == FullWakeHandlingLevel::Active {
-            let _ = self
-                .full_wake_handling_lease
-                .borrow_mut()
-                .get_or_insert(lease(&self.full_wake_handling_controller, 1).await?);
-        }
-        if required_wake_handling_level == WakeHandlingLevel::Active {
-            let _ = self
-                .wake_handling_lease
-                .borrow_mut()
-                .get_or_insert(lease(&self.wake_handling_controller, 1).await?);
-        }
-        if required_wake_handling_level == WakeHandlingLevel::Inactive {
-            drop(self.wake_handling_lease.borrow_mut().take());
-        }
-        if required_full_wake_handling_level == FullWakeHandlingLevel::Inactive {
-            drop(self.full_wake_handling_lease.borrow_mut().take());
-        }
-        Ok(())
-    }
-
     async fn handle_application_activity_changes(
         self: &Rc<Self>,
         required_application_activity_level: ApplicationActivityLevel,
@@ -409,9 +297,6 @@ impl SystemActivityGovernorControl {
         let required_application_activity_level = sag_state
             .application_activity_level
             .unwrap_or(self.current_state.lock().await.application_activity_level.unwrap());
-        let required_full_wake_handling_level = sag_state
-            .full_wake_handling_level
-            .unwrap_or(self.current_state.lock().await.full_wake_handling_level.unwrap());
         let required_wake_handling_level = sag_state
             .wake_handling_level
             .unwrap_or(self.current_state.lock().await.wake_handling_level.unwrap());
@@ -425,57 +310,34 @@ impl SystemActivityGovernorControl {
             .await
             .application_activity_level
             .replace(required_application_activity_level);
-        self.required_state
-            .lock()
-            .await
-            .full_wake_handling_level
-            .replace(required_full_wake_handling_level);
         self.required_state.lock().await.wake_handling_level.replace(required_wake_handling_level);
 
         match required_execution_state_level {
             ExecutionStateLevel::Inactive => {
                 if *self.boot_complete.lock().await == false
                     || required_application_activity_level != ApplicationActivityLevel::Inactive
-                    || required_full_wake_handling_level != FullWakeHandlingLevel::Inactive
                     || required_wake_handling_level != WakeHandlingLevel::Inactive
                 {
                     return Err(fctrl::SetSystemActivityGovernorStateError::NotSupported);
                 }
+                drop(self.suspending_token.borrow_mut().take());
                 self.handle_application_activity_changes(required_application_activity_level)
                     .await
                     .map_err(|err| {
                         error!(%err, "Request failed with internal error");
                         fctrl::SetSystemActivityGovernorStateError::Internal
                     })?;
-                self.handle_full_partial_wake_handling_changes(
-                    required_full_wake_handling_level,
-                    required_wake_handling_level,
-                )
-                .await
-                .map_err(|err| {
-                    error!(%err, "Request failed with internal error");
-                    fctrl::SetSystemActivityGovernorStateError::Internal
-                })?;
             }
             ExecutionStateLevel::Suspending => {
                 if *self.boot_complete.lock().await == false
                     || required_application_activity_level != ApplicationActivityLevel::Inactive
-                    || (required_full_wake_handling_level == FullWakeHandlingLevel::Inactive
-                        && required_wake_handling_level == WakeHandlingLevel::Inactive)
+                        && required_wake_handling_level == WakeHandlingLevel::Inactive
                 {
                     return Err(fctrl::SetSystemActivityGovernorStateError::NotSupported);
                 }
 
-                // Take any wake handling leases before dropping any application activity lease.
-                self.handle_full_partial_wake_handling_changes(
-                    required_full_wake_handling_level,
-                    required_wake_handling_level,
-                )
-                .await
-                .map_err(|err| {
-                    error!(%err, "Request failed with internal error");
-                    fctrl::SetSystemActivityGovernorStateError::Internal
-                })?;
+                let token = self.sag_proxy.take_wake_lease("Suspending").await.unwrap();
+                let _ = self.suspending_token.borrow_mut().get_or_insert(token);
 
                 self.handle_application_activity_changes(required_application_activity_level)
                     .await
@@ -498,15 +360,6 @@ impl SystemActivityGovernorControl {
                         error!(%err, "Request failed with internal error");
                         fctrl::SetSystemActivityGovernorStateError::Internal
                     })?;
-                self.handle_full_partial_wake_handling_changes(
-                    required_full_wake_handling_level,
-                    required_wake_handling_level,
-                )
-                .await
-                .map_err(|err| {
-                    error!(%err, "Request failed with internal error");
-                    fctrl::SetSystemActivityGovernorStateError::Internal
-                })?;
             }
             _ => (),
         }
