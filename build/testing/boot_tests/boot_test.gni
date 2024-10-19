@@ -80,6 +80,8 @@ template("_boot_test") {
       rebase_path(inputs[0], root_build_dir),
       "-success-str",
       boot_test_success_string,
+      "-failure-str",
+      "FAILED TEST",
       "-timeout",
       "${timeout_secs}s",
     ]

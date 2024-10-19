@@ -31,6 +31,7 @@ import (
 var (
 	timeout        time.Duration
 	successString  string
+	failureString  string
 	redirectStdout bool
 )
 
@@ -38,6 +39,7 @@ func init() {
 	flag.DurationVar(&timeout, "timeout", 10*time.Minute, "amount of time to wait for success string")
 	flag.BoolVar(&redirectStdout, "stdout", false, "whether to redirect serial output to stdout")
 	flag.StringVar(&successString, "success-str", "", "string that - if read - indicates success")
+	flag.StringVar(&failureString, "failure-str", "", "string that - if read - indicates failure")
 }
 
 func execute(ctx context.Context, serialLogPath string, stdout io.Writer) error {
@@ -72,7 +74,7 @@ func execute(ctx context.Context, serialLogPath string, stdout io.Writer) error 
 	}()
 
 	for {
-		if match, err := iomisc.ReadUntilMatchString(ctx, serialTee, successString); err != nil {
+		if match, err := iomisc.ReadUntilMatchString(ctx, serialTee, successString, failureString); err != nil {
 			if ctx.Err() != nil {
 				// LINT.IfChange(timed_out)
 				return fmt.Errorf("timed out before success string %q was read from serial", successString)
@@ -86,6 +88,8 @@ func execute(ctx context.Context, serialLogPath string, stdout io.Writer) error 
 			// to read until the success string is found or the timeout is hit.
 			time.Sleep(100 * time.Millisecond)
 			continue
+		} else if match == failureString {
+			return fmt.Errorf("failure string found: %q", failureString)
 		} else if match != successString {
 			return fmt.Errorf("match found %q doesn't match successString %q", match, successString)
 		}
