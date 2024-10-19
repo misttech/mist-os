@@ -17,13 +17,14 @@ use linux_uapi::XATTR_NAME_SELINUX;
 use selinux::permission_check::{PermissionCheck, PermissionCheckResult};
 use selinux::policy::FsUseType;
 use selinux::{
-    ClassPermission, FileClass, FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions,
-    InitialSid, ObjectClass, Permission, ProcessPermission, SecurityId, SecurityPermission,
-    SecurityServer,
+    ClassPermission, DirPermission, FileClass, FilePermission, FileSystemLabel,
+    FileSystemLabelingScheme, FileSystemMountOptions, FileSystemPermission, InitialSid,
+    ObjectClass, Permission, ProcessPermission, SecurityId, SecurityPermission, SecurityServer,
 };
 use starnix_logging::{log_debug, log_error, log_warn, track_stub};
 use starnix_sync::Mutex;
 use starnix_uapi::arc_key::WeakKey;
+use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::mount_flags::MountFlags;
@@ -272,6 +273,79 @@ pub(super) fn fs_node_init_on_create(
     set_cached_sid(new_node, sid);
 
     Ok(xattr)
+}
+
+/// Helper used by filesystem node creation checks to validate that `current_task` has necessary
+/// permissions to create a new node under the specified `parent`.
+fn may_create(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    parent: &FsNode,
+) -> Result<(), Errno> {
+    let (current_sid, fscreate_sid) = {
+        let attrs = &current_task.read().security_state.attrs;
+        (attrs.current_sid, attrs.fscreate_sid)
+    };
+    let parent_sid = fs_node_effective_sid(parent);
+    let file_sid = fscreate_sid.unwrap_or_else(
+        // TODO: Calculate the new file's SID here.
+        || SecurityId::initial(InitialSid::File),
+    );
+    let permission_check = security_server.as_permission_check();
+    let filesystem_sid = match &*parent.fs().security_state.state.0.lock() {
+        FileSystemLabelState::Labeled { label } => Ok(label.sid),
+        _ => error!(EPERM),
+    }?;
+    check_permission(&permission_check, current_sid, parent_sid, DirPermission::Search)?;
+    check_permission(&permission_check, current_sid, parent_sid, DirPermission::AddName)?;
+    check_permission(&permission_check, current_sid, file_sid, FilePermission::Create)?;
+    check_permission(&permission_check, file_sid, filesystem_sid, FileSystemPermission::Associate)?;
+    Ok(())
+}
+
+/// Validate that `current_task` has permission to create a regular file in the `parent` directory,
+/// with the specified file `mode`.
+pub fn check_fs_node_create_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    parent: &FsNode,
+    _mode: FileMode,
+) -> Result<(), Errno> {
+    may_create(security_server, current_task, parent)
+}
+
+/// Validate that `current_task` has permission to create a symlink to `old_path` in the `parent`
+/// directory.
+pub fn check_fs_node_symlink_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    parent: &FsNode,
+    _old_path: &FsStr,
+) -> Result<(), Errno> {
+    may_create(security_server, current_task, parent)
+}
+
+/// Validate that `current_task` has permission to create a new directory in the `parent` directory,
+/// with the specified file `mode`.
+pub fn check_fs_node_mkdir_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    parent: &FsNode,
+    _mode: FileMode,
+) -> Result<(), Errno> {
+    may_create(security_server, current_task, parent)
+}
+
+/// Validate that `current_task` has permission to create a new special file, socket or pipe, in the
+/// `parent` directory, and with the specified file `mode` and `device_id`.
+pub fn check_fs_node_mknod_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    parent: &FsNode,
+    _mode: FileMode,
+    _device_id: DeviceType,
+) -> Result<(), Errno> {
+    may_create(security_server, current_task, parent)
 }
 
 /// Returns the Security Context corresponding to the SID with which `FsNode`

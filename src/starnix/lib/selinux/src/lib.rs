@@ -80,6 +80,8 @@ enumerable_enum! {
         Fifo,
         /// The SELinux "file" object class.
         File,
+        /// The SELinux "filesystem" object class.
+        FileSystem,
         /// The SELinux "lnk_file" object class.
         Link,
         /// The SELinux "process" object class.
@@ -101,6 +103,7 @@ impl ObjectClass {
             Self::Dir => "dir",
             Self::Fifo => "fifo_file",
             Self::File => "file",
+            Self::FileSystem => "filesystem",
             Self::Link => "lnk_file",
             Self::Process => "process",
             Self::Security => "security",
@@ -233,8 +236,12 @@ permission_enum! {
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
     Permission {
         // keep-sorted start
+        /// Permissions for the well-known SELinux "dir" object class.
+        Dir(DirPermission),
         /// Permissions for the well-known SELinux "file" object class.
         File(FilePermission),
+        /// Permissions for the well-known SELinux "filesystem" object class.
+        FileSystem(FileSystemPermission),
         /// Permissions for the well-known SELinux "process" object class.
         Process(ProcessPermission),
         /// Permissions for access to parts of the "selinuxfs" used to administer and query SELinux.
@@ -270,6 +277,20 @@ macro_rules! class_permission_enum {
 }
 
 class_permission_enum! {
+    /// A well-known "dir" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    DirPermission {
+        // keep-sorted start
+        /// Permission to add a file to the directory.
+        AddName("add_name"),
+        /// Search access to the directory.
+        Search("search"),
+        // keep-sorted end
+    }
+}
+
+class_permission_enum! {
     /// A well-known "file" class permission in SELinux policy that has a particular meaning in
     /// policy enforcement hooks.
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -284,6 +305,18 @@ class_permission_enum! {
         ExecuteNoTrans("execute_no_trans"),
         /// Permission to open a file.
         Open("open"),
+        // keep-sorted end
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "filesystem" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    FileSystemPermission {
+        // keep-sorted start
+        /// Permission to associate a file to the filesystem.
+        Associate("associate"),
         // keep-sorted end
     }
 }

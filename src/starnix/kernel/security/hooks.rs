@@ -13,7 +13,9 @@ use selinux::{SecurityPermission, SecurityServer};
 use starnix_logging::log_debug;
 use starnix_uapi::arc_key::WeakKey;
 use starnix_uapi::auth::CAP_SYS_ADMIN;
+use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::ownership::TempRef;
 use starnix_uapi::signals::Signal;
@@ -132,6 +134,69 @@ pub fn fs_node_init_on_create(
 ) -> Result<Option<FsNodeSecurityXattr>, Errno> {
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::fs_node_init_on_create(security_server, current_task, new_node, parent)
+    })
+}
+
+/// Validate that `current_task` has permission to create a regular file in the `parent` directory,
+/// with the specified file `mode`.
+/// Corresponds to the `security_inode_create()` hook.
+pub fn check_fs_node_create_access(
+    current_task: &CurrentTask,
+    parent: &FsNode,
+    mode: FileMode,
+) -> Result<(), Errno> {
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_fs_node_create_access(security_server, current_task, parent, mode)
+    })
+}
+
+/// Validate that `current_task` has permission to create a symlink to `old_path` in the `parent`
+/// directory.
+/// Corresponds to the `security_inode_symlink()` hook.
+pub fn check_fs_node_symlink_access(
+    current_task: &CurrentTask,
+    parent: &FsNode,
+    old_path: &FsStr,
+) -> Result<(), Errno> {
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_fs_node_symlink_access(security_server, current_task, parent, old_path)
+    })
+}
+
+/// Validate that `current_task` has permission to create a new directory in the `parent` directory,
+/// with the specified file `mode`.
+/// Corresponds to the `security_inode_mkdir()` hook.
+pub fn check_fs_node_mkdir_access(
+    current_task: &CurrentTask,
+    parent: &FsNode,
+    mode: FileMode,
+) -> Result<(), Errno> {
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_fs_node_mkdir_access(security_server, current_task, parent, mode)
+    })
+}
+
+/// Validate that `current_task` has permission to create a new special file, socket or pipe, in the
+/// `parent` directory, and with the specified file `mode` and `device_id`.
+/// For consistency any calls to `mknod()` with a file `mode` specifying a regular file will be
+/// validated by `check_fs_node_create_access()` rather than by this hook.
+/// /// Corresponds to the `security_inode_mknod()` hook.
+pub fn check_fs_node_mknod_access(
+    current_task: &CurrentTask,
+    parent: &FsNode,
+    mode: FileMode,
+    device_id: DeviceType,
+) -> Result<(), Errno> {
+    assert!(!mode.is_reg());
+
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::check_fs_node_mknod_access(
+            security_server,
+            current_task,
+            parent,
+            mode,
+            device_id,
+        )
     })
 }
 
