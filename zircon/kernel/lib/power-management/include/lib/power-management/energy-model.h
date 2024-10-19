@@ -69,7 +69,7 @@ class PowerLevel {
   };
 
   constexpr PowerLevel() = default;
-  explicit constexpr PowerLevel(uint8_t level_index, const zx_processor_power_level_t& level)
+  explicit PowerLevel(uint8_t level_index, const zx_processor_power_level_t& level)
       : options_(level.options),
         control_(static_cast<ControlInterface>(level.control_interface)),
         control_argument_(level.control_argument),
@@ -204,7 +204,7 @@ struct TransitionMatrix {
 
  private:
   friend PowerModel;
-  constexpr TransitionMatrix(cpp20::span<const PowerLevelTransition> transitions, size_t num_rows)
+  TransitionMatrix(cpp20::span<const PowerLevelTransition> transitions, size_t num_rows)
       : transitions_(transitions), num_rows_(num_rows) {
     ZX_DEBUG_ASSERT(transitions_.size() != 0);
     ZX_DEBUG_ASSERT(num_rows_ != 0);
@@ -255,7 +255,7 @@ class PowerModel {
 
   // Returns a transition matrix, where the entry <i,j> represents the transition costs for
   // transitioning from i to j.
-  constexpr TransitionMatrix transitions() const {
+  TransitionMatrix transitions() const {
     return TransitionMatrix(transitions_, power_levels_.size());
   }
 
@@ -298,7 +298,7 @@ class PowerDomain : public fbl::RefCounted<PowerDomain>,
 
   // Normalized utilization accumulated from all the entities that this `PowerDomain`
   // is associated with (e.g. all the cpus in the power domain).
-  constexpr uint64_t total_normalized_utilization() const {
+  uint64_t total_normalized_utilization() const {
     return total_normalized_utilization_.load(std::memory_order_relaxed);
   }
 

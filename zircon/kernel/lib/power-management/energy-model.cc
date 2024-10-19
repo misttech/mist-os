@@ -95,8 +95,12 @@ zx::result<PowerModel> PowerModel::Create(
 
   size_t idle_levels = 0;
   for (size_t i = 0; i < levels.size(); ++i) {
-    power_levels.push_back(PowerLevel(static_cast<uint8_t>(i), levels[i]));
-    power_levels_lookup.push_back(i);
+    power_levels.push_back(PowerLevel(static_cast<uint8_t>(i), levels[i]), &ac);
+    // These were preallocated above.
+    ZX_ASSERT(ac.check());
+    power_levels_lookup.push_back(i, &ac);
+    // These were preallocated above.
+    ZX_ASSERT(ac.check());
     if (power_levels[i].type() == PowerLevel::kIdle) {
       idle_levels++;
     }
