@@ -7,12 +7,14 @@ use builtins::smc_resource::SmcResource;
 
 #[cfg(target_arch = "x86_64")]
 use builtins::ioport_resource::IoportResource;
-use fuchsia_boot::UserbootRequest;
+use fidl_fuchsia_boot::UserbootRequest;
 
 use crate::bootfs::BootfsSvc;
 use crate::builtin::builtin_resolver::{BuiltinResolver, SCHEME as BUILTIN_SCHEME};
 use crate::builtin::crash_introspect::CrashIntrospectSvc;
-use crate::builtin::fuchsia_boot_resolver::{FuchsiaBootResolver, SCHEME as BOOT_SCHEME};
+use crate::builtin::fuchsia_boot_resolver::{
+    FuchsiaBootPackageResolver, FuchsiaBootResolver, SCHEME as BOOT_SCHEME,
+};
 use crate::builtin::log::{ReadOnlyLog, WriteOnlyLog};
 use crate::builtin::realm_builder::{
     RealmBuilderResolver, RealmBuilderRunnerFactory, RUNNER_NAME as REALM_BUILDER_RUNNER_NAME,
@@ -111,11 +113,9 @@ use zx::{self as zx, Resource};
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
-    fidl_fuchsia_kernel as fkernel, fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys,
-    fidl_fuchsia_time as ftime, fuchsia_async as fasync,
+    fidl_fuchsia_kernel as fkernel, fidl_fuchsia_pkg as fpkg, fidl_fuchsia_process as fprocess,
+    fidl_fuchsia_sys2 as fsys, fidl_fuchsia_time as ftime, fuchsia_async as fasync,
 };
-
-use fidl_fuchsia_boot as fuchsia_boot;
 
 // Allow shutdown to take up to an hour.
 pub static SHUTDOWN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60 * 60);
@@ -298,7 +298,7 @@ impl BuiltinEnvironmentBuilder {
 
         register_builtin_resolver(&mut self.resolvers);
 
-        let boot_resolver = if self.add_environment_resolvers {
+        let boot_resolvers = if self.add_environment_resolvers {
             register_boot_resolver(&mut self.resolvers, &runtime_config).await?
         } else {
             None
@@ -365,7 +365,7 @@ impl BuiltinEnvironmentBuilder {
             runtime_config,
             system_resource_handle,
             builtin_runners,
-            boot_resolver,
+            boot_resolvers,
             realm_builder_resolver,
             self.utc_clock,
             self.inspector.unwrap_or(component::init_inspector_with_size(INSPECTOR_SIZE).clone()),
@@ -409,6 +409,24 @@ impl RootComponentInputBuilder {
         P: DiscoverableProtocolMarker + ProtocolMarker,
     {
         let name = Name::new(P::PROTOCOL_NAME).unwrap();
+        self.add_named_builtin_protocol_if_enabled::<P>(name, task_to_launch)
+    }
+
+    /// Adds a new builtin protocol to the input that will be given to the root component. If the
+    /// protocol is not listed in `self.builtin_capabilities`, then it will silently be omitted
+    /// from the input.
+    /// The protocol's name, which is the value checked for in `self.builtin_capabilities` and how
+    /// the protocol is exposed to the root component, will be `name` instead of `P::PROTOCOL_NAME`.
+    fn add_named_builtin_protocol_if_enabled<P>(
+        &mut self,
+        name: cm_types::Name,
+        task_to_launch: impl Fn(P::RequestStream) -> BoxFuture<'static, Result<(), anyhow::Error>>
+            + Sync
+            + Send
+            + 'static,
+    ) where
+        P: DiscoverableProtocolMarker + ProtocolMarker,
+    {
         // TODO: check capability type too
         // TODO: if we store the capabilities in a hashmap by name, then we can remove them as
         // they're added and confirm at the end that we've not been asked to enable something
@@ -434,7 +452,7 @@ impl RootComponentInputBuilder {
         );
 
         match self.input.insert_capability(
-            &P::PROTOCOL_NAME.parse::<Name>().unwrap(),
+            &name,
             launch
                 .into_router()
                 .with_porcelain_type(
@@ -714,7 +732,7 @@ impl BuiltinEnvironment {
         runtime_config: Arc<RuntimeConfig>,
         system_resource_handle: Option<Resource>,
         builtin_runners: Vec<BuiltinRunner>,
-        boot_resolver: Option<FuchsiaBootResolver>,
+        boot_resolvers: Option<(FuchsiaBootResolver, Option<Arc<FuchsiaBootPackageResolver>>)>,
         realm_builder_resolver: Option<RealmBuilderResolver>,
         utc_clock: Option<Arc<UtcClock>>,
         inspector: Inspector,
@@ -831,7 +849,7 @@ impl BuiltinEnvironment {
         let userboot = take_startup_handle(HandleInfo::new(HandleType::User0, 0))
             .map(zx::Channel::from)
             .map(fasync::Channel::from_channel)
-            .map(fuchsia_boot::UserbootRequestStream::from_channel);
+            .map(fboot::UserbootRequestStream::from_channel);
 
         if let Some(userboot) = userboot {
             let mut svc_stash_provider = None;
@@ -1322,15 +1340,32 @@ impl BuiltinEnvironment {
             vec![Box::new(EventSourceFactoryCapability::new(event_source_factory.clone()))];
 
         // Set up the boot resolver so it is routable from "above root".
-        if let Some(boot_resolver) = boot_resolver {
-            let b = boot_resolver.clone();
+        if let Some((component_resolver, package_resolver)) = boot_resolvers {
+            let c = component_resolver.clone();
             root_input_builder.add_builtin_protocol_if_enabled::<fresolution::ResolverMarker>(
                 move |stream| {
-                    let b = b.clone();
-                    async move { b.serve(stream).await.map_err(|e| format_err!("{:?}", e)) }.boxed()
+                    let c = c.clone();
+                    async move { c.serve(stream).await.map_err(|e| format_err!("{e:?}")) }.boxed()
                 },
             );
-            builtin_capabilities.push(Box::new(boot_resolver));
+            builtin_capabilities.push(Box::new(component_resolver));
+
+            if let Some(package_resolver) = package_resolver {
+                root_input_builder
+                    .add_named_builtin_protocol_if_enabled::<fpkg::PackageResolverMarker>(
+                        cm_types::BoundedName::new("fuchsia.pkg.PackageResolver-boot").unwrap(),
+                        move |stream| {
+                            let package_resolver = package_resolver.clone();
+                            async move {
+                                package_resolver
+                                    .serve(stream)
+                                    .await
+                                    .map_err(|e| format_err!("{e:?}"))
+                            }
+                            .boxed()
+                        },
+                    );
+            }
         }
 
         for runner in builtin_runners.iter() {
@@ -1669,7 +1704,7 @@ fn register_builtin_resolver(resolvers: &mut ResolverRegistry) {
 async fn register_boot_resolver(
     resolvers: &mut ResolverRegistry,
     runtime_config: &RuntimeConfig,
-) -> Result<Option<FuchsiaBootResolver>, Error> {
+) -> Result<Option<(FuchsiaBootResolver, Option<Arc<FuchsiaBootPackageResolver>>)>, Error> {
     let path = match &runtime_config.builtin_boot_resolver {
         BuiltinBootResolver::Boot => "/boot",
         BuiltinBootResolver::None => return Ok(None),
@@ -1681,9 +1716,9 @@ async fn register_boot_resolver(
             info!(%path, "fuchsia-boot resolver unavailable, not in namespace");
             Ok(None)
         }
-        Some(resolver) => {
-            resolvers.register(BOOT_SCHEME.to_string(), Arc::new(resolver.clone()));
-            Ok(Some(resolver))
+        Some((component, package)) => {
+            resolvers.register(BOOT_SCHEME.into(), Arc::new(component.clone()));
+            Ok(Some((component, package)))
         }
     }
 }

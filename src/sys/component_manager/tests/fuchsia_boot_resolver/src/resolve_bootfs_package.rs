@@ -12,13 +12,8 @@ use {
     fuchsia_component_test::ScopedInstance,
     fuchsia_runtime::{HandleInfo, HandleType},
     std::{fs::File, io::Read},
-    zx::{self as zx, HandleBased},
+    zx::HandleBased,
 };
-
-// macros
-use vfs::assert_read_dirents;
-
-use vfs::directory::test_utils::DirentsSameInodeBuilder;
 
 const ZBI_PATH: &str = "/pkg/data/tests/uncompressed_bootfs";
 
@@ -47,69 +42,38 @@ async fn package_resolution() {
     };
     let _cm_controller = instance.start_with_args(args).await.unwrap();
 
-    // Confirm root component (trigger.cm) can be started.
+    // Start the root component
     let lifecycle_controller =
         instance.connect_to_protocol_at_exposed_dir::<fsys::LifecycleControllerMarker>().unwrap();
     let (_binder, server_end) = endpoints::create_proxy::<fcomponent::BinderMarker>().unwrap();
-    // Confirm root component (hello_world.cm) can be started.
     lifecycle_controller.start_instance(".".into(), server_end).await.unwrap().unwrap();
 
-    // Verify the contents of hello_world's /pkg match what we expect.
+    // Connect to the root component's test.checker.Check capability.
     let realm_query =
         instance.connect_to_protocol_at_exposed_dir::<fsys::RealmQueryMarker>().unwrap();
-    let (dir_proxy, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-    let server_end = endpoints::ServerEnd::new(server_end.into_channel());
+    let (exposed_dir, server_end) = endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
     realm_query
         .open(
             ".".into(),
-            fsys::OpenDirType::PackageDir,
-            fio::OpenFlags::RIGHT_READABLE,
+            fsys::OpenDirType::ExposedDir,
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
             fio::ModeType::empty(),
             ".",
-            server_end,
+            server_end.into_channel().into(),
         )
         .await
         .unwrap()
         .unwrap();
+    let checker = fuchsia_component::client::connect_to_protocol_at_dir_root::<
+        fidl_test_checker::CheckerMarker,
+    >(&exposed_dir)
+    .unwrap();
 
-    let mut expected = DirentsSameInodeBuilder::new(fio::INO_UNKNOWN);
-    expected
-        .add(fio::DirentType::Directory, b".")
-        .add(fio::DirentType::Directory, b"bin")
-        .add(fio::DirentType::Directory, b"lib")
-        .add(fio::DirentType::Directory, b"meta");
-
-    assert_read_dirents!(dir_proxy, 1000, expected.into_vec());
-
-    let mut expected_bin = DirentsSameInodeBuilder::new(fio::INO_UNKNOWN);
-    expected_bin.add(fio::DirentType::Directory, b".").add(fio::DirentType::File, b"trigger");
-    assert_read_dirents!(
-        fuchsia_fs::directory::open_directory_no_describe_deprecated(
-            &dir_proxy,
-            "bin",
-            fio::OpenFlags::empty(),
-        )
-        .unwrap(),
-        1000,
-        expected_bin.into_vec()
-    );
-
-    let mut expected_meta = DirentsSameInodeBuilder::new(fio::INO_UNKNOWN);
-    expected_meta
-        .add(fio::DirentType::Directory, b".")
-        .add(fio::DirentType::File, b"contents")
-        .add(fio::DirentType::Directory, b"fuchsia.abi")
-        .add(fio::DirentType::File, b"package")
-        .add(fio::DirentType::File, b"trigger.cm");
-
-    assert_read_dirents!(
-        fuchsia_fs::directory::open_directory_no_describe_deprecated(
-            &dir_proxy,
-            "meta",
-            fio::OpenFlags::empty(),
-        )
-        .unwrap(),
-        1000,
-        expected_meta.into_vec()
-    );
+    // The root component responding to FIDL requests at all suggests that bootfs package resolution
+    // as used by the component resolver is working correctly.
+    // If the contents of the sentinel file, which is contained in a package that is resolved by the
+    // root component using CM's exposed bootfs fuchsia.pkg.PackageResolver capability, are as
+    // expected, that suggests that bootfs package resolution as exposed as a CM builtin capability
+    // is working correctly.
+    assert_eq!(checker.sentinel_file_contents().await.unwrap(), "unguessable contents\n");
 }

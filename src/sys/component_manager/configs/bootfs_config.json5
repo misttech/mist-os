@@ -15,6 +15,7 @@
     builtin_capabilities: [
         {
             protocol: [
+                "fuchsia.pkg.PackageResolver-boot",
                 "fuchsia.boot.Arguments",
                 "fuchsia.boot.ReadOnlyLog",
                 "fuchsia.boot.WriteOnlyLog",
