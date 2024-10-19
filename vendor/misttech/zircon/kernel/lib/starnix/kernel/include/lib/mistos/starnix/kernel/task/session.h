@@ -29,9 +29,18 @@ struct SessionMutableState {
   /// groups must unregister themselves before they are deleted.
   fbl::WAVLTree<pid_t, util::WeakPtr<ProcessGroup>> process_groups_;
 
- public:
+  /// The leader of the foreground process group. This is necessary because the leader must
+  /// be returned even if the process group has already been deleted.
+  // pid_t foreground_process_group;
+
   /// The controlling terminal of the session.
   // pub controlling_terminal: Option<ControllingTerminal>,
+
+ public:
+  /// Removes the process group from the session. Returns whether the session is empty.
+  void remove(pid_t pid);
+
+  void insert(fbl::RefPtr<ProcessGroup> process_group);
 
   ~SessionMutableState();
 };
@@ -62,8 +71,19 @@ class Session : public fbl::RefCounted<Session> {
   static fbl::RefPtr<Session> New(pid_t leader);
 
   // C++
+  // ordered_state_accessor;
+  starnix_sync::RwLock<SessionMutableState>::RwLockReadGuard Read() const {
+    return mutable_state_.Read();
+  }
+
+  starnix_sync::RwLock<SessionMutableState>::RwLockWriteGuard Write() const {
+    return mutable_state_.Write();
+  }
+
+  // Accessor for the leader
  public:
   pid_t leader() { return leader_; }
+
   ~Session();
 
  private:
