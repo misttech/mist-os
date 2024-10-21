@@ -12,7 +12,7 @@ use fuchsia_async::DurationExt as _;
 use futures::stream::LocalBoxStream;
 use futures::{future, StreamExt as _, TryStreamExt as _};
 use net_declare::fidl_subnet;
-use tracing::error;
+use tracing::{error, warn};
 use {
     fidl_fuchsia_net_filter_deprecated as fnet_filter_deprecated,
     fidl_fuchsia_net_masquerade as fnet_masquerade,
@@ -71,6 +71,10 @@ pub(super) struct Masquerade<Filter = fnet_filter_deprecated::FilterProxy> {
     active_controllers: HashMap<ValidatedConfig, MasqueradeState>,
 }
 
+/// Updates the interface enabled state to acknowledge the change in masquerade
+/// configuration.
+///
+/// Note: It is incorrect to call this function if no change has occurred.
 async fn update_interface<Filter: fnet_filter_deprecated::FilterProxyInterface>(
     filter: &Filter,
     interface: InterfaceId,
@@ -79,9 +83,9 @@ async fn update_interface<Filter: fnet_filter_deprecated::FilterProxyInterface>(
     interface_states: &HashMap<InterfaceId, InterfaceState>,
 ) -> Result<(), Error> {
     if enabled {
-        filter_enabled_state.enable_masquerade_interface_id(interface);
+        filter_enabled_state.increment_masquerade_count_on_interface(interface);
     } else {
-        filter_enabled_state.disable_masquerade_interface_id(interface);
+        filter_enabled_state.decrement_masquerade_count_on_interface(interface);
     }
     if let Err(e) = filter_enabled_state
         .maybe_update_deprecated(
@@ -116,6 +120,12 @@ impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
     ) -> Result<bool, Error> {
         let state =
             self.active_controllers.get_mut(&config).ok_or_else(|| Error::InvalidArguments)?;
+        if state.active == enabled {
+            // The current state is already the desired state; short circuit.
+            // This prevents calling `update_interface` in the no-change case.
+            return Ok(state.active);
+        }
+
         let ValidatedConfig { src_subnet, output_interface } = config;
         let outgoing_nic = output_interface.get();
         update_interface(
@@ -195,13 +205,17 @@ impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
         Err(Error::RetryExceeded)
     }
 
+    /// Attempts to create a new fuchsia_net_masquerade/Control connection.
+    ///
+    /// On error, returns the original control handle back so that the caller
+    /// may terminate the connection.
     fn create_control(
         &mut self,
         config: ValidatedConfig,
         control: Option<fnet_masquerade::ControlControlHandle>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), (Error, Option<fnet_masquerade::ControlControlHandle>)> {
         if config.src_subnet == UNSPECIFIED_SUBNET {
-            return Err(Error::Unsupported);
+            return Err((Error::Unsupported, control));
         }
 
         match self.active_controllers.entry(config) {
@@ -210,7 +224,13 @@ impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
                 let _: &mut MasqueradeState = e.insert(MasqueradeState::new(control));
                 Ok(())
             }
-            std::collections::hash_map::Entry::Occupied(_) => Err(Error::AlreadyExists),
+            // TODO(https://fxbug.dev/374287551): At the moment, new controllers
+            // are rejected if their configuration exactly matches an existing
+            // controller. However, it would be preferable to also reject
+            // controllers that specify an overlapping configuration. E.g. a
+            // subnet that overlaps with an existing subnet on the same
+            // interface.
+            std::collections::hash_map::Entry::Occupied(_) => Err((Error::AlreadyExists, control)),
         }
     }
 
@@ -246,27 +266,24 @@ impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
                         return;
                     }
                 };
-                let result = self.create_control(config, Some(control));
-                let state = self
-                    .active_controllers
-                    .get_mut(&config)
-                    .expect("state was created by the previous function");
-                state.respond_and_maybe_shutdown(result, |r| {
-                    let _: Result<(), fidl::Error> = responder.send(r);
-                    // N.B. we always return Ok here because we don't
-                    // want to shut down the Control handle if replying
-                    // to the Factory request fails.
-                    Ok(())
-                });
-                if let Err(e) = result {
-                    error!("failed to create control: {e:?}");
-                    return;
+                match self.create_control(config, Some(control)) {
+                    Ok(()) => {
+                        if let Err(e) = responder.send(Ok(())) {
+                            error!("failed to notify control of successful creation: {e:?}");
+                        }
+                        events.push(
+                            stream
+                                .try_filter_map(move |r| {
+                                    future::ok(Some(Event::ControlRequest(config, r)))
+                                })
+                                .boxed(),
+                        );
+                    }
+                    Err((e, control)) => {
+                        warn!("failed to create control: {e:?}");
+                        control.respond_and_maybe_shutdown(Err(e), |r| responder.send(r));
+                    }
                 }
-                events.push(
-                    stream
-                        .try_filter_map(move |r| future::ok(Some(Event::ControlRequest(config, r))))
-                        .boxed(),
-                );
             }
             Event::ControlRequest(
                 config,
@@ -339,7 +356,7 @@ impl RespondAndMaybeShutdown for fnet_masquerade::ControlControlHandle {
                     // This is not a permanent error, and should not cause a shutdown.
                 }
                 e => {
-                    error!("Shutting down due to permanent error: {e:?}");
+                    warn!("Shutting down due to permanent error: {e:?}");
                     self.shutdown_with_epitaph(to_epitaph(e));
                 }
             }
@@ -574,7 +591,7 @@ pub mod test {
         }
         let mut masq = Masquerade::new(filter);
         pretty_assertions::assert_eq!(
-            masq.create_control(config.clone(), None),
+            masq.create_control(config.clone(), None).map_err(|(e, _control)| e),
             create_control_response
         );
         pretty_assertions::assert_eq!(
