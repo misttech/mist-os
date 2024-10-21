@@ -15,6 +15,7 @@
 #include <lib/mistos/starnix_uapi/signals.h>
 #include <lib/mistos/util/weak_wrapper.h>
 #include <lib/starnix_sync/locks.h>
+#include <trace.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 
@@ -25,7 +26,11 @@
 #include <ktl/optional.h>
 #include <object/process_dispatcher.h>
 
+#include "../kernel_priv.h"
+
 #include <linux/errno.h>
+
+#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 namespace starnix {
 
@@ -96,16 +101,18 @@ pid_t ThreadGroupMutableState::get_ppid() const {
 }
 
 void ThreadGroupMutableState::set_process_group(fbl::RefPtr<ProcessGroup> process_group,
-                                                PidTable* pids) {
+                                                PidTable& pids) {
   if (process_group_ == process_group) {
     return;
   }
-  // pids->move_thread_group(base_->leader_, process_group->get_pgid());
+  leave_process_group(pids);
+  process_group_ = process_group;
+  process_group->insert(fbl::RefPtr<ThreadGroup>(base_));
 }
 
 void ThreadGroupMutableState::leave_process_group(PidTable& pids) {
   if (process_group_->remove(fbl::RefPtr<ThreadGroup>(base_))) {
-    // process_group_->session()->Write()->remove(process_group_->leader());
+    process_group_->session()->Write()->remove(process_group_->leader());
     pids.remove_process_group(process_group_->leader());
   }
 }
@@ -284,9 +291,9 @@ ThreadGroup::ThreadGroup(
 }
 
 ThreadGroup::~ThreadGroup() {
-  // auto state = mutable_state_.Read();
-  // ZX_ASSERT(state->tasks_.is_empty());
-  //  ZX_ASSERT(state->children_.is_empty());
+  auto state = mutable_state_.Read();
+  ZX_ASSERT(state->tasks_.is_empty());
+  ZX_ASSERT(state->children_.is_empty());
 }
 
 void ThreadGroup::exit(ExitStatus exit_status, ktl::optional<CurrentTask> current_task) {
@@ -377,8 +384,7 @@ void ThreadGroup::remove(fbl::RefPtr<Task> task) const {
     // auto zombie = ZombieProcess::New(this, persistent_info.Lock()->creds(), exit_info);
     // pids->kill_process(leader_, fbl::WrapRefPtr(zombie.get()));
 
-    // state->leave_process_group(locked, &mut pids);
-    // TODO: Implement leave_process_group functionality
+    state->leave_process_group(*pids);
 
     // I have no idea if dropping the lock here is correct, and I don't want to think about
     // it. If problems do turn up with another thread observing an intermediate state of
@@ -389,39 +395,37 @@ void ThreadGroup::remove(fbl::RefPtr<Task> task) const {
     // containers that only lock the data they contain, but see
     // https://docs.google.com/document/d/1YHrhBqNhU1WcrsYgGAu3JwwlVmFXPlwWHTJLAbwRebY/edit
     // for an idea.
+    state.~RwLockGuard();
+
+    // We will need the immediate parent and the reaper. Once we have them, we can make
+    // sure to take the locks in the right order: parent before child.
+    auto parent = Read()->parent_;
+    // auto reaper = state->find_reaper();
+    {
+      // TODO (Herrera): Reparent the children.
+    }
+
+    if (parent.has_value()) {
+      // TODO (Herrera) Replace by ZombieProcess logic;
+      auto strong_parent = parent->upgrade();
+      auto pstate = strong_parent->Write();
+
+      auto deleted = pstate->children_.erase(Read()->base_->leader_);
+    }
   }
 }
 
 fit::result<Errno> ThreadGroup::setsid() const {
-  auto pids = kernel_->pids.Write();
-
-  // Check if this thread group is already a process group leader
-  if (pids->get_process_group(leader_).has_value()) {
-    return fit::error(errno(EPERM));
-  }
-
-  // Create a new process group with this thread group as the leader
-  auto new_process_group = ProcessGroup::New(leader_, ktl::nullopt);
-  pids->add_process_group(new_process_group);
-
-  // Update the thread group's process group
-  auto state = Write();
-  state->process_group_ = ktl::move(new_process_group);
-
-  /*
-    // Set the session ID to be the same as the process group ID
-    state->session_id = leader_;
-
-    // Remove this thread group from its parent's children list
-    if (state->parent.has_value()) {
-      auto parent = state->parent.value();
-      auto parent_state = parent->Write();
-      parent_state->children_.erase(weak_thread_group());
+  {
+    auto pids = kernel_->pids.Write();
+    if (pids->get_process_group(leader_).has_value()) {
+      return fit::error(errno(EPERM));
     }
-
-    // Clear the parent
-    state->parent = ktl::nullopt;
-  */
+    auto process_group = ProcessGroup::New(leader_, ktl::nullopt);
+    pids->add_process_group(process_group);
+    Write()->set_process_group(process_group, *pids);
+  }
+  // check_orphans();
   return fit::ok();
 }
 
