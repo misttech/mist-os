@@ -805,5 +805,17 @@ zx_status_t sys_system_set_processor_power_state(
     return res;
   }
 
-  return ZX_ERR_NOT_SUPPORTED;
+  ProcessDispatcher* up = ProcessDispatcher::GetCurrent();
+  fbl::RefPtr<PortDispatcher> port_dispatcher;
+  if (zx_status_t res =
+          up->handle_table().GetDispatcherWithRights(*up, port, ZX_RIGHT_READ, &port_dispatcher);
+      res != ZX_OK) {
+    return res;
+  }
+
+  return power_management::KernelPowerDomainRegistry::UpdateDomainPowerLevel(
+             ps.domain_id, port_dispatcher->get_koid(),
+             static_cast<power_management::ControlInterface>(ps.control_interface),
+             ps.control_argument)
+      .status_value();
 }

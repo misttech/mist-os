@@ -27,8 +27,10 @@
 #include <zxtest/zxtest.h>
 
 #include "../needs-next.h"
+#include "zxtest/base/test.h"
 
 NEEDS_NEXT_SYSCALL(zx_system_set_processor_power_domain);
+NEEDS_NEXT_SYSCALL(zx_system_set_processor_power_state);
 
 namespace {
 
@@ -125,7 +127,7 @@ TEST(SetPowerDomainTest, ValidPowerDomainSucceeds) {
   ASSERT_OK(zx_system_set_processor_power_domain(rsrc->get(), 0, &domain, p.get(), levels.data(),
                                                  levels.size(), transitions.data(),
                                                  transitions.size()));
-  Cleanup(domain.domain_id);
+  auto cleanup = Cleanup(domain.domain_id);
 }
 
 TEST(SetPowerDomainTest, SameIdUpdates) {
@@ -140,13 +142,12 @@ TEST(SetPowerDomainTest, SameIdUpdates) {
   ASSERT_OK(zx_system_set_processor_power_domain(rsrc->get(), 0, &domain, p.get(), levels.data(),
                                                  levels.size(), transitions.data(),
                                                  transitions.size()));
-  Cleanup(domain.domain_id);
+  auto cleanup = Cleanup(domain.domain_id);
 
   auto domain_updated = MakeDomain(123, 0);
   ASSERT_OK(zx_system_set_processor_power_domain(rsrc->get(), 0, &domain_updated, p.get(),
                                                  levels.data(), levels.size(), transitions.data(),
                                                  transitions.size()));
-  Cleanup(domain_updated.domain_id);
 }
 
 TEST(SetPowerDomainTest, UnregisterDomain) {
@@ -357,6 +358,128 @@ TEST(SetPowerDomainTest, BadTransitionPointer) {
           rsrc->get(), 0, &domain, p.get(), levels.data(), levels.size(),
           reinterpret_cast<zx_processor_power_level_transition_t*>(0x01), transitions.size()),
       ZX_ERR_INVALID_ARGS);
+}
+
+class SetPowerStateTest : public zxtest::Test {
+ public:
+  void SetUp() final {
+    NEEDS_NEXT_SKIP(zx_system_set_processor_power_domain);
+    ASSERT_OK(zx::port::create(0, &p_));
+    auto rsrc = standalone::GetSystemResource();
+    ASSERT_TRUE(rsrc->is_valid());
+    auto [levels, transitions] = GetModel();
+    levels_ = std::move(levels);
+    transitions_ = std::move(transitions);
+    domain_info_ = GetDomainWithDefaultCpus(123);
+
+    ASSERT_OK(zx_system_set_processor_power_domain(rsrc->get(), 0, &domain_info_, p_.get(),
+                                                   levels_.data(), levels_.size(),
+                                                   transitions_.data(), transitions_.size()));
+    cleanup_ = true;
+  }
+  void TearDown() final {
+    if (cleanup_) {
+      Cleanup(domain_info_.domain_id);
+    }
+  }
+
+ protected:
+  zx::port p_;
+  std::vector<zx_processor_power_level_t> levels_;
+  std::vector<zx_processor_power_level_transition_t> transitions_;
+  zx_processor_power_domain_t domain_info_;
+
+ private:
+  bool cleanup_ = false;
+};
+
+TEST_F(SetPowerStateTest, UpdatePowerLevel) {
+  NEEDS_NEXT_SKIP(zx_system_set_processor_power_state);
+  zx_processor_power_state_t pstate = {
+      .domain_id = domain_info_.domain_id,
+      .control_interface = levels_[1].control_interface,
+      .control_argument = levels_[1].control_argument,
+  };
+
+  ASSERT_OK(zx_system_set_processor_power_state(p_.get(), &pstate));
+}
+
+TEST_F(SetPowerStateTest, UpdatePowerLevelWithWrongPort) {
+  NEEDS_NEXT_SKIP(zx_system_set_processor_power_domain);
+  NEEDS_NEXT_SKIP(zx_system_set_processor_power_state);
+
+  zx_processor_power_state_t pstate = {
+      .domain_id = domain_info_.domain_id,
+      .control_interface = levels_[1].control_interface,
+      .control_argument = levels_[1].control_argument,
+  };
+
+  zx::port p2;
+  ASSERT_OK(zx::port::create(0, &p2));
+  ASSERT_STATUS(zx_system_set_processor_power_state(p2.get(), &pstate), ZX_ERR_ACCESS_DENIED);
+}
+
+TEST_F(SetPowerStateTest, UpdatePowerLevelUnknownDomain) {
+  NEEDS_NEXT_SKIP(zx_system_set_processor_power_domain);
+  NEEDS_NEXT_SKIP(zx_system_set_processor_power_state);
+
+  zx_processor_power_state_t pstate = {
+      .domain_id = domain_info_.domain_id + 1,
+      .control_interface = levels_[1].control_interface,
+      .control_argument = levels_[1].control_argument,
+  };
+
+  ASSERT_STATUS(zx_system_set_processor_power_state(p_.get(), &pstate), ZX_ERR_NOT_FOUND);
+}
+
+TEST_F(SetPowerStateTest, UpdatePowerLevelUnknownControlArgument) {
+  NEEDS_NEXT_SKIP(zx_system_set_processor_power_domain);
+  NEEDS_NEXT_SKIP(zx_system_set_processor_power_state);
+
+  zx_processor_power_state_t pstate = {
+      .domain_id = domain_info_.domain_id,
+      .control_interface = levels_[1].control_interface,
+      .control_argument = levels_[1].control_argument + 0xDEAD,
+  };
+
+  ASSERT_STATUS(zx_system_set_processor_power_state(p_.get(), &pstate), ZX_ERR_NOT_FOUND);
+}
+
+TEST_F(SetPowerStateTest, UpdatePowerLevelUnknownControlInterface) {
+  NEEDS_NEXT_SKIP(zx_system_set_processor_power_domain);
+  NEEDS_NEXT_SKIP(zx_system_set_processor_power_state);
+
+  zx_processor_power_state_t pstate = {
+      .domain_id = domain_info_.domain_id,
+      .control_interface = levels_[1].control_interface + 0xDEAD,
+      .control_argument = levels_[1].control_argument,
+  };
+
+  ASSERT_STATUS(zx_system_set_processor_power_state(p_.get(), &pstate), ZX_ERR_NOT_FOUND);
+}
+
+TEST_F(SetPowerStateTest, UpdatePowerLevelBadBuffer) {
+  NEEDS_NEXT_SKIP(zx_system_set_processor_power_domain);
+  NEEDS_NEXT_SKIP(zx_system_set_processor_power_state);
+
+  ASSERT_STATUS(zx_system_set_processor_power_state(
+                    p_.get(), reinterpret_cast<zx_processor_power_state_t*>(0x01)),
+                ZX_ERR_INVALID_ARGS);
+}
+
+TEST_F(SetPowerStateTest, UpdatePowerLevelWithPortWithoutRead) {
+  NEEDS_NEXT_SKIP(zx_system_set_processor_power_domain);
+  NEEDS_NEXT_SKIP(zx_system_set_processor_power_state);
+
+  zx_processor_power_state_t pstate = {
+      .domain_id = domain_info_.domain_id,
+      .control_interface = levels_[1].control_interface,
+      .control_argument = levels_[1].control_argument,
+  };
+
+  zx::port p2;
+  ASSERT_OK(p_.duplicate(ZX_DEFAULT_PORT_RIGHTS & ~ZX_RIGHT_READ, &p2));
+  ASSERT_STATUS(zx_system_set_processor_power_state(p2.get(), &pstate), ZX_ERR_ACCESS_DENIED);
 }
 
 }  // namespace
