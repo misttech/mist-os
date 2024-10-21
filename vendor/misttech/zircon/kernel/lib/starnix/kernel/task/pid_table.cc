@@ -140,6 +140,11 @@ ktl::optional<fbl::RefPtr<ProcessGroup>> PidTable::get_process_group(pid_t pid) 
   return ktl::nullopt;
 }
 
-void PidTable::remove_process_group(pid_t pid) {}
+void PidTable::remove_process_group(pid_t pid) {
+  remove_item(pid, [](auto& entry) {
+    auto removed = ktl::move(entry.process_group_);
+    ZX_ASSERT(removed.has_value());
+  });
+}
 
 }  // namespace starnix
