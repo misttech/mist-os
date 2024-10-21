@@ -9,6 +9,10 @@ use fidl_fuchsia_diagnostics as fdiagnostics;
 use std::str::FromStr;
 use std::{cmp, fmt};
 
+#[cfg(feature = "serde")]
+#[doc(hidden)]
+pub mod serde_ext;
+
 // LINT.IfChange
 
 /// Severities a log message can have, often called the log's "level".
@@ -28,8 +32,27 @@ pub enum Severity {
     /// Fatal severity level
     Fatal = 0x60,
 }
-
 // LINT.ThenChange(/src/lib/assembly/config_schema/src/platform_config/diagnostics_config.rs)
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for Severity {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serde_ext::severity::serialize(self, serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for Severity {
+    fn deserialize<D>(deserializer: D) -> Result<Severity, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        serde_ext::severity::deserialize(deserializer)
+    }
+}
 
 impl Severity {
     /// Returns a severity and also the raw severity if it's  not an exact match of a severity value.

@@ -6,7 +6,7 @@
 
 use anyhow::{format_err, Context, Error};
 use camino::{Utf8Path, Utf8PathBuf};
-use diagnostics_log_types_serde::{optional_severity, Severity};
+use diagnostics_log_types::Severity;
 use fidl::unpersist;
 use fidl_fuchsia_component_decl::Component;
 use fidl_fuchsia_data as fdata;
@@ -55,9 +55,7 @@ struct TestEntry {
 
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 struct LogSettings {
-    #[serde(default, with = "optional_severity")]
     max_severity: Option<Severity>,
-    #[serde(default, with = "optional_severity")]
     min_severity: Option<Severity>,
 }
 

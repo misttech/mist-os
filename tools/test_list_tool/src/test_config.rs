@@ -6,7 +6,7 @@
 // complete.
 
 use crate::TestsJsonEntry;
-use diagnostics_log_types_serde::{optional_severity, Severity};
+use diagnostics_log_types::Severity;
 use serde::{Deserialize, Serialize};
 use test_list::{FuchsiaComponentExecutionEntry, TestTag};
 
@@ -71,7 +71,6 @@ pub struct Execution {
 
     /// Max severity of the logs that the test is
     /// supposed to produce
-    #[serde(default, with = "optional_severity")]
     pub max_severity_logs: Option<Severity>,
 
     /// Run tests in parallel, if non-zero

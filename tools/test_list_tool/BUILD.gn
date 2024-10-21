@@ -13,7 +13,7 @@ rustc_binary("test_list_tool") {
   deps = [
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
     "//sdk/fidl/fuchsia.data:fuchsia.data_rust",
-    "//src/lib/diagnostics/log/types:types-serde",
+    "//src/lib/diagnostics/log/types",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-url",
     "//src/lib/testing/test_list",
