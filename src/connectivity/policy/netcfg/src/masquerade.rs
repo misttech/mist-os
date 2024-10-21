@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use std::collections::HashMap;
-use std::num::NonZeroU64;
 
 use derivative::Derivative;
 use fidl::endpoints::ControlHandle;
@@ -20,7 +19,7 @@ use {
 };
 
 use crate::filter::FilterEnabledState;
-use crate::InterfaceState;
+use crate::{InterfaceId, InterfaceState};
 
 const UNSPECIFIED_SUBNET: Subnet = fidl_subnet!("0.0.0.0/0");
 
@@ -39,7 +38,7 @@ pub(super) struct ValidatedConfig {
     /// The network to be masqueraded.
     pub src_subnet: fidl_fuchsia_net::Subnet,
     /// The interface through which to masquerade.
-    pub output_interface: NonZeroU64,
+    pub output_interface: InterfaceId,
 }
 
 impl TryFrom<fnet_masquerade::ControlConfig> for ValidatedConfig {
@@ -50,7 +49,7 @@ impl TryFrom<fnet_masquerade::ControlConfig> for ValidatedConfig {
     ) -> Result<Self, Self::Error> {
         Ok(Self {
             src_subnet,
-            output_interface: NonZeroU64::new(output_interface).ok_or(Error::InvalidArguments)?,
+            output_interface: InterfaceId::new(output_interface).ok_or(Error::InvalidArguments)?,
         })
     }
 }
@@ -74,10 +73,10 @@ pub(super) struct Masquerade<Filter = fnet_filter_deprecated::FilterProxy> {
 
 async fn update_interface<Filter: fnet_filter_deprecated::FilterProxyInterface>(
     filter: &Filter,
-    interface: NonZeroU64,
+    interface: InterfaceId,
     enabled: bool,
     filter_enabled_state: &mut FilterEnabledState,
-    interface_states: &HashMap<NonZeroU64, InterfaceState>,
+    interface_states: &HashMap<InterfaceId, InterfaceState>,
 ) -> Result<(), Error> {
     if enabled {
         filter_enabled_state.enable_masquerade_interface_id(interface);
@@ -113,7 +112,7 @@ impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
         config: ValidatedConfig,
         enabled: bool,
         filter_enabled_state: &mut FilterEnabledState,
-        interface_states: &HashMap<NonZeroU64, InterfaceState>,
+        interface_states: &HashMap<InterfaceId, InterfaceState>,
     ) -> Result<bool, Error> {
         let state =
             self.active_controllers.get_mut(&config).ok_or_else(|| Error::InvalidArguments)?;
@@ -220,7 +219,7 @@ impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
         event: Event,
         events: &mut futures::stream::SelectAll<EventStream>,
         filter_enabled_state: &mut FilterEnabledState,
-        interface_states: &HashMap<NonZeroU64, InterfaceState>,
+        interface_states: &HashMap<InterfaceId, InterfaceState>,
     ) {
         match event {
             Event::FactoryRequestStream(stream) => events.push(
@@ -372,7 +371,7 @@ pub mod test {
     use super::*;
 
     impl ValidatedConfig {
-        const fn new(src_subnet: fidl_fuchsia_net::Subnet, output_interface: NonZeroU64) -> Self {
+        const fn new(src_subnet: fidl_fuchsia_net::Subnet, output_interface: InterfaceId) -> Self {
             Self { src_subnet, output_interface }
         }
     }
@@ -385,8 +384,8 @@ pub mod test {
         fail_generations: i32,
     }
 
-    const VALID_OUTPUT_INTERFACE: NonZeroU64 = const_unwrap_option(NonZeroU64::new(11));
-    const NON_EXISTENT_INTERFACE: NonZeroU64 = const_unwrap_option(NonZeroU64::new(1005));
+    const VALID_OUTPUT_INTERFACE: InterfaceId = const_unwrap_option(InterfaceId::new(11));
+    const NON_EXISTENT_INTERFACE: InterfaceId = const_unwrap_option(InterfaceId::new(1005));
 
     const VALID_SUBNET: Subnet = fidl_subnet!("192.0.2.0/24");
 

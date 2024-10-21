@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use std::collections::{HashMap, HashSet};
-use std::num::NonZeroU64;
 
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_dhcpv6 as fnet_dhcpv6,
@@ -19,7 +18,7 @@ use futures::future::TryFutureExt as _;
 use futures::stream::{Stream, TryStreamExt as _};
 use tracing::warn;
 
-use crate::{dns, errors, DnsServerWatchers};
+use crate::{dns, errors, DnsServerWatchers, InterfaceId};
 
 // TODO(https://fxbug.dev/329099228): Switch to using DUID-LLT and persisting it to disk.
 pub(super) fn duid(mac: fnet_ext::MacAddress) -> fnet_dhcpv6::Duid {
@@ -28,14 +27,14 @@ pub(super) fn duid(mac: fnet_ext::MacAddress) -> fnet_dhcpv6::Duid {
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(super) struct PrefixOnInterface {
-    interface_id: NonZeroU64,
+    interface_id: InterfaceId,
     prefix: net_types::ip::Subnet<net_types::ip::Ipv6Addr>,
     lifetimes: Lifetimes,
 }
 
 pub(super) type Prefixes = HashMap<net_types::ip::Subnet<net_types::ip::Ipv6Addr>, Lifetimes>;
-pub(super) type InterfaceIdTaggedPrefixesStream = Tagged<NonZeroU64, PrefixesStream>;
-pub(super) type PrefixesStreamMap = StreamMap<NonZeroU64, InterfaceIdTaggedPrefixesStream>;
+pub(super) type InterfaceIdTaggedPrefixesStream = Tagged<InterfaceId, PrefixesStream>;
+pub(super) type PrefixesStreamMap = StreamMap<InterfaceId, InterfaceIdTaggedPrefixesStream>;
 
 #[derive(Debug)]
 pub(super) struct ClientState {
@@ -118,7 +117,7 @@ pub(super) fn from_fidl_prefixes(
 /// Start a DHCPv6 client for the specified host interface.
 pub(super) fn start_client(
     dhcpv6_client_provider: &fnet_dhcpv6::ClientProviderProxy,
-    interface_id: NonZeroU64,
+    interface_id: InterfaceId,
     sockaddr: fnet::Ipv6SocketAddress,
     duid: fnet_dhcpv6::Duid,
     prefix_delegation_config: Option<fnet_dhcpv6::PrefixDelegationConfig>,
@@ -159,7 +158,7 @@ pub(super) fn start_client(
 
 fn get_suitable_dhcpv6_prefix(
     current_prefix: Option<PrefixOnInterface>,
-    interface_states: &HashMap<NonZeroU64, crate::InterfaceState>,
+    interface_states: &HashMap<InterfaceId, crate::InterfaceState>,
     allowed_upstream_device_classes: &HashSet<crate::DeviceClass>,
     interface_config: AcquirePrefixInterfaceConfig,
 ) -> Option<PrefixOnInterface> {
@@ -253,7 +252,7 @@ fn get_suitable_dhcpv6_prefix(
 }
 
 pub(super) fn maybe_send_watch_prefix_response(
-    interface_states: &HashMap<NonZeroU64, crate::InterfaceState>,
+    interface_states: &HashMap<InterfaceId, crate::InterfaceState>,
     allowed_upstream_device_classes: &HashSet<crate::DeviceClass>,
     prefix_provider_handler: Option<&mut PrefixProviderHandler>,
 ) -> Result<(), anyhow::Error> {
@@ -307,7 +306,7 @@ pub(super) async fn stop_client(
     lookup_admin: &fnet_name::LookupAdminProxy,
     dns_servers: &mut DnsServers,
     dns_server_watch_responders: &mut dns::DnsServerWatchResponders,
-    interface_id: NonZeroU64,
+    interface_id: InterfaceId,
     watchers: &mut DnsServerWatchers<'_>,
     prefixes_streams: &mut PrefixesStreamMap,
 ) {
@@ -440,7 +439,7 @@ mod tests {
         ].into_iter(),
         AcquirePrefixInterfaceConfig::Upstreams,
         Some(PrefixOnInterface {
-            interface_id: const_unwrap_option(NonZeroU64::new(1)),
+            interface_id: const_unwrap_option(InterfaceId::new(1)),
             prefix: net_subnet_v6!("abcd::/64"),
             lifetimes: LIFETIMES,
         });
@@ -448,7 +447,7 @@ mod tests {
     )]
     #[test_case(
         Some(PrefixOnInterface {
-            interface_id: const_unwrap_option(NonZeroU64::new(1)),
+            interface_id: const_unwrap_option(InterfaceId::new(1)),
             prefix: net_subnet_v6!("abcd::/64"),
             lifetimes: LIFETIMES,
         }),
@@ -460,7 +459,7 @@ mod tests {
         ].into_iter(),
         AcquirePrefixInterfaceConfig::Upstreams,
         Some(PrefixOnInterface {
-            interface_id: const_unwrap_option(NonZeroU64::new(1)),
+            interface_id: const_unwrap_option(InterfaceId::new(1)),
             prefix: net_subnet_v6!("abcd::/64"),
             lifetimes: LIFETIMES,
         });
@@ -468,7 +467,7 @@ mod tests {
     )]
     #[test_case(
         Some(PrefixOnInterface {
-            interface_id: const_unwrap_option(NonZeroU64::new(1)),
+            interface_id: const_unwrap_option(InterfaceId::new(1)),
             prefix: net_subnet_v6!("abcd::/64"),
             lifetimes: LIFETIMES,
         }),
@@ -480,7 +479,7 @@ mod tests {
         ].into_iter(),
         AcquirePrefixInterfaceConfig::Upstreams,
         Some(PrefixOnInterface {
-            interface_id: const_unwrap_option(NonZeroU64::new(1)),
+            interface_id: const_unwrap_option(InterfaceId::new(1)),
             prefix: net_subnet_v6!("abcd::/64"),
             lifetimes: RENEWED_LIFETIMES,
         });
@@ -488,7 +487,7 @@ mod tests {
     )]
     #[test_case(
         Some(PrefixOnInterface {
-            interface_id: const_unwrap_option(NonZeroU64::new(1)),
+            interface_id: const_unwrap_option(InterfaceId::new(1)),
             prefix: net_subnet_v6!("abcd::/64"),
             lifetimes: LIFETIMES,
         }),
@@ -504,7 +503,7 @@ mod tests {
         ].into_iter(),
         AcquirePrefixInterfaceConfig::Upstreams,
         Some(PrefixOnInterface {
-            interface_id: const_unwrap_option(NonZeroU64::new(2)),
+            interface_id: const_unwrap_option(InterfaceId::new(2)),
             prefix: net_subnet_v6!("efff::/64"),
             lifetimes: RENEWED_LIFETIMES,
         });
@@ -518,7 +517,7 @@ mod tests {
         want: Option<PrefixOnInterface>,
     ) {
         let interface_states = (1..)
-            .flat_map(NonZeroU64::new)
+            .flat_map(InterfaceId::new)
             .zip(interface_state_iter.into_iter().map(|(device_class, prefixes)| {
                 let (control, _control_server_end) =
                     fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()

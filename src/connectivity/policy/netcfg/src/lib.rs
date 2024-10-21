@@ -17,6 +17,7 @@ mod virtualization;
 use ::dhcpv4::protocol::FromFidlExt as _;
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
+use std::fmt::{self, Display};
 use std::num::NonZeroU64;
 use std::pin::{pin, Pin};
 use std::str::FromStr;
@@ -58,6 +59,61 @@ use self::devices::DeviceInfo;
 use self::errors::{accept_error, ContextExt as _};
 use self::filter::{FilterControl, FilterEnabledState};
 use self::interface::DeviceInfoRef;
+
+/// Interface Identifier
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
+pub struct InterfaceId(NonZeroU64);
+
+impl InterfaceId {
+    const fn new(raw: u64) -> Option<Self> {
+        // Note: use a match here because `Option::map` is non-const.
+        match NonZeroU64::new(raw) {
+            Some(id) => Some(InterfaceId(id)),
+            None => None,
+        }
+    }
+
+    const fn get(self) -> u64 {
+        self.0.get()
+    }
+}
+
+impl Display for InterfaceId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl fnet_interfaces_ext::TryFromMaybeNonZero for InterfaceId {
+    fn try_from(value: u64) -> Result<Self, fnet_interfaces_ext::ZeroError> {
+        Self::new(value).ok_or(fnet_interfaces_ext::ZeroError {})
+    }
+}
+
+impl TryFrom<u64> for InterfaceId {
+    type Error = std::num::TryFromIntError;
+    fn try_from(val: u64) -> Result<Self, Self::Error> {
+        Ok(Self(NonZeroU64::try_from(val)?))
+    }
+}
+
+impl From<NonZeroU64> for InterfaceId {
+    fn from(val: NonZeroU64) -> Self {
+        Self(val)
+    }
+}
+
+impl From<InterfaceId> for NonZeroU64 {
+    fn from(InterfaceId(val): InterfaceId) -> Self {
+        val
+    }
+}
+
+impl From<InterfaceId> for u64 {
+    fn from(val: InterfaceId) -> Self {
+        val.get()
+    }
+}
 
 /// Interface metrics.
 ///
@@ -455,7 +511,7 @@ impl InterfaceState {
                 interface_admin_auth,
             }) => {
                 NetCfg::handle_dhcpv4_client_start(
-                    properties.id,
+                    properties.id.into(),
                     &properties.name,
                     dhcpv4_client,
                     dhcpv4_client_provider,
@@ -514,8 +570,8 @@ pub struct NetCfg<'a> {
 
     // TODO(https://fxbug.dev/42146318): These hashmaps are all indexed by
     // interface ID and store per-interface state, and should be merged.
-    interface_states: HashMap<NonZeroU64, InterfaceState>,
-    interface_properties: HashMap<NonZeroU64, fnet_interfaces_ext::PropertiesAndState<()>>,
+    interface_states: HashMap<InterfaceId, InterfaceState>,
+    interface_properties: HashMap<InterfaceId, fnet_interfaces_ext::PropertiesAndState<()>>,
     interface_metrics: InterfaceMetrics,
 
     dns_servers: DnsServers,
@@ -598,6 +654,7 @@ fn start_dhcpv6_client(
     watchers: &mut DnsServerWatchers<'_>,
     dhcpv6_prefixes_streams: &mut dhcpv6::PrefixesStreamMap,
 ) -> Result<Option<fnet::Ipv6SocketAddress>, errors::Error> {
+    let id = InterfaceId::from(*id);
     if !online {
         return Ok(None);
     }
@@ -640,14 +697,14 @@ fn start_dhcpv6_client(
 
     let source = DnsServersUpdateSource::Dhcpv6 { interface_id: id.get() };
     assert!(
-        !watchers.contains_key(&source) && !dhcpv6_prefixes_streams.contains_key(id),
+        !watchers.contains_key(&source) && !dhcpv6_prefixes_streams.contains_key(&id),
         "interface with id={} already has a DHCPv6 client",
         id
     );
 
     let (dns_servers_stream, prefixes_stream) = dhcpv6::start_client(
         dhcpv6_client_provider,
-        *id,
+        id,
         sockaddr,
         duid,
         pd_config.clone(),
@@ -665,9 +722,9 @@ fn start_dhcpv6_client(
         let _: Pin<Box<BoxStream<'_, _>>> = o;
         unreachable!("DNS server watchers must not contain key {:?}", source);
     }
-    if let Some(o) = dhcpv6_prefixes_streams.insert(*id, prefixes_stream.tagged(*id)) {
+    if let Some(o) = dhcpv6_prefixes_streams.insert(id, prefixes_stream.tagged(id)) {
         let _: Pin<Box<dhcpv6::InterfaceIdTaggedPrefixesStream>> = o;
-        unreachable!("DHCPv6 prefixes streams must not contain key {:?}", *id);
+        unreachable!("DHCPv6 prefixes streams must not contain key {:?}", id);
     }
 
     info!(
@@ -724,14 +781,14 @@ enum ProvisioningEvent {
     ),
     RequestStream(Option<RequestStream>),
     Dhcpv4Configuration(
-        Option<(NonZeroU64, Result<fnet_dhcp_ext::Configuration, fnet_dhcp_ext::Error>)>,
+        Option<(InterfaceId, Result<fnet_dhcp_ext::Configuration, fnet_dhcp_ext::Error>)>,
     ),
-    Dhcpv4ClientDelayedStart(NonZeroU64),
+    Dhcpv4ClientDelayedStart(InterfaceId),
     Dhcpv6PrefixProviderRequest(Result<fnet_dhcpv6::PrefixProviderRequest, fidl::Error>),
     Dhcpv6PrefixControlRequest(
         Option<Result<Option<fnet_dhcpv6::PrefixControlRequest>, fidl::Error>>,
     ),
-    Dhcpv6Prefixes(Option<(NonZeroU64, Result<Vec<fnet_dhcpv6::Prefix>, fidl::Error>)>),
+    Dhcpv6Prefixes(Option<(InterfaceId, Result<Vec<fnet_dhcpv6::Prefix>, fidl::Error>)>),
     DnsServerWatcherRequest(
         (dns::ConnectionId, Result<fnet_name::DnsServerWatcherRequest, fidl::Error>),
     ),
@@ -1423,7 +1480,7 @@ impl<'a> NetCfg<'a> {
     }
 
     async fn handle_dhcpv4_client_stop(
-        id: NonZeroU64,
+        id: InterfaceId,
         name: &str,
         dhcpv4_client: &mut Dhcpv4ClientState,
         configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
@@ -1454,7 +1511,7 @@ impl<'a> NetCfg<'a> {
     }
 
     async fn handle_dhcpv4_client_start(
-        id: NonZeroU64,
+        id: InterfaceId,
         name: &str,
         dhcpv4_client: &mut Dhcpv4ClientState,
         dhcpv4_client_provider: Option<&fnet_dhcp::ClientProviderProxy>,
@@ -1480,7 +1537,7 @@ impl<'a> NetCfg<'a> {
     }
 
     async fn handle_dhcpv4_client_update(
-        id: NonZeroU64,
+        id: InterfaceId,
         name: &str,
         online: bool,
         dhcpv4_client: &mut Dhcpv4ClientState,
@@ -1524,7 +1581,7 @@ impl<'a> NetCfg<'a> {
 
     async fn on_delayed_dhcpv4_client_start(
         &mut self,
-        interface_id: NonZeroU64,
+        interface_id: InterfaceId,
     ) -> Result<(), errors::Error> {
         let Self {
             dhcpv4_client_provider,
@@ -1571,7 +1628,7 @@ impl<'a> NetCfg<'a> {
         };
 
         Self::handle_dhcpv4_client_start(
-            properties.id,
+            properties.id.into(),
             &properties.name,
             dhcpv4_client,
             dhcpv4_client_provider.as_ref(),
@@ -1627,7 +1684,7 @@ impl<'a> NetCfg<'a> {
                 fnet_interfaces_ext::PropertiesAndState { properties, state: _ },
             ) => Some(properties.id),
         } {
-            if let Some(&InterfaceState { provisioning, .. }) = interface_states.get(&id) {
+            if let Some(&InterfaceState { provisioning, .. }) = interface_states.get(&id.into()) {
                 if provisioning == interface::ProvisioningAction::Delegated {
                     // Ignore result handling, which prevents provisioning
                     // activity from starting such as DHCP and DHCPv6 clients.
@@ -1683,7 +1740,7 @@ impl<'a> NetCfg<'a> {
         watchers: &mut DnsServerWatchers<'_>,
         dns_servers: &mut DnsServers,
         dns_server_watch_responders: &mut dns::DnsServerWatchResponders,
-        interface_states: &mut HashMap<NonZeroU64, InterfaceState>,
+        interface_states: &mut HashMap<InterfaceId, InterfaceState>,
         dhcpv4_configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
         dhcpv6_prefixes_streams: &mut dhcpv6::PrefixesStreamMap,
         lookup_admin: &fnet_name::LookupAdminProxy,
@@ -1694,7 +1751,7 @@ impl<'a> NetCfg<'a> {
     ) -> Result<(), errors::Error> {
         match update_result {
             fnet_interfaces_ext::UpdateResult::Added { properties, state: _ } => {
-                match interface_states.get_mut(&properties.id) {
+                match interface_states.get_mut(&properties.id.into()) {
                     Some(state) => state
                         .on_discovery(
                             properties,
@@ -1713,7 +1770,7 @@ impl<'a> NetCfg<'a> {
                 }
             }
             fnet_interfaces_ext::UpdateResult::Existing { properties, state: _ } => {
-                match interface_states.get_mut(&properties.id) {
+                match interface_states.get_mut(&properties.id.into()) {
                     Some(state) => state
                         .on_discovery(
                             properties,
@@ -1739,7 +1796,7 @@ impl<'a> NetCfg<'a> {
                 let &fnet_interfaces_ext::Properties {
                     id, ref name, online, ref addresses, ..
                 } = current_properties;
-                match interface_states.get_mut(&id) {
+                match interface_states.get_mut(&(*id).into()) {
                     // An interface netcfg is not configuring was changed, do nothing.
                     None => return Ok(()),
                     Some(InterfaceState {
@@ -1756,7 +1813,7 @@ impl<'a> NetCfg<'a> {
                     }) => {
                         if previous_online.is_some() {
                             Self::handle_dhcpv4_client_update(
-                                *id,
+                                (*id).into(),
                                 name,
                                 *online,
                                 dhcpv4_client,
@@ -1799,7 +1856,7 @@ impl<'a> NetCfg<'a> {
                                 &lookup_admin,
                                 dns_servers,
                                 dns_server_watch_responders,
-                                *id,
+                                (*id).into(),
                                 watchers,
                                 dhcpv6_prefixes_streams,
                             )
@@ -1841,7 +1898,7 @@ impl<'a> NetCfg<'a> {
                                     &lookup_admin,
                                     dns_servers,
                                     dns_server_watch_responders,
-                                    *id,
+                                    (*id).into(),
                                     watchers,
                                     dhcpv6_prefixes_streams,
                                 )
@@ -1907,7 +1964,7 @@ impl<'a> NetCfg<'a> {
                     state: (),
                 },
             ) => {
-                match interface_states.remove(&id) {
+                match interface_states.remove(&(*id).into()) {
                     // An interface netcfg was not responsible for configuring was removed, do
                     // nothing.
                     None => Ok(()),
@@ -1920,7 +1977,7 @@ impl<'a> NetCfg<'a> {
                                 interface_admin_auth: _,
                             }) => {
                                 Self::handle_dhcpv4_client_stop(
-                                    *id,
+                                    (*id).into(),
                                     name,
                                     &mut dhcpv4_client,
                                     dhcpv4_configuration_streams,
@@ -1953,7 +2010,7 @@ impl<'a> NetCfg<'a> {
                                     &lookup_admin,
                                     dns_servers,
                                     dns_server_watch_responders,
-                                    *id,
+                                    (*id).into(),
                                     watchers,
                                     dhcpv6_prefixes_streams,
                                 )
@@ -2239,7 +2296,7 @@ impl<'a> NetCfg<'a> {
     /// will be configured as a host (see `configure_host` for more details).
     async fn configure_eth_interface(
         &mut self,
-        interface_id: NonZeroU64,
+        interface_id: InterfaceId,
         control: fidl_fuchsia_net_interfaces_ext::admin::Control,
         interface_name: String,
         interface_naming_id: interface::InterfaceNamingIdentifier,
@@ -2419,7 +2476,7 @@ impl<'a> NetCfg<'a> {
         filter_enabled_state: &mut FilterEnabledState,
         filter_control: &mut FilterControl,
         stack: &fnet_stack::StackProxy,
-        interface_id: NonZeroU64,
+        interface_id: InterfaceId,
         device_info: &DeviceInfoRef<'_>,
         start_in_stack_dhcpv4: bool,
     ) -> Result<(), errors::Error> {
@@ -2453,7 +2510,7 @@ impl<'a> NetCfg<'a> {
     async fn configure_wlan_ap_and_dhcp_server(
         filter_enabled_state: &mut FilterEnabledState,
         filter_control: &mut FilterControl,
-        interface_id: NonZeroU64,
+        interface_id: InterfaceId,
         dhcp_server: &fnet_dhcp::Server_Proxy,
         control: &fidl_fuchsia_net_interfaces_ext::admin::Control,
         name: String,
@@ -2920,7 +2977,7 @@ impl<'a> NetCfg<'a> {
 
     async fn handle_dhcpv4_configuration(
         &mut self,
-        interface_id: NonZeroU64,
+        interface_id: InterfaceId,
         res: Result<fnet_dhcp_ext::Configuration, fnet_dhcp_ext::Error>,
     ) -> Dhcpv4ConfigurationHandlerResult {
         let configuration = match res {
@@ -3025,7 +3082,7 @@ impl<'a> NetCfg<'a> {
 
     async fn handle_dhcpv6_prefixes(
         &mut self,
-        interface_id: NonZeroU64,
+        interface_id: InterfaceId,
         res: Result<Vec<fnet_dhcpv6::Prefix>, fidl::Error>,
         dns_watchers: &mut DnsServerWatchers<'_>,
     ) -> Result<(), anyhow::Error> {
@@ -3424,7 +3481,7 @@ mod tests {
         ))
     }
 
-    const INTERFACE_ID: NonZeroU64 = const_unwrap_option(NonZeroU64::new(1));
+    const INTERFACE_ID: InterfaceId = const_unwrap_option(InterfaceId::new(1));
     const DHCPV6_DNS_SOURCE: DnsServersUpdateSource =
         DnsServersUpdateSource::Dhcpv6 { interface_id: INTERFACE_ID.get() };
     const LINK_LOCAL_SOCKADDR1: fnet::Ipv6SocketAddress = fnet::Ipv6SocketAddress {
@@ -3487,7 +3544,7 @@ mod tests {
     /// Make sure that a new DHCPv6 client was requested, and verify its parameters.
     async fn check_new_dhcpv6_client(
         server: &mut fnet_dhcpv6::ClientProviderRequestStream,
-        id: NonZeroU64,
+        id: InterfaceId,
         sockaddr: fnet::Ipv6SocketAddress,
         prefix_delegation_config: Option<fnet_dhcpv6::PrefixDelegationConfig>,
         dns_watchers: &mut DnsServerWatchers<'_>,
@@ -4643,22 +4700,22 @@ mod tests {
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
     struct InterfaceConfig {
-        id: NonZeroU64,
+        id: InterfaceId,
         kind: InterfaceKind,
     }
 
     const UPSTREAM_INTERFACE_CONFIG: InterfaceConfig = InterfaceConfig {
-        id: const_unwrap_option(NonZeroU64::new(1)),
+        id: const_unwrap_option(InterfaceId::new(1)),
         kind: InterfaceKind::Host { upstream: true },
     };
 
     const ALLOWED_UPSTREAM_DEVICE_CLASS: DeviceClass = DeviceClass::Ethernet;
     const DISALLOWED_UPSTREAM_DEVICE_CLASS: DeviceClass = DeviceClass::Virtual;
 
-    fn dhcpv6_sockaddr(interface_id: NonZeroU64) -> fnet::Ipv6SocketAddress {
+    fn dhcpv6_sockaddr(interface_id: InterfaceId) -> fnet::Ipv6SocketAddress {
         let mut address = fidl_ip_v6!("fe80::");
         let interface_id: u8 =
-            u64::from(interface_id).try_into().expect("interface ID should fit into u8");
+            interface_id.get().try_into().expect("interface ID should fit into u8");
         *address.addr.last_mut().expect("IPv6 address is empty") = interface_id;
         fnet::Ipv6SocketAddress {
             address: address,
@@ -4681,25 +4738,25 @@ mod tests {
         Some(1); "all_upstreams_preferred_prefix_len")]
     #[fuchsia::test]
     async fn test_dhcpv6_acquire_prefix(
-        interface_id: Option<NonZeroU64>,
+        interface_id: Option<InterfaceId>,
         preferred_prefix_len: Option<u8>,
     ) {
         const INTERFACE_CONFIGS: [InterfaceConfig; 5] = [
             UPSTREAM_INTERFACE_CONFIG,
             InterfaceConfig {
-                id: const_unwrap_option(NonZeroU64::new(2)),
+                id: const_unwrap_option(InterfaceId::new(2)),
                 kind: InterfaceKind::Host { upstream: true },
             },
             InterfaceConfig {
-                id: const_unwrap_option(NonZeroU64::new(3)),
+                id: const_unwrap_option(InterfaceId::new(3)),
                 kind: InterfaceKind::Host { upstream: false },
             },
             InterfaceConfig {
-                id: const_unwrap_option(NonZeroU64::new(4)),
+                id: const_unwrap_option(InterfaceId::new(4)),
                 kind: InterfaceKind::Unowned,
             },
             InterfaceConfig {
-                id: const_unwrap_option(NonZeroU64::new(5)),
+                id: const_unwrap_option(InterfaceId::new(5)),
                 kind: InterfaceKind::NonHost,
             },
         ];
@@ -4850,9 +4907,9 @@ mod tests {
         }
 
         async fn assert_dhcpv6_clients_stopped(
-            interface_states: &mut HashMap<NonZeroU64, TestInterfaceState>,
-            interface_id: Option<NonZeroU64>,
-        ) -> HashSet<NonZeroU64> {
+            interface_states: &mut HashMap<InterfaceId, TestInterfaceState>,
+            interface_id: Option<InterfaceId>,
+        ) -> HashSet<InterfaceId> {
             futures::stream::iter(
                 interface_states.iter_mut(),
             ).filter_map(|(
@@ -4893,9 +4950,9 @@ mod tests {
         async fn assert_dhcpv6_clients_started(
             count: usize,
             dhcpv6_client_provider_request_stream: &mut fnet_dhcpv6::ClientProviderRequestStream,
-            interface_states: &mut HashMap<NonZeroU64, TestInterfaceState>,
+            interface_states: &mut HashMap<InterfaceId, TestInterfaceState>,
             want_pd_config: Option<fnet_dhcpv6::PrefixDelegationConfig>,
-        ) -> HashSet<NonZeroU64> {
+        ) -> HashSet<InterfaceId> {
             dhcpv6_client_provider_request_stream
                 .map(|res| res.expect("DHCPv6 ClientProvider request stream error"))
                 .take(count)
@@ -4952,7 +5009,7 @@ mod tests {
         async fn handle_watch_prefix_with_fake(
             netcfg: &mut NetCfg<'_>,
             dns_watchers: &mut DnsServerWatchers<'_>,
-            interface_id: NonZeroU64,
+            interface_id: InterfaceId,
             fake_prefixes: Vec<fnet_dhcpv6::Prefix>,
             // Used to test handling PrefixControl.WatchPrefix & Client.WatchPrefixes
             // events in different orders.
@@ -4972,7 +5029,7 @@ mod tests {
             async fn handle_dhcpv6_prefixes(
                 netcfg: &mut NetCfg<'_>,
                 dns_watchers: &mut DnsServerWatchers<'_>,
-                interface_id: NonZeroU64,
+                interface_id: InterfaceId,
                 fake_prefixes: Vec<fnet_dhcpv6::Prefix>,
             ) {
                 netcfg
@@ -5017,7 +5074,7 @@ mod tests {
         {
             let acquire_prefix_fut = netcfg.handle_dhcpv6_acquire_prefix(
                 fnet_dhcpv6::AcquirePrefixConfig {
-                    interface_id: interface_id.map(NonZeroU64::get),
+                    interface_id: interface_id.map(InterfaceId::get),
                     preferred_prefix_len,
                     ..Default::default()
                 },
@@ -5167,8 +5224,8 @@ mod tests {
             .expect("handle DHCPv6 acquire prefix");
 
         for (id, upstream) in [
-            (const_unwrap_option(NonZeroU64::new(1)), true),
-            (const_unwrap_option(NonZeroU64::new(2)), false),
+            (const_unwrap_option(InterfaceId::new(1)), true),
+            (const_unwrap_option(InterfaceId::new(2)), false),
         ] {
             // Mock interface being discovered by NetCfg.
             let (control, control_server_end) =

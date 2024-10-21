@@ -4,7 +4,6 @@
 
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
-use std::num::NonZeroU64;
 
 use fidl_fuchsia_net_filter_ext::{
     self as fnet_filter_ext, Change, Domain, InstalledIpRoutine, InterfaceMatcher, IpHook,
@@ -20,7 +19,7 @@ use {
 use anyhow::{bail, Context as _};
 use tracing::{error, info};
 
-use crate::{exit_with_fidl_error, FilterConfig, InterfaceType};
+use crate::{exit_with_fidl_error, FilterConfig, InterfaceId, InterfaceType};
 
 // A container to dispatch filtering functions depending on the
 // filtering API present.
@@ -202,7 +201,7 @@ fn generate_initial_filter_changes(
 fn generate_updated_filter_rules(
     uninstalled_ip_routines: &netfilter::parser::FilterRoutines,
     installed_ip_routines: &netfilter::parser::FilterRoutines,
-    interface_id: NonZeroU64,
+    interface_id: InterfaceId,
     current_installed_rule_index: u32,
 ) -> Vec<fnet_filter_ext::Rule> {
     let netfilter::parser::FilterRoutines {
@@ -248,17 +247,22 @@ fn generate_updated_filter_rules(
 fn create_interface_matching_jump_rule(
     routine_id: RoutineId,
     index: u32,
-    interface_id: NonZeroU64,
+    interface_id: InterfaceId,
     hook: IpHook,
     target_routine_name: &str,
 ) -> fnet_filter_ext::Rule {
     // Some matchers cannot be used on all `IpHook`s.
     let (in_interface, out_interface) = match hook {
-        IpHook::LocalIngress | IpHook::Ingress => (Some(InterfaceMatcher::Id(interface_id)), None),
-        IpHook::LocalEgress | IpHook::Egress => (None, Some(InterfaceMatcher::Id(interface_id))),
-        IpHook::Forwarding => {
-            (Some(InterfaceMatcher::Id(interface_id)), Some(InterfaceMatcher::Id(interface_id)))
+        IpHook::LocalIngress | IpHook::Ingress => {
+            (Some(InterfaceMatcher::Id(interface_id.into())), None)
         }
+        IpHook::LocalEgress | IpHook::Egress => {
+            (None, Some(InterfaceMatcher::Id(interface_id.into())))
+        }
+        IpHook::Forwarding => (
+            Some(InterfaceMatcher::Id(interface_id.into())),
+            Some(InterfaceMatcher::Id(interface_id.into())),
+        ),
     };
 
     // Full path qualification is preferred where types can get mistaken
@@ -372,11 +376,11 @@ async fn update_filters_deprecated(
 #[derive(Debug, Default)]
 pub(super) struct FilterEnabledState {
     interface_types: HashSet<InterfaceType>,
-    masquerade_enabled_interface_ids: HashSet<NonZeroU64>,
+    masquerade_enabled_interface_ids: HashSet<InterfaceId>,
     // Indexed by interface id and stores `RuleId`s inserted for that interface.
     // All rules for an interface should be removed upon interface removal.
     // Vec will always be empty when using filter.deprecated.
-    currently_enabled_interfaces: HashMap<NonZeroU64, Vec<RuleId>>,
+    currently_enabled_interfaces: HashMap<InterfaceId, Vec<RuleId>>,
 }
 
 impl FilterEnabledState {
@@ -393,7 +397,7 @@ impl FilterEnabledState {
     pub(super) async fn maybe_update(
         &mut self,
         interface_type: Option<InterfaceType>,
-        interface_id: NonZeroU64,
+        interface_id: InterfaceId,
         filter: &mut FilterControl,
     ) -> Result<(), anyhow::Error> {
         match filter {
@@ -412,7 +416,7 @@ impl FilterEnabledState {
     >(
         &mut self,
         interface_type: Option<InterfaceType>,
-        interface_id: NonZeroU64,
+        interface_id: InterfaceId,
         filter: &Filter,
     ) -> Result<(), fnet_filter_deprecated::EnableDisableInterfaceError> {
         let should_be_enabled = self.should_enable(interface_type, interface_id);
@@ -452,7 +456,7 @@ impl FilterEnabledState {
     pub(super) async fn maybe_update_current(
         &mut self,
         interface_type: Option<InterfaceType>,
-        interface_id: NonZeroU64,
+        interface_id: InterfaceId,
         filter: &mut FilterState,
     ) -> Result<(), anyhow::Error> {
         let should_be_enabled = self.should_enable(interface_type, interface_id);
@@ -542,7 +546,7 @@ impl FilterEnabledState {
     fn should_enable(
         &self,
         interface_type: Option<InterfaceType>,
-        interface_id: NonZeroU64,
+        interface_id: InterfaceId,
     ) -> bool {
         interface_type
             .as_ref()
@@ -560,11 +564,11 @@ impl FilterEnabledState {
             || self.masquerade_enabled_interface_ids.contains(&interface_id)
     }
 
-    pub(crate) fn enable_masquerade_interface_id(&mut self, interface_id: NonZeroU64) {
+    pub(crate) fn enable_masquerade_interface_id(&mut self, interface_id: InterfaceId) {
         let _: bool = self.masquerade_enabled_interface_ids.insert(interface_id);
     }
 
-    pub(crate) fn disable_masquerade_interface_id(&mut self, interface_id: NonZeroU64) {
+    pub(crate) fn disable_masquerade_interface_id(&mut self, interface_id: InterfaceId) {
         let _: bool = self.masquerade_enabled_interface_ids.remove(&interface_id);
     }
 }
@@ -579,7 +583,7 @@ mod tests {
 
     use super::*;
 
-    const INTERFACE_ID: NonZeroU64 = const_unwrap_option(NonZeroU64::new(1));
+    const INTERFACE_ID: InterfaceId = const_unwrap_option(InterfaceId::new(1));
     const LOCAL_INGRESS: &str = "local_ingress";
     const UNINSTALLED_LOCAL_INGRESS: &str = "local_ingress_uninstalled";
     const LOCAL_EGRESS: &str = "local_egress";
@@ -761,7 +765,7 @@ mod tests {
             [InterfaceType::WlanClient].iter().cloned().collect();
         let types_ap: HashSet<InterfaceType> = [InterfaceType::WlanAp].iter().cloned().collect();
 
-        let id = const_unwrap_option(NonZeroU64::new(10));
+        let id = const_unwrap_option(InterfaceId::new(10));
 
         let make_info = |device_class| DeviceInfoRef {
             device_class,

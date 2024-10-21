@@ -453,19 +453,24 @@ impl<S: Default> Update<S> for InterfaceState<S> {
     }
 }
 
-trait TryFromMaybeNonzero: Sized {
-    fn try_from_maybe_nonzero(value: u64) -> Result<Self, UpdateError>;
+/// An error indicated an unexpected zero value.
+pub struct ZeroError {}
+
+/// A type that may fallibly convert from a u64 because the value is 0.
+pub trait TryFromMaybeNonZero: Sized {
+    /// Try to convert the u64 into `Self`.
+    fn try_from(value: u64) -> Result<Self, ZeroError>;
 }
 
-impl TryFromMaybeNonzero for u64 {
-    fn try_from_maybe_nonzero(value: u64) -> Result<Self, UpdateError> {
+impl TryFromMaybeNonZero for u64 {
+    fn try_from(value: u64) -> Result<Self, ZeroError> {
         Ok(value)
     }
 }
 
-impl TryFromMaybeNonzero for NonZeroU64 {
-    fn try_from_maybe_nonzero(value: u64) -> Result<Self, UpdateError> {
-        NonZeroU64::new(value).ok_or(UpdateError::ZeroInterfaceId)
+impl TryFromMaybeNonZero for NonZeroU64 {
+    fn try_from(value: u64) -> Result<Self, ZeroError> {
+        NonZeroU64::new(value).ok_or(ZeroError {})
     }
 }
 
@@ -473,7 +478,7 @@ macro_rules! impl_map {
     ($map_type:ident, $map_mod:tt) => {
         impl<K, S> Update<S> for $map_type<K, PropertiesAndState<S>>
         where
-            K: TryFromMaybeNonzero + Copy + From<NonZeroU64> + Eq + Ord + std::hash::Hash,
+            K: TryFromMaybeNonZero + Copy + From<NonZeroU64> + Eq + Ord + std::hash::Hash,
             S: Default,
         {
             fn update(
@@ -519,16 +524,20 @@ macro_rules! impl_map {
                         } else {
                             return Err(UpdateError::MissingId(change));
                         };
-                        if let Some(properties) = self.get_mut(&K::try_from_maybe_nonzero(id)?) {
+                        if let Some(properties) = self.get_mut(
+                            &K::try_from(id)
+                                .map_err(|ZeroError {}| UpdateError::ZeroInterfaceId)?,
+                        ) {
                             properties.update(fnet_interfaces::Event::Changed(change))
                         } else {
                             Err(UpdateError::UnknownChanged(change))
                         }
                     }
                     fnet_interfaces::Event::Removed(removed_id) => {
-                        if let Some(properties) =
-                            self.remove(&K::try_from_maybe_nonzero(removed_id)?)
-                        {
+                        if let Some(properties) = self.remove(
+                            &K::try_from(removed_id)
+                                .map_err(|ZeroError {}| UpdateError::ZeroInterfaceId)?,
+                        ) {
                             Ok(UpdateResult::Removed(properties))
                         } else {
                             Err(UpdateError::UnknownRemoved(removed_id))
