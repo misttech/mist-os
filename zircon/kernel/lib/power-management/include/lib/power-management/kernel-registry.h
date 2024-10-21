@@ -29,6 +29,11 @@ class KernelPowerDomainRegistry {
   // the associated scheduler's power state.
   static zx::result<> Unregister(uint32_t domain_id) TA_EXCL(registry_lock_::Get());
 
+  // Update power level for a power domain.
+  static zx::result<> UpdateDomainPowerLevel(uint32_t domain_id, uint64_t controller_id,
+                                             power_management::ControlInterface interface,
+                                             uint64_t arg);
+
  private:
   static PowerDomainRegistry registry_ TA_GUARDED(registry_lock_::Get());
 };
