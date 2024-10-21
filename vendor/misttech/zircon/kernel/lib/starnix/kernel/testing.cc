@@ -19,6 +19,7 @@
 #include <lib/mistos/starnix/kernel/vfs/fs_context.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/starnix/kernel/vfs/namespace.h>
+#include <lib/mistos/util/error_propagation.h>
 #include <lib/starnix/bootfs/tests/data/bootfs.zbi.h>
 #include <lib/starnix/bootfs/tests/zbi_file.h>
 #include <zircon/assert.h>
@@ -50,7 +51,8 @@ TaskBuilder create_test_init_task(fbl::RefPtr<Kernel> kernel, fbl::RefPtr<FsCont
 
   auto system_task = CurrentTask::create_system_task(kernel, fs);
   ZX_ASSERT_MSG(system_task.is_ok(), "create system task");
-  // kernel.kthreads.init(system_task).expect("failed to initialize kthreads");*/
+  ZX_ASSERT_MSG(kernel->kthreads().Init(ktl::move(system_task.value())).is_ok(),
+                "failed to initialize kthreads");
 
   // let system_task = kernel.kthreads.system_task();
   // kernel.hrtimer_manager.init(&system_task).expect("init hrtimer manager worker thread");

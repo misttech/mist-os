@@ -7,6 +7,7 @@
 
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/lifecycle/atomic_counter.h>
+#include <lib/mistos/starnix/kernel/task/kernel_threads.h>
 #include <lib/mistos/starnix/kernel/task/pid_table.h>
 #include <lib/mistos/util/onecell.h>
 #include <lib/starnix_sync/locks.h>
@@ -31,10 +32,11 @@ using FileSystemHandle = fbl::RefPtr<FileSystem>;
 /// The structure of this object will likely need to evolve as we implement more namespacing and
 /// isolation mechanisms, such as `namespaces(7)` and `pid_namespaces(7)`.
 class Kernel : public fbl::RefCountedUpgradeable<Kernel> {
- public:
+ private:
   /// The kernel threads running on behalf of this kernel.
-  // pub kthreads: KernelThreads,
+  KernelThreads kthreads_;
 
+ public:
   /// The feaures enabled for this kernel.
   // pub features: KernelFeatures,
 
@@ -208,6 +210,10 @@ class Kernel : public fbl::RefCountedUpgradeable<Kernel> {
   using fbl::RefCountedUpgradeable<Kernel>::Release;
   using fbl::RefCountedUpgradeable<Kernel>::Adopt;
   using fbl::RefCountedUpgradeable<Kernel>::AddRefMaybeInDestructor;
+
+  // C++
+  const KernelThreads& kthreads() const { return kthreads_; }
+  KernelThreads& kthreads() { return kthreads_; }
 
   ~Kernel();
 

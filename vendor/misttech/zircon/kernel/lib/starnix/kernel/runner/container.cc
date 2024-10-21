@@ -62,11 +62,11 @@ fit::result<Errno, Container> create_container(const Config& config) {
   auto system_task = CurrentTask::create_system_task(
                          /*kernel.kthreads.unlocked_for_async().deref_mut(),*/ kernel, fs_context)
                          .value();
-
   // The system task gives pid 2. This value is less critical than giving
   // pid 1 to init, but this value matches what is supposed to happen.
   DEBUG_ASSERT(system_task->id() == 2);
 
+  _EP(kernel->kthreads().Init(system_task));
   // Register common devices and add them in sysfs and devtmpfs.
   // init_common_devices(kernel.kthreads.unlocked_for_async().deref_mut(), &system_task);
   // register_common_file_systems(kernel.kthreads.unlocked_for_async().deref_mut(), &kernel);
