@@ -34,6 +34,7 @@
 #include <lib/starnix_sync/locks.h>
 #include <lib/user_copy/user_ptr.h>
 #include <trace.h>
+#include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
@@ -86,19 +87,40 @@ Task* TaskBuilder::operator->() {
   return task_.get();
 }
 
-CurrentTask::~CurrentTask() = default;
-
 CurrentTask::CurrentTask(fbl::RefPtr<Task> task, ThreadState thread_state)
     : task_(ktl::move(task)), thread_state_(thread_state) {}
+
+CurrentTask::CurrentTask(CurrentTask&& other) {
+  task_ = ktl::move(other.task_);
+  thread_state_ = ktl::move(other.thread_state_);
+}
+
+CurrentTask& CurrentTask::operator=(CurrentTask&& other) {
+  task_ = ktl::move(other.task_);
+  thread_state_ = ktl::move(other.thread_state_);
+  return *this;
+}
+
+CurrentTask::~CurrentTask() = default;
+
+Task* CurrentTask::operator->() {
+  ASSERT_MSG(task_, "called `operator->()` empty Task");
+  return task_.get();
+}
 
 const Task* CurrentTask::operator->() const {
   ASSERT_MSG(task_, "called `operator->()` empty Task");
   return task_.get();
 }
 
-Task* CurrentTask::operator->() {
-  ASSERT_MSG(task_, "called `operator->()` empty Task");
-  return task_.get();
+Task& CurrentTask::operator*() {
+  ASSERT_MSG(task_, "called `operator*()` empty Task");
+  return *task_;
+}
+
+const Task& CurrentTask::operator*() const {
+  ASSERT_MSG(task_, "called `operator*()` empty Task");
+  return *task_;
 }
 
 fit::result<Errno, TaskBuilder> CurrentTask::create_init_process(
@@ -129,7 +151,7 @@ fit::result<Errno, CurrentTask> CurrentTask::create_system_task(const fbl::RefPt
             TaskInfo{.thread = {}, .thread_group = thread_group, .memory_manager = memory_manager});
       }) _EP(builder);
 
-  return fit::ok(starnix::CurrentTask::From(builder.value()));
+  return fit::ok(starnix::CurrentTask::From(ktl::move(builder.value())));
 }
 
 fit::result<Errno, TaskBuilder> CurrentTask::create_init_child_process(
@@ -152,7 +174,8 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_init_child_process(
   {
     auto init_writer = init_task->thread_group()->Write();
     auto new_process_writer = task->thread_group()->Write();
-    // new_process_writer->parent() =
+    new_process_writer->parent() = ThreadGroupParent::From(init_task->thread_group().get());
+    init_writer->get_children().insert(util::WeakPtr(task->thread_group().get()));
   }
 
   // A child process created via fork(2) inherits its parent's
@@ -191,6 +214,12 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_task_with_pid(
   auto task_info = task_info_factory(pid, process_group).value_or(TaskInfo{});
 
   process_group->insert(task_info.thread_group);
+
+  // > The timer slack values of init (PID 1), the ancestor of all processes, are 50,000
+  // > nanoseconds (50 microseconds).  The timer slack value is inherited by a child created
+  // > via fork(2), and is preserved across execve(2).
+  // https://man7.org/linux/man-pages/man2/prctl.2.html
+  // const uint64_t default_timerslack = 50_000;
 
   auto builder =
       TaskBuilder{Task::New(pid, initial_name, task_info.thread_group, ktl::move(task_info.thread),
@@ -231,6 +260,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
 
   auto clone_files = (flags & CLONE_FILES) != 0;
   auto clone_fs = (flags & CLONE_FS) != 0;
+  auto clone_parent = (flags & CLONE_PARENT) != 0;
   auto clone_parent_settid = (flags & CLONE_PARENT_SETTID) != 0;
   auto clone_child_cleartid = (flags & CLONE_CHILD_CLEARTID) != 0;
   auto clone_child_settid = (flags & CLONE_CHILD_SETTID) != 0;
@@ -307,18 +337,42 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
   LTRACE;
 
   auto task_info = [&]() -> fit::result<Errno, TaskInfo> {
+    // These variables hold the original parent in case we need to switch the parent of the
+    // new task because of CLONE_PARENT.
+    ThreadGroupParent weak_original_parent;
+    fbl::RefPtr<ThreadGroup> original_parent;
+
     // Make sure to drop these locks ASAP to avoid inversion
-    auto self = (*this);
-    auto thread_group_state = self->thread_group()->Write();
-    auto state = self->mutable_state_.Read();
+    // auto self = (*this);
+    auto thread_group_state = [&]()
+        -> fit::result<Errno, starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard> {
+      auto tgs = task_->thread_group()->Write();
+      if (clone_parent) {
+        // With the CLONE_PARENT flag, the parent of the new task is our parent
+        // instead of ourselves.
+        if (!tgs->parent().has_value()) {
+          return fit::error(errno(EINVAL));
+        }
+        weak_original_parent = *tgs->parent();
+        original_parent = weak_original_parent.upgrade();
+        return fit::ok(ktl::move(original_parent->Write()));
+      }
+      return fit::ok(ktl::move(tgs));
+    }();
+
+    if (thread_group_state.is_error()) {
+      return thread_group_state.take_error();
+    }
+
+    auto state = task_->Read();
 
     no_new_privs = (*state).no_new_privs();
     // seccomp_filters = state.seccomp_filters.clone();
     // child_signal_mask = state.signals.mask();
 
     pid = pids->allocate_pid();
-    command = self->command();
-    creds = self->creds();
+    command = task_->command();
+    creds = task_->creds();
     // scheduler_policy = state.scheduler_policy.fork();
     // timerslack_ns = state.timerslack_ns;
 
@@ -355,7 +409,7 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
       };
       */
       auto process_group = thread_group_state->process_group();
-      return create_zircon_process(kernel, ktl::move(thread_group_state), pid, process_group,
+      return create_zircon_process(kernel, ktl::move(*thread_group_state), pid, process_group,
                                    command);
     }
   }() _EP(task_info);
@@ -386,26 +440,37 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
 
     /*
     #[cfg(any(test, debug_assertions))]
-    {
-        // Take the lock on the thread group and its child in the correct order to ensure any wrong
-    ordering
-        // will trigger the tracing-mutex at the right call site.
-        if !clone_thread {
-            let _l1 = self.thread_group.read();
-            let _l2 = child.thread_group.read();
-        }
-    }
     */
+    {
+      // Take the lock on the thread group and its child in the correct order to ensure any wrong
+      // ordering will trigger the tracing-mutex at the right call site.
+      if (!clone_thread) {
+        auto _l1 = task_->thread_group()->Read();
+        auto _l2 = child->thread_group()->Read();
+      }
+    }
 
     if (clone_thread) {
-      _EP((*this)->thread_group()->add(child_task));
+      _EP(task_->thread_group()->add(child_task));
     } else {
-      _EP((*this)->thread_group()->add(child_task));
-      auto child_state = child->mutable_state_.Write();
-      auto state = (*this)->mutable_state_.Read();
+      _EP(child->thread_group()->add(child_task));
+
+      // These manipulations of the signal handling state appear to be related to
+      // CLONE_SIGHAND and CLONE_VM rather than CLONE_THREAD. However, we do not support
+      // all the combinations of these flags, which means doing these operations here
+      // might actually be correct. However, if you find a test that fails because of the
+      // placement of this logic here, we might need to move it.
+      auto child_state = child->Write();
+      auto state = task_->Read();
       // child_state.signals.alt_stack = state.signals.alt_stack;
       // child_state.signals.set_mask(state.signals.mask());
-      _EP((*this)->mm()->snapshot_to(child->mm()));
+    }
+
+    if (!clone_vm) {
+      // We do not support running threads in the same process with different
+      // MemoryManagers.
+      ZX_ASSERT(!clone_thread);
+      _EP(task_->mm()->snapshot_to(child->mm()));
     }
 
     if (clone_parent_settid) {
@@ -420,18 +485,23 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
       _EP(child->write_object(user_child_tid, child->id()));
     }
 
+    // TODO(https://fxbug.dev/42066087): We do not support running different processes with
+    // the same MemoryManager. Instead, we implement a rough approximation of that behavior
+    // by making a copy-on-write clone of the memory from the original process.
+    if (clone_vm && !clone_thread) {
+      _EP(task_->mm()->snapshot_to(child->mm()));
+    }
+
     child.thread_state() = this->thread_state().snapshot();
   }
 
-  /*
   // Take the lock on thread group and task in the correct order to ensure any wrong ordering
   // will trigger the tracing-mutex at the right call site.
-  #[cfg(any(test, debug_assertions))]
+  // #[cfg(any(test, debug_assertions))]
   {
-      let _l1 = child.thread_group.read();
-      let _l2 = child.read();
+    auto _l1 = child->thread_group()->Read();
+    auto _l2 = child->Read();
   }
-  */
   return fit::ok(ktl::move(child));
 }
 
@@ -445,7 +515,7 @@ starnix::testing::AutoReleasableTask CurrentTask::clone_task_for_test(
   auto result = clone_task(flags, exit_signal, mtl::DefaultConstruct<UserRef<pid_t>>(),
                            mtl::DefaultConstruct<UserRef<pid_t>>());
   ZX_ASSERT_MSG(result.is_ok(), "failed to create task in test");
-  return starnix::testing::AutoReleasableTask::From(result.value());
+  return starnix::testing::AutoReleasableTask::From(ktl::move(result.value()));
 }
 
 fit::result<Errno> CurrentTask::exec(const FileHandle& executable, const ktl::string_view& path,
@@ -581,8 +651,8 @@ fit::result<Errno> CurrentTask::finish_exec(const ktl::string_view& path,
   return fit::ok();
 }
 
-CurrentTask CurrentTask::From(const TaskBuilder& builder) {
-  return CurrentTask::New(builder.task(), builder.thread_state());
+CurrentTask CurrentTask::From(TaskBuilder builder) {
+  return CurrentTask::New(ktl::move(builder.task()), ktl::move(builder.thread_state()));
 }
 
 CurrentTask CurrentTask::New(fbl::RefPtr<Task> task, ThreadState thread_state) {
@@ -600,16 +670,19 @@ void CurrentTask::set_creds(Credentials creds) const {
 }
 
 void CurrentTask::release() {
-  // self.notify_robust_list();
-  // let _ignored = self.clear_child_tid_if_needed();
+  LTRACE;
+  // if (task_ && task_->IsLastReference()) {
+  if (task_) {
+    // self.notify_robust_list();
+    // let _ignored = self.clear_child_tid_if_needed();
 
-  // We remove from the thread group here because the WeakRef in the pid
-  // table to this task must be valid until this task is removed from the
-  // thread group, but self.task.release() below invalidates it.
-  task_->thread_group()->remove(task_);
+    // We remove from the thread group here because the WeakRef in the pid
+    // table to this task must be valid until this task is removed from the
+    // thread group, but self.task.release() below invalidates it.
+    task_->thread_group()->remove(task_);
 
-  // let context = (self.thread_state, locked);
-  // self.task.release(context);
+    task_->release(thread_state_);
+  }
 }
 
 fit::result<Errno, ktl::pair<NamespaceNode, FsStr>> CurrentTask::resolve_dir_fd(

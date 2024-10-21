@@ -38,7 +38,7 @@
 
 namespace starnix {
 
-Container::~Container() = default;
+Container::~Container() { LTRACE_ENTRY_OBJ; }
 
 fit::result<Errno, Container> create_container(const Config& config) {
   const ktl::string_view DEFAULT_INIT("/container/init");

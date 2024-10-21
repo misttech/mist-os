@@ -27,8 +27,10 @@ bool open_device_file() {
 
   // Create a device file that points to the `zero` device (which is automatically
   // registered in the kernel).
-  auto result = current_task->fs()->root().create_node(*current_task, "zero",
-                                                       FILE_MODE(IFCHR, 0666), DeviceType::ZERO);
+  auto result = (*current_task)
+                    ->fs()
+                    ->root()
+                    .create_node(*current_task, "zero", FILE_MODE(IFCHR, 0666), DeviceType::ZERO);
   EXPECT_TRUE(
       result.is_ok());  //, "create_node error [errno=%d]", result.error_value().error_code());
 
