@@ -72,8 +72,7 @@ zx_status_t SdioControllerDevice::Create(SdmmcRootDevice* parent,
   return ZX_OK;
 }
 
-zx_status_t SdioControllerDevice::Probe(
-    const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata) {
+zx_status_t SdioControllerDevice::Probe(const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata) {
   std::lock_guard<std::mutex> lock(lock_);
   return ProbeLocked();
 }

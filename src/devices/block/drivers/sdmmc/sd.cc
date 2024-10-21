@@ -28,8 +28,7 @@ constexpr uint8_t kCsdStructV2 = 0x1;
 
 namespace sdmmc {
 
-zx_status_t SdmmcBlockDevice::ProbeSdLocked(
-    const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata) {
+zx_status_t SdmmcBlockDevice::ProbeSdLocked(const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata) {
   sdmmc_->SetRequestRetries(0);
 
   // Issue the SEND_IF_COND command, this will tell us that we can talk to
@@ -176,7 +175,7 @@ zx_status_t SdmmcBlockDevice::ProbeSdLocked(
     } while (false);
   }
 
-  if (metadata.removable()) {
+  if (metadata.removable().value()) {
     block_info_.flags |= FLAG_REMOVABLE;
   }
 

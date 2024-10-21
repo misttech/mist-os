@@ -61,8 +61,7 @@ class TestSdmmcRootDevice : public SdmmcRootDevice {
       : SdmmcRootDevice(std::move(start_args), std::move(dispatcher)) {}
 
  protected:
-  zx_status_t Init(
-      fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata> metadata) override {
+  zx_status_t Init(const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata) override {
     std::unique_ptr<SdmmcDevice> sdmmc;
     if (use_fidl_) {
       zx::result client_end = sdmmc_.GetFidlClientEnd();
@@ -86,7 +85,7 @@ class TestSdmmcRootDevice : public SdmmcRootDevice {
     if (status = SdmmcBlockDevice::Create(this, std::move(sdmmc), &block_device); status != ZX_OK) {
       return status;
     }
-    if (status = is_sd_ ? block_device->ProbeSd(*metadata) : block_device->ProbeMmc(*metadata);
+    if (status = is_sd_ ? block_device->ProbeSd(metadata) : block_device->ProbeMmc(metadata);
         status != ZX_OK) {
       return status;
     }

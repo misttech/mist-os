@@ -31,8 +31,8 @@ class SdmmcDevice {
   static constexpr uint32_t kTryAttempts = 10;  // 1 initial + 9 retries.
 
   explicit SdmmcDevice(SdmmcRootDevice* root_device,
-                       const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata)
-      : root_device_(root_device), max_frequency_(metadata.max_frequency()) {}
+                       const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata)
+      : root_device_(root_device), max_frequency_(metadata.max_frequency().value()) {}
 
   // For testing using Banjo.
   explicit SdmmcDevice(SdmmcRootDevice* root_device, const ddk::SdmmcProtocolClient& host)

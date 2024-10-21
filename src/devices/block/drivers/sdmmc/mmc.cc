@@ -290,16 +290,16 @@ bool SdmmcBlockDevice::MmcSupportsHs400() {
 }
 
 zx_status_t SdmmcBlockDevice::ProbeMmcLocked(
-    const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata) {
+    const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata) {
   sdmmc_->SetRequestRetries(10);
 
   auto reset_retries = fit::defer([this]() { sdmmc_->SetRequestRetries(0); });
 
   // Query OCR
-  zx::result<uint32_t> ocr =
-      sdmmc_->MmcSendOpCond(/*suppress_error_messages=*/metadata.removable());
+  bool removable = metadata.removable().value();
+  zx::result<uint32_t> ocr = sdmmc_->MmcSendOpCond(/*suppress_error_messages=*/removable);
   if (ocr.is_error()) {
-    if (metadata.removable()) {
+    if (removable) {
       // This error is expected if no card is inserted.
       FDF_LOGL(DEBUG, logger(), "MMC_SEND_OP_COND failed: %s", ocr.status_string());
     } else {
@@ -377,8 +377,10 @@ zx_status_t SdmmcBlockDevice::ProbeMmcLocked(
     MmcSelectBusWidth();
 
     // Must perform tuning at HS200 first if HS400 is supported
+    fuchsia_hardware_sdmmc::SdmmcHostPrefs speed_capabilities =
+        metadata.speed_capabilities().value();
     if (MmcSupportsHs200() && bus_width_ != SDMMC_BUS_WIDTH_ONE &&
-        !(metadata.speed_capabilities() & fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs200)) {
+        !(speed_capabilities & fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs200)) {
       if ((st = MmcSwitchTiming(SDMMC_TIMING_HS200)) != ZX_OK) {
         return st;
       }
@@ -393,8 +395,7 @@ zx_status_t SdmmcBlockDevice::ProbeMmcLocked(
       }
 
       if (MmcSupportsHs400() && bus_width_ == SDMMC_BUS_WIDTH_EIGHT &&
-          !(metadata.speed_capabilities() &
-            fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400)) {
+          !(speed_capabilities & fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs400)) {
         if ((st = MmcSwitchTimingHs200ToHs()) != ZX_OK) {
           return st;
         }
@@ -417,8 +418,7 @@ zx_status_t SdmmcBlockDevice::ProbeMmcLocked(
       }
 
       if (MmcSupportsHsDdr() && (bus_width_ != SDMMC_BUS_WIDTH_ONE) &&
-          !(metadata.speed_capabilities() &
-            fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHsddr)) {
+          !(speed_capabilities & fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHsddr)) {
         if ((st = MmcSwitchTiming(SDMMC_TIMING_HSDDR)) != ZX_OK) {
           return st;
         }
@@ -450,7 +450,7 @@ zx_status_t SdmmcBlockDevice::ProbeMmcLocked(
     block_info_.flags |= FLAG_TRIM_SUPPORT;
   }
 
-  if (GetCacheSizeBits(raw_ext_csd_) && metadata.enable_cache()) {
+  if (GetCacheSizeBits(raw_ext_csd_) && metadata.enable_cache().value()) {
     // Enable the cache.
     st = MmcDoSwitch(MMC_EXT_CSD_CACHE_CTRL, MMC_EXT_CSD_CACHE_EN_MASK);
     if (st != ZX_OK) {
@@ -475,16 +475,15 @@ zx_status_t SdmmcBlockDevice::ProbeMmcLocked(
     }
   }
 
-  if (metadata.removable()) {
+  if (removable) {
     block_info_.flags |= FLAG_REMOVABLE;
   }
 
   auto get_max_packed_commands_effective =
-      [](uint32_t max_packed_commands,
-         const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata) {
+      [](uint32_t max_packed_commands, const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata) {
         uint32_t max_packed_commands_effective =
             std::min(kMaxPackedCommandsFor512ByteBlockSize, max_packed_commands);
-        return std::min(max_packed_commands_effective, metadata.max_command_packing());
+        return std::min(max_packed_commands_effective, metadata.max_command_packing().value());
       };
   max_packed_reads_effective_ =
       get_max_packed_commands_effective(raw_ext_csd_[MMC_EXT_CSD_MAX_PACKED_READS], metadata);

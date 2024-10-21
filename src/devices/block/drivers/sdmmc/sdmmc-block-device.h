@@ -109,17 +109,15 @@ class SdmmcBlockDevice : public block_server::Interface {
   std::unique_ptr<SdmmcDevice> TakeSdmmcDevice() { return std::move(sdmmc_); }
 
   // Probe for SD first, then MMC.
-  zx_status_t Probe(const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata)
-      TA_EXCL(worker_lock_) {
+  zx_status_t Probe(const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata) TA_EXCL(worker_lock_) {
     fbl::AutoLock lock(&worker_lock_);
     return ProbeSdLocked(metadata) == ZX_OK ? ZX_OK : ProbeMmcLocked(metadata);
   }
-  zx_status_t ProbeSd(const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata)
-      TA_EXCL(worker_lock_) {
+  zx_status_t ProbeSd(const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata) TA_EXCL(worker_lock_) {
     fbl::AutoLock lock(&worker_lock_);
     return ProbeSdLocked(metadata);
   }
-  zx_status_t ProbeMmc(const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata)
+  zx_status_t ProbeMmc(const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata)
       TA_EXCL(worker_lock_) {
     fbl::AutoLock lock(&worker_lock_);
     return ProbeMmcLocked(metadata);
@@ -158,9 +156,9 @@ class SdmmcBlockDevice : public block_server::Interface {
   // until both queues are empty.
   static constexpr size_t kRoundRobinRequestCount = 16;
 
-  zx_status_t ProbeSdLocked(const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata)
+  zx_status_t ProbeSdLocked(const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata)
       TA_REQ(worker_lock_);
-  zx_status_t ProbeMmcLocked(const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata)
+  zx_status_t ProbeMmcLocked(const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata)
       TA_REQ(worker_lock_);
 
   template <typename Request>
