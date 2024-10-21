@@ -21,7 +21,9 @@ use crate::model::start::Start;
 use crate::model::storage::build_storage_admin_dictionary;
 use crate::model::token::{InstanceToken, InstanceTokenState};
 use crate::sandbox_util::RoutableExt;
-use ::routing::bedrock::program_output_dict::build_program_output_dictionary;
+use ::routing::bedrock::program_output_dict::{
+    build_program_output_dictionary, ProgramOutputGenerator,
+};
 use ::routing::bedrock::sandbox_construction::{
     self, build_component_sandbox, extend_dict_with_offers, ComponentSandbox,
 };
@@ -29,6 +31,7 @@ use ::routing::bedrock::structured_dict::{ComponentInput, StructuredDictMap};
 use ::routing::capability_source::{CapabilitySource, ComponentCapability, ComponentSource};
 use ::routing::component_instance::{
     ComponentInstanceInterface, ResolvedInstanceInterface, ResolvedInstanceInterfaceExt,
+    WeakComponentInstanceInterface,
 };
 use ::routing::error::ComponentInstanceError;
 use ::routing::resolving::{ComponentAddress, ComponentResolutionContext};
@@ -56,7 +59,8 @@ use hooks::{CapabilityReceiver, EventPayload};
 use moniker::{ChildName, ExtendedMoniker, Moniker};
 use router_error::RouterError;
 use sandbox::{
-    Capability, Dict, DirEntry, RemotableCapability, Request, Routable, Router, WeakInstanceToken,
+    Capability, Connector, Dict, DirEntry, RemotableCapability, Request, Router, SpecificRoutable,
+    SpecificRouter, SpecificRouterResponse, WeakInstanceToken,
 };
 use std::collections::HashMap;
 use std::fmt;
@@ -429,14 +433,47 @@ impl ResolvedInstanceState {
         };
         state.add_static_children(component).await?;
 
+        struct MyGenerator {}
+        impl ProgramOutputGenerator<ComponentInstance> for MyGenerator {
+            fn new_program_dictionary_router(
+                &self,
+                component: WeakComponentInstanceInterface<ComponentInstance>,
+                source_path: Path,
+                capability: ComponentCapability,
+            ) -> SpecificRouter<Dict> {
+                SpecificRouter::<Dict>::new(ProgramDictionaryRouter {
+                    component,
+                    source_path,
+                    capability,
+                })
+            }
+
+            fn new_outgoing_dir_connector_router(
+                &self,
+                component: &Arc<ComponentInstance>,
+                decl: &cm_rust::ComponentDecl,
+                capability: &cm_rust::CapabilityDecl,
+            ) -> SpecificRouter<Connector> {
+                ResolvedInstanceState::make_program_outgoing_connector_router(
+                    component, decl, capability,
+                )
+            }
+
+            fn new_outgoing_dir_dir_entry_router(
+                &self,
+                component: &Arc<ComponentInstance>,
+                decl: &cm_rust::ComponentDecl,
+                capability: &cm_rust::CapabilityDecl,
+            ) -> SpecificRouter<DirEntry> {
+                ResolvedInstanceState::make_program_outgoing_dir_entry_router(
+                    component, decl, capability,
+                )
+            }
+        }
         let child_outgoing_dictionary_routers =
             state.get_child_component_output_dictionary_routers();
-        let (program_output_dict, declared_dictionaries) = build_program_output_dictionary(
-            component,
-            &decl,
-            &new_program_router,
-            &ResolvedInstanceState::make_program_outgoing_router,
-        );
+        let (program_output_dict, declared_dictionaries) =
+            build_program_output_dictionary(component, &decl, &MyGenerator {});
 
         let component_sandbox = build_component_sandbox(
             &component,
@@ -455,15 +492,17 @@ impl ResolvedInstanceState {
         Ok(state)
     }
 
-    /// Creates a `Router` that requests the specified capability from the
+    /// Creates a `ConnectorRouter` that requests the specified capability from the
     /// program's outgoing directory.
-    pub fn make_program_outgoing_router(
+    pub fn make_program_outgoing_connector_router(
         component: &Arc<ComponentInstance>,
         component_decl: &ComponentDecl,
         capability_decl: &cm_rust::CapabilityDecl,
-    ) -> Router {
+    ) -> SpecificRouter<Connector> {
         if component_decl.get_runner().is_none() {
-            return Router::new_error(OpenOutgoingDirError::InstanceNonExecutable);
+            return SpecificRouter::<Connector>::new_error(
+                OpenOutgoingDirError::InstanceNonExecutable,
+            );
         }
         let name = capability_decl.name();
         let path = capability_decl.path().expect("must have path").to_string();
@@ -474,7 +513,6 @@ impl ResolvedInstanceState {
             .get_outgoing()
             .try_into_directory_entry()
             .expect("conversion to directory entry should succeed");
-
         #[derive(Derivative)]
         #[derivative(Debug)]
         struct OutgoingConnector {
@@ -498,25 +536,52 @@ impl ResolvedInstanceState {
             }
         }
         let node = Arc::new(SubNode::new(outgoing_dir_entry, relative_path, entry_type));
-        let capability: Capability = match capability_decl {
-            CapabilityDecl::Protocol(_) => {
-                sandbox::Connector::new_sendable(OutgoingConnector { node }).into()
-            }
-            _ => sandbox::DirEntry::new(node).into(),
-        };
+        let connector = sandbox::Connector::new_sendable(OutgoingConnector { node });
         let hook = CapabilityRequestedHook {
             source: component.as_weak(),
             name: name.clone(),
-            capability,
+            connector,
             capability_decl: capability_decl.clone(),
         };
         match capability_decl {
             CapabilityDecl::Protocol(p) => match p.delivery {
-                DeliveryType::Immediate => Router::new(hook),
+                DeliveryType::Immediate => SpecificRouter::<Connector>::new(hook),
                 DeliveryType::OnReadable => hook.on_readable(component.execution_scope.clone()),
             },
-            _ => Router::new(hook),
+            _ => SpecificRouter::<Connector>::new(hook),
         }
+    }
+
+    /// Creates a `SpecificRouter<DirEntry>` that requests the specified capability from the
+    /// program's outgoing directory.
+    pub fn make_program_outgoing_dir_entry_router(
+        component: &Arc<ComponentInstance>,
+        component_decl: &ComponentDecl,
+        capability_decl: &cm_rust::CapabilityDecl,
+    ) -> SpecificRouter<DirEntry> {
+        if component_decl.get_runner().is_none() {
+            return SpecificRouter::<DirEntry>::new_error(
+                OpenOutgoingDirError::InstanceNonExecutable,
+            );
+        }
+        let name = capability_decl.name();
+        let path = capability_decl.path().expect("must have path").to_string();
+        let path = fuchsia_fs::canonicalize_path(&path);
+        let entry_type = ComponentCapability::from(capability_decl.clone()).type_name().into();
+        let relative_path = vfs::path::Path::validate_and_split(path).unwrap();
+        let outgoing_dir_entry = component
+            .get_outgoing()
+            .try_into_directory_entry()
+            .expect("conversion to directory entry should succeed");
+        let dir_entry =
+            DirEntry::new(Arc::new(SubNode::new(outgoing_dir_entry, relative_path, entry_type)));
+        // DirEntry-based capabilities don't need to support CapabilityRequested.
+        SpecificRouter::<DirEntry>::new(DirEntryOutgoingRouter {
+            source: component.as_weak(),
+            name: name.clone(),
+            dir_entry,
+            capability_decl: capability_decl.clone(),
+        })
     }
 
     /// Returns a reference to the component's validated declaration.
@@ -984,7 +1049,9 @@ impl ResolvedInstanceState {
         }
     }
 
-    fn get_child_component_output_dictionary_routers(&self) -> HashMap<ChildName, Router> {
+    fn get_child_component_output_dictionary_routers(
+        &self,
+    ) -> HashMap<ChildName, SpecificRouter<Dict>> {
         self.children.iter().map(|(name, child)| (name.clone(), child.component_output())).collect()
     }
 
@@ -1189,17 +1256,18 @@ impl StartedInstanceState {
 struct CapabilityRequestedHook {
     source: WeakComponentInstance,
     name: Name,
-    capability: Capability,
+    connector: Connector,
     capability_decl: cm_rust::CapabilityDecl,
 }
 
 #[async_trait]
-impl Routable for CapabilityRequestedHook {
+
+impl SpecificRoutable<Connector> for CapabilityRequestedHook {
     async fn route(
         &self,
         request: Option<Request>,
         debug: bool,
-    ) -> Result<Capability, RouterError> {
+    ) -> Result<SpecificRouterResponse<Connector>, RouterError> {
         let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
 
         fn cm_unexpected() -> RouterError {
@@ -1232,45 +1300,102 @@ impl Routable for CapabilityRequestedHook {
             receiver: receiver.clone(),
         });
         source.hooks.dispatch(&event).await;
-        let capability = if debug {
-            CapabilitySource::Component(ComponentSource {
-                capability: self.capability_decl.clone().into(),
-                moniker: self.source.moniker.clone(),
-            })
-            .try_into()
-            .expect("failed to convert capability source to dictionary")
+        let resp = if debug {
+            SpecificRouterResponse::<Connector>::Debug(
+                CapabilitySource::Component(ComponentSource {
+                    capability: self.capability_decl.clone().into(),
+                    moniker: self.source.moniker.clone(),
+                })
+                .try_into()
+                .expect("failed to convert capability source to Data"),
+            )
         } else if receiver.is_taken() {
-            sender.into()
+            SpecificRouterResponse::<Connector>::Capability(sender)
         } else {
-            self.capability.try_clone().map_err(|_| RoutingError::BedrockNotCloneable {
-                moniker: self.source.moniker.clone().into(),
-            })?
+            SpecificRouterResponse::<Connector>::Capability(self.connector.clone())
         };
-        Ok(capability)
+        Ok(resp)
     }
 }
 
-struct ProgramRouter {
+#[derive(Debug)]
+struct DirEntryOutgoingRouter {
+    source: WeakComponentInstance,
+    name: Name,
+    dir_entry: DirEntry,
+    capability_decl: cm_rust::CapabilityDecl,
+}
+
+#[async_trait]
+impl SpecificRoutable<DirEntry> for DirEntryOutgoingRouter {
+    async fn route(
+        &self,
+        request: Option<Request>,
+        debug: bool,
+    ) -> Result<SpecificRouterResponse<DirEntry>, RouterError> {
+        fn cm_unexpected() -> RouterError {
+            RoutingError::from(ComponentInstanceError::ComponentManagerInstanceUnexpected {}).into()
+        }
+
+        let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
+        let ExtendedMoniker::ComponentInstance(target_moniker) =
+            <WeakInstanceToken as WeakInstanceTokenExt<ComponentInstance>>::moniker(
+                &request.target,
+            )
+        else {
+            return Err(cm_unexpected());
+        };
+        self.source
+            .ensure_started(&StartReason::AccessCapability {
+                target: target_moniker,
+                name: self.name.clone(),
+            })
+            .await?;
+        let ExtendedInstance::Component(_) =
+            request.target.upgrade().map_err(RoutingError::from)?
+        else {
+            return Err(cm_unexpected());
+        };
+        let resp = if debug {
+            SpecificRouterResponse::<DirEntry>::Debug(
+                CapabilitySource::Component(ComponentSource {
+                    capability: self.capability_decl.clone().into(),
+                    moniker: self.source.moniker.clone(),
+                })
+                .try_into()
+                .expect("failed to convert capability source to Data"),
+            )
+        } else {
+            SpecificRouterResponse::<DirEntry>::Capability(self.dir_entry.clone())
+        };
+        Ok(resp)
+    }
+}
+
+struct ProgramDictionaryRouter {
     component: WeakComponentInstance,
     source_path: Path,
     capability: ComponentCapability,
 }
 
 #[async_trait]
-impl Routable for ProgramRouter {
+impl SpecificRoutable<Dict> for ProgramDictionaryRouter {
     async fn route(
         &self,
         request: Option<Request>,
         debug: bool,
-    ) -> Result<Capability, RouterError> {
+    ) -> Result<SpecificRouterResponse<Dict>, RouterError> {
         if debug {
             let source = CapabilitySource::Component(ComponentSource {
                 capability: self.capability.clone(),
                 moniker: self.component.moniker.clone(),
             });
-            return Ok(source
-                .try_into()
-                .expect("failed to convert capability source to dictionary"));
+            let cap = Capability::try_from(source)
+                .expect("failed to convert capability source to capability");
+            let Capability::Data(data) = cap else {
+                panic!("failed to convert capability source to Debug");
+            };
+            return Ok(SpecificRouterResponse::<Dict>::Debug(data));
         }
         let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
         fn open_error(e: OpenOutgoingDirError) -> OpenError {
@@ -1300,21 +1425,14 @@ impl Routable for ProgramRouter {
         let capability = Capability::try_from(cap).map_err(|_| {
             RoutingError::BedrockRemoteCapability { moniker: self.component.moniker.clone() }
         })?;
-        if !matches!(capability, Capability::Dictionary(_)) {
-            Err(RoutingError::BedrockWrongCapabilityType {
+        let Capability::Dictionary(dict) = capability else {
+            return Err(RoutingError::BedrockWrongCapabilityType {
                 moniker: self.component.moniker.clone().into(),
                 actual: capability.debug_typename().into(),
                 expected: "Dictionary".into(),
-            })?;
-        }
-        Ok(capability)
+            }
+            .into());
+        };
+        Ok(SpecificRouterResponse::<Dict>::Capability(dict))
     }
-}
-
-fn new_program_router(
-    component: WeakComponentInstance,
-    source_path: Path,
-    capability: ComponentCapability,
-) -> Router {
-    Router::new(ProgramRouter { component: component, source_path: source_path, capability })
 }

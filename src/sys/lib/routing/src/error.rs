@@ -328,6 +328,12 @@ pub enum RoutingError {
         "routes that do not set the `debug` flag are unsupported in the current configuration (at `{moniker}`)."
     )]
     NonDebugRoutesUnsupported { moniker: ExtendedMoniker },
+
+    #[error("{type_name} router unexpectedly returned debug info for target {moniker}")]
+    RouteUnexpectedDebug { type_name: CapabilityTypeName, moniker: ExtendedMoniker },
+
+    #[error("{type_name} router unexpectedly returned unavailable for target {moniker}")]
+    RouteUnexpectedUnavailable { type_name: CapabilityTypeName, moniker: ExtendedMoniker },
 }
 
 impl Explain for RoutingError {
@@ -381,6 +387,8 @@ impl Explain for RoutingError {
             RoutingError::RightsRoutingError(err) => err.as_zx_status(),
             RoutingError::PolicyError(err) => err.as_zx_status(),
             RoutingError::SourceCapabilityIsVoid { .. } => zx::Status::NOT_FOUND,
+            RoutingError::RouteUnexpectedDebug { .. }
+            | RoutingError::RouteUnexpectedUnavailable { .. } => zx::Status::INTERNAL,
         }
     }
 }
@@ -425,6 +433,8 @@ impl From<RoutingError> for ExtendedMoniker {
             | RoutingError::BedrockFailedToSend { moniker, .. }
             | RoutingError::BedrockWrongCapabilityType { moniker, .. }
             | RoutingError::NonDebugRoutesUnsupported { moniker }
+            | RoutingError::RouteUnexpectedDebug { moniker, .. }
+            | RoutingError::RouteUnexpectedUnavailable { moniker, .. }
             | RoutingError::UnsupportedCapabilityType { moniker, .. }
             | RoutingError::UnsupportedRouteSource { moniker, .. } => moniker,
 

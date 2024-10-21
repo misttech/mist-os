@@ -295,7 +295,13 @@ impl<'de, const N: usize> de::Deserialize<'de> for BoundedName<N> {
 
 impl IterablePath for Name {
     fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &Name> + Send {
-        Box::new(iter::once(self))
+        iter::once(self)
+    }
+}
+
+impl IterablePath for &Name {
+    fn iter_segments(&self) -> impl DoubleEndedIterator<Item = &Name> + Send {
+        iter::once(*self)
     }
 }
 

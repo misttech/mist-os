@@ -11,6 +11,7 @@ use ::routing::error::{ComponentInstanceError, RoutingError};
 use ::routing::policy::GlobalPolicyChecker;
 use ::routing::{WeakInstanceTokenExt, WithDefault};
 use async_trait::async_trait;
+use cm_rust::CapabilityTypeName;
 use cm_util::WeakTaskGroup;
 use fidl::endpoints::{ProtocolMarker, RequestStream};
 use fidl::epitaph::ChannelEpitaphExt;
@@ -18,7 +19,10 @@ use fidl::AsyncChannel;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use router_error::{Explain, RouterError};
-use sandbox::{Capability, Connectable, Connector, Message, Request, Routable, Router};
+use sandbox::{
+    Capability, Connectable, Connector, Message, Request, Routable, Router, SpecificRoutable,
+    SpecificRouter, SpecificRouterResponse,
+};
 use std::fmt::Debug;
 use std::sync::Arc;
 use tracing::warn;
@@ -203,29 +207,29 @@ impl LaunchTaskOnReceive {
     }
 }
 
-/// Porcelain methods on [`Routable`] objects.
-pub trait RoutableExt: Routable {
+/// Porcelain methods on [`SpecificRoutable`] objects.
+pub trait RoutableExt: SpecificRoutable<Connector> {
     /// Returns a router that resolves with a [`sandbox::Connector`] that watches for
     /// the channel to be readable, then delegates to the current router. The wait
     /// is performed in the provided `scope`.
-    fn on_readable(self, scope: ExecutionScope) -> Router;
+    fn on_readable(self, scope: ExecutionScope) -> SpecificRouter<Connector>;
 }
 
-impl<T: Routable + 'static> RoutableExt for T {
-    fn on_readable(self, scope: ExecutionScope) -> Router {
+impl<T: SpecificRoutable<Connector> + 'static> RoutableExt for T {
+    fn on_readable(self, scope: ExecutionScope) -> SpecificRouter<Connector> {
         #[derive(Debug)]
         struct OnReadableRouter {
-            router: Router,
+            router: SpecificRouter<Connector>,
             scope: ExecutionScope,
         }
 
         #[async_trait]
-        impl Routable for OnReadableRouter {
+        impl SpecificRoutable<Connector> for OnReadableRouter {
             async fn route(
                 &self,
                 request: Option<Request>,
                 debug: bool,
-            ) -> Result<Capability, RouterError> {
+            ) -> Result<SpecificRouterResponse<Connector>, RouterError> {
                 if debug {
                     return self.router.route(request, debug).await;
                 }
@@ -243,7 +247,7 @@ impl<T: Routable + 'static> RoutableExt for T {
                 struct OnReadable {
                     scope: ExecutionScope,
                     target: Arc<ComponentInstance>,
-                    router: Router,
+                    router: SpecificRouter<Connector>,
                 }
                 impl Connectable for OnReadable {
                     fn send(&self, message: Message) -> Result<(), ()> {
@@ -267,7 +271,7 @@ impl<T: Routable + 'static> RoutableExt for T {
                 }
                 impl OnReadable {
                     async fn send_inner(
-                        router: &Router,
+                        router: &SpecificRouter<Connector>,
                         target: &Arc<ComponentInstance>,
                         channel: &fidl::Channel,
                     ) -> Result<Connector, zx::Status> {
@@ -280,13 +284,19 @@ impl<T: Routable + 'static> RoutableExt for T {
                         if !signals.contains(fidl::Signals::OBJECT_READABLE) {
                             return Err(zx::Status::PEER_CLOSED);
                         }
-                        let conn = match router.route(None, false).await.and_then(|c| {
-                            if let Capability::Connector(c) = c {
-                                Ok(c)
-                            } else {
-                                Err(RoutingError::BedrockWrongCapabilityType {
-                                    actual: c.debug_typename().into(),
-                                    expected: "Connector".into(),
+                        let conn = match router.route(None, false).await.and_then(|resp| match resp
+                        {
+                            SpecificRouterResponse::<Connector>::Capability(c) => Ok(c),
+                            SpecificRouterResponse::<Connector>::Unavailable => {
+                                Err(RoutingError::RouteUnexpectedUnavailable {
+                                    type_name: CapabilityTypeName::Protocol,
+                                    moniker: target.moniker.clone().into(),
+                                }
+                                .into())
+                            }
+                            SpecificRouterResponse::<Connector>::Debug(_) => {
+                                Err(RoutingError::RouteUnexpectedDebug {
+                                    type_name: CapabilityTypeName::Protocol,
                                     moniker: target.moniker.clone().into(),
                                 }
                                 .into())
@@ -314,12 +324,16 @@ impl<T: Routable + 'static> RoutableExt for T {
                 }
 
                 let on_readable = OnReadable { scope: self.scope.clone(), router, target };
-                Ok(Capability::from(Connector::new_sendable(on_readable)))
+                Ok(SpecificRouterResponse::<Connector>::Capability(Connector::new_sendable(
+                    on_readable,
+                )))
             }
         }
 
-        let router = Router::new(self);
-        Router::new(OnReadableRouter { router, scope })
+        SpecificRouter::<Connector>::new(OnReadableRouter {
+            router: SpecificRouter::<Connector>::new(self),
+            scope,
+        })
     }
 }
 
@@ -338,7 +352,7 @@ pub mod tests {
     use routing::availability::AvailabilityMetadata;
     use routing::bedrock::structured_dict::ComponentInput;
     use routing::{test_invalid_instance_token, DictExt, LazyGet};
-    use sandbox::{Data, Dict, RemotableCapability, WeakInstanceToken};
+    use sandbox::{Data, Dict, RemotableCapability};
     use std::pin::pin;
     use std::sync::Weak;
     use std::task::Poll;
@@ -525,13 +539,13 @@ pub mod tests {
 
     #[derive(Debug, Clone)]
     struct RouteCounter {
-        capability: Arc<Capability>,
+        connector: Connector,
         counter: Arc<test_util::Counter>,
     }
 
     impl RouteCounter {
-        fn new(capability: Capability) -> Self {
-            Self { capability: Arc::new(capability), counter: Arc::new(test_util::Counter::new(0)) }
+        fn new(connector: Connector) -> Self {
+            Self { connector, counter: Arc::new(test_util::Counter::new(0)) }
         }
 
         fn count(&self) -> usize {
@@ -540,10 +554,14 @@ pub mod tests {
     }
 
     #[async_trait]
-    impl Routable for RouteCounter {
-        async fn route(&self, _: Option<Request>, _: bool) -> Result<Capability, RouterError> {
+    impl SpecificRoutable<Connector> for RouteCounter {
+        async fn route(
+            &self,
+            _: Option<Request>,
+            _: bool,
+        ) -> Result<SpecificRouterResponse<Connector>, RouterError> {
             self.counter.inc();
-            Ok(self.capability.try_clone().unwrap())
+            Ok(SpecificRouterResponse::<Connector>::Capability(self.connector.clone()))
         }
     }
 
@@ -553,7 +571,7 @@ pub mod tests {
         let scope = ExecutionScope::new();
         let (client_end, server_end) = zx::Channel::create();
 
-        let route_counter = RouteCounter::new(sender.into());
+        let route_counter = RouteCounter::new(sender);
         let router = route_counter.clone().on_readable(scope.clone());
 
         let mut receive = pin!(receiver.receive());
@@ -569,17 +587,19 @@ pub mod tests {
         .await;
         let metadata = Dict::new();
         metadata.set_availability(Availability::Required);
-        let capability = router
+        let SpecificRouterResponse::<Connector>::Capability(conn) = router
             .route(Some(Request { target: component.as_weak().into(), metadata }), false)
             .await
-            .unwrap();
+            .unwrap()
+        else {
+            panic!();
+        };
 
         assert_matches!(TestExecutor::poll_until_stalled(&mut receive).await, Poll::Pending);
         assert_eq!(route_counter.count(), 0);
 
         let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
-        capability
-            .try_into_directory_entry()
+        conn.try_into_directory_entry()
             .unwrap()
             .open_entry(OpenRequest::new(
                 scope.clone(),
@@ -620,14 +640,16 @@ pub mod tests {
         .await;
         let metadata = Dict::new();
         metadata.set_availability(Availability::Required);
-        let capability = router
+        let SpecificRouterResponse::<Connector>::Capability(conn) = router
             .route(Some(Request { target: component.as_weak().into(), metadata }), false)
             .await
-            .unwrap();
+            .unwrap()
+        else {
+            panic!();
+        };
 
         let mut object_request = fio::OpenFlags::empty().to_object_request(server_end);
-        capability
-            .try_into_directory_entry()
+        conn.try_into_directory_entry()
             .unwrap()
             .open_entry(OpenRequest::new(
                 scope.clone(),
@@ -657,19 +679,17 @@ pub mod tests {
         let source_moniker: Moniker = "source".try_into().unwrap();
         let mut source = WeakComponentInstance::invalid();
         source.moniker = source_moniker;
-        let source = WeakExtendedInstance::Component(source);
-        let source2 = source.clone();
-        let debug_router = Router::new(move |request: Option<Request>, debug: bool| {
-            let source2 = source2.clone();
-            async move {
-                let _ = request.unwrap();
-                assert!(debug);
-                let res: Result<Capability, RouterError> =
-                    Ok(Capability::Instance(WeakInstanceToken::from(source2.clone())));
-                res
-            }
-            .boxed()
-        });
+        let debug_router =
+            SpecificRouter::<Connector>::new(move |_: Option<Request>, debug: bool| {
+                async move {
+                    assert!(debug);
+                    let res: Result<SpecificRouterResponse<Connector>, RouterError> = Ok(
+                        SpecificRouterResponse::<Connector>::Debug(Data::String("debug".into())),
+                    );
+                    res
+                }
+                .boxed()
+            });
         let router = debug_router.clone().on_readable(scope.clone());
 
         let target = ComponentInstance::new_root(
@@ -682,13 +702,13 @@ pub mod tests {
         .await;
         let metadata = Dict::new();
         metadata.set_availability(Availability::Required);
-        let capability = router
+        let resp = router
             .route(Some(Request { target: target.as_weak().into(), metadata }), true)
             .await
             .unwrap();
         assert_matches!(
-            capability,
-            Capability::Instance(c) if <WeakInstanceToken as WeakInstanceTokenExt<ComponentInstance>>::moniker(&c) == source.extended_moniker()
+            resp,
+            SpecificRouterResponse::<Connector>::Debug(Data::String(s)) if &s == "debug"
         );
     }
 
@@ -698,7 +718,7 @@ pub mod tests {
         let dict1 = Dict::new();
         dict1.insert("source".parse().unwrap(), source).expect("dict entry already exists");
 
-        let base_router = Router::new_ok(dict1);
+        let base_router = SpecificRouter::<Dict>::new_ok(dict1);
         let downscoped_router = base_router.lazy_get(
             RelativePath::new("source").unwrap(),
             RoutingError::BedrockMemberAccessUnsupported { moniker: Moniker::root().into() },
@@ -741,7 +761,7 @@ pub mod tests {
             .insert("dict3".parse().unwrap(), Capability::Dictionary(dict3))
             .expect("dict entry already exists");
 
-        let base_router = Router::new_ok(dict4);
+        let base_router = SpecificRouter::<Dict>::new_ok(dict4);
         let downscoped_router = base_router.lazy_get(
             RelativePath::new("dict3/dict2/dict1/source").unwrap(),
             RoutingError::BedrockMemberAccessUnsupported { moniker: Moniker::root().into() },

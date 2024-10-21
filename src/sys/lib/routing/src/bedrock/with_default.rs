@@ -4,7 +4,10 @@
 
 use async_trait::async_trait;
 use router_error::RouterError;
-use sandbox::{Capability, Request, Routable, Router};
+use sandbox::{
+    Capability, CapabilityBound, Request, Routable, Router, SpecificRoutable, SpecificRouter,
+    SpecificRouterResponse,
+};
 
 pub trait WithDefault {
     /// Returns a router that exceptions a `None` request, supplying the provided default.
@@ -36,5 +39,30 @@ impl WithDefault for Router {
         }
 
         Self::new(RouterWithDefault { router: self, default_request: request })
+    }
+}
+
+#[derive(Debug)]
+struct SpecificRouterWithDefault<T: CapabilityBound> {
+    router: SpecificRouter<T>,
+    default_request: Request,
+}
+
+#[async_trait]
+impl<T: CapabilityBound> SpecificRoutable<T> for SpecificRouterWithDefault<T> {
+    async fn route(
+        &self,
+        request: Option<Request>,
+        debug: bool,
+    ) -> Result<SpecificRouterResponse<T>, RouterError> {
+        let request =
+            if let Some(request) = request { request } else { self.default_request.try_clone()? };
+        self.router.route(Some(request), debug).await
+    }
+}
+
+impl<T: CapabilityBound> WithDefault for SpecificRouter<T> {
+    fn with_default(self, request: Request) -> Self {
+        Self::new(SpecificRouterWithDefault { router: self, default_request: request })
     }
 }

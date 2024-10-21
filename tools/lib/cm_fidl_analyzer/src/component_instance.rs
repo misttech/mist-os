@@ -5,8 +5,8 @@
 use crate::component_model::{BuildAnalyzerModelError, Child};
 use crate::component_sandbox::{
     build_capability_sourced_capabilities_dictionary, build_framework_dictionary,
-    build_root_component_input, new_outgoing_dir_router, new_program_router,
-    static_children_component_output_dictionary_routers,
+    build_root_component_input, static_children_component_output_dictionary_routers,
+    ProgramOutputGenerator,
 };
 use crate::environment::EnvironmentForAnalyzer;
 use async_trait::async_trait;
@@ -162,12 +162,8 @@ impl ComponentInstanceForAnalyzer {
         });
         let children_component_output_dictionary_routers =
             static_children_component_output_dictionary_routers(&self_, &decl);
-        let (program_output_dict, declared_dictionaries) = build_program_output_dictionary(
-            &self_,
-            &decl,
-            &new_program_router,
-            &new_outgoing_dir_router,
-        );
+        let (program_output_dict, declared_dictionaries) =
+            build_program_output_dictionary(&self_, &decl, &ProgramOutputGenerator {});
         #[derive(Clone)]
         struct NullErrorReporter {}
         #[async_trait]

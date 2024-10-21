@@ -10,21 +10,43 @@ use async_trait::async_trait;
 use cm_rust::NativeIntoFidl;
 use cm_types::Path;
 use router_error::RouterError;
-use sandbox::{Capability, Dict, Request, Routable, Router};
+use sandbox::{Capability, Connector, Dict, DirEntry, Request, Routable, Router, SpecificRouter};
 use std::sync::Arc;
 use tracing::warn;
 
-pub type ProgramRouterFn<C> =
-    dyn Fn(WeakComponentInstanceInterface<C>, Path, ComponentCapability) -> Router;
-pub type OutgoingDirRouterFn<C> =
-    dyn Fn(&Arc<C>, &cm_rust::ComponentDecl, &cm_rust::CapabilityDecl) -> Router;
+pub trait ProgramOutputGenerator<C: ComponentInstanceInterface + 'static> {
+    /// Get a router for [Dict] that forwards the request to a [Router] served at `path`
+    /// in the program's outgoing directory.
+    fn new_program_dictionary_router(
+        &self,
+        component: WeakComponentInstanceInterface<C>,
+        path: Path,
+        capability: ComponentCapability,
+    ) -> SpecificRouter<Dict>;
+
+    /// Get an outgoing directory router for `capability` that returns [Connector]. `capability`
+    /// should be a type that maps to [Connector].
+    fn new_outgoing_dir_connector_router(
+        &self,
+        component: &Arc<C>,
+        decl: &cm_rust::ComponentDecl,
+        capability: &cm_rust::CapabilityDecl,
+    ) -> SpecificRouter<Connector>;
+
+    /// Get an outgoing directory router for `capability` that returns [DirEntry]. `capability`
+    /// should be a type that maps to [DirEntry].
+    fn new_outgoing_dir_dir_entry_router(
+        &self,
+        component: &Arc<C>,
+        decl: &cm_rust::ComponentDecl,
+        capability: &cm_rust::CapabilityDecl,
+    ) -> SpecificRouter<DirEntry>;
+}
 
 pub fn build_program_output_dictionary<C: ComponentInstanceInterface + 'static>(
     component: &Arc<C>,
     decl: &cm_rust::ComponentDecl,
-    // This router should forward routing requests to a component's program
-    new_program_router: &ProgramRouterFn<C>,
-    new_outgoing_dir_router: &OutgoingDirRouterFn<C>,
+    router_gen: &impl ProgramOutputGenerator<C>,
 ) -> (Dict, Dict) {
     let program_output_dict = Dict::new();
     let declared_dictionaries = Dict::new();
@@ -35,8 +57,7 @@ pub fn build_program_output_dictionary<C: ComponentInstanceInterface + 'static>(
             capability,
             &program_output_dict,
             &declared_dictionaries,
-            new_program_router,
-            new_outgoing_dir_router,
+            router_gen,
         );
     }
     (program_output_dict, declared_dictionaries)
@@ -50,16 +71,11 @@ fn extend_dict_with_capability<C: ComponentInstanceInterface + 'static>(
     capability: &cm_rust::CapabilityDecl,
     program_output_dict: &Dict,
     declared_dictionaries: &Dict,
-    new_program_router: &ProgramRouterFn<C>,
-    new_outgoing_dir_router: &OutgoingDirRouterFn<C>,
+    router_gen: &impl ProgramOutputGenerator<C>,
 ) {
     match capability {
-        cm_rust::CapabilityDecl::Service(_)
-        | cm_rust::CapabilityDecl::Protocol(_)
-        | cm_rust::CapabilityDecl::Directory(_)
-        | cm_rust::CapabilityDecl::Runner(_)
-        | cm_rust::CapabilityDecl::Resolver(_) => {
-            let router = new_outgoing_dir_router(component, decl, capability);
+        cm_rust::CapabilityDecl::Service(_) | cm_rust::CapabilityDecl::Directory(_) => {
+            let router = router_gen.new_outgoing_dir_dir_entry_router(component, decl, capability);
             let router = router.with_policy_check::<C>(
                 CapabilitySource::Component(ComponentSource {
                     capability: ComponentCapability::from(capability.clone()),
@@ -67,6 +83,28 @@ fn extend_dict_with_capability<C: ComponentInstanceInterface + 'static>(
                 }),
                 component.policy_checker().clone(),
             );
+            // Specific -> general router
+            let router = Router::from(router);
+            match program_output_dict.insert_capability(capability.name(), router.into()) {
+                Ok(()) => (),
+                Err(e) => {
+                    warn!("failed to add {} to program output dict: {e:?}", capability.name())
+                }
+            }
+        }
+        cm_rust::CapabilityDecl::Protocol(_)
+        | cm_rust::CapabilityDecl::Runner(_)
+        | cm_rust::CapabilityDecl::Resolver(_) => {
+            let router = router_gen.new_outgoing_dir_connector_router(component, decl, capability);
+            let router = router.with_policy_check::<C>(
+                CapabilitySource::Component(ComponentSource {
+                    capability: ComponentCapability::from(capability.clone()),
+                    moniker: component.moniker().clone(),
+                }),
+                component.policy_checker().clone(),
+            );
+            // Specific -> general router
+            let router = Router::from(router);
             match program_output_dict.insert_capability(capability.name(), router.into()) {
                 Ok(()) => (),
                 Err(e) => {
@@ -80,7 +118,7 @@ fn extend_dict_with_capability<C: ComponentInstanceInterface + 'static>(
                 d,
                 program_output_dict,
                 declared_dictionaries,
-                new_program_router,
+                router_gen,
             );
         }
         cm_rust::CapabilityDecl::Config(c) => {
@@ -107,17 +145,17 @@ fn extend_dict_with_dictionary<C: ComponentInstanceInterface + 'static>(
     decl: &cm_rust::DictionaryDecl,
     program_output_dict: &Dict,
     declared_dictionaries: &Dict,
-    new_program_router: &ProgramRouterFn<C>,
+    router_gen: &impl ProgramOutputGenerator<C>,
 ) {
     let router;
     let declared_dict;
     if let Some(source_path) = decl.source_path.as_ref() {
         // Dictionary backed by program's outgoing directory.
-        router = new_program_router(
+        router = Router::from(router_gen.new_program_dictionary_router(
             component.as_weak(),
             source_path.clone(),
             ComponentCapability::Dictionary(decl.clone()),
-        );
+        ));
         declared_dict = None;
     } else {
         let dict = Dict::new();

@@ -50,7 +50,10 @@ use instance::{
 use manager::ComponentManagerInstance;
 use moniker::{ChildName, Moniker};
 use router_error::{Explain, RouterError};
-use sandbox::{Capability, Connectable, Dict, DirEntry, Message, Request, Routable, Router};
+use sandbox::{
+    Capability, Connectable, Dict, DirEntry, Message, Request, Router, SpecificRoutable,
+    SpecificRouter, SpecificRouterResponse,
+};
 use std::clone::Clone;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
@@ -994,25 +997,27 @@ impl ComponentInstance {
     }
 
     /// Returns a router that delegates to the component output dict.
-    pub(super) fn component_output(self: &Arc<Self>) -> Router {
+    pub(super) fn component_output(self: &Arc<Self>) -> SpecificRouter<Dict> {
         #[derive(Debug)]
         struct ComponentOutput {
             component: WeakComponentInstance,
         }
 
         #[async_trait]
-        impl Routable for ComponentOutput {
+        impl SpecificRoutable<Dict> for ComponentOutput {
             async fn route(
                 &self,
-                request: Option<Request>,
-                debug: bool,
-            ) -> Result<Capability, RouterError> {
+                _request: Option<Request>,
+                _debug: bool,
+            ) -> Result<SpecificRouterResponse<Dict>, RouterError> {
                 let component = self.component.upgrade().map_err(RoutingError::from)?;
-                component.get_component_output_dict().await?.route(request, debug).await
+                Ok(SpecificRouterResponse::<Dict>::Capability(
+                    component.get_component_output_dict().await?,
+                ))
             }
         }
 
-        Router::new(ComponentOutput { component: self.as_weak() })
+        SpecificRouter::<Dict>::new(ComponentOutput { component: self.as_weak() })
     }
 
     /// Opens this instance's exposed directory if it has been resolved.
