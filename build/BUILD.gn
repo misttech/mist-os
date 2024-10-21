@@ -521,7 +521,6 @@ group("legacy_bundle_allowlist") {
     "//src/security/lib/scrutiny/collector:*",
     "//src/security/lib/scrutiny/tests/structured_config:*",
     "//src/security/tests/pkg_test/tests:*",
-    "//src/security/tests/scrutiny_ffx_integration:*",
     "//src/sys/component_manager/tests/bootfs_launching_benchmark:*",
     "//src/sys/component_manager/tests/fuchsia_boot_resolver:*",
     "//src/tests/early-boot-coverage/*",
