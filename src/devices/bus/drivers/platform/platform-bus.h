@@ -38,6 +38,7 @@ using PlatformBusType = ddk::Device<PlatformBus, ddk::Initializable>;
 class PlatformBus : public PlatformBusType,
                     public fdf::WireServer<fuchsia_hardware_platform_bus::PlatformBus>,
                     public fdf::WireServer<fuchsia_hardware_platform_bus::Iommu>,
+                    public fdf::WireServer<fuchsia_hardware_platform_bus::Firmware>,
                     public fidl::WireServer<fuchsia_sysinfo::SysInfo> {
  public:
   static zx_status_t Create(zx_device_t* parent, const char* name, zx::channel items_svc);
@@ -65,9 +66,13 @@ class PlatformBus : public PlatformBusType,
       fidl::UnknownMethodMetadata<fuchsia_hardware_platform_bus::PlatformBus> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
-  // fuchsia.hardware.platform.bus.PlatformBus implementation.
+  // fuchsia.hardware.platform.bus.Iommu implementation.
   void GetBti(GetBtiRequestView request, fdf::Arena& arena,
               GetBtiCompleter::Sync& completer) override;
+
+  // fuchsia.hardware.platform.bus.Firmware implementation.
+  void GetFirmware(GetFirmwareRequestView request, fdf::Arena& arena,
+                   GetFirmwareCompleter::Sync& completer) override;
 
   // SysInfo protocol implementation.
   void GetBoardName(GetBoardNameCompleter::Sync& completer) override;
@@ -96,8 +101,8 @@ class PlatformBus : public PlatformBusType,
     uint32_t length;
   };
   // Returns ZX_ERR_NOT_FOUND when boot item wasn't found.
-  zx::result<BootItemResult> GetBootItem(uint32_t type, uint32_t extra);
-  zx::result<fbl::Array<uint8_t>> GetBootItemArray(uint32_t type, uint32_t extra);
+  zx::result<std::vector<BootItemResult>> GetBootItem(uint32_t type, std::optional<uint32_t> extra);
+  zx::result<fbl::Array<uint8_t>> GetBootItemArray(uint32_t type, std::optional<uint32_t> extra);
 
   fidl::WireClient<fuchsia_hardware_platform_bus::SysSuspend>& suspend_cb() { return suspend_cb_; }
 
@@ -116,6 +121,10 @@ class PlatformBus : public PlatformBusType,
 
   fdf::ServerBindingGroup<fuchsia_hardware_platform_bus::Iommu>& iommu_bindings() {
     return iommu_bindings_;
+  }
+
+  fdf::ServerBindingGroup<fuchsia_hardware_platform_bus::Firmware>& fw_bindings() {
+    return fw_bindings_;
   }
 
   fidl::ServerBindingGroup<fuchsia_sysinfo::SysInfo>& sysinfo_bindings() {
@@ -160,6 +169,7 @@ class PlatformBus : public PlatformBusType,
   fdf::OutgoingDirectory outgoing_;
   fdf::ServerBindingGroup<fuchsia_hardware_platform_bus::PlatformBus> bindings_;
   fdf::ServerBindingGroup<fuchsia_hardware_platform_bus::Iommu> iommu_bindings_;
+  fdf::ServerBindingGroup<fuchsia_hardware_platform_bus::Firmware> fw_bindings_;
   fidl::ServerBindingGroup<fuchsia_sysinfo::SysInfo> sysinfo_bindings_;
   fdf::UnownedDispatcher dispatcher_;
   std::optional<inspect::ComponentInspector> inspector_;

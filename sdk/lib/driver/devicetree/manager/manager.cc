@@ -53,42 +53,31 @@ std::string GetParentPath(const devicetree::NodePath& node_path) {
 namespace fdf_devicetree {
 
 zx::result<Manager> Manager::CreateFromNamespace(fdf::Namespace& ns) {
-  zx::result client_end = ns.Connect<fuchsia_boot::Items>();
-  if (client_end.is_error()) {
-    FDF_LOG(ERROR, "Failed to connect to fuchsia.boot.Items: %s", client_end.status_string());
-    return client_end.take_error();
+  zx::result client = ns.Connect<fuchsia_hardware_platform_bus::Service::Firmware>();
+  if (client.is_error()) {
+    FDF_LOG(ERROR, "Failed to connect to fuchsia.boot.Items: %s", client.status_string());
+    return client.take_error();
   }
 
-  fidl::WireSyncClient client(std::move(client_end.value()));
-  fidl::WireResult result = client->Get2(ZBI_TYPE_DEVICETREE, {});
+  fdf::Arena arena('dtdt');
+  auto result = fdf::WireCall(*client).buffer(arena)->GetFirmware(
+      fuchsia_hardware_platform_bus::wire::FirmwareType::kDeviceTree);
   if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to send get2 request: %s", result.FormatDescription().data());
+    FDF_LOG(ERROR, "Failed to send GetFirmware request: %s", result.FormatDescription().data());
     return zx::error(result.status());
   }
   if (result->is_error()) {
-    FDF_LOG(ERROR, "Failed to get2: %s", zx_status_get_string(result->error_value()));
+    FDF_LOG(ERROR, "Failed to GetFirmware: %s", zx_status_get_string(result->error_value()));
     return zx::error(result->error_value());
   }
 
-  fidl::VectorView items = result->value()->retrieved_items;
-  if (items.count() == 0) {
-    FDF_LOG(ERROR, "No devicetree item found in the boot items.");
-    return zx::error(ZX_ERR_NOT_FOUND);
-  }
-
-  if (items.count() != 1) {
-    FDF_LOG(DEBUG,
-            "Found more than 1 devicetree: %zu. Will be parsing only the first devicetree item.",
-            items.count());
-  }
-
-  fuchsia_boot::wire::RetrievedItems& dt = result->value()->retrieved_items[0];
+  auto& [vmo, length] = result->value()->blobs[0];
   std::vector<uint8_t> data;
-  data.resize(dt.length);
+  data.resize(length);
 
-  zx_status_t status = dt.payload.read(data.data(), 0, dt.length);
+  zx_status_t status = vmo.read(data.data(), 0, length);
   if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to read %u bytes from the devicetree: %s", dt.length,
+    FDF_LOG(ERROR, "Failed to read %lu bytes from the devicetree: %s", length,
             zx_status_get_string(status));
     return zx::error(status);
   }

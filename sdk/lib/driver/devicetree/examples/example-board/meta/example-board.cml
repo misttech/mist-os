@@ -15,7 +15,6 @@
     },
     use: [
         { service: "fuchsia.hardware.platform.bus.Service" },
-        { protocol: "fuchsia.boot.Items" },
         { protocol: "fuchsia.driver.framework.CompositeNodeManager" },
     ],
 }

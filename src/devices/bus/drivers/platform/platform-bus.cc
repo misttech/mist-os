@@ -29,10 +29,14 @@
 #include <fbl/auto_lock.h>
 
 #include "lib/fidl/cpp/wire/channel.h"
+#include "lib/fidl/cpp/wire/object_view.h"
 #include "src/devices/bus/drivers/platform/node-util.h"
 #include "src/devices/bus/drivers/platform/platform_bus_config.h"
 
 namespace {
+
+namespace fhpb = fuchsia_hardware_platform_bus;
+
 // Adds a passthrough device which forwards all banjo connections to the parent device.
 // The device will be added as a child of |parent| with the name |name|, and |props| will
 // be applied to the new device's add_args.
@@ -53,15 +57,16 @@ zx_status_t AddProtocolPassthrough(const char* name, cpp20::span<const zx_device
       .release = [](void* ctx) {},
   };
 
-  fuchsia_hardware_platform_bus::Service::InstanceHandler handler({
+  fhpb::Service::InstanceHandler handler({
       .platform_bus = parent->bindings().CreateHandler(parent, fdf::Dispatcher::GetCurrent()->get(),
                                                        fidl::kIgnoreBindingClosure),
       .iommu = parent->iommu_bindings().CreateHandler(parent, fdf::Dispatcher::GetCurrent()->get(),
                                                       fidl::kIgnoreBindingClosure),
+      .firmware = parent->fw_bindings().CreateHandler(parent, fdf::Dispatcher::GetCurrent()->get(),
+                                                      fidl::kIgnoreBindingClosure),
   });
 
-  auto status =
-      parent->outgoing().AddService<fuchsia_hardware_platform_bus::Service>(std::move(handler));
+  auto status = parent->outgoing().AddService<fhpb::Service>(std::move(handler));
   if (status.is_error()) {
     return status.error_value();
   }
@@ -87,7 +92,7 @@ zx_status_t AddProtocolPassthrough(const char* name, cpp20::span<const zx_device
   }
 
   std::array offers = {
-      fuchsia_hardware_platform_bus::Service::Name,
+      fhpb::Service::Name,
       fuchsia_sysinfo::Service::Name,
   };
 
@@ -244,7 +249,7 @@ void PlatformBus::NodeAdd(NodeAddRequestView request, fdf::Arena& arena,
   completer.buffer(arena).Reply(NodeAddInternal(natural));
 }
 
-zx::result<> PlatformBus::NodeAddInternal(fuchsia_hardware_platform_bus::Node& node) {
+zx::result<> PlatformBus::NodeAddInternal(fhpb::Node& node) {
   auto result = ValidateResources(node);
   if (result.is_error()) {
     return result.take_error();
@@ -302,13 +307,13 @@ void PlatformBus::GetInterruptControllerInfo(GetInterruptControllerInfoCompleter
 }
 
 void PlatformBus::GetSerialNumber(GetSerialNumberCompleter::Sync& completer) {
-  auto result = GetBootItem(ZBI_TYPE_SERIAL_NUMBER, 0);
+  auto result = GetBootItem(ZBI_TYPE_SERIAL_NUMBER, {});
   if (result.is_error()) {
     zxlogf(INFO, "Boot Item ZBI_TYPE_SERIAL_NUMBER not found");
     completer.ReplyError(result.error_value());
     return;
   }
-  auto& [vmo, length] = *result;
+  auto& [vmo, length] = result.value()[0];
   if (length > fuchsia_sysinfo::wire::kSerialNumberLen) {
     completer.ReplyError(ZX_ERR_BUFFER_TOO_SMALL);
     return;
@@ -462,32 +467,87 @@ void PlatformBus::GetBti(GetBtiRequestView request, fdf::Arena& arena,
   completer.buffer(arena).ReplySuccess(std::move(bti));
 }
 
-void PlatformBus::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_hardware_platform_bus::PlatformBus> metadata,
-    fidl::UnknownMethodCompleter::Sync& completer) {
+void PlatformBus::GetFirmware(GetFirmwareRequestView request, fdf::Arena& arena,
+                              GetFirmwareCompleter::Sync& completer) {
+  uint32_t type = 0;
+  switch (request->type) {
+    case fhpb::wire::FirmwareType::kDeviceTree:
+      type = ZBI_TYPE_DEVICETREE;
+      break;
+    case fhpb::wire::FirmwareType::kAcpi:
+      type = ZBI_TYPE_ACPI_RSDP;
+      break;
+    case fhpb::wire::FirmwareType::kSmbios:
+      type = ZBI_TYPE_SMBIOS;
+      break;
+    default:
+      completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+      return;
+  }
+  zx::result result = GetBootItem(type, {});
+  if (result.is_error()) {
+    zxlogf(WARNING, "Platform GetBootItem failed %s", result.status_string());
+    completer.buffer(arena).ReplyError(result.status_value());
+    return;
+  }
+  fidl::VectorView<fhpb::wire::FirmwareBlob> ret(arena, result->size());
+  for (size_t i = 0; i < result->size(); i++) {
+    auto& [vmo, length] = result.value()[i];
+    ret[i] = fhpb::wire::FirmwareBlob{
+        .vmo = std::move(vmo),
+        .length = length,
+    };
+  }
+  completer.buffer(arena).ReplySuccess(ret);
+}
+
+void PlatformBus::handle_unknown_method(fidl::UnknownMethodMetadata<fhpb::PlatformBus> metadata,
+                                        fidl::UnknownMethodCompleter::Sync& completer) {
   zxlogf(WARNING, "PlatformBus received unknown method with ordinal: %lu", metadata.method_ordinal);
 }
 
-zx::result<PlatformBus::BootItemResult> PlatformBus::GetBootItem(uint32_t type, uint32_t extra) {
-  auto result = fidl::WireCall(items_svc_)->Get(type, extra);
+zx::result<std::vector<PlatformBus::BootItemResult>> PlatformBus::GetBootItem(
+    uint32_t type, std::optional<uint32_t> extra) {
+  fidl::Arena arena;
+  fidl::ObjectView<fuchsia_boot::wire::Extra> extra_struct;
+  if (extra.has_value()) {
+    extra_struct = fidl::ObjectView<fuchsia_boot::wire::Extra>(arena, extra.value());
+  };
+  auto result = fidl::WireCall(items_svc_)->Get2(type, extra_struct);
   if (!result.ok()) {
     return zx::error(result.status());
   }
-  if (!result->payload.is_valid()) {
+  if (result->is_error()) {
+    if (result->error_value() == ZX_ERR_NOT_SUPPORTED) {
+      return zx::error(ZX_ERR_NOT_FOUND);
+    }
+    return zx::error(result->error_value());
+  }
+  fidl::VectorView items = result->value()->retrieved_items;
+  if (items.count() == 0) {
     return zx::error(ZX_ERR_NOT_FOUND);
   }
-  return zx::ok(PlatformBus::BootItemResult{
-      .vmo = std::move(result->payload),
-      .length = result->length,
-  });
+  std::vector<PlatformBus::BootItemResult> ret;
+  ret.reserve(items.count());
+  for (size_t i = 0; i < items.count(); i++) {
+    ret.emplace_back(PlatformBus::BootItemResult{
+        .vmo = std::move(items[i].payload),
+        .length = items[i].length,
+    });
+  }
+  return zx::ok(std::move(ret));
 }
 
-zx::result<fbl::Array<uint8_t>> PlatformBus::GetBootItemArray(uint32_t type, uint32_t extra) {
+zx::result<fbl::Array<uint8_t>> PlatformBus::GetBootItemArray(uint32_t type,
+                                                              std::optional<uint32_t> extra) {
   zx::result result = GetBootItem(type, extra);
   if (result.is_error()) {
     return result.take_error();
   }
-  auto& [vmo, length] = *result;
+  if (result->size() > 1) {
+    zxlogf(WARNING, "Found multiple boot items of type: %u", type);
+  }
+  auto& [vmo, length] = result.value()[0];
   fbl::Array<uint8_t> data(new uint8_t[length], length);
   zx_status_t status = vmo.read(data.data(), 0, data.size());
   if (status != ZX_OK) {
@@ -512,16 +572,14 @@ static void sys_device_suspend(void* ctx, uint8_t requested_state, bool enable_w
     auto& suspend_cb = pbus->suspend_cb();
     if (suspend_cb.is_valid()) {
       suspend_cb->Callback(enable_wake, suspend_reason)
-          .ThenExactlyOnce(
-              [sys_root = p->sys_root](
-                  fidl::WireUnownedResult<fuchsia_hardware_platform_bus::SysSuspend::Callback>&
-                      status) {
-                if (!status.ok()) {
-                  device_suspend_reply(sys_root, status.status(), DEV_POWER_STATE_D0);
-                  return;
-                }
-                device_suspend_reply(sys_root, status->out_status, DEV_POWER_STATE_D0);
-              });
+          .ThenExactlyOnce([sys_root = p->sys_root](
+                               fidl::WireUnownedResult<fhpb::SysSuspend::Callback>& status) {
+            if (!status.ok()) {
+              device_suspend_reply(sys_root, status.status(), DEV_POWER_STATE_D0);
+              return;
+            }
+            device_suspend_reply(sys_root, status->out_status, DEV_POWER_STATE_D0);
+          });
       return;
     }
   }
@@ -603,13 +661,13 @@ PlatformBus::PlatformBus(zx_device_t* parent, zx::channel items_svc)
       outgoing_(fdf::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())) {}
 
 zx::result<zbi_board_info_t> PlatformBus::GetBoardInfo() {
-  zx::result result = GetBootItem(ZBI_TYPE_DRV_BOARD_INFO, 0);
+  zx::result result = GetBootItem(ZBI_TYPE_DRV_BOARD_INFO, {});
   if (result.is_error()) {
     // This is expected on some boards.
     zxlogf(INFO, "Boot Item ZBI_TYPE_DRV_BOARD_INFO not found");
     return result.take_error();
   }
-  auto& [vmo, length] = *result;
+  auto& [vmo, length] = result.value()[0];
   if (length != sizeof(zbi_board_info_t)) {
     return zx::error(ZX_ERR_INTERNAL);
   }
@@ -669,7 +727,7 @@ zx_status_t PlatformBus::Init() {
 #endif
 
   // Read platform ID.
-  zx::result platform_id_result = GetBootItem(ZBI_TYPE_PLATFORM_ID, 0);
+  zx::result platform_id_result = GetBootItem(ZBI_TYPE_PLATFORM_ID, {});
   if (platform_id_result.is_error() && platform_id_result.status_value() != ZX_ERR_NOT_FOUND) {
     return platform_id_result.status_value();
   }
@@ -684,11 +742,11 @@ zx_status_t PlatformBus::Init() {
 
   fbl::AutoLock lock(&board_info_lock_);
   if (platform_id_result.is_ok()) {
-    if (platform_id_result->length != sizeof(zbi_platform_id_t)) {
+    if (platform_id_result.value()[0].length != sizeof(zbi_platform_id_t)) {
       return ZX_ERR_INTERNAL;
     }
     zbi_platform_id_t platform_id;
-    status = platform_id_result->vmo.read(&platform_id, 0, sizeof(platform_id));
+    status = platform_id_result.value()[0].vmo.read(&platform_id, 0, sizeof(platform_id));
     if (status != ZX_OK) {
       return status;
     }
@@ -734,7 +792,7 @@ zx_status_t PlatformBus::Init() {
   return ZX_OK;
 }
 
-zx::result<> PlatformBus::ValidateResources(fuchsia_hardware_platform_bus::Node& node) {
+zx::result<> PlatformBus::ValidateResources(fhpb::Node& node) {
   if (node.name() == std::nullopt) {
     zxlogf(ERROR, "Node has no name?");
     return zx::error(ZX_ERR_INVALID_ARGS);
@@ -791,7 +849,7 @@ zx::result<> PlatformBus::ValidateResources(fuchsia_hardware_platform_bus::Node&
 }
 
 void PlatformBus::DdkInit(ddk::InitTxn txn) {
-  zx::result board_data = GetBootItemArray(ZBI_TYPE_DRV_BOARD_PRIVATE, 0);
+  zx::result board_data = GetBootItemArray(ZBI_TYPE_DRV_BOARD_PRIVATE, {});
   if (board_data.is_error() && board_data.status_value() != ZX_ERR_NOT_FOUND) {
     return txn.Reply(board_data.status_value());
   }
@@ -817,7 +875,7 @@ void PlatformBus::DdkInit(ddk::InitTxn txn) {
     return txn.Reply(ZX_ERR_INVALID_ARGS);
   }
   for (size_t i = 0; i < config.software_device_ids().size(); i++) {
-    fuchsia_hardware_platform_bus::Node device = {};
+    fhpb::Node device = {};
     device.name() = config.software_device_names()[i];
     device.vid() = PDEV_VID_GENERIC;
     device.pid() = PDEV_PID_GENERIC;

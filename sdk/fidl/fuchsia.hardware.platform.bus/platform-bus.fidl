@@ -231,7 +231,29 @@ closed protocol Iommu {
     }) error zx.Status;
 };
 
+type FirmwareType = flexible enum : uint32 {
+    DEVICE_TREE = 1;
+    ACPI = 2;
+    SMBIOS = 3;
+};
+
+type FirmwareBlob = resource struct {
+    vmo zx.Handle:VMO;
+    length uint64;
+};
+
+@discoverable
+@transport("Driver")
+closed protocol Firmware {
+    strict GetFirmware(struct {
+        type FirmwareType;
+    }) -> (resource struct {
+        blobs vector<FirmwareBlob>:MAX;
+    }) error zx.Status;
+};
+
 service Service {
     platform_bus client_end:PlatformBus;
     iommu client_end:Iommu;
+    firmware client_end:Firmware;
 };
