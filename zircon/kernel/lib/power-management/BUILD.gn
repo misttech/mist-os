@@ -23,6 +23,7 @@ library_headers("headers") {
   if (is_kernel) {
     headers += [
       "lib/power-management/port-power-level-controller.h",
+      "lib/power-management/controller-dpc.h",
       "lib/power-management/kernel-registry.h",
     ]
     public_deps += [ "//zircon/kernel/object" ]
@@ -38,6 +39,7 @@ source_set("power-management") {
   deps = [ "//zircon/system/ulib/fbl" ]
   if (is_kernel) {
     sources += [
+      "controller-dpc.cc",
       "kernel-registry.cc",
       "port-power-level-controller.cc",
     ]
@@ -54,12 +56,14 @@ group("tests") {
   }
 }
 
-source_set("power-management-kunittests") {
-  sources = [ "power-management-tests.cc" ]
-  deps = [
-    ":power-management",
-    "//zircon/kernel/lib/unittest",
-  ]
+if (is_kernel) {
+  source_set("power-management-kunittests") {
+    sources = [ "power-management-tests.cc" ]
+    deps = [
+      ":power-management",
+      "//zircon/kernel/lib/unittest",
+    ]
+  }
 }
 
 test("power-management-unittests") {

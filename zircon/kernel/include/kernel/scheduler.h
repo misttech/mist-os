@@ -8,6 +8,8 @@
 
 #include <lib/fit/function.h>
 #include <lib/fxt/interned_string.h>
+#include <lib/power-management/controller-dpc.h>
+#include <lib/power-management/energy-model.h>
 #include <lib/power-management/power-state.h>
 #include <lib/relaxed_atomic.h>
 #include <lib/zircon-internal/macros.h>
@@ -892,6 +894,16 @@ class Scheduler {
     }();
   }
 
+  power_management::ControllerDpc::TransitionDetails GetPowerLevelTransitionDetails() {
+    // This method will be called from the DPC thread, to obtain the data required for the
+    // transition.
+    Guard<MonitoredSpinLock, IrqSave> guard(&queue_lock_, SOURCE_TAG);
+    power_management::ControllerDpc::TransitionDetails details = {
+        .domain = power_state_.domain(), .request = pending_power_level_transition_};
+    pending_power_level_transition_.reset();
+    return details;
+  }
+
   // Add a couple of small no-op helpers which inform the static analyzer of
   // some properties which are very difficult to apply to the lambdas used in
   // the functional programming patterns below.  Neither of these methods
@@ -1102,6 +1114,15 @@ class Scheduler {
 
   // Contains the power domain, energy model and controller for this scheduler's CPU.
   TA_GUARDED(queue_lock_) power_management::PowerState power_state_;
+
+  // Wraps a `Timer` and `Dpc` object. The only method provided in this object is meant to be
+  // called from the scheduler context. It will arm the underlying Timer. When the DPC Task executes
+  // it will clear the stored pending transition.
+  TA_GUARDED(queue_lock_)
+  power_management::ControllerDpc power_level_controller_dpc_{
+      [this]() { return GetPowerLevelTransitionDetails(); }};
+  TA_GUARDED(queue_lock_)
+  ktl::optional<power_management::PowerLevelUpdateRequest> pending_power_level_transition_;
 };
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_SCHEDULER_H_
