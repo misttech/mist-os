@@ -19,15 +19,10 @@ use self::stub as implementation;
 
 // Exports common to all target os.
 pub use implementation::executor::{
-    Duration, LocalExecutor, MonotonicInstant, SendExecutor, TestExecutor,
+    LocalExecutor, MonotonicDuration, MonotonicInstant, SendExecutor, TestExecutor,
 };
 pub use implementation::task::{unblock, JoinHandle, Task};
 pub use implementation::timer::Timer;
-
-// TODO(https://fxbug.dev/328306129): remove alias once we are only exporting the MonotonicDuration
-// type.
-/// A duration in nanoseconds in the monotonic timeline.
-pub type MonotonicDuration = Duration;
 
 #[cfg(not(target_arch = "wasm32"))]
 mod task_group;
@@ -59,7 +54,7 @@ use std::task::{ready, Context, Poll};
 
 /// An extension trait to provide `after_now` on `zx::MonotonicDuration`.
 pub trait DurationExt {
-    /// Return a `MonotonicInstant` which is a `Duration` after the current time.
+    /// Return a `MonotonicInstant` which is a `MonotonicDuration` after the current time.
     /// `duration.after_now()` is equivalent to `MonotonicInstant::after(duration)`.
     ///
     /// This method requires that an executor has been set up.
@@ -81,7 +76,7 @@ impl WakeupTime for std::time::Duration {
 }
 
 #[cfg(target_os = "fuchsia")]
-impl WakeupTime for Duration {
+impl WakeupTime for MonotonicDuration {
     fn into_time(self) -> MonotonicInstant {
         MonotonicInstant::after(self)
     }
@@ -310,7 +305,7 @@ mod timer_tests {
     fn can_use_zx_duration() {
         let mut exec = LocalExecutor::new();
         let start = Instant::now();
-        let timer = Timer::new(Duration::from_millis(100));
+        let timer = Timer::new(MonotonicDuration::from_millis(100));
         exec.run_singlethreaded(timer);
         let end = Instant::now();
         assert!(end - start > std::time::Duration::from_millis(100));

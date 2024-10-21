@@ -184,7 +184,7 @@ pub mod executor {
     use std::ops::{Deref, DerefMut};
     use std::rc::Rc;
 
-    pub use std::time::Duration;
+    pub use std::time::Duration as MonotonicDuration;
     /// A time relative to the executor's clock.
     pub use std::time::Instant as MonotonicInstant;
     use tokio::task::LocalSet;
