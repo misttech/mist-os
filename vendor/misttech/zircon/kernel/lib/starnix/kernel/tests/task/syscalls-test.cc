@@ -38,14 +38,14 @@ bool test_prctl_set_vma_anon_name() {
                                                      PR_SET_VMA_ANON_NAME, mapped_address.ptr(), 32,
                                                      name_addr.ptr()));
 
-  auto mapping_name_result = current_task->mm()->get_mapping_name(mapped_address + 24u);
+  auto mapping_name_result = (*current_task)->mm()->get_mapping_name(mapped_address + 24u);
   ASSERT_TRUE(mapping_name_result.is_ok(), "failed to get address");
   ASSERT_TRUE(starnix::FsString("test-name") == mapping_name_result.value());
 
   auto munmap_result = sys_munmap(*current_task, mapped_address, PAGE_SIZE);
   ASSERT_TRUE(munmap_result.is_ok(), "failed to unmap memory");
 
-  mapping_name_result = current_task->mm()->get_mapping_name(mapped_address + 24u);
+  mapping_name_result = (*current_task)->mm()->get_mapping_name(mapped_address + 24u);
   ASSERT_TRUE(mapping_name_result.is_error());
   ASSERT_TRUE(errno(EFAULT) == mapping_name_result.error_value());
 
@@ -143,12 +143,12 @@ bool test_sys_getsid() {
   auto result = starnix::sys_getsid(*current_task, 0);
   ASSERT_FALSE(result.is_error(), "failed to get sid");
 
-  ASSERT_EQ(current_task->get_tid(), result.value());
+  ASSERT_EQ((*current_task)->get_tid(), result.value());
 
   auto second_current = create_task(kernel, "second task");
 
-  ASSERT_EQ(second_current->get_tid(),
-            starnix::sys_getsid(*current_task, second_current->get_tid()).value());
+  ASSERT_EQ((*second_current)->get_tid(),
+            starnix::sys_getsid(*current_task, (*second_current)->get_tid()).value());
   END_TEST;
 }
 

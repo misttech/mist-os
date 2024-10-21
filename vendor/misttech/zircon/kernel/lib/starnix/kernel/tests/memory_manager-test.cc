@@ -50,7 +50,7 @@ bool test_brk() {
   BEGIN_TEST;
 
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
-  auto mm = current_task->mm();
+  auto mm = (*current_task)->mm();
 
   // Look up the given addr in the mappings table.
   auto get_range =
@@ -143,7 +143,7 @@ bool test_mm_exec() {
   BEGIN_TEST;
 
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
-  auto mm = current_task->mm();
+  auto mm = (*current_task)->mm();
 
   auto has = [&mm](const UserAddress& addr) -> bool {
     auto state = mm->state.Read();
@@ -183,7 +183,7 @@ bool test_get_contiguous_mappings_at() {
   BEGIN_TEST;
 
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
-  auto mm = current_task->mm();
+  auto mm = (*current_task)->mm();
 
   // Create four one-page mappings with a hole between the third one and the fourth one.
   size_t page_size = PAGE_SIZE;
@@ -360,8 +360,8 @@ bool test_read_write_crossing_mappings() {
   BEGIN_TEST;
 
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
-  auto mm = current_task->mm();
-  auto ma = *current_task;
+  auto mm = (*current_task)->mm();
+  auto& ma = *current_task;
 
   // Map two contiguous pages at fixed addresses, but backed by distinct mappings.
   size_t page_size = PAGE_SIZE;
@@ -396,7 +396,7 @@ bool test_read_write_crossing_mappings() {
 bool test_read_write_errors() {
   BEGIN_TEST;
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
-  auto ma = *current_task;
+  auto& ma = *current_task;
 
   size_t page_size = PAGE_SIZE;
   auto addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), page_size);
@@ -439,8 +439,8 @@ namespace {
 bool test_read_c_string_to_vec_large() {
   BEGIN_TEST;
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
-  auto mm = current_task->mm();
-  auto ma = *current_task;
+  auto mm = (*current_task)->mm();
+  auto& ma = *current_task;
 
   uint64_t page_size = PAGE_SIZE;
   auto max_size = 4 * static_cast<size_t>(page_size);
@@ -476,8 +476,8 @@ bool test_read_c_string_to_vec() {
   BEGIN_TEST;
 
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
-  auto mm = current_task->mm();
-  auto ma = *current_task;
+  auto mm = (*current_task)->mm();
+  auto& ma = *current_task;
 
   size_t page_size = PAGE_SIZE;
   auto max_size = 2 * page_size;
@@ -531,8 +531,8 @@ bool test_read_c_string() {
   BEGIN_TEST;
 
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
-  auto mm = current_task->mm();
-  auto ma = *current_task;
+  auto mm = (*current_task)->mm();
+  auto& ma = *current_task;
 
   size_t page_size = PAGE_SIZE;
   auto buf_cap = 2u * page_size;
@@ -585,7 +585,7 @@ bool test_find_next_unused_range() {
   BEGIN_TEST;
 
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
-  auto mm = current_task->mm();
+  auto mm = (*current_task)->mm();
 
   auto mmap_top = mm->state.Read()->find_next_unused_range(0).value().ptr();
   auto page_size = static_cast<size_t>(PAGE_SIZE);
@@ -627,7 +627,7 @@ bool test_unmap_returned_mappings() {
   BEGIN_TEST;
 
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
-  auto mm = current_task->mm();
+  auto mm = (*current_task)->mm();
 
   auto addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(),
                          static_cast<uint64_t>(PAGE_SIZE) * 2);
@@ -645,7 +645,7 @@ bool test_unmap_returns_multiple_mappings() {
   BEGIN_TEST;
 
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
-  auto mm = current_task->mm();
+  auto mm = (*current_task)->mm();
 
   // find_next_unused_range
   auto addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE);
@@ -666,7 +666,7 @@ bool test_unmap_beginning() {
   BEGIN_TEST;
 
   auto [_kernel, current_task] = create_kernel_task_and_unlocked();
-  auto mm = current_task->mm();
+  auto mm = (*current_task)->mm();
 
   auto addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE * 2ul);
 
@@ -747,7 +747,7 @@ bool test_unmap_end() {
   BEGIN_TEST;
 
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
-  auto mm = current_task->mm();
+  auto mm = (*current_task)->mm();
 
   auto addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE * 2ul);
 
@@ -828,7 +828,7 @@ bool test_unmap_end() {
 bool test_unmap_middle() {
   BEGIN_TEST;
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
-  auto mm = current_task->mm();
+  auto mm = (*current_task)->mm();
 
   auto addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE * 3ul);
 
@@ -943,9 +943,9 @@ namespace {
 bool test_read_write_objects() {
   BEGIN_TEST;
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
-  auto mm = current_task->mm();
+  auto mm = (*current_task)->mm();
   auto addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE);
-  auto ma = *current_task;
+  auto& ma = *current_task;
   auto item_ref = UserRef<uint32_t>::New(addr);
 
   auto items_written = fbl::Vector<uint32_t>();
@@ -980,9 +980,9 @@ bool test_read_write_objects() {
 bool test_read_write_objects_null() {
   BEGIN_TEST;
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
-  auto mm = current_task->mm();
+  auto mm = (*current_task)->mm();
   auto addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE);
-  auto ma = *current_task;
+  auto& ma = *current_task;
   auto item_ref = UserRef<uint32_t>::New(addr);
 
   auto items_written = fbl::Vector<uint32_t>();
@@ -1006,8 +1006,8 @@ bool test_read_object_partial() {
   };
 
   auto [kernel, current_task] = create_kernel_task_and_unlocked();
-  auto ma = *current_task;
-  auto mm = current_task->mm();
+  auto& ma = *current_task;
+  auto mm = (*current_task)->mm();
   auto addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), PAGE_SIZE);
   auto item_ref = UserRef<uint32_t>::New(addr);
 
@@ -1084,11 +1084,11 @@ bool test_preserve_name_snapshot() {
 
   auto target = create_task(kernel, "another-task");
 
-  auto result = current_task->mm()->snapshot_to(target->mm());
+  auto result = (*current_task)->mm()->snapshot_to((*target)->mm());
   ASSERT_TRUE(result.is_ok(), "snapshot_to failed");
 
   {
-    auto state = target->mm()->state.Read();
+    auto state = (*target)->mm()->state.Read();
 
     auto pair = state->mappings.get(mapping_addr);
     ASSERT_TRUE(pair.has_value());

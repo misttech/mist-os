@@ -21,14 +21,12 @@ namespace testing {
 
 class AutoReleasableTask {
  public:
-  AutoReleasableTask() = default;
-
-  static AutoReleasableTask From(const starnix::TaskBuilder& builder) {
-    return AutoReleasableTask::From(starnix::CurrentTask::From(builder));
+  static AutoReleasableTask From(starnix::TaskBuilder builder) {
+    return AutoReleasableTask::From(starnix::CurrentTask::From(ktl::move(builder)));
   }
 
-  static AutoReleasableTask From(const starnix::CurrentTask& task) {
-    return AutoReleasableTask(task);
+  static AutoReleasableTask From(starnix::CurrentTask task) {
+    return AutoReleasableTask({ktl::move(task)});
   }
 
   starnix::CurrentTask& operator*() {
@@ -37,18 +35,43 @@ class AutoReleasableTask {
     return task_.value();
   }
 
-  starnix::CurrentTask operator->() {
+  const starnix::CurrentTask& operator*() const {
     ASSERT_MSG(task_.has_value(),
-               "called `operator->` on ktl::optional that does not contain a value.");
+               "called `operator*` on ktl::optional that does not contain a value.");
     return task_.value();
   }
 
-  // ~AutoReleasableTask() { task_->release(); }
+  starnix::CurrentTask* operator->() {
+    ASSERT_MSG(task_.has_value(),
+               "called `operator->` on ktl::optional that does not contain a value.");
+    return &task_.value();
+  }
+
+  const starnix::CurrentTask* operator->() const {
+    ASSERT_MSG(task_.has_value(),
+               "called `operator->` on ktl::optional that does not contain a value.");
+    return &task_.value();
+  }
+
+  ~AutoReleasableTask() { task_->release(); }
+
+  AutoReleasableTask(AutoReleasableTask&& other) noexcept {
+    task_ = ktl::move(other.task_);
+    other.task_ = ktl::nullopt;
+  }
+
+  AutoReleasableTask& operator=(AutoReleasableTask&& other) noexcept {
+    task_ = ktl::move(other.task_);
+    other.task_ = ktl::nullopt;
+    return *this;
+  }
 
  private:
   explicit AutoReleasableTask(ktl::optional<starnix::CurrentTask> task) : task_(ktl::move(task)) {}
 
-  ktl::optional<starnix::CurrentTask> task_;
+  DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(AutoReleasableTask);
+
+  ktl::optional<starnix::CurrentTask> task_ = ktl::nullopt;
 };
 
 /// An old way of creating a task for testing

@@ -8,19 +8,24 @@
 #include <lib/mistos/starnix/kernel/vfs/file_system.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
 #include <lib/mistos/util/weak_wrapper.h>
+#include <trace.h>
 #include <zircon/errors.h>
 
 #include <fbl/alloc_checker.h>
 #include <ktl/string_view.h>
 
+#include "../kernel_priv.h"
+
 #include <ktl/enforce.h>
+
+#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 namespace starnix {
 
 Kernel::Kernel(const ktl::string_view& _cmdline)
     : kthreads_(KernelThreads::New(util::WeakPtr(this))), cmdline{ktl::move(_cmdline)} {}
 
-Kernel::~Kernel() = default;
+Kernel::~Kernel() { LTRACE_ENTRY_OBJ; }
 
 fit::result<zx_status_t, fbl::RefPtr<Kernel>> Kernel::New(const ktl::string_view& cmdline) {
   fbl::AllocChecker ac;

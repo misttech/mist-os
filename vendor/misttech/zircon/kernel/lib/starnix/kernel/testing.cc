@@ -118,7 +118,7 @@ AutoReleasableTask create_task(fbl::RefPtr<Kernel>& kernel, const ktl::string_vi
   auto task = CurrentTask::create_init_child_process(kernel, task_name);
   ZX_ASSERT_MSG(task.is_ok(), "failed to create second task");
   task->mm()->initialize_mmap_layout_for_test();
-  return ktl::move(testing::AutoReleasableTask::From(task.value()));
+  return ktl::move(testing::AutoReleasableTask::From(ktl::move(task.value())));
 }
 
 UserAddress map_memory(CurrentTask& current_task, UserAddress address, uint64_t length) {
