@@ -145,7 +145,7 @@ std::vector<testing::internal::PairMatcher<K, V>> Linearize(const std::map<K, V>
 class CrashReporterTest : public UnitTestFixture {
  public:
   void SetUp() override {
-    clock_.Set(zx::time(0u));
+    clock_.SetMonotonic(zx::time(0u));
     info_context_ =
         std::make_shared<InfoContext>(&InspectRoot(), &clock_, dispatcher(), services());
     crash_register_ = std::make_unique<CrashRegister>(info_context_, RegisterJsonPath());
@@ -497,7 +497,7 @@ TEST_F(CrashReporterTest, ResetsQuota) {
   }
 
   RunLoopFor(zx::hour(24) + kResetOffset);
-  clock_.Set(clock_.MonotonicNow() + zx::hour(24) + kResetOffset);
+  clock_.SetMonotonic(clock_.MonotonicNow() + zx::hour(24) + kResetOffset);
 
   for (size_t i = 0; i < kDailyPerProductQuota; ++i) {
     ASSERT_TRUE(FileOneCrashReport().is_response());

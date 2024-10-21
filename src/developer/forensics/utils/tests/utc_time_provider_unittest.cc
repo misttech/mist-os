@@ -27,7 +27,7 @@ constexpr timekeeper::time_utc kTime((zx::hour(7) + zx::min(14) + zx::sec(52)).g
 class UtcTimeProviderTest : public UnitTestFixture {
  public:
   UtcTimeProviderTest() {
-    clock_.Set(kTime);
+    clock_.SetUtc(kTime);
 
     zx_clock_create_args_v1_t clock_args{.backstop_time = 0};
     FX_CHECK(zx::clock::create(0u, &clock_args, &clock_handle_) == ZX_OK);
@@ -55,7 +55,9 @@ class UtcTimeProviderTest : public UnitTestFixture {
 };
 
 TEST_F(UtcTimeProviderTest, Check_CurrentUtcMonotonicDifference) {
-  clock_.Set(zx::time(0));
+  // TODO(https://fxbug.dev/374164875): Make this test case not just 0 + 0 = 0.
+  clock_.SetMonotonic(zx::time_monotonic(0));
+  clock_.SetUtc(timekeeper::time_utc(0));
   SignalLoggingQualityClock();
   RunLoopUntilIdle();
 

@@ -4,27 +4,55 @@
 
 #include "src/lib/timekeeper/test_clock.h"
 
+#include <lib/zx/time.h>
+
 #include <gtest/gtest.h>
+
+#include "src/lib/timekeeper/clock.h"
 
 namespace timekeeper {
 namespace {
 
-TEST(TestClockTest, Assignment) {
+TEST(TestClockTest, SetUtcUpdatesUtcTime) {
   TestClock clock;
 
-  zx::time t1(42);
+  const time_utc expected_utc(42);
+  clock.SetUtc(expected_utc);
 
-  clock.Set(t1);
+  time_utc utc;
+  ASSERT_EQ(ZX_OK, clock.UtcNow(&utc));
+  EXPECT_EQ(expected_utc, utc);
 
-  auto t2 = clock.MonotonicNow();
+  EXPECT_EQ(zx::time_monotonic(0), clock.MonotonicNow());
+  EXPECT_EQ(zx::time_boot(0), clock.BootNow());
+}
 
-  EXPECT_EQ(t1, t2);
+TEST(TestClockTest, SetMonotonicUpdatesMonotonicTime) {
+  TestClock clock;
 
-  time_utc t3;
+  const zx::time_monotonic expected_monotonic(42);
+  clock.SetMonotonic(expected_monotonic);
 
-  EXPECT_EQ(ZX_OK, clock.UtcNow(&t3));
+  time_utc utc;
+  ASSERT_EQ(ZX_OK, clock.UtcNow(&utc));
+  EXPECT_EQ(time_utc(0), utc);
 
-  EXPECT_EQ(t1.get(), t3.get());
+  EXPECT_EQ(expected_monotonic, clock.MonotonicNow());
+  EXPECT_EQ(zx::time_boot(0), clock.BootNow());
+}
+
+TEST(TestClockTest, SetBootUpdatesBootTime) {
+  TestClock clock;
+
+  const zx::time_boot expected_boot(42);
+  clock.SetBoot(expected_boot);
+
+  time_utc utc;
+  ASSERT_EQ(ZX_OK, clock.UtcNow(&utc));
+  EXPECT_EQ(time_utc(0), utc);
+
+  EXPECT_EQ(zx::time_monotonic(0), clock.MonotonicNow());
+  EXPECT_EQ(expected_boot, clock.BootNow());
 }
 
 }  // namespace

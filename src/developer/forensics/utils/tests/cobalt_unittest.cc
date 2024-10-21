@@ -77,10 +77,10 @@ TEST_F(CobaltTest, Check_Timer) {
 
   SetUpCobaltServer(std::make_unique<stubs::CobaltLoggerFactory>());
 
-  clock_.Set(kStartTime);
+  clock_.SetMonotonic(kStartTime);
   const uint64_t timer_id = cobalt_->StartTimer();
 
-  clock_.Set(kEndTime);
+  clock_.SetMonotonic(kEndTime);
   cobalt_->LogElapsedTime(SnapshotGenerationFlow::kSuccess, timer_id);
 
   RunLoopUntilIdle();

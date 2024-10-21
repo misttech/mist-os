@@ -6,6 +6,7 @@
 
 #include <lib/fpromise/result.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/time.h>
 
 #include <cstring>
 #include <memory>
@@ -454,7 +455,8 @@ TEST_F(MetadataTest, Check_UtcMonotonicDifference) {
   zx::time monotonic;
   timekeeper::time_utc utc;
 
-  clock_.Set(zx::time(0));
+  clock_.SetUtc(timekeeper::time_utc(0));
+  clock_.SetMonotonic(zx::time_monotonic(0));
 
   const zx::duration utc_monotonic_difference(utc.get() - monotonic.get());
 
@@ -530,7 +532,8 @@ TEST_F(MetadataTest, Check_NoUtcMonotonicDifferenceMissingFile) {
   zx::time monotonic;
   timekeeper::time_utc utc;
 
-  clock_.Set(zx::time(0));
+  clock_.SetUtc(timekeeper::time_utc(0));
+  clock_.SetMonotonic(zx::time_monotonic(0));
 
   const zx::duration utc_monotonic_difference(utc.get() - monotonic.get());
 

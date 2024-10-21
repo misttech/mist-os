@@ -108,7 +108,6 @@ class SnapshotCollectorTest : public UnitTestFixture {
 
   void SetUpSnapshotManager(StorageSize max_annotations_size, StorageSize max_archives_size) {
     FX_CHECK(data_provider_server_);
-    clock_.Set(zx::time(0u));
     snapshot_collector_ =
         std::make_unique<SnapshotCollector>(dispatcher(), &clock_, data_provider_server_.get(),
                                             GetSnapshotStore(), queue_.get(), kWindow);
