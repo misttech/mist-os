@@ -120,6 +120,9 @@ unified_only = [
   "system-suspend",
   "thread-sampler",
   "timer",
+
+  # Destroys any previous power domain information and needs `next-vdso`.
+  "power-domain",
 ]
 assert(core_tests + core_tests_with_custom_manifests -
            core_tests_with_custom_manifests == core_tests,

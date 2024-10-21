@@ -10,6 +10,9 @@
 #include <lib/debuglog.h>
 #include <lib/fit/defer.h>
 #include <lib/instrumentation/asan.h>
+#include <lib/power-management/energy-model.h>
+#include <lib/power-management/kernel-registry.h>
+#include <lib/power-management/port-power-level-controller.h>
 #include <lib/relaxed_atomic.h>
 #include <lib/syscalls/forward.h>
 #include <lib/zbi-format/kernel.h>
@@ -23,6 +26,8 @@
 #include <zircon/boot/crash-reason.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
+#include <zircon/rights.h>
+#include <zircon/status.h>
 #include <zircon/syscalls-next.h>
 #include <zircon/syscalls/resource.h>
 #include <zircon/syscalls/system.h>
@@ -30,14 +35,20 @@
 #include <zircon/types.h>
 
 #include <cstddef>
+#include <cstdint>
+#include <cstdio>
 
 #include <arch/arch_ops.h>
 #include <arch/mp.h>
+#include <arch/ops.h>
 #include <dev/hw_watchdog.h>
 #include <dev/interrupt.h>
+#include <fbl/alloc_checker.h>
+#include <fbl/ref_ptr.h>
 #include <kernel/cpu.h>
 #include <kernel/idle_power_thread.h>
 #include <kernel/mp.h>
+#include <kernel/mutex.h>
 #include <kernel/percpu.h>
 #include <kernel/range_check.h>
 #include <kernel/scheduler.h>
@@ -47,6 +58,7 @@
 #include <ktl/unique_ptr.h>
 #include <object/event_dispatcher.h>
 #include <object/job_dispatcher.h>
+#include <object/port_dispatcher.h>
 #include <object/process_dispatcher.h>
 #include <object/resource.h>
 #include <object/user_handles.h>
@@ -237,7 +249,7 @@ static zx_status_t vmo_coalesce_pages(zx_handle_t vmo_hdl, const size_t extra_by
     return ZX_ERR_INVALID_ARGS;
   }
 
-  auto up = ProcessDispatcher::GetCurrent();
+  ProcessDispatcher* up = ProcessDispatcher::GetCurrent();
   fbl::RefPtr<VmObjectDispatcher> vmo_dispatcher;
   zx_status_t st =
       up->handle_table().GetDispatcherWithRights(*up, vmo_hdl, ZX_RIGHT_READ, &vmo_dispatcher);
@@ -690,10 +702,108 @@ zx_status_t sys_system_set_processor_power_domain(
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  return ZX_ERR_NOT_SUPPORTED;
+  zx_processor_power_domain_t domain_info;
+  if (domain.copy_from_user(&domain_info) != ZX_OK) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  bool all_zero = true;
+  for (auto& c : domain_info.cpus.mask) {
+    all_zero = all_zero && (c == 0);
+  }
+
+  // No need to validate any of the other parameters, when we are unregistering a power domain.
+  if (all_zero) {
+    return power_management::KernelPowerDomainRegistry::Unregister(domain_info.domain_id)
+        .status_value();
+  }
+
+  if (num_power_levels == 0 || num_transitions == 0) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  size_t max_cpus = arch_max_num_cpus();
+  size_t bucket = max_cpus / ZX_CPU_SET_BITS_PER_WORD;
+  size_t bits = max_cpus % ZX_CPU_SET_BITS_PER_WORD;
+  size_t mask = ~((1ull << bits) - 1);
+
+  // We are not allowed to set cpus beyond our max cpus.
+  if ((domain_info.cpus.mask[bucket] & mask) != 0) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  for (size_t i = bucket + 1; i < ZX_CPU_SET_MAX_CPUS / ZX_CPU_SET_BITS_PER_WORD; ++i) {
+    if (domain_info.cpus.mask[i] != 0) {
+      return ZX_ERR_INVALID_ARGS;
+    }
+  }
+
+  // Check the port has required rights.
+  ProcessDispatcher* up = ProcessDispatcher::GetCurrent();
+  fbl::RefPtr<PortDispatcher> port_dispatcher;
+  if (zx_status_t res = up->handle_table().GetDispatcherWithRights(
+          *up, port, ZX_RIGHT_WRITE | ZX_RIGHT_READ, &port_dispatcher);
+      res != ZX_OK) {
+    return res;
+  }
+
+  // Set up the power domain and model.
+  fbl::AllocChecker ac;
+  auto levels = ktl::make_unique<zx_processor_power_level_t[]>(&ac, num_power_levels);
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
+
+  auto sparse_transitions =
+      ktl::make_unique<zx_processor_power_level_transition_t[]>(&ac, num_transitions);
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
+
+  if (zx_status_t res = power_levels.copy_array_from_user(levels.get(), num_power_levels);
+      res != ZX_OK) {
+    return res;
+  }
+
+  if (zx_status_t res = transitions.copy_array_from_user(sparse_transitions.get(), num_transitions);
+      res != ZX_OK) {
+    return res;
+  }
+
+  auto model =
+      power_management::PowerModel::Create(ktl::span(levels.get(), num_power_levels),
+                                           ktl::span(sparse_transitions.get(), num_transitions));
+  if (model.is_error()) {
+    return model.error_value();
+  }
+
+  auto controller = fbl::MakeRefCountedChecked<power_management::PortPowerLevelController>(
+      &ac, ktl::move(port_dispatcher));
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
+
+  auto power_domain = fbl::MakeRefCountedChecked<power_management::PowerDomain>(
+      &ac, domain_info.domain_id, domain_info.cpus, ktl::move(model).value(),
+      ktl::move(controller));
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
+
+  // Register power domain with the registry and update schedulers.
+  return power_management::KernelPowerDomainRegistry::Register(ktl::move(power_domain))
+      .status_value();
 }
 
 zx_status_t sys_system_set_processor_power_state(
     zx_handle_t port, user_in_ptr<const zx_processor_power_state_t> power_state) {
+  if (port == ZX_HANDLE_INVALID) {
+    return ZX_ERR_BAD_HANDLE;
+  }
+  zx_processor_power_state_t ps = {};
+  if (auto res = power_state.copy_from_user(&ps); res != ZX_OK) {
+    return res;
+  }
+
   return ZX_ERR_NOT_SUPPORTED;
 }

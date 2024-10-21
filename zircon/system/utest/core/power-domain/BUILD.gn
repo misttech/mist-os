@@ -1,0 +1,17 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+source_set("power-domain") {
+  testonly = true
+  sources = [ "power_domain.cc" ]
+  deps = [
+    "..:needs-next",
+    "//sdk/lib/fit",
+    "//src/zircon/testing/standalone-test",
+    "//zircon/system/public",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/zx",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
