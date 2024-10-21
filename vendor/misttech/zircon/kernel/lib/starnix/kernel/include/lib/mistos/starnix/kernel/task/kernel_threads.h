@@ -56,6 +56,11 @@ class KernelThreads {
   /// This function must be called before this object is used to spawn threads.
   fit::result<Errno> Init(CurrentTask system_task);
 
+  // Access the `CurrentTask` for the kernel main thread.
+  ///
+  /// This function can only be called from the kernel main thread itself.
+  CurrentTask& system_task();
+
   // C++
   ~KernelThreads();
 

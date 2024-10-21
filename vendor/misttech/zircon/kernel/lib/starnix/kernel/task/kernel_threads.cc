@@ -29,4 +29,6 @@ fit::result<Errno> KernelThreads::Init(CurrentTask system_task) {
   return fit::ok();
 }
 
+CurrentTask& KernelThreads::system_task() { return system_task_.get().system_task_.value(); }
+
 }  // namespace starnix
