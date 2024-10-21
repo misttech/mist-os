@@ -1381,7 +1381,16 @@ mod tests {
         let mut pb_pkgs = pb_client.list_packages().await.unwrap();
         pb_pkgs.sort();
 
-        assert_eq!(repo_pkgs, pb_pkgs);
+        for (repo_pkg, pb_pkg) in std::iter::zip(repo_pkgs, pb_pkgs) {
+            assert_eq!(repo_pkg.name, pb_pkg.name);
+            assert_eq!(repo_pkg.size, pb_pkg.size);
+            assert_eq!(repo_pkg.hash, pb_pkg.hash);
+            // Although the test is fairly quick, it does happen that the modified stamps differ by
+            // a short timespan (1-2 seconds), hence we allow a grace period of 5 seconds to pass.
+            let repo_pkg_mtime = repo_pkg.modified.unwrap();
+            let pb_pkg_mtime = pb_pkg.modified.unwrap();
+            assert!(repo_pkg_mtime.abs_diff(pb_pkg_mtime) < 5);
+        }
 
         for entry in std::fs::read_dir(pb_blobs_dir.join("1")).unwrap() {
             let entry = entry.unwrap();
