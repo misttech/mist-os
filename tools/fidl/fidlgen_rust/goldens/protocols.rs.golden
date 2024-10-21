@@ -638,7 +638,7 @@ impl fidl::endpoints::ControlHandle for AnotherDiscoverableProtocolControlHandle
         set_mask: zx::Signals,
     ) -> Result<(), zx_status::Status> {
         use fidl::Peered;
-        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+        self.inner.channel().signal_peer(clear_mask, set_mask)
     }
 }
 
@@ -1194,7 +1194,7 @@ impl fidl::endpoints::ControlHandle for ChannelProtocolControlHandle {
         set_mask: zx::Signals,
     ) -> Result<(), zx_status::Status> {
         use fidl::Peered;
-        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+        self.inner.channel().signal_peer(clear_mask, set_mask)
     }
 }
 
@@ -1714,7 +1714,7 @@ impl fidl::endpoints::ControlHandle for DiscoverableProtocolControlHandle {
         set_mask: zx::Signals,
     ) -> Result<(), zx_status::Status> {
         use fidl::Peered;
-        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+        self.inner.channel().signal_peer(clear_mask, set_mask)
     }
 }
 
@@ -2133,7 +2133,7 @@ impl fidl::endpoints::ControlHandle for HandleRightsProtocolControlHandle {
         set_mask: zx::Signals,
     ) -> Result<(), zx_status::Status> {
         use fidl::Peered;
-        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+        self.inner.channel().signal_peer(clear_mask, set_mask)
     }
 }
 
@@ -2667,7 +2667,7 @@ impl fidl::endpoints::ControlHandle for ManyParametersControlHandle {
         set_mask: zx::Signals,
     ) -> Result<(), zx_status::Status> {
         use fidl::Peered;
-        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+        self.inner.channel().signal_peer(clear_mask, set_mask)
     }
 }
 
@@ -3020,7 +3020,7 @@ impl fidl::endpoints::ControlHandle for MethodWithUnionControlHandle {
         set_mask: zx::Signals,
     ) -> Result<(), zx_status::Status> {
         use fidl::Peered;
-        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+        self.inner.channel().signal_peer(clear_mask, set_mask)
     }
 }
 
@@ -3358,7 +3358,7 @@ impl fidl::endpoints::ControlHandle for PlatformServer_ControlHandle {
         set_mask: zx::Signals,
     ) -> Result<(), zx_status::Status> {
         use fidl::Peered;
-        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+        self.inner.channel().signal_peer(clear_mask, set_mask)
     }
 }
 
@@ -4099,7 +4099,7 @@ impl fidl::endpoints::ControlHandle for WithAndWithoutRequestResponseControlHand
         set_mask: zx::Signals,
     ) -> Result<(), zx_status::Status> {
         use fidl::Peered;
-        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+        self.inner.channel().signal_peer(clear_mask, set_mask)
     }
 }
 
@@ -4957,7 +4957,7 @@ impl fidl::endpoints::ControlHandle for WithErrorSyntaxControlHandle {
         set_mask: zx::Signals,
     ) -> Result<(), zx_status::Status> {
         use fidl::Peered;
-        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+        self.inner.channel().signal_peer(clear_mask, set_mask)
     }
 }
 
@@ -5786,7 +5786,7 @@ impl fidl::endpoints::ControlHandle for WithProtocolEndsControlHandle {
         set_mask: zx::Signals,
     ) -> Result<(), zx_status::Status> {
         use fidl::Peered;
-        self.inner.channel().as_ref().signal_peer(clear_mask, set_mask)
+        self.inner.channel().signal_peer(clear_mask, set_mask)
     }
 }
 

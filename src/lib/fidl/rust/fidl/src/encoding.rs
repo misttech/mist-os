@@ -57,11 +57,6 @@ pub trait ProxyChannelBox<D: ResourceDialect>: std::fmt::Debug + Send + Sync {
 
     /// Unbox this channel
     fn unbox(self) -> D::ProxyChannel;
-
-    /// Stump for migrating the FIDL bindings. Please ignore.
-    fn as_ref(&self) -> &Self {
-        self
-    }
 }
 
 /// Message buffer used to hold a message in a particular dialect.
