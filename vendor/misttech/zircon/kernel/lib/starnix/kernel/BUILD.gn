@@ -28,6 +28,7 @@ zx_library("starnix_core") {
     "syscalls/misc.cc",
     "task/current_task.cc",
     "task/kernel.cc",
+    "task/kernel_threads.cc",
     "task/pid_table.cc",
     "task/process_group.cc",
     "task/session.cc",
