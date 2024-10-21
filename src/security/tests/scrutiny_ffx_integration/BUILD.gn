@@ -85,11 +85,11 @@ if (is_fuchsia) {
   # `assembled_system` builds a zbi and blob.blk for consumption by the test.
   assembled_system(_assemble_system_target_name) {
     testonly = true
+    include_legacy_bundle = true
     generate_fvm = true
     product_assembly_config_label = ":product_config"
     board_config_label = ":board_config"
     use_bringup_platform_bundles_only = true
-    bootfs_labels = []
     base_packages = [
       ":empty-pkg",
       ":empty_config",
@@ -101,11 +101,11 @@ if (is_fuchsia) {
   # extracted as part of the zbi, such as in recovery images.
   assembled_system(_assemble_system_recovery_target_name) {
     testonly = true
+    include_legacy_bundle = true
     generate_fvm = true
     product_assembly_config_label = ":product_config_recovery"
     board_config_label = ":board_config"
     use_bringup_platform_bundles_only = true
-    bootfs_labels = []
     ramdisk_in_zbi = true
     base_packages = [
       ":empty-pkg",

@@ -113,6 +113,7 @@ if (is_fuchsia) {
 
   assembled_system("assembly") {
     testonly = true
+    include_legacy_bundle = true
     generate_fvm = true
     generate_fvm_fastboot = false
     generate_vbmeta = false
