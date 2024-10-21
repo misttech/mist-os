@@ -17,9 +17,9 @@ class AtomicCounter {
  public:
   static constexpr AtomicCounter New(T value) { return AtomicCounter(value); }
 
-  T next() { return add(1); }
+  T next() const { return add(static_cast<T>(1)); }
 
-  T add(T amount) { return value_.fetch_add(amount, std::memory_order_relaxed); }
+  T add(T amount) const { return value_.fetch_add(amount, std::memory_order_relaxed); }
 
   T get() const { return value_.load(std::memory_order_relaxed); }
 
@@ -30,7 +30,8 @@ class AtomicCounter {
 
  private:
   explicit AtomicCounter(T value) : value_(value) {}
-  ktl::atomic<T> value_ = 0;
+
+  mutable ktl::atomic<T> value_ = 0;
 };
 
 }  // namespace starnix
