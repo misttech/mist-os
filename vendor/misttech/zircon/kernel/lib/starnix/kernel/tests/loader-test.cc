@@ -133,12 +133,11 @@ fit::result<Errno> exec_hello_starnix(starnix::CurrentTask& current_task) {
 bool test_load_hello_starnix() {
   BEGIN_TEST;
 
-  auto result = create_kernel_task_and_unlocked_with_bootfs_current_zbi();
-  auto [kernel, current_task] = result;
+  auto [kernel, current_task] = create_kernel_task_and_unlocked_with_bootfs_current_zbi();
 
   auto errno = exec_hello_starnix(*current_task);
   ASSERT_FALSE(errno.is_error(), "failed to load executable");
-  ASSERT_GT(current_task->mm()->get_mapping_count(), 0u);
+  ASSERT_GT((*current_task)->mm()->get_mapping_count(), 0u);
 
   END_TEST;
 }
@@ -146,17 +145,16 @@ bool test_load_hello_starnix() {
 bool test_snapshot_hello_starnix() {
   BEGIN_TEST;
 
-  auto result = create_kernel_task_and_unlocked_with_bootfs_current_zbi();
-  auto [kernel, current_task] = result;
+  auto [kernel, current_task] = create_kernel_task_and_unlocked_with_bootfs_current_zbi();
 
   auto errno = exec_hello_starnix(*current_task);
   ASSERT_FALSE(errno.is_error(), "failed to load executable");
 
   auto current2 = create_task(kernel, "another-task");
-  auto snapshot_to = current_task->mm()->snapshot_to(current2->mm());
+  auto snapshot_to = (*current_task)->mm()->snapshot_to((*current2)->mm());
   ASSERT_FALSE(snapshot_to.is_error(), "failed to snapshot mm");
 
-  ASSERT_EQ(current_task->mm()->get_mapping_count(), current2->mm()->get_mapping_count());
+  ASSERT_EQ((*current_task)->mm()->get_mapping_count(), (*current2)->mm()->get_mapping_count());
 
   END_TEST;
 }

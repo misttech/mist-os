@@ -115,8 +115,12 @@ class ThreadGroupParent {
     return ThreadGroupParent(util::WeakPtr<ThreadGroup>(std::forward<I>(r)));
   }
 
+  ThreadGroupParent() = default;
+  ThreadGroupParent(const ThreadGroupParent&) = default;
+  ThreadGroupParent& operator=(const ThreadGroupParent&) = default;
+
  private:
-  ThreadGroupParent(util::WeakPtr<ThreadGroup> t) : inner_(std::move(t)) {}
+  explicit ThreadGroupParent(util::WeakPtr<ThreadGroup> t) : inner_(std::move(t)) {}
 
   util::WeakPtr<ThreadGroup> inner_;
 };
@@ -235,9 +239,6 @@ class ThreadGroupMutableState {
 
   bool terminating_ = false;
 
-  /// The SELinux operations for this thread group.
-  // pub selinux_state: Option<SeLinuxThreadGroupState>,
-
   /// Time statistics accumulated from the children.
   // pub children_time_stats: TaskTimeStats,
 
@@ -293,6 +294,8 @@ class ThreadGroupMutableState {
   const fbl::Vector<fbl::RefPtr<ZombieProcess>>& get_zombie_children() const {
     return zombie_children_;
   }
+
+  BTreeMapThreadGroup& get_children() { return children_; }
 
   const ktl::optional<ThreadGroupParent>& parent() const { return parent_; }
   ktl::optional<ThreadGroupParent>& parent() { return parent_; }
@@ -385,7 +388,6 @@ class ThreadGroup
   /// The resource limits for this thread group.  This is outside mutable_state
   /// to avoid deadlocks where the thread_group lock is held when acquiring
   /// the task lock, and vice versa.
-  // pub limits: Mutex<ResourceLimits>,
   mutable starnix_sync::StarnixMutex<starnix_uapi::ResourceLimits> limits;
 
   /// The next unique identifier for a seccomp filter.  These are required to be
@@ -456,6 +458,8 @@ class ThreadGroup
       fbl::RefPtr<Kernel> kernel, KernelHandle<ProcessDispatcher> process,
       ktl::optional<starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard>& parent,
       pid_t leader, fbl::RefPtr<ProcessGroup> process_group);
+
+  DISALLOW_COPY_ASSIGN_AND_MOVE(ThreadGroup);
 };
 
 }  // namespace starnix

@@ -96,7 +96,6 @@ class TaskBuilder {
   ~TaskBuilder();
 
  private:
-  // move semantics only
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(TaskBuilder);
 };
 
@@ -125,7 +124,7 @@ class CurrentTask : public TaskMemoryAccessor {
 
  public:
   /// impl From<TaskBuilder> for CurrentTask
-  static CurrentTask From(const TaskBuilder& builder);
+  static CurrentTask From(TaskBuilder builder);
 
   /// impl CurrentTask
   static CurrentTask New(fbl::RefPtr<Task> task, ThreadState thread_state);
@@ -344,6 +343,8 @@ class CurrentTask : public TaskMemoryAccessor {
   UserAddress maximum_valid_address() const final;
 
   // C++
+  CurrentTask(CurrentTask&& other);
+  CurrentTask& operator=(CurrentTask&& other);
   ~CurrentTask() override;
 
   const fbl::RefPtr<Task>& task() const { return task_; }
@@ -355,8 +356,13 @@ class CurrentTask : public TaskMemoryAccessor {
   Task* operator->();
   const Task* operator->() const;
 
+  Task& operator*();
+  const Task& operator*() const;
+
  private:
   explicit CurrentTask(fbl::RefPtr<Task> task, ThreadState thread_state);
+
+  DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(CurrentTask);
 };
 
 }  // namespace starnix

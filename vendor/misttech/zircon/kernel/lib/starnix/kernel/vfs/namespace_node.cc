@@ -67,7 +67,7 @@ fit::result<Errno, NamespaceNode> NamespaceNode::open_create_node(const CurrentT
   auto owner = current_task->as_fscred();
   auto _mode = current_task->fs()->apply_umask(mode);
 
-  auto create_fn = [current_task, _mode, dev, owner](
+  auto create_fn = [&current_task, _mode, dev, owner](
                        const FsNodeHandle& dir, const MountInfo& mount,
                        const FsStr& name) -> fit::result<Errno, FsNodeHandle> {
     return dir->mknod(current_task, mount, name, _mode, dev, owner);
@@ -97,8 +97,8 @@ fit::result<Errno, NamespaceNode> NamespaceNode::create_node(const CurrentTask& 
   auto _mode = current_task->fs()->apply_umask(mode);
   auto result = entry->create_entry(
       current_task, mount, name,
-      [current_task, _mode, dev, owner](const FsNodeHandle& dir, const MountInfo& mount,
-                                        const FsStr& name) -> fit::result<Errno, FsNodeHandle> {
+      [&current_task, _mode, dev, owner](const FsNodeHandle& dir, const MountInfo& mount,
+                                         const FsStr& name) -> fit::result<Errno, FsNodeHandle> {
         return dir->mknod(current_task, mount, name, _mode, dev, owner);
       });
 

@@ -29,20 +29,20 @@ bool test_setsid() {
 
   auto [kernel, current_task] = starnix::testing::create_kernel_task_and_unlocked();
   ASSERT_EQ(errno(EPERM).error_code(),
-            current_task->thread_group()->setsid().error_value().error_code());
+            (*current_task)->thread_group()->setsid().error_value().error_code());
 
   auto child_task = (*current_task).clone_task_for_test(0, {kSIGCHLD});
   ASSERT_TRUE(get_process_group(*(*child_task).task()) ==
               get_process_group(*(*current_task).task()));
 
-  auto old_process_group = child_task->thread_group()->Read()->process_group();
-  ASSERT_TRUE(child_task->thread_group()->setsid().is_ok());
-  ASSERT_EQ(child_task->thread_group()->Read()->process_group()->session()->leader(),
-            child_task->get_pid());
+  auto old_process_group = (*child_task)->thread_group()->Read()->process_group();
+  ASSERT_TRUE((*child_task)->thread_group()->setsid().is_ok());
+  ASSERT_EQ((*child_task)->thread_group()->Read()->process_group()->session()->leader(),
+            (*child_task)->get_pid());
 
   auto tgs = old_process_group->Read()->thread_groups();
-  auto result =
-      std::ranges::find_if(tgs, [&](const auto& tg) { return tg == child_task->thread_group(); });
+  auto result = std::ranges::find_if(
+      tgs, [&](const auto& tg) { return tg == (*child_task)->thread_group(); });
   ASSERT_TRUE(result == tgs.end());
 
   END_TEST;
@@ -53,7 +53,7 @@ bool test_exit_status() {
   auto [kernel, current_task] = starnix::testing::create_kernel_task_and_unlocked();
   {
     auto child = (*current_task).clone_task_for_test(0, {kSIGCHLD});
-    child->thread_group()->exit(starnix::ExitStatusExit(42), {});
+    (*child)->thread_group()->exit(starnix::ExitStatusExit(42), {});
   }
   // ASSERT_EQ(current_task->thread_group->read(), starnix::ExitStatusExit(42))
 
