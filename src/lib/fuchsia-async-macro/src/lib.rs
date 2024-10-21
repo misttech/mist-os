@@ -100,7 +100,7 @@ fn common(item: TokenStream, run_executor: TokenStream, test: bool) -> TokenStre
             return Err(Error::new(sig.fn_token.span, "async entry may not have generics"));
         }
         if !sig.inputs.is_empty() && !test {
-            return Err(Error::new(sig.paren_token.span, "async entry takes no arguments"));
+            return Err(Error::new(sig.paren_token.span.join(), "async entry takes no arguments"));
         }
         if let Some(dot3) = &sig.variadic {
             return Err(Error::new(dot3.dots.spans[0], "async entry may not be variadic"));
@@ -114,11 +114,7 @@ fn common(item: TokenStream, run_executor: TokenStream, test: bool) -> TokenStre
         // Only allow on 'main' or 'test' functions
         if sig.ident.to_string() != "main"
             && !test
-            && !attrs.iter().any(|a| {
-                a.parse_meta()
-                    .map(|m| if let syn::Meta::Path(p) = m { p.is_ident("test") } else { false })
-                    .unwrap_or(false)
-            })
+            && !attrs.iter().any(|a| a.path().is_ident("test"))
         {
             return Err(Error::new(
                 sig.ident.span(),
