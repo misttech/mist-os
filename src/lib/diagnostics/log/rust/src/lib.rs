@@ -8,9 +8,6 @@
 //! This library isn't Fuchsia-specific and provides a general `tracing::Subscriber` that allows
 //! the library to also be used in the host.
 
-use std::str::FromStr;
-use thiserror::Error;
-
 #[cfg(target_os = "fuchsia")]
 mod fuchsia;
 #[cfg(target_os = "fuchsia")]
@@ -21,96 +18,8 @@ mod portable;
 #[cfg(not(target_os = "fuchsia"))]
 use self::portable as implementation;
 
-pub use fidl_fuchsia_diagnostics as fdiagnostics;
+pub use diagnostics_log_types::Severity;
 pub use implementation::*;
-
-/// The severity of a log.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
-#[repr(u8)]
-pub enum Severity {
-    /// Trace severity level
-    Trace = 0x10,
-    /// Debug severity level
-    Debug = 0x20,
-    /// Info severity level
-    Info = 0x30,
-    /// Warn severity level
-    Warn = 0x40,
-    /// Error severity level
-    Error = 0x50,
-    /// Fatal severity level
-    Fatal = 0x60,
-}
-
-/// Returned when a string fails to parse into a severity.
-#[derive(Error, Debug)]
-#[error("The given severity isn't a valid severity")]
-pub struct InvalidSeverity;
-
-impl FromStr for Severity {
-    type Err = InvalidSeverity;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "trace" => Ok(Severity::Trace),
-            "debug" => Ok(Severity::Debug),
-            "info" => Ok(Severity::Info),
-            "warn" => Ok(Severity::Warn),
-            "error" => Ok(Severity::Error),
-            "fatal" => Ok(Severity::Fatal),
-            _ => Err(InvalidSeverity),
-        }
-    }
-}
-
-impl From<Severity> for tracing::Level {
-    fn from(s: Severity) -> tracing::Level {
-        match s {
-            Severity::Trace => tracing::Level::TRACE,
-            Severity::Debug => tracing::Level::DEBUG,
-            Severity::Info => tracing::Level::INFO,
-            Severity::Warn => tracing::Level::WARN,
-            Severity::Fatal | Severity::Error => tracing::Level::ERROR,
-        }
-    }
-}
-
-impl From<tracing::Level> for Severity {
-    fn from(level: tracing::Level) -> Severity {
-        match level {
-            tracing::Level::TRACE => Severity::Trace,
-            tracing::Level::DEBUG => Severity::Debug,
-            tracing::Level::INFO => Severity::Info,
-            tracing::Level::WARN => Severity::Warn,
-            tracing::Level::ERROR => Severity::Error,
-        }
-    }
-}
-
-impl From<Severity> for fdiagnostics::Severity {
-    fn from(s: Severity) -> fdiagnostics::Severity {
-        match s {
-            Severity::Trace => fdiagnostics::Severity::Trace,
-            Severity::Debug => fdiagnostics::Severity::Debug,
-            Severity::Info => fdiagnostics::Severity::Info,
-            Severity::Warn => fdiagnostics::Severity::Warn,
-            Severity::Error => fdiagnostics::Severity::Error,
-            Severity::Fatal => fdiagnostics::Severity::Fatal,
-        }
-    }
-}
-
-impl From<fdiagnostics::Severity> for Severity {
-    fn from(s: fdiagnostics::Severity) -> Severity {
-        match s {
-            fdiagnostics::Severity::Trace => Severity::Trace,
-            fdiagnostics::Severity::Debug => Severity::Debug,
-            fdiagnostics::Severity::Info => Severity::Info,
-            fdiagnostics::Severity::Warn => Severity::Warn,
-            fdiagnostics::Severity::Error => Severity::Error,
-            fdiagnostics::Severity::Fatal => Severity::Fatal,
-        }
-    }
-}
 
 /// Adds a panic hook which will log an `ERROR` log with the panic information.
 pub(crate) fn install_panic_hook(prefix: Option<&'static str>) {

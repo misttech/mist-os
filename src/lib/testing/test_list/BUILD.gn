@@ -11,7 +11,7 @@ rustc_library("lib") {
 
   sources = [ "src/lib.rs" ]
   deps = [
-    "//src/lib/diagnostics/data/rust",
+    "//src/lib/diagnostics/log/types:types-serde",
     "//third_party/rust_crates:serde",
   ]
 }
