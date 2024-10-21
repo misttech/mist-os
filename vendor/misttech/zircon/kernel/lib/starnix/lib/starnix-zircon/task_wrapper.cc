@@ -6,14 +6,26 @@
 
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
+#include <trace.h>
 
 #include <ktl/move.h>
 
+#include "../kernel_priv.h"
+
+#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
+
 TaskWrapper::TaskWrapper(fbl::RefPtr<starnix::Task> task) : task_(ktl::move(task)) {}
 
-TaskWrapper::~TaskWrapper() = default;
+TaskWrapper::~TaskWrapper() {
+  LTRACE_ENTRY_OBJ;
+
+  if (task_) {
+    starnix::ThreadState dummy = {};
+    task_->release(dummy);
+  }
+}
 
 starnix::CurrentTask TaskWrapper::into() {
   starnix::TaskBuilder builder(task_);
-  return starnix::CurrentTask::From(builder);
+  return starnix::CurrentTask::From(ktl::move(builder));
 }

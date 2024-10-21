@@ -387,6 +387,8 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   friend TaskBuilder testing::create_test_init_task(fbl::RefPtr<Kernel> kernel,
                                                     fbl::RefPtr<FsContext> fs);
 
+  DISALLOW_COPY_ASSIGN_AND_MOVE(Task);
+
   Task(pid_t id, fbl::RefPtr<ThreadGroup> thread_group,
        ktl::optional<fbl::RefPtr<ThreadDispatcher>> thread, FdTable files,
        ktl::optional<fbl::RefPtr<MemoryManager>> mm, ktl::optional<fbl::RefPtr<FsContext>> fs);

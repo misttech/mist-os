@@ -24,10 +24,10 @@ bool test_tid_allocation() {
 
   auto [kernel, current_task] = create_kernel_and_task();
 
-  ASSERT_EQ(1, current_task->get_tid());
+  ASSERT_EQ(1, (*current_task)->get_tid());
 
   auto another_current = create_task(kernel, "another-task");
-  pid_t another_tid = another_current->get_tid();
+  pid_t another_tid = (*another_current)->get_tid();
 
   ASSERT_GE(2, another_tid);
 
@@ -46,15 +46,15 @@ bool test_clone_pid_and_parent_pid() {
       (*current_task)
           .clone_task_for_test(static_cast<uint64_t>(CLONE_THREAD | CLONE_VM | CLONE_SIGHAND),
                                starnix_uapi::kSIGCHLD);
-  ASSERT_EQ(current_task->get_pid(), thread->get_pid());
-  ASSERT_NE(current_task->get_tid(), thread->get_tid());
-  ASSERT_EQ(current_task->thread_group()->leader(), thread->thread_group()->leader());
+  ASSERT_EQ((*current_task)->get_pid(), (*thread)->get_pid());
+  ASSERT_NE((*current_task)->get_tid(), (*thread)->get_tid());
+  ASSERT_EQ((*current_task)->thread_group()->leader(), (*thread)->thread_group()->leader());
 
   auto child_task = (*current_task).clone_task_for_test(0, starnix_uapi::kSIGCHLD);
 
-  ASSERT_NE(current_task->get_pid(), child_task->get_pid());
-  ASSERT_NE(current_task->get_tid(), child_task->get_tid());
-  ASSERT_EQ(current_task->get_pid(), child_task->thread_group()->Read()->get_ppid());
+  ASSERT_NE((*current_task)->get_pid(), (*child_task)->get_pid());
+  ASSERT_NE((*current_task)->get_tid(), (*child_task)->get_tid());
+  ASSERT_EQ((*current_task)->get_pid(), (*child_task)->thread_group()->Read()->get_ppid());
 
   END_TEST;
 }

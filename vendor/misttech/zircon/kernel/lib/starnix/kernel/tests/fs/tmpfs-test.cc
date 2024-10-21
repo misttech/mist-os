@@ -55,10 +55,11 @@ bool test_write_read() {
   auto [kernel, current_task] = starnix::testing::create_kernel_and_task();
 
   FsStr path("test.bin");
-  auto _file = current_task->fs()
-                   ->root()
-                   .create_node(*current_task, path, FILE_MODE(IFREG, 0777), DeviceType::NONE)
-                   .value();
+  auto file = (*current_task)
+                  ->fs()
+                  ->root()
+                  .create_node(*current_task, path, FILE_MODE(IFREG, 0777), DeviceType::NONE)
+                  .value();
 
   auto wr_file = (*current_task).open_file(path, OpenFlags(OpenFlagsEnum::RDWR)).value();
 
@@ -109,7 +110,7 @@ bool test_persistence() {
   auto [kernel, current_task] = starnix::testing::create_kernel_task_and_unlocked();
 
   {
-    auto root = current_task->fs()->root().entry;
+    auto root = (*current_task)->fs()->root().entry;
     auto usr = root->create_dir(*current_task, "usr").value();
     auto _etc = root->create_dir(*current_task, "etc").value();
     auto _usr_bin = usr->create_dir(*current_task, "bin").value();

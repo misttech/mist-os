@@ -45,10 +45,10 @@ pid_t ThreadGroupMutableState::leader() const { return base_->leader(); }
 
 fbl::Vector<fbl::RefPtr<ThreadGroup>> ThreadGroupMutableState::children() const {
   fbl::Vector<fbl::RefPtr<ThreadGroup>> children_vec;
-  fbl::AllocChecker ac;
   for (auto iter = children_.begin(); iter != children_.end(); ++iter) {
     auto strong = iter.CopyPointer().Lock();
     ZX_ASSERT_MSG(strong, "Weak references to processes in ThreadGroup must always be valid");
+    fbl::AllocChecker ac;
     children_vec.push_back(strong, &ac);
     ZX_ASSERT(ac.check());
   }
@@ -174,11 +174,12 @@ WaitableChildResult ThreadGroupMutableState::get_waitable_running_children(
   // If wait_for_exited flag is disabled or no terminated children were found we look for living
   // children.
   fbl::Vector<fbl::RefPtr<ThreadGroup>> selected_children;
-  fbl::AllocChecker ac;
   for (auto it = children_.begin(); it != children_.end(); ++it) {
     auto t = it.CopyPointer().Lock();
     if (t && filter_children_by_pid_selector(t) && filter_children_by_waiting_options(t)) {
+      fbl::AllocChecker ac;
       selected_children.push_back(t, &ac);
+      ZX_ASSERT(ac.check());
     }
   }
 
@@ -247,6 +248,13 @@ WaitableChildResult ThreadGroupMutableState::get_waitable_running_children(
 WaitableChildResult ThreadGroupMutableState::get_waitable_child(ProcessSelector selector,
                                                                 const WaitingOptions& options,
                                                                 PidTable& pids) {
+  if (options.wait_for_exited()) {
+    /*if (auto waitable_zombie = get_waitable_zombie(
+            &|state: &mut ThreadGroupMutableState| &mut state.zombie_children, selector,
+            options, pids)) {
+      return WaitableChildResult::ReadyNow(waitable_zombie);
+    }*/
+  }
   return get_waitable_running_children(selector, options, pids);
 }
 
@@ -261,6 +269,8 @@ fbl::RefPtr<ThreadGroup> ThreadGroup::New(
 
   if (parent.has_value()) {
     // thread_group.next_seccomp_filter_id.reset(parent.base.next_seccomp_filter_id.get());
+    LTRACEF("Parent ThreadGroup(%p)->insert(%p)\n", parent.value()->base_,
+            thread_group->weak_thread_group_.get());
     parent.value()->children_.insert(thread_group->weak_thread_group_);
     process_group->insert(thread_group);
   }
@@ -277,14 +287,15 @@ ThreadGroup::ThreadGroup(
       leader_(leader),
       stop_state_(AtomicStopState(StopState::Awake)) {
   ktl::optional<ThreadGroupParent> tgp;
+  LTRACEF("ThreadGroup(%p)\n", this);
 
   if (parent.has_value()) {
     // A child process created via fork(2) inherits its parent's
     // resource limits.  Resource limits are preserved across execve(2).
     *limits.Lock() = *(*parent)->base_->limits.Lock();
 
-    auto& p = *(*parent)->base_->weak_thread_group_;
-    tgp = ThreadGroupParent::From(&p);
+    auto p = (*parent)->base_->weak_thread_group_;
+    tgp = ThreadGroupParent::From(p);
   }
 
   *mutable_state_.Write() = ktl::move(ThreadGroupMutableState(this, tgp, process_group));

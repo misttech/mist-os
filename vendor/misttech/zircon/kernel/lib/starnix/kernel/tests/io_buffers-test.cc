@@ -38,7 +38,7 @@ bool test_data_input_buffer() {
     ZX_DEBUG_ASSERT(ac.check());
   }
 
-  auto mm = *current_task;
+  auto& mm = *current_task;
   auto result = mm.write_memory(addr, data);
   ASSERT_TRUE(result.is_ok(), "failed to write test data");
 
@@ -139,7 +139,7 @@ bool test_data_output_buffer() {
   size_t page_size = PAGE_SIZE;
   auto addr = map_memory(*current_task, mtl::DefaultConstruct<UserAddress>(), 64ul * page_size);
 
-  auto mm = *current_task;
+  auto& mm = *current_task;
   fbl::Vector<uint8_t> data;
   for (int i = 0; i < 1024; ++i) {
     fbl::AllocChecker ac;
