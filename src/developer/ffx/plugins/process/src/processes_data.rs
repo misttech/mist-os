@@ -65,6 +65,26 @@ pub mod raw {
         /// Processes data
         pub processes: Vec<Process>,
     }
+
+    /// A structure containing information about a task.
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    pub struct Task {
+        pub depth: i32,
+        pub koid: zx_koid_t,
+        pub parent_koid: zx_koid_t,
+        #[serde(rename = "type")]
+        pub task_type: String,
+        pub name: String,
+    }
+
+    /// Task Hierarchy Data exported by `ProcessExplorer`.
+    /// This corresponds to the schema of the data that is transferred
+    /// by `ProcessExplorerQuery::WriteJsonTaskHierarchyData`'s API.
+    #[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
+    #[serde(rename_all = "PascalCase")]
+    pub struct TasksData {
+        pub tasks: Vec<Task>,
+    }
 }
 
 /// Types and utilities to produce and manipulate processed summaries
