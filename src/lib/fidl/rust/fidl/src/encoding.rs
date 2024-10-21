@@ -15,7 +15,7 @@ use crate::handle::{
 use crate::time::{Instant, Ticks, Timeline};
 use crate::{Error, MethodType, Result};
 use bitflags::bitflags;
-use std::cell::{RefCell, RefMut};
+use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::{mem, ptr, str};
 
@@ -26,10 +26,150 @@ use std::{mem, ptr, str};
 /// Trait for a "Box" that wraps a handle when it's inside a client. Useful when
 /// we need some infrastructure to make our underlying channels work the way the
 /// client code expects.
-pub trait ProxyChannelBox<D: ResourceDialect>: std::fmt::Debug + Send + Sync {}
+pub trait ProxyChannelBox<D: ResourceDialect>: std::fmt::Debug + Send + Sync {
+    /// Receives a message on the channel and registers this `Channel` as
+    /// needing a read on receiving a `io::std::ErrorKind::WouldBlock`.
+    #[allow(clippy::type_complexity)]
+    fn recv_etc_from(
+        &self,
+        ctx: &mut std::task::Context<'_>,
+        buf: &mut D::MessageBufEtc,
+    ) -> std::task::Poll<Result<(), Option<<D::ProxyChannel as ProxyChannelFor<D>>::Error>>>;
+
+    #[cfg(not(target_os = "fuchsia"))]
+    /// Closed reason for proxies.
+    fn closed_reason(&self) -> Option<String> {
+        None
+    }
+
+    /// Get a reference to the boxed channel.
+    fn as_channel(&self) -> &D::ProxyChannel;
+
+    /// Write data to a Proxy channel
+    fn write_etc(
+        &self,
+        bytes: &[u8],
+        handles: &mut [<D::ProxyChannel as ProxyChannelFor<D>>::HandleDisposition],
+    ) -> Result<(), Option<<D::ProxyChannel as ProxyChannelFor<D>>::Error>>;
+
+    /// Return whether a `ProxyChannel` is closed.
+    fn is_closed(&self) -> bool;
+
+    /// Unbox this channel
+    fn unbox(self) -> D::ProxyChannel;
+
+    /// Stump for migrating the FIDL bindings. Please ignore.
+    fn as_ref(&self) -> &Self {
+        self
+    }
+}
+
+/// Message buffer used to hold a message in a particular dialect.
+pub trait MessageBufFor<D: ResourceDialect>: std::fmt::Debug + Send + Sync {
+    /// Create a new message buffer.
+    fn new() -> Self;
+
+    /// Discard any allocated-but-unused space in the byte portion of this buffer.
+    fn shrink_bytes_to_fit(&mut self) {}
+
+    /// Access the contents of this buffer as two vectors.
+    fn split_mut(&mut self) -> (&mut Vec<u8>, &mut Vec<<D::Handle as HandleFor<D>>::HandleInfo>);
+}
+
+/// Channel used for proxies in a particular dialect.
+pub trait ProxyChannelFor<D: ResourceDialect>:
+    std::fmt::Debug + crate::epitaph::ChannelLike
+{
+    /// Box we put around a `ProxyChannel` when using it within a client.
+    type Boxed: ProxyChannelBox<D>;
+
+    /// Type of the errors we get from this proxy channel.
+    type Error: Into<crate::TransportError>;
+
+    /// Handle disposition used in this dialect.
+    ///
+    /// This is for sending handles, and includes the intended type/rights.
+    type HandleDisposition: HandleDispositionFor<D>;
+
+    /// Construct a new box around a proxy channel.
+    fn boxed(self) -> Self::Boxed;
+
+    /// Write data to a Proxy channel
+    fn write_etc(
+        &self,
+        bytes: &[u8],
+        handles: &mut [Self::HandleDisposition],
+    ) -> Result<(), Option<Self::Error>>;
+}
+
+/// Handle disposition struct used for a particular dialect.
+pub trait HandleDispositionFor<D: ResourceDialect>: std::fmt::Debug {
+    /// Wrap a handle in a handle disposition.
+    fn from_handle(handle: D::Handle, object_type: D::ObjectType, rights: D::Rights) -> Self;
+}
+
+/// Handle type used for a particular dialect.
+pub trait HandleFor<D: ResourceDialect> {
+    /// Handle info used in this dialect.
+    ///
+    /// This is used for receiving handles, and includes type/rights from the
+    /// kernel.
+    type HandleInfo: HandleInfoFor<D>;
+
+    /// Produce an invalid version of `Handle` used as a place filler when
+    /// we remove handles from an array.
+    fn invalid() -> Self;
+
+    /// Check whether a handle is invalid.
+    fn is_invalid(&self) -> bool;
+}
+
+/// Handle info struct used for a particular dialect.
+pub trait HandleInfoFor<D: ResourceDialect>: std::fmt::Debug {
+    /// Verifies a `HandleInfo` has the type and rights we expect and
+    /// extracts the `D::Handle` from it.
+    fn consume(
+        &mut self,
+        expected_object_type: D::ObjectType,
+        expected_rights: D::Rights,
+    ) -> Result<D::Handle>;
+
+    /// Destroy the given handle info, leaving it invalid.
+    fn drop_in_place(&mut self);
+}
 
 /// Describes how a given transport encodes resources like handles.
-pub trait ResourceDialect: 'static + Sized {}
+pub trait ResourceDialect: 'static + Sized + Default + std::fmt::Debug + Copy + Clone {
+    /// Handle type used in this dialect.
+    type Handle: HandleFor<Self>;
+
+    /// Message buffer type used in this dialect.
+    type MessageBufEtc: MessageBufFor<Self>;
+
+    /// Channel type used for proxies in this dialect.
+    type ProxyChannel: ProxyChannelFor<Self>;
+
+    /// `zx::ObjectType` equivalent used in this dialect.
+    type ObjectType: 'static;
+
+    /// `zx::Rights` equivalent used in this dialect.
+    type Rights: 'static;
+
+    /// Get a thread-local common instance of `TlsBuf`
+    fn with_tls_buf<R>(f: impl FnOnce(&mut TlsBuf<Self>) -> R) -> R;
+
+    /// Get an `ObjectType` from the native representation.
+    fn obj_type_from_local(ty: ObjectType) -> Self::ObjectType;
+
+    /// Get a `Rights` from the native representation.
+    fn rights_from_local(rights: Rights) -> Self::Rights;
+}
+
+/// Indicates a type is encodable as a handle in a given resource dialect.
+pub trait EncodableAsHandle: Into<<Self::Dialect as ResourceDialect>::Handle> {
+    /// What resource dialect can encode this object as a handle.
+    type Dialect: ResourceDialect<Handle: Into<Self>>;
+}
 
 /// A FIDL type marker.
 ///
@@ -176,16 +316,348 @@ pub trait Decode<T: TypeMarker, D>: 'static + Sized {
 // Resource Dialects
 ////////////////////////////////////////////////////////////////////////////////
 
+/// Box around an async channel. Needed to implement `ResourceDialect` for
+/// `DefaultFuchsiaResourceDialect` but not so useful for that case.
+#[derive(Debug)]
+pub struct FuchsiaProxyBox(crate::AsyncChannel);
+
+impl FuchsiaProxyBox {
+    /// Future that returns when the channel is closed.
+    pub fn on_closed(&self) -> crate::OnSignalsRef<'_> {
+        self.0.on_closed()
+    }
+
+    /// See [`crate::AsyncChannel::read_etc`]
+    pub fn read_etc(
+        &self,
+        cx: &mut std::task::Context<'_>,
+        bytes: &mut Vec<u8>,
+        handles: &mut Vec<crate::HandleInfo>,
+    ) -> std::task::Poll<Result<(), crate::Status>> {
+        self.0.read_etc(cx, bytes, handles)
+    }
+
+    /// Signal peer
+    pub fn signal_peer(
+        &self,
+        clear: crate::Signals,
+        set: crate::Signals,
+    ) -> Result<(), zx_status::Status> {
+        use crate::Peered;
+        self.0.as_ref().signal_peer(clear, set)
+    }
+}
+
+impl ProxyChannelBox<DefaultFuchsiaResourceDialect> for FuchsiaProxyBox {
+    fn write_etc(
+        &self,
+        bytes: &[u8],
+        handles: &mut [HandleDisposition<'static>],
+    ) -> Result<(), Option<zx_status::Status>> {
+        self.0
+            .write_etc(bytes, handles)
+            .map_err(|x| Some(x).filter(|x| *x != zx_status::Status::PEER_CLOSED))
+    }
+
+    fn recv_etc_from(
+        &self,
+        ctx: &mut std::task::Context<'_>,
+        buf: &mut crate::MessageBufEtc,
+    ) -> std::task::Poll<Result<(), Option<zx_status::Status>>> {
+        self.0
+            .recv_etc_from(ctx, buf)
+            .map_err(|x| Some(x).filter(|x| *x != zx_status::Status::PEER_CLOSED))
+    }
+
+    fn is_closed(&self) -> bool {
+        self.0.is_closed()
+    }
+
+    #[cfg(not(target_os = "fuchsia"))]
+    fn closed_reason(&self) -> Option<String> {
+        self.0.closed_reason()
+    }
+
+    fn unbox(self) -> <DefaultFuchsiaResourceDialect as ResourceDialect>::ProxyChannel {
+        self.0
+    }
+
+    fn as_channel(&self) -> &<DefaultFuchsiaResourceDialect as ResourceDialect>::ProxyChannel {
+        &self.0
+    }
+}
+
 /// The default [`ResourceDialect`]. Encodes everything into a channel
 /// MessageBuf for sending via channels between Fuchsia services.
+#[derive(Debug, Default, Copy, Clone)]
 pub struct DefaultFuchsiaResourceDialect;
-impl ResourceDialect for DefaultFuchsiaResourceDialect {}
+impl ResourceDialect for DefaultFuchsiaResourceDialect {
+    type Handle = Handle;
+    type MessageBufEtc = crate::MessageBufEtc;
+    type ObjectType = ObjectType;
+    type ProxyChannel = crate::AsyncChannel;
+    type Rights = Rights;
+
+    #[inline]
+    fn with_tls_buf<R>(f: impl FnOnce(&mut TlsBuf<Self>) -> R) -> R {
+        thread_local!(static TLS_BUF: RefCell<TlsBuf<DefaultFuchsiaResourceDialect>> =
+            RefCell::new(TlsBuf::default()));
+        TLS_BUF.with(|buf| f(&mut buf.borrow_mut()))
+    }
+
+    #[inline(always)]
+    fn obj_type_from_local(ty: ObjectType) -> Self::ObjectType {
+        ty
+    }
+
+    #[inline(always)]
+    fn rights_from_local(rights: Rights) -> Self::Rights {
+        rights
+    }
+}
+
+impl MessageBufFor<DefaultFuchsiaResourceDialect> for crate::MessageBufEtc {
+    fn new() -> crate::MessageBufEtc {
+        let mut ret = crate::MessageBufEtc::new();
+        ret.ensure_capacity_bytes(MIN_BUF_BYTES_SIZE);
+        ret
+    }
+
+    fn shrink_bytes_to_fit(&mut self) {
+        self.shrink_bytes_to_fit();
+    }
+
+    fn split_mut(&mut self) -> (&mut Vec<u8>, &mut Vec<HandleInfo>) {
+        self.split_mut()
+    }
+}
+
+impl ProxyChannelFor<DefaultFuchsiaResourceDialect> for crate::AsyncChannel {
+    type Boxed = FuchsiaProxyBox;
+    type Error = zx_status::Status;
+    type HandleDisposition = HandleDisposition<'static>;
+
+    fn boxed(self) -> FuchsiaProxyBox {
+        FuchsiaProxyBox(self)
+    }
+
+    fn write_etc(
+        &self,
+        bytes: &[u8],
+        handles: &mut [HandleDisposition<'static>],
+    ) -> Result<(), Option<zx_status::Status>> {
+        self.write_etc(bytes, handles)
+            .map_err(|x| Some(x).filter(|x| *x != zx_status::Status::PEER_CLOSED))
+    }
+}
+
+impl HandleDispositionFor<DefaultFuchsiaResourceDialect> for HandleDisposition<'static> {
+    fn from_handle(handle: Handle, object_type: ObjectType, rights: Rights) -> Self {
+        HandleDisposition::new(HandleOp::Move(handle), object_type, rights, Status::OK)
+    }
+}
+
+impl HandleFor<DefaultFuchsiaResourceDialect> for Handle {
+    type HandleInfo = HandleInfo;
+
+    fn invalid() -> Self {
+        Handle::invalid()
+    }
+
+    fn is_invalid(&self) -> bool {
+        Handle::is_invalid(self)
+    }
+}
+
+impl HandleInfoFor<DefaultFuchsiaResourceDialect> for HandleInfo {
+    fn consume(
+        &mut self,
+        expected_object_type: ObjectType,
+        expected_rights: Rights,
+    ) -> Result<Handle> {
+        let handle_info = std::mem::replace(
+            self,
+            HandleInfo::new(Handle::invalid(), ObjectType::NONE, Rights::NONE),
+        );
+        let received_object_type = handle_info.object_type;
+        if expected_object_type != ObjectType::NONE
+            && received_object_type != ObjectType::NONE
+            && expected_object_type != received_object_type
+        {
+            return Err(Error::IncorrectHandleSubtype {
+                expected: expected_object_type,
+                received: received_object_type,
+            });
+        }
+
+        let received_rights = handle_info.rights;
+        if expected_rights != Rights::SAME_RIGHTS
+            && received_rights != Rights::SAME_RIGHTS
+            && expected_rights != received_rights
+        {
+            if !received_rights.contains(expected_rights) {
+                return Err(Error::MissingExpectedHandleRights {
+                    missing_rights: expected_rights - received_rights,
+                });
+            }
+            return match handle_info.handle.replace(expected_rights) {
+                Ok(r) => Ok(r),
+                Err(status) => Err(Error::HandleReplace(status)),
+            };
+        }
+        Ok(handle_info.handle)
+    }
+
+    #[inline(always)]
+    fn drop_in_place(&mut self) {
+        *self = HandleInfo::new(Handle::invalid(), ObjectType::NONE, Rights::NONE);
+    }
+}
+
+/// A never type for handles in `NoHandleResourceDialect`.
+#[cfg(not(target_os = "fuchsia"))]
+#[derive(Debug)]
+pub enum NoHandles {}
+
+#[cfg(not(target_os = "fuchsia"))]
+impl ProxyChannelBox<NoHandleResourceDialect> for NoHandles {
+    fn recv_etc_from(
+        &self,
+        _ctx: &mut std::task::Context<'_>,
+        _buf: &mut <NoHandleResourceDialect as ResourceDialect>::MessageBufEtc,
+    ) -> std::task::Poll<Result<(), Option<zx_status::Status>>> {
+        unreachable!()
+    }
+
+    fn write_etc(
+        &self,
+        _bytes: &[u8],
+        _handles: &mut [
+            <<NoHandleResourceDialect as ResourceDialect>::ProxyChannel
+            as ProxyChannelFor<NoHandleResourceDialect>>::HandleDisposition],
+    ) -> Result<(), Option<zx_status::Status>> {
+        unreachable!()
+    }
+
+    fn is_closed(&self) -> bool {
+        unreachable!()
+    }
+
+    fn unbox(self) -> <NoHandleResourceDialect as ResourceDialect>::ProxyChannel {
+        unreachable!()
+    }
+
+    fn as_channel(&self) -> &<NoHandleResourceDialect as ResourceDialect>::ProxyChannel {
+        unreachable!()
+    }
+}
 
 /// A resource dialect which doesn't support handles at all.
 #[cfg(not(target_os = "fuchsia"))]
+#[derive(Debug, Default, Copy, Clone)]
 pub struct NoHandleResourceDialect;
+
 #[cfg(not(target_os = "fuchsia"))]
-impl ResourceDialect for NoHandleResourceDialect {}
+impl ResourceDialect for NoHandleResourceDialect {
+    type Handle = NoHandles;
+    type MessageBufEtc = NoHandles;
+    type ObjectType = NoHandles;
+    type ProxyChannel = NoHandles;
+    type Rights = NoHandles;
+
+    #[inline]
+    fn with_tls_buf<R>(f: impl FnOnce(&mut TlsBuf<Self>) -> R) -> R {
+        thread_local!(static TLS_BUF: RefCell<TlsBuf<NoHandleResourceDialect>> =
+            RefCell::new(TlsBuf::default()));
+        TLS_BUF.with(|buf| f(&mut buf.borrow_mut()))
+    }
+
+    #[inline(always)]
+    fn obj_type_from_local(_ty: ObjectType) -> Self::ObjectType {
+        unreachable!()
+    }
+
+    #[inline(always)]
+    fn rights_from_local(_rights: Rights) -> Self::Rights {
+        unreachable!()
+    }
+}
+
+#[cfg(not(target_os = "fuchsia"))]
+impl MessageBufFor<NoHandleResourceDialect> for NoHandles {
+    fn new() -> Self {
+        unreachable!()
+    }
+
+    fn split_mut(&mut self) -> (&mut Vec<u8>, &mut Vec<NoHandles>) {
+        unreachable!()
+    }
+}
+
+#[cfg(not(target_os = "fuchsia"))]
+impl ProxyChannelFor<NoHandleResourceDialect> for NoHandles {
+    type Boxed = NoHandles;
+    type Error = zx_status::Status;
+    type HandleDisposition = NoHandles;
+
+    fn boxed(self) -> NoHandles {
+        unreachable!()
+    }
+
+    fn write_etc(
+        &self,
+        _bytes: &[u8],
+        _handles: &mut [NoHandles],
+    ) -> Result<(), Option<zx_status::Status>> {
+        unreachable!()
+    }
+}
+
+#[cfg(not(target_os = "fuchsia"))]
+impl crate::epitaph::ChannelLike for NoHandles {
+    fn write_epitaph(&self, _bytes: &[u8]) -> std::result::Result<(), crate::TransportError> {
+        unreachable!()
+    }
+}
+
+#[cfg(not(target_os = "fuchsia"))]
+impl HandleFor<NoHandleResourceDialect> for NoHandles {
+    type HandleInfo = NoHandles;
+
+    fn invalid() -> Self {
+        unreachable!()
+    }
+
+    fn is_invalid(&self) -> bool {
+        unreachable!()
+    }
+}
+
+#[cfg(not(target_os = "fuchsia"))]
+impl HandleDispositionFor<NoHandleResourceDialect> for NoHandles {
+    fn from_handle(
+        _handle: <NoHandleResourceDialect as ResourceDialect>::Handle,
+        _object_type: <NoHandleResourceDialect as ResourceDialect>::ObjectType,
+        _rights: <NoHandleResourceDialect as ResourceDialect>::Rights,
+    ) -> Self {
+        unreachable!()
+    }
+}
+
+#[cfg(not(target_os = "fuchsia"))]
+impl HandleInfoFor<NoHandleResourceDialect> for NoHandles {
+    fn consume(
+        &mut self,
+        _expected_object_type: <NoHandleResourceDialect as ResourceDialect>::ObjectType,
+        _expected_rights: <NoHandleResourceDialect as ResourceDialect>::Rights,
+    ) -> Result<<NoHandleResourceDialect as ResourceDialect>::Handle> {
+        unreachable!()
+    }
+
+    fn drop_in_place(&mut self) {
+        unreachable!()
+    }
+}
 
 /// A resource dialect which doesn't support handles at all.
 #[cfg(target_os = "fuchsia")]
@@ -366,7 +838,7 @@ pub struct Encoder<'a, D: ResourceDialect> {
     pub buf: &'a mut Vec<u8>,
 
     /// Buffer to write output handles into.
-    handles: &'a mut Vec<HandleDisposition<'static>>,
+    handles: &'a mut Vec<<D::ProxyChannel as ProxyChannelFor<D>>::HandleDisposition>,
 
     /// Phantom data for `D`, which is here to provide types not values.
     _dialect: PhantomData<D>,
@@ -383,7 +855,7 @@ impl<'a, D: ResourceDialect> Encoder<'a, D> {
     #[inline]
     pub fn encode<T: TypeMarker>(
         buf: &'a mut Vec<u8>,
-        handles: &'a mut Vec<HandleDisposition<'static>>,
+        handles: &'a mut Vec<<D::ProxyChannel as ProxyChannelFor<D>>::HandleDisposition>,
         x: impl Encode<T, D>,
     ) -> Result<()> {
         let context = default_encode_context();
@@ -400,13 +872,13 @@ impl<'a, D: ResourceDialect> Encoder<'a, D> {
     pub fn encode_with_context<T: TypeMarker>(
         context: Context,
         buf: &'a mut Vec<u8>,
-        handles: &'a mut Vec<HandleDisposition<'static>>,
+        handles: &'a mut Vec<<D::ProxyChannel as ProxyChannelFor<D>>::HandleDisposition>,
         x: impl Encode<T, D>,
     ) -> Result<()> {
         fn prepare_for_encoding<'a, D: ResourceDialect>(
             context: Context,
             buf: &'a mut Vec<u8>,
-            handles: &'a mut Vec<HandleDisposition<'static>>,
+            handles: &'a mut Vec<<D::ProxyChannel as ProxyChannelFor<D>>::HandleDisposition>,
             ty_inline_size: usize,
         ) -> Encoder<'a, D> {
             // An empty response can have size zero.
@@ -456,7 +928,10 @@ impl<'a, D: ResourceDialect> Encoder<'a, D> {
 
     /// Writes the given handle to the handles list.
     #[inline(always)]
-    pub fn push_next_handle(&mut self, handle: HandleDisposition<'static>) {
+    pub fn push_next_handle(
+        &mut self,
+        handle: <D::ProxyChannel as ProxyChannelFor<D>>::HandleDisposition,
+    ) {
         self.handles.push(handle)
     }
 
@@ -567,7 +1042,7 @@ pub struct Decoder<'a, D: ResourceDialect> {
     next_out_of_line: usize,
 
     /// Buffer from which to read handles.
-    handles: &'a mut [HandleInfo],
+    handles: &'a mut [<D::Handle as HandleFor<D>>::HandleInfo],
 
     /// Index of the next handle to read from the handle array
     next_handle: usize,
@@ -584,7 +1059,7 @@ impl<'a, D: ResourceDialect> Decoder<'a, D> {
     pub fn decode_into<T: TypeMarker>(
         header: &TransactionHeader,
         buf: &'a [u8],
-        handles: &'a mut [HandleInfo],
+        handles: &'a mut [<D::Handle as HandleFor<D>>::HandleInfo],
         value: &mut T::Owned,
     ) -> Result<()>
     where
@@ -603,7 +1078,7 @@ impl<'a, D: ResourceDialect> Decoder<'a, D> {
     pub fn decode_with_context<T: TypeMarker>(
         context: Context,
         buf: &'a [u8],
-        handles: &'a mut [HandleInfo],
+        handles: &'a mut [<D::Handle as HandleFor<D>>::HandleInfo],
         value: &mut T::Owned,
     ) -> Result<()>
     where
@@ -806,18 +1281,13 @@ impl<'a, D: ResourceDialect> Decoder<'a, D> {
     #[inline]
     pub fn take_next_handle(
         &mut self,
-        expected_object_type: ObjectType,
-        expected_rights: Rights,
-    ) -> Result<Handle> {
+        expected_object_type: D::ObjectType,
+        expected_rights: D::Rights,
+    ) -> Result<D::Handle> {
         let Some(next_handle) = self.handles.get_mut(self.next_handle) else {
             return Err(Error::OutOfRange);
         };
-        let handle_info = mem::replace(
-            next_handle,
-            HandleInfo::new(Handle::invalid(), ObjectType::NONE, Rights::NONE),
-        );
-        let handle =
-            self.consume_handle_info(handle_info, expected_object_type, expected_rights)?;
+        let handle = next_handle.consume(expected_object_type, expected_rights)?;
         self.next_handle += 1;
         Ok(handle)
     }
@@ -828,47 +1298,9 @@ impl<'a, D: ResourceDialect> Decoder<'a, D> {
         let Some(next_handle) = self.handles.get_mut(self.next_handle) else {
             return Err(Error::OutOfRange);
         };
-        drop(mem::replace(
-            next_handle,
-            HandleInfo::new(Handle::invalid(), ObjectType::NONE, Rights::NONE),
-        ));
+        next_handle.drop_in_place();
         self.next_handle += 1;
         Ok(())
-    }
-
-    fn consume_handle_info(
-        &self,
-        mut handle_info: HandleInfo,
-        expected_object_type: ObjectType,
-        expected_rights: Rights,
-    ) -> Result<Handle> {
-        let received_object_type = handle_info.object_type;
-        if expected_object_type != ObjectType::NONE
-            && received_object_type != ObjectType::NONE
-            && expected_object_type != received_object_type
-        {
-            return Err(Error::IncorrectHandleSubtype {
-                expected: expected_object_type,
-                received: received_object_type,
-            });
-        }
-
-        let received_rights = handle_info.rights;
-        if expected_rights != Rights::SAME_RIGHTS
-            && received_rights != Rights::SAME_RIGHTS
-            && expected_rights != received_rights
-        {
-            if !received_rights.contains(expected_rights) {
-                return Err(Error::MissingExpectedHandleRights {
-                    missing_rights: expected_rights - received_rights,
-                });
-            }
-            return match handle_info.handle.replace(expected_rights) {
-                Ok(r) => Ok(r),
-                Err(status) => Err(Error::HandleReplace(status)),
-            };
-        }
-        Ok(mem::replace(&mut handle_info.handle, Handle::invalid()))
     }
 }
 
@@ -929,10 +1361,6 @@ pub struct Ambiguous2;
 /// An uninhabited type used as owned and borrowed type for ambiguous markers.
 /// Can be replaced by `!` once that is stable.
 pub enum AmbiguousNever {}
-
-/// Placeholder resource dialect.
-pub struct AmbiguousResourceDialect;
-impl ResourceDialect for AmbiguousResourceDialect {}
 
 macro_rules! impl_ambiguous {
     ($ambiguous:ident) => {
@@ -1834,8 +2262,14 @@ fn check_string_length(actual_bytes: usize, max_bytes: usize) -> Result<()> {
 // Handles
 ////////////////////////////////////////////////////////////////////////////////
 
+impl<T: HandleBased> EncodableAsHandle for T {
+    type Dialect = DefaultFuchsiaResourceDialect;
+}
+
 /// The FIDL type `zx.Handle:<OBJECT_TYPE, RIGHTS>`, or a `client_end` or `server_end`.
-pub struct HandleType<T: HandleBased, const OBJECT_TYPE: u32, const RIGHTS: u32>(PhantomData<T>);
+pub struct HandleType<T: EncodableAsHandle, const OBJECT_TYPE: u32, const RIGHTS: u32>(
+    PhantomData<T>,
+);
 
 /// An abbreviation of `HandleType` that for channels with default rights, used
 /// for the FIDL types `client_end:P` and `server_end:P`.
@@ -1845,7 +2279,7 @@ pub type Endpoint<T> = HandleType<
     { crate::Rights::CHANNEL_DEFAULT.bits() },
 >;
 
-unsafe impl<T: 'static + HandleBased, const OBJECT_TYPE: u32, const RIGHTS: u32> TypeMarker
+unsafe impl<T: 'static + EncodableAsHandle, const OBJECT_TYPE: u32, const RIGHTS: u32> TypeMarker
     for HandleType<T, OBJECT_TYPE, RIGHTS>
 {
     type Owned = T;
@@ -1861,56 +2295,56 @@ unsafe impl<T: 'static + HandleBased, const OBJECT_TYPE: u32, const RIGHTS: u32>
     }
 }
 
-impl<T: 'static + HandleBased, const OBJECT_TYPE: u32, const RIGHTS: u32> ResourceTypeMarker
+impl<T: 'static + EncodableAsHandle, const OBJECT_TYPE: u32, const RIGHTS: u32> ResourceTypeMarker
     for HandleType<T, OBJECT_TYPE, RIGHTS>
 {
     type Borrowed<'a> = T;
     #[inline(always)]
     fn take_or_borrow(value: &mut <Self as TypeMarker>::Owned) -> Self::Borrowed<'_> {
-        mem::replace(value, Handle::invalid().into())
+        mem::replace(value, <T::Dialect as ResourceDialect>::Handle::invalid().into())
     }
 }
 
-unsafe impl<T: 'static + HandleBased, const OBJECT_TYPE: u32, const RIGHTS: u32>
-    Encode<HandleType<T, OBJECT_TYPE, RIGHTS>, DefaultFuchsiaResourceDialect> for T
+unsafe impl<T: 'static + EncodableAsHandle, const OBJECT_TYPE: u32, const RIGHTS: u32>
+    Encode<HandleType<T, OBJECT_TYPE, RIGHTS>, T::Dialect> for T
 {
     #[inline]
     unsafe fn encode(
         self,
-        encoder: &mut Encoder<'_, DefaultFuchsiaResourceDialect>,
+        encoder: &mut Encoder<'_, T::Dialect>,
         offset: usize,
         _depth: Depth,
     ) -> Result<()> {
         encoder.debug_check_bounds::<HandleType<T, OBJECT_TYPE, RIGHTS>>(offset);
         encode_handle(
             self.into(),
-            ObjectType::from_raw(OBJECT_TYPE),
-            Rights::from_bits_retain(RIGHTS),
+            T::Dialect::obj_type_from_local(crate::ObjectType::from_raw(OBJECT_TYPE)),
+            T::Dialect::rights_from_local(crate::Rights::from_bits_retain(RIGHTS)),
             encoder,
             offset,
         )
     }
 }
 
-impl<T: 'static + HandleBased, const OBJECT_TYPE: u32, const RIGHTS: u32>
-    Decode<HandleType<T, OBJECT_TYPE, RIGHTS>, DefaultFuchsiaResourceDialect> for T
+impl<T: 'static + EncodableAsHandle, const OBJECT_TYPE: u32, const RIGHTS: u32>
+    Decode<HandleType<T, OBJECT_TYPE, RIGHTS>, T::Dialect> for T
 {
     #[inline(always)]
     fn new_empty() -> Self {
-        Handle::invalid().into()
+        <T::Dialect as ResourceDialect>::Handle::invalid().into()
     }
 
     #[inline]
     unsafe fn decode(
         &mut self,
-        decoder: &mut Decoder<'_, DefaultFuchsiaResourceDialect>,
+        decoder: &mut Decoder<'_, T::Dialect>,
         offset: usize,
         _depth: Depth,
     ) -> Result<()> {
         decoder.debug_check_bounds::<HandleType<T, OBJECT_TYPE, RIGHTS>>(offset);
         *self = decode_handle(
-            ObjectType::from_raw(OBJECT_TYPE),
-            Rights::from_bits_retain(RIGHTS),
+            T::Dialect::obj_type_from_local(crate::ObjectType::from_raw(OBJECT_TYPE)),
+            T::Dialect::rights_from_local(crate::Rights::from_bits_retain(RIGHTS)),
             decoder,
             offset,
         )?
@@ -1920,33 +2354,32 @@ impl<T: 'static + HandleBased, const OBJECT_TYPE: u32, const RIGHTS: u32>
 }
 
 #[inline]
-unsafe fn encode_handle(
-    handle: Handle,
-    object_type: ObjectType,
-    rights: Rights,
-    encoder: &mut Encoder<'_, DefaultFuchsiaResourceDialect>,
+unsafe fn encode_handle<D: ResourceDialect>(
+    handle: D::Handle,
+    object_type: D::ObjectType,
+    rights: D::Rights,
+    encoder: &mut Encoder<'_, D>,
     offset: usize,
 ) -> Result<()> {
     if handle.is_invalid() {
         return Err(Error::NotNullable);
     }
     encoder.write_num(ALLOC_PRESENT_U32, offset);
-    encoder.push_next_handle(HandleDisposition::new(
-        HandleOp::Move(handle),
+    encoder.handles.push(<D::ProxyChannel as ProxyChannelFor<D>>::HandleDisposition::from_handle(
+        handle,
         object_type,
         rights,
-        Status::OK,
     ));
     Ok(())
 }
 
 #[inline]
-unsafe fn decode_handle(
-    object_type: ObjectType,
-    rights: Rights,
-    decoder: &mut Decoder<'_, DefaultFuchsiaResourceDialect>,
+unsafe fn decode_handle<D: ResourceDialect>(
+    object_type: D::ObjectType,
+    rights: D::Rights,
+    decoder: &mut Decoder<'_, D>,
     offset: usize,
-) -> Result<Handle> {
+) -> Result<D::Handle> {
     match decoder.read_num::<u32>(offset) {
         ALLOC_PRESENT_U32 => {}
         ALLOC_ABSENT_U32 => return Err(Error::NotNullable),
@@ -3150,14 +3583,17 @@ impl<D: ResourceDialect> Decode<Self, D> for TransactionHeader {
 // TLS buffer
 ////////////////////////////////////////////////////////////////////////////////
 
-struct TlsBuf {
+/// Thread-local buffer for encoding and decoding FIDL transactions. Needed to
+/// implement `ResourceDialect`.
+pub struct TlsBuf<D: ResourceDialect> {
     bytes: Vec<u8>,
-    encode_handles: Vec<HandleDisposition<'static>>,
-    decode_handles: Vec<HandleInfo>,
+    encode_handles: Vec<<D::ProxyChannel as ProxyChannelFor<D>>::HandleDisposition>,
+    decode_handles: Vec<<D::Handle as HandleFor<D>>::HandleInfo>,
 }
 
-impl TlsBuf {
-    fn new() -> TlsBuf {
+impl<D: ResourceDialect> Default for TlsBuf<D> {
+    /// Create a new `TlsBuf`
+    fn default() -> TlsBuf<D> {
         TlsBuf {
             bytes: Vec::with_capacity(MIN_BUF_BYTES_SIZE),
             encode_handles: Vec::new(),
@@ -3166,7 +3602,10 @@ impl TlsBuf {
     }
 }
 
-thread_local!(static TLS_BUF: RefCell<TlsBuf> = RefCell::new(TlsBuf::new()));
+#[inline]
+fn with_tls_buf<D: ResourceDialect, R>(f: impl FnOnce(&mut TlsBuf<D>) -> R) -> R {
+    D::with_tls_buf(f)
+}
 
 pub(crate) const MIN_BUF_BYTES_SIZE: usize = 512;
 
@@ -3175,14 +3614,15 @@ pub(crate) const MIN_BUF_BYTES_SIZE: usize = 512;
 /// This function may not be called recursively.
 #[inline]
 pub fn with_tls_encode_buf<R, D: ResourceDialect>(
-    f: impl FnOnce(&mut Vec<u8>, &mut Vec<HandleDisposition<'static>>) -> R,
+    f: impl FnOnce(
+        &mut Vec<u8>,
+        &mut Vec<<D::ProxyChannel as ProxyChannelFor<D>>::HandleDisposition>,
+    ) -> R,
 ) -> R {
-    TLS_BUF.with(|buf| {
-        let (mut bytes, mut handles) =
-            RefMut::map_split(buf.borrow_mut(), |b| (&mut b.bytes, &mut b.encode_handles));
-        let res = f(&mut bytes, &mut handles);
-        bytes.clear();
-        handles.clear();
+    with_tls_buf::<D, R>(|buf| {
+        let res = f(&mut buf.bytes, &mut buf.encode_handles);
+        buf.bytes.clear();
+        buf.encode_handles.clear();
         res
     })
 }
@@ -3192,14 +3632,12 @@ pub fn with_tls_encode_buf<R, D: ResourceDialect>(
 /// This function may not be called recursively.
 #[inline]
 pub fn with_tls_decode_buf<R, D: ResourceDialect>(
-    f: impl FnOnce(&mut Vec<u8>, &mut Vec<HandleInfo>) -> R,
+    f: impl FnOnce(&mut Vec<u8>, &mut Vec<<D::Handle as HandleFor<D>>::HandleInfo>) -> R,
 ) -> R {
-    TLS_BUF.with(|buf| {
-        let (mut bytes, mut handles) =
-            RefMut::map_split(buf.borrow_mut(), |b| (&mut b.bytes, &mut b.decode_handles));
-        let res = f(&mut bytes, &mut handles);
-        bytes.clear();
-        handles.clear();
+    with_tls_buf::<D, R>(|buf| {
+        let res = f(&mut buf.bytes, &mut buf.decode_handles);
+        buf.bytes.clear();
+        buf.decode_handles.clear();
         res
     })
 }
@@ -3210,10 +3648,13 @@ pub fn with_tls_decode_buf<R, D: ResourceDialect>(
 #[inline]
 pub fn with_tls_encoded<T: TypeMarker, D: ResourceDialect, Out>(
     val: impl Encode<T, D>,
-    f: impl FnOnce(&mut Vec<u8>, &mut Vec<HandleDisposition<'static>>) -> Result<Out>,
+    f: impl FnOnce(
+        &mut Vec<u8>,
+        &mut Vec<<D::ProxyChannel as ProxyChannelFor<D>>::HandleDisposition>,
+    ) -> Result<Out>,
 ) -> Result<Out> {
-    with_tls_encode_buf::<_, D>(|bytes, handles| {
-        Encoder::encode(bytes, handles, val)?;
+    with_tls_encode_buf::<Result<Out>, D>(|bytes, handles| {
+        Encoder::<D>::encode(bytes, handles, val)?;
         f(bytes, handles)
     })
 }

@@ -374,6 +374,7 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
+    use fidl::encoding::ProxyChannelBox;
     use fidl::endpoints::RequestStream;
     use fidl_fuchsia_inspect::InspectSinkMarker;
     use fidl_fuchsia_logger::{LogSinkMarker, LogSinkRequestStream};
@@ -545,7 +546,7 @@ mod tests {
         } => {
             assert_eq!(payload.component, *IDENTITY);
             let actual_koid = payload.request_stream
-                .into_inner().0.channel().as_handle_ref().get_koid().unwrap();
+                .into_inner().0.channel().as_channel().as_handle_ref().get_koid().unwrap();
             assert_eq!(actual_koid, request_stream_koid);
         });
         assert!(second_receiver.next().now_or_never().is_none());

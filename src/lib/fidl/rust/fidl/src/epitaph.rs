@@ -5,11 +5,11 @@
 //! Epitaph support for Channel and AsyncChannel.
 
 use crate::encoding::{
-    self, DefaultFuchsiaResourceDialect, DynamicFlags, EpitaphBody, TransactionHeader,
+    self, DynamicFlags, EpitaphBody, NoHandleResourceDialect, TransactionHeader,
     TransactionMessage, TransactionMessageType,
 };
 use crate::error::Error;
-use crate::{AsyncChannel, Channel, HandleDisposition};
+use crate::{AsyncChannel, Channel, TransportError};
 use zx_status;
 
 /// Extension trait that provides Channel-like objects with the ability to send a FIDL epitaph.
@@ -30,31 +30,21 @@ impl ChannelEpitaphExt for AsyncChannel {
     }
 }
 
-pub(crate) trait ChannelLike {
-    fn write_etc(
-        &self,
-        bytes: &[u8],
-        handles: &mut Vec<HandleDisposition<'_>>,
-    ) -> Result<(), zx_status::Status>;
+/// Indicates an object is "channel-like" in that it can receive epitaphs.
+pub trait ChannelLike {
+    /// Write an epitaph to a channel. Same as write_etc but is never fed handles.
+    fn write_epitaph(&self, bytes: &[u8]) -> Result<(), TransportError>;
 }
 
 impl ChannelLike for Channel {
-    fn write_etc(
-        &self,
-        bytes: &[u8],
-        handles: &mut Vec<HandleDisposition<'_>>,
-    ) -> Result<(), zx_status::Status> {
-        self.write_etc(bytes, handles)
+    fn write_epitaph(&self, bytes: &[u8]) -> Result<(), TransportError> {
+        self.write_etc(bytes, &mut []).map_err(Into::into)
     }
 }
 
 impl ChannelLike for AsyncChannel {
-    fn write_etc(
-        &self,
-        bytes: &[u8],
-        handles: &mut Vec<HandleDisposition<'_>>,
-    ) -> Result<(), zx_status::Status> {
-        self.write_etc(bytes, handles)
+    fn write_epitaph(&self, bytes: &[u8]) -> Result<(), TransportError> {
+        self.write_etc(bytes, &mut []).map_err(Into::into)
     }
 }
 
@@ -66,12 +56,14 @@ pub(crate) fn write_epitaph_impl<T: ChannelLike>(
         header: TransactionHeader::new(0, encoding::EPITAPH_ORDINAL, DynamicFlags::empty()),
         body: &EpitaphBody { error: status },
     };
-    encoding::with_tls_encoded::<
-        TransactionMessageType<EpitaphBody>,
-        DefaultFuchsiaResourceDialect,
-        (),
-    >(msg, |bytes, handles| match channel.write_etc(bytes, handles) {
-        Ok(()) | Err(zx_status::Status::PEER_CLOSED) => Ok(()),
-        Err(e) => Err(Error::ServerEpitaphWrite(e.into())),
-    })
+    encoding::with_tls_encoded::<TransactionMessageType<EpitaphBody>, NoHandleResourceDialect, ()>(
+        msg,
+        |bytes, handles| {
+            assert!(handles.is_empty(), "Epitaph should not have handles!");
+            match channel.write_epitaph(bytes) {
+                Ok(()) | Err(TransportError::Status(zx_status::Status::PEER_CLOSED)) => Ok(()),
+                Err(e) => Err(Error::ServerEpitaphWrite(e)),
+            }
+        },
+    )
 }

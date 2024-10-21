@@ -44,6 +44,7 @@ rustc_library("fidl") {
   edition = "2021"
   deps = fidl_rust_deps
   sources = fidl_rust_sources
+  configs += [ "//build/config:optimize_size_lto" ]
 }
 
 rustc_test("fidl_rust_lib_tests_bin") {
