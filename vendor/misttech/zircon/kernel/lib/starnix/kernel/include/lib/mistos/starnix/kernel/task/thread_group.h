@@ -265,7 +265,7 @@ class ThreadGroupMutableState {
 
   pid_t get_ppid() const;
 
-  void set_process_group(fbl::RefPtr<ProcessGroup> new_process_group, PidTable* pids);
+  void set_process_group(fbl::RefPtr<ProcessGroup> new_process_group, PidTable& pids);
 
   // Removes this thread group from its current process group
   void leave_process_group(PidTable& pids);
