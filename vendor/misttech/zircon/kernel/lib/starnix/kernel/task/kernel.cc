@@ -7,6 +7,7 @@
 #include <lib/fit/result.h>
 #include <lib/mistos/starnix/kernel/vfs/file_system.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
+#include <lib/mistos/util/weak_wrapper.h>
 #include <zircon/errors.h>
 
 #include <fbl/alloc_checker.h>
@@ -16,7 +17,8 @@
 
 namespace starnix {
 
-Kernel::Kernel(const ktl::string_view& _cmdline) : cmdline{ktl::move(_cmdline)} {}
+Kernel::Kernel(const ktl::string_view& _cmdline)
+    : kthreads_(KernelThreads::New(util::WeakPtr(this))), cmdline{ktl::move(_cmdline)} {}
 
 Kernel::~Kernel() = default;
 
