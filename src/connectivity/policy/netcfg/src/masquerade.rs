@@ -118,13 +118,7 @@ impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
         let state =
             self.active_controllers.get_mut(&config).ok_or_else(|| Error::InvalidArguments)?;
         let ValidatedConfig { src_subnet, output_interface } = config;
-        let outgoing_nic = match u32::try_from(output_interface.get()) {
-            Ok(on) => on,
-            Err(e) => {
-                error!("Provided output_interface does not fit in u32: {e:?}");
-                return Err(Error::InvalidArguments);
-            }
-        };
+        let outgoing_nic = output_interface.get();
         update_interface(
             &self.filter,
             output_interface,
@@ -521,7 +515,7 @@ pub mod test {
             assert!(s.active_interfaces.contains(&VALID_OUTPUT_INTERFACE.get()));
 
             assert_eq!(s.nat_rules.len(), 1);
-            assert_eq!(s.nat_rules[0].outgoing_nic, VALID_OUTPUT_INTERFACE.get() as u32);
+            assert_eq!(s.nat_rules[0].outgoing_nic, VALID_OUTPUT_INTERFACE.get());
         }
         assert_matches!(
             masq.set_enabled(DEFAULT_CONFIG, false, &mut filter_enabled_state, &interface_states)
