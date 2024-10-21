@@ -163,7 +163,7 @@ struct TestVariation {
 }
 
 fn str_to_syn_path(path: &str) -> syn::Path {
-    let mut segments = syn::punctuated::Punctuated::<_, syn::token::Colon2>::new();
+    let mut segments = syn::punctuated::Punctuated::<_, syn::token::PathSep>::new();
     for seg in path.split("::") {
         segments.push(syn::PathSegment {
             ident: syn::Ident::new(seg, Span::call_site()),
@@ -244,14 +244,14 @@ impl syn::parse::Parse for NetstackTestArgs {
             syn::punctuated::Punctuated::<syn::MetaNameValue, syn::Token![,]>::parse_terminated(
                 input,
             )?;
-        for syn::MetaNameValue { path, lit, .. } in args {
+        for syn::MetaNameValue { path, value, .. } in args {
             let ident = path
                 .get_ident()
                 .ok_or_else(|| syn::Error::new(path.span(), "expecting identifier"))?;
             if ident == "test_name" {
-                let lit = match lit {
-                    syn::Lit::Bool(b) => b,
-                    _ => return Err(syn::Error::new(lit.span(), "expected boolean")),
+                let lit = match value {
+                    syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Bool(b), .. }) => b,
+                    _ => return Err(syn::Error::new(value.span(), "expected boolean")),
                 };
                 test_name = lit.value;
             } else {
@@ -269,7 +269,7 @@ fn extract_variants(mut input: syn::ItemFn) -> Result<(syn::ItemFn, Vec<Variant>
     // ones that aren't part of netstack_test.
     let mut variants = Vec::new();
     for attr in all_attrs {
-        if !attr.path.get_ident().is_some_and(|ident| ident == "variant") {
+        if !attr.path().get_ident().is_some_and(|ident| ident == "variant") {
             // Not a netstack_test variant attribute.
             attrs.push(attr);
             continue;
