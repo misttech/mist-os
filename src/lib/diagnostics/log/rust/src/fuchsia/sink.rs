@@ -227,7 +227,7 @@ mod tests {
             let len = socket.read(&mut buf).unwrap();
             let (record, _) = parse_record(&buf[..len]).unwrap();
             assert_eq!(socket.outstanding_read_bytes().unwrap(), 0, "socket must be empty");
-            record.to_owned()
+            record.into_owned()
         };
 
         // emit some expected messages and then we'll retrieve them for parsing
@@ -325,7 +325,7 @@ mod tests {
             let len = socket.read(&mut buf).unwrap();
             let (record, _) = parse_record(&buf[..len]).unwrap();
             assert_eq!(socket.outstanding_read_bytes().unwrap(), 0, "socket must be empty");
-            record.to_owned()
+            record.into_owned()
         };
 
         info!("this should have a tag");
@@ -349,7 +349,7 @@ mod tests {
             let len = socket.read(buf).unwrap();
             let (record, _) = parse_record(&buf[..len]).unwrap();
             assert_eq!(socket.outstanding_read_bytes().unwrap(), 0, "socket must be empty");
-            record.to_owned()
+            record.into_owned()
         };
 
         let log_fn = || {
@@ -390,7 +390,7 @@ mod tests {
             let len = socket.read(&mut buf).unwrap();
             let (record, _) = parse_record(&buf[..len]).unwrap();
             assert_eq!(socket.outstanding_read_bytes().unwrap(), 0, "socket must be empty");
-            record.to_owned()
+            record.into_owned()
         };
 
         let span = info_span!("span 1", tag = "foo");
@@ -433,7 +433,7 @@ mod tests {
             let len = socket.read(&mut buf).unwrap();
             let (record, _) = parse_record(&buf[..len]).unwrap();
             assert_eq!(socket.outstanding_read_bytes().unwrap(), 0, "socket must be empty");
-            record.to_owned()
+            record.into_owned()
         };
 
         let span = info_span!("span 1", tag = "foo");

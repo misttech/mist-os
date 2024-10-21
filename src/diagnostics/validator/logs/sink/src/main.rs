@@ -657,7 +657,7 @@ impl TestRecord {
             match argument {
                 Argument::Tag(tag) => {
                     // check for ignored tags
-                    if args.ignored_tags.iter().any(|t| t.as_str() == tag.as_str()) {
+                    if args.ignored_tags.iter().any(|t| t.as_str() == tag) {
                         return Ok(None);
                     }
                 }

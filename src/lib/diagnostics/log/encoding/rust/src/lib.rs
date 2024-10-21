@@ -31,11 +31,11 @@ pub struct Record<'a> {
 
 impl Record<'_> {
     /// Consumes the current value and returns one in the static lifetime.
-    pub fn to_owned(self) -> Record<'static> {
+    pub fn into_owned(self) -> Record<'static> {
         Record {
             timestamp: self.timestamp,
             severity: self.severity,
-            arguments: self.arguments.into_iter().map(|arg| arg.to_owned()).collect(),
+            arguments: self.arguments.into_iter().map(|arg| arg.into_owned()).collect(),
         }
     }
 }
@@ -48,19 +48,19 @@ pub enum Argument<'a> {
     /// Thread ID
     Tid(zx::Koid),
     /// A log tag
-    Tag(StringRef<'a>),
+    Tag(Cow<'a, str>),
     /// Number of dropped logs
     Dropped(u64),
     /// A filename
-    File(StringRef<'a>),
+    File(Cow<'a, str>),
     /// A log message
-    Message(StringRef<'a>),
+    Message(Cow<'a, str>),
     /// A line number in a file
     Line(u64),
     /// A custom argument with a given name and value
     Other {
         /// The name of the argument.
-        name: StringRef<'a>,
+        name: Cow<'a, str>,
         /// The value of the argument.
         value: Value<'a>,
     },
@@ -76,9 +76,9 @@ const LINE: &'static str = "line";
 
 impl<'a> Argument<'a> {
     /// Creates a new argument given its name and a value.
-    pub fn new(name: impl Into<StringRef<'a>>, value: impl Into<Value<'a>>) -> Self {
-        let name: StringRef<'a> = name.into();
-        match (name.as_str(), value.into()) {
+    pub fn new(name: impl Into<Cow<'a, str>>, value: impl Into<Value<'a>>) -> Self {
+        let name: Cow<'a, str> = name.into();
+        match (name.as_ref(), value.into()) {
             (PID, Value::UnsignedInt(pid)) => Self::pid(zx::Koid::from_raw(pid)),
             (TID, Value::UnsignedInt(pid)) => Self::tid(zx::Koid::from_raw(pid)),
             (TAG, Value::Text(tag)) => Self::tag(tag),
@@ -104,13 +104,13 @@ impl<'a> Argument<'a> {
 
     #[inline]
     /// Creates a new argument for a log message.
-    pub fn message(message: impl Into<StringRef<'a>>) -> Self {
+    pub fn message(message: impl Into<Cow<'a, str>>) -> Self {
         Argument::Message(message.into())
     }
 
     #[inline]
     /// Creates a new argument for a tag.
-    pub fn tag(value: impl Into<StringRef<'a>>) -> Self {
+    pub fn tag(value: impl Into<Cow<'a, str>>) -> Self {
         Argument::Tag(value.into())
     }
 
@@ -122,7 +122,7 @@ impl<'a> Argument<'a> {
 
     #[inline]
     /// Creates a new argument for a file.
-    pub fn file(value: impl Into<StringRef<'a>>) -> Self {
+    pub fn file(value: impl Into<Cow<'a, str>>) -> Self {
         Argument::File(value.into())
     }
 
@@ -135,22 +135,22 @@ impl<'a> Argument<'a> {
     // We keep this private for the places where we know we don't need to interpret as a known
     // field.
     #[inline]
-    pub(crate) fn other(name: impl Into<StringRef<'a>>, value: impl Into<Value<'a>>) -> Self {
+    pub(crate) fn other(name: impl Into<Cow<'a, str>>, value: impl Into<Value<'a>>) -> Self {
         Argument::Other { name: name.into(), value: value.into() }
     }
 
     /// Consumes the current value and returns one in the static lifetime.
-    pub fn to_owned(self) -> Argument<'static> {
+    pub fn into_owned(self) -> Argument<'static> {
         match self {
             Self::Pid(pid) => Argument::Pid(pid),
             Self::Tid(tid) => Argument::Tid(tid),
-            Self::Tag(tag) => Argument::Tag(tag.to_owned()),
+            Self::Tag(tag) => Argument::Tag(Cow::Owned(tag.into_owned())),
             Self::Dropped(dropped) => Argument::Dropped(dropped),
-            Self::File(file) => Argument::File(file.to_owned()),
+            Self::File(file) => Argument::File(Cow::Owned(file.into_owned())),
             Self::Line(line) => Argument::Line(line),
-            Self::Message(msg) => Argument::Message(msg.to_owned()),
+            Self::Message(msg) => Argument::Message(Cow::Owned(msg.into_owned())),
             Self::Other { name, value } => {
-                Argument::Other { name: name.to_owned(), value: value.to_owned() }
+                Argument::Other { name: Cow::Owned(name.into_owned()), value: value.into_owned() }
             }
         }
     }
@@ -165,8 +165,7 @@ impl<'a> Argument<'a> {
             Self::File(_) => FILE,
             Self::Line(_) => LINE,
             Self::Message(_) => MESSAGE,
-            Self::Other { name: StringRef::Empty, .. } => "",
-            Self::Other { name: StringRef::Inline(name), .. } => name.as_ref(),
+            Self::Other { name, .. } => name.borrow(),
         }
     }
 
@@ -175,10 +174,10 @@ impl<'a> Argument<'a> {
         match self {
             Self::Pid(pid) => Value::UnsignedInt(pid.raw_koid()),
             Self::Tid(tid) => Value::UnsignedInt(tid.raw_koid()),
-            Self::Tag(tag) => Value::Text(tag.clone_borrowed()),
+            Self::Tag(tag) => Value::Text(Cow::Borrowed(tag.as_ref())),
             Self::Dropped(num_dropped) => Value::UnsignedInt(*num_dropped),
-            Self::File(file) => Value::Text(file.clone_borrowed()),
-            Self::Message(msg) => Value::Text(msg.clone_borrowed()),
+            Self::File(file) => Value::Text(Cow::Borrowed(file.as_ref())),
+            Self::Message(msg) => Value::Text(Cow::Borrowed(msg.as_ref())),
             Self::Line(line) => Value::UnsignedInt(*line),
             Self::Other { value, .. } => value.clone_borrowed(),
         }
@@ -197,13 +196,13 @@ pub enum Value<'a> {
     /// A boolean value for a logging argument.
     Boolean(bool),
     /// A string value for a logging argument.
-    Text(StringRef<'a>),
+    Text(Cow<'a, str>),
 }
 
 impl<'a> Value<'a> {
-    fn to_owned(self) -> Value<'static> {
+    fn into_owned(self) -> Value<'static> {
         match self {
-            Self::Text(s) => Value::Text(s.to_owned()),
+            Self::Text(s) => Value::Text(Cow::Owned(s.into_owned())),
             Self::SignedInt(n) => Value::SignedInt(n),
             Self::UnsignedInt(n) => Value::UnsignedInt(n),
             Self::Floating(n) => Value::Floating(n),
@@ -213,7 +212,7 @@ impl<'a> Value<'a> {
 
     fn clone_borrowed(&'a self) -> Value<'a> {
         match self {
-            Self::Text(s) => Self::Text(s.clone_borrowed()),
+            Self::Text(s) => Self::Text(Cow::Borrowed(s.as_ref())),
             Self::SignedInt(n) => Self::SignedInt(*n),
             Self::UnsignedInt(n) => Self::UnsignedInt(*n),
             Self::Floating(n) => Self::Floating(*n),
@@ -258,12 +257,21 @@ impl From<f64> for Value<'_> {
     }
 }
 
-impl<'a, T> From<T> for Value<'a>
-where
-    T: Into<StringRef<'a>>,
-{
-    fn from(text: T) -> Value<'a> {
-        Value::Text(text.into())
+impl<'a> From<&'a str> for Value<'a> {
+    fn from(text: &'a str) -> Value<'a> {
+        Value::Text(Cow::Borrowed(text))
+    }
+}
+
+impl From<String> for Value<'static> {
+    fn from(text: String) -> Value<'static> {
+        Value::Text(Cow::Owned(text))
+    }
+}
+
+impl<'a> From<Cow<'a, str>> for Value<'a> {
+    fn from(text: Cow<'a, str>) -> Value<'a> {
+        Value::Text(text)
     }
 }
 
@@ -364,75 +372,6 @@ impl TryFrom<u8> for ArgType {
     }
 }
 
-/// A reference to a string, which may be owned or borrowed.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum StringRef<'a> {
-    /// An empty string.
-    Empty,
-    /// A string.
-    Inline(Cow<'a, str>),
-}
-
-impl<'a> StringRef<'a> {
-    fn mask(&self) -> u16 {
-        match self {
-            StringRef::Empty => 0,
-            StringRef::Inline(s) => (s.len() as u16) | (1 << 15),
-        }
-    }
-
-    fn to_owned(self) -> StringRef<'static> {
-        match self {
-            Self::Empty => StringRef::Empty,
-            Self::Inline(Cow::Owned(s)) => StringRef::Inline(Cow::Owned(s)),
-            Self::Inline(Cow::Borrowed(s)) => StringRef::Inline(Cow::Owned(s.to_owned())),
-        }
-    }
-
-    fn clone_borrowed(&'a self) -> Self {
-        match self {
-            Self::Empty => Self::Empty,
-            Self::Inline(Cow::Owned(s)) => Self::Inline(Cow::Borrowed(s.as_ref())),
-            Self::Inline(Cow::Borrowed(s)) => Self::Inline(Cow::Borrowed(s)),
-        }
-    }
-
-    /// Returns a reference to a underlying string or an empty static string when empty.
-    pub fn as_str(&'a self) -> &'a str {
-        match self {
-            StringRef::Empty => "",
-            StringRef::Inline(s) => s.borrow(),
-        }
-    }
-}
-
-impl<'a> From<String> for StringRef<'a> {
-    fn from(string: String) -> StringRef<'a> {
-        match string.len() {
-            0 => StringRef::Empty,
-            _ => StringRef::Inline(Cow::Owned(string)),
-        }
-    }
-}
-
-impl<'a> From<&'a str> for StringRef<'a> {
-    fn from(string: &'a str) -> StringRef<'a> {
-        match string.len() {
-            0 => StringRef::Empty,
-            _ => StringRef::Inline(Cow::Borrowed(string)),
-        }
-    }
-}
-
-impl std::fmt::Display for StringRef<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let StringRef::Inline(s) = self {
-            write!(f, "{s}")?;
-        }
-        Ok(())
-    }
-}
-
 /// A type which has a `Severity`.
 pub trait SeverityExt {
     /// Return the severity of this value.
@@ -511,13 +450,13 @@ mod tests {
     fn parse_argument<'a>(bytes: &'a [u8]) -> (&'a [u8], Argument<'static>) {
         let (remaining, decoded_from_full) =
             nom::error::dbg_dmp(&crate::parse::parse_argument, "roundtrip")(bytes).unwrap();
-        (remaining, decoded_from_full.to_owned())
+        (remaining, decoded_from_full.into_owned())
     }
 
     fn parse_record<'a>(bytes: &'a [u8]) -> (&'a [u8], Record<'static>) {
         let (remaining, decoded_from_full) =
             nom::error::dbg_dmp(&crate::parse::try_parse_record, "roundtrip")(bytes).unwrap();
-        (remaining, decoded_from_full.to_owned())
+        (remaining, decoded_from_full.into_owned())
     }
 
     const BUF_LEN: usize = 1024;

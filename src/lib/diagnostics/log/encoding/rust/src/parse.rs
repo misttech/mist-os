@@ -5,7 +5,7 @@
 //! Parse diagnostic records from streams, returning FIDL-generated structs that match expected
 //! diagnostic service APIs.
 
-use crate::{ArgType, Argument, Header, RawSeverity, Record, StringRef, Value};
+use crate::{ArgType, Argument, Header, RawSeverity, Record, Value};
 use nom::bytes::complete::take;
 use nom::multi::many0;
 use nom::number::complete::{le_f64, le_i64, le_u64};
@@ -95,9 +95,7 @@ fn parse_argument_internal<'a>(
     let arg_ty = ArgType::try_from(header.raw_type()).map_err(nom::Err::Failure)?;
 
     let (after_name, name) = string_ref(header.name_ref(), after_header, false)?;
-    if matches!(state, ParseState::Initial)
-        && matches!(&name, StringRef::Inline(Cow::Borrowed("message")))
-    {
+    if matches!(state, ParseState::Initial) && matches!(&name, Cow::Borrowed("message")) {
         *state = ParseState::InMessage;
     }
     let (value, after_value) = match arg_ty {
@@ -135,9 +133,9 @@ fn string_ref(
     ref_mask: u16,
     buf: &[u8],
     support_invalid_utf8: bool,
-) -> ParseResult<'_, StringRef<'_>> {
+) -> ParseResult<'_, Cow<'_, str>> {
     Ok(if ref_mask == 0 {
-        (buf, StringRef::Empty)
+        (buf, "".into())
     } else if (ref_mask & 1 << 15) == 0 {
         return Err(Err::Failure(ParseError::Unsupported));
     } else {
@@ -156,7 +154,7 @@ fn string_ref(
         };
         let (_padding, after_padding) = after_name.split_at(after_name.len() % 8);
 
-        (after_padding, StringRef::Inline(parsed))
+        (after_padding, parsed)
     })
 }
 

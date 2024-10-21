@@ -72,7 +72,7 @@ pub fn from_structured(source: MonikerWithUrl, bytes: &[u8]) -> Result<LogsData,
     for argument in record.arguments {
         match argument {
             Argument::Tag(tag) => {
-                builder = builder.add_tag(tag.as_str());
+                builder = builder.add_tag(tag);
             }
             Argument::Pid(pid) => {
                 builder = builder.set_pid(pid.raw_koid());
@@ -84,13 +84,13 @@ pub fn from_structured(source: MonikerWithUrl, bytes: &[u8]) -> Result<LogsData,
                 builder = builder.set_dropped(dropped);
             }
             Argument::File(file) => {
-                builder = builder.set_file(file.as_str());
+                builder = builder.set_file(file);
             }
             Argument::Line(line) => {
                 builder = builder.set_line(line);
             }
             Argument::Message(msg) => {
-                builder = builder.set_message(msg.as_str());
+                builder = builder.set_message(msg);
             }
             Argument::Other { value, name } => {
                 let name = LogsField::Other(name.to_string());

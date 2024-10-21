@@ -4,9 +4,7 @@
 
 //! Encoding diagnostic records using the Fuchsia Tracing format.
 
-use crate::{
-    ArgType, Argument, Header, Metatag, RawSeverity, Record, SeverityExt, StringRef, Value,
-};
+use crate::{ArgType, Argument, Header, Metatag, RawSeverity, Record, SeverityExt, Value};
 use fidl_fuchsia_diagnostics::Severity;
 use std::array::TryFromSliceError;
 use std::borrow::Borrow;
@@ -176,7 +174,7 @@ where
         let mut header = Header(0);
 
         self.write_string(argument.name())?;
-        header.set_name_ref(StringRef::from(argument.name()).mask());
+        header.set_name_ref(string_mask(argument.name()));
 
         match argument.value() {
             Value::SignedInt(s) => {
@@ -193,8 +191,8 @@ where
             }
             Value::Text(t) => {
                 header.set_type(ArgType::String as u8);
-                header.set_value_ref(t.mask());
-                self.write_string(t.as_str())
+                header.set_value_ref(string_mask(&t));
+                self.write_string(&t)
             }
             Value::Boolean(b) => {
                 header.set_type(ArgType::Bool as u8);
@@ -255,6 +253,14 @@ where
         }
         Ok(())
     }
+}
+
+fn string_mask(s: &str) -> u16 {
+    let len = s.len();
+    if len == 0 {
+        return 0;
+    }
+    (len as u16) | (1 << 15)
 }
 
 /// The attributes of a Span pre-encoded for usage in child events.
