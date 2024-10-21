@@ -305,7 +305,7 @@ fn may_create(
 
 /// Validate that `current_task` has permission to create a regular file in the `parent` directory,
 /// with the specified file `mode`.
-pub fn check_fs_node_create_access(
+pub(super) fn check_fs_node_create_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     parent: &FsNode,
@@ -316,7 +316,7 @@ pub fn check_fs_node_create_access(
 
 /// Validate that `current_task` has permission to create a symlink to `old_path` in the `parent`
 /// directory.
-pub fn check_fs_node_symlink_access(
+pub(super) fn check_fs_node_symlink_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     parent: &FsNode,
@@ -327,7 +327,7 @@ pub fn check_fs_node_symlink_access(
 
 /// Validate that `current_task` has permission to create a new directory in the `parent` directory,
 /// with the specified file `mode`.
-pub fn check_fs_node_mkdir_access(
+pub(super) fn check_fs_node_mkdir_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     parent: &FsNode,
@@ -338,7 +338,7 @@ pub fn check_fs_node_mkdir_access(
 
 /// Validate that `current_task` has permission to create a new special file, socket or pipe, in the
 /// `parent` directory, and with the specified file `mode` and `device_id`.
-pub fn check_fs_node_mknod_access(
+pub(super) fn check_fs_node_mknod_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     parent: &FsNode,
