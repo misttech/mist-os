@@ -62,21 +62,31 @@
                 // Fails due to: "No supported filesystems"
                 "getxattr03",
 
-                // 24 requires F_SETLEASE, and does not run on tmpfs.
+                // Does not run on tmpfs.
                 "fcntl24",
                 "fcntl24_64",
+
+                // Does not run on tmpfs.
                 "fcntl25",
                 "fcntl25_64",
+
+                // Does not run on tmpfs.
                 "fcntl26",
                 "fcntl26_64",
 
                 // 31 requires F_SETSIG.
                 "fcntl31",
                 "fcntl31_64",
+
+                // Does not run on tmpfs.
                 "fcntl32",
                 "fcntl32_64",
+
+                // 33 requires F_GETSIG.
                 "fcntl33",
                 "fcntl33_64",
+
+                // Skipped with tmpfs.
                 "fdatasync03",
                 "fs_di",
                 "fsetxattr02",
