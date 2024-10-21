@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/developer/process_explorer/utils.h"
+#include "src/developer/process_explorer/process_data.h"
 
 #include <unordered_map>
 

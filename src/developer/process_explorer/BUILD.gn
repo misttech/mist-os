@@ -14,10 +14,12 @@ group("process_explorer") {
 
 source_set("lib") {
   sources = [
+    "process_data.cc",
+    "process_data.h",
     "process_explorer.cc",
     "process_explorer.h",
-    "utils.cc",
-    "utils.h",
+    "task_hierarchy_data.cc",
+    "task_hierarchy_data.h",
   ]
 
   deps = [

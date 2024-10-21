@@ -354,6 +354,10 @@ mod tests {
                 })
                 .detach();
             }
+            QueryRequest::WriteJsonTaskHierarchyData { .. } => {
+                unreachable!();
+            }
+            _ => unreachable!(),
         })
     }
 

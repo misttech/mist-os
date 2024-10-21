@@ -18,7 +18,7 @@ pub mod raw {
     ///     (https://fxbug.dev/42138321), so the value is calculated
     ///     by the process_explorer component.
     ///     See more details about its implementation at
-    ///     src/developer/process_explorer/utils.h
+    ///     src/developer/process_explorer/process_data.h
     #[derive(Clone, Copy, Serialize, Deserialize, PartialEq, Debug)]
     pub struct KernelObject {
         /// The object type: channel, event, socket, etc.

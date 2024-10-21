@@ -24,6 +24,11 @@ class Explorer : public fidl::Server<fuchsia_process_explorer::Query>,
   void WriteJsonProcessesData(WriteJsonProcessesDataRequest& request,
                               WriteJsonProcessesDataCompleter::Sync& completer) override;
 
+  // Writes job hierarchy information to |socket| in JSON, in UTF-8.
+  // See process_explorer.fidl for a description of the format of the JSON.
+  void WriteJsonTaskHierarchyData(WriteJsonTaskHierarchyDataRequest& request,
+                                  WriteJsonTaskHierarchyDataCompleter::Sync& completer) override;
+
   // fuchsia.process.exploxer/ProcessExplorer implementation.
   void GetTaskInfo(GetTaskInfoRequest& request, GetTaskInfoCompleter::Sync& completer) override;
   void GetHandleInfo(GetHandleInfoRequest& request,
@@ -32,6 +37,9 @@ class Explorer : public fidl::Server<fuchsia_process_explorer::Query>,
   void GetStackTrace(GetStackTraceRequest& request,
                      GetStackTraceCompleter::Sync& completer) override;
   void KillTask(KillTaskRequest& request, KillTaskCompleter::Sync& completer) override;
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_process_explorer::Query> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
 
  private:
   fidl::ServerBindingGroup<fuchsia_process_explorer::Query> query_bindings_;

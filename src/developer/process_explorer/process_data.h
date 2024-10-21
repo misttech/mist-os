@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVELOPER_PROCESS_EXPLORER_UTILS_H_
-#define SRC_DEVELOPER_PROCESS_EXPLORER_UTILS_H_
+#ifndef SRC_DEVELOPER_PROCESS_EXPLORER_PROCESS_DATA_H_
+#define SRC_DEVELOPER_PROCESS_EXPLORER_PROCESS_DATA_H_
 
 #include <lib/zx/process.h>
 #include <zircon/types.h>
@@ -61,4 +61,4 @@ void FillPeerOwnerKoid(std::vector<Process>& processes_data);
 
 }  // namespace process_explorer
 
-#endif  // SRC_DEVELOPER_PROCESS_EXPLORER_UTILS_H_
+#endif  // SRC_DEVELOPER_PROCESS_EXPLORER_PROCESS_DATA_H_
