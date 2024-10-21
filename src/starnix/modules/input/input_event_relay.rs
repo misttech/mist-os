@@ -199,18 +199,14 @@ impl InputEventsRelay {
 
                             let dev = devs.get_mut(&device_id).unwrap_or(&mut default_touch_device);
 
+                            let last_event_time_ns: i64;
                             if let InputDeviceType::Touch(ref mut converter) = dev.device_type {
-                                let (
-                                    mut covered_events,
-                                    num_converted,
-                                    num_ignored,
-                                    num_unexpected,
-                                ) = converter.handle(events);
-
-                                new_events.append(&mut covered_events);
-                                num_converted_events += num_converted;
-                                num_ignored_events += num_ignored;
-                                num_unexpected_events += num_unexpected;
+                                let mut batch = converter.handle(events);
+                                new_events.append(&mut batch.events);
+                                num_converted_events += batch.count_converted_fidl_events;
+                                num_ignored_events += batch.count_ignored_fidl_events;
+                                num_unexpected_events += batch.count_unexpected_fidl_events;
+                                last_event_time_ns = batch.last_event_time_ns;
                             } else {
                                 log_warn!("Non touch device received touch events: device_id = {}, device_type = {}", device_id, dev.device_type);
                                 continue;
@@ -218,6 +214,7 @@ impl InputEventsRelay {
 
                             dev.open_files.lock().retain(|f| {
                                 let Some(file) = f.upgrade() else {
+                                    log_warn!("Dropping input file for touch that failed to upgrade");
                                     return false;
                                 };
                                 let mut inner = file.inner.lock();
@@ -228,17 +225,23 @@ impl InputEventsRelay {
                                         inspect_status
                                             .count_unexpected_events(num_unexpected_events);
                                         inspect_status.count_converted_events(num_converted_events);
-                                        inspect_status.count_generated_events(
-                                            new_events.len().try_into().unwrap(),
-                                        );
                                     }
-                                    None => (),
+                                    None => {
+                                      log_warn!("unable to record inspect within the input file")
+                                    }
                                 }
 
                                 if !new_events.is_empty() {
                                     // TODO(https://fxbug.dev/42075438): Reading from an `InputFile` should
                                     // not provide access to events that occurred before the file was
                                     // opened.
+                                    if let Some(inspect_status) = &inner.inspect_status {
+                                        inspect_status.count_generated_events(
+                                            new_events.len().try_into().unwrap(),
+                                            last_event_time_ns
+                                        );
+                                    }
+
                                     inner.events.append(&mut new_events);
                                     inner.waiters.notify_fd_events(FdEvents::POLLIN);
                                 }
@@ -295,6 +298,9 @@ impl InputEventsRelay {
 
                             dev.open_files.lock().retain(|f| {
                                 let Some(file) = f.upgrade() else {
+                                    log_warn!(
+                                        "Dropping input file for keyboard that failed to upgrade"
+                                    );
                                     return false;
                                 };
                                 let mut inner = file.inner.lock();
@@ -381,12 +387,14 @@ impl InputEventsRelay {
 
             match next_event_future.await {
                 Some(Ok(fuipolicy::MediaButtonsListenerRequest::OnEvent { event, responder })) => {
-                    let (new_events, power_is_pressed, function_is_pressed) =
+                    let batch =
                         parse_fidl_button_event(&event, power_was_pressed, function_was_pressed);
-                    power_was_pressed = power_is_pressed;
-                    function_was_pressed = function_is_pressed;
 
-                    let (converted_events, ignored_events, generated_events) = match new_events
+                    power_was_pressed = batch.power_is_pressed;
+                    function_was_pressed = batch.function_is_pressed;
+
+                    let (converted_events, ignored_events, generated_events) = match batch
+                        .events
                         .len()
                     {
                         0 => (0u64, 1u64, 0u64),
@@ -409,6 +417,7 @@ impl InputEventsRelay {
 
                     dev.open_files.lock().retain(|f| {
                         let Some(file) = f.upgrade() else {
+                            log_warn!("Dropping input file for buttons that failed to upgrade");
                             return false;
                         };
                         let mut inner = file.inner.lock();
@@ -417,13 +426,21 @@ impl InputEventsRelay {
                                 inspect_status.count_received_events(1);
                                 inspect_status.count_ignored_events(ignored_events);
                                 inspect_status.count_converted_events(converted_events);
-                                inspect_status.count_generated_events(generated_events);
                             }
-                            None => (),
+                            None => {
+                                log_warn!("unable to record inspect within the input file")
+                            }
                         }
 
-                        if !new_events.is_empty() {
-                            inner.events.extend(new_events.clone());
+                        if !batch.events.is_empty() {
+                            if let Some(inspect_status) = &inner.inspect_status {
+                                inspect_status.count_generated_events(
+                                    generated_events,
+                                    batch.event_time.into_nanos().try_into().unwrap(),
+                                );
+                            }
+
+                            inner.events.extend(batch.events.clone());
                             inner.waiters.notify_fd_events(FdEvents::POLLIN);
                         }
 

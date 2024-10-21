@@ -204,7 +204,7 @@ mod test {
     use crate::input_event_relay::{self, EventProxyMode};
     use anyhow::anyhow;
     use assert_matches::assert_matches;
-    use diagnostics_assertions::assert_data_tree;
+    use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fidl_fuchsia_ui_input::MediaButtonsEvent;
     use fuipointer::{
         EventPhase, TouchEvent, TouchInteractionId, TouchPointerSample, TouchResponse,
@@ -792,6 +792,8 @@ mod test {
                     fidl_events_converted_count: 1u64,
                     uapi_events_generated_count: 6u64,
                     uapi_events_read_count: 6u64,
+                    last_generated_uapi_event_timestamp_ns: 0i64,
+                    last_read_uapi_event_timestamp_ns: 0i64,
                 },
             }
         });
@@ -850,6 +852,8 @@ mod test {
                     fidl_events_converted_count: 1u64,
                     uapi_events_generated_count: 6u64,
                     uapi_events_read_count: 6u64,
+                    last_generated_uapi_event_timestamp_ns: 0i64,
+                    last_read_uapi_event_timestamp_ns: 0i64,
                 },
             }
         });
@@ -1519,6 +1523,8 @@ mod test {
                 fidl_events_converted_count: 0u64,
                 uapi_events_generated_count: 0u64,
                 uapi_events_read_count: 0u64,
+                last_generated_uapi_event_timestamp_ns: 0i64,
+                last_read_uapi_event_timestamp_ns: 0i64,
             }
         });
     }
@@ -1551,35 +1557,35 @@ mod test {
                             0.0,
                             EventPhase::Add,
                             1,
-                            1,
+                            1000,
                         ),
                         make_touch_event_with_coords_phase_timestamp(
                             0.0,
                             0.0,
                             EventPhase::Change,
                             1,
-                            2,
+                            2000,
                         ),
                         make_touch_event_with_coords_phase_timestamp(
                             0.0,
                             0.0,
                             EventPhase::Change,
                             1,
-                            3,
+                            3000,
                         ),
                         make_touch_event_with_coords_phase_timestamp(
                             0.0,
                             0.0,
                             EventPhase::Change,
                             1,
-                            4,
+                            4000,
                         ),
                         make_touch_event_with_coords_phase_timestamp(
                             0.0,
                             0.0,
                             EventPhase::Remove,
                             1,
-                            5,
+                            5000,
                         ),
                     ])
                     .expect("failure sending Watch reply");
@@ -1596,7 +1602,6 @@ mod test {
         }
 
         let _events = read_uapi_events(&mut locked, &input_file, &current_task);
-
         assert_data_tree!(inspector, root: {
             touch_device: {
                 touch_file: {
@@ -1606,6 +1611,8 @@ mod test {
                     fidl_events_converted_count: 5u64,
                     uapi_events_generated_count: 22u64,
                     uapi_events_read_count: 22u64,
+                    last_generated_uapi_event_timestamp_ns: 5000i64,
+                    last_read_uapi_event_timestamp_ns: 5000i64,
                 },
             }
         });
@@ -1627,6 +1634,8 @@ mod test {
                 fidl_events_converted_count: 0u64,
                 uapi_events_generated_count: 0u64,
                 uapi_events_read_count: 0u64,
+                last_generated_uapi_event_timestamp_ns: 0i64,
+                last_read_uapi_event_timestamp_ns: 0i64,
             }
         });
     }
@@ -1694,6 +1703,10 @@ mod test {
                     fidl_events_converted_count: 2u64,
                     uapi_events_generated_count: 4u64,
                     uapi_events_read_count: 4u64,
+
+                    // Button events perform a realtime clockread, so any value will do.
+                    last_generated_uapi_event_timestamp_ns: AnyProperty,
+                    last_read_uapi_event_timestamp_ns: AnyProperty,
                 },
             }
         });
