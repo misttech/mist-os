@@ -43,6 +43,7 @@ typedef struct zx_system_powerctl_arg {
 // Topics used by zx_system_{get,set}_performance_info():
 #define ZX_CPU_PERF_SCALE ((uint32_t)1u)
 #define ZX_CPU_DEFAULT_PERF_SCALE ((uint32_t)2u)
+#define ZX_CPU_POWER_LIMIT ((uint32_t)3)
 
 typedef struct zx_cpu_performance_scale {
   uint32_t integral_part;
@@ -53,6 +54,12 @@ typedef struct zx_cpu_performance_info {
   uint32_t logical_cpu_number;
   zx_cpu_performance_scale_t performance_scale;
 } zx_cpu_performance_info_t;
+
+typedef struct zx_cpu_power_limit {
+  uint32_t logical_cpu_number;
+  uint8_t padding1[4];
+  uint64_t max_power_nw;
+} zx_cpu_power_limit_t;
 
 __END_CDECLS
 

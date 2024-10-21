@@ -695,6 +695,7 @@ pub const ZX_RSRC_FLAG_EXCLUSIVE: zx_rsrc_flags_t = 0x00010000;
 // Topics for CPU performance info syscalls
 pub const ZX_CPU_PERF_SCALE: u32 = 1;
 pub const ZX_CPU_DEFAULT_PERF_SCALE: u32 = 2;
+pub const ZX_CPU_POWER_LIMIT: u32 = 3;
 
 // Cache policy flags.
 pub const ZX_CACHE_POLICY_CACHED: u32 = 0;
@@ -2192,6 +2193,14 @@ pub struct zx_cpu_performance_scale_t {
 pub struct zx_cpu_performance_info_t {
     pub logical_cpu_number: u32,
     pub performance_scale: zx_cpu_performance_scale_t,
+}
+
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
+pub struct zx_cpu_power_limit_t {
+    pub logical_cpu_number: u32,
+    pub padding1: [PadByte; 4],
+    pub max_power_nw: u64,
 }
 
 #[repr(C)]

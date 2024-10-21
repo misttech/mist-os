@@ -73,6 +73,14 @@ type StringView = struct {
     length usize64;
 };
 
+type CpuPowerLimit = struct {
+    // Target CPU.
+    logical_cpu_number uint32;
+    padding1 array<uint8, 4>;
+    // Maximum power consumption allowed for the cpu in nano-watts.
+    max_power_nw uint64;
+};
+
 @transport("Syscall")
 closed protocol System {
     /// ## Summary
@@ -507,6 +515,16 @@ closed protocol System {
     ///
     /// See [RFC 0123](/docs/contribute/governance/rfcs/0123_cpu_performance_info.md)
     /// for further details on values and update protocols.
+    ///
+    /// ### ZX_CPU_POWER_LIMIT
+    ///
+    /// *count*: Must be non-zero and less than or equal to the number of logical CPUs in the system.
+    ///
+    /// *info* type: `zx_cpu_power_limit_t[count]`
+    ///
+    /// An array of `zx_cpu_power_limit_t` with entries specifying the energy limits (in nano-watts).
+    /// These values will then be used by the scheduler to constrain the power consumption of each
+    /// affected processor.
     ///
     /// ## Rights
     ///
