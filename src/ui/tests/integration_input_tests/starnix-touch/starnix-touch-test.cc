@@ -121,7 +121,6 @@ class StarnixTouchTest : public ui_testing::PortableUITest {
 
   // For use by test cases.
   void InjectInput(TapLocation tap_location) {
-    auto touch = std::make_unique<fuchsia_ui_input::TouchscreenReport>();
     switch (tap_location) {
       case TapLocation::kTopLeft:
         InjectTap(display_width() / 4, display_height() / 4);
@@ -132,16 +131,17 @@ class StarnixTouchTest : public ui_testing::PortableUITest {
     }
   }
 
-  // Launches `touch_dump.cc`, connecting its `stdout` to `local_socket_`.
+  // Launches `touch_dump.cc`, connecting its `stdout` to `local_socket`.
   // Then waits for `touch_dump.cc` to report that it is ready to receive
   // input events.
-  void LaunchDumper() {
+  zx::socket LaunchDumper() {
     // Create a socket for communicating with `touch_dump`, and store it in
     // a collection of `HandleInfo`s.
     std::vector<fuchsia_process::HandleInfo> numbered_handles;
     zx::socket remote_socket;
+    zx::socket local_socket;
     zx_status_t sock_res;
-    sock_res = zx::socket::create(ZX_SOCKET_DATAGRAM, &local_socket_, &remote_socket);
+    sock_res = zx::socket::create(ZX_SOCKET_DATAGRAM, &local_socket, &remote_socket);
     FX_CHECK(sock_res == ZX_OK) << "Creating socket failed: " << zx_status_get_string(sock_res);
     numbered_handles.push_back(fuchsia_process::HandleInfo{
         {.handle = zx::handle(std::move(remote_socket)), .id = PA_HND(PA_FD, STDOUT_FILENO)}});
@@ -178,23 +178,26 @@ class StarnixTouchTest : public ui_testing::PortableUITest {
     // Wait for `touch_dump` to start.
     std::string packet;
     FX_LOGS(INFO) << "Waiting for touch_dump";
-    packet = BlockingReadFromTouchDump();
+    packet = BlockingReadFromTouchDump(local_socket);
     FX_CHECK(packet == relay_api::kReadyMessage)
         << "Got \"" << packet.data() << "\" with size " << packet.size();
+
+    return local_socket;
   }
 
-  // Reads sequences of touch events from `touch_dump.cc`, via `local_socket_`
+  // Reads sequences of touch events from `touch_dump.cc`, via `local_socket`
   // until we get num_expected events.
   //
   // Because of the variable amount of packets read at a time, we may create
   // varying  amounts of TouchEvents from a single call to GetEvDevPackets.
   // Therefore we use the running size of the final result to determine whether
   // to read more packets.
-  std::vector<TouchEvent> GetTouchEventSequenceOfLen(size_t num_expected) {
+  std::vector<TouchEvent> GetTouchEventSequenceOfLen(zx::socket& local_socket,
+                                                     size_t num_expected) {
     std::vector<TouchEvent> result;
 
     while (result.size() < num_expected) {
-      std::vector<EvDevPacket> pkts = GetEvDevPackets();
+      std::vector<EvDevPacket> pkts = GetEvDevPackets(local_socket);
 
       for (EvDevPacket pkt : pkts) {
         if (pkt.type == EV_SYN) {
@@ -324,7 +327,7 @@ class StarnixTouchTest : public ui_testing::PortableUITest {
     };
   }
 
-  // Reads a single piece of data from `touch_dump.cc`, via `local_socket_`.
+  // Reads a single piece of data from `touch_dump.cc`, via `local_socket`.
   //
   // There's no framing protocol between these two programs, so calling
   // code must run in lock-step with `touch_dump.cc`.
@@ -332,20 +335,20 @@ class StarnixTouchTest : public ui_testing::PortableUITest {
   // In particular: the calling code must not send a second touch event
   // until the calling code has read the response that `touch_dump.cc`
   // sent for the first event.
-  std::string BlockingReadFromTouchDump() {
+  std::string BlockingReadFromTouchDump(zx::socket& local_socket) {
     std::string buf(relay_api::kMaxPacketLen * relay_api::kDownUpNumPackets, '\0');
     size_t n_read{};
     zx_status_t res{};
     zx_signals_t actual_signals;
 
     FX_LOGS(INFO) << "Waiting for socket to be readable";
-    res = local_socket_.wait_one(ZX_SOCKET_READABLE, zx::deadline_after(kSocketTimeout),
-                                 &actual_signals);
+    res = local_socket.wait_one(ZX_SOCKET_READABLE, zx::deadline_after(kSocketTimeout),
+                                &actual_signals);
     FX_CHECK(res == ZX_OK) << "wait_one() returned " << zx_status_get_string(res);
     FX_CHECK(actual_signals & ZX_SOCKET_READABLE)
         << "expected signals to include ZX_SOCKET_READABLE, but actual_signals=" << actual_signals;
 
-    res = local_socket_.read(/* options = */ 0, buf.data(), buf.capacity(), &n_read);
+    res = local_socket.read(/* options = */ 0, buf.data(), buf.capacity(), &n_read);
     FX_CHECK(res == ZX_OK) << "read() returned " << zx_status_get_string(res);
     buf.resize(n_read);
 
@@ -353,9 +356,9 @@ class StarnixTouchTest : public ui_testing::PortableUITest {
     return buf;
   }
 
-  std::vector<EvDevPacket> GetEvDevPackets() {
+  std::vector<EvDevPacket> GetEvDevPackets(zx::socket& local_socket) {
     std::vector<EvDevPacket> ev_pkts;
-    std::string packets = BlockingReadFromTouchDump();
+    std::string packets = BlockingReadFromTouchDump(local_socket);
     std::size_t next = packets.find(relay_api::kEventDelimiter);
     while (next != std::string::npos) {
       packets = packets.substr(next);
@@ -375,7 +378,6 @@ class StarnixTouchTest : public ui_testing::PortableUITest {
     return {fidl::DiscoverableProtocolName<T>};
   }
 
-  zx::socket local_socket_;
   // Resources for communicating with the realm server.
   // * `realm_event_handler_` must live at least as long as `realm_client_`
   // * `realm_client_` is stored in the fixture to keep `touch_dump` alive for the
@@ -386,7 +388,7 @@ class StarnixTouchTest : public ui_testing::PortableUITest {
 
 // TODO: https://fxbug.dev/42082519 - Test for DPR=2.0, too.
 TEST_F(StarnixTouchTest, Tap) {
-  LaunchDumper();
+  zx::socket local_socket = LaunchDumper();
 
   // Wait until #launch_input is presented before injecting input.
   WaitForViewPresentation();
@@ -395,7 +397,7 @@ TEST_F(StarnixTouchTest, Tap) {
   InjectInput(TapLocation::kTopLeft);
 
   {
-    auto events = GetTouchEventSequenceOfLen(kDownUpNumEvents);
+    auto events = GetTouchEventSequenceOfLen(local_socket, kDownUpNumEvents);
     ExpectBtnTouch(events[0], 1);
     ExpectLocationPhaseAndSlot(events[1], static_cast<float>(display_width()) / 4.f,
                                static_cast<float>(display_height()) / 4.f,
@@ -408,7 +410,7 @@ TEST_F(StarnixTouchTest, Tap) {
   InjectInput(TapLocation::kBottomRight);
 
   {
-    auto events = GetTouchEventSequenceOfLen(kDownUpNumEvents);
+    auto events = GetTouchEventSequenceOfLen(local_socket, kDownUpNumEvents);
     ExpectBtnTouch(events[0], 1);
     ExpectLocationPhaseAndSlot(events[1], 3 * static_cast<float>(display_width()) / 4.f,
                                3 * static_cast<float>(display_height()) / 4.f,
