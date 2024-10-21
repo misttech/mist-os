@@ -10,28 +10,48 @@ ffx_plugin("ffx_update") {
   with_unit_tests = true
   args_with_unit_tests = true
   deps = [
+    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
+    "//sdk/fidl/fuchsia.pkg.rewrite:fuchsia.pkg.rewrite_rust",
+    "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//sdk/fidl/fuchsia.update:fuchsia.update_rust",
     "//sdk/fidl/fuchsia.update.channelcontrol:fuchsia.update.channelcontrol_rust",
+    "//sdk/rust/zx-status",
+    "//src/developer/ffx/config:lib",
+    "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/fho:lib",
+    "//src/developer/ffx/lib/target:lib",
+    "//src/developer/ffx/lib/timeout:lib",
+    "//src/developer/ffx/plugins/repository/server/start:ffx_repository_server_start",
+    "//src/developer/ffx/plugins/repository/server/start:ffx_repository_server_start_args",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-url",
+    "//src/sys/lib/fidl-fuchsia-pkg-rewrite-ext",
     "//src/sys/pkg/fidl/fuchsia.update.installer:fuchsia.update.installer_rust",
     "//src/sys/pkg/lib/fidl-fuchsia-update-ext",
     "//src/sys/pkg/lib/fidl-fuchsia-update-installer-ext",
-    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:camino",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:termion",
+    "//third_party/rust_crates:tracing",
   ]
 
   test_deps = [
+    "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/sys/pkg/testing/mock-installer",
     "//third_party/rust_crates:assert_matches",
   ]
+
   args_test_deps = [ "//third_party/rust_crates:assert_matches" ]
 
   args_sources = [ "src/args.rs" ]
 
-  sources = [ "src/lib.rs" ]
+  sources = [
+    "src/lib.rs",
+    "src/server.rs",
+  ]
 }
