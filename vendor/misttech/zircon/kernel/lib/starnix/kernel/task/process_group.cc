@@ -41,8 +41,6 @@ bool ProcessGroupMutableState::remove(fbl::RefPtr<ThreadGroup> thread_group) {
   return thread_groups_.is_empty();
 }
 
-ProcessGroup::~ProcessGroup() { mutable_state_.Write()->thread_groups_.clear(); }
-
 ProcessGroup::ProcessGroup(fbl::RefPtr<Session> session, pid_t leader)
     : session_(ktl::move(session)), leader_(leader) {}
 
@@ -56,6 +54,8 @@ fbl::RefPtr<ProcessGroup> ProcessGroup::New(pid_t leader,
 
   return ktl::move(pg);
 }
+
+ProcessGroup::~ProcessGroup() = default;
 
 void ProcessGroup::insert(fbl::RefPtr<ThreadGroup> thread_group) {
   mutable_state_.Write()->thread_groups_.insert(thread_group->weak_thread_group());
