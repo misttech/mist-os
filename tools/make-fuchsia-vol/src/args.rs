@@ -23,11 +23,31 @@ impl FromStr for Arch {
     }
 }
 
+#[cfg(target_arch = "x86_64")]
+impl Default for Arch {
+    fn default() -> Self {
+        Arch::X64
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
+impl Default for Arch {
+    fn default() -> Self {
+        Arch::Arm64
+    }
+}
+
 #[derive(Debug)]
 pub enum BootPart {
     BootA,
     BootB,
     BootR,
+}
+
+impl Default for BootPart {
+    fn default() -> Self {
+        BootPart::BootA
+    }
 }
 
 impl FromStr for BootPart {
@@ -43,7 +63,7 @@ impl FromStr for BootPart {
 }
 
 /// make-fuchsia-vol command line arguments
-#[derive(FromArgs, Debug)]
+#[derive(FromArgs, Debug, Default)]
 pub struct TopLevel {
     /// disk-path
     #[argh(positional)]
@@ -73,7 +93,7 @@ pub struct TopLevel {
     pub arch: Arch,
 
     /// the architecture of the host CPU (x64|arm64)
-    #[argh(option, default = "Arch::X64")]
+    #[argh(option, default = "Arch::default()")]
     pub host_arch: Arch,
 
     /// path to fuchsia-efi.efi
@@ -145,7 +165,7 @@ pub struct TopLevel {
     pub vbmeta_size: u64,
 
     /// A/B/R partition to boot by default
-    #[argh(option, default = "BootPart::BootA")]
+    #[argh(option, default = "BootPart::default()")]
     pub abr_boot: BootPart,
 
     /// the block size of the target disk
