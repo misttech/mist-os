@@ -204,7 +204,7 @@ impl From<MulticastAddr<Mac>> for FrameDestination {
 }
 
 /// The metadata required for a packet to get into the IP layer.
-pub struct RecvIpFrameMeta<D, I: Ip> {
+pub struct RecvIpFrameMeta<D, M, I: Ip> {
     /// The device on which the IP frame was received.
     pub device: D,
     /// The link-layer destination address from the link-layer frame, if any.
@@ -214,15 +214,22 @@ pub struct RecvIpFrameMeta<D, I: Ip> {
     // protocols without destination addresses (i.e. PPP), but at the moment no
     // such protocols are supported.
     pub frame_dst: Option<FrameDestination>,
+    /// Metadata that is produced and consumed by the IP layer but which traverses
+    /// the device layer through the loopback device.
+    pub ip_layer_metadata: M,
     /// A marker for the Ip version in this frame.
     pub marker: IpVersionMarker<I>,
 }
 
-impl<D, I: Ip> RecvIpFrameMeta<D, I> {
+impl<D, M, I: Ip> RecvIpFrameMeta<D, M, I> {
     /// Creates a new `RecvIpFrameMeta` originating from `device` and `frame_dst`
     /// option.
-    pub fn new(device: D, frame_dst: Option<FrameDestination>) -> RecvIpFrameMeta<D, I> {
-        RecvIpFrameMeta { device, frame_dst, marker: IpVersionMarker::new() }
+    pub fn new(
+        device: D,
+        frame_dst: Option<FrameDestination>,
+        ip_layer_metadata: M,
+    ) -> RecvIpFrameMeta<D, M, I> {
+        RecvIpFrameMeta { device, frame_dst, ip_layer_metadata, marker: IpVersionMarker::new() }
     }
 }
 

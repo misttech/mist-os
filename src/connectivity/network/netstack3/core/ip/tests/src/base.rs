@@ -8,6 +8,7 @@ use assert_matches::assert_matches;
 use core::num::NonZeroU16;
 use core::time::Duration;
 
+use const_unwrap::const_unwrap_option;
 use ip_test_macro::ip_test;
 use net_declare::{net_ip_v4, net_ip_v6};
 use net_types::ethernet::Mac;
@@ -15,10 +16,11 @@ use net_types::ip::{
     AddrSubnet, GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, IpVersion, Ipv4, Ipv4Addr, Ipv6,
     Ipv6Addr, Mtu, Subnet,
 };
-use net_types::{MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _};
+use net_types::{MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _, ZonedAddr};
 use packet::{Buf, InnerPacketBuilder, ParseBuffer, ParseMetadata, Serializer as _};
 use packet_formats::ethernet::{
-    EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, ETHERNET_MIN_BODY_LEN_NO_TAG,
+    EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt as _,
+    ETHERNET_MIN_BODY_LEN_NO_TAG,
 };
 use packet_formats::icmp::{
     IcmpDestUnreachable, IcmpEchoRequest, IcmpPacketBuilder, IcmpParseArgs, IcmpUnusedCode,
@@ -32,22 +34,30 @@ use packet_formats::ipv4::Ipv4PacketBuilder;
 use packet_formats::ipv6::ext_hdrs::ExtensionHeaderOptionAction;
 use packet_formats::ipv6::Ipv6PacketBuilder;
 use packet_formats::testutil::parse_icmp_packet_in_ip_packet_in_ethernet_frame;
+use packet_formats::udp::UdpPacketBuilder;
 use rand::Rng;
 use test_case::test_case;
 
 use netstack3_base::testutil::{
-    new_rng, set_logger_for_test, FakeInstant, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6,
+    new_rng, set_logger_for_test, FakeInstant, TestAddrs, TestDualStackIpExt, TestIpExt,
+    TEST_ADDRS_V4, TEST_ADDRS_V6,
 };
 use netstack3_base::{FrameDestination, InstantContext as _, IpDeviceAddr};
 use netstack3_core::device::{
     DeviceId, EthernetCreationProperties, EthernetLinkDevice, RecvEthernetFrameMeta,
 };
+use netstack3_core::filter::{
+    Action, Hook, IpRoutines, NatRoutines, PacketMatcher, Routine, Routines, Rule, Tuple,
+};
+use netstack3_core::socket::{ListenerInfo, SocketInfo};
 use netstack3_core::testutil::{
     new_simple_fake_network, Ctx, CtxPairExt as _, FakeBindingsCtx, FakeCtx, FakeCtxBuilder,
     DEFAULT_INTERFACE_METRIC,
 };
-use netstack3_core::{BindingsContext, IpExt, StackState};
+use netstack3_core::{BindingsContext, CoreCtx, IpExt, StackState};
+use netstack3_device::queue::{ReceiveQueueContext as _, ReceiveQueueHandler as _};
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
+use netstack3_filter::{FilterIpContext, TransportProtocol};
 use netstack3_ip::device::{
     IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
     SlaacConfigurationUpdate,
@@ -2225,4 +2235,213 @@ fn loopback_assignment_state_v4(addr: Ipv4Addr, status: Ipv4PresentAddressStatus
         ),
         AddressStatus::Present(status)
     );
+}
+
+enum ActionAffectingConntrack {
+    RemoveConnectionAfterEgress,
+    ModifyPacketAfterEgress,
+}
+
+#[netstack3_core::context_ip_bounds(I, FakeBindingsCtx)]
+#[ip_test(I)]
+#[test_case(None; "reuse existing connection")]
+#[test_case(
+    Some(ActionAffectingConntrack::RemoveConnectionAfterEgress);
+    "new connection because connection removed after egress"
+)]
+#[test_case(
+    Some(ActionAffectingConntrack::ModifyPacketAfterEgress);
+    "new connection because packet modified at device layer"
+)]
+fn conntrack_entry_retained_across_loopback<I: TestDualStackIpExt + IpExt>(
+    action: Option<ActionAffectingConntrack>,
+) where
+    for<'a> CoreCtx<'a, FakeBindingsCtx, lock_order::Unlocked>: FilterIpContext<I, FakeBindingsCtx>,
+    for<'a> CoreCtx<'a, FakeBindingsCtx, lock_order::Unlocked>:
+        FilterIpContext<I::OtherVersion, FakeBindingsCtx>,
+{
+    set_logger_for_test();
+
+    let (mut ctx, _device_ids) = FakeCtxBuilder::default().build();
+    let loopback = ctx.test_api().add_loopback();
+
+    // Add default routes through loopback for IPv4 and IPv6.
+    ctx.test_api()
+        .add_route(AddableEntryEither::without_gateway(
+            Subnet::new(Ipv4::UNSPECIFIED_ADDRESS, 0).unwrap().into(),
+            loopback.clone().into(),
+            AddableMetric::MetricTracksInterface,
+        ))
+        .unwrap();
+    ctx.test_api()
+        .add_route(AddableEntryEither::without_gateway(
+            Subnet::new(Ipv6::UNSPECIFIED_ADDRESS, 0).unwrap().into(),
+            loopback.clone().into(),
+            AddableMetric::MetricTracksInterface,
+        ))
+        .unwrap();
+
+    // Add a Redirect rule in the LOCAL_EGRESS NAT hook.
+    fn routines<I: IpExt>() -> Routines<I, (), &'static str> {
+        Routines {
+            nat: NatRoutines {
+                local_egress: Hook {
+                    routines: vec![Routine {
+                        rules: vec![Rule {
+                            matcher: PacketMatcher::default(),
+                            action: Action::Redirect { dst_port: None },
+                            validation_info: "redirect in local egress",
+                        }],
+                    }],
+                },
+                ..Default::default()
+            },
+            ip: IpRoutines::default(),
+        }
+    }
+    ctx.core_api()
+        .filter()
+        .set_filter_state(routines(), routines())
+        .expect("install redirect rule");
+
+    // Create a dual-stack listening socket.
+    const LISTENER_PORT: NonZeroU16 = const_unwrap_option(NonZeroU16::new(33333));
+    let mut v6_api = ctx.core_api().udp::<Ipv6>();
+    let listener = v6_api.create();
+    v6_api.set_dual_stack_enabled(&listener, true).unwrap();
+    v6_api.listen(&listener, None, Some(LISTENER_PORT)).unwrap();
+
+    // Send a packet to a remote destination. It should be redirected to localhost.
+    let TestAddrs::<I::Addr> { remote_ip, .. } = I::TEST_ADDRS;
+    let mut udp_api = ctx.core_api().udp();
+    let socket = udp_api.create();
+    const HELLO: &'static [u8] = b"Hello";
+    udp_api
+        .send_to(
+            &socket,
+            Some(ZonedAddr::Unzoned(remote_ip)),
+            LISTENER_PORT.into(),
+            Buf::new(HELLO.to_vec(), ..),
+        )
+        .unwrap();
+    let local_port = match udp_api.get_info(&socket) {
+        SocketInfo::Unbound | SocketInfo::Connected(_) => panic!("socket should be listener"),
+        SocketInfo::Listener(ListenerInfo { local_identifier, .. }) => local_identifier,
+    };
+
+    fn original_tuple<I: TestIpExt>(local_port: NonZeroU16) -> Tuple<I> {
+        Tuple {
+            protocol: TransportProtocol::Udp,
+            src_addr: I::LOOPBACK_ADDRESS.get(),
+            dst_addr: I::TEST_ADDRS.remote_ip.get(),
+            src_port_or_id: local_port.get(),
+            dst_port_or_id: LISTENER_PORT.get(),
+        }
+    }
+
+    fn assert_conntrack_contains_tuple<I: TestIpExt>(ctx: &mut FakeCtx, tuple: Tuple<I>)
+    where
+        for<'a> CoreCtx<'a, FakeBindingsCtx, lock_order::Unlocked>:
+            FilterIpContext<I, FakeBindingsCtx>,
+    {
+        FilterIpContext::<I, _>::with_filter_state(
+            &mut ctx.core_ctx(),
+            |netstack3_filter::State { conntrack, .. }| {
+                assert_eq!(conntrack.num_connections(), 1);
+                assert!(conntrack.contains_tuple(&tuple));
+            },
+        );
+    }
+
+    match action {
+        None => {
+            // If neither the packet nor the conntrack table is modified after the packet
+            // egresses to the device, the packet should retain its conntrack connection.
+            assert!(ctx.test_api().handle_queued_rx_packets());
+            assert_conntrack_contains_tuple::<I>(&mut ctx, original_tuple(local_port));
+        }
+        Some(ActionAffectingConntrack::RemoveConnectionAfterEgress) => {
+            // If the connection is removed from the conntrack table after the packet
+            // egresses to the device...
+            assert_conntrack_contains_tuple::<I>(&mut ctx, original_tuple(local_port));
+            {
+                let conntrack = &mut ctx.core_ctx.common_ip::<I>().filter().write().conntrack;
+                assert_matches!(conntrack.remove_connection(&original_tuple(local_port)), Some(_));
+                assert_eq!(conntrack.num_connections(), 0);
+            }
+            // ...then a new connection should be created for the packet (based on its post-
+            // NAT state) when it is handled at the IP layer.
+            assert!(ctx.test_api().handle_queued_rx_packets());
+            assert_conntrack_contains_tuple::<I>(
+                &mut ctx,
+                Tuple { dst_addr: I::LOOPBACK_ADDRESS.get(), ..original_tuple(local_port) },
+            );
+        }
+        Some(ActionAffectingConntrack::ModifyPacketAfterEgress) => {
+            // If the packet is modified after egress such that it no longer matches the
+            // type of its cached connection (such as the IP version changing)...
+            let (mut core_ctx, bindings_ctx) = ctx.contexts();
+            let (meta, _frame) = core_ctx
+                .with_receive_queue_mut(&loopback, |queue| queue.take_frames())
+                .next()
+                .expect("one frame should be available");
+            // Swap the IP version of the packet, but queue it with the same metadata (which
+            // includes the cached conntrack entry).
+            let frame = Buf::new(HELLO.to_vec(), ..)
+                .encapsulate(UdpPacketBuilder::new(
+                    I::OtherVersion::LOOPBACK_ADDRESS.get(),
+                    I::OtherVersion::LOOPBACK_ADDRESS.get(),
+                    Some(local_port),
+                    LISTENER_PORT,
+                ))
+                .encapsulate(<I::OtherVersion as packet_formats::ip::IpExt>::PacketBuilder::new(
+                    I::OtherVersion::LOOPBACK_ADDRESS.get(),
+                    I::OtherVersion::LOOPBACK_ADDRESS.get(),
+                    64,
+                    IpProto::Udp.into(),
+                ))
+                .encapsulate(EthernetFrameBuilder::new(
+                    Mac::UNSPECIFIED,
+                    Mac::UNSPECIFIED,
+                    I::OtherVersion::ETHER_TYPE,
+                    ETHERNET_MIN_BODY_LEN_NO_TAG,
+                ))
+                .serialize_vec_outer()
+                .ok()
+                .unwrap()
+                .into_inner();
+            core_ctx
+                .queue_rx_frame(bindings_ctx, &loopback, meta, frame)
+                .expect("queue modified frame");
+            assert!(ctx.test_api().handle_queued_rx_packets());
+
+            // ...then a new connection should be created for the packet (in the conntrack
+            // table for the new packet's IP version) when it is handled at the IP layer.
+            assert_conntrack_contains_tuple::<I::OtherVersion>(
+                &mut ctx,
+                Tuple {
+                    dst_addr: I::OtherVersion::LOOPBACK_ADDRESS.get(),
+                    ..original_tuple(local_port)
+                },
+            );
+            // The original connection should also still be in the conntrack table.
+            assert_conntrack_contains_tuple::<I>(&mut ctx, original_tuple(local_port));
+            assert_eq!(
+                ctx.core_ctx
+                    .common_ip::<I::OtherVersion>()
+                    .counters()
+                    .invalid_cached_conntrack_entry
+                    .get(),
+                1
+            );
+        }
+    }
+
+    // Regardless of changes to the packet or conntrack table, the packet should be
+    // successfully redirected to the listener socket on ingress.
+    assert_matches!(
+        &ctx.bindings_ctx.take_udp_received(&listener)[..],
+        [packet] => assert_eq!(packet, HELLO)
+    );
+    ctx.test_api().clear_routes_and_remove_device(loopback);
 }

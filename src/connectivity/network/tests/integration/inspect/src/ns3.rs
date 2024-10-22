@@ -977,6 +977,7 @@ async fn inspect_counters(name: &str) {
                     UnspecifiedSrc: 0u64,
                     Dropped: 0u64,
                     MulticastNoInterest: 0u64,
+                    InvalidCachedConntrackEntry: 0u64,
                 },
                 "Forwarding": {
                     Forwarded: 0u64,
@@ -1013,6 +1014,7 @@ async fn inspect_counters(name: &str) {
                     DroppedExtensionHeader: 0u64,
                     DroppedLoopedBackDadProbe: 0u64,
                     MulticastNoInterest: 0u64,
+                    InvalidCachedConntrackEntry: 0u64,
                 },
                 "Forwarding": {
                     Forwarded: 0u64,

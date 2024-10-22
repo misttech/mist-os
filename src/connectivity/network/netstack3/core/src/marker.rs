@@ -39,7 +39,15 @@ use netstack3_udp::{self as udp, UdpBindingsContext, UdpBindingsTypes, UdpCounte
 use crate::TimerId;
 
 /// A marker for extensions to IP types.
-pub trait IpExt:
+///
+/// This trait acts as a marker for [`BaseIpExt`] for both `Self` and
+/// `Self::OtherVersion`.
+pub trait IpExt: BaseIpExt + datagram::DualStackIpExt<OtherVersion: BaseIpExt> {}
+
+impl<I> IpExt for I where I: BaseIpExt + datagram::DualStackIpExt<OtherVersion: BaseIpExt> {}
+
+/// A marker for extensions to IP types.
+pub trait BaseIpExt:
     IpLayerIpExt
     + IpDeviceIpExt
     + netstack3_base::IcmpIpExt
@@ -49,8 +57,8 @@ pub trait IpExt:
 {
 }
 
-impl<O> IpExt for O where
-    O: ip::IpLayerIpExt
+impl<I> BaseIpExt for I where
+    I: ip::IpLayerIpExt
         + IpDeviceIpExt
         + netstack3_base::IcmpIpExt
         + ip::device::IpDeviceIpExt

@@ -60,8 +60,9 @@ use netstack3_ip::device::{
 use netstack3_ip::nud::{self, LinkResolutionContext, LinkResolutionNotifier};
 use netstack3_ip::raw::{RawIpSocketId, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes};
 use netstack3_ip::{
-    self as ip, AddRouteError, AddableEntryEither, AddableMetric, IpLayerEvent, IpLayerTimerId,
-    Marks, RawMetric, ResolveRouteError, ResolvedRoute, RoutableIpAddr,
+    self as ip, AddRouteError, AddableEntryEither, AddableMetric, DeviceIpLayerMetadata,
+    IpLayerEvent, IpLayerTimerId, Marks, RawMetric, ResolveRouteError, ResolvedRoute,
+    RoutableIpAddr,
 };
 use netstack3_tcp::testutil::{ClientBuffers, ProvidedBuffers, RingBuffer, TestSendBuffer};
 use netstack3_tcp::{BufferSizes, TcpBindingsTypes};
@@ -276,12 +277,22 @@ where
     ) {
         let (core_ctx, bindings_ctx) = self.contexts();
         match I::VERSION {
-            IpVersion::V4 => {
-                ip::receive_ipv4_packet(core_ctx, bindings_ctx, device, frame_dst, buffer)
-            }
-            IpVersion::V6 => {
-                ip::receive_ipv6_packet(core_ctx, bindings_ctx, device, frame_dst, buffer)
-            }
+            IpVersion::V4 => ip::receive_ipv4_packet(
+                core_ctx,
+                bindings_ctx,
+                device,
+                frame_dst,
+                DeviceIpLayerMetadata::default(),
+                buffer,
+            ),
+            IpVersion::V6 => ip::receive_ipv6_packet(
+                core_ctx,
+                bindings_ctx,
+                device,
+                frame_dst,
+                DeviceIpLayerMetadata::default(),
+                buffer,
+            ),
         }
     }
 

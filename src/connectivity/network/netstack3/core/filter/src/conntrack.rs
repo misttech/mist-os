@@ -6,9 +6,10 @@ mod tcp;
 
 use alloc::collections::HashMap;
 use alloc::fmt::Debug;
-use alloc::sync::Arc;
+use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
 use assert_matches::assert_matches;
+use core::any::Any;
 use core::fmt::Display;
 use core::hash::Hash;
 use core::time::Duration;
@@ -75,7 +76,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, E> Table<I, BT, E> {
     /// one already in the map. While it might seem inefficient, to require
     /// locking in a loop, taking an uncontested lock is going to be
     /// significantly faster than the RNG used to allocate NAT parameters.
-    pub(crate) fn contains_tuple(&self, tuple: &Tuple<I>) -> bool {
+    pub fn contains_tuple(&self, tuple: &Tuple<I>) -> bool {
         self.inner.lock().table.contains_key(tuple)
     }
 
@@ -84,6 +85,37 @@ impl<I: IpExt, BT: FilterBindingsTypes, E> Table<I, BT, E> {
         let guard = self.inner.lock();
         let conn = guard.table.get(&tuple)?;
         Some(Connection::Shared(conn.clone()))
+    }
+
+    /// Returns the number of connections in the table.
+    #[cfg(feature = "testutils")]
+    pub fn num_connections(&self) -> usize {
+        self.inner.lock().num_connections
+    }
+
+    /// Removes the [`Connection`] for the flow indexed by `tuple`, if one exists,
+    /// and returns it to the caller.
+    #[cfg(feature = "testutils")]
+    pub fn remove_connection(&mut self, tuple: &Tuple<I>) -> Option<Connection<I, BT, E>> {
+        let mut guard = self.inner.lock();
+
+        // Remove the entry indexed by the tuple.
+        let conn = guard.table.remove(&tuple)?;
+        let (original, reply) = (&conn.inner.original_tuple, &conn.inner.reply_tuple);
+
+        // If this is not a self-connected flow, we need to remove the other tuple on
+        // which the connection is indexed.
+        if original != reply {
+            if tuple == original {
+                assert!(guard.table.remove(reply).is_some());
+            } else {
+                assert!(guard.table.remove(original).is_some());
+            }
+        }
+
+        guard.num_connections -= 1;
+
+        Some(Connection::Shared(conn))
     }
 }
 
@@ -94,7 +126,7 @@ where
     let _ = bindings_ctx.schedule_timer(GC_INTERVAL, timer);
 }
 
-impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
+impl<I: IpExt, BC: FilterBindingsContext, E: Default + Send + Sync + 'static> Table<I, BC, E> {
     pub(crate) fn new<CC: CoreTimerContext<FilterTimerId<I>, BC>>(bindings_ctx: &mut BC) -> Self {
         Self {
             inner: Mutex::new(TableInner {
@@ -122,17 +154,17 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
         &self,
         bindings_ctx: &mut BC,
         connection: Connection<I, BC, E>,
-    ) -> Result<bool, FinalizeConnectionError> {
+    ) -> Result<(bool, Option<Arc<ConnectionShared<I, BC, E>>>), FinalizeConnectionError> {
         let exclusive = match connection {
             Connection::Exclusive(c) => c,
             // Given that make_shared is private, the only way for us to receive
             // a shared connection is if it was already present in the map. This
             // is far and away the most common case under normal operation.
-            Connection::Shared(_) => return Ok(false),
+            Connection::Shared(inner) => return Ok((false, Some(inner))),
         };
 
         if exclusive.do_not_insert {
-            return Ok(false);
+            return Ok((false, None));
         }
 
         let mut guard = self.inner.lock();
@@ -185,6 +217,7 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
             Err(FinalizeConnectionError::Conflict)
         } else {
             let shared = exclusive.make_shared();
+            let clone = Arc::clone(&shared);
 
             let res = guard.table.insert(shared.inner.original_tuple.clone(), shared.clone());
             debug_assert!(res.is_none());
@@ -205,7 +238,7 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
                 schedule_gc(bindings_ctx, &mut guard.gc_timer);
             }
 
-            Ok(true)
+            Ok((true, Some(clone)))
         }
     }
 
@@ -487,6 +520,64 @@ pub enum Connection<I: IpExt, BT: FilterBindingsTypes, E> {
     /// This is an existing connection, and there are possibly many other
     /// packets that are concurrently modifying it.
     Shared(Arc<ConnectionShared<I, BT, E>>),
+}
+
+/// An error when attempting to retrieve the underlying conntrack entry from a
+/// weak handle to it.
+#[derive(Debug)]
+pub enum WeakConnectionError {
+    /// The entry was removed from the table after the weak handle was created.
+    EntryRemoved,
+    /// The entry does not match the type that is expected (due to an IP version
+    /// mismatch, for example).
+    InvalidEntry,
+}
+
+/// A type-erased weak handle to a connection tracking entry.
+///
+/// We use type erasure here to get rid of the parameterization on IP version;
+/// this handle is meant to be able to transit the device layer and at that
+/// point things are not parameterized on IP version (IPv4 and IPv6 packets both
+/// end up in the same device queue, for example).
+///
+/// When this is received for incoming packets, [`WeakConnection::into_inner`]
+/// can be used to downcast to the expected concrete [`Connection`] type.
+#[derive(Debug, Clone)]
+pub struct WeakConnection(pub(crate) Weak<dyn Any + Send + Sync>);
+
+impl WeakConnection {
+    /// Creates a new type-erased weak handle to the provided conntrack entry,
+    /// provided it is a shared entry.
+    pub fn new<I: IpExt, BT: FilterBindingsTypes + 'static, E: Send + Sync + 'static>(
+        conn: &Connection<I, BT, E>,
+    ) -> Option<Self> {
+        let shared = match conn {
+            Connection::Exclusive(_) => return None,
+            Connection::Shared(shared) => shared,
+        };
+        let weak = Arc::downgrade(shared);
+        Some(Self(weak))
+    }
+
+    /// Attempts to upgrade the provided weak handle to the conntrack entry and
+    /// downcast it to the specified concrete [`Connection`] type.
+    ///
+    /// Fails if either the weak handle cannot be upgraded (because the conntrack
+    /// entry has since been removed), or the type-erased handle cannot be downcast
+    /// to the concrete type (because the packet was modified after the creation of
+    /// this handle such that it no longer matches, e.g. the IP version of the
+    /// connection).
+    pub fn into_inner<I: IpExt, BT: FilterBindingsTypes + 'static, E: Send + Sync + 'static>(
+        self,
+    ) -> Result<Connection<I, BT, E>, WeakConnectionError> {
+        let Self(inner) = self;
+        let shared = inner
+            .upgrade()
+            .ok_or(WeakConnectionError::EntryRemoved)?
+            .downcast()
+            .map_err(|_err: Arc<_>| WeakConnectionError::InvalidEntry)?;
+        Ok(Connection::Shared(shared))
+    }
 }
 
 impl<I: IpExt, BT: FilterBindingsTypes, E> Connection<I, BT, E> {
@@ -805,6 +896,8 @@ pub struct ConnectionShared<I: IpExt, BT: FilterBindingsTypes, E> {
     state: Mutex<ConnectionState<BT>>,
 }
 
+/// The IP-agnostic transport protocol of a packet.
+#[allow(missing_docs)]
 #[derive(Copy, Clone, PartialEq, Eq, Hash, GenericOverIp)]
 #[generic_over_ip()]
 pub enum TransportProtocol {
@@ -1289,7 +1382,7 @@ mod tests {
         assert!(!table.contains_tuple(&reply_tuple));
 
         // Once we finalize the connection, it should be present in the map.
-        assert_matches!(table.finalize_connection(&mut bindings_ctx, conn), Ok(true));
+        assert_matches!(table.finalize_connection(&mut bindings_ctx, conn), Ok((true, Some(_))));
         assert!(table.contains_tuple(&original_tuple));
         assert!(table.contains_tuple(&reply_tuple));
 
@@ -1323,7 +1416,7 @@ mod tests {
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid")
             .unwrap();
-        assert_matches!(table.finalize_connection(&mut bindings_ctx, conn), Ok(false));
+        assert_matches!(table.finalize_connection(&mut bindings_ctx, conn), Ok((false, Some(_))));
         assert!(table.contains_tuple(&original_tuple));
         assert!(table.contains_tuple(&reply_tuple));
     }
@@ -1375,7 +1468,7 @@ mod tests {
         conn3.inner.reply_tuple = nated_original_packet.tuple.clone().invert();
         let conn3 = Connection::Exclusive(conn3);
 
-        assert_matches!(table.finalize_connection(&mut bindings_ctx, conn1), Ok(true));
+        assert_matches!(table.finalize_connection(&mut bindings_ctx, conn1), Ok((true, Some(_))));
         assert_matches!(
             table.finalize_connection(&mut bindings_ctx, conn2),
             Err(FinalizeConnectionError::Conflict)
@@ -1447,19 +1540,25 @@ mod tests {
             .get_connection_for_packet_and_update(&bindings_ctx, &first_packet)
             .expect("packet should be valid")
             .expect("packet should be trackable");
-        assert!(core_ctx
-            .conntrack()
-            .finalize_connection(&mut bindings_ctx, conn)
-            .expect("connection finalize should succeed"));
+        assert_matches!(
+            core_ctx
+                .conntrack()
+                .finalize_connection(&mut bindings_ctx, conn)
+                .expect("connection finalize should succeed"),
+            (true, Some(_))
+        );
         let conn = core_ctx
             .conntrack()
             .get_connection_for_packet_and_update(&bindings_ctx, &second_packet)
             .expect("packet should be valid")
             .expect("packet should be trackable");
-        assert!(core_ctx
-            .conntrack()
-            .finalize_connection(&mut bindings_ctx, conn)
-            .expect("connection finalize should succeed"));
+        assert_matches!(
+            core_ctx
+                .conntrack()
+                .finalize_connection(&mut bindings_ctx, conn)
+                .expect("connection finalize should succeed"),
+            (true, Some(_))
+        );
         assert!(core_ctx.conntrack().contains_tuple(&first_tuple));
         assert!(core_ctx.conntrack().contains_tuple(&second_tuple));
         assert_eq!(core_ctx.conntrack().inner.lock().num_connections, 2);
@@ -1481,10 +1580,13 @@ mod tests {
             .expect("packet should be valid")
             .expect("packet should be trackable");
         assert_matches!(conn.state().establishment_lifecycle, EstablishmentLifecycle::SeenReply);
-        assert!(!core_ctx
-            .conntrack()
-            .finalize_connection(&mut bindings_ctx, conn)
-            .expect("connection finalize should succeed"));
+        assert_matches!(
+            core_ctx
+                .conntrack()
+                .finalize_connection(&mut bindings_ctx, conn)
+                .expect("connection finalize should succeed"),
+            (false, Some(_))
+        );
         assert_eq!(core_ctx.conntrack().contains_tuple(&first_tuple), true);
         assert_eq!(core_ctx.conntrack().contains_tuple(&first_tuple_reply), true);
         assert_eq!(core_ctx.conntrack().contains_tuple(&second_tuple), true);
@@ -1570,9 +1672,12 @@ mod tests {
                 .get_connection_for_packet_and_update(&bindings_ctx, &packet)
                 .expect("packet should be valid")
                 .expect("packet should be trackable");
-            assert!(table
-                .finalize_connection(&mut bindings_ctx, conn)
-                .expect("connection finalize should succeed"));
+            assert_matches!(
+                table
+                    .finalize_connection(&mut bindings_ctx, conn)
+                    .expect("connection finalize should succeed"),
+                (true, Some(_))
+            );
 
             // Whether to update the connection to be established by sending
             // through the reply packet.
@@ -1581,9 +1686,12 @@ mod tests {
                     .get_connection_for_packet_and_update(&bindings_ctx, &reply_packet)
                     .expect("packet should be valid")
                     .expect("packet should be trackable");
-                assert!(!table
-                    .finalize_connection(&mut bindings_ctx, conn)
-                    .expect("connection finalize should succeed"));
+                assert_matches!(
+                    table
+                        .finalize_connection(&mut bindings_ctx, conn)
+                        .expect("connection finalize should succeed"),
+                    (false, Some(_))
+                );
             }
         }
 
@@ -1612,13 +1720,19 @@ mod tests {
                 .get_connection_for_packet_and_update(&bindings_ctx, &packet)
                 .expect("packet should be valid")
                 .expect("packet should be trackable");
-            assert!(!table
-                .finalize_connection(&mut bindings_ctx, conn)
-                .expect("connection finalize should succeed"));
+            assert_matches!(
+                table
+                    .finalize_connection(&mut bindings_ctx, conn)
+                    .expect("connection finalize should succeed"),
+                (false, Some(_))
+            );
         } else {
-            assert!(table
-                .finalize_connection(&mut bindings_ctx, conn)
-                .expect("connection finalize should succeed"));
+            assert_matches!(
+                table
+                    .finalize_connection(&mut bindings_ctx, conn)
+                    .expect("connection finalize should succeed"),
+                (true, Some(_))
+            );
         }
     }
 
@@ -1655,9 +1769,12 @@ mod tests {
             .expect("packet should be valid")
             .expect("packet should be trackable");
         assert_matches!(conn.state().establishment_lifecycle, EstablishmentLifecycle::SeenOriginal);
-        assert!(table
-            .finalize_connection(&mut bindings_ctx, conn)
-            .expect("connection finalize should succeed"));
+        assert_matches!(
+            table
+                .finalize_connection(&mut bindings_ctx, conn)
+                .expect("connection finalize should succeed"),
+            (true, Some(_))
+        );
 
         {
             let inspector = Inspector::new(Default::default());
@@ -1699,17 +1816,23 @@ mod tests {
                 .get_connection_for_packet_and_update(&bindings_ctx, &packet)
                 .expect("packet should be valid")
                 .expect("packet should be trackable");
-            assert!(table
-                .finalize_connection(&mut bindings_ctx, conn)
-                .expect("connection finalize should succeed"));
+            assert_matches!(
+                table
+                    .finalize_connection(&mut bindings_ctx, conn)
+                    .expect("connection finalize should succeed"),
+                (true, Some(_))
+            );
 
             let conn = table
                 .get_connection_for_packet_and_update(&bindings_ctx, &reply_packet)
                 .expect("packet should be valid")
                 .unwrap();
-            assert!(!table
-                .finalize_connection(&mut bindings_ctx, conn)
-                .expect("connection finalize should succeed"));
+            assert_matches!(
+                table
+                    .finalize_connection(&mut bindings_ctx, conn)
+                    .expect("connection finalize should succeed"),
+                (false, Some(_))
+            );
         }
 
         assert_eq!(table.inner.lock().num_connections, MAXIMUM_CONNECTIONS);
@@ -1721,16 +1844,22 @@ mod tests {
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid")
             .expect("packet should be trackable");
-        assert!(table
-            .finalize_connection(&mut bindings_ctx, conn)
-            .expect("connection finalize should succeed"));
+        assert_matches!(
+            table
+                .finalize_connection(&mut bindings_ctx, conn)
+                .expect("connection finalize should succeed"),
+            (true, Some(_))
+        );
         let conn = table
             .get_connection_for_packet_and_update(&bindings_ctx, &reply_packet)
             .expect("packet should be valid")
             .expect("packet should be trackable");
-        assert!(!table
-            .finalize_connection(&mut bindings_ctx, conn)
-            .expect("connection finalize should succeed"));
+        assert_matches!(
+            table
+                .finalize_connection(&mut bindings_ctx, conn)
+                .expect("connection finalize should succeed"),
+            (false, Some(_))
+        );
 
         // This next one should fail because there are no connections left to
         // evict.
@@ -1786,7 +1915,7 @@ mod tests {
         assert!(!table.contains_tuple(&tuple));
 
         // Once we finalize the connection, it should be present in the map.
-        assert_matches!(table.finalize_connection(&mut bindings_ctx, conn), Ok(true));
+        assert_matches!(table.finalize_connection(&mut bindings_ctx, conn), Ok((true, Some(_))));
         assert!(table.contains_tuple(&tuple));
 
         // There should be a single connection in the table, despite there only
@@ -1847,7 +1976,7 @@ mod tests {
             .get_connection_for_packet_and_update(&bindings_ctx, &original_packet)
             .expect("packet should be valid")
             .expect("packet should be trackable");
-        assert_matches!(table.finalize_connection(&mut bindings_ctx, conn), Ok(true));
+        assert_matches!(table.finalize_connection(&mut bindings_ctx, conn), Ok((true, Some(_))));
 
         assert!(table.contains_tuple(&tuple));
         assert!(table.contains_tuple(&reply_tuple));
@@ -1863,7 +1992,7 @@ mod tests {
         assert!(!table.contains_tuple(&reply_tuple));
 
         // The connection should not added back on finalization.
-        assert_matches!(table.finalize_connection(&mut bindings_ctx, conn), Ok(false));
+        assert_matches!(table.finalize_connection(&mut bindings_ctx, conn), Ok((false, Some(_))));
 
         assert!(!table.contains_tuple(&tuple));
         assert!(!table.contains_tuple(&reply_tuple));
@@ -1895,7 +2024,7 @@ mod tests {
         conn.do_not_insert = true;
         assert_matches!(
             table.finalize_connection(&mut bindings_ctx, Connection::Exclusive(conn)),
-            Ok(false)
+            Ok((false, None))
         );
 
         assert!(!table.contains_tuple(&tuple));

@@ -20,7 +20,7 @@ use crate::state::State;
 /// Allows rules that match on device class to be installed, storing the
 /// [`FilterBindingsTypes::DeviceClass`] type at rest, while allowing Netstack3
 /// Core to have Bindings provide the type since it is platform-specific.
-pub trait FilterBindingsTypes: InstantBindingsTypes + TimerBindingsTypes {
+pub trait FilterBindingsTypes: InstantBindingsTypes + TimerBindingsTypes + 'static {
     /// The device class type for devices installed in the netstack.
     type DeviceClass: Clone + Debug;
 }
@@ -80,8 +80,12 @@ pub trait FilterContext<BT: FilterBindingsTypes> {
 }
 
 #[cfg(feature = "testutils")]
-impl<TimerId: Debug + PartialEq + Clone + Send + Sync, Event: Debug, State, FrameMeta>
-    FilterBindingsTypes
+impl<
+        TimerId: Debug + PartialEq + Clone + Send + Sync + 'static,
+        Event: Debug + 'static,
+        State: 'static,
+        FrameMeta: 'static,
+    > FilterBindingsTypes
     for netstack3_base::testutil::FakeBindingsCtx<TimerId, Event, State, FrameMeta>
 {
     type DeviceClass = ();
@@ -90,6 +94,7 @@ impl<TimerId: Debug + PartialEq + Clone + Send + Sync, Event: Debug, State, Fram
 #[cfg(test)]
 pub(crate) mod testutil {
     use alloc::collections::HashMap;
+    use alloc::vec::Vec;
     use core::time::Duration;
 
     use net_types::ip::Ip;
@@ -124,6 +129,17 @@ pub(crate) mod testutil {
     }
 
     impl<I: IpExt> FakeCtx<I> {
+        pub fn new(bindings_ctx: &mut FakeBindingsCtx<I>) -> Self {
+            Self {
+                state: State {
+                    installed_routines: ValidRoutines::default(),
+                    uninstalled_routines: Vec::default(),
+                    conntrack: conntrack::Table::new::<IntoCoreTimerCtx>(bindings_ctx),
+                },
+                nat: FakeNatCtx::default(),
+            }
+        }
+
         pub fn with_ip_routines(
             bindings_ctx: &mut FakeBindingsCtx<I>,
             routines: IpRoutines<I, FakeDeviceClass, ()>,

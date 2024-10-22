@@ -18,7 +18,7 @@ use netstack3_core::IpExt;
 use netstack3_device::loopback::{self, LoopbackCreationProperties, LoopbackDevice};
 use netstack3_device::queue::ReceiveQueueContext;
 use netstack3_ip::device::IpAddressId as _;
-use netstack3_ip::{self as ip};
+use netstack3_ip::{self as ip, DeviceIpLayerMetadata};
 use packet::{Buf, ParseBuffer as _};
 use packet_formats::ethernet::{EthernetFrame, EthernetFrameLengthCheck};
 
@@ -96,8 +96,15 @@ fn loopback_sends_ethernet<I: TestIpExt + IpExt>() {
     const BODY: &[u8] = b"IP body".as_slice();
 
     let body = Buf::new(Vec::from(BODY), ..);
-    loopback::send_ip_frame(&mut core_ctx.context(), bindings_ctx, &device, destination, body)
-        .expect("can send");
+    loopback::send_ip_frame(
+        &mut core_ctx.context(),
+        bindings_ctx,
+        &device,
+        destination,
+        DeviceIpLayerMetadata::default(),
+        body,
+    )
+    .expect("can send");
 
     // There is no transmit queue so the frames will immediately go into the
     // receive queue.
