@@ -42,7 +42,7 @@ const TEST_DEVICE_BLOCK_COUNT: u64 = 8192;
 struct FsckTest {
     filesystem: Option<OpenFxFilesystem>,
     errors: Mutex<Vec<FsckIssue>>,
-    crypt: Option<Arc<dyn Crypt>>,
+    crypt: Option<Arc<InsecureCrypt>>,
 }
 
 #[derive(Default)]
@@ -99,7 +99,7 @@ impl FsckTest {
                 self.filesystem().as_ref(),
                 &options,
                 store_id,
-                self.crypt.clone(),
+                self.crypt.clone().map(|x| x as Arc<dyn Crypt>),
             )
             .await?;
         }
@@ -111,7 +111,7 @@ impl FsckTest {
     fn errors(&self) -> Vec<FsckIssue> {
         self.errors.lock().unwrap().clone()
     }
-    fn get_crypt(&mut self) -> Arc<dyn Crypt> {
+    fn get_crypt(&mut self) -> Arc<InsecureCrypt> {
         self.crypt.get_or_insert_with(|| Arc::new(InsecureCrypt::new())).clone()
     }
 }
@@ -1254,7 +1254,7 @@ async fn test_large_extended_attribute_nonexistent_attribute() {
         .expect_err("Fsck should fail");
     assert_matches!(
         test.errors()[..],
-        [FsckIssue::Error(FsckError::MissingAttributeForExtendedAttribute(..)), ..]
+        [.., FsckIssue::Error(FsckError::MissingAttributeForExtendedAttribute(..))]
     );
 }
 
@@ -2080,6 +2080,592 @@ async fn test_missing_encryption_keys() {
         .expect_err("Fsck should fail");
 
     assert_matches!(&test.errors()[..], [ FsckIssue::Error(FsckError::MissingEncryptionKeys(sid, oid)) ] if *sid == store_id && *oid == object_id);
+}
+
+#[fuchsia::test]
+async fn test_encrypted_directory_has_unencrypted_child() {
+    let mut test = FsckTest::new().await;
+
+    let (store_id, parent_oid, child_oid) = {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let crypt = test.get_crypt();
+        let store = root_volume.new_volume("vol", Some(crypt.clone())).await.unwrap();
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+
+        let handle;
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        handle = root_directory
+            .create_child_dir(&mut transaction, "dir")
+            .await
+            .expect("create_child_file failed");
+        transaction.commit().await.expect("commit failed");
+        let transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), handle.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+
+        crypt.add_wrapping_key(2, [1; 32]);
+        handle
+            .update_attributes(
+                transaction,
+                Some(&fio::MutableNodeAttributes {
+                    wrapping_key_id: Some(u128::to_le_bytes(2)),
+                    ..Default::default()
+                }),
+                0,
+                None,
+            )
+            .await
+            .expect("update attributes failed");
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), handle.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        let subdir = handle
+            .create_child_dir(&mut transaction, "subdir")
+            .await
+            .expect("create_child_file failed");
+
+        let txn_mutation = transaction
+            .mutations()
+            .iter()
+            .find(|m| {
+                match m.mutation {
+                    Mutation::ObjectStore(ObjectStoreMutation {
+                        item: Item {
+                            key: ObjectKey {
+                                object_id,
+                                data: ObjectKeyData::EncryptedChild { .. },
+                            },
+                            ..
+                        },
+                        ..
+                    }) if object_id == handle.object_id() => true,
+                    _ => false
+                }
+            })
+            .expect("find failed");
+
+        let mutation = txn_mutation.mutation.clone();
+        let store_id = store.store_object_id();
+        transaction.remove(store_id, mutation.clone());
+
+        if let Mutation::ObjectStore(ObjectStoreMutation {
+            item: Item { value, key: ObjectKey { object_id, .. }, .. },
+            ..
+        }) = &mutation
+        {
+            let mutation = Mutation::replace_or_insert_object(
+                ObjectKey::child(*object_id, "subdir", false),
+                value.clone(),
+            );
+            transaction.add(store_id, mutation);
+            transaction.commit().await.expect("commit failed");
+        } else {
+            unreachable!();
+        }
+
+        (store_id, handle.object_id(), subdir.object_id())
+    };
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
+        .await
+        .expect_err("Fsck should fail");
+
+    assert_matches!(&test.errors()[..], [ FsckIssue::Error(FsckError::EncryptedDirectoryHasUnencryptedChild(sid, oid, oid_child)) ] if *sid == store_id && *oid == parent_oid && *oid_child == child_oid);
+}
+
+#[fuchsia::test]
+async fn test_unencrypted_directory_has_encrypted_child() {
+    let mut test = FsckTest::new().await;
+
+    let (store_id, parent_oid, child_oid) = {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let crypt = test.get_crypt();
+        let store = root_volume.new_volume("vol", Some(crypt.clone())).await.unwrap();
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+
+        let handle;
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        handle = root_directory
+            .create_child_dir(&mut transaction, "dir")
+            .await
+            .expect("create_child_file failed");
+        transaction.commit().await.expect("commit failed");
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), handle.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+
+        let subdir = handle
+            .create_child_dir(&mut transaction, "subdir")
+            .await
+            .expect("create_child_file failed");
+
+        let txn_mutation = transaction
+            .mutations()
+            .iter()
+            .find(|m| match m.mutation {
+                Mutation::ObjectStore(ObjectStoreMutation {
+                    item:
+                        Item {
+                            key: ObjectKey { object_id, data: ObjectKeyData::Child { .. } },
+                            value: ObjectValue::Child(..),
+                            ..
+                        },
+                    ..
+                }) if object_id == handle.object_id() => true,
+                _ => false,
+            })
+            .expect("find failed");
+
+        let mutation = txn_mutation.mutation.clone();
+        let store_id = store.store_object_id();
+        transaction.remove(store_id, mutation.clone());
+
+        if let Mutation::ObjectStore(ObjectStoreMutation {
+            item: Item { value, key: ObjectKey { object_id, .. }, .. },
+            ..
+        }) = &mutation
+        {
+            let mutation = Mutation::replace_or_insert_object(
+                ObjectKey::encrypted_child(*object_id, [1, 2, 3].to_vec()),
+                value.clone(),
+            );
+            transaction.add(store_id, mutation);
+            transaction.commit().await.expect("commit failed");
+        } else {
+            unreachable!();
+        }
+
+        (store_id, handle.object_id(), subdir.object_id())
+    };
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
+        .await
+        .expect_err("Fsck should fail");
+
+    assert_matches!(&test.errors()[..], [ FsckIssue::Error(FsckError::UnencryptedDirectoryHasEncryptedChild(sid, oid, oid_child)), .. ] if *sid == store_id && *oid == parent_oid && *oid_child == child_oid);
+}
+
+#[fuchsia::test]
+async fn test_parent_and_child_encrypted_with_different_wrapping_keys() {
+    let mut test = FsckTest::new().await;
+
+    let (store_id, parent_oid, child_oid, parent_wrapping_key_id, child_wrapping_key_id) = {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let crypt = test.get_crypt();
+        let store = root_volume.new_volume("vol", Some(crypt.clone())).await.unwrap();
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+
+        let handle;
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        handle = root_directory
+            .create_child_dir(&mut transaction, "dir")
+            .await
+            .expect("create_child_file failed");
+        transaction.commit().await.expect("commit failed");
+        let transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), handle.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+
+        crypt.add_wrapping_key(2, [1; 32]);
+        handle
+            .update_attributes(
+                transaction,
+                Some(&fio::MutableNodeAttributes {
+                    wrapping_key_id: Some(u128::to_le_bytes(2)),
+                    ..Default::default()
+                }),
+                0,
+                None,
+            )
+            .await
+            .expect("update attributes failed");
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), handle.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+
+        let subdir = handle
+            .create_child_dir(&mut transaction, "subdir")
+            .await
+            .expect("create_child_file failed");
+
+        let txn_mutation = transaction
+            .mutations()
+            .iter()
+            .find(|m| match m.mutation {
+                Mutation::ObjectStore(ObjectStoreMutation {
+                    item:
+                        Item {
+                            key: ObjectKey { object_id, data: ObjectKeyData::Object },
+                            value:
+                                ObjectValue::Object {
+                                    kind: ObjectKind::Directory { wrapping_key_id, .. },
+                                    ..
+                                },
+                            ..
+                        },
+                    ..
+                }) if object_id == subdir.object_id() && wrapping_key_id.is_some() => true,
+                _ => false,
+            })
+            .expect("find failed");
+
+        let mut mutation = txn_mutation.mutation.clone();
+        let store_id = store.store_object_id();
+        transaction.remove(store_id, mutation.clone());
+
+        if let Mutation::ObjectStore(ObjectStoreMutation {
+            item:
+                Item {
+                    value:
+                        ObjectValue::Object {
+                            kind: ObjectKind::Directory { wrapping_key_id, .. }, ..
+                        },
+                    ..
+                },
+            ..
+        }) = &mut mutation
+        {
+            *wrapping_key_id = Some(3);
+        } else {
+            unreachable!();
+        }
+        transaction.add(store_id, mutation);
+
+        transaction.commit().await.expect("commit failed");
+
+        (store_id, handle.object_id(), subdir.object_id(), 2, 3)
+    };
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
+        .await
+        .expect_err("Fsck should fail");
+
+    assert_matches!(&test.errors()[..], [ FsckIssue::Error(FsckError::ChildEncryptedWithDifferentWrappingKeyThanParent(sid, oid, oid_child, parent_id, child_id)) ]
+    if *sid == store_id && *oid == parent_oid && *oid_child == child_oid && *parent_id == parent_wrapping_key_id && *child_id == child_wrapping_key_id);
+}
+
+#[fuchsia::test]
+async fn test_encrypted_directory_no_wrapping_key() {
+    let mut test = FsckTest::new().await;
+
+    let (store_id, child_oid) = {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let crypt = test.get_crypt();
+        let store = root_volume.new_volume("vol", Some(crypt.clone())).await.unwrap();
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+
+        let handle;
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        handle = root_directory
+            .create_child_dir(&mut transaction, "dir")
+            .await
+            .expect("create_child_file failed");
+        transaction.commit().await.expect("commit failed");
+        let transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), handle.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+
+        crypt.add_wrapping_key(2, [1; 32]);
+        handle
+            .update_attributes(
+                transaction,
+                Some(&fio::MutableNodeAttributes {
+                    wrapping_key_id: Some(u128::to_le_bytes(2)),
+                    ..Default::default()
+                }),
+                0,
+                None,
+            )
+            .await
+            .expect("update attributes failed");
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), handle.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        let subdir = handle
+            .create_child_dir(&mut transaction, "subdir")
+            .await
+            .expect("create_child_file failed");
+
+        let txn_mutation = transaction
+            .mutations()
+            .iter()
+            .find(|m| match m.mutation {
+                Mutation::ObjectStore(ObjectStoreMutation {
+                    item:
+                        Item {
+                            key: ObjectKey { object_id, data: ObjectKeyData::Object },
+                            value:
+                                ObjectValue::Object {
+                                    kind: ObjectKind::Directory { wrapping_key_id, .. },
+                                    ..
+                                },
+                            ..
+                        },
+                    ..
+                }) if object_id == subdir.object_id() && wrapping_key_id.is_some() => true,
+                _ => false,
+            })
+            .expect("find failed");
+
+        let mut mutation = txn_mutation.mutation.clone();
+        let store_id = store.store_object_id();
+        transaction.remove(store_id, mutation.clone());
+
+        if let Mutation::ObjectStore(ObjectStoreMutation {
+            item:
+                Item {
+                    value:
+                        ObjectValue::Object {
+                            kind: ObjectKind::Directory { wrapping_key_id, .. }, ..
+                        },
+                    ..
+                },
+            ..
+        }) = &mut mutation
+        {
+            *wrapping_key_id = None;
+        } else {
+            unreachable!();
+        }
+        transaction.add(store_id, mutation);
+
+        transaction.commit().await.expect("commit failed");
+
+        (store_id, subdir.object_id())
+    };
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
+        .await
+        .expect_err("Fsck should fail");
+
+    assert_matches!(&test.errors()[..], [FsckIssue::Error(FsckError::EncryptedChildDirectoryNoWrappingKey(sid, oid)) ]
+    if *sid == store_id && *oid == child_oid);
+}
+
+#[fuchsia::test]
+async fn test_directory_missing_encryption_key_for_large_extended_attribute() {
+    let mut test = FsckTest::new().await;
+
+    let (store_id, object_id) = {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let crypt = test.get_crypt();
+        let store = root_volume.new_volume("vol", Some(crypt.clone())).await.unwrap();
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+
+        let handle;
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        handle = root_directory
+            .create_child_dir(&mut transaction, "dir")
+            .await
+            .expect("create_child_file failed");
+        transaction.commit().await.expect("commit failed");
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), handle.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        transaction.add(
+            store.store_object_id(),
+            Mutation::replace_or_insert_object(
+                ObjectKey::attribute(handle.object_id(), 10, AttributeKey::Attribute),
+                ObjectValue::attribute(300, false),
+            ),
+        );
+        transaction.add(
+            store.store_object_id(),
+            Mutation::replace_or_insert_object(
+                ObjectKey::extended_attribute(handle.object_id(), b"foo".to_vec()),
+                ObjectValue::extended_attribute(10),
+            ),
+        );
+        transaction.commit().await.expect("commit failed");
+        (store.store_object_id(), handle.object_id())
+    };
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
+        .await
+        .expect_err("Fsck should fail");
+
+    assert_matches!(&test.errors()[..], [ FsckIssue::Error(FsckError::MissingKey(sid, oid, 0)) ] if *sid == store_id && *oid == object_id);
+}
+
+#[fuchsia::test]
+async fn test_directory_missing_encryption_key_for_fscrypt() {
+    let mut test = FsckTest::new().await;
+
+    let (store_id, object_id) = {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let crypt = test.get_crypt();
+        let store = root_volume.new_volume("vol", Some(crypt.clone())).await.unwrap();
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+
+        let handle;
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        handle = root_directory
+            .create_child_dir(&mut transaction, "dir")
+            .await
+            .expect("create_child_file failed");
+        transaction.commit().await.expect("commit failed");
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), handle.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+
+        crypt.add_wrapping_key(2, [1; 32]);
+        handle.set_wrapping_key(&mut transaction, 2).await.expect("failed to set wrapping key");
+
+        let txn_mutation = transaction
+            .mutations()
+            .iter()
+            .find(|m| match &m.mutation {
+                Mutation::ObjectStore(ObjectStoreMutation {
+                    item:
+                        Item {
+                            key: ObjectKey { data: ObjectKeyData::Keys, .. },
+                            value: ObjectValue::Keys(EncryptionKeys::AES256XTS(keys)),
+                            ..
+                        },
+                    ..
+                }) => {
+                    assert!(keys.iter().find(|x| x.0 == 1).is_some());
+                    true
+                }
+                _ => false,
+            })
+            .expect("find failed");
+
+        let mut mutation = txn_mutation.mutation.clone();
+        let store_id = store.store_object_id();
+        transaction.remove(store_id, mutation.clone());
+
+        if let Mutation::ObjectStore(ObjectStoreMutation {
+            item: Item { value: ObjectValue::Keys(EncryptionKeys::AES256XTS(keys)), .. },
+            ..
+        }) = &mut mutation
+        {
+            use std::ops::DerefMut as _;
+            let keys = keys.deref_mut();
+            let idx = keys.iter().position(|x| x.0 == 1).unwrap();
+            let (_, wrapped_key) = keys.remove(idx);
+            keys.push((0, wrapped_key));
+        } else {
+            unreachable!();
+        }
+
+        transaction.add(store_id, mutation);
+
+        transaction.commit().await.expect("commit failed");
+
+        (store_id, handle.object_id())
+    };
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
+        .await
+        .expect_err("Fsck should fail");
+
+    assert_matches!(&test.errors()[..], [ FsckIssue::Error(FsckError::MissingKey(sid, oid, 1)) ] if *sid == store_id && *oid == object_id);
 }
 
 #[fuchsia::test]
