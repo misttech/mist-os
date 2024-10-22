@@ -171,6 +171,10 @@ enum FileHolder<T> {
 impl Pager {
     /// Creates a new pager.
     pub fn new(scope: ExecutionScope) -> Result<Self, Error> {
+        info!(
+            "fxfs pager port koid: {:?}",
+            fasync::EHandle::local().port().as_handle_ref().get_koid()
+        );
         Ok(Pager {
             pager: zx::Pager::create(zx::PagerOptions::empty())?,
             scope,

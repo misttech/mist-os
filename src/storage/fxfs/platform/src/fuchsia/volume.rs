@@ -15,6 +15,7 @@ use crate::fuchsia::symlink::FxSymlink;
 use crate::fuchsia::volumes_directory::VolumesDirectory;
 use anyhow::{bail, ensure, Error};
 use async_trait::async_trait;
+use fidl::AsHandleRef;
 use fidl_fuchsia_fxfs::{
     BlobCreatorRequestStream, BlobReaderRequestStream, BytesAndNodes, ProjectIdRequest,
     ProjectIdRequestStream, ProjectIterToken,
@@ -617,7 +618,9 @@ impl FsInspectVolume for FxVolume {
         let (used_bytes, bytes_limit) =
             self.store.filesystem().allocator().owner_allocation_info(self.store.store_object_id());
         let encrypted = self.store().crypt().is_some();
-        VolumeData { bytes_limit, used_bytes, used_nodes: object_count, encrypted }
+        let port_koid =
+            fasync::EHandle::local().port().as_handle_ref().get_koid().unwrap().raw_koid();
+        VolumeData { bytes_limit, used_bytes, used_nodes: object_count, encrypted, port_koid }
     }
 }
 

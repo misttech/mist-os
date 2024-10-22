@@ -190,6 +190,8 @@ pub struct VolumeData {
     pub bytes_limit: Option<u64>,
     pub used_nodes: u64,
     pub encrypted: bool,
+    /// Nb: Port is useful in diagnosing the source of stalled pager requests.
+    pub port_koid: u64,
 }
 
 impl VolumeData {
@@ -200,5 +202,6 @@ impl VolumeData {
         }
         node.record_uint("used_nodes", self.used_nodes);
         node.record_bool("encrypted", self.encrypted);
+        node.record_uint("port_koid", self.port_koid);
     }
 }

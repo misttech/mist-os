@@ -11,7 +11,7 @@ use zx::sys::zx_page_request_command_t::{ZX_PAGER_VMO_COMPLETE, ZX_PAGER_VMO_REA
 
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::FsStr;
-use starnix_logging::{log_debug, log_error, log_warn};
+use starnix_logging::{log_debug, log_error, log_info, log_warn};
 use starnix_sync::Mutex;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
@@ -58,6 +58,8 @@ impl Pager {
 
     /// Starts the pager threads.
     pub fn start_pager_threads(self: &Arc<Self>, current_task: &CurrentTask) {
+        // TODO(b/373445079): Remove log once bug fixed.
+        log_info!("ext4 pager port koid: {:?}", self.port.as_handle_ref().get_koid());
         for _ in 0..PAGER_THREADS {
             let this = self.clone();
             current_task.kernel().kthreads.spawn(move |_, _| {
