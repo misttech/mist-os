@@ -840,12 +840,16 @@ impl ObjectValue {
         ObjectValue::VerifiedAttribute { size, fsverity_metadata }
     }
     /// Creates an ObjectValue for an insertion/replacement of an object extent.
-    pub fn extent(device_offset: u64) -> ObjectValue {
-        ObjectValue::Extent(ExtentValue::new_raw(device_offset))
+    pub fn extent(device_offset: u64, key_id: u64) -> ObjectValue {
+        ObjectValue::Extent(ExtentValue::new_raw(device_offset, key_id))
     }
     /// Creates an ObjectValue for an insertion/replacement of an object extent.
-    pub fn extent_with_checksum(device_offset: u64, checksum: Checksums) -> ObjectValue {
-        ObjectValue::Extent(ExtentValue::with_checksum(device_offset, checksum))
+    pub fn extent_with_checksum(
+        device_offset: u64,
+        checksum: Checksums,
+        key_id: u64,
+    ) -> ObjectValue {
+        ObjectValue::Extent(ExtentValue::with_checksum(device_offset, checksum, key_id))
     }
     /// Creates an ObjectValue for a deletion of an object extent.
     pub fn deleted_extent() -> ObjectValue {

@@ -246,11 +246,12 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             .mark_allocated(transaction, self.store().store_object_id(), device_range.clone())
             .await?;
         self.txn_update_size(transaction, new_size).await?;
+        let key_id = self.get_key(None).await?.map_or(0, |k| k.key_id());
         transaction.add(
             self.store().store_object_id,
             Mutation::merge_object(
                 ObjectKey::extent(self.object_id(), self.attribute_id(), old_end..new_size),
-                ObjectValue::Extent(ExtentValue::new_raw(device_range.start)),
+                ObjectValue::Extent(ExtentValue::new_raw(device_range.start, key_id)),
             ),
         );
         self.update_allocated_size(transaction, device_range.end - device_range.start, 0).await
@@ -276,7 +277,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         buf: MutableBufferRef<'_>,
         device_offset: u64,
     ) -> Result<MaybeChecksums, Error> {
-        self.handle.write_at(self.attribute_id(), offset, buf, device_offset).await
+        self.handle.write_at(self.attribute_id(), offset, buf, None, device_offset).await
     }
 
     /// Zeroes the given range.  The range must be aligned.  Returns the amount of data deallocated.
@@ -474,6 +475,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         let mut to_allocate = Vec::new();
         let mut to_switch = Vec::new();
         let mut new_range = range.clone();
+        let key_id = self.get_key(None).await?.map_or(0, |k| k.key_id());
 
         {
             let tree = &self.store().tree;
@@ -626,7 +628,10 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 self.store().store_object_id(),
                 Mutation::merge_object(
                     ObjectKey::extent(self.object_id(), self.attribute_id(), switch_range),
-                    ObjectValue::Extent(ExtentValue::initialized_overwrite_extent(device_offset)),
+                    ObjectValue::Extent(ExtentValue::initialized_overwrite_extent(
+                        device_offset,
+                        key_id,
+                    )),
                 ),
                 AssocObj::Borrowed(self),
             );
@@ -660,6 +665,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                         ObjectValue::Extent(ExtentValue::blank_overwrite_extent(
                             device_range.start,
                             (device_range_len / self.block_size()) as usize,
+                            key_id,
                         )),
                     ),
                     AssocObj::Borrowed(self),
@@ -824,7 +830,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         ranges: &[Range<u64>],
         buf: MutableBufferRef<'_>,
     ) -> Result<(), Error> {
-        self.handle.multi_write(transaction, attribute_id, ranges, buf).await
+        self.handle.multi_write(transaction, attribute_id, None, ranges, buf).await
     }
 
     // If allow_allocations is false, then all the extents for the range must have been
@@ -845,6 +851,8 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     ) -> Result<(), Error> {
         assert_eq!((buf.len() as u32) % self.store().device.block_size(), 0);
         let end = offset + buf.len() as u64;
+
+        let key_id = self.get_key(None).await?.map_or(0, |k| k.key_id());
 
         // The transaction only ends up being used if allow_allocations is true
         let mut transaction =
@@ -997,7 +1005,10 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                                         self.attribute_id(),
                                         offset..offset + device_range_len,
                                     ),
-                                    ObjectValue::Extent(ExtentValue::new_raw(device_range.start)),
+                                    ObjectValue::Extent(ExtentValue::new_raw(
+                                        device_range.start,
+                                        key_id,
+                                    )),
                                 ),
                             );
 
@@ -1227,6 +1238,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             )))
             .await?;
         let mut allocated = 0;
+        let key_id = self.get_key(None).await?.map_or(0, |k| k.key_id());
         'outer: while file_range.start < file_range.end {
             let allocate_end = loop {
                 match iter.get() {
@@ -1318,7 +1330,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                 self.store().store_object_id,
                 Mutation::merge_object(
                     ObjectKey::extent(self.object_id(), self.attribute_id(), this_file_range),
-                    ObjectValue::Extent(ExtentValue::new_raw(device_range.start)),
+                    ObjectValue::Extent(ExtentValue::new_raw(device_range.start, key_id)),
                 ),
             );
             ranges.push(device_range);
@@ -1381,7 +1393,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         self.handle.read_attr(attribute_id).await
     }
 
-    /// Writes an entire attribute.
+    /// Writes an entire attribute.  This *always* uses the volume data key.
     pub async fn write_attr(&self, attribute_id: u64, data: &[u8]) -> Result<(), Error> {
         // Must be different attribute otherwise cached size gets out of date.
         assert_ne!(attribute_id, self.attribute_id());

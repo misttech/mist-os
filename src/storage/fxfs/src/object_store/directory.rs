@@ -4,7 +4,7 @@
 
 use crate::errors::FxfsError;
 use crate::lsm_tree::merge::{Merger, MergerIterator};
-use crate::lsm_tree::types::{ItemRef, LayerIterator};
+use crate::lsm_tree::types::{Item, ItemRef, LayerIterator};
 use crate::lsm_tree::Query;
 use crate::object_handle::{ObjectHandle, ObjectProperties, INVALID_OBJECT_ID};
 use crate::object_store::object_record::{
@@ -22,10 +22,13 @@ use anyhow::{anyhow, bail, ensure, Context, Error};
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
 use base64::engine::Engine as _;
 use fidl_fuchsia_io as fio;
-use fxfs_crypto::{UnwrappedKeys, WrappedKeys, XtsCipherSet};
+use fxfs_crypto::{Key, WrappedKeys, XtsCipher, XtsCipherSet};
 use std::fmt;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+
+use super::FSCRYPT_KEY_ID;
+
 /// This contains the transaction with the appropriate locks to replace src with dst, and also the
 /// ID and type of the src and dst.
 pub struct ReplaceContext<'a> {
@@ -89,9 +92,15 @@ impl<S: HandleOwner> Directory<S> {
     }
 
     /// Retrieves keys from the key manager or unwraps the wrapped keys in the directory's key
-    /// record.
-    pub async fn get_keys(&self) -> Result<Option<Arc<XtsCipherSet>>, Error> {
-        self.handle.get_keys().await
+    /// record.  Returns None if the key is currently unavailable due to the wrapping key being
+    /// unavailable.
+    pub async fn get_fscrypt_key(&self) -> Result<Option<Key>, Error> {
+        let object_id = self.object_id();
+        let store = self.store();
+        store
+            .key_manager()
+            .get_fscrypt_key(object_id, store.crypt().unwrap().as_ref(), store.get_keys(object_id))
+            .await
     }
 
     pub fn owner(&self) -> &Arc<S> {
@@ -190,7 +199,8 @@ impl<S: HandleOwner> Directory<S> {
                     Mutation::insert_object(
                         ObjectKey::keys(object_id),
                         ObjectValue::keys(EncryptionKeys::AES256XTS(WrappedKeys::from(vec![(
-                            0, key,
+                            FSCRYPT_KEY_ID,
+                            key,
                         )]))),
                     ),
                 );
@@ -198,7 +208,11 @@ impl<S: HandleOwner> Directory<S> {
                 // this transaction doesn't get committed. This shouldn't be a problem because
                 // unused keys get purged on a standard timeout interval and this key shouldn't
                 // conflict with any other keys.
-                store.key_manager.insert(object_id, &vec![(0, unwrapped_key)], false);
+                store.key_manager.insert(
+                    object_id,
+                    &vec![(FSCRYPT_KEY_ID, Some(unwrapped_key))],
+                    false,
+                );
             } else {
                 return Err(anyhow!("No crypt"));
             }
@@ -210,7 +224,7 @@ impl<S: HandleOwner> Directory<S> {
         &self,
         transaction: &mut Transaction<'_>,
         id: u128,
-    ) -> Result<UnwrappedKeys, Error> {
+    ) -> Result<XtsCipher, Error> {
         let object_id = self.object_id();
         let store = self.store();
         if let Some(crypt) = store.crypt() {
@@ -254,17 +268,36 @@ impl<S: HandleOwner> Directory<S> {
                 _ => bail!(FxfsError::NotDir),
             }
 
-            transaction.add(
-                store.store_object_id(),
-                Mutation::insert_object(
-                    ObjectKey::keys(object_id),
-                    ObjectValue::keys(EncryptionKeys::AES256XTS(WrappedKeys::from(vec![(0, key)]))),
-                ),
-            );
-            *self.wrapping_key_id.lock().unwrap() = Some(id);
-            return Ok(vec![(0, unwrapped_key)]);
+            match store.tree.find(&ObjectKey::keys(object_id)).await? {
+                None => {
+                    transaction.add(
+                        store.store_object_id(),
+                        Mutation::insert_object(
+                            ObjectKey::keys(object_id),
+                            ObjectValue::keys(EncryptionKeys::AES256XTS(WrappedKeys::from(vec![
+                                (FSCRYPT_KEY_ID, key),
+                            ]))),
+                        ),
+                    );
+                }
+                Some(Item {
+                    value: ObjectValue::Keys(EncryptionKeys::AES256XTS(mut keys)),
+                    ..
+                }) => {
+                    keys.push((FSCRYPT_KEY_ID, key));
+                    transaction.add(
+                        store.store_object_id(),
+                        Mutation::replace_or_insert_object(
+                            ObjectKey::keys(object_id),
+                            ObjectValue::keys(EncryptionKeys::AES256XTS(keys)),
+                        ),
+                    );
+                }
+                Some(item) => bail!("Unexpected item in lookup: {item:?}"),
+            }
+            Ok(XtsCipher::new(FSCRYPT_KEY_ID, &unwrapped_key))
         } else {
-            return Err(anyhow!("No crypt"));
+            Err(anyhow!("No crypt"))
         }
     }
 
@@ -442,25 +475,22 @@ impl<S: HandleOwner> Directory<S> {
 
     /// Returns the encrypted form of `name` that would be stored in an encrypted child record.
     async fn get_encrypted_name(&self, name: &str, fail_if_locked: bool) -> Result<Vec<u8>, Error> {
-        let name = String::from(name);
-        let mut name_bytes = name.clone().into_bytes();
-        let encrypted_name = match self.get_keys().await? {
-            Some(keys) => {
-                // TODO(https://fxbug.dev/361656831): Change key_id to 1.
-                keys.encrypt_filename(0, name_bytes.as_mut())?;
-                name_bytes
+        let mut name_bytes = name.to_string().into_bytes();
+        match self.get_fscrypt_key().await? {
+            Some(key) => {
+                key.encrypt_filename(&mut name_bytes)?;
+                Ok(name_bytes)
             }
             None => {
                 if fail_if_locked {
                     // Note: Right now, FxfsError::NoKey maps to zx::Status::NOT_FOUND. Starnix
                     // however, catches this error earlier and generates the appropriate Linux code.
-                    return Err(anyhow!(FxfsError::NoKey));
+                    Err(anyhow!(FxfsError::NoKey))
                 } else {
-                    BASE64_STANDARD.decode(name_bytes).map_err(|_| FxfsError::NotFound)?
+                    Ok(BASE64_STANDARD.decode(name_bytes).map_err(|_| FxfsError::NotFound)?)
                 }
             }
-        };
-        Ok(encrypted_name)
+        }
     }
 
     pub async fn create_child_dir(
@@ -766,12 +796,17 @@ impl<S: HandleOwner> Directory<S> {
             transaction.add(self.store().store_object_id(), Mutation::ObjectStore(mutation));
         }
 
-        let mut unwrapped_keys = None;
-        if let Some(fio::MutableNodeAttributes { wrapping_key_id: Some(id), .. }) = node_attributes
-        {
-            unwrapped_keys =
-                Some(self.set_wrapping_key(&mut transaction, u128::from_le_bytes(*id)).await?);
-        }
+        let wrapping_key =
+            if let Some(fio::MutableNodeAttributes { wrapping_key_id: Some(id), .. }) =
+                node_attributes
+            {
+                Some((
+                    u128::from_le_bytes(*id),
+                    self.set_wrapping_key(&mut transaction, u128::from_le_bytes(*id)).await?,
+                ))
+            } else {
+                None
+            };
 
         // Delegate to the StoreObjectHandle update_attributes for the rest of the updates.
         if node_attributes.is_some() || change_time.is_some() {
@@ -779,8 +814,13 @@ impl<S: HandleOwner> Directory<S> {
         }
         transaction
             .commit_with_callback(|_| {
-                if let Some(keys) = unwrapped_keys {
-                    self.store().key_manager.insert(self.object_id(), &keys, false);
+                if let Some((key_id, unwrapped_key)) = wrapping_key {
+                    *self.wrapping_key_id.lock().unwrap() = Some(key_id);
+                    self.store().key_manager.merge(self.object_id(), |existing| {
+                        let mut new = existing.map_or(Vec::new(), |e| e.ciphers().to_vec());
+                        new.push(unwrapped_key);
+                        Arc::new(XtsCipherSet::from(new))
+                    });
                 }
             })
             .await?;
@@ -1235,11 +1275,13 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
 
 #[cfg(test)]
 mod tests {
-    use super::{replace_child_with_object, MutableAttributesInternal};
+    use super::replace_child_with_object;
     use crate::errors::FxfsError;
     use crate::filesystem::{FxFilesystem, JournalingObject, SyncOptions};
     use crate::object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle};
-    use crate::object_store::directory::{replace_child, Directory, ReplacedChild};
+    use crate::object_store::directory::{
+        replace_child, Directory, MutableAttributesInternal, ReplacedChild,
+    };
     use crate::object_store::object_record::Timestamp;
     use crate::object_store::transaction::{lock_keys, Options};
     use crate::object_store::volume::root_volume;
@@ -1472,7 +1514,7 @@ mod tests {
             .expect("create_child_dir failed");
         transaction.commit().await.expect("commit failed");
         crypt.add_wrapping_key(2, [1; 32]);
-        let mut transaction = fs
+        let transaction = fs
             .clone()
             .new_transaction(
                 lock_keys![LockKey::object(store.store_object_id(), directory.object_id())],
@@ -1481,10 +1523,17 @@ mod tests {
             .await
             .expect("new transaction failed");
         directory
-            .set_wrapping_key(&mut transaction, 2)
+            .update_attributes(
+                transaction,
+                Some(&fio::MutableNodeAttributes {
+                    wrapping_key_id: Some(u128::to_le_bytes(2)),
+                    ..Default::default()
+                }),
+                0,
+                None,
+            )
             .await
-            .expect("wrapping key id 2 has been added");
-        transaction.commit().await.expect("commit failed");
+            .expect("update attributes failed");
         crypt.remove_wrapping_key(2);
         let mut transaction = fs
             .clone()

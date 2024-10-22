@@ -19,7 +19,7 @@ use crate::object_store::{
     AttributeKey, ChildValue, EncryptionKeys, ExtentValue, FsverityMetadata, HandleOptions,
     Mutation, ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKeyData, ObjectKind,
     ObjectStore, ObjectValue, RootDigest, StoreInfo, Timestamp, DEFAULT_DATA_ATTRIBUTE_ID,
-    FSVERITY_MERKLE_ATTRIBUTE_ID,
+    FSVERITY_MERKLE_ATTRIBUTE_ID, VOLUME_DATA_KEY_ID,
 };
 use crate::round::round_down;
 use crate::serialized_types::VersionedLatest;
@@ -409,7 +409,7 @@ async fn test_misaligned_extent_in_child_store() {
             store.store_object_id(),
             Mutation::insert_object(
                 ObjectKey::extent(555, 0, 1..fs.block_size()),
-                ObjectValue::Extent(ExtentValue::new_raw(1)),
+                ObjectValue::Extent(ExtentValue::new_raw(1, VOLUME_DATA_KEY_ID)),
             ),
         );
         transaction.commit().await.expect("commit failed");
@@ -445,7 +445,7 @@ async fn test_malformed_extent_in_child_store() {
             store.store_object_id(),
             Mutation::insert_object(
                 ObjectKey::extent(555, 0, fs.block_size()..0),
-                ObjectValue::Extent(ExtentValue::new_raw(1)),
+                ObjectValue::Extent(ExtentValue::new_raw(1, VOLUME_DATA_KEY_ID)),
             ),
         );
         transaction.commit().await.expect("commit failed");
@@ -1887,14 +1887,14 @@ async fn test_spurious_extents() {
             store.store_object_id(),
             Mutation::insert_object(
                 ObjectKey::extent(555, 0, 0..4096),
-                ObjectValue::Extent(ExtentValue::new_raw(SPURIOUS_OFFSET)),
+                ObjectValue::Extent(ExtentValue::new_raw(SPURIOUS_OFFSET, VOLUME_DATA_KEY_ID)),
             ),
         );
         transaction.add(
             store.store_object_id(),
             Mutation::insert_object(
                 ObjectKey::extent(store.root_directory_object_id(), 0, 0..4096),
-                ObjectValue::Extent(ExtentValue::new_raw(SPURIOUS_OFFSET)),
+                ObjectValue::Extent(ExtentValue::new_raw(SPURIOUS_OFFSET, VOLUME_DATA_KEY_ID)),
             ),
         );
         transaction.commit().await.expect("commit failed");

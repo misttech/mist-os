@@ -201,27 +201,35 @@ pub enum ExtentValueV38 {
 }
 
 impl ExtentValue {
-    pub fn new(device_offset: u64, mode: ExtentMode) -> ExtentValue {
-        ExtentValue::Some { device_offset, mode, key_id: 0 }
+    pub fn new(device_offset: u64, mode: ExtentMode, key_id: u64) -> ExtentValue {
+        ExtentValue::Some { device_offset, mode, key_id }
     }
 
-    pub fn new_raw(device_offset: u64) -> ExtentValue {
-        Self::new(device_offset, ExtentMode::Raw)
+    pub fn new_raw(device_offset: u64, key_id: u64) -> ExtentValue {
+        Self::new(device_offset, ExtentMode::Raw, key_id)
     }
 
     /// Creates an ExtentValue with a checksum
-    pub fn with_checksum(device_offset: u64, checksums: Checksums) -> ExtentValue {
-        Self::new(device_offset, ExtentMode::Cow(checksums))
+    pub fn with_checksum(device_offset: u64, checksums: Checksums, key_id: u64) -> ExtentValue {
+        Self::new(device_offset, ExtentMode::Cow(checksums), key_id)
     }
 
     /// Creates an ExtentValue for an overwrite range with no blocks written to yet.
-    pub fn blank_overwrite_extent(device_offset: u64, num_blocks: usize) -> ExtentValue {
-        Self::new(device_offset, ExtentMode::OverwritePartial(BitVec::from_elem(num_blocks, false)))
+    pub fn blank_overwrite_extent(
+        device_offset: u64,
+        num_blocks: usize,
+        key_id: u64,
+    ) -> ExtentValue {
+        Self::new(
+            device_offset,
+            ExtentMode::OverwritePartial(BitVec::from_elem(num_blocks, false)),
+            key_id,
+        )
     }
 
     /// Creates an ExtentValue for an overwrite range with all the blocks initialized.
-    pub fn initialized_overwrite_extent(device_offset: u64) -> ExtentValue {
-        Self::new(device_offset, ExtentMode::Overwrite)
+    pub fn initialized_overwrite_extent(device_offset: u64, key_id: u64) -> ExtentValue {
+        Self::new(device_offset, ExtentMode::Overwrite, key_id)
     }
 
     /// Creates an ObjectValue for a deletion of an object extent.
@@ -329,6 +337,7 @@ mod tests {
     use super::{ExtentKey, ExtentMode, ExtentValue};
     use crate::checksum::Checksums;
     use crate::lsm_tree::types::{OrdLowerBound, OrdUpperBound};
+    use crate::object_store::VOLUME_DATA_KEY_ID;
     use bit_vec::BitVec;
     use std::cmp::Ordering;
 
@@ -372,24 +381,36 @@ mod tests {
     #[test]
     fn extent_value_offset_by() {
         assert_eq!(ExtentValue::None.offset_by(1024, 2048), ExtentValue::None);
-        assert_eq!(ExtentValue::new_raw(1024).offset_by(0, 2048), ExtentValue::new_raw(1024));
-        assert_eq!(ExtentValue::new_raw(1024).offset_by(1024, 2048), ExtentValue::new_raw(2048));
-        assert_eq!(ExtentValue::new_raw(1024).offset_by(2048, 2048), ExtentValue::new_raw(3072));
+        assert_eq!(
+            ExtentValue::new_raw(1024, VOLUME_DATA_KEY_ID).offset_by(0, 2048),
+            ExtentValue::new_raw(1024, VOLUME_DATA_KEY_ID)
+        );
+        assert_eq!(
+            ExtentValue::new_raw(1024, VOLUME_DATA_KEY_ID).offset_by(1024, 2048),
+            ExtentValue::new_raw(2048, VOLUME_DATA_KEY_ID)
+        );
+        assert_eq!(
+            ExtentValue::new_raw(1024, VOLUME_DATA_KEY_ID).offset_by(2048, 2048),
+            ExtentValue::new_raw(3072, VOLUME_DATA_KEY_ID)
+        );
 
         let make_checksums = |range: std::ops::Range<u64>| Checksums::fletcher(range.collect());
 
         // In these tests we are making block size 256.
         assert_eq!(
-            ExtentValue::with_checksum(1024, make_checksums(0..8)).offset_by(0, 2048),
-            ExtentValue::with_checksum(1024, make_checksums(0..8))
+            ExtentValue::with_checksum(1024, make_checksums(0..8), VOLUME_DATA_KEY_ID)
+                .offset_by(0, 2048),
+            ExtentValue::with_checksum(1024, make_checksums(0..8), VOLUME_DATA_KEY_ID)
         );
         assert_eq!(
-            ExtentValue::with_checksum(1024, make_checksums(0..8)).offset_by(1024, 2048),
-            ExtentValue::with_checksum(2048, make_checksums(4..8))
+            ExtentValue::with_checksum(1024, make_checksums(0..8), VOLUME_DATA_KEY_ID)
+                .offset_by(1024, 2048),
+            ExtentValue::with_checksum(2048, make_checksums(4..8), VOLUME_DATA_KEY_ID)
         );
         assert_eq!(
-            ExtentValue::with_checksum(1024, make_checksums(0..8)).offset_by(2048, 2048),
-            ExtentValue::with_checksum(3072, Checksums::fletcher(Vec::new()))
+            ExtentValue::with_checksum(1024, make_checksums(0..8), VOLUME_DATA_KEY_ID)
+                .offset_by(2048, 2048),
+            ExtentValue::with_checksum(3072, Checksums::fletcher(Vec::new()), VOLUME_DATA_KEY_ID)
         );
 
         // Takes a place to switch from zeros to ones. The goal is to make sure there is exactly
@@ -433,24 +454,36 @@ mod tests {
     #[test]
     fn extent_value_shrunk() {
         assert_eq!(ExtentValue::None.shrunk(2048, 1024), ExtentValue::None);
-        assert_eq!(ExtentValue::new_raw(1024).shrunk(2048, 2048), ExtentValue::new_raw(1024));
-        assert_eq!(ExtentValue::new_raw(1024).shrunk(2048, 1024), ExtentValue::new_raw(1024));
-        assert_eq!(ExtentValue::new_raw(1024).shrunk(2048, 0), ExtentValue::new_raw(1024));
+        assert_eq!(
+            ExtentValue::new_raw(1024, VOLUME_DATA_KEY_ID).shrunk(2048, 2048),
+            ExtentValue::new_raw(1024, VOLUME_DATA_KEY_ID)
+        );
+        assert_eq!(
+            ExtentValue::new_raw(1024, VOLUME_DATA_KEY_ID).shrunk(2048, 1024),
+            ExtentValue::new_raw(1024, VOLUME_DATA_KEY_ID)
+        );
+        assert_eq!(
+            ExtentValue::new_raw(1024, VOLUME_DATA_KEY_ID).shrunk(2048, 0),
+            ExtentValue::new_raw(1024, VOLUME_DATA_KEY_ID)
+        );
 
         let make_checksums = |range: std::ops::Range<u64>| Checksums::fletcher(range.collect());
 
         // In these tests we are making block size 256.
         assert_eq!(
-            ExtentValue::with_checksum(1024, make_checksums(0..8)).shrunk(2048, 2048),
-            ExtentValue::with_checksum(1024, make_checksums(0..8))
+            ExtentValue::with_checksum(1024, make_checksums(0..8), VOLUME_DATA_KEY_ID)
+                .shrunk(2048, 2048),
+            ExtentValue::with_checksum(1024, make_checksums(0..8), VOLUME_DATA_KEY_ID)
         );
         assert_eq!(
-            ExtentValue::with_checksum(1024, make_checksums(0..8)).shrunk(2048, 1024),
-            ExtentValue::with_checksum(1024, make_checksums(0..4))
+            ExtentValue::with_checksum(1024, make_checksums(0..8), VOLUME_DATA_KEY_ID)
+                .shrunk(2048, 1024),
+            ExtentValue::with_checksum(1024, make_checksums(0..4), VOLUME_DATA_KEY_ID)
         );
         assert_eq!(
-            ExtentValue::with_checksum(1024, make_checksums(0..8)).shrunk(2048, 0),
-            ExtentValue::with_checksum(1024, Checksums::fletcher(Vec::new()))
+            ExtentValue::with_checksum(1024, make_checksums(0..8), VOLUME_DATA_KEY_ID)
+                .shrunk(2048, 0),
+            ExtentValue::with_checksum(1024, Checksums::fletcher(Vec::new()), VOLUME_DATA_KEY_ID)
         );
 
         // Takes a place to switch from zeros to ones. The goal is to make sure there is exactly
