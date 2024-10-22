@@ -16,14 +16,7 @@
 
 TaskWrapper::TaskWrapper(fbl::RefPtr<starnix::Task> task) : task_(ktl::move(task)) {}
 
-TaskWrapper::~TaskWrapper() {
-  LTRACE_ENTRY_OBJ;
-
-  if (task_) {
-    starnix::ThreadState dummy = {};
-    task_->release(dummy);
-  }
-}
+TaskWrapper::~TaskWrapper() { LTRACE_ENTRY_OBJ; }
 
 starnix::CurrentTask TaskWrapper::into() {
   starnix::TaskBuilder builder(task_);

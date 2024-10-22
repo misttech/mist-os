@@ -111,10 +111,12 @@ void ThreadGroupMutableState::set_process_group(fbl::RefPtr<ProcessGroup> proces
 }
 
 void ThreadGroupMutableState::leave_process_group(PidTable& pids) {
+  LTRACE_ENTRY_OBJ;
   if (process_group_->remove(fbl::RefPtr<ThreadGroup>(base_))) {
     process_group_->session()->Write()->remove(process_group_->leader());
     pids.remove_process_group(process_group_->leader());
   }
+  LTRACE_EXIT_OBJ;
 }
 
 bool ThreadGroupMutableState::is_waitable() const {
@@ -177,6 +179,7 @@ WaitableChildResult ThreadGroupMutableState::get_waitable_running_children(
   for (auto it = children_.begin(); it != children_.end(); ++it) {
     auto t = it.CopyPointer().Lock();
     if (t && filter_children_by_pid_selector(t) && filter_children_by_waiting_options(t)) {
+      LTRACEF("Found child pid: %d\n", t->leader());
       fbl::AllocChecker ac;
       selected_children.push_back(t, &ac);
       ZX_ASSERT(ac.check());
