@@ -5,6 +5,8 @@
 use heck::SnakeCase;
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
+use syn::punctuated::Punctuated;
+use syn::{Path, Token};
 
 /// Generates the necessary glue code to use your protocol within the daemon.
 ///
@@ -36,15 +38,11 @@ use quote::{format_ident, quote};
 #[proc_macro_attribute]
 pub fn ffx_protocol(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item: syn::ItemStruct = syn::parse(item.into()).expect("expected struct");
-    let attr: syn::AttributeArgs = syn::parse_macro_input!(attr as syn::AttributeArgs);
+    let paths = syn::parse_macro_input!(attr with Punctuated::<Path, Token![,]>::parse_terminated);
     let name = item.ident.clone();
     let mut deps = vec![];
-    for meta in attr.iter() {
-        if let syn::NestedMeta::Meta(syn::Meta::Path(p)) = meta {
-            deps.push(p);
-        } else {
-            panic!("unrecognized meta format");
-        }
+    for path in paths.iter() {
+        deps.push(path);
     }
 
     let mut q: proc_macro2::TokenStream = quote! {
