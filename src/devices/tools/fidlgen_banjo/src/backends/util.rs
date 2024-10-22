@@ -571,55 +571,62 @@ pub fn get_out_params(
     let (skip, return_param) = get_first_param(m, ir)?;
     let skip_amt = if skip { 1 } else { 0 };
 
-    Ok((m.response_parameters(ir)?.as_ref().map_or(Vec::new(), |response| { response.iter().skip(skip_amt).map(|param| {
-        let name = to_c_name(&param.name.0);
-        if let Some(arg_type) = get_base_type_from_alias(
-            &param.experimental_maybe_from_alias.as_ref().map(|t| &t.name),
-        ) {
-            return format!("{}* out_{}", arg_type, name);
+    let out_params = m
+        .response_parameters(ir)?
+        .into_iter()
+        .flatten()
+        .skip(skip_amt)
+        .map(|param| method_out_param_to_cpp_str(&param, wrappers, ir))
+        .collect();
+    Ok((out_params, return_param))
+}
+
+fn method_out_param_to_cpp_str(param: &MethodParameter<'_>, wrappers: bool, ir: &FidlIr) -> String {
+    let name = to_c_name(&param.name.0);
+    if let Some(arg_type) =
+        get_base_type_from_alias(&param.experimental_maybe_from_alias.as_ref().map(|t| &t.name))
+    {
+        return format!("{}* out_{}", arg_type, name);
+    }
+    let ty_name = type_to_cpp_str(&param._type, wrappers, ir).unwrap();
+    match &param._type {
+        Type::Str { .. } => {
+            format!("{} out_{name}, size_t {name}_capacity", ty_name, name = name)
         }
-        let ty_name = type_to_cpp_str(&param._type, wrappers, ir).unwrap();
-        match &param._type {
-            Type::Str { .. } => {
-                format!("{} out_{name}, size_t {name}_capacity", ty_name,
-                        name=name)
-            }
-            Type::Array { .. } => {
-                let bounds = array_bounds(&param._type).unwrap();
+        Type::Array { .. } => {
+            let bounds = array_bounds(&param._type).unwrap();
+            format!("{ty} out_{name}{bounds}", bounds = bounds, ty = ty_name, name = name)
+        }
+        Type::Vector { .. } => {
+            // Note: wrappers are explicitly disabled here.
+            let ty_name = type_to_cpp_str(&param._type, false, ir).unwrap();
+            let buffer_name = name_buffer(&param.maybe_attributes);
+            let size_name = name_size(&param.maybe_attributes);
+            if param.maybe_attributes.has("CalleeAllocated") {
                 format!(
-                    "{ty} out_{name}{bounds}",
-                    bounds = bounds,
+                    "{ty}** out_{name}_{buffer}, size_t* {name}_{size}",
+                    buffer = buffer_name,
+                    size = size_name,
+                    ty = ty_name,
+                    name = name
+                )
+            } else {
+                format!(
+                    "{ty}* out_{name}_{buffer}, size_t {name}_{size}, size_t* out_{name}_actual",
+                    buffer = buffer_name,
+                    size = size_name,
                     ty = ty_name,
                     name = name
                 )
             }
-            Type::Vector { .. } => {
-                // Note: wrappers are explicitly disabled here.
-                let ty_name = type_to_cpp_str(&param._type, false, ir).unwrap();
-                let buffer_name = name_buffer(&param.maybe_attributes);
-                let size_name = name_size(&param.maybe_attributes);
-                if param.maybe_attributes.has("CalleeAllocated") {
-                    format!("{ty}** out_{name}_{buffer}, size_t* {name}_{size}",
-                            buffer = buffer_name,
-                            size = size_name,
-                            ty = ty_name,
-                            name = name)
-                } else {
-                    format!("{ty}* out_{name}_{buffer}, size_t {name}_{size}, size_t* out_{name}_actual",
-                            buffer = buffer_name,
-                            size = size_name,
-                            ty = ty_name,
-                            name = name)
-                }
-            },
-            Type::Handle { .. } => format!("{}* out_{}", ty_name, name),
-            Type::Identifier { nullable, .. } => {
-                let ptr = if *nullable { "*" } else { "" };
-                format!("{}{}* out_{}", ty_name, ptr, name)
-            },
-            _ => format!("{}* out_{}", ty_name, name)
         }
-    }).collect()}), return_param))
+        Type::Handle { .. } => format!("{}* out_{}", ty_name, name),
+        Type::Identifier { nullable, .. } => {
+            let ptr = if *nullable { "*" } else { "" };
+            format!("{}{}* out_{}", ty_name, ptr, name)
+        }
+        _ => format!("{}* out_{}", ty_name, name),
+    }
 }
 
 pub fn doesnt_use_error_syntax(m: &Method, ir: &FidlIr) -> bool {
