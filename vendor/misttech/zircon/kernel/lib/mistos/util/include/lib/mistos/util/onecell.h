@@ -47,7 +47,7 @@ class OnceCell {
  private:
   mutable DECLARE_MUTEX(OnceCell) mtx_;
 
-  ktl::optional<T> value_ __TA_GUARDED(mtx_);
+  ktl::optional<T> value_ __TA_GUARDED(mtx_) = ktl::nullopt;
 };
 
 #endif  // ZIRCON_KERNEL_LIB_MISTOS_UTIL_INCLUDE_LIB_MISTOS_UTIL_ONECELL_H_
