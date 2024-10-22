@@ -18,7 +18,6 @@ rustc_test("bin") {
     "//sdk/rust/zx",
     "//src/diagnostics/archivist:lib",
     "//src/lib/diagnostics/data/rust",
-    "//src/lib/diagnostics/log/rust",
     "//src/lib/diagnostics/reader/rust",
     "//src/lib/diagnostics/selectors",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
