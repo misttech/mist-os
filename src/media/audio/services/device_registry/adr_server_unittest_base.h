@@ -133,7 +133,8 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
   std::optional<zx_status_t>& provider_fidl_error_status() { return provider_fidl_error_status_; }
 
   // Registry support
-  std::unique_ptr<TestServerAndNaturalAsyncClient<RegistryServer>> CreateTestRegistryServer() {
+  std::unique_ptr<TestServerAndNaturalAsyncClient<RegistryServer>>
+  CreateTestRegistryServerNoDeviceDiscovery() {
     auto [client_end, server_end] = CreateNaturalAsyncClientOrDie<fuchsia_audio_device::Registry>();
     auto server = adr_service_->CreateRegistryServer(std::move(server_end));
     registry_fidl_error_status().reset();
@@ -141,6 +142,11 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
                                                                registry_fidl_handler_.get());
     return std::make_unique<TestServerAndNaturalAsyncClient<RegistryServer>>(
         test_loop(), std::move(server), std::move(client));
+  }
+  std::unique_ptr<TestServerAndNaturalAsyncClient<RegistryServer>> CreateTestRegistryServer() {
+    auto registry = CreateTestRegistryServerNoDeviceDiscovery();
+    registry->server().InitialDeviceDiscoveryIsComplete();
+    return registry;
   }
   class RegistryFidlHandler final : public fidl::AsyncEventHandler<fuchsia_audio_device::Registry>,
                                     public FidlHandler {

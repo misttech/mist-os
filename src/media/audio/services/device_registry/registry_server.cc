@@ -53,6 +53,13 @@ RegistryServer::~RegistryServer() {
   LogObjectCounts();
 }
 
+void RegistryServer::InitialDeviceDiscoveryIsComplete() {
+  FX_DCHECK(!initial_device_discovery_complete_);
+  initial_device_discovery_complete_ = true;
+
+  MaybeReplyWatchDevicesAdded();
+}
+
 void RegistryServer::WatchDevicesAdded(WatchDevicesAddedCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogRegistryServerMethods);
   if (watch_devices_added_completer_.has_value()) {
@@ -63,7 +70,7 @@ void RegistryServer::WatchDevicesAdded(WatchDevicesAddedCompleter::Sync& complet
   }
 
   watch_devices_added_completer_ = completer.ToAsync();
-  ReplyWithAddedDevices();
+  MaybeReplyWatchDevicesAdded();
 }
 
 void RegistryServer::DeviceWasAdded(const std::shared_ptr<const Device>& new_device) {
@@ -71,8 +78,8 @@ void RegistryServer::DeviceWasAdded(const std::shared_ptr<const Device>& new_dev
 
   auto id = *new_device->info()->token_id();
   auto token_match = [id](fad::Info& info) { return info.token_id() == id; };
-  if (std::find_if(devices_added_since_notify_.begin(), devices_added_since_notify_.end(),
-                   token_match) != devices_added_since_notify_.end()) {
+  if (std::ranges::find_if(devices_added_since_notify_.begin(), devices_added_since_notify_.end(),
+                           token_match) != devices_added_since_notify_.end()) {
     FX_LOGS(ERROR) << "Device already added and not yet acknowledged, for this RegistryServer";
     return;
   }
@@ -81,25 +88,33 @@ void RegistryServer::DeviceWasAdded(const std::shared_ptr<const Device>& new_dev
   // Removed-then-added devices get a new token_id, so in practice this will never happen.
 
   devices_added_since_notify_.push_back(*new_device->info());
-  ReplyWithAddedDevices();
+
+  MaybeReplyWatchDevicesAdded();
 }
 
-// We just got either a completer, or a newly-added device. If now we have both, Reply.
-void RegistryServer::ReplyWithAddedDevices() {
+// We were notified that either (1) initial device discovery is complete, or (2) WatchDevicesAdded
+// was called, or (3) a device was added. If all three are now true, then Reply.
+void RegistryServer::MaybeReplyWatchDevicesAdded() {
+  if (!initial_device_discovery_complete_) {
+    ADR_LOG_METHOD(kLogRegistryServerMethods) << "waiting for initial device discovery";
+    return;
+  }
   if (!watch_devices_added_completer_.has_value()) {
-    ADR_LOG_METHOD(kLogRegistryServerMethods) << "no pending completer; just adding to our list";
+    ADR_LOG_METHOD(kLogRegistryServerMethods) << "waiting for a WatchDevicesAdded call";
     return;
   }
   if (devices_added_since_notify_.empty() && responded_to_initial_watch_devices_added_) {
-    ADR_LOG_METHOD(kLogRegistryServerMethods) << "devices_added_since_notify_ is empty";
+    ADR_LOG_METHOD(kLogRegistryServerMethods) << "waiting for a device";
     return;
   }
-  responded_to_initial_watch_devices_added_ = true;
 
   auto completer = *std::move(watch_devices_added_completer_);
   watch_devices_added_completer_.reset();
-  ADR_LOG_METHOD(kLogRegistryServerResponses) << "responding to WatchDevicesAdded with "
-                                              << devices_added_since_notify_.size() << " devices:";
+  ADR_LOG_METHOD(kLogRegistryServerResponses)
+      << "responding to "
+      << (responded_to_initial_watch_devices_added_ ? "a subsequent" : "the initial")
+      << " WatchDevicesAdded with " << devices_added_since_notify_.size() << " devices:";
+  responded_to_initial_watch_devices_added_ = true;
   for (auto& info : devices_added_since_notify_) {
     ADR_LOG_METHOD(kLogRegistryServerResponses) << "    token_id " << *info.token_id();
   }
@@ -119,7 +134,7 @@ void RegistryServer::WatchDeviceRemoved(WatchDeviceRemovedCompleter::Sync& compl
   }
 
   watch_device_removed_completer_ = completer.ToAsync();
-  ReplyWithNextRemovedDevice();
+  MaybeReplyWatchDeviceRemoved();
 }
 
 void RegistryServer::DeviceWasRemoved(TokenId removed_id) {
@@ -148,11 +163,12 @@ void RegistryServer::DeviceWasRemoved(TokenId removed_id) {
   }
 
   devices_removed_since_notify_.push(removed_id);
-  ReplyWithNextRemovedDevice();
+  MaybeReplyWatchDeviceRemoved();
 }
 
-// We just got either a completer, or a newly-removed device. If now we have both, Reply.
-void RegistryServer::ReplyWithNextRemovedDevice() {
+// We were notified that either (1) WatchDeviceRemoved was called, or (2) a device was removed.
+// If both are now true, then Reply.
+void RegistryServer::MaybeReplyWatchDeviceRemoved() {
   if (devices_removed_since_notify_.empty()) {
     ADR_LOG_METHOD(kLogRegistryServerMethods) << "devices_removed_since_notify_ is empty";
     return;

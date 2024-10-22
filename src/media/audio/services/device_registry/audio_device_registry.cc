@@ -37,33 +37,11 @@ AudioDeviceRegistry::AudioDeviceRegistry(std::shared_ptr<FidlThread> server_thre
 AudioDeviceRegistry::~AudioDeviceRegistry() { ADR_LOG_METHOD(kLogObjectLifetimes); }
 
 zx_status_t AudioDeviceRegistry::StartDeviceDetection() {
-  DeviceDetectionHandler device_detection_handler = [this](std::string_view name,
-                                                           fad::DeviceType device_type,
-                                                           fad::DriverClient driver_client) {
-    ADR_LOG_OBJECT(kLogDeviceDetection) << "detected Audio " << device_type << " '" << name << "'";
-
-    switch (driver_client.Which()) {
-      case fad::DriverClient::Tag::kCodec:
-        FX_CHECK(driver_client.codec()->is_valid());
-        break;
-      case fad::DriverClient::Tag::kComposite:
-        FX_CHECK(driver_client.composite()->is_valid());
-        break;
-      case fad::DriverClient::Tag::kStreamConfig:
-        FX_CHECK(driver_client.stream_config()->is_valid());
-        break;
-      case fad::DriverClient::Tag::kDai:
-        ADR_WARN_OBJECT() << "Dai device detected but not yet supported";
-        return;
-      default:
-        FX_CHECK(!driver_client.IsUnknown());
-    }
-    AddDevice(Device::Create(this->shared_from_this(), thread_->dispatcher(), name, device_type,
-                             std::move(driver_client)));
-  };
-
-  auto detector_result =
-      media_audio::DeviceDetector::Create(device_detection_handler, thread_->dispatcher());
+  auto detector_result = media_audio::DeviceDetector::Create(
+      [this](std::string_view name, fad::DeviceType device_type, fad::DriverClient driver_client) {
+        DeviceDetected(name, device_type, std::move(driver_client));
+      },
+      [this]() { InitialDeviceDetectionComplete(); }, thread_->dispatcher());
 
   if (detector_result.is_ok()) {
     device_detector_ = detector_result.value();
@@ -73,17 +51,67 @@ zx_status_t AudioDeviceRegistry::StartDeviceDetection() {
   return detector_result.status_value();
 }
 
-void AudioDeviceRegistry::AddDevice(const std::shared_ptr<Device>& initializing_device) {
-  pending_devices_.insert(initializing_device);
+void AudioDeviceRegistry::DeviceDetected(std::string_view name, fad::DeviceType device_type,
+                                         fad::DriverClient driver_client) {
+  ADR_LOG_OBJECT(kLogDeviceDetection) << "detected Audio " << device_type << " '" << name << "'";
+
+  switch (driver_client.Which()) {
+    case fad::DriverClient::Tag::kCodec:
+      FX_CHECK(driver_client.codec()->is_valid());
+      break;
+    case fad::DriverClient::Tag::kComposite:
+      FX_CHECK(driver_client.composite()->is_valid());
+      break;
+    case fad::DriverClient::Tag::kStreamConfig:
+      FX_CHECK(driver_client.stream_config()->is_valid());
+      break;
+    case fad::DriverClient::Tag::kDai:
+      ADR_WARN_OBJECT() << "Dai device detected but not yet supported";
+      return;
+    default:
+      FX_CHECK(!driver_client.IsUnknown());
+  }
+  AddDevice(Device::Create(this->shared_from_this(), thread_->dispatcher(), name, device_type,
+                           std::move(driver_client)));
 }
 
+void AudioDeviceRegistry::AddDevice(const std::shared_ptr<Device>& initializing_device) {
+  ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods);
+  if (initial_device_detection_complete_) {
+    pending_devices_.insert(initializing_device);
+  } else {
+    initial_pending_devices_.insert(initializing_device);
+  }
+}
+
+// The DeviceDetector has notified us of any devices that existed when device detection began.
+// (It will continue to notify us if additional devices are detected.)
+// These initially-detected devices might still be in the initialization process, but if not, then
+// notify all Registry servers that they may begin responding to WatchDevicesAdded calls.
+void AudioDeviceRegistry::InitialDeviceDetectionComplete() {
+  ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods);
+
+  FX_DCHECK(!initial_device_detection_complete_);
+  initial_device_detection_complete_ = true;
+
+  MaybeNotifyInitialDevicesAvailable();
+}
+
+// A device has completed initialization and can be moved into the set of "ready" devices.
+// If this was an initially-detected device, then check whether we can now allow Registry servers to
+// respond to WatchDevicesAdded calls.
 void AudioDeviceRegistry::DeviceIsReady(std::shared_ptr<media_audio::Device> ready_device) {
   ADR_LOG_METHOD(kLogAudioDeviceRegistryMethods) << "for device " << ready_device;
 
-  if (!pending_devices_.erase(ready_device)) {
-    FX_LOGS(ERROR) << __func__ << ": device " << ready_device << " not found in pending list";
+  bool initial_device_is_now_ready = initial_pending_devices_.erase(ready_device);
+  bool subsequent_device_is_now_ready = pending_devices_.erase(ready_device);
+  FX_DCHECK(!(initial_device_is_now_ready && subsequent_device_is_now_ready))
+      << __func__ << " inconsistency error: device " << ready_device
+      << " found in both pending lists";
+  if (!initial_device_is_now_ready && !subsequent_device_is_now_ready) {
+    FX_LOGS(ERROR) << __func__ << ": device " << ready_device
+                   << " not found in either pending list";
   }
-
   // We don't check the removed device list, because TokenIds are uint64_t created incrementally;
   // it is galactically improbable that TokenIds will ever rollover. We don't check the unhealthy
   // device list, because (for now) an unhealthy device cannot "get well"; it must be entirely
@@ -94,10 +122,34 @@ void AudioDeviceRegistry::DeviceIsReady(std::shared_ptr<media_audio::Device> rea
     return;
   }
 
-  // Notify registry clients of this new device.
+  // Notify registry servers of this new device (even if they can't yet notify their clients).
   for (auto& weak_registry : registries_) {
     if (auto registry = weak_registry.lock(); registry) {
       registry->DeviceWasAdded(ready_device);
+    }
+  }
+
+  // If this was one of the preexisting devices, then this may be the last one needed for us to
+  // consider initial device discovery complete. Check for that (and if so, notify all existing
+  // Registry servers that they may respond to WatchDevicesAdded now).
+  if (initial_device_is_now_ready) {
+    MaybeNotifyInitialDevicesAvailable();
+  }
+}
+
+// Either initial device detection just completed, or a device is now ready. If initial detection is
+// done, and all of the initially-detected devices are now ready, then (one-time) notify existing
+// Registry servers that they can start responding to WatchDevicesAdded. We also set the flag
+// all_initial_devices_ready_ so we inform subsequent Registry servers immediately on creation.
+void AudioDeviceRegistry::MaybeNotifyInitialDevicesAvailable() {
+  if (!all_initial_devices_ready_ && initial_device_detection_complete_ &&
+      initial_pending_devices_.empty()) {
+    all_initial_devices_ready_ = true;
+
+    for (auto& weak_registry : registries_) {
+      if (auto registry = weak_registry.lock(); registry) {
+        registry->InitialDeviceDiscoveryIsComplete();
+      }
     }
   }
 }
@@ -247,6 +299,10 @@ std::shared_ptr<RegistryServer> AudioDeviceRegistry::CreateRegistryServer(
 
   for (const auto& device : devices()) {
     new_registry->DeviceWasAdded(device);
+  }
+  // Notify new_registry whether it can start responding to WatchDevicesAdded calls.
+  if (all_initial_devices_ready_) {
+    new_registry->InitialDeviceDiscoveryIsComplete();
   }
   return new_registry;
 }

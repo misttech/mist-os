@@ -44,6 +44,7 @@ class RegistryServer
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_audio_device::Registry> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 
+  void InitialDeviceDiscoveryIsComplete();
   void DeviceWasAdded(const std::shared_ptr<const Device>& new_device);
   void DeviceWasRemoved(TokenId removed_id);
 
@@ -63,10 +64,11 @@ class RegistryServer
   static inline uint64_t count_ = 0;
 
   explicit RegistryServer(std::shared_ptr<AudioDeviceRegistry> parent);
-  void ReplyWithAddedDevices();
-  void ReplyWithNextRemovedDevice();
+  void MaybeReplyWatchDevicesAdded();
+  void MaybeReplyWatchDeviceRemoved();
 
   std::shared_ptr<AudioDeviceRegistry> parent_;
+  bool initial_device_discovery_complete_ = false;
   bool responded_to_initial_watch_devices_added_ = false;
 
   std::vector<fuchsia_audio_device::Info> devices_added_since_notify_;

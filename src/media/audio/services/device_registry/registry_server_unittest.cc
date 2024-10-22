@@ -25,6 +25,18 @@ class RegistryServerCompositeTest : public RegistryServerTest {};
 class RegistryServerStreamConfigTest : public RegistryServerTest {};
 
 /////////////////////
+// An important aspect validated by the RegistryServer tests is the state machine that determines
+// when clients are notified of device arrivals. Here are event sequences we test:
+//    R W.C|                WatchAddedPendsUntilDiscovery
+//    R C W|                WatchWithNoDevicesCompletes
+//    D R W.C|W.D           WatchBeforeDiscoveryComplete
+//    D R C W|D W           DiscoveryCompleteBeforeWatch
+//    R D W.D.C|            WatchBeforeDiscoveryWithDevicesDuring
+//    R D C D W|            DiscoveryBeforeWatchWithDevicesDuring
+// Where D is device arrival, R is Registry creation,       C is device discovery complete,
+// . is expected NO callback, W is first WatchDevicesAdded, | is expected first callback.
+
+/////////////////////
 // Device-less tests
 //
 // A client can drop their Registry connection without hang, and without WARNING being logged.
@@ -43,8 +55,36 @@ TEST_F(RegistryServerTest, CleanServerShutdown) {
   registry->server().Shutdown(ZX_ERR_PEER_CLOSED);
 }
 
-// On a system without devices, the initial call to WatchDevicesAdded should complete.
-TEST_F(RegistryServerTest, InitialWatchDevicesAddedWithoutDevicesComplete) {
+// On a system without devices, the initial call to WatchDevicesAdded should pend until the server
+// is notified that initial device discovery is complete.  R W.C|
+TEST_F(RegistryServerTest, WatchAddedPendsUntilDiscovery) {
+  auto registry = CreateTestRegistryServerNoDeviceDiscovery();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  bool received_callback = false;
+
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices().has_value());
+        EXPECT_TRUE(result->devices()->empty());
+        received_callback = true;
+      });
+
+  // Validate that the request has not yet completed.
+  RunLoopUntilIdle();
+  EXPECT_FALSE(received_callback);
+
+  // Inform registry server of initial device discovery complete.
+  registry->server().InitialDeviceDiscoveryIsComplete();
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(RegistryServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+}
+
+// On a system without devices, the initial call to WatchDevicesAdded should complete.  R C W|
+TEST_F(RegistryServerTest, WatchWithNoDevicesCompletes) {
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
   bool received_callback = false;
@@ -67,8 +107,8 @@ TEST_F(RegistryServerTest, InitialWatchDevicesAddedWithoutDevicesComplete) {
 // Codec tests
 //
 // Device already exists before the Registry connection is created.
-// Client calls WatchDevicesAdded and is notified.
-TEST_F(RegistryServerCodecTest, DeviceAddThenRegistryCreate) {
+// Client calls WatchDevicesAdded and is notified.  D R W.C|W.D
+TEST_F(RegistryServerCodecTest, WatchBeforeDiscoveryComplete) {
   auto fake_driver = CreateFakeCodecOutput();
   adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
                                           fad::DeviceType::kCodec,
@@ -77,89 +117,187 @@ TEST_F(RegistryServerCodecTest, DeviceAddThenRegistryCreate) {
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
   ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
-  auto registry = CreateTestRegistryServer();
+  auto registry = CreateTestRegistryServerNoDeviceDiscovery();
   ASSERT_EQ(RegistryServer::count(), 1u);
   auto received_callback = false;
 
   registry->client()->WatchDevicesAdded().Then(
       [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
-        received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
         EXPECT_EQ(result->devices()->at(0).device_type(), fad::DeviceType::kCodec);
-      });
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(received_callback);
-  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
-}
-
-// Client calls WatchDevicesAdded, then add device and client is notified.
-TEST_F(RegistryServerCodecTest, WatchAddsThenDeviceAdd) {
-  auto registry = CreateTestRegistryServer();
-  ASSERT_EQ(RegistryServer::count(), 1u);
-  ASSERT_EQ(adr_service()->devices().size(), 0u);
-  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
-  auto received_callback = false;
-
-  registry->client()->WatchDevicesAdded().Then(
-      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
-        ASSERT_TRUE(result.is_ok()) << result.error_value();
-        ASSERT_TRUE(result->devices());
-        EXPECT_TRUE(result->devices()->empty());
         received_callback = true;
-      });
-
-  RunLoopUntilIdle();
-  ASSERT_TRUE(received_callback);
-  received_callback = false;
-
-  registry->client()->WatchDevicesAdded().Then(
-      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
-        received_callback = true;
-        ASSERT_TRUE(result.is_ok()) << result.error_value();
-        ASSERT_TRUE(result->devices());
-        ASSERT_EQ(result->devices()->size(), 1u);
-        EXPECT_EQ(result->devices()->at(0).device_type(), fad::DeviceType::kCodec);
       });
 
   RunLoopUntilIdle();
   EXPECT_FALSE(received_callback);
-  EXPECT_EQ(adr_service()->devices().size(), 0u);
 
-  auto fake_driver = CreateFakeCodecInput();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                          fad::DeviceType::kCodec,
-                                          fad::DriverClient::WithCodec(fake_driver->Enable())));
+  registry->server().InitialDeviceDiscoveryIsComplete();
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service()->devices().size(), 1u);
+  received_callback = false;
+
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices());
+        ASSERT_EQ(result->devices()->size(), 1u);
+        EXPECT_EQ(result->devices()->at(0).device_type(), fad::DeviceType::kCodec);
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_FALSE(received_callback);
+
+  auto fake_driver2 = CreateFakeCodecOutput();
+  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name 2",
+                                          fad::DeviceType::kCodec,
+                                          fad::DriverClient::WithCodec(fake_driver2->Enable())));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service()->devices().size(), 2u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_TRUE(received_callback);
   EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
 }
 
-// Add device, see it added, then client calls WatchDevicesAdded and is notified.
-TEST_F(RegistryServerCodecTest, DeviceAddThenWatchAdds) {
-  auto registry = CreateTestRegistryServer();
-  ASSERT_EQ(RegistryServer::count(), 1u);
-  ASSERT_EQ(adr_service()->devices().size(), 0u);
+// Client calls WatchDevicesAdded, then add device and client is notified.  D R C W|D W
+TEST_F(RegistryServerCodecTest, DiscoveryCompleteBeforeWatch) {
   auto fake_driver = CreateFakeCodecOutput();
   adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
                                           fad::DeviceType::kCodec,
                                           fad::DriverClient::WithCodec(fake_driver->Enable())));
 
   RunLoopUntilIdle();
-  EXPECT_EQ(adr_service()->devices().size(), 1u);
-  auto received_callback = false;
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  auto registry = CreateTestRegistryServerNoDeviceDiscovery();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  registry->server().InitialDeviceDiscoveryIsComplete();
 
+  RunLoopUntilIdle();
+  auto received_callback = false;
   registry->client()->WatchDevicesAdded().Then(
       [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
-        received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
         EXPECT_EQ(result->devices()->at(0).device_type(), fad::DeviceType::kCodec);
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+
+  auto fake_driver2 = CreateFakeCodecOutput();
+  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name 2",
+                                          fad::DeviceType::kCodec,
+                                          fad::DriverClient::WithCodec(fake_driver2->Enable())));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service()->devices().size(), 2u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  received_callback = false;
+
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices());
+        ASSERT_EQ(result->devices()->size(), 1u);
+        EXPECT_EQ(result->devices()->at(0).device_type(), fad::DeviceType::kCodec);
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+}
+
+// Add device, client calls WatchDevicesAdded, is notified upon discovery complete.  R D W.D.C|
+TEST_F(RegistryServerCodecTest, WatchBeforeDiscoveryWithDevicesDuring) {
+  auto registry = CreateTestRegistryServerNoDeviceDiscovery();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+
+  auto fake_driver = CreateFakeCodecOutput();
+  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
+                                          fad::DeviceType::kCodec,
+                                          fad::DriverClient::WithCodec(fake_driver->Enable())));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+
+  auto received_callback = false;
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices());
+        ASSERT_EQ(result->devices()->size(), 2u);
+        EXPECT_EQ(result->devices()->at(0).device_type(), fad::DeviceType::kCodec);
+        EXPECT_FALSE(*result->devices()->at(0).is_input());
+        EXPECT_EQ(result->devices()->at(1).device_type(), fad::DeviceType::kCodec);
+        EXPECT_TRUE(*result->devices()->at(1).is_input());
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_FALSE(received_callback);
+
+  auto fake_driver2 = CreateFakeCodecInput();
+  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name 2",
+                                          fad::DeviceType::kCodec,
+                                          fad::DriverClient::WithCodec(fake_driver2->Enable())));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service()->devices().size(), 2u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_FALSE(received_callback);
+
+  registry->server().InitialDeviceDiscoveryIsComplete();
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+}
+
+// Add device, discovery completes, client is notified upon WatchDevicesAdded.  R D C D W|
+TEST_F(RegistryServerCodecTest, DiscoveryBeforeWatchWithDevicesDuring) {
+  auto registry = CreateTestRegistryServerNoDeviceDiscovery();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+
+  auto fake_driver = CreateFakeCodecOutput();
+  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
+                                          fad::DeviceType::kCodec,
+                                          fad::DriverClient::WithCodec(fake_driver->Enable())));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+
+  registry->server().InitialDeviceDiscoveryIsComplete();
+
+  auto fake_driver2 = CreateFakeCodecInput();
+  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name 2",
+                                          fad::DeviceType::kCodec,
+                                          fad::DriverClient::WithCodec(fake_driver2->Enable())));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service()->devices().size(), 2u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+
+  auto received_callback = false;
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices());
+        ASSERT_EQ(result->devices()->size(), 2u);
+        EXPECT_EQ(result->devices()->at(0).device_type(), fad::DeviceType::kCodec);
+        EXPECT_FALSE(*result->devices()->at(0).is_input());
+        EXPECT_EQ(result->devices()->at(1).device_type(), fad::DeviceType::kCodec);
+        EXPECT_TRUE(*result->devices()->at(1).is_input());
+        received_callback = true;
       });
 
   RunLoopUntilIdle();
@@ -441,8 +579,10 @@ TEST_F(RegistryServerCodecTest, CreateObserver) {
 
 /////////////////////
 // Composite tests
+//
 // Device already exists before the Registry connection is created.
-TEST_F(RegistryServerCompositeTest, DeviceAddThenRegistryCreate) {
+// Client calls WatchDevicesAdded and is notified.  D R W.C|W.D
+TEST_F(RegistryServerCompositeTest, WatchBeforeDiscoveryComplete) {
   auto fake_driver = CreateFakeComposite();
   adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
                                           fad::DeviceType::kComposite,
@@ -451,89 +591,183 @@ TEST_F(RegistryServerCompositeTest, DeviceAddThenRegistryCreate) {
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
   ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
-  auto registry = CreateTestRegistryServer();
+  auto registry = CreateTestRegistryServerNoDeviceDiscovery();
   ASSERT_EQ(RegistryServer::count(), 1u);
   auto received_callback = false;
 
   registry->client()->WatchDevicesAdded().Then(
       [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
-        received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
         EXPECT_EQ(result->devices()->at(0).device_type(), fad::DeviceType::kComposite);
-      });
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(received_callback);
-  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
-}
-
-// Client calls WatchDevicesAdded, then add device and client is notified.
-TEST_F(RegistryServerCompositeTest, WatchAddsThenDeviceAdd) {
-  auto registry = CreateTestRegistryServer();
-  ASSERT_EQ(RegistryServer::count(), 1u);
-  ASSERT_EQ(adr_service()->devices().size(), 0u);
-  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
-  auto received_callback = false;
-
-  registry->client()->WatchDevicesAdded().Then(
-      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
-        ASSERT_TRUE(result.is_ok()) << result.error_value();
-        ASSERT_TRUE(result->devices());
-        EXPECT_TRUE(result->devices()->empty());
         received_callback = true;
-      });
-
-  RunLoopUntilIdle();
-  ASSERT_TRUE(received_callback);
-  received_callback = false;
-
-  registry->client()->WatchDevicesAdded().Then(
-      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
-        received_callback = true;
-        ASSERT_TRUE(result.is_ok()) << result.error_value();
-        ASSERT_TRUE(result->devices());
-        ASSERT_EQ(result->devices()->size(), 1u);
-        EXPECT_EQ(result->devices()->at(0).device_type(), fad::DeviceType::kComposite);
       });
 
   RunLoopUntilIdle();
   EXPECT_FALSE(received_callback);
-  EXPECT_EQ(adr_service()->devices().size(), 0u);
 
-  auto fake_driver = CreateFakeComposite();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
-                                          fad::DeviceType::kComposite,
-                                          fad::DriverClient::WithComposite(fake_driver->Enable())));
+  registry->server().InitialDeviceDiscoveryIsComplete();
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service()->devices().size(), 1u);
-  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
-}
-
-// Add device, see it added, then client calls WatchDevicesAdded and is notified.
-TEST_F(RegistryServerCompositeTest, DeviceAddThenWatchAdds) {
-  auto registry = CreateTestRegistryServer();
-  ASSERT_EQ(RegistryServer::count(), 1u);
-  ASSERT_EQ(adr_service()->devices().size(), 0u);
-  auto fake_driver = CreateFakeComposite();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
-                                          fad::DeviceType::kComposite,
-                                          fad::DriverClient::WithComposite(fake_driver->Enable())));
-
-  RunLoopUntilIdle();
-  EXPECT_EQ(adr_service()->devices().size(), 1u);
-  auto received_callback = false;
+  received_callback = false;
 
   registry->client()->WatchDevicesAdded().Then(
       [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
-        received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
         EXPECT_EQ(result->devices()->at(0).device_type(), fad::DeviceType::kComposite);
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_FALSE(received_callback);
+
+  auto fake_driver2 = CreateFakeComposite();
+  adr_service()->AddDevice(Device::Create(
+      adr_service(), dispatcher(), "Test composite name 2", fad::DeviceType::kComposite,
+      fad::DriverClient::WithComposite(fake_driver2->Enable())));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service()->devices().size(), 2u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+}
+
+// Client calls WatchDevicesAdded, then add device and client is notified.  D R C W|D W
+TEST_F(RegistryServerCompositeTest, DiscoveryCompleteBeforeWatch) {
+  auto fake_driver = CreateFakeComposite();
+  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
+                                          fad::DeviceType::kComposite,
+                                          fad::DriverClient::WithComposite(fake_driver->Enable())));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  auto registry = CreateTestRegistryServerNoDeviceDiscovery();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  registry->server().InitialDeviceDiscoveryIsComplete();
+
+  RunLoopUntilIdle();
+  auto received_callback = false;
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices());
+        ASSERT_EQ(result->devices()->size(), 1u);
+        EXPECT_EQ(result->devices()->at(0).device_type(), fad::DeviceType::kComposite);
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+
+  auto fake_driver2 = CreateFakeComposite();
+  adr_service()->AddDevice(Device::Create(
+      adr_service(), dispatcher(), "Test composite name 2", fad::DeviceType::kComposite,
+      fad::DriverClient::WithComposite(fake_driver2->Enable())));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service()->devices().size(), 2u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  received_callback = false;
+
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices());
+        ASSERT_EQ(result->devices()->size(), 1u);
+        EXPECT_EQ(result->devices()->at(0).device_type(), fad::DeviceType::kComposite);
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+}
+
+// Add device, client calls WatchDevicesAdded, is notified upon discovery complete.  R D W.D.C|
+TEST_F(RegistryServerCompositeTest, WatchBeforeDiscoveryWithDevicesDuring) {
+  auto registry = CreateTestRegistryServerNoDeviceDiscovery();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+
+  auto fake_driver = CreateFakeComposite();
+  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
+                                          fad::DeviceType::kComposite,
+                                          fad::DriverClient::WithComposite(fake_driver->Enable())));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+
+  auto received_callback = false;
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices());
+        ASSERT_EQ(result->devices()->size(), 2u);
+        EXPECT_EQ(result->devices()->at(0).device_type(), fad::DeviceType::kComposite);
+        EXPECT_EQ(result->devices()->at(1).device_type(), fad::DeviceType::kComposite);
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_FALSE(received_callback);
+
+  auto fake_driver2 = CreateFakeComposite();
+  adr_service()->AddDevice(Device::Create(
+      adr_service(), dispatcher(), "Test composite name 2", fad::DeviceType::kComposite,
+      fad::DriverClient::WithComposite(fake_driver2->Enable())));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service()->devices().size(), 2u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_FALSE(received_callback);
+
+  registry->server().InitialDeviceDiscoveryIsComplete();
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+}
+
+// Add device, discovery completes, client is notified upon WatchDevicesAdded.  R D C D W|
+TEST_F(RegistryServerCompositeTest, DiscoveryBeforeWatchWithDevicesDuring) {
+  auto registry = CreateTestRegistryServerNoDeviceDiscovery();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+
+  auto fake_driver = CreateFakeComposite();
+  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
+                                          fad::DeviceType::kComposite,
+                                          fad::DriverClient::WithComposite(fake_driver->Enable())));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+
+  registry->server().InitialDeviceDiscoveryIsComplete();
+
+  auto fake_driver2 = CreateFakeComposite();
+  adr_service()->AddDevice(Device::Create(
+      adr_service(), dispatcher(), "Test composite name 2", fad::DeviceType::kComposite,
+      fad::DriverClient::WithComposite(fake_driver2->Enable())));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service()->devices().size(), 2u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+
+  auto received_callback = false;
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices());
+        ASSERT_EQ(result->devices()->size(), 2u);
+        EXPECT_EQ(result->devices()->at(0).device_type(), fad::DeviceType::kComposite);
+        EXPECT_EQ(result->devices()->at(1).device_type(), fad::DeviceType::kComposite);
+        received_callback = true;
       });
 
   RunLoopUntilIdle();
@@ -815,8 +1049,11 @@ TEST_F(RegistryServerCompositeTest, CreateObserver) {
 
 /////////////////////
 // StreamConfig tests
+//
+//
 // Device already exists before the Registry connection is created.
-TEST_F(RegistryServerStreamConfigTest, DeviceAddThenRegistryCreate) {
+// Client calls WatchDevicesAdded and is notified.  D R W.C|W.D
+TEST_F(RegistryServerStreamConfigTest, WatchBeforeDiscoveryComplete) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   adr_service()->AddDevice(
       Device::Create(adr_service(), dispatcher(), "Test output name", fad::DeviceType::kOutput,
@@ -825,89 +1062,185 @@ TEST_F(RegistryServerStreamConfigTest, DeviceAddThenRegistryCreate) {
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
   ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
-  auto registry = CreateTestRegistryServer();
+  auto registry = CreateTestRegistryServerNoDeviceDiscovery();
   ASSERT_EQ(RegistryServer::count(), 1u);
   auto received_callback = false;
 
   registry->client()->WatchDevicesAdded().Then(
       [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
-        received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
         EXPECT_EQ(result->devices()->at(0).device_type(), fad::DeviceType::kOutput);
-      });
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(received_callback);
-  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
-}
-
-// Client calls WatchDevicesAdded, then add device and client is notified.
-TEST_F(RegistryServerStreamConfigTest, WatchAddsThenDeviceAdd) {
-  auto registry = CreateTestRegistryServer();
-  ASSERT_EQ(RegistryServer::count(), 1u);
-  ASSERT_EQ(adr_service()->devices().size(), 0u);
-  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
-  auto received_callback = false;
-
-  registry->client()->WatchDevicesAdded().Then(
-      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
-        ASSERT_TRUE(result.is_ok()) << result.error_value();
-        ASSERT_TRUE(result->devices());
-        EXPECT_TRUE(result->devices()->empty());
         received_callback = true;
-      });
-
-  RunLoopUntilIdle();
-  ASSERT_TRUE(received_callback);
-  received_callback = false;
-
-  registry->client()->WatchDevicesAdded().Then(
-      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
-        received_callback = true;
-        ASSERT_TRUE(result.is_ok()) << result.error_value();
-        ASSERT_TRUE(result->devices());
-        ASSERT_EQ(result->devices()->size(), 1u);
-        EXPECT_EQ(result->devices()->at(0).device_type(), fad::DeviceType::kInput);
       });
 
   RunLoopUntilIdle();
   EXPECT_FALSE(received_callback);
-  EXPECT_EQ(adr_service()->devices().size(), 0u);
 
-  auto fake_driver = CreateFakeStreamConfigInput();
-  adr_service()->AddDevice(
-      Device::Create(adr_service(), dispatcher(), "Test input name", fad::DeviceType::kInput,
-                     fad::DriverClient::WithStreamConfig(fake_driver->Enable())));
+  registry->server().InitialDeviceDiscoveryIsComplete();
 
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
-  EXPECT_EQ(adr_service()->devices().size(), 1u);
+  received_callback = false;
+
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices());
+        ASSERT_EQ(result->devices()->size(), 1u);
+        EXPECT_EQ(result->devices()->at(0).device_type(), fad::DeviceType::kInput);
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_FALSE(received_callback);
+
+  auto fake_driver2 = CreateFakeStreamConfigOutput();
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test input name", fad::DeviceType::kInput,
+                     fad::DriverClient::WithStreamConfig(fake_driver2->Enable())));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service()->devices().size(), 2u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_TRUE(received_callback);
   EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
 }
 
-// Add device, see it added, then client calls WatchDevicesAdded and is notified.
-TEST_F(RegistryServerStreamConfigTest, DeviceAddThenWatchAdds) {
-  auto registry = CreateTestRegistryServer();
-  ASSERT_EQ(RegistryServer::count(), 1u);
-  ASSERT_EQ(adr_service()->devices().size(), 0u);
+// Client calls WatchDevicesAdded, then add device and client is notified.  D R C W|D W
+TEST_F(RegistryServerStreamConfigTest, DiscoveryCompleteBeforeWatch) {
   auto fake_driver = CreateFakeStreamConfigOutput();
   adr_service()->AddDevice(
       Device::Create(adr_service(), dispatcher(), "Test output name", fad::DeviceType::kOutput,
                      fad::DriverClient::WithStreamConfig(fake_driver->Enable())));
 
   RunLoopUntilIdle();
-  EXPECT_EQ(adr_service()->devices().size(), 1u);
-  auto received_callback = false;
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  auto registry = CreateTestRegistryServerNoDeviceDiscovery();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  registry->server().InitialDeviceDiscoveryIsComplete();
 
+  RunLoopUntilIdle();
+  auto received_callback = false;
   registry->client()->WatchDevicesAdded().Then(
       [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
-        received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
         EXPECT_EQ(result->devices()->at(0).device_type(), fad::DeviceType::kOutput);
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+
+  auto fake_driver2 = CreateFakeStreamConfigOutput();
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test input name", fad::DeviceType::kInput,
+                     fad::DriverClient::WithStreamConfig(fake_driver2->Enable())));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service()->devices().size(), 2u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  received_callback = false;
+
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices());
+        ASSERT_EQ(result->devices()->size(), 1u);
+        EXPECT_EQ(result->devices()->at(0).device_type(), fad::DeviceType::kInput);
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+}
+
+// Add device, client calls WatchDevicesAdded, is notified upon discovery complete.  R D W.D.C|
+TEST_F(RegistryServerStreamConfigTest, WatchBeforeDiscoveryWithDevicesDuring) {
+  auto registry = CreateTestRegistryServerNoDeviceDiscovery();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+
+  auto fake_driver = CreateFakeStreamConfigOutput();
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test output name", fad::DeviceType::kOutput,
+                     fad::DriverClient::WithStreamConfig(fake_driver->Enable())));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+
+  auto received_callback = false;
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices());
+        ASSERT_EQ(result->devices()->size(), 2u);
+        EXPECT_EQ(result->devices()->at(0).device_type(), fad::DeviceType::kOutput);
+        EXPECT_EQ(result->devices()->at(1).device_type(), fad::DeviceType::kInput);
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_FALSE(received_callback);
+
+  auto fake_driver2 = CreateFakeStreamConfigInput();
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test input name", fad::DeviceType::kInput,
+                     fad::DriverClient::WithStreamConfig(fake_driver2->Enable())));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service()->devices().size(), 2u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+  EXPECT_FALSE(received_callback);
+
+  registry->server().InitialDeviceDiscoveryIsComplete();
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+}
+
+// Add device, discovery completes, client is notified upon WatchDevicesAdded.  R D C D W|
+TEST_F(RegistryServerStreamConfigTest, DiscoveryBeforeWatchWithDevicesDuring) {
+  auto registry = CreateTestRegistryServerNoDeviceDiscovery();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+
+  auto fake_driver = CreateFakeStreamConfigOutput();
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test output name", fad::DeviceType::kOutput,
+                     fad::DriverClient::WithStreamConfig(fake_driver->Enable())));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service()->devices().size(), 1u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+
+  registry->server().InitialDeviceDiscoveryIsComplete();
+
+  auto fake_driver2 = CreateFakeStreamConfigInput();
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test input name", fad::DeviceType::kInput,
+                     fad::DriverClient::WithStreamConfig(fake_driver2->Enable())));
+
+  RunLoopUntilIdle();
+  ASSERT_EQ(adr_service()->devices().size(), 2u);
+  ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
+
+  auto received_callback = false;
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices());
+        ASSERT_EQ(result->devices()->size(), 2u);
+        EXPECT_EQ(result->devices()->at(0).device_type(), fad::DeviceType::kOutput);
+        EXPECT_FALSE(*result->devices()->at(0).is_input());
+        EXPECT_EQ(result->devices()->at(1).device_type(), fad::DeviceType::kInput);
+        EXPECT_TRUE(*result->devices()->at(1).is_input());
+        received_callback = true;
       });
 
   RunLoopUntilIdle();
