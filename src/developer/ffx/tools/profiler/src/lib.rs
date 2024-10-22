@@ -355,6 +355,20 @@ pub async fn profiler(
             };
             (target, config, session_opts)
         }
+        ProfilerSubCommand::Symbolize(opts) => {
+            let tmp_dir = Builder::new().prefix("fuchsia_cpu_profiler_").tempdir()?;
+            let symbolized_path = if opts.pprof_conversion {
+                tmp_dir.path().join("symbolized.txt")
+            } else {
+                opts.output.clone()
+            };
+            symbolize(&opts.input, &symbolized_path).await?;
+
+            if !opts.pprof_conversion {
+                return Ok(());
+            }
+            return pprof_conversion(&symbolized_path, opts.output);
+        }
     };
     let config = profiler::Config {
         configs: Some(vec![config]),
