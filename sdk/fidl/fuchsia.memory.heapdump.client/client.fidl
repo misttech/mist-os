@@ -51,7 +51,7 @@ type Allocation = table {
     3: stack_trace_key StackTraceKey;
 
     /// Allocation timestamp.
-    4: timestamp zx.Time;
+    4: timestamp zx.InstantMono;
 
     /// The allocating thread.
     5: thread_info_key ThreadInfoKey;

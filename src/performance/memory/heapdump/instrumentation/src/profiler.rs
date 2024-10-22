@@ -129,7 +129,7 @@ impl Profiler {
         address: u64,
         size: u64,
         compressed_stack_trace: &[u8],
-        timestamp: i64,
+        timestamp: zx::MonotonicInstant,
     ) {
         let (mut inner, thread_info_key, stack_trace_key) =
             self.intern_and_lock(thread_data, compressed_stack_trace);
@@ -168,7 +168,7 @@ impl Profiler {
         address: u64,
         size: u64,
         compressed_stack_trace: &[u8],
-        timestamp: i64,
+        timestamp: zx::MonotonicInstant,
     ) {
         let (mut inner, thread_info_key, stack_trace_key) =
             self.intern_and_lock(thread_data, compressed_stack_trace);
