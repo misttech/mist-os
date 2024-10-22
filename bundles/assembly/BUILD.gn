@@ -4437,6 +4437,12 @@ assembly_input_bundle("kernel_evict_continuous") {
   kernel_cmdline = [ "kernel.oom.evict-continuous=true" ]
 }
 
+# Makes the kernel age pages faster; this allows more pages to be reclaimed by reducing the working
+# set.
+assembly_input_bundle("kernel_page_scanner_aging_fast") {
+  kernel_cmdline = [ "kernel.page-scanner.min-aging-interval-ms=0" ]
+}
+
 assembly_input_bundle("kernel_logs_in_reboot_info") {
   kernel_cmdline = [ "kernel.render-dlog-to-crashlog=true" ]
 }

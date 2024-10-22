@@ -284,6 +284,7 @@ user_platform_aib_names =
       "kernel_anonymous_memory_compression",
       "kernel_anonymous_memory_compression_eager_lru",
       "kernel_evict_continuous",
+      "kernel_page_scanner_aging_fast",
 
       # Recovery
       "factory_reset",

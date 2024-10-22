@@ -6,7 +6,7 @@ use crate::subsystems::prelude::*;
 use anyhow::{anyhow, Context};
 use assembly_config_schema::board_config::SerialMode;
 use assembly_config_schema::platform_config::kernel_config::{
-    OOMBehavior, OOMRebootTimeout, PlatformKernelConfig,
+    MemoryReclamationStrategy, OOMBehavior, OOMRebootTimeout, PlatformKernelConfig,
 };
 use assembly_util::{BootfsDestination, FileEntry};
 use camino::Utf8PathBuf;
@@ -115,6 +115,15 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
             if let Some(warning_mb) = oom.warning_mb {
                 let arg = format!("kernel.oom.warning-mb={}", warning_mb);
                 builder.kernel_arg(arg);
+            }
+        }
+
+        match kernel_config.memory_reclamation_strategy {
+            MemoryReclamationStrategy::Balanced => {
+                // Use the kernel defaults.
+            }
+            MemoryReclamationStrategy::Eager => {
+                builder.platform_bundle("kernel_page_scanner_aging_fast");
             }
         }
 
