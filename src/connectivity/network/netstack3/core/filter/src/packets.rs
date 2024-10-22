@@ -558,10 +558,12 @@ impl<I: IpExt, B: BufferMut> Serializer for ForwardedPacket<I, B> {
 
     fn serialize_new_buf<BB: packet::ReusableBuffer, A: packet::BufferAlloc<BB>>(
         &self,
-        outer: packet::PacketConstraints,
-        alloc: A,
+        _outer: packet::PacketConstraints,
+        _alloc: A,
     ) -> Result<BB, packet::SerializeError<A::Error>> {
-        self.body.serialize_new_buf(outer, alloc)
+        // Currently `serialize_new_buf()` is called only for loopback multicast packets. It's not
+        // needed for `ForwardedPacket`.
+        unimplemented!();
     }
 }
 
