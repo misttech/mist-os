@@ -46,7 +46,9 @@ use crate::internal::socket::{
     TcpIpTransportContext, TcpPortSpec, TcpSocketId, TcpSocketSetEntry, TcpSocketState,
     TcpSocketStateInner,
 };
-use crate::internal::state::{BufferProvider, Closed, DataAcked, Initial, State, TimeWait};
+use crate::internal::state::{
+    BufferProvider, Closed, DataAcked, Initial, NewlyClosed, State, TimeWait,
+};
 
 impl<BT: TcpBindingsTypes> BufferProvider<BT::ReceiveBuffer, BT::SendBuffer> for BT {
     type ActiveOpen = BT::ListenerNotifierOrProvidedBuffers;
@@ -622,8 +624,7 @@ where
             }
         }
     }
-    let was_closed = matches!(state, State::Closed { .. });
-    let (reply, passive_open, data_acked) = core_ctx.with_counters(|counters| {
+    let (reply, passive_open, data_acked, newly_closed) = core_ctx.with_counters(|counters| {
         state.on_segment::<_, BC>(counters, incoming, bindings_ctx.now(), socket_options, *defunct)
     });
 
@@ -662,15 +663,14 @@ where
             //
             // If the socket was already in the closed state we can assume it's
             // no longer in the demux.
-            if !was_closed {
-                TcpDemuxContext::<WireI, _, _>::with_demux_mut(
-                    core_ctx,
-                    |DemuxState { socketmap, .. }| {
-                        assert_matches!(socketmap.conns_mut().remove(&demux_id, &conn_addr), Ok(()))
-                    },
-                );
-            }
-            let _: Option<_> = bindings_ctx.cancel_timer(timer);
+            socket::handle_newly_closed(
+                core_ctx,
+                bindings_ctx,
+                newly_closed,
+                &demux_id,
+                &conn_addr,
+                timer,
+            );
             if let Some(accept_queue) = accept_queue {
                 accept_queue.remove(&conn_id);
                 *defunct = true;
@@ -700,7 +700,15 @@ where
     }
 
     // Send any enqueued data, if there is any.
-    socket::do_send_inner(conn_id, conn, &conn_addr, timer, core_ctx, bindings_ctx);
+    socket::do_send_inner_and_then_handle_newly_closed(
+        conn_id,
+        demux_id,
+        conn,
+        &conn_addr,
+        timer,
+        core_ctx,
+        bindings_ctx,
+    );
 
     // Enqueue the connection to the associated listener
     // socket's accept queue.
@@ -950,7 +958,7 @@ where
     });
     let reply = assert_matches!(
         result,
-        (reply, None, /* data_acked */ _) => reply
+        (reply, None, /* data_acked */ _, NewlyClosed::No /* can't become closed */) => reply
     );
 
     let result = if matches!(state, State::SynRcvd(_)) {
