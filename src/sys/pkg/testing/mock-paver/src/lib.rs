@@ -290,6 +290,52 @@ pub mod hooks {
         }
     }
 
+    /// A Hook for responding to `QueryConfigurationStatusAndBootAttempts` calls.
+    pub fn config_status_and_boot_attempts<F>(callback: F) -> ConfigStatusAndBootAttempts<F>
+    where
+        F: Fn(paver::Configuration) -> Result<(paver::ConfigurationStatus, Option<u8>), Status>,
+    {
+        ConfigStatusAndBootAttempts(callback)
+    }
+
+    pub struct ConfigStatusAndBootAttempts<F>(F);
+
+    #[async_trait]
+    impl<F> Hook for ConfigStatusAndBootAttempts<F>
+    where
+        F: Fn(paver::Configuration) -> Result<(paver::ConfigurationStatus, Option<u8>), Status>
+            + Sync,
+    {
+        async fn boot_manager(
+            &self,
+            request: paver::BootManagerRequest,
+        ) -> Option<paver::BootManagerRequest> {
+            let mut response_storage;
+            match request {
+                paver::BootManagerRequest::QueryConfigurationStatusAndBootAttempts {
+                    configuration,
+                    responder,
+                } => {
+                    let raw_values = (self.0)(configuration).map_err(Status::into_raw);
+                    let result = match raw_values {
+                        Ok((status, boot_attempts)) => {
+                            response_storage = paver::BootManagerQueryConfigurationStatusAndBootAttemptsResponse::default();
+                            response_storage.status = Some(status);
+                            response_storage.boot_attempts = boot_attempts;
+                            Ok(&response_storage)
+                        }
+                        Err(e) => Err(e),
+                    };
+
+                    // Ignore errors from peers closing the channel early
+                    let _ = responder.send(result);
+                    None
+                }
+                request => Some(request),
+            }
+        }
+    }
+
     /// A Hook for responding to `WriteFirmware` calls.
     pub fn write_firmware<F>(callback: F) -> WriteFirmware<F>
     where
@@ -745,10 +791,12 @@ impl MockPaverService {
                 paver::BootManagerRequest::QueryConfigurationStatusAndBootAttempts {
                     responder,
                     ..
-                } => {
-                    // Nothing uses this yet, wait to implement until we need it.
-                    responder.send(Err(Status::NOT_SUPPORTED.into_raw()))
-                }
+                } => responder.send(Ok(
+                    &paver::BootManagerQueryConfigurationStatusAndBootAttemptsResponse {
+                        status: Some(paver::ConfigurationStatus::Healthy),
+                        ..Default::default()
+                    },
+                )),
                 paver::BootManagerRequest::SetConfigurationHealthy {
                     configuration,
                     responder,
