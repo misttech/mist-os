@@ -206,6 +206,10 @@
                 "timer_create01",
                 "timer_delete01",
                 "timer_settime02",
+
+                // TODO(https://fxbug.dev/374802310)
+                "inotify03",
+                "inotify12",
             ],
         },
         {
