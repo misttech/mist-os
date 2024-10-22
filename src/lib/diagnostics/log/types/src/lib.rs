@@ -13,9 +13,8 @@ use std::{cmp, fmt};
 #[doc(hidden)]
 pub mod serde_ext;
 
-// LINT.IfChange
-
 /// Severities a log message can have, often called the log's "level".
+#[cfg_attr(feature = "serde", derive(schemars::JsonSchema))]
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 #[repr(u8)]
 pub enum Severity {
@@ -32,7 +31,6 @@ pub enum Severity {
     /// Fatal severity level
     Fatal = 0x60,
 }
-// LINT.ThenChange(/src/lib/assembly/config_schema/src/platform_config/diagnostics_config.rs)
 
 #[cfg(feature = "serde")]
 impl serde::Serialize for Severity {

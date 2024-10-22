@@ -19,7 +19,10 @@ rustc_library("types") {
   features = []
   if (is_host) {
     features += [ "serde" ]
-    deps += [ "//third_party/rust_crates:serde" ]
+    deps += [
+      "//third_party/rust_crates:schemars",
+      "//third_party/rust_crates:serde",
+    ]
   }
 
   sources = [
