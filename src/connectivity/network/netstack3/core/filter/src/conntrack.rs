@@ -214,6 +214,7 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default + Send + Sync + 'static> Ta
         if guard.table.contains_key(&exclusive.inner.original_tuple)
             || guard.table.contains_key(&exclusive.inner.reply_tuple)
         {
+            // TODO(https://fxbug.dev/372549231): add a counter for this error.
             Err(FinalizeConnectionError::Conflict)
         } else {
             let shared = exclusive.make_shared();

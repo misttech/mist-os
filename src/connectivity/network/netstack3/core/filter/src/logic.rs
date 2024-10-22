@@ -12,7 +12,7 @@ use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
 use netstack3_base::{AnyDevice, DeviceIdContext, HandleableTimer};
 use packet_formats::ip::IpExt;
 
-use crate::conntrack::{Connection, GetConnectionError};
+use crate::conntrack::{Connection, FinalizeConnectionError, GetConnectionError};
 use crate::context::{FilterBindingsContext, FilterBindingsTypes, FilterIpContext};
 use crate::matchers::InterfaceProperties;
 use crate::packets::{IpPacket, MaybeTransportPacket};
@@ -451,9 +451,11 @@ where
 
                 match state.conntrack.finalize_connection(bindings_ctx, conn) {
                     Ok((_inserted, _weak_conn)) => {}
-                    // TODO(https://fxbug.dev/318717702): When implementing NAT, errors should be
-                    // handled.
-                    Err(_) => {}
+                    // If finalizing the connection would result in a conflict in the connection
+                    // tracking table, or if the table is at capacity, drop the packet.
+                    Err(FinalizeConnectionError::Conflict | FinalizeConnectionError::TableFull) => {
+                        return Verdict::Drop;
+                    }
                 }
             }
 
@@ -602,9 +604,11 @@ where
                             debug_assert!(res.is_none());
                         }
                     }
-                    // TODO(https://fxbug.dev/333419001): When implementing NAT, errors should be
-                    // handled.
-                    Err(_) => {}
+                    // If finalizing the connection would result in a conflict in the connection
+                    // tracking table, or if the table is at capacity, drop the packet.
+                    Err(FinalizeConnectionError::Conflict | FinalizeConnectionError::TableFull) => {
+                        return Verdict::Drop;
+                    }
                 }
             }
 
@@ -751,6 +755,7 @@ pub mod testutil {
 
 #[cfg(test)]
 mod tests {
+    use alloc::collections::HashMap;
     use alloc::sync::Arc;
     use alloc::vec;
     use alloc::vec::Vec;
@@ -760,7 +765,7 @@ mod tests {
     use derivative::Derivative;
     use ip_test_macro::ip_test;
     use net_types::ip::Ipv4;
-    use netstack3_base::SegmentHeader;
+    use netstack3_base::{IpDeviceAddr, SegmentHeader};
     use test_case::test_case;
 
     use super::*;
@@ -768,11 +773,14 @@ mod tests {
     use crate::context::testutil::{FakeBindingsCtx, FakeCtx, FakeDeviceClass};
     use crate::logic::nat::NatConfig;
     use crate::matchers::testutil::{ethernet_interface, wlan_interface, FakeDeviceId};
-    use crate::matchers::{InterfaceMatcher, PacketMatcher, PortMatcher, TransportProtocolMatcher};
+    use crate::matchers::{
+        AddressMatcher, AddressMatcherType, InterfaceMatcher, PacketMatcher, PortMatcher,
+        TransportProtocolMatcher,
+    };
     use crate::packets::testutil::internal::{
         ArbitraryValue, FakeIpPacket, FakeTcpSegment, FakeUdpPacket, TestIpExt, TransportPacketExt,
     };
-    use crate::state::{IpRoutines, UninstalledRoutine};
+    use crate::state::{IpRoutines, NatRoutines, UninstalledRoutine};
 
     impl<I: IpExt> Rule<I, FakeDeviceClass, ()> {
         pub(crate) fn new(
@@ -1397,5 +1405,61 @@ mod tests {
                 assert!(Arc::ptr_eq(&before, &after));
             }
         );
+    }
+
+    #[ip_test(I)]
+    fn drop_packet_on_finalize_connection_failure<I: TestIpExt>() {
+        let mut bindings_ctx = FakeBindingsCtx::new();
+        let mut ctx = FakeCtx::with_nat_routines_and_device_addrs(
+            &mut bindings_ctx,
+            NatRoutines {
+                egress: Hook {
+                    routines: vec![Routine {
+                        rules: vec![Rule::new(
+                            PacketMatcher {
+                                src_address: Some(AddressMatcher {
+                                    matcher: AddressMatcherType::Range(I::SRC_IP_2..=I::SRC_IP_2),
+                                    invert: false,
+                                }),
+                                ..Default::default()
+                            },
+                            Action::Masquerade { src_port: None },
+                        )],
+                    }],
+                },
+                ..Default::default()
+            },
+            HashMap::from([(ethernet_interface(), IpDeviceAddr::new(I::SRC_IP).unwrap())]),
+        );
+
+        // Simulate a forwarded packet, originally from I::SRC_IP_2, that is masqueraded
+        // to be from I::SRC_IP. The packet should have had SNAT performed.
+        let mut packet = FakeIpPacket {
+            src_ip: I::SRC_IP_2,
+            dst_ip: I::DST_IP,
+            body: FakeUdpPacket::arbitrary_value(),
+        };
+        let (verdict, _proof) = FilterImpl(&mut ctx).egress_hook(
+            &mut bindings_ctx,
+            &mut packet,
+            &ethernet_interface(),
+            &mut NullMetadata {},
+        );
+        assert_eq!(verdict, Verdict::Accept);
+        assert_eq!(packet.src_ip, I::SRC_IP);
+
+        // Now simulate a locally-generated packet that conflicts with this flow; it is
+        // from I::SRC_IP to I::DST_IP and has the same source and destination ports.
+        // Finalizing the connection should fail and the packet should be dropped.
+        //
+        // TODO(https://fxbug.dev/372543214): once we remap source ports for locally-
+        // generated traffic, finalizing the connection should succeed.
+        let (verdict, _proof) = FilterImpl(&mut ctx).egress_hook(
+            &mut bindings_ctx,
+            &mut FakeIpPacket::<I, FakeUdpPacket>::arbitrary_value(),
+            &ethernet_interface(),
+            &mut NullMetadata {},
+        );
+        assert_eq!(verdict, Verdict::Drop);
     }
 }

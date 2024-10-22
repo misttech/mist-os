@@ -110,7 +110,7 @@ pub(crate) mod testutil {
     use crate::logic::FilterTimerId;
     use crate::matchers::testutil::FakeDeviceId;
     use crate::state::validation::ValidRoutines;
-    use crate::state::{IpRoutines, Routines};
+    use crate::state::{IpRoutines, NatRoutines, Routines};
 
     #[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Hash)]
     pub enum FakeDeviceClass {
@@ -154,6 +154,24 @@ pub(crate) mod testutil {
                     conntrack: conntrack::Table::new::<IntoCoreTimerCtx>(bindings_ctx),
                 },
                 nat: FakeNatCtx::default(),
+            }
+        }
+
+        pub fn with_nat_routines_and_device_addrs(
+            bindings_ctx: &mut FakeBindingsCtx<I>,
+            routines: NatRoutines<I, FakeDeviceClass, ()>,
+            device_addrs: HashMap<FakeDeviceId, IpDeviceAddr<I::Addr>>,
+        ) -> Self {
+            let (installed_routines, uninstalled_routines) =
+                ValidRoutines::new(Routines { nat: routines, ..Default::default() })
+                    .expect("invalid state");
+            Self {
+                state: State {
+                    installed_routines,
+                    uninstalled_routines,
+                    conntrack: conntrack::Table::new::<IntoCoreTimerCtx>(bindings_ctx),
+                },
+                nat: FakeNatCtx { device_addrs },
             }
         }
 
