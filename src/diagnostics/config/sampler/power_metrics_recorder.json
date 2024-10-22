@@ -215,6 +215,11 @@
                 2,
                 2
             ]
+        },
+        {
+            "selector": "bootstrap/power-broker:root/fuchsia.inspect.Stats:current_size",
+            "metric_id": 7,
+            "metric_type": "Integer"
         }
     ],
     "poll_rate_sec": 600,
