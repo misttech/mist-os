@@ -21,8 +21,11 @@ import (
 
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder"
+	"go.fuchsia.dev/fuchsia/tools/integration/testsharder/proto"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
+
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 var (
@@ -67,6 +70,7 @@ func TestExecute(t *testing.T) {
 	testCases := []struct {
 		name          string
 		flags         testsharderFlags
+		params        *proto.Params
 		testSpecs     []build.TestSpec
 		testDurations []build.TestDuration
 		testList      []build.TestListEntry
@@ -129,8 +133,8 @@ func TestExecute(t *testing.T) {
 		},
 		{
 			name: "multiply",
-			flags: testsharderFlags{
-				targetDurationSecs: 5,
+			params: &proto.Params{
+				TargetDuration: durationpb.New(5 * time.Second),
 			},
 			testSpecs: []build.TestSpec{
 				fuchsiaTestSpec("foo"),
@@ -178,8 +182,8 @@ func TestExecute(t *testing.T) {
 		},
 		{
 			name: "target test count",
-			flags: testsharderFlags{
-				targetTestCount: 2,
+			params: &proto.Params{
+				TargetTestCount: 2,
 			},
 			testSpecs: []build.TestSpec{
 				fuchsiaTestSpec("foo1"),
@@ -190,9 +194,9 @@ func TestExecute(t *testing.T) {
 		},
 		{
 			name: "sharding by time",
-			flags: testsharderFlags{
-				targetDurationSecs: int((4 * time.Minute).Seconds()),
-				perTestTimeoutSecs: int((10 * time.Minute).Seconds()),
+			params: &proto.Params{
+				TargetDuration: durationpb.New(4 * time.Minute),
+				PerTestTimeout: durationpb.New(10 * time.Minute),
 			},
 			testSpecs: []build.TestSpec{
 				fuchsiaTestSpec("slow"),
@@ -214,13 +218,15 @@ func TestExecute(t *testing.T) {
 		{
 			name: "max shards per env",
 			flags: testsharderFlags{
+				skipUnaffected: true,
+			},
+			params: &proto.Params{
 				// Given expected test durations of 4 minutes for each test it's
 				// impossible to satisfy both the target shard duration and the
 				// max shards per environment, so the target shard duration
 				// should effectively be ignored.
-				targetDurationSecs:      int((5 * time.Minute).Seconds()),
-				maxShardsPerEnvironment: 2,
-				skipUnaffected:          true,
+				TargetDuration:  durationpb.New(5 * time.Minute),
+				MaxShardsPerEnv: 2,
 			},
 			testSpecs: []build.TestSpec{
 				fuchsiaTestSpec("affected1"),
@@ -257,8 +263,8 @@ func TestExecute(t *testing.T) {
 		},
 		{
 			name: "hermetic deps",
-			flags: testsharderFlags{
-				hermeticDeps: true,
+			params: &proto.Params{
+				HermeticDeps: true,
 			},
 			testSpecs: []build.TestSpec{
 				fuchsiaTestSpec("foo"),
@@ -275,9 +281,9 @@ func TestExecute(t *testing.T) {
 		},
 		{
 			name: "multiply affected test",
-			flags: testsharderFlags{
-				affectedTestsMultiplyThreshold: 3,
-				targetDurationSecs:             int(2 * time.Minute.Seconds()),
+			params: &proto.Params{
+				AffectedTestsMultiplyThreshold: 3,
+				TargetDuration:                 durationpb.New(2 * time.Minute),
 			},
 			testSpecs: []build.TestSpec{
 				fuchsiaTestSpec("multiplied-affected-test"),
@@ -303,9 +309,9 @@ func TestExecute(t *testing.T) {
 		},
 		{
 			name: "multiply affected tests with large number of runs",
-			flags: testsharderFlags{
-				affectedTestsMultiplyThreshold: 3,
-				targetDurationSecs:             int(5 * time.Minute.Seconds()),
+			params: &proto.Params{
+				AffectedTestsMultiplyThreshold: 3,
+				TargetDuration:                 durationpb.New(5 * time.Minute),
 			},
 			testSpecs: []build.TestSpec{
 				fuchsiaTestSpec("affected-test1"),
@@ -442,8 +448,8 @@ func TestExecute(t *testing.T) {
 		},
 		{
 			name: "boot test with modifiers",
-			flags: testsharderFlags{
-				targetDurationSecs: 5,
+			params: &proto.Params{
+				TargetDuration: durationpb.New(5 * time.Second),
 			},
 			testSpecs: []build.TestSpec{
 				bootTestSpec("boot-test"),
@@ -463,8 +469,8 @@ func TestExecute(t *testing.T) {
 		},
 		{
 			name: "various modifiers",
-			flags: testsharderFlags{
-				targetDurationSecs: 5,
+			params: &proto.Params{
+				TargetDuration: durationpb.New(5 * time.Second),
 			},
 			testSpecs: []build.TestSpec{
 				fuchsiaTestSpec("foo"),
@@ -522,9 +528,13 @@ func TestExecute(t *testing.T) {
 				tc.flags.outputFile = filepath.Join(t.TempDir(), goldenBasename)
 			}
 
+			if tc.params == nil {
+				tc.params = &proto.Params{}
+			}
+
 			tc.flags.buildDir = t.TempDir()
-			tc.flags.productBundleName = "core.x64"
-			tc.flags.pave = true
+			tc.params.ProductBundleName = "core.x64"
+			tc.params.Pave = true
 			if len(tc.modifiers) > 0 {
 				tc.flags.modifiersPath = writeTempJSONFile(t, tc.modifiers)
 			}
@@ -578,8 +588,7 @@ func TestExecute(t *testing.T) {
 					{Name: "boot-test_product_bundle", Path: "boot-test_product_bundle"},
 				},
 			}
-			params := getParamsFromFlags(tc.flags)
-			if err := execute(ctx, tc.flags, params, m); err != nil {
+			if err := execute(ctx, tc.flags, tc.params, m); err != nil {
 				t.Fatal(err)
 			}
 
