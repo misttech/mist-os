@@ -48,6 +48,7 @@ rustc_library("rust") {
   ]
 
   sources = [
+    "src/constants.rs",
     "src/encode.rs",
     "src/lib.rs",
     "src/parse.rs",

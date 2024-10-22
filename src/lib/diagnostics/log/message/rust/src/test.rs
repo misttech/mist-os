@@ -488,7 +488,7 @@ fn test_raw_severity_parsing_and_conversions() {
 
     let mut buffer = Cursor::new(vec![0u8; MAX_DATAGRAM_LEN]);
     let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
-    encoder.write_record(&record).unwrap();
+    encoder.write_record(record).unwrap();
     let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
     let mut parsed = crate::from_structured(get_test_identity(), encoded).unwrap();
     parsed.sort_payload();
@@ -548,7 +548,7 @@ fn test_from_structured() {
 
     let mut buffer = Cursor::new(vec![0u8; MAX_DATAGRAM_LEN]);
     let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
-    encoder.write_record(&record).unwrap();
+    encoder.write_record(record).unwrap();
     let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
     let parsed = crate::from_structured(get_test_identity(), encoded).unwrap();
     assert_eq!(
@@ -593,7 +593,7 @@ fn test_from_structured() {
     };
     let mut buffer = Cursor::new(vec![0u8; MAX_DATAGRAM_LEN]);
     let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
-    encoder.write_record(&record).unwrap();
+    encoder.write_record(record).unwrap();
     let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
     let parsed = crate::from_structured(get_test_identity(), encoded).unwrap();
     assert_eq!(
@@ -618,7 +618,7 @@ fn test_from_structured() {
     };
     let mut buffer = Cursor::new(vec![0u8; MAX_DATAGRAM_LEN]);
     let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
-    encoder.write_record(&record).unwrap();
+    encoder.write_record(record).unwrap();
     let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
     let parsed = crate::from_structured(get_test_identity(), encoded).unwrap();
     assert_eq!(

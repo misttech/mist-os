@@ -567,7 +567,7 @@ fn vector_filter(vector: &TestVector) -> bool {
     let mut buf = Cursor::new(vec![0; 1_000_000]);
     {
         diagnostics_log_encoding::encode::Encoder::new(&mut buf, EncoderOpts::default())
-            .write_record(&record)
+            .write_record(record)
             .unwrap();
     }
 

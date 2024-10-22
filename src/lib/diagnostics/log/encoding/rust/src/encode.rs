@@ -4,10 +4,12 @@
 
 //! Encoding diagnostic records using the Fuchsia Tracing format.
 
-use crate::{ArgType, Argument, Header, Metatag, RawSeverity, Record, SeverityExt, Value};
+use crate::{
+    constants, ArgType, Argument, Header, Metatag, RawSeverity, Record, SeverityExt, Value,
+};
 use fidl_fuchsia_diagnostics::Severity;
 use std::array::TryFromSliceError;
-use std::borrow::Borrow;
+use std::borrow::{Borrow, Cow};
 use std::fmt::Debug;
 use std::io::Cursor;
 use std::ops::Deref;
@@ -87,35 +89,35 @@ where
         let WriteEventParams { event, tags, metatags, pid, tid, dropped } = params;
         let severity = event.raw_severity();
         self.write_inner(event.timestamp(), severity, |this| {
-            this.write_argument(Argument::pid(pid))?;
-            this.write_argument(Argument::tid(tid))?;
+            this.write_raw_argument(constants::PID, pid.raw_koid())?;
+            this.write_raw_argument(constants::TID, tid.raw_koid())?;
             if dropped > 0 {
-                this.write_argument(Argument::dropped(dropped))?;
+                this.write_raw_argument(constants::NUM_DROPPED, dropped)?;
             }
             if this.options.always_log_file_line || severity >= Severity::Error.into_primitive() {
                 // If the severity is ERROR or higher, we add the file and line information.
                 if let Some(mut file) = event.file() {
                     let split = file.split("../");
                     file = split.last().unwrap();
-                    this.write_argument(Argument::file(file))?;
+                    this.write_raw_argument(constants::FILE, Value::Text(Cow::Borrowed(file)))?;
                 }
 
                 if let Some(line) = event.line() {
-                    this.write_argument(Argument::line(line as u64))?;
+                    this.write_raw_argument(constants::LINE, line as u64)?;
                 }
             }
 
             // Write the metatags as tags (if any were given)
             for metatag in metatags {
                 match metatag {
-                    Metatag::Target => this.write_argument(Argument::tag(event.target()))?,
+                    Metatag::Target => this.write_raw_argument(constants::TAG, event.target())?,
                 }
             }
 
             event.write_arguments(this)?;
 
             for tag in tags {
-                this.write_argument(Argument::tag(tag.as_ref()))?;
+                this.write_raw_argument(constants::TAG, tag.as_ref())?;
             }
             Ok(())
         })?;
@@ -123,7 +125,7 @@ where
     }
 
     /// Writes a Record to the buffer.
-    pub fn write_record<R>(&mut self, record: &R) -> Result<(), EncodingError>
+    pub fn write_record<R>(&mut self, record: R) -> Result<(), EncodingError>
     where
         R: RecordFields,
     {
@@ -161,45 +163,51 @@ where
         Ok(())
     }
 
+    /// Writes an argument with this encoder with the given name and value.
+    pub fn write_raw_argument(
+        &mut self,
+        name: &str,
+        value: impl WriteArgumentValue<B>,
+    ) -> Result<(), EncodingError> {
+        self.inner_write_argument(move |header, encoder| {
+            encoder.write_argument_name(header, name)?;
+            value.write_value(header, encoder)?;
+            Ok(())
+        })
+    }
+
     /// Writes an argument with this encoder.
     pub fn write_argument<'a>(
         &mut self,
         argument: impl Borrow<Argument<'a>>,
     ) -> Result<(), EncodingError> {
         let argument = argument.borrow();
-        let starting_idx = self.buf.cursor();
+        self.inner_write_argument(move |header, encoder| {
+            encoder.write_argument_name(header, argument.name())?;
+            argument.write_value(header, encoder)?;
+            Ok(())
+        })
+    }
 
+    fn write_argument_name(
+        &mut self,
+        header: &mut Header,
+        name: &str,
+    ) -> Result<(), EncodingError> {
+        self.write_string(name)?;
+        header.set_name_ref(string_mask(name));
+        Ok(())
+    }
+
+    fn inner_write_argument(
+        &mut self,
+        cb: impl FnOnce(&mut Header, &mut Self) -> Result<(), EncodingError>,
+    ) -> Result<(), EncodingError> {
+        let starting_idx = self.buf.cursor();
         let header_slot = self.buf.put_slot(std::mem::size_of::<Header>())?;
 
         let mut header = Header(0);
-
-        self.write_string(argument.name())?;
-        header.set_name_ref(string_mask(argument.name()));
-
-        match argument.value() {
-            Value::SignedInt(s) => {
-                header.set_type(ArgType::I64 as u8);
-                self.write_i64(s)
-            }
-            Value::UnsignedInt(u) => {
-                header.set_type(ArgType::U64 as u8);
-                self.write_u64(u)
-            }
-            Value::Floating(f) => {
-                header.set_type(ArgType::F64 as u8);
-                self.write_f64(f)
-            }
-            Value::Text(t) => {
-                header.set_type(ArgType::String as u8);
-                header.set_value_ref(string_mask(&t));
-                self.write_string(&t)
-            }
-            Value::Boolean(b) => {
-                header.set_type(ArgType::Bool as u8);
-                header.set_bool_val(b);
-                Ok(())
-            }
-        }?;
+        cb(&mut header, self)?;
 
         let record_len = self.buf.cursor() - starting_idx;
         assert_eq!(record_len % 8, 0, "arguments must be 8-byte aligned");
@@ -210,14 +218,14 @@ where
         Ok(())
     }
 
-    fn maybe_write_argument<'a>(
+    fn maybe_write_argument(
         &mut self,
         field: &Field,
-        value: impl Into<Value<'a>>,
+        value: impl WriteArgumentValue<B>,
     ) -> Result<(), EncodingError> {
         let name = field.name();
         if !matches!(name, "log.target" | "log.module_path" | "log.file" | "log.line") {
-            self.write_argument(Argument::other(name, value.into()))?;
+            self.write_raw_argument(name, value)?;
         }
         Ok(())
     }
@@ -252,6 +260,141 @@ where
             self.buf.advance_cursor(num_padding_bytes);
         }
         Ok(())
+    }
+}
+
+mod private {
+    use super::*;
+
+    pub trait Sealed {}
+    impl Sealed for Value<'_> {}
+    impl Sealed for Argument<'_> {}
+    impl Sealed for u64 {}
+    impl Sealed for f64 {}
+    impl Sealed for i64 {}
+    impl Sealed for bool {}
+    impl Sealed for String {}
+    impl Sealed for &str {}
+    impl Sealed for Cow<'_, str> {}
+}
+
+/// Trait implemented by types which can be written to the encoder.
+pub trait WriteArgumentValue<B>: private::Sealed {
+    /// Writes the value of the argument.
+    fn write_value(
+        &self,
+        header: &mut Header,
+        encoder: &mut Encoder<B>,
+    ) -> Result<(), EncodingError>;
+}
+
+impl<B: MutableBuffer> WriteArgumentValue<B> for Argument<'_> {
+    fn write_value(
+        &self,
+        header: &mut Header,
+        encoder: &mut Encoder<B>,
+    ) -> Result<(), EncodingError> {
+        match self {
+            Self::Pid(value) | Self::Tid(value) => value.raw_koid().write_value(header, encoder),
+            Self::Line(value) | Self::Dropped(value) => value.write_value(header, encoder),
+            Self::Tag(value) | Self::File(value) | Self::Message(value) => {
+                value.write_value(header, encoder)
+            }
+            Self::Other { value, .. } => value.write_value(header, encoder),
+        }
+    }
+}
+
+impl<B: MutableBuffer> WriteArgumentValue<B> for i64 {
+    fn write_value(
+        &self,
+        header: &mut Header,
+        encoder: &mut Encoder<B>,
+    ) -> Result<(), EncodingError> {
+        header.set_type(ArgType::I64 as u8);
+        encoder.write_i64(*self)
+    }
+}
+
+impl<B: MutableBuffer> WriteArgumentValue<B> for u64 {
+    fn write_value(
+        &self,
+        header: &mut Header,
+        encoder: &mut Encoder<B>,
+    ) -> Result<(), EncodingError> {
+        header.set_type(ArgType::U64 as u8);
+        encoder.write_u64(*self)
+    }
+}
+
+impl<B: MutableBuffer> WriteArgumentValue<B> for f64 {
+    fn write_value(
+        &self,
+        header: &mut Header,
+        encoder: &mut Encoder<B>,
+    ) -> Result<(), EncodingError> {
+        header.set_type(ArgType::F64 as u8);
+        encoder.write_f64(*self)
+    }
+}
+
+impl<B: MutableBuffer> WriteArgumentValue<B> for bool {
+    fn write_value(
+        &self,
+        header: &mut Header,
+        _encoder: &mut Encoder<B>,
+    ) -> Result<(), EncodingError> {
+        header.set_type(ArgType::Bool as u8);
+        header.set_bool_val(*self);
+        Ok(())
+    }
+}
+
+impl<B: MutableBuffer> WriteArgumentValue<B> for &str {
+    fn write_value(
+        &self,
+        header: &mut Header,
+        encoder: &mut Encoder<B>,
+    ) -> Result<(), EncodingError> {
+        header.set_type(ArgType::String as u8);
+        header.set_value_ref(string_mask(*self));
+        encoder.write_string(*self)
+    }
+}
+
+impl<B: MutableBuffer> WriteArgumentValue<B> for String {
+    fn write_value(
+        &self,
+        header: &mut Header,
+        encoder: &mut Encoder<B>,
+    ) -> Result<(), EncodingError> {
+        self.as_str().write_value(header, encoder)
+    }
+}
+
+impl<B: MutableBuffer> WriteArgumentValue<B> for Cow<'_, str> {
+    fn write_value(
+        &self,
+        header: &mut Header,
+        encoder: &mut Encoder<B>,
+    ) -> Result<(), EncodingError> {
+        self.as_ref().write_value(header, encoder)
+    }
+}
+
+impl<B: MutableBuffer> WriteArgumentValue<B> for Value<'_> {
+    fn write_value(
+        &self,
+        header: &mut Header,
+        encoder: &mut Encoder<B>,
+    ) -> Result<(), EncodingError> {
+        match self {
+            Value::SignedInt(s) => s.write_value(header, encoder),
+            Value::UnsignedInt(u) => u.write_value(header, encoder),
+            Value::Floating(f) => f.write_value(header, encoder),
+            Value::Text(t) => t.write_value(header, encoder),
+            Value::Boolean(b) => b.write_value(header, encoder),
+        }
     }
 }
 
@@ -360,7 +503,7 @@ pub trait RecordFields {
 
     /// Consumes this type and writes all the arguments.
     fn write_arguments<B: MutableBuffer>(
-        &self,
+        self,
         writer: &mut Encoder<B>,
     ) -> Result<(), EncodingError>;
 }
@@ -533,7 +676,28 @@ impl RecordFields for Record<'_> {
     }
 
     fn write_arguments<B: MutableBuffer>(
-        &self,
+        self,
+        writer: &mut Encoder<B>,
+    ) -> Result<(), EncodingError> {
+        for arg in self.arguments {
+            writer.write_argument(arg)?;
+        }
+        Ok(())
+    }
+
+    fn timestamp(&self) -> zx::BootInstant {
+        self.timestamp
+    }
+}
+
+#[cfg(test)]
+impl RecordFields for &Record<'_> {
+    fn raw_severity(&self) -> RawSeverity {
+        self.severity
+    }
+
+    fn write_arguments<B: MutableBuffer>(
+        self,
         writer: &mut Encoder<B>,
     ) -> Result<(), EncodingError> {
         for arg in &self.arguments {

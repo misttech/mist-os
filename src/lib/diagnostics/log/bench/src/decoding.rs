@@ -24,7 +24,7 @@ fn bench_argument(
         let arg = Argument::new("foo", value.clone());
         let buffer = [0u8; MAX_DATAGRAM_LEN_BYTES as usize];
         let mut encoder = Encoder::new(Cursor::new(buffer), EncoderOpts::default());
-        let _ = encoder.write_argument(&arg);
+        let _ = encoder.write_argument(arg);
         b.iter(|| parse_argument(encoder.inner().get_ref()))
     }
 }

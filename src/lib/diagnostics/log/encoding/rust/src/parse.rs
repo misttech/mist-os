@@ -213,7 +213,7 @@ mod tests {
         };
         let mut buffer = Cursor::new(vec![0u8; 1000]);
         let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
-        encoder.write_record(&record).unwrap();
+        encoder.write_record(record).unwrap();
         let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
 
         let (timestamp, severity) = basic_info(encoded).unwrap();

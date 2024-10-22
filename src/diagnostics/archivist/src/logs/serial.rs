@@ -360,7 +360,7 @@ mod tests {
         }
         let mut buffer = Cursor::new(vec![0u8; 1024]);
         let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
-        encoder.write_record(&record).unwrap();
+        encoder.write_record(record).unwrap();
         let encoded = &buffer.get_ref()[..buffer.position() as usize];
         StoredMessage::new(encoded.to_vec().into(), &Default::default()).unwrap()
     }

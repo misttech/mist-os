@@ -23,7 +23,7 @@ async fn run_encoding_service(mut stream: EncodingPuppetRequestStream) -> Result
         let mut buffer = Cursor::new(vec![0u8; BUFFER_SIZE]);
         let mut encoder = Encoder::new(&mut buffer, EncoderOpts::default());
         let record = utils::fidl_to_record(record);
-        match encoder.write_record(&record) {
+        match encoder.write_record(record) {
             Ok(()) => {
                 let encoded = &buffer.get_ref().as_slice()[..buffer.position() as usize];
                 let vmo = Vmo::create(BUFFER_SIZE as u64)?;

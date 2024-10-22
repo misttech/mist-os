@@ -158,10 +158,10 @@ mod tests {
             message2.severity = packet2.metadata.severity;
 
             let mut foo_stream = $harness.create_stream_from_log_reader($log_reader1);
-            foo_stream.write_packet(&packet);
+            foo_stream.write_packet(packet);
 
             let mut bar_stream = $harness.create_stream_from_log_reader($log_reader2);
-            bar_stream.write_packet(&packet2);
+            bar_stream.write_packet(packet2);
             drop((foo_stream, bar_stream));
 
             let log_stats_tree = $harness.filter_test(vec![message, message2], None).await;

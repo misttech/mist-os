@@ -12,6 +12,7 @@ use tracing::{Level, Metadata};
 
 pub use fidl_fuchsia_diagnostics::Severity;
 
+mod constants;
 pub mod encode;
 pub mod parse;
 
@@ -66,26 +67,18 @@ pub enum Argument<'a> {
     },
 }
 
-const PID: &'static str = "pid";
-const TID: &'static str = "tid";
-const TAG: &'static str = "tag";
-const NUM_DROPPED: &'static str = "num_dropped";
-const MESSAGE: &'static str = "message";
-const FILE: &'static str = "file";
-const LINE: &'static str = "line";
-
 impl<'a> Argument<'a> {
     /// Creates a new argument given its name and a value.
     pub fn new(name: impl Into<Cow<'a, str>>, value: impl Into<Value<'a>>) -> Self {
         let name: Cow<'a, str> = name.into();
         match (name.as_ref(), value.into()) {
-            (PID, Value::UnsignedInt(pid)) => Self::pid(zx::Koid::from_raw(pid)),
-            (TID, Value::UnsignedInt(pid)) => Self::tid(zx::Koid::from_raw(pid)),
-            (TAG, Value::Text(tag)) => Self::tag(tag),
-            (NUM_DROPPED, Value::UnsignedInt(dropped)) => Self::dropped(dropped),
-            (FILE, Value::Text(file)) => Self::file(file),
-            (LINE, Value::UnsignedInt(line)) => Self::line(line),
-            (MESSAGE, Value::Text(msg)) => Self::message(msg),
+            (constants::PID, Value::UnsignedInt(pid)) => Self::pid(zx::Koid::from_raw(pid)),
+            (constants::TID, Value::UnsignedInt(pid)) => Self::tid(zx::Koid::from_raw(pid)),
+            (constants::TAG, Value::Text(tag)) => Self::tag(tag),
+            (constants::NUM_DROPPED, Value::UnsignedInt(dropped)) => Self::dropped(dropped),
+            (constants::FILE, Value::Text(file)) => Self::file(file),
+            (constants::LINE, Value::UnsignedInt(line)) => Self::line(line),
+            (constants::MESSAGE, Value::Text(msg)) => Self::message(msg),
             (_, value) => Self::other(name, value),
         }
     }
@@ -158,13 +151,13 @@ impl<'a> Argument<'a> {
     /// Returns the name of the argument.
     pub fn name(&self) -> &str {
         match self {
-            Self::Pid(_) => PID,
-            Self::Tid(_) => TID,
-            Self::Tag(_) => TAG,
-            Self::Dropped(_) => NUM_DROPPED,
-            Self::File(_) => FILE,
-            Self::Line(_) => LINE,
-            Self::Message(_) => MESSAGE,
+            Self::Pid(_) => constants::PID,
+            Self::Tid(_) => constants::TID,
+            Self::Tag(_) => constants::TAG,
+            Self::Dropped(_) => constants::NUM_DROPPED,
+            Self::File(_) => constants::FILE,
+            Self::Line(_) => constants::LINE,
+            Self::Message(_) => constants::MESSAGE,
             Self::Other { name, .. } => name.borrow(),
         }
     }
@@ -512,7 +505,7 @@ mod tests {
 
         assert_roundtrips(
             Record { timestamp, severity: Severity::Info.into_primitive(), arguments: vec![] },
-            Encoder::write_record,
+            |encoder, val| encoder.write_record(val),
             parse_record,
             Some(&expected_record),
         );
@@ -582,7 +575,7 @@ mod tests {
                     Argument::other("msg", "test message one"),
                 ],
             },
-            Encoder::write_record,
+            |encoder, val| encoder.write_record(val),
             parse_record,
             None,
         );
@@ -600,7 +593,7 @@ mod tests {
                     Argument::other("msg", "test message three"),
                 ],
             },
-            Encoder::write_record,
+            |encoder, val| encoder.write_record(val),
             parse_record,
             None,
         );
