@@ -141,6 +141,11 @@ zx_status_t PartitionDevice::BlockPartitionGetName(char* out_name, size_t capaci
   return GetPartitionName(gpt_entry_, out_name, capacity).status_value();
 }
 
+zx_status_t PartitionDevice::BlockPartitionGetFlags(uint64_t* out_flags) {
+  *out_flags = gpt_entry_.flags;
+  return ZX_OK;
+}
+
 zx_status_t PartitionDevice::DdkGetProtocol(uint32_t proto_id, void* out) {
   auto* proto = static_cast<ddk::AnyProtocol*>(out);
   switch (proto_id) {

@@ -233,6 +233,10 @@ zx_status_t BlockDevice::BlockPartitionGetName(char* out_name, size_t capacity) 
   return ZX_OK;
 }
 
+zx_status_t BlockDevice::BlockPartitionGetFlags(uint64_t* out_flags) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
 bool BlockDevice::OnVolumeAdded(uint32_t page_size, uint32_t num_pages) {
   params_ = {page_size, num_pages};
   zxlogf(INFO, "FTL: %d pages of %d bytes", num_pages, page_size);

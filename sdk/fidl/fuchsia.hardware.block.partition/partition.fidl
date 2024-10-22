@@ -40,4 +40,10 @@ closed protocol Partition {
         status zx.Status;
         name string:<NAME_LENGTH, optional>;
     });
+
+    /// Gets the flags of the partition.
+    /// If the partition has no flags, ZX_ERR_NOT_SUPPORTED is returned.
+    strict GetFlags() -> (struct {
+        flags uint64;
+    }) error zx.Status;
 };

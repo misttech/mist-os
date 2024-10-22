@@ -455,6 +455,8 @@ zx_status_t VPartition::BlockPartitionGetName(char* out_name, size_t capacity) {
   return ZX_OK;
 }
 
+zx_status_t VPartition::BlockPartitionGetFlags(uint64_t* out_flags) { return ZX_ERR_NOT_SUPPORTED; }
+
 zx_status_t VPartition::BlockVolumeExtend(const slice_extent_t* extent) {
   if (zx_status_t status = BoundsCheckSliceExtent(*extent, mgr_->VSliceMax()); status != ZX_OK) {
     return status;

@@ -103,6 +103,11 @@ zx_status_t BootPartition::BlockPartitionGetName(char* out_name, size_t capacity
   return ZX_OK;
 }
 
+zx_status_t BootPartition::BlockPartitionGetFlags(uint64_t* out_flags) {
+  *out_flags = zbi_partition_.flags;
+  return ZX_OK;
+}
+
 zx_status_t BootPartition::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
   auto* proto = static_cast<ddk::AnyProtocol*>(out_protocol);
   proto->ctx = this;

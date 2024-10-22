@@ -51,6 +51,7 @@ class BootPartition : public DeviceType,
   // BlockPartitionProtocol implementation.
   zx_status_t BlockPartitionGetGuid(guidtype_t guid_type, guid_t* out_guid);
   zx_status_t BlockPartitionGetName(char* out_name, size_t capacity);
+  zx_status_t BlockPartitionGetFlags(uint64_t* out_flags);
 
  private:
   const uint64_t partition_index_;

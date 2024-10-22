@@ -182,6 +182,13 @@ zx_status_t Device::BlockPartitionGetName(char* out_name, size_t capacity) {
   return info_.partition_protocol.GetName(out_name, capacity);
 }
 
+zx_status_t Device::BlockPartitionGetFlags(uint64_t* out_flags) {
+  if (!info_.partition_protocol.is_valid()) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  return info_.partition_protocol.GetFlags(out_flags);
+}
+
 ////////////////////////////////////////////////////////////////
 // ddk::VolumeProtocol methods
 zx_status_t Device::BlockVolumeExtend(const slice_extent_t* extent) {

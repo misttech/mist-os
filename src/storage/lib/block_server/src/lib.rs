@@ -181,22 +181,24 @@ impl<SM: SessionManager> BlockServer<SM> {
         request: fvolume::VolumeRequest,
     ) -> Result<Option<impl Future<Output = Result<(), Error>> + Send>, Error> {
         match request {
-            fvolume::VolumeRequest::GetInfo { responder } => {
-                let partition_info = self.partition_info().await?;
-                let block_count = if partition_info.block_count == 0 {
-                    let volume_info = self.session_manager.get_volume_info().await?;
-                    volume_info.0.slice_size * volume_info.1.partition_slice_count
-                        / self.block_size as u64
-                } else {
-                    partition_info.block_count
-                };
-                responder.send(Ok(&fblock::BlockInfo {
-                    block_count,
-                    block_size: self.block_size,
-                    max_transfer_size: fblock::MAX_TRANSFER_UNBOUNDED,
-                    flags: fblock::Flag::empty(),
-                }))?;
-            }
+            fvolume::VolumeRequest::GetInfo { responder } => match self.partition_info().await {
+                Ok(info) => {
+                    let block_count = if info.block_count == 0 {
+                        let volume_info = self.session_manager.get_volume_info().await?;
+                        volume_info.0.slice_size * volume_info.1.partition_slice_count
+                            / self.block_size as u64
+                    } else {
+                        info.block_count
+                    };
+                    responder.send(Ok(&fblock::BlockInfo {
+                        block_count,
+                        block_size: self.block_size,
+                        max_transfer_size: fblock::MAX_TRANSFER_UNBOUNDED,
+                        flags: fblock::Flag::empty(),
+                    }))?;
+                }
+                Err(status) => responder.send(Err(status.into_raw()))?,
+            },
             fvolume::VolumeRequest::GetStats { clear: _, responder } => {
                 // TODO(https://fxbug.dev/348077960): Implement this
                 responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
@@ -209,26 +211,48 @@ impl<SM: SessionManager> BlockServer<SM> {
                 ));
             }
             fvolume::VolumeRequest::GetTypeGuid { responder } => {
-                let mut guid = fpartition::Guid { value: [0u8; fpartition::GUID_LENGTH as usize] };
-                let partition_info = self.partition_info().await?;
-                guid.value.copy_from_slice(&partition_info.type_guid);
-                responder.send(zx::sys::ZX_OK, Some(&guid))?;
+                match self.partition_info().await {
+                    Ok(info) => {
+                        let mut guid =
+                            fpartition::Guid { value: [0u8; fpartition::GUID_LENGTH as usize] };
+                        guid.value.copy_from_slice(&info.type_guid);
+                        responder.send(zx::sys::ZX_OK, Some(&guid))?;
+                    }
+                    Err(status) => {
+                        responder.send(status.into_raw(), None)?;
+                    }
+                }
             }
             fvolume::VolumeRequest::GetInstanceGuid { responder } => {
-                let mut guid = fpartition::Guid { value: [0u8; fpartition::GUID_LENGTH as usize] };
-                let partition_info = self.partition_info().await?;
-                guid.value.copy_from_slice(&partition_info.instance_guid);
-                responder.send(zx::sys::ZX_OK, Some(&guid))?;
+                match self.partition_info().await {
+                    Ok(info) => {
+                        let mut guid =
+                            fpartition::Guid { value: [0u8; fpartition::GUID_LENGTH as usize] };
+                        guid.value.copy_from_slice(&info.instance_guid);
+                        responder.send(zx::sys::ZX_OK, Some(&guid))?;
+                    }
+                    Err(status) => {
+                        responder.send(status.into_raw(), None)?;
+                    }
+                }
             }
-            fvolume::VolumeRequest::GetName { responder } => {
-                let partition_info = self.partition_info().await?;
-                let status = if partition_info.name.is_some() {
-                    zx::sys::ZX_OK
-                } else {
-                    zx::sys::ZX_ERR_NOT_SUPPORTED
-                };
-                responder.send(status, partition_info.name.as_ref().map(|s| s.as_str()))?;
-            }
+            fvolume::VolumeRequest::GetName { responder } => match self.partition_info().await {
+                Ok(info) => {
+                    let status = if info.name.is_some() {
+                        zx::sys::ZX_OK
+                    } else {
+                        zx::sys::ZX_ERR_NOT_SUPPORTED
+                    };
+                    responder.send(status, info.name.as_ref().map(|s| s.as_str()))?;
+                }
+                Err(status) => {
+                    responder.send(status.into_raw(), None)?;
+                }
+            },
+            fvolume::VolumeRequest::GetFlags { responder } => match self.partition_info().await {
+                Ok(info) => responder.send(Ok(info.flags))?,
+                Err(status) => responder.send(Err(status.into_raw()))?,
+            },
             fvolume::VolumeRequest::QuerySlices { responder, start_slices } => {
                 match self.session_manager.query_slices(&start_slices).await {
                     Ok(mut results) => {
@@ -633,7 +657,7 @@ mod tests {
             type_guid: [1; 16],
             instance_guid: [2; 16],
             name: Some("foo".to_string()),
-            flags: 0,
+            flags: 0xabcd,
         }
     }
 
@@ -653,7 +677,7 @@ mod tests {
                 let block_info = proxy.get_info().await.unwrap().unwrap();
                 assert_eq!(block_info.block_count, partition_info.block_count);
 
-                // TODO(https://fxbug.dev/348077960): Check max_transfer_size and flags
+                // TODO(https://fxbug.dev/348077960): Check max_transfer_size
 
                 let (status, type_guid) = proxy.get_type_guid().await.unwrap();
                 assert_eq!(status, zx::sys::ZX_OK);
@@ -666,6 +690,9 @@ mod tests {
                 let (status, name) = proxy.get_name().await.unwrap();
                 assert_eq!(status, zx::sys::ZX_OK);
                 assert_eq!(&name, &partition_info.name);
+
+                let flags = proxy.get_flags().await.unwrap().expect("get_flags failed");
+                assert_eq!(flags, partition_info.flags);
 
                 std::mem::drop(proxy);
             }

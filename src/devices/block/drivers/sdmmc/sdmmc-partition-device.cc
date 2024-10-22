@@ -135,6 +135,10 @@ zx_status_t PartitionDevice::BlockPartitionGetName(char* out_name, size_t capaci
   return ZX_OK;
 }
 
+zx_status_t PartitionDevice::BlockPartitionGetFlags(uint64_t* out_flags) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
 fdf::Logger& PartitionDevice::logger() { return sdmmc_parent_->logger(); }
 
 }  // namespace sdmmc

@@ -325,6 +325,10 @@ impl BlockServer {
             VolumeRequest::GetName { responder } => {
                 responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED, None)?;
             }
+            // TODO(https://fxbug.dev/42171261)
+            VolumeRequest::GetFlags { responder } => {
+                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
+            }
             VolumeRequest::QuerySlices { start_slices, responder } => {
                 // Initialise slices with default value.
                 let default = volume::VsliceRange { allocated: false, count: 0 };
