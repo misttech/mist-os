@@ -47,7 +47,7 @@ impl SeLinuxBooleans {
         self.active = HashMap::from_iter(booleans);
         self.pending.clear();
     }
-    fn names(&mut self) -> Vec<String> {
+    fn names(&self) -> Vec<String> {
         self.active.keys().cloned().collect()
     }
     fn set_pending(&mut self, name: &str, value: bool) -> Result<(), ()> {
@@ -57,7 +57,7 @@ impl SeLinuxBooleans {
         self.pending.insert(name.into(), value);
         Ok(())
     }
-    fn get(&mut self, name: &str) -> Result<(bool, bool), ()> {
+    fn get(&self, name: &str) -> Result<(bool, bool), ()> {
         let active = self.active.get(name).ok_or(())?;
         let pending = self.pending.get(name).unwrap_or(active);
         Ok((*active, *pending))
@@ -69,8 +69,6 @@ impl SeLinuxBooleans {
 
 struct SecurityServerState {
     /// Cache of SecurityIds (SIDs) used to refer to Security Contexts.
-    // TODO(http://b/308175643): reference count SIDs, so that when the last SELinux object
-    // referencing a SID gets destroyed, the entry is removed from the map.
     sids: HashMap<SecurityId, SecurityContext>,
 
     /// Identifier to allocate to the next new Security Context.
@@ -195,7 +193,8 @@ impl SecurityServer {
 
     /// Returns the Security Context string for the requested `sid`.
     /// This is used only where Contexts need to be stringified to expose to userspace, as
-    /// is the case for e.g. the `/proc/*/attr/` filesystem.
+    /// is the case for e.g. the `/proc/*/attr/` filesystem and `security.selinux` extended
+    /// attribute values.
     pub fn sid_to_security_context(&self, sid: SecurityId) -> Option<Vec<u8>> {
         let state = self.state.lock();
         let context = state.try_sid_to_security_context(sid)?;
