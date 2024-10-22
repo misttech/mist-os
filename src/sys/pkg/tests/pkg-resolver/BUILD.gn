@@ -140,6 +140,7 @@ rustc_test("resolve_propagates_blobfs_failure") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/storage/lib/delivery_blob",
+    "//src/storage/lib/vfs/rust:vfs",
     "//src/sys/pkg/lib/fuchsia-merkle",
     "//src/sys/pkg/lib/fuchsia-pkg-testing",
     "//src/sys/pkg/testing/blobfs-ramdisk",

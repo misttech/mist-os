@@ -110,17 +110,17 @@ impl ClientBuilder {
     /// executable flags. Connects to the fuchsia.fxfs.BlobCreator and BlobReader if requested.
     /// Connects to and initializes the VmexResource if `use_vmex` is set. Returns a `Client`.
     pub async fn build(self) -> Result<Client, BlobfsError> {
-        let mut flags = fio::OpenFlags::empty();
+        let mut flags = fio::Flags::empty();
         if self.readable {
-            flags |= fio::OpenFlags::RIGHT_READABLE
+            flags |= fio::PERM_READABLE
         }
         if self.writable {
-            flags |= fio::OpenFlags::RIGHT_WRITABLE
+            flags |= fio::PERM_WRITABLE
         }
         if self.executable {
-            flags |= fio::OpenFlags::RIGHT_EXECUTABLE
+            flags |= fio::PERM_EXECUTABLE
         }
-        let dir = fuchsia_fs::directory::open_in_namespace_deprecated("/blob", flags)?;
+        let dir = fuchsia_fs::directory::open_in_namespace("/blob", flags)?;
         let reader = match self.use_reader {
             Reader::DontUse => None,
             Reader::Use { use_vmex } => {
@@ -257,13 +257,10 @@ impl Client {
                 .map_err(GetBlobVmoError::Fidl)?
                 .map_err(|s| GetBlobVmoError::GetVmo(Status::from_raw(s)))
         } else {
-            let blob = fuchsia_fs::directory::open_file_deprecated(
-                &self.dir,
-                &hash.to_string(),
-                fio::OpenFlags::RIGHT_READABLE,
-            )
-            .await
-            .map_err(GetBlobVmoError::OpenBlob)?;
+            let blob =
+                fuchsia_fs::directory::open_file(&self.dir, &hash.to_string(), fio::PERM_READABLE)
+                    .await
+                    .map_err(GetBlobVmoError::OpenBlob)?;
             blob.get_backing_memory(fio::VmoFlags::READ)
                 .await
                 .map_err(GetBlobVmoError::Fidl)?
@@ -383,18 +380,14 @@ impl Client {
         &self,
         blob: &Hash,
     ) -> Result<fio::FileProxy, CreateError> {
-        let flags = fio::OpenFlags::CREATE
-            | fio::OpenFlags::RIGHT_WRITABLE
-            | fio::OpenFlags::RIGHT_READABLE;
+        let flags = fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE | fio::PERM_READABLE;
 
         let path = delivery_blob::delivery_blob_path(blob);
-        fuchsia_fs::directory::open_file_deprecated(&self.dir, &path, flags).await.map_err(|e| {
-            match e {
-                fuchsia_fs::node::OpenError::OpenError(Status::ACCESS_DENIED) => {
-                    CreateError::AlreadyExists
-                }
-                other => CreateError::Io(other),
+        fuchsia_fs::directory::open_file(&self.dir, &path, flags).await.map_err(|e| match e {
+            fuchsia_fs::node::OpenError::OpenError(Status::ACCESS_DENIED) => {
+                CreateError::AlreadyExists
             }
+            other => CreateError::Io(other),
         })
     }
 
@@ -410,10 +403,10 @@ impl Client {
             // TODO(https://fxbug.dev/295552228): Use faster API for determining blob presence.
             matches!(reader.get_vmo(blob).await, Ok(Ok(_)))
         } else {
-            let file = match fuchsia_fs::directory::open_file_no_describe_deprecated(
+            let file = match fuchsia_fs::directory::open_file_async(
                 &self.dir,
                 &blob.to_string(),
-                fio::OpenFlags::DESCRIBE | fio::OpenFlags::RIGHT_READABLE,
+                fio::Flags::FLAG_SEND_REPRESENTATION | fio::PERM_READABLE,
             ) {
                 Ok(file) => file,
                 Err(_) => return false,

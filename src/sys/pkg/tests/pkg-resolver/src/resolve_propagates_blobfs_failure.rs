@@ -12,12 +12,13 @@ use {
     blobfs_ramdisk::BlobfsRamdisk,
     fidl::endpoints::{ClientEnd, RequestStream, ServerEnd},
     fidl_fuchsia_io as fio,
-    fuchsia_async::Task,
+    fuchsia_async::{self as fasync, Task},
     fuchsia_merkle::Hash,
     fuchsia_pkg_testing::{Package, RepositoryBuilder, SystemImageBuilder},
     futures::{future::BoxFuture, prelude::*},
     lib::{extra_blob_contents, make_pkg_with_extra_blobs, TestEnvBuilder, EMPTY_REPO_PATH},
     std::sync::{atomic::AtomicU64, Arc},
+    vfs::ObjectRequest,
     zx::Status,
 };
 
@@ -102,6 +103,43 @@ impl DirectoryWithFileCreateOverride {
                     } else {
                         let () = self.inner.open(flags, mode, &path, object).unwrap();
                     }
+                }
+                fio::DirectoryRequest::Open3 {
+                    path,
+                    flags,
+                    options,
+                    object,
+                    control_handle: _,
+                } => {
+                    ObjectRequest::new3(flags, &options, object).handle(|request| {
+                        if path == "." {
+                            let stream = fio::NodeRequestStream::from_channel(
+                                fasync::Channel::from_channel(request.take().into_channel()),
+                            )
+                            .cast_stream();
+                            self.clone().spawn(stream);
+                        } else if path == self.target.0
+                            && flags.intersects(fio::Flags::FLAG_MAYBE_CREATE)
+                        {
+                            let server_end =
+                                ServerEnd::<fio::FileMarker>::new(request.take().into_channel());
+                            let handler = self.target.1.clone();
+
+                            Task::spawn(
+                                async move { handler.handle_file_stream(server_end).await },
+                            )
+                            .detach();
+                        } else {
+                            // The channel will be dropped and closed if the wire call fails.
+                            let _ = self.inner.open3(
+                                &path,
+                                flags,
+                                &request.options(),
+                                request.take().into_channel(),
+                            );
+                        }
+                        Ok(())
+                    });
                 }
                 fio::DirectoryRequest::Close { .. } => (),
                 fio::DirectoryRequest::GetToken { .. } => (),

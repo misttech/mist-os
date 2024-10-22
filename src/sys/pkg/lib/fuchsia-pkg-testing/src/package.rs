@@ -7,7 +7,6 @@
 use anyhow::{format_err, Context as _, Error};
 use blobfs_ramdisk::BlobfsRamdisk;
 use camino::{Utf8Path, Utf8PathBuf};
-use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
 use fuchsia_merkle::{Hash, MerkleTree};
 use fuchsia_pkg::{MetaContents, MetaSubpackages, PackageManifest};
@@ -98,10 +97,7 @@ impl Package {
     pub async fn from_dir(root: impl AsRef<Path>) -> Result<Self, Error> {
         let root = root.as_ref();
         let package_directory = fuchsia_pkg::PackageDirectory::from_proxy(
-            fuchsia_fs::directory::open_in_namespace_deprecated(
-                root.to_str().unwrap(),
-                fuchsia_fs::OpenFlags::RIGHT_READABLE,
-            )?,
+            fuchsia_fs::directory::open_in_namespace(root.to_str().unwrap(), fio::PERM_READABLE)?,
         );
 
         let meta_package = package_directory.meta_package().await.context("read meta/package")?;
@@ -347,40 +343,55 @@ impl Package {
 async fn read_file(dir: &fio::DirectoryProxy, path: &str) -> Result<Vec<u8>, VerificationError> {
     let (file, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
 
-    let flags = fio::OpenFlags::DESCRIBE | fio::OpenFlags::RIGHT_READABLE;
-    dir.open(flags, fio::ModeType::empty(), path, ServerEnd::new(server_end.into_channel()))
-        .expect("open request to send");
+    let flags = fio::Flags::FLAG_SEND_REPRESENTATION | fio::PERM_READABLE;
+    dir.open3(path, flags, &fio::Options::default(), server_end.into_channel())
+        .expect("open3 request failed to send");
 
     let mut events = file.take_event_stream();
     let open = async move {
-        let event = match events.next().await.expect("Some(event)").expect("no fidl error") {
-            fio::FileEvent::OnOpen_ { s, info } => {
-                match Status::ok(s) {
-                    Err(Status::NOT_FOUND) => {
-                        Err(VerificationError::MissingFile { path: path.to_owned() })
-                    }
-                    Err(status) => {
-                        Err(format_err!("unable to open {:?}: {:?}", path, status).into())
-                    }
-                    Ok(()) => Ok(()),
-                }?;
+        let event = match events.next().await.expect("Some(event)") {
+            Ok(representation) => match representation {
+                fio::FileEvent::OnOpen_ { s, info } => {
+                    match Status::ok(s) {
+                        Err(Status::NOT_FOUND) => {
+                            Err(VerificationError::MissingFile { path: path.to_owned() })
+                        }
+                        Err(status) => {
+                            Err(format_err!("unable to open {:?}: {:?}", path, status).into())
+                        }
+                        Ok(()) => Ok(()),
+                    }?;
 
-                match *info.expect("fio::FileEvent to have fio::NodeInfoDeprecated") {
-                    fio::NodeInfoDeprecated::File(fio::FileObject { event, .. }) => event,
-                    other => {
-                        panic!(
-                            "fio::NodeInfoDeprecated from fio::FileEventStream to be File variant with event: {other:?}"
-                        )
+                    match *info.expect("fio::FileEvent to have fio::NodeInfoDeprecated") {
+                        fio::NodeInfoDeprecated::File(fio::FileObject { event, .. }) => event,
+                        other => {
+                            panic!(
+                                    "fio::NodeInfoDeprecated from fio::FileEventStream to be File variant with event: {other:?}"
+                                )
+                        }
                     }
                 }
-            }
-            fio::FileEvent::OnRepresentation { payload } => match payload {
-                fio::Representation::File(fio::FileInfo { observer, .. }) => observer,
-                other => {
-                    panic!("ConnectionInfo from fio::FileEventStream to be File variant with event: {other:?}")
+                fio::FileEvent::OnRepresentation { payload } => match payload {
+                    fio::Representation::File(fio::FileInfo { observer, .. }) => observer,
+                    other => {
+                        panic!("ConnectionInfo from fio::FileEventStream to be File variant with event: {other:?}")
+                    }
+                },
+                fio::FileEvent::_UnknownEvent { ordinal, .. } => {
+                    panic!("unknown file event {ordinal}")
                 }
             },
-            fio::FileEvent::_UnknownEvent { ordinal, .. } => panic!("unknown file event {ordinal}"),
+            // If not found, Open3 will send an epitaph when closing the channel.
+            Err(fidl::Error::ClientChannelClosed { status, .. })
+                if status == zx::Status::NOT_FOUND =>
+            {
+                return Err(VerificationError::MissingFile { path: path.to_owned() });
+            }
+            Err(other_e) => {
+                return Err(
+                    format_err!("open fidl request at {:?} failed: {:?}", path, other_e).into()
+                );
+            }
         };
 
         // Files served by the package will either provide an event in its describe info (if that

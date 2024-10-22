@@ -5,13 +5,13 @@
 //! Mock implementation of blobfs for blobfs::Client.
 
 use fidl::endpoints::RequestStream as _;
-use fidl_fuchsia_io as fio;
 use fuchsia_hash::Hash;
 use futures::{Future, StreamExt as _, TryStreamExt as _};
 use std::cmp::min;
 use std::collections::HashSet;
 use std::convert::TryInto as _;
 use zx::{self as zx, AsHandleRef as _, HandleBased as _, Status};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 /// A testing server implementation of /blob.
 ///
@@ -42,6 +42,22 @@ impl Mock {
                 let stream = object.into_stream().unwrap().cast_stream();
                 Blob { stream }
             }
+            Some(Ok(fio::DirectoryRequest::Open3 {
+                path,
+                flags,
+                options: _,
+                object,
+                control_handle: _,
+            })) => {
+                assert_eq!(path, merkle.to_string());
+                assert!(flags.contains(fio::PERM_READABLE));
+                assert!(!flags.intersects(fio::Flags::PERM_WRITE | fio::Flags::FLAG_MAYBE_CREATE));
+
+                let stream =
+                    fio::NodeRequestStream::from_channel(fasync::Channel::from_channel(object))
+                        .cast_stream();
+                Blob { stream }
+            }
             other => panic!("unexpected request: {other:?}"),
         }
     }
@@ -65,6 +81,20 @@ impl Mock {
                 assert_eq!(path, delivery_blob::delivery_blob_path(merkle));
 
                 let stream = object.into_stream().unwrap().cast_stream();
+                Blob { stream }
+            }
+            Some(Ok(fio::DirectoryRequest::Open3 {
+                path,
+                flags,
+                options: _,
+                object,
+                control_handle: _,
+            })) => {
+                assert!(flags.contains(fio::PERM_WRITABLE | fio::Flags::FLAG_MAYBE_CREATE));
+                assert_eq!(path, delivery_blob::delivery_blob_path(merkle));
+                let stream =
+                    fio::NodeRequestStream::from_channel(fasync::Channel::from_channel(object))
+                        .cast_stream();
                 Blob { stream }
             }
             other => panic!("unexpected request: {other:?}"),
@@ -170,6 +200,31 @@ impl Mock {
                     let stream = object.into_stream().unwrap().cast_stream();
                     let blob = Blob { stream };
 
+                    if readable.remove(&path) {
+                        blob.succeed_open_with_blob_readable().await;
+                    } else if missing.remove(&path) {
+                        blob.fail_open_with_not_found();
+                    } else {
+                        panic!("Unexpected blob existance check for {path}");
+                    }
+                }
+                Some(Ok(fio::DirectoryRequest::Open3 {
+                    path,
+                    flags,
+                    options: _,
+                    object,
+                    control_handle: _,
+                })) => {
+                    assert!(flags.contains(fio::PERM_READABLE));
+                    assert!(
+                        !flags.intersects(fio::Flags::PERM_WRITE | fio::Flags::FLAG_MAYBE_CREATE)
+                    );
+                    let path: Hash = path.parse().unwrap();
+
+                    let stream =
+                        fio::NodeRequestStream::from_channel(fasync::Channel::from_channel(object))
+                            .cast_stream();
+                    let blob = Blob { stream };
                     if readable.remove(&path) {
                         blob.succeed_open_with_blob_readable().await;
                     } else if missing.remove(&path) {

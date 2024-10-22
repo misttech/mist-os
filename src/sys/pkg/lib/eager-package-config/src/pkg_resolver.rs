@@ -38,21 +38,28 @@ impl EagerPackageConfigs {
     }
 
     async fn from_path(path: &str) -> Result<Self, EagerPackageConfigsError> {
-        let proxy = fuchsia_fs::file::open_in_namespace_deprecated(
+        let proxy = fuchsia_fs::file::open_in_namespace(
             path,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE,
-        )?;
+            fio::PERM_READABLE | fio::Flags::FLAG_SEND_REPRESENTATION,
+        )
+        .map_err(|e| EagerPackageConfigsError::Open(e))?;
         match fuchsia_fs::file::read(&proxy).await {
             Ok(json) => Self::from_json(&json),
             Err(e) => {
-                if matches!(
-                    proxy.take_event_stream().next().await,
-                    Some(Ok(fio::FileEvent::OnOpen_{s, ..}))
-                        if s == zx::Status::NOT_FOUND.into_raw()
-                ) {
-                    Ok(EagerPackageConfigs { packages: Vec::new() })
-                } else {
-                    Err(EagerPackageConfigsError::Read(e))
+                match proxy.take_event_stream().next().await {
+                    // If not found, Open1 sends the NOT_FOUND status in an OnOpen event.
+                    Some(Ok(fio::FileEvent::OnOpen_ { s, .. }))
+                        if s == zx::Status::NOT_FOUND.into_raw() =>
+                    {
+                        Ok(EagerPackageConfigs { packages: Vec::new() })
+                    }
+                    // If not found, Open3 sends the will close the channel with NOT_FOUND status.
+                    Some(Err(fidl::Error::ClientChannelClosed { status, .. }))
+                        if status == zx::Status::NOT_FOUND =>
+                    {
+                        Ok(EagerPackageConfigs { packages: Vec::new() })
+                    }
+                    _ => Err(EagerPackageConfigsError::Read(e)),
                 }
             }
         }

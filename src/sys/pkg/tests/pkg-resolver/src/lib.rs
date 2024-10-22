@@ -43,6 +43,7 @@ use std::time::Duration;
 use tempfile::TempDir;
 use vfs::directory::entry_container::Directory as _;
 use vfs::directory::helper::DirectlyMutable as _;
+use vfs::ObjectRequest;
 use zx::{self as zx, AsHandleRef as _, HandleBased as _};
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio,
@@ -290,14 +291,26 @@ pub enum DirOrProxy {
 }
 
 impl DirOrProxy {
-    fn to_proxy(&self, rights: fio::OpenFlags) -> fio::DirectoryProxy {
+    fn to_proxy(&self, rights: fio::Rights) -> fio::DirectoryProxy {
         match &self {
-            DirOrProxy::Dir(d) => fuchsia_fs::directory::open_in_namespace_deprecated(
+            DirOrProxy::Dir(d) => fuchsia_fs::directory::open_in_namespace(
                 d.path().to_str().unwrap(),
-                rights,
+                fio::Flags::from_bits(rights.bits()).unwrap(),
             )
             .unwrap(),
-            DirOrProxy::Proxy(p) => clone_directory_proxy(p, rights),
+            DirOrProxy::Proxy(p) => {
+                let mut open1_flags = fio::OpenFlags::empty();
+                if rights.contains(fio::R_STAR_DIR) {
+                    open1_flags |= fio::OpenFlags::RIGHT_READABLE;
+                }
+                if rights.contains(fio::W_STAR_DIR) {
+                    open1_flags |= fio::OpenFlags::RIGHT_WRITABLE;
+                }
+                if rights.contains(fio::X_STAR_DIR) {
+                    open1_flags |= fio::OpenFlags::RIGHT_EXECUTABLE;
+                }
+                clone_directory_proxy(p, open1_flags)
+            }
         }
     }
 }
@@ -517,16 +530,16 @@ where
                 blobfs.root_dir_handle().into_proxy().unwrap()
             ),
             "data" => vfs::remote::remote_dir(
-                mounts.pkg_resolver_data.to_proxy(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE)
+                mounts.pkg_resolver_data.to_proxy(fio::RW_STAR_DIR)
             ),
             "config" => vfs::pseudo_directory! {
                 "data" => vfs::remote::remote_dir(
-                    mounts.pkg_resolver_config_data.to_proxy(fio::OpenFlags::RIGHT_READABLE)
+                    mounts.pkg_resolver_config_data.to_proxy(fio::R_STAR_DIR)
                 ),
                 "ssl" => vfs::remote::remote_dir(
-                    fuchsia_fs::directory::open_in_namespace_deprecated(
+                    fuchsia_fs::directory::open_in_namespace(
                         "/pkg/data/ssl",
-                        fio::OpenFlags::RIGHT_READABLE
+                        fio::PERM_READABLE
                     ).unwrap()
                 ),
             },
@@ -562,14 +575,20 @@ where
                         .take()
                         .expect("mock component should only be launched once");
                     let scope = vfs::execution_scope::ExecutionScope::new();
-                    let () = local_child_out_dir.open(
-                        scope.clone(),
-                        fio::OpenFlags::RIGHT_READABLE
-                            | fio::OpenFlags::RIGHT_WRITABLE
-                            | fio::OpenFlags::RIGHT_EXECUTABLE,
-                        vfs::path::Path::dot(),
-                        handles.outgoing_dir.into_channel().into(),
-                    );
+                    let flags = fio::PERM_READABLE | fio::PERM_WRITABLE | fio::PERM_EXECUTABLE;
+                    ObjectRequest::new3(
+                        flags,
+                        &fio::Options::default(),
+                        handles.outgoing_dir.into_channel(),
+                    )
+                    .handle(|request| {
+                        local_child_out_dir.open3(
+                            scope.clone(),
+                            vfs::path::Path::dot(),
+                            flags,
+                            request,
+                        )
+                    });
                     async move {
                         scope.wait().await;
                         Ok(())
