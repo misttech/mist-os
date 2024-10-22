@@ -16,10 +16,13 @@ namespace mtl {
 template <typename T>
 class MaybeUninit {
  public:
+  // Constexpr constructor to create uninitialized memory
+  constexpr MaybeUninit() : storage_() {}
+
   // Static method to create uninitialized MaybeUninit<T>
   static constexpr MaybeUninit<T> uninit() { return MaybeUninit<T>(); }
 
-  T assume_init() && {
+  T assume_init() {
     // Move the value out, assuming it is initialized
     return std::move(*get_ptr());
   }
@@ -27,12 +30,18 @@ class MaybeUninit {
   // Returns a mutable pointer to the underlying uninitialized memory
   T* as_mut_ptr() { return get_ptr(); }
 
- private:
-  // Constexpr constructor to create uninitialized memory
-  constexpr MaybeUninit() : storage_() {}
+  // Returns a const pointer to the underlying uninitialized memory
+  const T* as_ptr() const { return get_ptr(); }
 
+  T& write(T value) {
+    new (get_ptr()) T(std::move(value));
+    return *get_ptr();
+  }
+
+ private:
   // Returns a pointer to the memory
   T* get_ptr() { return reinterpret_cast<T*>(&storage_); }
+  const T* get_ptr() const { return reinterpret_cast<const T*>(&storage_); }
 
   // Storage to hold an uninitialized object of type T
   std::aligned_storage_t<sizeof(T), alignof(T)> storage_;
