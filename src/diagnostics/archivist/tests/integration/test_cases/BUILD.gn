@@ -82,10 +82,5 @@ fuchsia_component("archivist_integration_test_cases_component") {
 fuchsia_package("pkg") {
   testonly = true
   package_name = "archivist_integration_test_cases"
-  deps = [
-    ":archivist_integration_test_cases_component",
-    "../realm_factory:archivist_component",
-    "../realm_factory:archivist_config",
-  ]
-  subpackages = [ "../realm_factory:pkg" ]
+  deps = [ ":archivist_integration_test_cases_component" ]
 }
