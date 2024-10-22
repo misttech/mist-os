@@ -47,6 +47,7 @@
                 "fuchsia.ui.PowerOnDelayMillis",
                 "fuchsia.ui.SupportedInputDevices",
                 "fuchsia.ui.ViewingDistance",
+                "fuchsia.ui.VisualDebuggingLevel",
                 "fuchsia.wlan.RecoveryEnabled",
                 "fuchsia.wlan.RecoveryProfile",
                 "fuchsia.wlan.RoamingPolicy",

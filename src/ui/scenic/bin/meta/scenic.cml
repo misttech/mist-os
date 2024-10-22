@@ -197,6 +197,11 @@
             key: "max_display_refresh_rate_millihertz",
             type: "int32",
         },
+        {
+            config: "fuchsia.ui.VisualDebuggingLevel",
+            key: "visual_debugging_level",
+            type: "uint8",
+        },
     ],
     expose: [
         {

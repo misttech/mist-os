@@ -67,6 +67,10 @@ pub struct PlatformUiConfig {
     // The constraints on the display mode
     #[serde(default)]
     pub display_mode: DisplayModeConfig,
+
+    /// Set visual_debugging_level to enable visual debugging features.
+    #[serde(default)]
+    pub visual_debugging_level: VisualDebuggingLevel,
 }
 
 impl Default for PlatformUiConfig {
@@ -85,6 +89,7 @@ impl Default for PlatformUiConfig {
             with_synthetic_device_support: Default::default(),
             renderer: Default::default(),
             display_mode: Default::default(),
+            visual_debugging_level: Default::default(),
         }
     }
 }
@@ -181,4 +186,28 @@ pub struct UnsignedIntegerRangeInclusive {
 
     /// The inclusive upper bound of the range. If None, the range is unbounded.
     pub end: Option<u32>,
+}
+
+/// VisualDebuggingLevel used to enable visualized debug features.
+/// It has 3 level for now:
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum VisualDebuggingLevel {
+    /// None (0): disable all visual debugging features.
+    #[default]
+    None,
+    /// InfoProduct (1): enable colorful blackscreen.
+    InfoProduct,
+    /// InfoPlatform (2): enable platform related debug: scenic tint.
+    InfoPlatform,
+}
+
+impl std::convert::Into<u8> for VisualDebuggingLevel {
+    fn into(self) -> u8 {
+        match self {
+            VisualDebuggingLevel::None => 0,
+            VisualDebuggingLevel::InfoProduct => 1,
+            VisualDebuggingLevel::InfoPlatform => 2,
+        }
+    }
 }

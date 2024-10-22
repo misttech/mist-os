@@ -142,6 +142,7 @@ async fn assemble_realm(
                     "fuchsia.scenic.MinDisplayVerticalResolutionPx",
                 ))
                 .capability(Capability::configuration("fuchsia.scenic.PointerAutoFocus"))
+                .capability(Capability::configuration("fuchsia.ui.VisualDebuggingLevel"))
                 .from(&config)
                 .to(Ref::child(SCENIC)),
         )

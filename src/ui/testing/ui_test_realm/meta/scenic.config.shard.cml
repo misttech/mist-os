@@ -10,8 +10,6 @@
     ],
     offer: [
         {
-            from: "#config",
-            to: "#scenic",
             config: [
                 "fuchsia.scenic.DisplayComposition",
                 "fuchsia.scenic.DisplayRotation",
@@ -26,7 +24,10 @@
                 "fuchsia.scenic.MinDisplayVerticalResolutionPx",
                 "fuchsia.scenic.PointerAutoFocus",
                 "fuchsia.scenic.Renderer",
+                "fuchsia.ui.VisualDebuggingLevel",
             ],
+            from: "#config",
+            to: "#scenic",
         },
     ],
 }
