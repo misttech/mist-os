@@ -37,7 +37,7 @@ class ControlServerTest : public AudioDeviceRegistryServerTestBase {
           ASSERT_TRUE(result->devices().has_value());
           ASSERT_EQ(result->devices()->size(), 1u);
           ASSERT_TRUE(result->devices()->at(0).token_id().has_value());
-          added_device_id = *result->devices()->at(0).token_id();
+          added_device_id = result->devices()->at(0).token_id();
         });
     RunLoopUntilIdle();
     return added_device_id;

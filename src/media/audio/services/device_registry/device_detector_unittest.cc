@@ -164,7 +164,7 @@ class DeviceTracker {
 
 class DeviceDetectorTest : public gtest::TestLoopFixture {
  protected:
-  static inline constexpr zx::duration kCommandTimeout = zx::sec(10);
+  static constexpr zx::duration kCommandTimeout = zx::sec(10);
 
   void SetUp() override {
     // Use our production Inspector during DeviceDetector unittests.

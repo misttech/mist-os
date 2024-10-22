@@ -188,7 +188,7 @@ TEST_F(RegistryServerCodecTest, WatchRemovesThenDeviceRemove) {
         ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1);
         ASSERT_TRUE(result->devices()->at(0).device_type() == fad::DeviceType::kCodec &&
                     result->devices()->at(0).token_id().has_value());
-        added_device_id = *result->devices()->at(0).token_id();
+        added_device_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -203,7 +203,7 @@ TEST_F(RegistryServerCodecTest, WatchRemovesThenDeviceRemove) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->token_id());
-        removed_device_id = *result->token_id();
+        removed_device_id = result->token_id();
       });
 
   RunLoopUntilIdle();
@@ -240,7 +240,7 @@ TEST_F(RegistryServerCodecTest, DeviceRemoveThenWatchRemoves) {
         ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1);
         ASSERT_TRUE(result->devices()->at(0).device_type() == fad::DeviceType::kCodec &&
                     result->devices()->at(0).token_id().has_value());
-        added_device_id = *result->devices()->at(0).token_id();
+        added_device_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -259,7 +259,7 @@ TEST_F(RegistryServerCodecTest, DeviceRemoveThenWatchRemoves) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->token_id());
-        removed_device_id = *result->token_id();
+        removed_device_id = result->token_id();
       });
 
   RunLoopUntilIdle();
@@ -339,7 +339,7 @@ TEST_F(RegistryServerCodecTest, DeviceRemoveAddThenWatches) {
         ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1);
         ASSERT_TRUE(result->devices()->at(0).device_type() == fad::DeviceType::kCodec &&
                     result->devices()->at(0).token_id().has_value());
-        first_added_id = *result->devices()->at(0).token_id();
+        first_added_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -365,7 +365,7 @@ TEST_F(RegistryServerCodecTest, DeviceRemoveAddThenWatches) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->token_id());
-        removed_device_id = *result->token_id();
+        removed_device_id = result->token_id();
       });
 
   RunLoopUntilIdle();
@@ -382,7 +382,7 @@ TEST_F(RegistryServerCodecTest, DeviceRemoveAddThenWatches) {
         ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1);
         ASSERT_TRUE(result->devices()->at(0).device_type() == fad::DeviceType::kCodec &&
                     result->devices()->at(0).token_id().has_value());
-        second_added_id = *result->devices()->at(0).token_id();
+        second_added_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -413,7 +413,7 @@ TEST_F(RegistryServerCodecTest, CreateObserver) {
         ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1);
         ASSERT_TRUE(result->devices()->at(0).device_type() == fad::DeviceType::kCodec &&
                     result->devices()->at(0).token_id().has_value());
-        added_id = *result->devices()->at(0).token_id();
+        added_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -426,7 +426,7 @@ TEST_F(RegistryServerCodecTest, CreateObserver) {
 
   registry->client()
       ->CreateObserver({{
-          .token_id = *added_id,
+          .token_id = added_id,
           .observer_server = std::move(observer_server_end),
       }})
       .Then([&received_callback](fidl::Result<fad::Registry::CreateObserver>& result) {
@@ -562,7 +562,7 @@ TEST_F(RegistryServerCompositeTest, WatchRemovesThenDeviceRemove) {
         ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1);
         ASSERT_TRUE(result->devices()->at(0).device_type() == fad::DeviceType::kComposite &&
                     result->devices()->at(0).token_id().has_value());
-        added_device_id = *result->devices()->at(0).token_id();
+        added_device_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -577,7 +577,7 @@ TEST_F(RegistryServerCompositeTest, WatchRemovesThenDeviceRemove) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->token_id());
-        removed_device_id = *result->token_id();
+        removed_device_id = result->token_id();
       });
 
   RunLoopUntilIdle();
@@ -614,7 +614,7 @@ TEST_F(RegistryServerCompositeTest, DeviceRemoveThenWatchRemoves) {
         ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1);
         ASSERT_TRUE(result->devices()->at(0).device_type() == fad::DeviceType::kComposite &&
                     result->devices()->at(0).token_id().has_value());
-        added_device_id = *result->devices()->at(0).token_id();
+        added_device_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -633,7 +633,7 @@ TEST_F(RegistryServerCompositeTest, DeviceRemoveThenWatchRemoves) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->token_id());
-        removed_device_id = *result->token_id();
+        removed_device_id = result->token_id();
       });
 
   RunLoopUntilIdle();
@@ -713,7 +713,7 @@ TEST_F(RegistryServerCompositeTest, DeviceRemoveAddThenWatches) {
         ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1);
         ASSERT_TRUE(result->devices()->at(0).device_type() == fad::DeviceType::kComposite &&
                     result->devices()->at(0).token_id().has_value());
-        first_added_id = *result->devices()->at(0).token_id();
+        first_added_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -739,7 +739,7 @@ TEST_F(RegistryServerCompositeTest, DeviceRemoveAddThenWatches) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->token_id());
-        removed_device_id = *result->token_id();
+        removed_device_id = result->token_id();
       });
 
   RunLoopUntilIdle();
@@ -756,7 +756,7 @@ TEST_F(RegistryServerCompositeTest, DeviceRemoveAddThenWatches) {
         ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1);
         ASSERT_TRUE(result->devices()->at(0).device_type() == fad::DeviceType::kComposite &&
                     result->devices()->at(0).token_id().has_value());
-        second_added_id = *result->devices()->at(0).token_id();
+        second_added_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -787,7 +787,7 @@ TEST_F(RegistryServerCompositeTest, CreateObserver) {
         ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1);
         ASSERT_TRUE(result->devices()->at(0).device_type() == fad::DeviceType::kComposite &&
                     result->devices()->at(0).token_id().has_value());
-        added_id = *result->devices()->at(0).token_id();
+        added_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -800,7 +800,7 @@ TEST_F(RegistryServerCompositeTest, CreateObserver) {
 
   registry->client()
       ->CreateObserver({{
-          .token_id = *added_id,
+          .token_id = added_id,
           .observer_server = std::move(observer_server_end),
       }})
       .Then([&received_callback](fidl::Result<fad::Registry::CreateObserver>& result) {
@@ -936,7 +936,7 @@ TEST_F(RegistryServerStreamConfigTest, WatchRemovesThenDeviceRemove) {
         ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1);
         ASSERT_TRUE(result->devices()->at(0).device_type() == fad::DeviceType::kInput &&
                     result->devices()->at(0).token_id().has_value());
-        added_device_id = *result->devices()->at(0).token_id();
+        added_device_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -951,7 +951,7 @@ TEST_F(RegistryServerStreamConfigTest, WatchRemovesThenDeviceRemove) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->token_id());
-        removed_device_id = *result->token_id();
+        removed_device_id = result->token_id();
       });
 
   RunLoopUntilIdle();
@@ -988,7 +988,7 @@ TEST_F(RegistryServerStreamConfigTest, DeviceRemoveThenWatchRemoves) {
         ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1);
         ASSERT_TRUE(result->devices()->at(0).device_type() == fad::DeviceType::kOutput &&
                     result->devices()->at(0).token_id().has_value());
-        added_device_id = *result->devices()->at(0).token_id();
+        added_device_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -1007,7 +1007,7 @@ TEST_F(RegistryServerStreamConfigTest, DeviceRemoveThenWatchRemoves) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->token_id());
-        removed_device_id = *result->token_id();
+        removed_device_id = result->token_id();
       });
 
   RunLoopUntilIdle();
@@ -1087,7 +1087,7 @@ TEST_F(RegistryServerStreamConfigTest, DeviceRemoveAddThenWatches) {
         ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1);
         ASSERT_TRUE(result->devices()->at(0).device_type() == fad::DeviceType::kOutput &&
                     result->devices()->at(0).token_id().has_value());
-        first_added_id = *result->devices()->at(0).token_id();
+        first_added_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -1113,7 +1113,7 @@ TEST_F(RegistryServerStreamConfigTest, DeviceRemoveAddThenWatches) {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->token_id());
-        removed_device_id = *result->token_id();
+        removed_device_id = result->token_id();
       });
 
   RunLoopUntilIdle();
@@ -1130,7 +1130,7 @@ TEST_F(RegistryServerStreamConfigTest, DeviceRemoveAddThenWatches) {
         ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1);
         ASSERT_TRUE(result->devices()->at(0).device_type() == fad::DeviceType::kInput &&
                     result->devices()->at(0).token_id().has_value());
-        second_added_id = *result->devices()->at(0).token_id();
+        second_added_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -1161,7 +1161,7 @@ TEST_F(RegistryServerStreamConfigTest, CreateObserver) {
         ASSERT_TRUE(result.is_ok() && result->devices() && result->devices()->size() == 1);
         ASSERT_TRUE(result->devices()->at(0).device_type() == fad::DeviceType::kOutput &&
                     result->devices()->at(0).token_id().has_value());
-        added_id = *result->devices()->at(0).token_id();
+        added_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -1174,7 +1174,7 @@ TEST_F(RegistryServerStreamConfigTest, CreateObserver) {
 
   registry->client()
       ->CreateObserver({{
-          .token_id = *added_id,
+          .token_id = added_id,
           .observer_server = std::move(observer_server_end),
       }})
       .Then([&received_callback](fidl::Result<fad::Registry::CreateObserver>& result) {

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_AUDIO_DEVICE_REGISTRY_H_
-#define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_AUDIO_DEVICE_REGISTRY_H_
+#ifndef FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_AUDIO_DEVICE_REGISTRY_H_
+#define FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_AUDIO_DEVICE_REGISTRY_H_
 
 #include <fidl/fuchsia.audio.device/cpp/markers.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
@@ -51,7 +51,7 @@ class AudioDeviceRegistry : public std::enable_shared_from_this<AudioDeviceRegis
   // Add a newly-constructed Device object to our "initializing" list.
   void AddDevice(const std::shared_ptr<Device>& initializing_device);
 
-  enum class DevicePresence { Unknown, Active, Error };
+  enum class DevicePresence : uint8_t { Unknown, Active, Error };
   std::pair<DevicePresence, std::shared_ptr<Device>> FindDeviceByTokenId(TokenId token_id);
 
   static bool ClaimDeviceForControl(const std::shared_ptr<Device>& device,
@@ -116,4 +116,4 @@ class AudioDeviceRegistry : public std::enable_shared_from_this<AudioDeviceRegis
 
 }  // namespace media_audio
 
-#endif  // SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_AUDIO_DEVICE_REGISTRY_H_
+#endif  // FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_AUDIO_DEVICE_REGISTRY_H_

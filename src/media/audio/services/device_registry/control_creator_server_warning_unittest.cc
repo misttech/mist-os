@@ -77,7 +77,7 @@ TEST_F(ControlCreatorServerCodecWarningTest, BadId) {
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
         ASSERT_TRUE(result->devices()->at(0).token_id());
-        added_device_id = *result->devices()->at(0).token_id();
+        added_device_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -132,7 +132,7 @@ TEST_F(ControlCreatorServerCodecWarningTest, MissingServerEnd) {
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
         ASSERT_TRUE(result->devices()->at(0).token_id());
-        added_device_id = *result->devices()->at(0).token_id();
+        added_device_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -144,7 +144,7 @@ TEST_F(ControlCreatorServerCodecWarningTest, MissingServerEnd) {
 
   control_creator->client()
       ->Create({{
-          .token_id = *added_device_id,
+          .token_id = added_device_id,
           // Missing server_end
       }})
       .Then([&received_callback](fidl::Result<fad::ControlCreator::Create>& result) mutable {
@@ -188,7 +188,7 @@ TEST_F(ControlCreatorServerCodecWarningTest, BadServerEnd) {
           ASSERT_TRUE(result->devices());
           ASSERT_EQ(result->devices()->size(), 1u);
           ASSERT_TRUE(result->devices()->at(0).token_id());
-          added_device_id = *result->devices()->at(0).token_id();
+          added_device_id = result->devices()->at(0).token_id();
         });
 
     RunLoopUntilIdle();
@@ -204,7 +204,7 @@ TEST_F(ControlCreatorServerCodecWarningTest, BadServerEnd) {
 
   control_creator->client()
       ->Create({{
-          .token_id = *added_device_id,
+          .token_id = added_device_id,
           .control_server = fidl::ServerEnd<fad::Control>(),  // Bad server_end
       }})
       .Then([&received_callback](fidl::Result<fad::ControlCreator::Create>& result) mutable {
@@ -248,7 +248,7 @@ TEST_F(ControlCreatorServerCodecWarningTest, IdAlreadyControlled) {
           ASSERT_TRUE(result->devices());
           ASSERT_EQ(result->devices()->size(), 1u);
           ASSERT_TRUE(result->devices()->at(0).token_id());
-          added_device_id = *result->devices()->at(0).token_id();
+          added_device_id = result->devices()->at(0).token_id();
         });
 
     RunLoopUntilIdle();
@@ -265,7 +265,7 @@ TEST_F(ControlCreatorServerCodecWarningTest, IdAlreadyControlled) {
 
   control_creator->client()
       ->Create({{
-          .token_id = *added_device_id,
+          .token_id = added_device_id,
           .control_server = std::move(server),
       }})
       .Then([&received_callback](fidl::Result<fad::ControlCreator::Create>& result) mutable {
@@ -286,7 +286,7 @@ TEST_F(ControlCreatorServerCodecWarningTest, IdAlreadyControlled) {
 
   control_creator->client()
       ->Create({{
-          .token_id = *added_device_id,
+          .token_id = added_device_id,
           .control_server = std::move(server2),
       }})
       .Then([&received_callback](fidl::Result<fad::ControlCreator::Create>& result) mutable {
@@ -335,7 +335,7 @@ TEST_F(ControlCreatorServerCompositeWarningTest, BadId) {
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
         ASSERT_TRUE(result->devices()->at(0).token_id());
-        added_device_id = *result->devices()->at(0).token_id();
+        added_device_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -389,7 +389,7 @@ TEST_F(ControlCreatorServerCompositeWarningTest, MissingServerEnd) {
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
         ASSERT_TRUE(result->devices()->at(0).token_id());
-        added_device_id = *result->devices()->at(0).token_id();
+        added_device_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -403,7 +403,7 @@ TEST_F(ControlCreatorServerCompositeWarningTest, MissingServerEnd) {
 
   control_creator->client()
       ->Create({{
-          .token_id = *added_device_id,
+          .token_id = added_device_id,
           // Missing server_end
       }})
       .Then([&received_callback](fidl::Result<fad::ControlCreator::Create>& result) mutable {
@@ -447,7 +447,7 @@ TEST_F(ControlCreatorServerCompositeWarningTest, BadServerEnd) {
           ASSERT_TRUE(result->devices());
           ASSERT_EQ(result->devices()->size(), 1u);
           ASSERT_TRUE(result->devices()->at(0).token_id());
-          added_device_id = *result->devices()->at(0).token_id();
+          added_device_id = result->devices()->at(0).token_id();
         });
 
     RunLoopUntilIdle();
@@ -463,7 +463,7 @@ TEST_F(ControlCreatorServerCompositeWarningTest, BadServerEnd) {
 
   control_creator->client()
       ->Create({{
-          .token_id = *added_device_id,
+          .token_id = added_device_id,
           .control_server = fidl::ServerEnd<fad::Control>(),  // Bad server_end
       }})
       .Then([&received_callback](fidl::Result<fad::ControlCreator::Create>& result) mutable {
@@ -507,7 +507,7 @@ TEST_F(ControlCreatorServerCompositeWarningTest, IdAlreadyControlled) {
           ASSERT_TRUE(result->devices());
           ASSERT_EQ(result->devices()->size(), 1u);
           ASSERT_TRUE(result->devices()->at(0).token_id());
-          added_device_id = *result->devices()->at(0).token_id();
+          added_device_id = result->devices()->at(0).token_id();
         });
 
     RunLoopUntilIdle();
@@ -524,7 +524,7 @@ TEST_F(ControlCreatorServerCompositeWarningTest, IdAlreadyControlled) {
 
   control_creator->client()
       ->Create({{
-          .token_id = *added_device_id,
+          .token_id = added_device_id,
           .control_server = std::move(server),
       }})
       .Then([&received_callback](fidl::Result<fad::ControlCreator::Create>& result) mutable {
@@ -543,7 +543,7 @@ TEST_F(ControlCreatorServerCompositeWarningTest, IdAlreadyControlled) {
 
   control_creator->client()
       ->Create({{
-          .token_id = *added_device_id,
+          .token_id = added_device_id,
           .control_server = std::move(server2),
       }})
       .Then([&received_callback](fidl::Result<fad::ControlCreator::Create>& result) mutable {
@@ -592,7 +592,7 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, BadId) {
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
         ASSERT_TRUE(result->devices()->at(0).token_id());
-        added_device_id = *result->devices()->at(0).token_id();
+        added_device_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -646,7 +646,7 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, MissingServerEnd) {
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
         ASSERT_TRUE(result->devices()->at(0).token_id());
-        added_device_id = *result->devices()->at(0).token_id();
+        added_device_id = result->devices()->at(0).token_id();
       });
 
   RunLoopUntilIdle();
@@ -660,7 +660,7 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, MissingServerEnd) {
 
   control_creator->client()
       ->Create({{
-          .token_id = *added_device_id,
+          .token_id = added_device_id,
           // Missing server_end
       }})
       .Then([&received_callback](fidl::Result<fad::ControlCreator::Create>& result) mutable {
@@ -704,7 +704,7 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, BadServerEnd) {
           ASSERT_TRUE(result->devices());
           ASSERT_EQ(result->devices()->size(), 1u);
           ASSERT_TRUE(result->devices()->at(0).token_id());
-          added_device_id = *result->devices()->at(0).token_id();
+          added_device_id = result->devices()->at(0).token_id();
         });
 
     RunLoopUntilIdle();
@@ -720,7 +720,7 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, BadServerEnd) {
 
   control_creator->client()
       ->Create({{
-          .token_id = *added_device_id,
+          .token_id = added_device_id,
           .control_server = fidl::ServerEnd<fad::Control>(),  // Bad server_end
       }})
       .Then([&received_callback](fidl::Result<fad::ControlCreator::Create>& result) mutable {
@@ -764,7 +764,7 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, IdAlreadyControlled) {
           ASSERT_TRUE(result->devices());
           ASSERT_EQ(result->devices()->size(), 1u);
           ASSERT_TRUE(result->devices()->at(0).token_id());
-          added_device_id = *result->devices()->at(0).token_id();
+          added_device_id = result->devices()->at(0).token_id();
         });
 
     RunLoopUntilIdle();
@@ -781,7 +781,7 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, IdAlreadyControlled) {
 
   control_creator->client()
       ->Create({{
-          .token_id = *added_device_id,
+          .token_id = added_device_id,
           .control_server = std::move(server),
       }})
       .Then([&received_callback](fidl::Result<fad::ControlCreator::Create>& result) mutable {
@@ -800,7 +800,7 @@ TEST_F(ControlCreatorServerStreamConfigWarningTest, IdAlreadyControlled) {
 
   control_creator->client()
       ->Create({{
-          .token_id = *added_device_id,
+          .token_id = added_device_id,
           .control_server = std::move(server2),
       }})
       .Then([&received_callback](fidl::Result<fad::ControlCreator::Create>& result) mutable {

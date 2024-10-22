@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_CONTROL_SERVER_H_
-#define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_CONTROL_SERVER_H_
+#ifndef FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_CONTROL_SERVER_H_
+#define FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_CONTROL_SERVER_H_
 
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.audio.signalprocessing/cpp/fidl.h>
@@ -106,7 +106,7 @@ class ControlServer
   }
 
   // Static object count, for debugging purposes.
-  static inline uint64_t count() { return count_; }
+  static uint64_t count() { return count_; }
 
  private:
   template <typename ServerT, template <typename T> typename FidlServerT, typename ProtocolT>
@@ -148,4 +148,4 @@ class ControlServer
 
 }  // namespace media_audio
 
-#endif  // SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_CONTROL_SERVER_H_
+#endif  // FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_CONTROL_SERVER_H_

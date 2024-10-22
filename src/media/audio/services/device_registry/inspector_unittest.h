@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_INSPECTOR_UNITTEST_H_
-#define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_INSPECTOR_UNITTEST_H_
+#ifndef FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_INSPECTOR_UNITTEST_H_
+#define FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_INSPECTOR_UNITTEST_H_
 
 #include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <lib/inspect/cpp/hierarchy.h>
@@ -75,7 +75,7 @@ class InspectorTest : public AudioDeviceRegistryServerTestBase {
           ASSERT_TRUE(result->devices().has_value());
           ASSERT_EQ(result->devices()->size(), 1u);
           ASSERT_TRUE(result->devices()->at(0).token_id().has_value());
-          added_device_id = *result->devices()->at(0).token_id();
+          added_device_id = result->devices()->at(0).token_id();
         });
     RunLoopUntilIdle();
     return added_device_id;
@@ -87,4 +87,4 @@ class InspectorTest : public AudioDeviceRegistryServerTestBase {
 
 }  // namespace media_audio
 
-#endif  // SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_INSPECTOR_UNITTEST_H_
+#endif  // FUCHSIA_SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_INSPECTOR_UNITTEST_H_
