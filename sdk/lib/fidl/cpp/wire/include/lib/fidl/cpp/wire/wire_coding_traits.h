@@ -380,6 +380,19 @@ struct WireCodingTraits<fidl::basic_time<ClockId>, WireCodingConstraintEmpty, Is
                      RecursionDepth<IsRecursive> recursion_depth) {}
 };
 
+template <zx_clock_t ClockId, bool IsRecursive>
+struct WireCodingTraits<fidl::basic_ticks<ClockId>, WireCodingConstraintEmpty, IsRecursive> {
+  static constexpr size_t kInlineSize = sizeof(zx_ticks_t);
+  static constexpr bool kIsMemcpyCompatible = true;
+
+  static void Encode(WireEncoder* encoder, fidl::basic_ticks<ClockId>* value, WirePosition position,
+                     RecursionDepth<IsRecursive> recursion_depth) {
+    *position.As<zx_ticks_t>() = value->get();
+  }
+  static void Decode(WireDecoder* decoder, WirePosition position,
+                     RecursionDepth<IsRecursive> recursion_depth) {}
+};
+
 template <typename T, typename Constraint, bool IsRecursive>
 struct WireCodingTraits<fidl::ObjectView<T>, Constraint, IsRecursive> {
   static constexpr size_t kInlineSize = sizeof(uintptr_t);

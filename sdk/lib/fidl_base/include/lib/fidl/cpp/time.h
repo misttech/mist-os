@@ -15,8 +15,11 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 
-template <zx_clock_t ClockId>
-using basic_time = zx::basic_time<ClockId>;
+template <zx_clock_t kClockId>
+using basic_time = zx::basic_time<kClockId>;
+
+template <zx_clock_t kClockId>
+using basic_ticks = zx::basic_ticks<kClockId>;
 
 #else
 
@@ -48,6 +51,32 @@ class basic_time final {
 
  private:
   zx_time_t value_ = 0;
+};
+
+template <zx_clock_t kClockId>
+class basic_ticks final {
+ public:
+  constexpr basic_ticks() = default;
+
+  explicit constexpr basic_ticks(zx_ticks_t value) : value_(value) {}
+
+  // Acquires the number of ticks contained within this object.
+  constexpr zx_ticks_t get() const { return value_; }
+
+  static constexpr basic_ticks<kClockId> infinite() { return basic_ticks(ZX_TIME_INFINITE); }
+  static constexpr basic_ticks<kClockId> infinite_past() {
+    return basic_ticks(ZX_TIME_INFINITE_PAST);
+  }
+
+  constexpr bool operator==(basic_ticks<kClockId> other) const { return value_ == other.value_; }
+  constexpr bool operator!=(basic_ticks<kClockId> other) const { return value_ != other.value_; }
+  constexpr bool operator<(basic_ticks<kClockId> other) const { return value_ < other.value_; }
+  constexpr bool operator<=(basic_ticks<kClockId> other) const { return value_ <= other.value_; }
+  constexpr bool operator>(basic_ticks<kClockId> other) const { return value_ > other.value_; }
+  constexpr bool operator>=(basic_ticks<kClockId> other) const { return value_ >= other.value_; }
+
+ private:
+  zx_ticks_t value_ = 0;
 };
 
 #endif  // __Fuchsia__
