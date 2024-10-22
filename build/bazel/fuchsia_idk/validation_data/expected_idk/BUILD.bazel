@@ -1,0 +1,37 @@
+# AUTO-GENERATED - DO NOT EDIT !
+
+package(default_visibility = ["//visibility:public"])
+
+# buildifier: disable=load-on-top
+load(":generate_final_idk.bzl", "generate_final_idk")
+
+generate_final_idk(
+    name = "final_idk",
+    files_to_copy = {
+        "//bind/fuchsia.test:fuchsia.test.bind": "bind/fuchsia.test/fuchsia.test.bind",
+        "//dart/sl4f/lib:sl4f.dart": "dart/sl4f/lib/sl4f.dart",
+        "//data/config/symbol_index:config.json": "data/config/symbol_index/config.json",
+        "//docs:logging.md": "docs/logging.md",
+        "//fidl/fuchsia.auth:attestation_signer_fidl": "fidl/fuchsia.auth/attestation_signer_fidl",
+        "//tools/x64/ffx_tools:ffx-agis.json": "tools/x64/ffx_tools/ffx-agis.json",
+        "@test_idk//bind/fuchsia.test:fuchsia.test.generated.bind": "bind/fuchsia.test/fuchsia.test.generated.bind",
+        "@test_idk//dart/sl4f/lib:generated.dart": "dart/sl4f/lib/generated.dart",
+        "@test_idk//data/config/symbol_index:generated.json": "data/config/symbol_index/generated.json",
+        "@test_idk//docs:fidldoc_zip": "docs/fidldoc_zip",
+        "@test_idk//fidl/fuchsia.auth:generated_fidl": "fidl/fuchsia.auth/generated_fidl",
+        "@test_idk//tools/x64/ffx_tools:ffx-agis": "tools/x64/ffx_tools/ffx-agis",
+        "@test_idk//tools/x64:far": "tools/x64/far",
+        "@test_idk//tools/x64:ffx": "tools/x64/ffx",
+    },
+    manifest = "meta/manifest.json",
+    meta_files_to_copy = {
+        "//bind/fuchsia.test:meta.json": "bind/fuchsia.test/meta.json",
+        "//dart/sl4f:meta.json": "dart/sl4f/meta.json",
+        "//data/config/symbol_index:meta.json": "data/config/symbol_index/meta.json",
+        "//docs:low_level.json": "docs/low_level.json",
+        "//fidl/fuchsia.auth:meta.json": "fidl/fuchsia.auth/meta.json",
+        "//tools/x64/ffx_tools:ffx-agis-meta.json": "tools/x64/ffx_tools/ffx-agis-meta.json",
+        "//tools/x64:far-meta.json": "tools/x64/far-meta.json",
+        "//tools/x64:ffx-meta.json": "tools/x64/ffx-meta.json",
+    },
+)

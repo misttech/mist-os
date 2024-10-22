@@ -318,7 +318,7 @@ repositories, whose content will still be usable exactly in the same way by the 
 of the `BUILD.bazel` files of `fuchsia.git`. Even the `.bzl` files within these
 repositories will stay unchanged.
 
-## Generate final version `@fuchsia_sdk`.
+## Generate final version of `@fuchsia_sdk`.
 
 A drawback of the previous step is that the content of `@fuchsia_sdk` contains
 `BUILD.bazel` files that now contain references to `@fuchsia_in_tree_idk`, which
