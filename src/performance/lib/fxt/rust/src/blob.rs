@@ -169,7 +169,7 @@ impl<'a> RawLargeBlobRecord<'a> {
         let (payload, blob_size) = le_u64(payload)?;
 
         let (empty, bytes) = all_consuming(|p| take_n_padded(blob_size as usize, p))(payload)?;
-        assert_eq!(empty, [], "all_consuming must not return any trailing bytes");
+        assert_eq!(empty, [] as [u8; 0], "all_consuming must not return any trailing bytes");
 
         let payload = if let Some(metadata) = metadata {
             RawLargeBlobPayload::BytesAndMetadata(bytes, metadata)
