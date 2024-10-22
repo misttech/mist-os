@@ -34,7 +34,8 @@ constexpr char kSnapshotFilename[] = "snapshot.zip";
 // UTC-monotonic difference
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-constexpr char kUtcMonotonicDifferenceFile[] = "current_utc_monotonic_difference.txt";
+// TODO(https://fxbug.dev/360946313): change to current_utc_boot_difference.txt.
+constexpr char kUtcBootDifferenceFile[] = "current_utc_monotonic_difference.txt";
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 // Logs from current boot.

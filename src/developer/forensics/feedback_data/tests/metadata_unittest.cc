@@ -98,7 +98,7 @@
     EXPECT_STREQ(files[name]["error"].GetString(), error);     \
   }
 
-#define UTC_MONOTONIC_DIFFERENCE_IS(json, name, utc_monotonic_difference) \
+#define UTC_BOOT_DIFFERENCE_IS(json, name, utc_boot_difference)           \
   {                                                                       \
     ASSERT_TRUE(json.HasMember("files"));                                 \
     auto& files = json["files"];                                          \
@@ -106,14 +106,14 @@
     ASSERT_TRUE(files[name].HasMember("utc_monotonic_difference_nanos")); \
     ASSERT_TRUE(files[name]["utc_monotonic_difference_nanos"].IsInt64()); \
     EXPECT_EQ(files[name]["utc_monotonic_difference_nanos"].GetInt64(),   \
-              utc_monotonic_difference.get());                            \
+              utc_boot_difference.get());                                 \
   }
 
 namespace forensics {
 namespace feedback_data {
 namespace {
 
-constexpr zx::duration kPreviousBootUtcMonotonicDifference = zx::sec(100);
+constexpr zx::duration kPreviousBootUtcBootDifference = zx::sec(100);
 constexpr const char* kSnapshotUuid = "snapshot_uuid";
 
 template <typename C>
@@ -153,13 +153,13 @@ class RedactorForTest : public RedactorBase {
 class MetadataTest : public UnitTestFixture {
  protected:
   void SetUp() override {
-    FX_CHECK(files::WriteFile(files::JoinPath("/cache", kUtcMonotonicDifferenceFile),
-                              std::to_string(kPreviousBootUtcMonotonicDifference.get())));
+    FX_CHECK(files::WriteFile(files::JoinPath("/cache", kUtcBootDifferenceFile),
+                              std::to_string(kPreviousBootUtcBootDifference.get())));
   }
 
   void TearDown() override {
-    files::DeletePath(files::JoinPath("/tmp", kUtcMonotonicDifferenceFile), /*recursive=*/false);
-    files::DeletePath(files::JoinPath("/cache", kUtcMonotonicDifferenceFile), /*recursive=*/false);
+    files::DeletePath(files::JoinPath("/tmp", kUtcBootDifferenceFile), /*recursive=*/false);
+    files::DeletePath(files::JoinPath("/cache", kUtcBootDifferenceFile), /*recursive=*/false);
   }
 
   void SetUpMetadata(const std::set<std::string>& annotation_allowlist,
@@ -427,7 +427,7 @@ TEST_F(MetadataTest, Check_EmptySnapshot) {
   EXPECT_TRUE(json["files"].GetObject().ObjectEmpty());
 }
 
-TEST_F(MetadataTest, Check_UtcMonotonicDifference) {
+TEST_F(MetadataTest, Check_UtcBootDifference) {
   const std::set<std::string> annotation_allowlist = {
       "annotation 1",
   };
@@ -452,24 +452,24 @@ TEST_F(MetadataTest, Check_UtcMonotonicDifference) {
   SetUpMetadata(annotation_allowlist, attachment_allowlist);
   RunLoopUntilIdle();
 
-  zx::time monotonic;
+  zx::time_boot boot;
   timekeeper::time_utc utc;
 
   clock_.SetUtc(timekeeper::time_utc(0));
-  clock_.SetMonotonic(zx::time_monotonic(0));
+  clock_.SetBoot(zx::time_boot(0));
 
-  const zx::duration utc_monotonic_difference(utc.get() - monotonic.get());
+  const zx::duration utc_boot_difference(utc.get() - boot.get());
 
-  monotonic = clock_.MonotonicNow();
+  boot = clock_.BootNow();
   ASSERT_EQ(clock_.UtcNow(&utc), ZX_OK);
 
   const auto metadata_json = MakeJsonReport(std::move(annotations), std::move(attachments));
 
-  UTC_MONOTONIC_DIFFERENCE_IS(metadata_json, kAttachmentInspect, utc_monotonic_difference);
-  UTC_MONOTONIC_DIFFERENCE_IS(metadata_json, kAttachmentLogKernel, utc_monotonic_difference);
-  UTC_MONOTONIC_DIFFERENCE_IS(metadata_json, kAttachmentLogSystem, utc_monotonic_difference);
-  UTC_MONOTONIC_DIFFERENCE_IS(metadata_json, kAttachmentLogSystemPrevious,
-                              kPreviousBootUtcMonotonicDifference);
+  UTC_BOOT_DIFFERENCE_IS(metadata_json, kAttachmentInspect, utc_boot_difference);
+  UTC_BOOT_DIFFERENCE_IS(metadata_json, kAttachmentLogKernel, utc_boot_difference);
+  UTC_BOOT_DIFFERENCE_IS(metadata_json, kAttachmentLogSystem, utc_boot_difference);
+  UTC_BOOT_DIFFERENCE_IS(metadata_json, kAttachmentLogSystemPrevious,
+                         kPreviousBootUtcBootDifference);
 
   ASSERT_TRUE(metadata_json["files"].HasMember(kAttachmentAnnotations));
   ASSERT_FALSE(
@@ -504,7 +504,7 @@ TEST_F(MetadataTest, Check_NoUtcMontonicDifferenceAvailable) {
   ASSERT_FALSE(metadata_json["files"]["attachment 1"].HasMember("utc_monotonic_difference"));
 }
 
-TEST_F(MetadataTest, Check_NoUtcMonotonicDifferenceMissingFile) {
+TEST_F(MetadataTest, Check_NoUtcBootDifferenceMissingFile) {
   const std::set<std::string> annotation_allowlist = {
       "annotation 1",
   };
@@ -529,22 +529,22 @@ TEST_F(MetadataTest, Check_NoUtcMonotonicDifferenceMissingFile) {
   SetUpMetadata(annotation_allowlist, attachment_allowlist);
   RunLoopUntilIdle();
 
-  zx::time monotonic;
+  zx::time_boot boot;
   timekeeper::time_utc utc;
 
   clock_.SetUtc(timekeeper::time_utc(0));
-  clock_.SetMonotonic(zx::time_monotonic(0));
+  clock_.SetBoot(zx::time_boot(0));
 
-  const zx::duration utc_monotonic_difference(utc.get() - monotonic.get());
+  const zx::duration utc_boot_difference(utc.get() - boot.get());
 
-  monotonic = clock_.MonotonicNow();
+  boot = clock_.BootNow();
   ASSERT_EQ(clock_.UtcNow(&utc), ZX_OK);
 
   const auto metadata_json = MakeJsonReport(std::move(annotations), std::move(attachments));
 
-  UTC_MONOTONIC_DIFFERENCE_IS(metadata_json, kAttachmentInspect, utc_monotonic_difference);
-  UTC_MONOTONIC_DIFFERENCE_IS(metadata_json, kAttachmentLogKernel, utc_monotonic_difference);
-  UTC_MONOTONIC_DIFFERENCE_IS(metadata_json, kAttachmentLogSystem, utc_monotonic_difference);
+  UTC_BOOT_DIFFERENCE_IS(metadata_json, kAttachmentInspect, utc_boot_difference);
+  UTC_BOOT_DIFFERENCE_IS(metadata_json, kAttachmentLogKernel, utc_boot_difference);
+  UTC_BOOT_DIFFERENCE_IS(metadata_json, kAttachmentLogSystem, utc_boot_difference);
 
   ASSERT_TRUE(metadata_json["files"].HasMember(kAttachmentLogSystemPrevious));
   ASSERT_FALSE(

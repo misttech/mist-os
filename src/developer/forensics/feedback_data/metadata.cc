@@ -27,13 +27,13 @@ namespace {
 
 using namespace rapidjson;
 
-std::set<std::string> kUtcMonotonicDifferenceAllowlist = {
+std::set<std::string> kUtcBootDifferenceAllowlist = {
     kAttachmentInspect,
     kAttachmentLogKernel,
     kAttachmentLogSystem,
 };
 
-std::set<std::string> kPreviousBootUtcMonotonicDifferenceAllowlist = {
+std::set<std::string> kPreviousBootUtcBootDifferenceAllowlist = {
     kAttachmentLogSystemPrevious,
 };
 
@@ -94,9 +94,10 @@ feedback::Attachments AllAttachments(const feedback::AttachmentKeys& allowlist,
   return all_attachments;
 }
 
-void AddUtcMonotonicDifference(const std::optional<zx::duration>& utc_monotonic_difference,
-                               Value* file, Document::AllocatorType& allocator) {
-  if (!utc_monotonic_difference.has_value() || !file->IsObject() ||
+void AddUtcBootDifference(const std::optional<zx::duration>& utc_boot_difference, Value* file,
+                          Document::AllocatorType& allocator) {
+  // TODO(https://fxbug.dev/360946313): change field name to utc_boot_difference_nanos.
+  if (!utc_boot_difference.has_value() || !file->IsObject() ||
       file->HasMember("utc_monotonic_difference_nanos") ||
       (file->HasMember("state") && (*file)["state"].IsString() &&
        (*file)["state"].GetString() == ToString(feedback::AttachmentValue::State::kMissing))) {
@@ -104,28 +105,26 @@ void AddUtcMonotonicDifference(const std::optional<zx::duration>& utc_monotonic_
   }
 
   file->AddMember("utc_monotonic_difference_nanos",
-                  Value().SetInt64(utc_monotonic_difference.value().get()), allocator);
+                  Value().SetInt64(utc_boot_difference.value().get()), allocator);
 }
 
-void AddUtcMonotonicDifferences(
-    const std::optional<zx::duration> utc_monotonic_difference,
-    const std::optional<zx::duration> previous_boot_utc_monotonic_difference,
-    Document* metadata_json) {
+void AddUtcBootDifferences(const std::optional<zx::duration> utc_boot_difference,
+                           const std::optional<zx::duration> previous_boot_utc_boot_difference,
+                           Document* metadata_json) {
   if (!metadata_json->HasMember("files")) {
     return;
   }
 
   for (auto& file : (*metadata_json)["files"].GetObject()) {
-    if (kUtcMonotonicDifferenceAllowlist.find(file.name.GetString()) !=
-        kUtcMonotonicDifferenceAllowlist.end()) {
-      AddUtcMonotonicDifference(utc_monotonic_difference, &file.value,
-                                metadata_json->GetAllocator());
+    if (kUtcBootDifferenceAllowlist.find(file.name.GetString()) !=
+        kUtcBootDifferenceAllowlist.end()) {
+      AddUtcBootDifference(utc_boot_difference, &file.value, metadata_json->GetAllocator());
     }
 
-    if (kPreviousBootUtcMonotonicDifferenceAllowlist.find(file.name.GetString()) !=
-        kPreviousBootUtcMonotonicDifferenceAllowlist.end()) {
-      AddUtcMonotonicDifference(previous_boot_utc_monotonic_difference, &file.value,
-                                metadata_json->GetAllocator());
+    if (kPreviousBootUtcBootDifferenceAllowlist.find(file.name.GetString()) !=
+        kPreviousBootUtcBootDifferenceAllowlist.end()) {
+      AddUtcBootDifference(previous_boot_utc_boot_difference, &file.value,
+                           metadata_json->GetAllocator());
     }
   }
 }
@@ -233,7 +232,7 @@ Metadata::Metadata(async_dispatcher_t* dispatcher, timekeeper::Clock* clock,
       annotation_allowlist_(annotation_allowlist),
       attachment_allowlist_(attachment_allowlist),
       utc_provider_(utc_clock_ready_watcher, clock,
-                    PreviousBootFile::FromCache(is_first_instance, kUtcMonotonicDifferenceFile)) {
+                    PreviousBootFile::FromCache(is_first_instance, kUtcBootDifferenceFile)) {
   redactor->Redact(log_redaction_canary_);
 }
 
@@ -271,8 +270,8 @@ std::string Metadata::MakeMetadata(const feedback::Annotations& annotations,
   AddAttachments(attachment_allowlist_, attachments, &metadata_json);
   AddAnnotationsJson(annotation_allowlist_, annotations, missing_non_platform_annotations,
                      &metadata_json);
-  AddUtcMonotonicDifferences(utc_provider_.CurrentUtcMonotonicDifference(),
-                             utc_provider_.PreviousBootUtcMonotonicDifference(), &metadata_json);
+  AddUtcBootDifferences(utc_provider_.CurrentUtcBootDifference(),
+                        utc_provider_.PreviousBootUtcBootDifference(), &metadata_json);
 
   return MetadataString();
 }
