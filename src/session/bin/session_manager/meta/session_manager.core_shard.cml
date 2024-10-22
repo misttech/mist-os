@@ -302,6 +302,9 @@
             config: [
                 "fuchsia.session.AutoLaunch",
                 "fuchsia.session.SessionUrl",
+                "fuchsia.session.window.Collection",
+                "fuchsia.session.window.InitialElementUrl",
+                "fuchsia.session.window.InitialViewIdAnnotation",
             ],
             from: "parent",
             to: "#session-manager",
@@ -330,7 +333,7 @@
             from: "parent",
             as: "root-data",
             to: "#session-manager",
-            rights: [ 'r*' ],
+            rights: [ "r*" ],
         },
 
         // These all originated from session.smart.from_platform.core_shard.cml

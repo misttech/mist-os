@@ -559,6 +559,17 @@
             from: "self",
             to: "#session",
         },
+
+        // Window manager configs.
+        {
+            config: [
+                "fuchsia.session.window.Collection",
+                "fuchsia.session.window.InitialElementUrl",
+                "fuchsia.session.window.InitialViewIdAnnotation",
+            ],
+            from: "parent",
+            to: "#session",
+        },
     ],
     expose: [
         // Served by session_manager.
