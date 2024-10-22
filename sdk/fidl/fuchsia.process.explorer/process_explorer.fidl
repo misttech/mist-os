@@ -28,7 +28,9 @@ open protocol Query {
     //         ...
     //     ]
     // }
-    // TODO(https://fxbug.dev/42059381): define the schema of data in FIDL and return the data via a response struct
+    //
+    // The schema of this JSON data is depended upon by the ffx process command, which means
+    // we need to keep the schema stable.
     flexible WriteJsonProcessesData(resource struct {
         socket zx.Handle:<SOCKET, zx.Rights.WRITE | zx.Rights.WAIT>;
     });
@@ -46,7 +48,9 @@ open protocol Query {
     //         ...
     //     ]
     // }
-    // TODO(https://fxbug.dev/42059381): define the schema of data in FIDL and return the data via a response struct
+    //
+    // The schema of this JSON data is depended upon by the ffx process command, which means
+    // we need to keep the schema stable.
     flexible WriteJsonTaskHierarchyData(resource struct {
         socket zx.Handle:<SOCKET, zx.Rights.WRITE | zx.Rights.WAIT>;
     });
@@ -97,13 +101,13 @@ type Mapping = table {
 };
 
 @discoverable
-closed protocol ProcessExplorer {
+open protocol ProcessExplorer {
     /// Errors will be propogated via epitaph on TaskIterator.
-    strict GetTaskInfo(resource table {
+    flexible GetTaskInfo(resource table {
         1: iterator server_end:TaskIterator;
     });
 
-    strict GetHandleInfo(flexible union {
+    flexible GetHandleInfo(flexible union {
         /// Must be an exact match.
         1: process_name string:zx.MAX_NAME_LEN;
         /// Must be the koid for a process.
@@ -112,7 +116,7 @@ closed protocol ProcessExplorer {
         handle_info vector<Handle>:MAX;
     }) error zx.Status;
 
-    strict GetVmaps(flexible union {
+    flexible GetVmaps(flexible union {
         /// Must be an exact match.
         1: process_name string:zx.MAX_NAME_LEN;
         /// Must be the koid for a process.
@@ -121,7 +125,7 @@ closed protocol ProcessExplorer {
         vmaps vector<Vmap>:MAX;
     }) error zx.Status;
 
-    strict GetStackTrace(flexible union {
+    flexible GetStackTrace(flexible union {
         /// Must be an exact match.
         1: process_name string:zx.MAX_NAME_LEN;
         /// Must be the koid for a process.
@@ -130,7 +134,7 @@ closed protocol ProcessExplorer {
         stack_trace string:MAX;
     }) error zx.Status;
 
-    strict KillTask(flexible union {
+    flexible KillTask(flexible union {
         /// Must be an exact match.
         1: process_name string:zx.MAX_NAME_LEN;
         /// May be the koid for a process or job.

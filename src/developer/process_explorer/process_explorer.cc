@@ -362,4 +362,8 @@ void Explorer::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_process_explorer::Query> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {}
 
+void Explorer::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_process_explorer::ProcessExplorer> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {}
+
 }  // namespace process_explorer

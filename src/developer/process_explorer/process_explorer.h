@@ -41,6 +41,10 @@ class Explorer : public fidl::Server<fuchsia_process_explorer::Query>,
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_process_explorer::Query> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_process_explorer::ProcessExplorer> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
+
  private:
   fidl::ServerBindingGroup<fuchsia_process_explorer::Query> query_bindings_;
   fidl::ServerBindingGroup<fuchsia_process_explorer::ProcessExplorer> explorer_bindings_;

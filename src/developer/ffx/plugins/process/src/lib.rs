@@ -12,7 +12,7 @@ use anyhow::{Context, Result};
 
 use ffx_config::global_env_context;
 use ffx_process_args::{Args, ProcessCommand, Task};
-use fho::{moniker, AvailabilityFlag, FfxMain, FfxTool, MachineWriter, ToolIO};
+use fho::{moniker, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_buildinfo::{BuildInfo, ProviderProxy};
 use fidl_fuchsia_process_explorer::{
     ProcessExplorerGetStackTraceRequest, ProcessExplorerKillTaskRequest, ProcessExplorerProxy,
@@ -34,9 +34,7 @@ const BARRIER: &str = "<ffx symbolizer>\n";
 
 pub(crate) type Writer = MachineWriter<processed::ProcessesData>;
 
-// TODO(https://fxbug.dev/42059381): The plugin must remain experimental until the FIDL API is strongly typed.
 #[derive(FfxTool)]
-#[check(AvailabilityFlag("ffx_process"))]
 pub struct ProcessTool {
     #[with(moniker("/core/process_explorer"))]
     query_proxy: QueryProxy,
