@@ -5,7 +5,7 @@
 use block_client::{BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient};
 use fidl_fuchsia_hardware_block::BlockMarker;
 use fuchsia_component::client;
-use fuchsia_fs::{directory, OpenFlags};
+use fuchsia_fs::{directory, PERM_READABLE};
 use structopt::StructOpt;
 
 const BLOCK_CLASS_PATH: &str = "/dev/class/block/";
@@ -45,8 +45,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // Scan current files in the directory and watch for new ones in case we don't find the block
     // device we're looking for. There's a slim possibility a partition may not yet be available
     // when this tool is executed in a test.
-    let block_dir =
-        directory::open_in_namespace_deprecated(BLOCK_CLASS_PATH, OpenFlags::RIGHT_READABLE)?;
+    let block_dir = directory::open_in_namespace(BLOCK_CLASS_PATH, PERM_READABLE)?;
     let block_proxy = device_watcher::wait_for_device_with(
         &block_dir,
         |device_watcher::DeviceInfo { filename, topological_path }| {
