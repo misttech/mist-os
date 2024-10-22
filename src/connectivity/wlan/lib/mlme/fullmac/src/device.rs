@@ -311,8 +311,7 @@ pub mod test_utils {
     const fn dummy_band_cap() -> fidl_fullmac::WlanFullmacBandCapability {
         fidl_fullmac::WlanFullmacBandCapability {
             band: fidl_common::WlanBand::TwoGhz,
-            basic_rate_count: 0,
-            basic_rate_list: [0u8; 12],
+            basic_rates: vec![],
             ht_supported: false,
             ht_caps: fidl_ieee80211::HtCapabilities { bytes: [0u8; 26] },
             vht_supported: false,

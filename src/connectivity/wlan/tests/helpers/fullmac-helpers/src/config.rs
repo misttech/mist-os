@@ -92,8 +92,7 @@ fn default_spectrum_management_support() -> fidl_common::SpectrumManagementSuppo
 fn default_fullmac_band_capability() -> fidl_fullmac::WlanFullmacBandCapability {
     let mut cap = fidl_fullmac::WlanFullmacBandCapability {
         band: fidl_common::WlanBand::TwoGhz,
-        basic_rate_count: 12,
-        basic_rate_list: [2, 4, 11, 22, 12, 18, 24, 36, 48, 72, 96, 108],
+        basic_rates: vec![2, 4, 11, 22, 12, 18, 24, 36, 48, 72, 96, 108],
         ht_supported: true,
         ht_caps: fidl_ieee80211::HtCapabilities {
             bytes: fake_ht_capabilities().as_bytes().try_into().unwrap(),

@@ -618,7 +618,8 @@ zx_status_t brcmf_netdev_open(struct net_device* ndev);
 
 zx_status_t brcmf_if_start(net_device* ndev, zx_handle_t* out_mlme_channel);
 void brcmf_if_stop(net_device* ndev);
-void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacQueryInfo* info);
+void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac_wire::WlanFullmacQueryInfo* info,
+                    fdf::Arena& arena);
 void brcmf_if_query_mac_sublayer_support(net_device* ndev,
                                          fuchsia_wlan_common::wire::MacSublayerSupport* resp);
 void brcmf_if_query_security_support(net_device* ndev,
