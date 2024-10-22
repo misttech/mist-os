@@ -317,7 +317,7 @@ fn may_create(
         _ => error!(EPERM),
     }?;
     todo_check_permission!(
-        TODO("https://fxbug.dev/374910392", "Check add_name permission."),
+        TODO("https://fxbug.dev/374910392", "Check search permission."),
         &permission_check,
         current_sid,
         parent_sid,
