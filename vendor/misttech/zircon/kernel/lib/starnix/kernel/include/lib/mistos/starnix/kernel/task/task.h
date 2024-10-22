@@ -26,6 +26,7 @@
 #include <ktl/optional.h>
 #include <ktl/string_view.h>
 #include <ktl/unique_ptr.h>
+#include <object/signal_observer.h>
 
 class ThreadDispatcher;
 
@@ -379,6 +380,23 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   const FdTable& files() const { return files_; }
   FdTable& files() { return files_; }
 
+  class ThreadSignalObserver final : public SignalObserver {
+   public:
+    ThreadSignalObserver(util::WeakPtr<Task> task) : SignalObserver(), task_(ktl::move(task)) {}
+    ~ThreadSignalObserver() final = default;
+
+   private:
+    // |SignalObserver| implementation.
+    void OnMatch(zx_signals_t signals) final;
+    void OnCancel(zx_signals_t signals) final;
+
+    fbl::Canary<fbl::magic("TTSO")> canary_;
+
+    util::WeakPtr<Task> task_;
+  };
+
+  ThreadSignalObserver* observer() { return &observer_; }
+
   ~Task() override;
 
  private:
@@ -392,6 +410,8 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   Task(pid_t id, fbl::RefPtr<ThreadGroup> thread_group,
        ktl::optional<fbl::RefPtr<ThreadDispatcher>> thread, FdTable files,
        ktl::optional<fbl::RefPtr<MemoryManager>> mm, ktl::optional<fbl::RefPtr<FsContext>> fs);
+
+  ThreadSignalObserver observer_;
 };
 
 // NOTE: This class originaly was in thread_group.rs
