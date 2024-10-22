@@ -37,7 +37,7 @@ pub use fxfs_container::FxfsContainer;
 use std::collections::HashSet;
 use std::sync::Arc;
 use uuid::Uuid;
-use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_inspect as finspect};
 
 const INITIAL_SLICE_COUNT: u64 = 1;
 
@@ -358,7 +358,7 @@ pub struct FshostEnvironment {
     /// This lock can be taken and device.path() added to the vector to have them
     /// ignored the next time they appear to the Watcher/Matcher code.
     matcher_lock: Arc<Mutex<HashSet<String>>>,
-    inspector: fuchsia_inspect::Inspector,
+    inspector: finspect::Inspector,
     watcher: Watcher,
     registered_devices: Arc<RegisteredDevices>,
 }
@@ -370,6 +370,7 @@ impl FshostEnvironment {
         inspector: fuchsia_inspect::Inspector,
         watcher: Watcher,
     ) -> Self {
+        let corruption_events = inspector.root().create_child("corruption_events");
         Self {
             config: config.clone(),
             gpt: Filesystem::Queue(FilesystemQueue::default()),
@@ -377,7 +378,7 @@ impl FshostEnvironment {
             blobfs: Filesystem::Queue(FilesystemQueue::default()),
             data: Filesystem::Queue(FilesystemQueue::default()),
             fvm: None,
-            launcher: Arc::new(FilesystemLauncher { config }),
+            launcher: Arc::new(FilesystemLauncher { config, corruption_events }),
             matcher_lock,
             inspector,
             watcher,
@@ -1090,6 +1091,7 @@ impl Environment for FshostEnvironment {
 
 pub struct FilesystemLauncher {
     config: Arc<fshost_config::Config>,
+    corruption_events: finspect::Node,
 }
 
 impl FilesystemLauncher {
@@ -1456,5 +1458,10 @@ impl FilesystemLauncher {
             }
         })
         .detach();
+
+        // NOTE: If a corruption event has already been recorded, this will turn into a no-op, which
+        // means we'd short count the number of corruption events.  Given that this should only
+        // occur no more than once per-boot, this doesn't seem worth fixing.
+        self.corruption_events.record_uint(format, 1);
     }
 }

@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 use assert_matches::assert_matches;
+use diagnostics_assertions::assert_data_tree;
+use diagnostics_reader::{ArchiveReader, Inspect};
 use fidl::endpoints::{create_proxy, ServiceMarker as _};
 use fidl_fuchsia_fxfs::BlobReaderMarker;
 use fuchsia_component::client::connect_to_protocol_at_dir_root;
@@ -380,6 +382,28 @@ impl TestFixture {
             let report = self.crash_reports.next().await.expect("Sender closed");
             assert_eq!(report.program_name.as_deref(), Some(expected_program));
             assert_eq!(report.crash_signature.as_deref(), Some(expected_signature));
+        }
+        if count > 0 {
+            let selector =
+                format!("realm_builder\\:{}/test-fshost:root", self.realm.root.child_name());
+            tracing::info!("Checking inspect for corruption event, selector={selector}");
+            let tree = ArchiveReader::new()
+                .add_selector(selector)
+                .snapshot::<Inspect>()
+                .await
+                .unwrap()
+                .into_iter()
+                .next()
+                .and_then(|result| result.payload)
+                .expect("expected one inspect hierarchy");
+
+            let format = || expected_program.to_string();
+
+            assert_data_tree!(tree, root: contains {
+                corruption_events: contains {
+                    format() => 1u64,
+                }
+            });
         }
     }
 
