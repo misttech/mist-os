@@ -142,6 +142,21 @@ fn to_type_path(ty: &syn::Type) -> Result<syn::TypePath, Error> {
     }
 }
 
+enum FieldAttrArg {
+    Ident(syn::Ident),
+    NameValue(syn::MetaNameValue),
+}
+
+impl syn::parse::Parse for FieldAttrArg {
+    fn parse(input: syn::parse::ParseStream<'_>) -> Result<Self, syn::Error> {
+        Ok(if input.peek2(syn::Token![=]) {
+            Self::NameValue(input.parse()?)
+        } else {
+            Self::Ident(input.parse()?)
+        })
+    }
+}
+
 /// Parsed inspect attributes for an individual field.
 struct FieldAttrArgs {
     /// The span of the field, for errors.
@@ -215,51 +230,40 @@ impl FieldAttrArgs {
 /// Given an `inspect` field attribute, parse its arguments. Errors out if
 /// arguments are malformed.
 fn parse_field_attr_args(attr: &syn::Attribute, args: &mut FieldAttrArgs) -> Result<(), Error> {
-    return match attr.parse_meta()? {
-        syn::Meta::List(syn::MetaList { ref nested, .. }) => {
-            for nested_meta in nested {
-                match nested_meta {
-                    syn::NestedMeta::Meta(syn::Meta::Path(ref path)) => {
-                        if path.is_ident("skip") {
-                            args.skip = true;
-                        } else if path.is_ident("forward") {
-                            args.forward = true;
-                        } else {
-                            return Err(Error::new_spanned(
-                                path,
-                                "unrecognized attribute argument",
-                            ));
-                        }
-                    }
-                    syn::NestedMeta::Meta(syn::Meta::NameValue(ref name_value)) => {
-                        if name_value.path.is_ident("rename") {
-                            if let syn::Lit::Str(ref lit_str) = name_value.lit {
-                                args.rename = Some(lit_str.clone());
-                            } else {
-                                return Err(Error::new_spanned(
-                                    &name_value.lit,
-                                    "rename value must be string literal",
-                                ));
-                            }
-                        } else {
-                            return Err(Error::new_spanned(
-                                name_value,
-                                "unrecognized attribute argument",
-                            ));
-                        }
-                    }
-                    _ => {
-                        return Err(Error::new_spanned(
-                            nested_meta,
-                            "unrecognized attribute argument",
-                        ))
-                    }
+    let nested = attr.parse_args_with(
+        syn::punctuated::Punctuated::<FieldAttrArg, syn::Token![,]>::parse_terminated,
+    )?;
+    for arg in nested.iter() {
+        match arg {
+            FieldAttrArg::Ident(ident) => {
+                if ident == "skip" {
+                    args.skip = true;
+                } else if ident == "forward" {
+                    args.forward = true;
+                } else {
+                    return Err(Error::new_spanned(ident, "unrecognized attribute argument"));
                 }
             }
-            Ok(())
+            FieldAttrArg::NameValue(name_value) => {
+                if name_value.path.is_ident("rename") {
+                    if let syn::Expr::Lit(syn::ExprLit {
+                        lit: syn::Lit::Str(ref lit_str), ..
+                    }) = name_value.value
+                    {
+                        args.rename = Some(lit_str.clone());
+                    } else {
+                        return Err(Error::new_spanned(
+                            &name_value.value,
+                            "rename value must be string literal",
+                        ));
+                    }
+                } else {
+                    return Err(Error::new_spanned(name_value, "unrecognized attribute argument"));
+                }
+            }
         }
-        meta @ _ => Err(Error::new_spanned(meta, "unrecognized attribute arguments")),
-    };
+    }
+    Ok(())
 }
 
 /// Returns the field attribute args on a structured form, or an error upon unrecognized arguments.
@@ -267,7 +271,7 @@ fn parse_field_attr_args(attr: &syn::Attribute, args: &mut FieldAttrArgs) -> Res
 fn get_field_attrs(f: &syn::Field) -> Result<FieldAttrArgs, Error> {
     let mut args = FieldAttrArgs::new(f.span());
     for attr in &f.attrs {
-        if attr.path.is_ident("inspect") {
+        if attr.path().is_ident("inspect") {
             parse_field_attr_args(attr, &mut args)?;
         }
     }
@@ -277,7 +281,7 @@ fn get_field_attrs(f: &syn::Field) -> Result<FieldAttrArgs, Error> {
 /// Checks that no `inspect` attributes are set on the container.
 fn check_container_attrs(d: &syn::DeriveInput) -> Result<(), Error> {
     for attr in &d.attrs {
-        if attr.path.segments.len() == 1 && attr.path.segments[0].ident == "inspect" {
+        if attr.path().segments.len() == 1 && attr.path().segments[0].ident == "inspect" {
             return Err(Error::new_spanned(attr, "inspect does not support container attributes"));
         }
     }
