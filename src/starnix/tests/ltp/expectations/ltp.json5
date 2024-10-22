@@ -267,10 +267,6 @@
                 // TODO(https://fxbug.dev/374984756) Crashes the kernel in debug builds
                 // (cycle in mutex deps).
                 "inotify08",
-
-                // TODO(https://fxbug.dev/374790090) Enable once new version of the test
-                // is rolled.
-                "mmapstress07",
             ],
         },
     ],
