@@ -46,7 +46,6 @@ zx::result<fuchsia_hardware_sdmmc::wire::SdmmcReq> AmlSdmmcWithBanjo::BanjoToFid
 zx_status_t AmlSdmmcWithBanjo::SdmmcHostInfo(sdmmc_host_info_t* info) {
   info->caps = dev_info_.caps;
   info->max_transfer_size = dev_info_.max_transfer_size;
-  info->max_transfer_size_non_dma = dev_info_.max_transfer_size_non_dma;
   info->max_buffer_regions = dev_info_.max_buffer_regions;
   return ZX_OK;
 }

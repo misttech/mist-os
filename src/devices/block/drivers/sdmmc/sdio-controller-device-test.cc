@@ -137,7 +137,6 @@ class SdioControllerDeviceTest : public ::testing::Test {
     sdmmc_.set_host_info({
         .caps = 0,
         .max_transfer_size = 1,
-        .max_transfer_size_non_dma = 1,
     });
   }
 
@@ -211,7 +210,6 @@ class SdioScatterGatherTest : public SdioControllerDeviceTest {
     sdmmc_.set_host_info({
         .caps = 0,
         .max_transfer_size = 1024,
-        .max_transfer_size_non_dma = 1024,
     });
 
     ASSERT_OK(StartDriver());
@@ -436,7 +434,6 @@ TEST_F(SdioControllerDeviceTest, SdioDoRwTxn) {
   sdmmc_.set_host_info({
       .caps = 0,
       .max_transfer_size = 16,
-      .max_transfer_size_non_dma = 16,
   });
 
   ASSERT_OK(StartDriver());
@@ -567,7 +564,6 @@ TEST_F(SdioControllerDeviceTest, SdioDoRwTxnMultiBlock) {
   sdmmc_.set_host_info({
       .caps = 0,
       .max_transfer_size = 32,
-      .max_transfer_size_non_dma = 32,
   });
 
   ASSERT_OK(StartDriver());
@@ -905,7 +901,6 @@ TEST_F(SdioControllerDeviceTest, ProcessCisFunction0) {
   sdmmc_.set_host_info({
       .caps = 0,
       .max_transfer_size = 1024,
-      .max_transfer_size_non_dma = 1024,
   });
 
   sdmmc_.Write(0x0000'0000, std::vector<uint8_t>{0x43}, 0);  // CCCR/SDIO version 3.
@@ -1021,7 +1016,6 @@ TEST_F(SdioControllerDeviceTest, ProbeSdr104) {
       .caps = SDMMC_HOST_CAP_VOLTAGE_330 | SDMMC_HOST_CAP_SDR104 | SDMMC_HOST_CAP_SDR50 |
               SDMMC_HOST_CAP_DDR50,
       .max_transfer_size = 0x1000,
-      .max_transfer_size_non_dma = 0x1000,
   });
 
   ASSERT_OK(StartDriver());
@@ -1042,7 +1036,6 @@ TEST_F(SdioControllerDeviceTest, ProbeSdr50LimitedByHost) {
   sdmmc_.set_host_info({
       .caps = SDMMC_HOST_CAP_VOLTAGE_330 | SDMMC_HOST_CAP_SDR50,
       .max_transfer_size = 0x1000,
-      .max_transfer_size_non_dma = 0x1000,
   });
 
   ASSERT_OK(StartDriver());
@@ -1064,7 +1057,6 @@ TEST_F(SdioControllerDeviceTest, ProbeSdr50LimitedByCard) {
       .caps = SDMMC_HOST_CAP_VOLTAGE_330 | SDMMC_HOST_CAP_SDR104 | SDMMC_HOST_CAP_SDR50 |
               SDMMC_HOST_CAP_DDR50,
       .max_transfer_size = 0x1000,
-      .max_transfer_size_non_dma = 0x1000,
   });
 
   ASSERT_OK(StartDriver());
@@ -1088,7 +1080,6 @@ TEST_F(SdioControllerDeviceTest, ProbeFallBackToHs) {
       .caps = SDMMC_HOST_CAP_VOLTAGE_330 | SDMMC_HOST_CAP_SDR104 | SDMMC_HOST_CAP_SDR50 |
               SDMMC_HOST_CAP_DDR50,
       .max_transfer_size = 0x1000,
-      .max_transfer_size_non_dma = 0x1000,
   });
 
   ASSERT_OK(StartDriver());
@@ -1358,7 +1349,6 @@ TEST_F(SdioControllerDeviceTest, UpdateBlockSizeMultiBlock) {
   sdmmc_.set_host_info({
       .caps = 0,
       .max_transfer_size = 2048,
-      .max_transfer_size_non_dma = 2048,
   });
 
   sdmmc_.Write(0x210, std::vector<uint8_t>{0x00, 0x00}, 0);
@@ -1436,7 +1426,6 @@ TEST_F(SdioControllerDeviceTest, UpdateBlockSizeNoMultiBlock) {
   sdmmc_.set_host_info({
       .caps = 0,
       .max_transfer_size = 2048,
-      .max_transfer_size_non_dma = 2048,
   });
 
   // Placeholder value that should not get written or returned.
@@ -1885,7 +1874,6 @@ TEST_F(SdioControllerDeviceTest, RequestCardReset) {
       .caps = SDMMC_HOST_CAP_VOLTAGE_330 | SDMMC_HOST_CAP_SDR104 | SDMMC_HOST_CAP_SDR50 |
               SDMMC_HOST_CAP_DDR50,
       .max_transfer_size = 0x1000,
-      .max_transfer_size_non_dma = 0x1000,
   });
 
   ASSERT_OK(StartDriver());
@@ -1917,7 +1905,6 @@ TEST_F(SdioControllerDeviceTest, PerformTuning) {
   sdmmc_.set_host_info({
       .caps = SDMMC_HOST_CAP_VOLTAGE_330 | SDMMC_HOST_CAP_SDR104,
       .max_transfer_size = 0x1000,
-      .max_transfer_size_non_dma = 0x1000,
   });
 
   ASSERT_OK(StartDriver());

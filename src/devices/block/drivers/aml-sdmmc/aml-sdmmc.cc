@@ -1761,7 +1761,6 @@ zx_status_t AmlSdmmc::Init(const fdf::PDev::DeviceInfo& device_info) {
                    static_cast<uint64_t>(fuchsia_hardware_sdmmc::SdmmcHostCap::kDma);
 
   dev_info_.max_transfer_size = kMaxDmaDescriptors * zx_system_get_page_size();
-  dev_info_.max_transfer_size_non_dma = AML_SDMMC_MAX_PIO_DATA_SIZE;
 
   inspect_.Init(device_info, inspector().root(), power_suspended_);
   inspect_.max_delay.Set(AmlSdmmcClock::kMaxDelay + 1);

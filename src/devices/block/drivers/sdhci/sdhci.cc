@@ -1061,11 +1061,6 @@ zx_status_t Sdhci::Init() {
   }
   info_.caps |= SDMMC_HOST_CAP_AUTO_CMD12;
 
-  // Assumes typical block size of 512 bytes, though in theory the request could specify a different
-  // value.
-  constexpr size_t kBlockSize = 512;
-  info_.max_transfer_size_non_dma = std::numeric_limits<BlockCountType>::max() * kBlockSize;
-
   // allocate and setup DMA descriptor
   if (SupportsAdma2()) {
     auto buffer_factory = dma_buffer::CreateBufferFactory();
@@ -1095,7 +1090,10 @@ zx_status_t Sdhci::Init() {
 
     host_control1.WriteTo(&regs_mmio_buffer_);
   } else {
-    info_.max_transfer_size = info_.max_transfer_size_non_dma;
+    // Assumes typical block size of 512 bytes, though in theory the request could specify a
+    // different value.
+    constexpr size_t kBlockSize = 512;
+    info_.max_transfer_size = std::numeric_limits<BlockCountType>::max() * kBlockSize;
   }
 
   // Configure the clock.
