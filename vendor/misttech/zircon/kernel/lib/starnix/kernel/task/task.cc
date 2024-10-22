@@ -70,13 +70,13 @@ Task::Task(pid_t id, fbl::RefPtr<ThreadGroup> thread_group,
       fs_(ktl::move(fs)) {
   *thread_.Write() = ktl::move(thread);
 
-  LTRACEF("Task(%p)\n", this);
+  LTRACE_ENTRY_OBJ;
 }
 
-Task::~Task() { LTRACEF("~Task(%p)\n", this); }
+Task::~Task() { LTRACE_ENTRY_OBJ; }
 
 void Task::release(ThreadState context) {
-  LTRACE;
+  LTRACE_ENTRY_OBJ;
 
   // ZX_ASSERT(IsLastReference());
 
@@ -99,6 +99,8 @@ void Task::release(ThreadState context) {
   // auto task = current_task.task().reset();
   //  Release the ThreadGroup
   thread_group_->release();
+
+  LTRACE_EXIT_OBJ;
 }
 
 fbl::RefPtr<FsContext> Task::fs() const {

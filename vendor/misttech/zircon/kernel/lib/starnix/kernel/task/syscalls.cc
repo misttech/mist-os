@@ -35,8 +35,12 @@
 #include <ktl/optional.h>
 #include <object/process_dispatcher.h>
 
+#include "../kernel_priv.h"
+
 #include <linux/errno.h>
 #include <linux/prctl.h>
+
+#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 using namespace starnix_syscalls;
 
@@ -112,7 +116,9 @@ fit::result<Errno, pid_t> do_clone(CurrentTask& current_task, struct clone_args 
           // Copy register state in the current task to fork_frame
           thread->SetForkFrame(*current_task.thread_state().registers);
 
-          // RegisterState::print_regs(stdout, &*current_task.thread_state().registers);
+          if (LOCAL_TRACE) {
+            RegisterState::print_regs(stdout, &*current_task.thread_state().registers);
+          }
         }
         return fit::ok();
       },
