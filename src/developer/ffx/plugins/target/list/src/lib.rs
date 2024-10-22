@@ -173,7 +173,7 @@ async fn handle_to_info(
         }
         discovery::TargetState::Fastboot(fts) => {
             let addresses = match fts.connection_state {
-                discovery::FastbootConnectionState::Usb => None,
+                discovery::FastbootConnectionState::Usb => Some(vec![]),
                 discovery::FastbootConnectionState::Tcp(addresses) => Some(addresses.to_vec()),
                 discovery::FastbootConnectionState::Udp(addresses) => Some(addresses.to_vec()),
             };
@@ -218,15 +218,31 @@ async fn local_list_targets(
     ctx: &EnvironmentContext,
     cmd: &ListCommand,
 ) -> Result<Vec<ffx::TargetInfo>> {
-    let name = cmd.nodename.clone();
-    let query = TargetInfoQuery::from(name);
     let connect = do_connect_to_target(ctx, cmd).await;
-    let stream = ffx_target::get_discovery_stream(query, !cmd.no_usb, !cmd.no_mdns, ctx).await?;
+    let stream = get_handle_stream(cmd, ctx).await?;
+    let targets = handles_to_infos(stream, ctx, connect).await?;
+    Ok(targets)
+}
+
+async fn handles_to_infos(
+    stream: impl futures::Stream<Item = Result<discovery::TargetHandle>>,
+    ctx: &EnvironmentContext,
+    connect: bool,
+) -> Result<Vec<fidl_fuchsia_developer_ffx::TargetInfo>> {
     let info_futures = stream.then(|t| handle_res_to_info(ctx, t, connect));
     let infos: Vec<Result<ffx::TargetInfo>> = info_futures.collect().await;
-    // Fail if any results are Err
     let targets = infos.into_iter().collect::<Result<Vec<ffx::TargetInfo>>>()?;
     Ok(targets)
+}
+
+async fn get_handle_stream(
+    cmd: &ListCommand,
+    ctx: &EnvironmentContext,
+) -> Result<impl futures::Stream<Item = Result<discovery::TargetHandle>>> {
+    let name = cmd.nodename.clone();
+    let query = TargetInfoQuery::from(name);
+    let stream = ffx_target::get_discovery_stream(query, !cmd.no_usb, !cmd.no_mdns, ctx).await?;
+    Ok(stream)
 }
 
 async fn list_targets(
@@ -523,5 +539,22 @@ mod test {
         assert!(out[1].starts_with("a"));
         assert!(out[2].starts_with("z"));
         Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_serial_addresses() {
+        // USB targets should have an empty list of addresses, not None
+        let env = ffx_config::test_init().await.unwrap();
+        let handle = Ok(discovery::TargetHandle {
+            node_name: Some("nodename".to_string()),
+            state: discovery::TargetState::Fastboot(discovery::FastbootTargetState {
+                serial_number: "12345678".to_string(),
+                connection_state: discovery::FastbootConnectionState::Usb,
+            }),
+        });
+        let stream = futures::stream::once(async { handle });
+        let targets = handles_to_infos(stream, &env.context, true).await;
+        let targets = targets.unwrap();
+        assert_ne!(targets[0].addresses, None);
     }
 }
