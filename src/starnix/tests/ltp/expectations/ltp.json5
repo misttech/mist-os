@@ -264,6 +264,10 @@
 
                 // TODO(https://fxbug.dev/) fix upstream test and enable
                 "mmap04",
+
+                // TODO(https://fxbug.dev/374984756) Crashes the kernel in debug builds
+                // (cycle in mutex deps).
+                "inotify08",
             ],
         },
     ],
