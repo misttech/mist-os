@@ -513,7 +513,7 @@ class BuildFileMatcher:
             if similarity is not None:
                 for target in sorted(set(targets)):  # deduplicate targets
                     matches.append(
-                        Suggestion(name, similarity, f"--with-test {target}")
+                        Suggestion(name, similarity, f"fx add-test {target}")
                     )
 
         return matches
