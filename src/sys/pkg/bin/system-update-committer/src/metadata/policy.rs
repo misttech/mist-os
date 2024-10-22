@@ -14,8 +14,16 @@ use zx::Status;
 /// After gathering state from the BootManager, the PolicyEngine can answer whether we
 /// should verify and commit.
 #[derive(Debug)]
-pub struct PolicyEngine {
-    current_config: Option<(Configuration, paver::ConfigurationStatus)>,
+pub struct PolicyEngine(State);
+
+#[derive(Debug)]
+enum State {
+    // If no verification or committing is necessary, i.e. if any of:
+    //   * ABR is not supported
+    //   * the current config is Recovery
+    //   * the current config status is Healthy
+    NoOp,
+    Active { current_config: Configuration },
 }
 
 impl PolicyEngine {
@@ -32,47 +40,52 @@ impl PolicyEngine {
                 ..
             }) => {
                 info!("ABR not supported: skipping health verification and boot metadata updates");
-                return Ok(Self { current_config: None });
+                return Ok(Self(State::NoOp));
             }
             Err(e) => return Err(PolicyError::Build(e)),
 
             // As a special case, if we're in Recovery, ensure we neither verify nor commit.
             Ok(paver::Configuration::Recovery) => {
                 info!("System in recovery: skipping health verification and boot metadata updates");
-                return Ok(Self { current_config: None });
+                return Ok(Self(State::NoOp));
             }
 
             Ok(paver::Configuration::A) => Configuration::A,
             Ok(paver::Configuration::B) => Configuration::B,
         };
 
-        let current_config_status = boot_manager
+        let status_and_boot_attempts = boot_manager
             .query_configuration_status_and_boot_attempts((&current_config).into())
             .await
             .into_boot_manager_result("query_configuration_status")
-            .map_err(PolicyError::Build)?
-            .status
-            .ok_or(PolicyError::Build(BootManagerError::StatusNotSet))?;
+            .map_err(PolicyError::Build)?;
 
-        Ok(Self { current_config: Some((current_config, current_config_status)) })
+        match status_and_boot_attempts
+            .status
+            .ok_or(PolicyError::Build(BootManagerError::StatusNotSet))?
+        {
+            paver::ConfigurationStatus::Healthy => {
+                return Ok(Self(State::NoOp));
+            }
+            paver::ConfigurationStatus::Pending => {}
+            // TODO(https://fxbug.dev/368597963) On the final boot attempt the current config will
+            // be marked unbootable, but fuchsia.paver.Firmware/SetConfigurationHealthy says it is
+            // an error to call it when the current config is unbootable.
+            paver::ConfigurationStatus::Unbootable => {
+                return Err(PolicyError::CurrentConfigurationUnbootable((&current_config).into()));
+            }
+        };
+
+        Ok(Self(State::Active { current_config }))
     }
 
     /// Determines if we should verify and commit.
-    /// * If we should (e.g. if the system is pending commit), return `Ok(Some(slot_to_act_on))`.
-    /// * If we shouldn't (e.g. if the system is already committed), return `Ok(None)`.
-    /// * If the system is seriously busted, return an error.
-    pub fn should_verify_and_commit(&self) -> Result<Option<&Configuration>, PolicyError> {
-        match self.current_config.as_ref() {
-            Some((config, paver::ConfigurationStatus::Pending)) => Ok(Some(config)),
-            Some((config, paver::ConfigurationStatus::Unbootable)) => {
-                Err(PolicyError::CurrentConfigurationUnbootable(config.into()))
-            }
-            // We don't need to verify and commit in these situations because it wont give us any
-            // new information or have any effect on boot metadata:
-            // * ABR is not supported
-            // * current slot is recovery
-            // * current slot already healthy on boot
-            None | Some((_, paver::ConfigurationStatus::Healthy)) => Ok(None),
+    /// * If we should (e.g. if the system is pending commit), return `Some(slot_to_act_on)`.
+    /// * If we shouldn't (e.g. if the system is already committed), return `None`.
+    pub fn should_verify_and_commit(&self) -> Option<&Configuration> {
+        match &self.0 {
+            State::Active { current_config } => Some(current_config),
+            State::NoOp => None,
         }
     }
 
@@ -129,7 +142,7 @@ mod tests {
         );
         let engine = PolicyEngine::build(&paver.spawn_boot_manager_service()).await.unwrap();
 
-        assert_eq!(engine.should_verify_and_commit().unwrap(), None);
+        assert_eq!(engine.should_verify_and_commit(), None);
 
         assert_eq!(paver.take_events(), vec![PaverEvent::QueryCurrentConfiguration]);
     }
@@ -144,7 +157,7 @@ mod tests {
         );
         let engine = PolicyEngine::build(&paver.spawn_boot_manager_service()).await.unwrap();
 
-        assert_eq!(engine.should_verify_and_commit().unwrap(), None);
+        assert_eq!(engine.should_verify_and_commit(), None);
 
         assert_eq!(paver.take_events(), vec![]);
     }
@@ -161,7 +174,7 @@ mod tests {
         );
         let engine = PolicyEngine::build(&paver.spawn_boot_manager_service()).await.unwrap();
 
-        assert_eq!(engine.should_verify_and_commit().unwrap(), None);
+        assert_eq!(engine.should_verify_and_commit(), None);
 
         assert_eq!(
             paver.take_events(),
@@ -196,7 +209,7 @@ mod tests {
         );
         let engine = PolicyEngine::build(&paver.spawn_boot_manager_service()).await.unwrap();
 
-        assert_eq!(engine.should_verify_and_commit().unwrap(), Some(current_config));
+        assert_eq!(engine.should_verify_and_commit(), Some(current_config));
 
         assert_eq!(
             paver.take_events(),
@@ -229,10 +242,9 @@ mod tests {
                 }))
                 .build(),
         );
-        let engine = PolicyEngine::build(&paver.spawn_boot_manager_service()).await.unwrap();
 
         assert_matches!(
-            engine.should_verify_and_commit(),
+            PolicyEngine::build(&paver.spawn_boot_manager_service()).await,
             Err(PolicyError::CurrentConfigurationUnbootable(cc)) if cc == current_config.into()
         );
 

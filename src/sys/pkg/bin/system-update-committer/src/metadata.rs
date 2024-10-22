@@ -44,11 +44,9 @@ pub async fn put_metadata_in_happy_state(
     let mut unblocker = Some(unblocker);
     if config.enable() {
         let engine = PolicyEngine::build(boot_manager).await.map_err(MetadataError::Policy)?;
-        if let Some(current_config) =
-            engine.should_verify_and_commit().map_err(MetadataError::Policy)?
-        {
-            // At this point, the FIDL server should start responding to requests so that clients can
-            // find out that the health verification is underway.
+        if let Some(current_config) = engine.should_verify_and_commit() {
+            // At this point, the FIDL server should start responding to requests so that clients
+            // can find out that the health verification is underway.
             unblocker = unblock_fidl_server(unblocker)?;
             let res = do_health_verification(verifiers, node).await;
             let () = PolicyEngine::apply_config(res, config).map_err(MetadataError::Verify)?;
