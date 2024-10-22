@@ -7,9 +7,7 @@ use crate::fuchsia::node::OpenedNode;
 use anyhow::Error;
 use block_client::{BlockFifoRequest, BlockFifoResponse};
 use fidl::endpoints::ServerEnd;
-use fidl_fuchsia_hardware_block_volume::{
-    self as volume, VolumeAndNodeMarker, VolumeAndNodeRequest,
-};
+use fidl_fuchsia_hardware_block_volume::{self as volume, VolumeMarker, VolumeRequest};
 use fuchsia_async::{self as fasync, FifoReadable, FifoWritable};
 use futures::stream::TryStreamExt;
 use futures::try_join;
@@ -19,7 +17,6 @@ use rustc_hash::FxHashMap as HashMap;
 use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
 use std::sync::Mutex;
-use vfs::execution_scope::ExecutionScope;
 use vfs::file::File;
 use vfs::node::Node;
 use {fidl_fuchsia_hardware_block as block, fidl_fuchsia_io as fio};
@@ -111,7 +108,6 @@ const DEVICE_VOLUME_SLICE_SIZE: u64 = 32 * 1024;
 /// Implements server to handle Block requests
 pub struct BlockServer {
     file: OpenedNode<FxFile>,
-    scope: ExecutionScope,
     server_channel: Option<zx::Channel>,
     maybe_server_fifo: Mutex<Option<zx::Fifo<BlockFifoResponse, BlockFifoRequest>>>,
     message_groups: Mutex<FifoMessageGroups>,
@@ -120,14 +116,9 @@ pub struct BlockServer {
 
 impl BlockServer {
     /// Creates a new BlockServer given a server channel to listen on.
-    pub fn new(
-        file: OpenedNode<FxFile>,
-        scope: ExecutionScope,
-        server_channel: zx::Channel,
-    ) -> BlockServer {
+    pub fn new(file: OpenedNode<FxFile>, server_channel: zx::Channel) -> BlockServer {
         BlockServer {
             file,
-            scope,
             server_channel: Some(server_channel),
             maybe_server_fifo: Mutex::new(None),
             message_groups: Mutex::new(FifoMessageGroups::new()),
@@ -275,18 +266,9 @@ impl BlockServer {
         maybe_reply
     }
 
-    fn handle_clone_request(&self, object: zx::Channel) {
-        let file = OpenedNode::new(self.file.clone());
-        let scope_cloned = self.scope.clone();
-        self.scope.spawn(async move {
-            let mut cloned_server = BlockServer::new(file, scope_cloned, object);
-            let _ = cloned_server.run().await;
-        });
-    }
-
-    async fn handle_request(&self, request: VolumeAndNodeRequest) -> Result<(), Error> {
+    async fn handle_request(&self, request: VolumeRequest) -> Result<(), Error> {
         match request {
-            VolumeAndNodeRequest::GetInfo { responder } => {
+            VolumeRequest::GetInfo { responder } => {
                 let block_size = self.file.get_block_size();
                 let block_count =
                     (self.file.get_size().await.unwrap() + block_size - 1) / block_size;
@@ -298,10 +280,10 @@ impl BlockServer {
                 }))?;
             }
             // TODO(https://fxbug.dev/42171261)
-            VolumeAndNodeRequest::GetStats { clear: _, responder } => {
+            VolumeRequest::GetStats { clear: _, responder } => {
                 responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
-            VolumeAndNodeRequest::OpenSession { session, control_handle: _ } => {
+            VolumeRequest::OpenSession { session, control_handle: _ } => {
                 let stream = session.into_stream()?;
                 let () = stream
                     .try_for_each(|request| async {
@@ -332,18 +314,18 @@ impl BlockServer {
                     .await?;
             }
             // TODO(https://fxbug.dev/42171261)
-            VolumeAndNodeRequest::GetTypeGuid { responder } => {
+            VolumeRequest::GetTypeGuid { responder } => {
                 responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED, None)?;
             }
             // TODO(https://fxbug.dev/42171261)
-            VolumeAndNodeRequest::GetInstanceGuid { responder } => {
+            VolumeRequest::GetInstanceGuid { responder } => {
                 responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED, None)?;
             }
             // TODO(https://fxbug.dev/42171261)
-            VolumeAndNodeRequest::GetName { responder } => {
+            VolumeRequest::GetName { responder } => {
                 responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED, None)?;
             }
-            VolumeAndNodeRequest::QuerySlices { start_slices, responder } => {
+            VolumeRequest::QuerySlices { start_slices, responder } => {
                 // Initialise slices with default value.
                 let default = volume::VsliceRange { allocated: false, count: 0 };
                 let mut slices = [default; volume::MAX_SLICE_REQUESTS as usize];
@@ -366,7 +348,7 @@ impl BlockServer {
                 responder.send(status, &slices, response_count)?;
             }
             // TODO(https://fxbug.dev/42171261): need to check if this returns the right information.
-            VolumeAndNodeRequest::GetVolumeInfo { responder } => {
+            VolumeRequest::GetVolumeInfo { responder } => {
                 match self.file.get_attributes(fio::NodeAttributesQuery::STORAGE_SIZE).await {
                     Ok(attr) => {
                         debug_assert!(attr.immutable_attributes.storage_size.is_some());
@@ -395,7 +377,7 @@ impl BlockServer {
                     }
                 }
             }
-            VolumeAndNodeRequest::Extend { start_slice, slice_count, responder } => {
+            VolumeRequest::Extend { start_slice, slice_count, responder } => {
                 // TODO(https://fxbug.dev/42171261): this is a hack. When extend is called, the extent is
                 // expected to be set as allocated. The easiest way to do this is to just
                 // write an extent of zeroed data. Another issue here is the size. The memory
@@ -411,134 +393,20 @@ impl BlockServer {
                 };
             }
             // TODO(https://fxbug.dev/42171261)
-            VolumeAndNodeRequest::Shrink { start_slice: _, slice_count: _, responder } => {
+            VolumeRequest::Shrink { start_slice: _, slice_count: _, responder } => {
                 responder.send(zx::sys::ZX_OK)?;
             }
             // TODO(https://fxbug.dev/42171261)
-            VolumeAndNodeRequest::Destroy { responder } => {
+            VolumeRequest::Destroy { responder } => {
                 responder.send(zx::sys::ZX_OK)?;
             }
-            VolumeAndNodeRequest::Clone { flags: _, object, control_handle: _ } => {
-                // Have to move this into a non-async function to avoid Rust compiler's
-                // complaint about recursive async functions
-                self.handle_clone_request(object.into_channel());
-            }
-            // TODO(https://fxbug.dev/42171261)
-            VolumeAndNodeRequest::Reopen {
-                rights_request: _,
-                object_request: _,
-                control_handle: _,
-            } => {}
-            // TODO(https://fxbug.dev/42171261)
-            VolumeAndNodeRequest::Close { responder } => {
-                responder.send(Ok(()))?;
-            }
-            // TODO(https://fxbug.dev/42171261)
-            VolumeAndNodeRequest::GetConnectionInfo { responder } => {
-                // TODO(https://fxbug.dev/42157659): Fill in rights and available operations.
-                let info = fio::ConnectionInfo::default();
-                responder.send(info)?;
-            }
-            // TODO(https://fxbug.dev/42171261)
-            VolumeAndNodeRequest::Sync { responder } => {
-                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
-            }
-            VolumeAndNodeRequest::GetAttr { responder } => {
-                // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
-                let (status, mut attrs) =
-                    vfs::common::io2_to_io1_attrs(self.file.as_ref(), fio::Rights::GET_ATTRIBUTES)
-                        .await;
-                if status == zx::Status::OK {
-                    attrs.mode = fio::MODE_TYPE_BLOCK_DEVICE;
-                }
-                responder.send(status.into_raw(), &attrs)?;
-            }
-            // TODO(https://fxbug.dev/42171261)
-            VolumeAndNodeRequest::SetAttr { flags: _, attributes: _, responder } => {
-                responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED)?;
-            }
-            VolumeAndNodeRequest::GetAttributes { query, responder } => {
-                // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
-                let attrs = self.file.get_attributes(query).await;
-                responder.send(
-                    attrs
-                        .as_ref()
-                        .map(|attrs| (&attrs.mutable_attributes, &attrs.immutable_attributes))
-                        .map_err(|status| status.into_raw()),
-                )?;
-            }
-            VolumeAndNodeRequest::UpdateAttributes { payload: _, responder } => {
-                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
-            }
-            VolumeAndNodeRequest::ListExtendedAttributes { iterator, .. } => {
-                iterator.close_with_epitaph(zx::Status::NOT_SUPPORTED)?;
-            }
-            VolumeAndNodeRequest::GetExtendedAttribute { responder, .. } => {
-                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
-            }
-            VolumeAndNodeRequest::SetExtendedAttribute { responder, .. } => {
-                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
-            }
-            VolumeAndNodeRequest::RemoveExtendedAttribute { responder, .. } => {
-                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
-            }
-            // TODO(https://fxbug.dev/42171261)
-            VolumeAndNodeRequest::GetFlags { responder } => {
-                responder.send(zx::sys::ZX_OK, fio::OpenFlags::NODE_REFERENCE)?;
-            }
-            // TODO(https://fxbug.dev/42171261)
-            VolumeAndNodeRequest::SetFlags { flags: _, responder } => {
-                responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED)?;
-            }
-            // TODO(https://fxbug.dev/42056856)
-            VolumeAndNodeRequest::Query { responder } => {
-                responder.send(fio::NODE_PROTOCOL_NAME.as_bytes())?;
-            }
-            VolumeAndNodeRequest::QueryFilesystem { responder } => {
-                match self.file.query_filesystem() {
-                    Ok(info) => responder.send(zx::sys::ZX_OK, Some(&info))?,
-                    Err(e) => responder.send(e.into_raw(), None)?,
-                }
-            }
-            VolumeAndNodeRequest::ConnectToDeviceFidl { server, control_handle: _ } => {
-                // This should serve *only* Volume, but it's a pain to write that without
-                // duplication.
-                //
-                // TODO(https://fxbug.dev/42171261):  make it so.
-                // TODO(https://fxbug.dev/42054916): make it so.
-                self.handle_clone_request(server);
-            }
-            VolumeAndNodeRequest::ConnectToController { server, control_handle: _ } => {
-                // This should serve *only* Controller, but it's a pain to write that without
-                // duplication.
-                //
-                // TODO(https://fxbug.dev/42171261):  make it so.
-                // TODO(https://fxbug.dev/42054916): make it so.
-                self.handle_clone_request(server.into_channel());
-            }
-            VolumeAndNodeRequest::Bind { driver: _, responder } => {
-                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
-            }
-            VolumeAndNodeRequest::Rebind { driver: _, responder } => {
-                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
-            }
-            VolumeAndNodeRequest::UnbindChildren { responder } => {
-                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
-            }
-            VolumeAndNodeRequest::ScheduleUnbind { responder } => {
-                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
-            }
-            VolumeAndNodeRequest::GetTopologicalPath { responder } => {
-                responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
-            }
-            VolumeAndNodeRequest::_UnknownMethod { .. } => (),
         }
         Ok(())
     }
 
     async fn handle_requests(
         &self,
-        server: fidl::endpoints::ServerEnd<VolumeAndNodeMarker>,
+        server: fidl::endpoints::ServerEnd<VolumeMarker>,
     ) -> Result<(), Error> {
         server
             .into_stream()?
@@ -549,7 +417,7 @@ impl BlockServer {
     }
 
     pub async fn run(&mut self) -> Result<(), Error> {
-        let server = ServerEnd::<VolumeAndNodeMarker>::new(self.server_channel.take().unwrap());
+        let server = ServerEnd::<VolumeMarker>::new(self.server_channel.take().unwrap());
 
         // Create a fifo pair
         let (server_fifo, client_fifo) =
@@ -594,139 +462,60 @@ mod tests {
     use crate::fuchsia::testing::{open_file_checked, TestFixture};
     use block_client::{BlockClient, RemoteBlockClient, VmoId};
     use fidl::endpoints::{ClientEnd, ServerEnd};
-    use fidl_fuchsia_device::ControllerMarker;
     use fidl_fuchsia_hardware_block::BlockMarker;
-    use fidl_fuchsia_hardware_block_volume::VolumeAndNodeMarker;
+    use fidl_fuchsia_hardware_block_volume::VolumeMarker;
     use fidl_fuchsia_io as fio;
     use fs_management::filesystem::Filesystem;
     use fs_management::Blobfs;
     use futures::join;
     use rustc_hash::FxHashSet as HashSet;
 
-    #[fuchsia::test(threads = 10)]
-    async fn test_block_server() {
-        let fixture = TestFixture::new().await;
-        let (client, server) = fidl::endpoints::create_proxy::<ControllerMarker>().unwrap();
-        join!(
-            async {
-                let mut blobfs = Filesystem::new(client, Blobfs::default());
-                blobfs.format().await.expect("format blobfs failed");
-                blobfs.fsck().await.expect("fsck failed");
-            },
-            async {
-                let root = fixture.root();
+    struct BlockConnector(fio::DirectoryProxy, &'static str);
 
-                let file = open_file_checked(
-                    &root,
-                    fio::OpenFlags::CREATE
-                        | fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE
-                        | fio::OpenFlags::NOT_DIRECTORY,
-                    "block_device",
-                )
-                .await;
-                let () = file
-                    .resize(2 * 1024 * 1024)
-                    .await
-                    .expect("resize failed")
-                    .map_err(zx::Status::from_raw)
-                    .expect("resize error");
-                let () = file
-                    .close()
-                    .await
-                    .expect("close failed")
-                    .map_err(zx::Status::from_raw)
-                    .expect("close error");
-
-                root.open(
+    impl fs_management::filesystem::BlockConnector for BlockConnector {
+        fn connect_volume(&self) -> Result<ClientEnd<VolumeMarker>, anyhow::Error> {
+            let (client, server) = fidl::endpoints::create_endpoints::<VolumeMarker>();
+            self.0
+                .open(
                     fio::OpenFlags::RIGHT_READABLE
                         | fio::OpenFlags::RIGHT_WRITABLE
                         | fio::OpenFlags::BLOCK_DEVICE,
                     fio::ModeType::empty(),
-                    "block_device",
+                    self.1,
                     server.into_channel().into(),
                 )
                 .expect("open failed");
-            }
-        );
-        fixture.close().await;
+            Ok(client)
+        }
     }
 
     #[fuchsia::test(threads = 10)]
-    async fn test_clone() {
+    async fn test_block_server() {
         let fixture = TestFixture::new().await;
-        let (client_channel, server_channel) = zx::Channel::create();
-        let (client_channel_copy1, server_channel_copy1) = zx::Channel::create();
-        let (client_channel_copy2, server_channel_copy2) = zx::Channel::create();
+        let connector = {
+            let root = fixture.root();
+            let file = open_file_checked(
+                &root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::NOT_DIRECTORY,
+                "block_device",
+            )
+            .await;
+            file.resize(2 * 1024 * 1024).await.expect("FIDL error").expect("resize error");
+            let () = file.close().await.expect("FIDL error").expect("close error");
+            let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            root.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())
+                .expect("clone error");
+            BlockConnector(client, "block_device")
+        };
 
-        join!(
-            async {
-                // Putting original block device in its own execution scope to test that the
-                // clone will work independent of the original
-                {
-                    let original_block_device =
-                        ClientEnd::<VolumeAndNodeMarker>::new(client_channel)
-                            .into_proxy()
-                            .expect("convert into proxy failed");
-                    original_block_device
-                        .clone(
-                            fio::OpenFlags::CLONE_SAME_RIGHTS,
-                            ServerEnd::new(server_channel_copy1),
-                        )
-                        .expect("clone failed");
-                    original_block_device
-                        .clone(
-                            fio::OpenFlags::CLONE_SAME_RIGHTS,
-                            ServerEnd::new(server_channel_copy2),
-                        )
-                        .expect("clone failed");
-                }
-
-                let block_device_cloned1 = RemoteBlockClient::new(
-                    ClientEnd::<BlockMarker>::new(client_channel_copy1)
-                        .into_proxy()
-                        .expect("create proxy"),
-                )
-                .await
-                .expect("create new RemoteBlockClient failed");
-                let block_device_cloned2 = RemoteBlockClient::new(
-                    ClientEnd::<BlockMarker>::new(client_channel_copy2)
-                        .into_proxy()
-                        .expect("create proxy"),
-                )
-                .await
-                .expect("create new RemoteBlockClient failed");
-
-                let offset = block_device_cloned1.block_size() as usize;
-                let len = block_device_cloned1.block_size() as usize;
-                // Must write with length as a multiple of the block_size
-                let write_buf = vec![0xa3u8; len];
-                // Write to "foo" via block_device_cloned1
-                block_device_cloned1
-                    .write_at(write_buf[..].into(), offset as u64)
-                    .await
-                    .expect("write_at failed");
-                let mut read_buf = vec![0u8; len];
-                block_device_cloned2
-                    .read_at(read_buf.as_mut_slice().into(), offset as u64)
-                    .await
-                    .expect("read_at failed");
-                assert_eq!(&read_buf, &write_buf);
-            },
-            async {
-                let root = fixture.root();
-                root.open(
-                    fio::OpenFlags::CREATE
-                        | fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE
-                        | fio::OpenFlags::BLOCK_DEVICE,
-                    fio::ModeType::empty(),
-                    "foo",
-                    ServerEnd::new(server_channel),
-                )
-                .expect("open failed");
-            }
-        );
+        {
+            let mut blobfs = Filesystem::new(connector, Blobfs::default());
+            blobfs.format().await.expect("format blobfs failed");
+            blobfs.fsck().await.expect("fsck failed");
+        }
         fixture.close().await;
     }
 
@@ -906,45 +695,13 @@ mod tests {
     }
 
     #[fuchsia::test(threads = 10)]
-    async fn test_getattr() {
-        let fixture = TestFixture::new().await;
-        let (client_channel, server_channel) = zx::Channel::create();
-
-        join!(
-            async {
-                let original_block_device = ClientEnd::<VolumeAndNodeMarker>::new(client_channel)
-                    .into_proxy()
-                    .expect("convert into proxy failed");
-                let (status, attr) =
-                    original_block_device.get_attr().await.expect("get_attr failed");
-                zx::Status::ok(status).expect("block get_attr failed");
-                assert_eq!(attr.mode, fio::MODE_TYPE_BLOCK_DEVICE);
-            },
-            async {
-                let root = fixture.root();
-                root.open(
-                    fio::OpenFlags::CREATE
-                        | fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE
-                        | fio::OpenFlags::BLOCK_DEVICE,
-                    fio::ModeType::empty(),
-                    "foo",
-                    ServerEnd::new(server_channel),
-                )
-                .expect("open failed");
-            }
-        );
-        fixture.close().await;
-    }
-
-    #[fuchsia::test(threads = 10)]
     async fn test_get_info() {
         let fixture = TestFixture::new().await;
         let (client_channel, server_channel) = zx::Channel::create();
         let file_size = 2 * 1024 * 1024;
         join!(
             async {
-                let original_block_device = ClientEnd::<VolumeAndNodeMarker>::new(client_channel)
+                let original_block_device = ClientEnd::<VolumeMarker>::new(client_channel)
                     .into_proxy()
                     .expect("convert into proxy failed");
                 let info = original_block_device
@@ -996,93 +753,74 @@ mod tests {
     #[fuchsia::test(threads = 10)]
     async fn test_blobfs() {
         let fixture = TestFixture::new().await;
-        let (client, server) = fidl::endpoints::create_proxy::<ControllerMarker>().unwrap();
-        join!(
-            async {
-                let mut blobfs = Filesystem::new(client, Blobfs::default());
-                blobfs.format().await.expect("format blobfs failed");
-                blobfs.fsck().await.expect("fsck failed");
-                // Mount blobfs
-                let serving = blobfs.serve().await.expect("serve blobfs failed");
+        let connector = {
+            let root = fixture.root();
+            let file = open_file_checked(
+                &root,
+                fio::OpenFlags::CREATE
+                    | fio::OpenFlags::RIGHT_READABLE
+                    | fio::OpenFlags::RIGHT_WRITABLE
+                    | fio::OpenFlags::NOT_DIRECTORY,
+                "block_device",
+            )
+            .await;
+            file.resize(5 * 1024 * 1024).await.expect("FIDL error").expect("resize error");
+            let () = file.close().await.expect("FIDL error").expect("close error");
+            let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+            root.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())
+                .expect("clone error");
+            BlockConnector(client, "block_device")
+        };
 
-                let content = String::from("Hello world!").into_bytes();
-                let merkle_root_hash = fuchsia_merkle::from_slice(&content).root().to_string();
-                {
-                    let file = fuchsia_fs::directory::open_file(
-                        serving.root(),
-                        &merkle_root_hash,
-                        fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE,
-                    )
-                    .await
-                    .expect("open file failed");
-                    let () = file
-                        .resize(content.len() as u64)
-                        .await
-                        .expect("resize failed")
-                        .map_err(zx::Status::from_raw)
-                        .expect("resize error");
-                    let _: u64 = file
-                        .write(&content)
-                        .await
-                        .expect("write to file failed")
-                        .map_err(zx::Status::from_raw)
-                        .expect("write to file error");
-                }
-                // Check that blobfs can be successfully unmounted
-                serving.shutdown().await.expect("shutdown blobfs failed");
+        {
+            let mut blobfs = Filesystem::new(connector, Blobfs::default());
+            blobfs.format().await.expect("format blobfs failed");
+            blobfs.fsck().await.expect("fsck failed");
+            // Mount blobfs
+            let serving = blobfs.serve().await.expect("serve blobfs failed");
 
-                let serving = blobfs.serve().await.expect("serve blobfs failed");
-                {
-                    let file = fuchsia_fs::directory::open_file(
-                        serving.root(),
-                        &merkle_root_hash,
-                        fio::PERM_READABLE,
-                    )
-                    .await
-                    .expect("open file failed");
-                    let read_content =
-                        fuchsia_fs::file::read(&file).await.expect("read from file failed");
-                    assert_eq!(content, read_content);
-                }
-
-                serving.shutdown().await.expect("shutdown blobfs failed");
-            },
-            async {
-                let root = fixture.root();
-
-                let file = open_file_checked(
-                    &root,
-                    fio::OpenFlags::CREATE
-                        | fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE
-                        | fio::OpenFlags::NOT_DIRECTORY,
-                    "block_device",
+            let content = String::from("Hello world!").into_bytes();
+            let merkle_root_hash = fuchsia_merkle::from_slice(&content).root().to_string();
+            {
+                let file = fuchsia_fs::directory::open_file(
+                    serving.root(),
+                    &merkle_root_hash,
+                    fio::Flags::FLAG_MAYBE_CREATE | fio::PERM_WRITABLE,
                 )
-                .await;
+                .await
+                .expect("open file failed");
                 let () = file
-                    .resize(5 * 1024 * 1024)
+                    .resize(content.len() as u64)
                     .await
                     .expect("resize failed")
                     .map_err(zx::Status::from_raw)
                     .expect("resize error");
-                let () = file
-                    .close()
+                let _: u64 = file
+                    .write(&content)
                     .await
-                    .expect("close failed")
+                    .expect("write to file failed")
                     .map_err(zx::Status::from_raw)
-                    .expect("close error");
-
-                root.open(
-                    fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE
-                        | fio::OpenFlags::BLOCK_DEVICE,
-                    fio::ModeType::empty(),
-                    "block_device",
-                    server.into_channel().into(),
-                )
-                .expect("open failed");
+                    .expect("write to file error");
             }
-        );
+            // Check that blobfs can be successfully unmounted
+            serving.shutdown().await.expect("shutdown blobfs failed");
+
+            let serving = blobfs.serve().await.expect("serve blobfs failed");
+            {
+                let file = fuchsia_fs::directory::open_file(
+                    serving.root(),
+                    &merkle_root_hash,
+                    fio::PERM_READABLE,
+                )
+                .await
+                .expect("open file failed");
+                let read_content =
+                    fuchsia_fs::file::read(&file).await.expect("read from file failed");
+                assert_eq!(content, read_content);
+            }
+
+            serving.shutdown().await.expect("shutdown blobfs failed");
+        }
         fixture.close().await;
     }
 }

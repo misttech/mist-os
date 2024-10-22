@@ -85,7 +85,6 @@ rustc_library("platform") {
       "//third_party/zstd",
     ]
     test_deps += [
-      "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
       "//src/lib/fdio/rust:fdio",
       "//src/lib/fuchsia",
       "//src/lib/fuchsia-component",

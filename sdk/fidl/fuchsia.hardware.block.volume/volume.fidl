@@ -4,9 +4,7 @@
 @available(added=HEAD)
 library fuchsia.hardware.block.volume;
 
-using fuchsia.device as device;
 using fuchsia.hardware.block.partition as partition;
-using fuchsia.io as io;
 using zx;
 
 /// VolumeManagerInfo describes the properties of the volume manager and not each individual volume.
@@ -213,15 +211,6 @@ closed protocol Volume {
     strict Destroy() -> (struct {
         status zx.Status;
     });
-};
-
-/// This protocol is intended to emulate a block device.
-// TODO(https://fxbug.dev/42054916): Make this protocol test-only.
-// TODO(https://fxbug.dev/42063787): Remove this protocol entirely.
-open protocol VolumeAndNode {
-    compose Volume;
-    compose io.Node;
-    compose device.Controller;
 };
 
 service Service {

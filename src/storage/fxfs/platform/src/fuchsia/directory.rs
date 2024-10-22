@@ -768,7 +768,7 @@ impl VfsDirectory for FxDirectory {
                             return Err(zx::Status::NOT_SUPPORTED);
                         }
                         let mut server =
-                            BlockServer::new(node, scope, object_request.take().into_channel());
+                            BlockServer::new(node, object_request.take().into_channel());
                         Ok(async move {
                             let _ = server.run().await;
                         }
