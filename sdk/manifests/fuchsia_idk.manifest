@@ -391,6 +391,7 @@ host_tool://tools/arm64/bootserver
 host_tool://tools/arm64/cmc
 host_tool://tools/arm64/configc
 host_tool://tools/arm64/device-finder
+host_tool://tools/arm64/gen-android-starnix-container
 host_tool://tools/arm64/fake-omaha-client
 host_tool://tools/arm64/far
 host_tool://tools/arm64/ffx
@@ -418,6 +419,7 @@ host_tool://tools/x64/bootserver
 host_tool://tools/x64/cmc
 host_tool://tools/x64/configc
 host_tool://tools/x64/device-finder
+host_tool://tools/x64/gen-android-starnix-container
 host_tool://tools/x64/fake-omaha-client
 host_tool://tools/x64/far
 host_tool://tools/x64/ffx

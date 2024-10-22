@@ -607,6 +607,7 @@ if (is_host) {
       "//src/developer/ffx/plugins/wlan:sdk",
       "//src/developer/ffx/tools/starnix:sdk",
       "//src/performance/trace2json:bin_sdk",
+      "//src/starnix/tools/gen_android_starnix_container:gen_android_starnix_container_sdk",
       "//src/storage/bin/fvm:fvm_sdk",
       "//src/storage/blobfs/tools:blobfs_sdk",
       "//src/storage/minfs/tools:minfs_sdk",
