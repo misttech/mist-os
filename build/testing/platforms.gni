@@ -170,6 +170,12 @@ test_platforms = [
     cpu = "arm64"
   },
 
+  # https://fxbug.dev/355507826
+  {
+    device_type = "Sorrel"
+    cpu = "arm64"
+  },
+
   # Experimental/FYI.
   # https://fxbug.dev/42120306
   {

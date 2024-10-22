@@ -160,6 +160,18 @@ _all_named_fuchsia_envs += [
   },
 ]
 
+sorrel_env = {
+  dimensions = {
+    device_type = "Sorrel"
+  }
+}
+_all_named_fuchsia_envs += [
+  {
+    name = "sorrel"
+    env = sorrel_env
+  },
+]
+
 nelson_env = {
   dimensions = {
     device_type = "Nelson"
