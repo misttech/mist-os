@@ -735,7 +735,7 @@ sdk_molecule("core_data") {
     # TODO(ddorwin): Rename these to make it clear that they are data (e.g., _shards).
     "//sdk/lib/driver_component:driver_component",
     "//sdk/lib/heapdump_instrumentation:heapdump_instrumentation_shard",
-    "//sdk/lib/inspect",
+    "//sdk/lib/inspect/shards:inspect_sdk",
     "//sdk/lib/sys/component:realm_builder_shard_sdk",
     "//sdk/lib/syslog/shards:syslog_sdk",
     "//sdk/lib/vulkan",

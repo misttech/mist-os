@@ -130,7 +130,7 @@ dart_library://dart/sl4f
 data://data/config/symbol_index
 data://pkg/driver_component/driver_component.json
 data://pkg/heapdump_instrumentation/heapdump_instrumentation_shard.json
-data://pkg/inspect/inspect.json
+data://pkg/inspect/inspect_sdk.json
 data://pkg/sys/component/realm_builder_shard_sdk.json
 data://pkg/sys/testing/testing_sdk.json
 data://pkg/syslog/syslog_sdk.json
