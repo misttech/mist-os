@@ -97,8 +97,6 @@ struct is_complete<T, std::void_t<std::integral_constant<std::size_t, sizeof(T)>
 template <typename T>
 constexpr inline auto is_complete_v = is_complete<T>::value;
 
-enum class AssumeProtocolComposesNodeTag { kAssumeProtocolComposesNode };
-
 }  // namespace component::internal
 
 #endif  // LIB_COMPONENT_INCOMING_CPP_INTERNAL_H_
