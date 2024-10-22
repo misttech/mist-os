@@ -28,7 +28,7 @@
 
                 // These tests currently pass on arm64 and are SKIPPED on x86_64. Our test harness thinks skipped tests fail.
                 "MemtagStackTest.*",
-                "MemtagGlobalsTest.*",
+                "*MemtagGlobalsTest.*",
                 "MemtagNoteTest.*",
                 "scs_test.stack_overflow",
                 "scs_DeathTest.stack_overflow",
