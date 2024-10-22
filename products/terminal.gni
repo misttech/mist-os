@@ -27,8 +27,4 @@
 fuchsia_product_assembly_config_label = "//products/terminal"
 zedboot_product_assembly_config_label = "//products/zedboot"
 
-# Add SDK tools set to "cache" so these tools are automatically available in
-# QEMU images generated for the SDK, but in cache, so they can be updated.
-legacy_cache_package_labels = [ "//sdk/bundles:tools" ]
-
 discoverable_package_labels = [ "//bundles/tools" ]
