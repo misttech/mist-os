@@ -206,6 +206,26 @@ fn file_class_from_file_mode(mode: FileMode) -> Result<FileClass, Errno> {
     }
 }
 
+#[macro_export]
+macro_rules! todo_check_permission {
+    (TODO($bug_url:literal, $todo_message:literal), $permission_check:expr, $source_sid:expr, $target_sid:expr, $permission:expr $(,)?) => {{
+        use crate::security::selinux_hooks::check_permission_internal;
+        if check_permission_internal(
+            $permission_check,
+            $source_sid,
+            $target_sid,
+            $permission,
+            "todo_deny",
+        )
+        .is_err()
+        {
+            use starnix_logging::track_stub;
+            track_stub!(TODO($bug_url), $todo_message);
+        }
+        Ok(())
+    }};
+}
+
 /// Called by file-system implementations when creating the `FsNode` for a new file.
 pub(super) fn fs_node_init_on_create(
     security_server: &SecurityServer,
@@ -296,10 +316,34 @@ fn may_create(
         FileSystemLabelState::Labeled { label } => Ok(label.sid),
         _ => error!(EPERM),
     }?;
-    check_permission(&permission_check, current_sid, parent_sid, DirPermission::Search)?;
-    check_permission(&permission_check, current_sid, parent_sid, DirPermission::AddName)?;
-    check_permission(&permission_check, current_sid, file_sid, FilePermission::Create)?;
-    check_permission(&permission_check, file_sid, filesystem_sid, FileSystemPermission::Associate)?;
+    todo_check_permission!(
+        TODO("https://fxbug.dev/374910392", "Check add_name permission."),
+        &permission_check,
+        current_sid,
+        parent_sid,
+        DirPermission::Search
+    )?;
+    todo_check_permission!(
+        TODO("https://fxbug.dev/374910392", "Check add_name permission."),
+        &permission_check,
+        current_sid,
+        parent_sid,
+        DirPermission::AddName
+    )?;
+    todo_check_permission!(
+        TODO("https://fxbug.dev/374910392", "Check create permission."),
+        &permission_check,
+        current_sid,
+        file_sid,
+        FilePermission::Create
+    )?;
+    todo_check_permission!(
+        TODO("https://fxbug.dev/374910392", "Check associate permission."),
+        &permission_check,
+        file_sid,
+        filesystem_sid,
+        FileSystemPermission::Associate
+    )?;
     Ok(())
 }
 
@@ -405,26 +449,6 @@ fn fs_node_effective_sid(fs_node: &FsNode) -> SecurityId {
         log_error!("Unlabeled FsNode@{} in {}", ino, fs_node.fs().name());
         SecurityId::initial(InitialSid::Unlabeled)
     })
-}
-
-#[macro_export]
-macro_rules! todo_check_permission {
-    (TODO($bug_url:literal, $todo_message:literal), $permission_check:expr, $source_sid:expr, $target_sid:expr, $permission:expr $(,)?) => {{
-        use crate::security::selinux_hooks::check_permission_internal;
-        if check_permission_internal(
-            $permission_check,
-            $source_sid,
-            $target_sid,
-            $permission,
-            "todo_deny",
-        )
-        .is_err()
-        {
-            use starnix_logging::track_stub;
-            track_stub!(TODO($bug_url), $todo_message);
-        }
-        Ok(())
-    }};
 }
 
 /// Checks whether `source_sid` is allowed the specified `permission` on `target_sid`.

@@ -180,7 +180,7 @@ pub fn check_fs_node_mkdir_access(
 /// `parent` directory, and with the specified file `mode` and `device_id`.
 /// For consistency any calls to `mknod()` with a file `mode` specifying a regular file will be
 /// validated by `check_fs_node_create_access()` rather than by this hook.
-/// /// Corresponds to the `security_inode_mknod()` hook.
+/// Corresponds to the `security_inode_mknod()` hook.
 pub fn check_fs_node_mknod_access(
     current_task: &CurrentTask,
     parent: &FsNode,
