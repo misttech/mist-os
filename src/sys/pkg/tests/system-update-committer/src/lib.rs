@@ -342,6 +342,19 @@ async fn system_pending_commit() {
         PaverEvent::BootManagerFlush,
     ]);
     assert_eq!(OnSignals::new(&event_pair, zx::Signals::USER_0).await, Ok(zx::Signals::USER_0));
+
+    let () = fasync::Timer::new(std::time::Duration::from_millis(500)).await;
+
+    // Observe boot_attempts shows up in inspect.
+    let hierarchy = env.system_update_committer_inspect_hierarchy().await;
+    assert_data_tree!(
+        hierarchy,
+        root: contains {
+            "commit": {
+                "boot_attempts": 1u64,
+            }
+        }
+    );
 }
 
 /// If the current system is already committed, the EventPair returned should immediately have
@@ -435,6 +448,9 @@ async fn inspect_health_status_ok() {
             "fuchsia.inspect.Health": {
                 "start_timestamp_nanos": AnyProperty,
                 "status": "OK"
+            },
+            "commit": {
+                "boot_attempts": 1u64
             }
         }
     );
@@ -481,6 +497,9 @@ async fn inspect_multiple_failures() {
             "fuchsia.inspect.Health": {
                 "start_timestamp_nanos": AnyProperty,
                 "status": "OK",
+            },
+            "commit": {
+                "boot_attempts": 1u64
             }
         }
     );
@@ -528,7 +547,8 @@ async fn paver_failure_causes_reboot() {
                 "message": AnyProperty,
                 "start_timestamp_nanos": AnyProperty,
                 "status": "UNHEALTHY"
-            }
+            },
+            "commit": {}
         }
     );
 }
@@ -579,7 +599,8 @@ async fn blobfs_verification_failure_causes_reboot() {
                 "message": AnyProperty,
                 "start_timestamp_nanos": AnyProperty,
                 "status": "UNHEALTHY"
-            }
+            },
+            "commit": {}
         }
     );
 }
@@ -630,7 +651,8 @@ async fn netstack_verification_failure_causes_reboot() {
                 "message": AnyProperty,
                 "start_timestamp_nanos": AnyProperty,
                 "status": "UNHEALTHY"
-            }
+            },
+            "commit": {}
         }
     );
 }
@@ -684,6 +706,9 @@ async fn verification_failure_does_not_cause_reboot() {
             "fuchsia.inspect.Health": {
                 "start_timestamp_nanos": AnyProperty,
                 "status": "OK"
+            },
+            "commit": {
+                "boot_attempts": 1u64
             }
         }
     );

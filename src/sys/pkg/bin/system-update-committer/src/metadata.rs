@@ -39,12 +39,13 @@ pub async fn put_metadata_in_happy_state(
     unblocker: oneshot::Sender<()>,
     verifiers: &[&dyn VerifierProxy],
     node: &finspect::Node,
+    commit_inspect: &CommitInspect,
     config: &Config,
 ) -> Result<(), MetadataError> {
     let mut unblocker = Some(unblocker);
     if config.enable() {
         let engine = PolicyEngine::build(boot_manager).await.map_err(MetadataError::Policy)?;
-        if let Some(current_config) = engine.should_verify_and_commit() {
+        if let Some((current_config, boot_attempts)) = engine.should_verify_and_commit() {
             // At this point, the FIDL server should start responding to requests so that clients
             // can find out that the health verification is underway.
             unblocker = unblock_fidl_server(unblocker)?;
@@ -52,6 +53,7 @@ pub async fn put_metadata_in_happy_state(
             let () = PolicyEngine::apply_config(res, config).map_err(MetadataError::Verify)?;
             let () =
                 do_commit(boot_manager, current_config).await.map_err(MetadataError::Commit)?;
+            let () = commit_inspect.record_boot_attempts(boot_attempts);
         }
     }
 
@@ -64,6 +66,22 @@ pub async fn put_metadata_in_happy_state(
     unblock_fidl_server(unblocker)?;
 
     Ok(())
+}
+
+/// Records inspect data specific to committing the update if the health checks pass.
+pub struct CommitInspect(finspect::Node);
+
+impl CommitInspect {
+    pub fn new(node: finspect::Node) -> Self {
+        Self(node)
+    }
+
+    fn record_boot_attempts(&self, count: Option<u8>) {
+        match count {
+            Some(count) => self.0.record_uint("boot_attempts", count.into()),
+            None => self.0.record_uint("boot_attempts_missing", 0),
+        }
+    }
 }
 
 fn unblock_fidl_server(
@@ -138,6 +156,7 @@ mod tests {
             unblocker,
             &[&blobfs_verifier],
             &finspect::Node::default(),
+            &CommitInspect::new(finspect::Node::default()),
             &Config::builder().build(),
         )
         .await
@@ -173,6 +192,7 @@ mod tests {
             unblocker,
             &[&blobfs_verifier],
             &finspect::Node::default(),
+            &CommitInspect::new(finspect::Node::default()),
             &Config::builder().build(),
         )
         .await
@@ -206,6 +226,7 @@ mod tests {
             unblocker,
             &[&blobfs_verifier],
             &finspect::Node::default(),
+            &CommitInspect::new(finspect::Node::default()),
             &Config::builder().enable(false).build(),
         )
         .await
@@ -241,6 +262,7 @@ mod tests {
             unblocker,
             &[&blobfs_verifier],
             &finspect::Node::default(),
+            &CommitInspect::new(finspect::Node::default()),
             &Config::builder().build(),
         )
         .await
@@ -294,6 +316,7 @@ mod tests {
             unblocker,
             &[&blobfs_verifier],
             &finspect::Node::default(),
+            &CommitInspect::new(finspect::Node::default()),
             &Config::builder().build(),
         )
         .await
@@ -349,6 +372,7 @@ mod tests {
             unblocker,
             &[&blobfs_verifier],
             &finspect::Node::default(),
+            &CommitInspect::new(finspect::Node::default()),
             &Config::builder().blobfs(Mode::Ignore).build(),
         )
         .await
@@ -404,6 +428,7 @@ mod tests {
             unblocker,
             &[&blobfs_verifier],
             &finspect::Node::default(),
+            &CommitInspect::new(finspect::Node::default()),
             &Config::builder().blobfs(Mode::RebootOnFailure).build(),
         )
         .await;
@@ -440,5 +465,19 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn test_errors_when_failed_verification_not_ignored_b() {
         test_errors_when_failed_verification_not_ignored(&Configuration::B).await
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn commit_inspect_handles_missing_count() {
+        let inspector = finspect::Inspector::default();
+        let commit_inspect = CommitInspect::new(inspector.root().create_child("commit"));
+
+        commit_inspect.record_boot_attempts(None);
+
+        diagnostics_assertions::assert_data_tree!(inspector, root: {
+            "commit": {
+                "boot_attempts_missing": 0u64
+            }
+        });
     }
 }

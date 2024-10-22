@@ -2,6 +2,24 @@
     "metrics": [
         {
             "event_codes": [
+                1
+            ],
+            "metric_id": 29,
+            "metric_type": "Integer",
+            "selector": "core/system-update/system-update-committer:root/commit:boot_attempts",
+            "upload_once": true
+        },
+        {
+            "event_codes": [
+                2
+            ],
+            "metric_id": 29,
+            "metric_type": "Integer",
+            "selector": "core/system-update/system-update-committer:root/commit:boot_attempts_missing",
+            "upload_once": true
+        },
+        {
+            "event_codes": [
                 0
             ],
             "metric_id": 121,

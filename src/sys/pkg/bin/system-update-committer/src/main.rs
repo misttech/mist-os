@@ -61,9 +61,11 @@ async fn main_inner_async() -> Result<(), Error> {
         inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
 
     let verification_node = inspector.root().create_child("verification");
+    let commit_node = metadata::CommitInspect::new(inspector.root().create_child("commit"));
     let mut health_node = finspect::health::Node::new(inspector.root());
 
     let verification_node_ref = &verification_node;
+    let commit_node_ref = &commit_node;
     let health_node_ref = &mut health_node;
 
     let config = Config::load_from_config_data_or_default();
@@ -104,6 +106,7 @@ async fn main_inner_async() -> Result<(), Error> {
                 unblocker,
                 &[&blobfs_verifier, &netstack_verifier],
                 verification_node_ref,
+                commit_node_ref,
                 &config,
             )
             .await

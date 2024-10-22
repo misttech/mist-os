@@ -8,7 +8,7 @@ use super::errors::{
 };
 use crate::config::{Config as ComponentConfig, Mode};
 use fidl_fuchsia_paver as paver;
-use tracing::info;
+use tracing::{info, warn};
 use zx::Status;
 
 /// After gathering state from the BootManager, the PolicyEngine can answer whether we
@@ -23,7 +23,11 @@ enum State {
     //   * the current config is Recovery
     //   * the current config status is Healthy
     NoOp,
-    Active { current_config: Configuration },
+    Active {
+        current_config: Configuration,
+        // None if the value is erroneously missing from QueryConfigurationStatusAndBootAttempts.
+        boot_attempts: Option<u8>,
+    },
 }
 
 impl PolicyEngine {
@@ -34,7 +38,6 @@ impl PolicyEngine {
             .await
             .into_boot_manager_result("query_current_configuration")
         {
-            // As a special case, if we don't support ABR, ensure we neither verify nor commit.
             Err(BootManagerError::Fidl {
                 error: fidl::Error::ClientChannelClosed { status: Status::NOT_SUPPORTED, .. },
                 ..
@@ -43,13 +46,10 @@ impl PolicyEngine {
                 return Ok(Self(State::NoOp));
             }
             Err(e) => return Err(PolicyError::Build(e)),
-
-            // As a special case, if we're in Recovery, ensure we neither verify nor commit.
             Ok(paver::Configuration::Recovery) => {
                 info!("System in recovery: skipping health verification and boot metadata updates");
                 return Ok(Self(State::NoOp));
             }
-
             Ok(paver::Configuration::A) => Configuration::A,
             Ok(paver::Configuration::B) => Configuration::B,
         };
@@ -59,7 +59,6 @@ impl PolicyEngine {
             .await
             .into_boot_manager_result("query_configuration_status")
             .map_err(PolicyError::Build)?;
-
         match status_and_boot_attempts
             .status
             .ok_or(PolicyError::Build(BootManagerError::StatusNotSet))?
@@ -76,15 +75,23 @@ impl PolicyEngine {
             }
         };
 
-        Ok(Self(State::Active { current_config }))
+        let boot_attempts = status_and_boot_attempts.boot_attempts;
+        if boot_attempts.is_none() {
+            warn!("Current config status is pending but boot attempts was not set");
+        }
+
+        Ok(Self(State::Active { current_config, boot_attempts }))
     }
 
     /// Determines if we should verify and commit.
-    /// * If we should (e.g. if the system is pending commit), return `Some(slot_to_act_on)`.
+    /// * If we should (e.g. if the system is pending commit), return
+    ///   `Some((slot_to_act_on, boot_attempts))`.
     /// * If we shouldn't (e.g. if the system is already committed), return `None`.
-    pub fn should_verify_and_commit(&self) -> Option<&Configuration> {
+    pub fn should_verify_and_commit(&self) -> Option<(&Configuration, Option<u8>)> {
         match &self.0 {
-            State::Active { current_config } => Some(current_config),
+            State::Active { current_config, boot_attempts } => {
+                Some((current_config, *boot_attempts))
+            }
             State::NoOp => None,
         }
     }
@@ -209,7 +216,7 @@ mod tests {
         );
         let engine = PolicyEngine::build(&paver.spawn_boot_manager_service()).await.unwrap();
 
-        assert_eq!(engine.should_verify_and_commit(), Some(current_config));
+        assert_eq!(engine.should_verify_and_commit(), Some((current_config, Some(1))));
 
         assert_eq!(
             paver.take_events(),
