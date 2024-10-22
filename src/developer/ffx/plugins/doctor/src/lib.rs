@@ -211,17 +211,17 @@ struct DoctorRecorderParameters {
 pub struct ShowToolWrapper {
     env: FhoEnvironment,
     inner: Option<ShowTool>,
-    target_spec: Option<String>,
 }
 
 impl ShowToolWrapper {
     fn set_target_spec(&mut self, target_spec: Option<String>) {
-        self.target_spec = target_spec;
+        self.env.ffx.global.target = target_spec;
     }
 
     async fn allocate(&mut self) -> fho::Result<()> {
-        self.env.ffx.global.target = self.target_spec.clone();
-        self.inner.replace(ShowTool::from_env(self.env.clone(), TargetShow::default()).await?);
+        let context = self.env.ffx.global.load_context(self.env.context.exe_kind())?;
+        let fho_env = FhoEnvironment::new(&context, &self.env.ffx).await?;
+        self.inner.replace(ShowTool::from_env(fho_env, TargetShow::default()).await?);
         Ok(())
     }
 
@@ -240,7 +240,7 @@ impl ShowToolWrapper {
 #[async_trait(?Send)]
 impl fho::TryFromEnv for ShowToolWrapper {
     async fn try_from_env(env: &FhoEnvironment) -> fho::Result<Self> {
-        Ok(Self { env: env.clone(), inner: None, target_spec: None })
+        Ok(Self { env: env.clone(), inner: None })
     }
 }
 
