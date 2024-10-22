@@ -68,7 +68,7 @@ where
 /// ```
 /// [#derive(Clone)]
 /// struct IntegersFile;
-/// impl FileOps for IntegersFile {
+/// impl SequenceFileSource for IntegersFile {
 ///     type Cursor = usize;
 ///     fn next(&self, cursor: usize, sink: &mut DynamicFileBuf) -> Result<Option<usize>, Errno> {
 ///         // The cursor starts at i32::default(), which is 0.
