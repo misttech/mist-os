@@ -57,6 +57,8 @@
                 "cve-2020-11494",
                 "cve-2021-4034",
                 "cve-2022-2590",
+
+                // Requires SEEK_HOLE.
                 "fallocate04",
 
                 // Fails due to: "No supported filesystems"
