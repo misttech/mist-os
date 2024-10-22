@@ -40,7 +40,6 @@ void UsbAdbDevice::Start(StartRequestView request, StartCompleter::Sync& complet
   }
   {
     fbl::AutoLock _(&bulk_out_ep_.mutex_);
-    ZX_ASSERT(pending_replies_.empty());
     ZX_ASSERT(rx_requests_.empty());
   }
 
@@ -56,23 +55,24 @@ void UsbAdbDevice::Start(StartRequestView request, StartCompleter::Sync& complet
                          Stop();
                        });
   // Reset interface and configure endpoints as adb binding is set now.
-  zx_status_t status = function_.SetInterface(nullptr, nullptr);
-  if (status != ZX_OK) {
+  zx_status_t status = function_.SetInterface(this, &usb_function_interface_protocol_ops_);
+  if (status != ZX_OK && status != ZX_ERR_ALREADY_BOUND) {
     zxlogf(ERROR, "SetInterface failed %s", zx_status_get_string(status));
     CompleteTxn(completer, status);
     return;
   }
-  status = function_.SetInterface(this, &usb_function_interface_protocol_ops_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "SetInterface failed %s", zx_status_get_string(status));
-    CompleteTxn(completer, status);
+  auto result = fidl::WireSendEvent(adb_binding_.value())
+                    ->OnStatusChanged(Online() ? fadb::StatusFlags::kOnline : fadb::StatusFlags(0));
+  if (!result.ok()) {
+    zxlogf(ERROR, "Could not call AdbInterface Status.");
+    CompleteTxn(completer, result.error().status());
     return;
-  }
-  status = ConfigureEndpoints(Online());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ConfigureEndpoints failed %s", zx_status_get_string(status));
   }
   CompleteTxn(completer, status);
+
+  // Run receive to pass up messages received while disconnected.
+  fbl::AutoLock _(&bulk_out_ep_.mutex_);
+  ReceiveLocked();
 }
 
 void UsbAdbDevice::Stop(StopCompleter::Sync& completer) {
@@ -81,13 +81,13 @@ void UsbAdbDevice::Stop(StopCompleter::Sync& completer) {
 }
 
 void UsbAdbDevice::Stop() {
-  // Disable endpoints and reset binding to prevent new requests present in our
-  // pipeline from getting queued.
-  zx_status_t status = ConfigureEndpoints(false);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "ConfigureEndpoints failed %s", zx_status_get_string(status));
+  if (adb_binding_.has_value()) {
+    auto result = fidl::WireSendEvent(adb_binding_.value())->OnStatusChanged(fadb::StatusFlags(0));
+    if (!result.ok()) {
+      zxlogf(ERROR, "Could not call AdbInterface Status.");
+    }
+    adb_binding_.reset();
   }
-  adb_binding_.reset();
 
   // Cancel all requests in the pipeline -- the completion handler will free these requests as they
   // come in.
@@ -119,7 +119,7 @@ void UsbAdbDevice::Stop() {
     }
   }
 
-  status = function_.SetInterface(nullptr, nullptr);
+  zx_status_t status = function_.SetInterface(nullptr, nullptr);
   if (status != ZX_OK) {
     zxlogf(ERROR, "SetInterface failed %s", zx_status_get_string(status));
   }
@@ -386,8 +386,7 @@ zx_status_t UsbAdbDevice::UsbFunctionInterfaceSetConfigured(bool configured, usb
     status_ = fadb::StatusFlags(configured);
   }
 
-  // Enable endpoints only when USB is configured and ADB interface is set.
-  return ConfigureEndpoints(configured && adb_binding_.has_value());
+  return ConfigureEndpoints(configured);
 }
 
 zx_status_t UsbAdbDevice::UsbFunctionInterfaceSetInterface(uint8_t interface, uint8_t alt_setting) {
@@ -424,6 +423,10 @@ void UsbAdbDevice::ShutdownComplete() {
 
 void UsbAdbDevice::DdkUnbind(ddk::UnbindTxn txn) {
   SetShutdownCallback([unbind_txn = std::move(txn)]() mutable { unbind_txn.Reply(); });
+  auto status = ConfigureEndpoints(false);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "ConfigureEndpoints failed %s", zx_status_get_string(status));
+  }
   Stop();
 }
 
@@ -433,6 +436,10 @@ void UsbAdbDevice::DdkSuspend(ddk::SuspendTxn txn) {
   SetShutdownCallback([suspend_txn = std::move(txn)]() mutable {
     suspend_txn.Reply(ZX_OK, suspend_txn.requested_state());
   });
+  auto status = ConfigureEndpoints(false);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "ConfigureEndpoints failed %s", zx_status_get_string(status));
+  }
   Stop();
 }
 
