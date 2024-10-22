@@ -81,7 +81,7 @@ impl<D: Borrow<fio::DirectoryProxy>, P: DiscoverableProtocolMarker> ProtocolConn
 
 /// Clone the handle to the service directory in the application's root namespace.
 pub fn clone_namespace_svc() -> Result<fio::DirectoryProxy, Error> {
-    fuchsia_fs::directory::open_in_namespace_deprecated(SVC_DIR, fio::OpenFlags::empty())
+    fuchsia_fs::directory::open_in_namespace(SVC_DIR, fio::Flags::empty())
         .context("error opening svc directory")
 }
 
@@ -99,11 +99,8 @@ pub fn new_protocol_connector<P: DiscoverableProtocolMarker>(
 pub fn new_protocol_connector_at<P: DiscoverableProtocolMarker>(
     service_directory_path: &str,
 ) -> Result<ProtocolConnector<fio::DirectoryProxy, P>, Error> {
-    let dir = fuchsia_fs::directory::open_in_namespace_deprecated(
-        service_directory_path,
-        fio::OpenFlags::empty(),
-    )
-    .context("error opening service directory")?;
+    let dir = fuchsia_fs::directory::open_in_namespace(service_directory_path, fio::Flags::empty())
+        .context("error opening service directory")?;
 
     Ok(ProtocolConnector::new(dir))
 }
@@ -260,10 +257,8 @@ pub fn connect_to_service_instance_at<S: ServiceMarker>(
     instance: &str,
 ) -> Result<S::Proxy, Error> {
     let service_path = format!("{}/{}/{}", path_prefix, S::SERVICE_NAME, instance);
-    let directory_proxy = fuchsia_fs::directory::open_in_namespace_deprecated(
-        &service_path,
-        fio::OpenFlags::empty(),
-    )?;
+    let directory_proxy =
+        fuchsia_fs::directory::open_in_namespace(&service_path, fio::Flags::empty())?;
     Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(directory_proxy))))
 }
 
@@ -281,10 +276,10 @@ pub fn connect_to_instance_in_service_dir<S: ServiceMarker>(
     directory: &fio::DirectoryProxy,
     instance: &str,
 ) -> Result<S::Proxy, Error> {
-    let directory_proxy = fuchsia_fs::directory::open_directory_no_describe_deprecated(
+    let directory_proxy = fuchsia_fs::directory::open_directory_async(
         directory,
         &instance.to_string(),
-        fio::OpenFlags::empty(),
+        fio::Flags::empty(),
     )?;
     Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(directory_proxy))))
 }
@@ -315,11 +310,8 @@ pub fn connect_to_service_instance_at_dir<S: ServiceMarker>(
     instance: &str,
 ) -> Result<S::Proxy, Error> {
     let service_path = format!("{}/{}", S::SERVICE_NAME, instance);
-    let directory_proxy = fuchsia_fs::directory::open_directory_no_describe_deprecated(
-        directory,
-        &service_path,
-        fio::OpenFlags::empty(),
-    )?;
+    let directory_proxy =
+        fuchsia_fs::directory::open_directory_async(directory, &service_path, fio::Flags::empty())?;
     Ok(S::Proxy::from_member_opener(Box::new(ServiceInstanceDirectory(directory_proxy))))
 }
 
@@ -369,7 +361,7 @@ pub fn connect_to_service_instance_at_channel<S: ServiceMarker>(
 /// Opens a FIDL service as a directory, which holds instances of the service.
 pub fn open_service<S: ServiceMarker>() -> Result<fio::DirectoryProxy, Error> {
     let service_path = format!("{}/{}", SVC_DIR, S::SERVICE_NAME);
-    fuchsia_fs::directory::open_in_namespace_deprecated(&service_path, fio::OpenFlags::empty())
+    fuchsia_fs::directory::open_in_namespace(&service_path, fio::Flags::empty())
         .context("namespace open failed")
 }
 
@@ -378,12 +370,8 @@ pub fn open_service<S: ServiceMarker>() -> Result<fio::DirectoryProxy, Error> {
 pub fn open_service_at_dir<S: ServiceMarker>(
     directory: &fio::DirectoryProxy,
 ) -> Result<fio::DirectoryProxy, Error> {
-    fuchsia_fs::directory::open_directory_no_describe_deprecated(
-        directory,
-        S::SERVICE_NAME,
-        fio::OpenFlags::empty(),
-    )
-    .map_err(Into::into)
+    fuchsia_fs::directory::open_directory_async(directory, S::SERVICE_NAME, fio::Flags::empty())
+        .map_err(Into::into)
 }
 
 /// Opens the exposed directory from a child. Only works in CFv2, and only works if this component
