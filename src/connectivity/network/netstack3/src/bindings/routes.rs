@@ -25,7 +25,7 @@ use derivative::Derivative;
 use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
 use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
 use fidl_fuchsia_net_routes_ext::rules::{
-    InstalledRule, RuleAction, RuleIndex, RuleSetPriority, DEFAULT_RULE_SET_PRIORITY,
+    InstalledRule, RuleAction, RuleEvent, RuleIndex, RuleSetPriority, DEFAULT_RULE_SET_PRIORITY,
 };
 use futures::channel::{mpsc, oneshot};
 use futures::{stream, Future, FutureExt as _, StreamExt as _};
@@ -484,11 +484,13 @@ where
                     if let Some(table_id) = removing {
                         rest.close();
                         let removed = rules.handle_table_removed(table_id);
-                        for rule in removed {
-                               rule_update_dispatcher
-                               .notify(watcher::Update::Removed(rule))
-                               .expect("failed to update");
-                        }
+                        Self::install_rules_and_notify_watchers(
+                            &mut ctx,
+                            rules,
+                            tables,
+                            removed.into_iter().map(watcher::Update::Removed),
+                            rule_update_dispatcher,
+                        )
                     }
                     Self::handle_route_change(
                         &mut ctx,
@@ -554,7 +556,9 @@ where
                         } => {
                             let is_removal = matches!(op, RuleOp::RemoveSet { .. });
                             let result = Self::handle_rule_op(
+                                &mut ctx,
                                 rules,
+                                tables,
                                 op,
                                 rule_update_dispatcher
                             );
@@ -652,39 +656,56 @@ where
     }
 
     fn handle_rule_op(
+        ctx: &mut Ctx,
         rule_table: &mut RuleTable<I>,
+        route_tables: &HashMap<TableId<I>, Table<I>>,
         op: RuleOp<I>,
         rules_update_dispatcher: &rules_state::RuleUpdateDispatcher<I>,
     ) -> Result<(), fnet_routes_admin::RuleSetError> {
-        match op {
-            RuleOp::RemoveSet { priority } => {
-                let removed = rule_table.remove_rule_set(priority);
-                for rule in removed {
-                    rules_update_dispatcher
-                        .notify(watcher::Update::Removed(rule))
-                        .expect("failed to notify a removed rule");
+        let updates =
+            match op {
+                RuleOp::RemoveSet { priority } => {
+                    let removed = rule_table.remove_rule_set(priority);
+                    itertools::Either::Left(removed.into_iter().map(watcher::Update::Removed))
                 }
-                Ok(())
-            }
-            RuleOp::Add { priority, index, matcher, action } => {
-                rule_table.add_rule(priority, index, matcher.clone(), action)?;
-                rules_update_dispatcher
-                    .notify(watcher::Update::Added(InstalledRule {
-                        priority,
-                        index,
-                        matcher: matcher.into(),
-                        action,
-                    }))
-                    .expect("failed to notify an added rule");
-                Ok(())
-            }
-            RuleOp::Remove { priority, index } => {
-                let removed = rule_table.remove_rule(priority, index)?;
-                rules_update_dispatcher
-                    .notify(watcher::Update::Removed(removed))
-                    .expect("failed to notify a removed rule");
-                Ok(())
-            }
+                RuleOp::Add { priority, index, matcher, action } => {
+                    rule_table.add_rule(priority, index, matcher.clone(), action)?;
+                    itertools::Either::Right(std::iter::once(watcher::Update::Added(
+                        InstalledRule { priority, index, matcher: matcher.into(), action },
+                    )))
+                }
+                RuleOp::Remove { priority, index } => {
+                    let removed = rule_table.remove_rule(priority, index)?;
+                    itertools::Either::Right(std::iter::once(watcher::Update::Removed(removed)))
+                }
+            };
+        Self::install_rules_and_notify_watchers(
+            ctx,
+            rule_table,
+            route_tables,
+            updates,
+            rules_update_dispatcher,
+        );
+        Ok(())
+    }
+
+    fn install_rules_and_notify_watchers(
+        ctx: &mut Ctx,
+        rule_table: &mut RuleTable<I>,
+        route_tables: &HashMap<TableId<I>, Table<I>>,
+        updates: impl IntoIterator<Item = watcher::Update<RuleEvent<I>>>,
+        rules_update_dispatcher: &rules_state::RuleUpdateDispatcher<I>,
+    ) {
+        let rules = rule_table
+            .iter()
+            .map(|r| {
+                // Rule table should only contain validated rules.
+                to_core_rule(ctx, r, route_tables).expect("the rule referenced an invalid table id")
+            })
+            .collect::<Vec<_>>();
+        ctx.api().routes::<I>().set_rules(rules);
+        for update in updates {
+            rules_update_dispatcher.notify(update).expect("failed to notify an update")
         }
     }
 
@@ -703,6 +724,31 @@ where
             Ok(())
         }
     }
+}
+
+#[derive(Debug, Clone)]
+struct InvalidTableError;
+
+#[netstack3_core::context_ip_bounds(I, BindingsCtx)]
+fn to_core_rule<I: netstack3_core::IpExt>(
+    ctx: &mut Ctx,
+    rule: &rules_admin::Rule<I>,
+    tables: &HashMap<TableId<I>, Table<I>>,
+) -> Result<netstack3_core::routes::Rule<I, DeviceId>, InvalidTableError> {
+    let rules_admin::Rule { matcher, action } = rule;
+    let action = match action {
+        RuleAction::Unreachable => netstack3_core::routes::RuleAction::Unreachable,
+        RuleAction::Lookup(table_id) => {
+            let table_id = TableId::new(*table_id).ok_or(InvalidTableError)?;
+            let core_id = &tables.get(&table_id).ok_or(InvalidTableError)?.core_id;
+            let id = match core_id {
+                CoreId::Main => ctx.api().routes::<I>().main_table_id(),
+                CoreId::User(id) => id.clone(),
+            };
+            netstack3_core::routes::RuleAction::Lookup(id)
+        }
+    };
+    Ok(netstack3_core::routes::Rule { matcher: matcher.clone().into(), action })
 }
 
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]

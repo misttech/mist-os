@@ -18,12 +18,12 @@ use netstack3_base::{
 
 use crate::internal::base::{
     self, IpLayerBindingsContext, IpLayerContext, IpLayerIpExt, IpRouteTablesContext,
-    ResolveRouteError, RoutingTableId,
+    IpStateContext as _, ResolveRouteError, RoutingTableId,
 };
 use crate::internal::device::{
     IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt,
 };
-use crate::internal::routing::rules::Marks;
+use crate::internal::routing::rules::{Marks, Rule};
 use crate::internal::routing::RoutingTable;
 use crate::internal::types::{
     Destination, Entry, EntryAndGeneration, Metric, NextHop, OrderedEntry, ResolvedRoute,
@@ -197,12 +197,7 @@ where
         })
     }
 
-    /// Set the routes in the routing table.
-    ///
-    /// While doing a full `set` of the routing table with each modification is
-    /// suboptimal for performance, it simplifies the API exposed by core for route
-    /// table modifications to allow for evolution of the routing table in the
-    /// future.
+    /// Replaces the entire route table atomically.
     pub fn set_routes(
         &mut self,
         table_id: &RoutingTableId<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>,
@@ -217,6 +212,16 @@ where
         self.core_ctx().with_ip_routing_table_mut(table_id, |_core_ctx, table| {
             table.table = entries;
         });
+    }
+
+    /// Replaces the entire rule table atomically.
+    pub fn set_rules(
+        &mut self,
+        rules: Vec<Rule<I, <C::CoreContext as DeviceIdContext<AnyDevice>>::DeviceId>>,
+    ) {
+        self.core_ctx().with_rules_table_mut(|_core_ctx, rule_table| {
+            rule_table.replace(rules);
+        })
     }
 
     /// Gets all table IDs.
