@@ -67,7 +67,8 @@ Task::Task(pid_t id, fbl::RefPtr<ThreadGroup> thread_group,
       thread_group_(ktl::move(thread_group)),
       files_(files),
       mm_(ktl::move(mm)),
-      fs_(ktl::move(fs)) {
+      fs_(ktl::move(fs)),
+      observer_(util::WeakPtr(this)) {
   *thread_.Write() = ktl::move(thread);
 
   LTRACE_ENTRY_OBJ;
@@ -146,6 +147,24 @@ fit::result<Errno, size_t> Task::write_memory_partial(UserAddress addr,
 
 fit::result<Errno, size_t> Task::zero(UserAddress addr, size_t length) const {
   return (*mm_)->syscall_zero(addr, length);
+}
+
+void Task::ThreadSignalObserver::OnMatch(zx_signals_t signals) {
+  canary_.Assert();
+  LTRACEF("signal: 0x%x\n", signals);
+  auto task = task_.Lock();
+  if (task) {
+    starnix::TaskBuilder builder(task);
+    auto current_task = starnix::CurrentTask::From(ktl::move(builder));
+    current_task.release();
+
+    auto thread_guard = task->thread().Write();
+    *thread_guard = nullptr;
+  }
+}
+void Task::ThreadSignalObserver::OnCancel(zx_signals_t signals) {
+  canary_.Assert();
+  LTRACEF("signal: 0x%x\n", signals);
 }
 
 }  // namespace starnix

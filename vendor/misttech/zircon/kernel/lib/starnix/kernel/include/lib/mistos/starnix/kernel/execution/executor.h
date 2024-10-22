@@ -68,15 +68,14 @@ void execute_task(TaskBuilder task_builder, PreRunFn&& pre_run,
   // Hold a lock on the task's thread slot until we have a chance to initialize it.
   auto task_thread_guard = ref_task->thread().Write();
 
-  auto current_task = CurrentTask::From(ktl::move(task_builder));
-
   auto user_thread =
-      create_thread(current_task->thread_group()->process().dispatcher(), current_task->command());
+      create_thread(ref_task->thread_group()->process().dispatcher(), ref_task->command());
   if (user_thread.is_ok()) {
     *task_thread_guard = ktl::move(user_thread.value().release());
   }
   std::destroy_at(std::addressof(task_thread_guard));
 
+  auto current_task = CurrentTask::From(ktl::move(task_builder));
   auto pre_run_result = pre_run(current_task);
   if (pre_run_result.is_error()) {
     TRACEF("Pre run failed from %d. The task will not be run.",
