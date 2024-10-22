@@ -143,7 +143,7 @@ fi
 
 # Print any detected lints if --quiet wasn't passed
 if [[ "$quiet" = 0 ]]; then
-  "$jq" -sr ".[] | select($filter(.level == \"error\" or .level == \"warning\")) | .rendered" "$output" || cat "$output" >&2
+  "$jq" -sr ".[] | select($filter(.level == \"error\" or .level == \"warning\")) | .rendered" "$output" || cat "$output"
 fi
 
 # Only fail the build with a nonzero exit code if --fail was passed
