@@ -150,7 +150,7 @@ pub mod testutil {
         InstantAndData, WithFakeTimerContext,
     };
     pub use crate::trace::testutil::FakeTracingCtx;
-    pub use addr::{TestAddrs, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6};
+    pub use addr::{TestAddrs, TestDualStackIpExt, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6};
     pub use benchmarks::{Bencher, RealBencher, TestBencher};
     pub use fake_bindings::FakeBindingsCtx;
     pub use fake_core::FakeCoreCtx;
