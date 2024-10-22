@@ -1527,7 +1527,9 @@ void Thread::Current::ProcessPendingSignals(GeneralRegsSource source, void* greg
 
       arch_set_iframe_from_general_regs_mistos(current_thread, reinterpret_cast<iframe_t*>(gregs),
                                                &current_thread->fork_frame_);
-      // PrintFrame(stdout, *reinterpret_cast<iframe_t*>(gregs));
+      if (LOCAL_TRACE) {
+        PrintFrame(stdout, *reinterpret_cast<iframe_t*>(gregs));
+      }
     }
   }
 #endif

@@ -23,7 +23,9 @@
 namespace starnix {
 
 Kernel::Kernel(const ktl::string_view& _cmdline)
-    : kthreads_(KernelThreads::New(util::WeakPtr(this))), cmdline{ktl::move(_cmdline)} {}
+    : kthreads_(KernelThreads::New(util::WeakPtr(this))), cmdline{ktl::move(_cmdline)} {
+  LTRACE_ENTRY_OBJ;
+}
 
 Kernel::~Kernel() { LTRACE_ENTRY_OBJ; }
 

@@ -101,7 +101,7 @@ CurrentTask& CurrentTask::operator=(CurrentTask&& other) {
   return *this;
 }
 
-CurrentTask::~CurrentTask() = default;
+CurrentTask::~CurrentTask() { LTRACE_ENTRY_OBJ; }
 
 Task* CurrentTask::operator->() {
   ASSERT_MSG(task_, "called `operator->()` empty Task");
@@ -670,7 +670,7 @@ void CurrentTask::set_creds(Credentials creds) const {
 }
 
 void CurrentTask::release() {
-  LTRACE;
+  LTRACE_ENTRY_OBJ;
   // if (task_ && task_->IsLastReference()) {
   if (task_) {
     // self.notify_robust_list();
@@ -683,6 +683,7 @@ void CurrentTask::release() {
 
     task_->release(thread_state_);
   }
+  LTRACE_EXIT_OBJ;
 }
 
 fit::result<Errno, ktl::pair<NamespaceNode, FsStr>> CurrentTask::resolve_dir_fd(
