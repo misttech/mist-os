@@ -11,12 +11,16 @@ rustc_binary("lifecycle_example") {
   source_root = "src/lifecycle.rs"
 
   deps = [
+    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
     "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-runtime",
+    "//src/lib/sandbox",
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures-util",
     "//third_party/rust_crates:tracing",
   ]
@@ -41,7 +45,7 @@ rustc_binary("lifecycle_manager") {
   sources = [ "src/manager.rs" ]
 }
 
-fuchsia_package_with_single_component("lifecycle") {
+fuchsia_package_with_single_component("rust") {
   # Since `//examples/components/lifecycle/README.md` includes instructions to
   # use `ffx component run` to launch one of two versions of `lifecycle`, the
   # two versions need unique package names (`lifecycle_rust` in this case).
