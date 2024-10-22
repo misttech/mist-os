@@ -28,8 +28,9 @@ func NewIsolateDir(path string) IsolateDir {
 }
 
 type FFXTool struct {
-	ffxToolPath string
-	isolateDir  IsolateDir
+	ffxToolPath         string
+	isolateDir          IsolateDir
+	supportsPackageBlob *bool
 }
 
 func NewFFXTool(ffxToolPath string, isolateDir IsolateDir) (*FFXTool, error) {
@@ -38,8 +39,9 @@ func NewFFXTool(ffxToolPath string, isolateDir IsolateDir) (*FFXTool, error) {
 	}
 
 	return &FFXTool{
-		ffxToolPath: ffxToolPath,
-		isolateDir:  isolateDir,
+		ffxToolPath:         ffxToolPath,
+		isolateDir:          isolateDir,
+		supportsPackageBlob: nil,
 	}, nil
 }
 
@@ -268,6 +270,29 @@ func (f *FFXTool) RepositoryPublish(ctx context.Context, repoDir string, package
 
 	args = append(args, additionalArgs...)
 	args = append(args, repoDir)
+
+	_, err := f.runFFXCmd(ctx, args...)
+	return err
+}
+
+func (f *FFXTool) SupportsPackageBlob(ctx context.Context) bool {
+	if f.supportsPackageBlob == nil {
+		_, err := f.runFFXCmd(ctx, "package", "blob", "--help")
+		supportsPackageBlob := err == nil
+		f.supportsPackageBlob = &supportsPackageBlob
+	}
+	return *f.supportsPackageBlob
+}
+
+func (f *FFXTool) DecompressBlobs(ctx context.Context, delivery_blobs []string, out_dir string) error {
+	args := []string{
+		"package",
+		"blob",
+		"decompress",
+		"--output", out_dir,
+	}
+
+	args = append(args, delivery_blobs...)
 
 	_, err := f.runFFXCmd(ctx, args...)
 	return err

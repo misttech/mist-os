@@ -7,6 +7,7 @@ package packages
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -216,7 +217,25 @@ func (r *Repository) PrefetchUncompressedBlobs(
 	ctx context.Context,
 	merkles []build.MerkleRoot,
 ) error {
-	return r.blobStore.PrefetchBlobs(ctx, nil, merkles)
+	if r.deliveryBlobType == nil || !r.ffx.SupportsPackageBlob(ctx) {
+		return r.blobStore.PrefetchBlobs(ctx, nil, merkles)
+	}
+
+	if err := r.blobStore.PrefetchBlobs(ctx, r.deliveryBlobType, merkles); err != nil {
+		return err
+	}
+
+	blobs_to_decompress := []string{}
+	for _, merkle := range merkles {
+		path, err := r.blobStore.BlobPath(ctx, r.deliveryBlobType, merkle)
+		if err != nil {
+			return err
+		}
+
+		blobs_to_decompress = append(blobs_to_decompress, path)
+	}
+
+	return r.ffx.DecompressBlobs(ctx, blobs_to_decompress, r.blobStore.Dir())
 }
 
 func (r *Repository) UncompressedBlobPath(ctx context.Context, merkle build.MerkleRoot) (string, error) {
@@ -225,6 +244,13 @@ func (r *Repository) UncompressedBlobPath(ctx context.Context, merkle build.Merk
 
 func (r *Repository) OpenUncompressedBlob(ctx context.Context, merkle build.MerkleRoot) (*os.File, error) {
 	file, err := r.blobStore.OpenBlob(ctx, nil, merkle)
+	if errors.Is(err, os.ErrNotExist) {
+		err = r.PrefetchUncompressedBlobs(ctx, []build.MerkleRoot{merkle})
+		if err != nil {
+			return nil, err
+		}
+		file, err = r.blobStore.OpenBlob(ctx, nil, merkle)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to open uncompressed blob for merkle %q from TUF: %w", merkle, err)
 	}
