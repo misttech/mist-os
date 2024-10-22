@@ -1114,7 +1114,7 @@ impl Broker {
     pub fn remove_element(&mut self, element_id: &ElementID) {
         tracing::debug!("removing element {element_id}");
         // Before removing the element, clear any transiting state and simulate the
-        // downward transition from it's transiting level to it's minimum level. This
+        // downward transition from its transiting level to its minimum level. This
         // ensures that all associated claims are cleared.
         let minimum_level = self.catalog.minimum_level(element_id);
         if let Some(transition_level) = self.in_transition.get(element_id) {
@@ -1129,6 +1129,7 @@ impl Broker {
         self.unregister_all_credentials_for_element(element_id);
         self.current.remove(element_id);
         self.required.remove(element_id);
+        self.lease_counter.remove(element_id);
     }
 
     pub fn get_level_index(
@@ -1858,6 +1859,18 @@ mod tests {
     const ONE: IndexedPowerLevel = IndexedPowerLevel::from_same_level_and_index(1);
     const TWO: IndexedPowerLevel = IndexedPowerLevel::from_same_level_and_index(2);
     const THREE: IndexedPowerLevel = IndexedPowerLevel::from_same_level_and_index(3);
+
+    #[track_caller]
+    fn assert_element_cleaned_up(broker: &Broker, element_id: &ElementID) {
+        assert!(
+            !broker.catalog.topology.element_exists(&element_id),
+            "topology.elements not cleaned up"
+        );
+        assert_eq!(broker.in_transition.get(&element_id), None, "in_transition not cleaned up");
+        assert!(!broker.current.contains_key(&element_id), "current not cleaned up");
+        assert!(!broker.required.contains_key(&element_id), "required not cleaned up");
+        assert_eq!(broker.lease_counter.get(&element_id), None, "lease_counter not cleaned up");
+    }
 
     #[track_caller]
     fn assert_lease_cleaned_up(catalog: &Catalog, lease_id: &LeaseID) {
@@ -3048,6 +3061,13 @@ mod tests {
         assert!(extra_drop.is_err());
 
         assert_lease_cleaned_up(&broker.catalog, &lease.id);
+
+        broker.remove_element(&child);
+        assert_element_cleaned_up(&broker, &child);
+        broker.remove_element(&parent2);
+        assert_element_cleaned_up(&broker, &parent2);
+        broker.remove_element(&parent1);
+        assert_element_cleaned_up(&broker, &parent1);
     }
 
     #[fuchsia::test]
