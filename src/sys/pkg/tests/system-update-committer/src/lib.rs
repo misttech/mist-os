@@ -262,7 +262,8 @@ impl TestEnv {
     }
 }
 
-/// IsCurrentSystemCommitted should hang until when the Paver responds to QueryConfigurationStatus.
+/// IsCurrentSystemCommitted should hang until when the Paver responds to
+/// QueryConfigurationStatusAndBootAttempts.
 #[fasync::run_singlethreaded(test)]
 async fn is_current_system_committed_hangs_until_query_configuration_status() {
     let (throttle_hook, throttler) = mphooks::throttle();
@@ -297,14 +298,15 @@ async fn is_current_system_committed_hangs_until_query_configuration_status() {
     );
 
     // After the second paver event, we're finally unblocked.
-    let () = throttler.emit_next_paver_event(&PaverEvent::QueryConfigurationStatus {
-        configuration: Configuration::A,
-    });
+    let () =
+        throttler.emit_next_paver_event(&PaverEvent::QueryConfigurationStatusAndBootAttempts {
+            configuration: Configuration::A,
+        });
     env.commit_status_provider_proxy().is_current_system_committed().await.unwrap();
 }
 
 /// If the current system is pending commit, the commit status FIDL server should hang
-/// until the verifiers start (e.g. after we call QueryConfigurationStatus). Once the
+/// until the verifiers start (e.g. after we call QueryConfigurationStatusAndBootAttempts). Once the
 /// verifications complete, we should observe the `USER_0` signal.
 #[fasync::run_singlethreaded(test)]
 async fn system_pending_commit() {
@@ -312,9 +314,11 @@ async fn system_pending_commit() {
 
     let env = TestEnv::builder()
         .paver_service_builder(
-            MockPaverServiceBuilder::new()
-                .insert_hook(throttle_hook)
-                .insert_hook(mphooks::config_status(|_| Ok(ConfigurationStatus::Pending))),
+            MockPaverServiceBuilder::new().insert_hook(throttle_hook).insert_hook(
+                mphooks::config_status_and_boot_attempts(|_| {
+                    Ok((ConfigurationStatus::Pending, Some(1)))
+                }),
+            ),
         )
         .build()
         .await;
@@ -322,7 +326,7 @@ async fn system_pending_commit() {
     // Emit the first 2 paver events to unblock the FIDL server.
     let () = throttler.emit_next_paver_events(&[
         PaverEvent::QueryCurrentConfiguration,
-        PaverEvent::QueryConfigurationStatus { configuration: Configuration::A },
+        PaverEvent::QueryConfigurationStatusAndBootAttempts { configuration: Configuration::A },
     ]);
     let event_pair =
         env.commit_status_provider_proxy().is_current_system_committed().await.unwrap();
@@ -354,7 +358,7 @@ async fn system_already_committed() {
     // Emit the first 2 paver events to unblock the FIDL server.
     let () = throttler.emit_next_paver_events(&[
         PaverEvent::QueryCurrentConfiguration,
-        PaverEvent::QueryConfigurationStatus { configuration: Configuration::A },
+        PaverEvent::QueryConfigurationStatusAndBootAttempts { configuration: Configuration::A },
     ]);
 
     // When the commit status FIDL responds, the event pair should immediately observe the signal.
@@ -406,10 +410,11 @@ async fn multiple_commit_status_provider_requests() {
 async fn inspect_health_status_ok() {
     let env = TestEnv::builder()
         // Make sure we run health verifications.
-        .paver_service_builder(
-            MockPaverServiceBuilder::new()
-                .insert_hook(mphooks::config_status(|_| Ok(ConfigurationStatus::Pending))),
-        )
+        .paver_service_builder(MockPaverServiceBuilder::new().insert_hook(
+            mphooks::config_status_and_boot_attempts(|_| {
+                Ok((ConfigurationStatus::Pending, Some(1)))
+            }),
+        ))
         .build()
         .await;
 
@@ -440,10 +445,11 @@ async fn inspect_health_status_ok() {
 async fn inspect_multiple_failures() {
     let env = TestEnv::builder()
         // Make sure we run health verifications.
-        .paver_service_builder(
-            MockPaverServiceBuilder::new()
-                .insert_hook(mphooks::config_status(|_| Ok(ConfigurationStatus::Pending))),
-        )
+        .paver_service_builder(MockPaverServiceBuilder::new().insert_hook(
+            mphooks::config_status_and_boot_attempts(|_| {
+                Ok((ConfigurationStatus::Pending, Some(1)))
+            }),
+        ))
         .blobfs_verifier_service(MockVerifierService::new(|_| {
             Err(fidl_fuchsia_update_verify::VerifyError::Internal)
         }))
@@ -534,10 +540,11 @@ async fn blobfs_verification_failure_causes_reboot() {
     let reboot_sender = Arc::new(Mutex::new(Some(reboot_sender)));
     let env = TestEnv::builder()
         // Make sure we run health verifications.
-        .paver_service_builder(
-            MockPaverServiceBuilder::new()
-                .insert_hook(mphooks::config_status(|_| Ok(ConfigurationStatus::Pending))),
-        )
+        .paver_service_builder(MockPaverServiceBuilder::new().insert_hook(
+            mphooks::config_status_and_boot_attempts(|_| {
+                Ok((ConfigurationStatus::Pending, Some(1)))
+            }),
+        ))
         // Make the blobfs health verifications fail.
         .blobfs_verifier_service(MockVerifierService::new(|_| {
             Err(fidl_fuchsia_update_verify::VerifyError::Internal)
@@ -584,10 +591,11 @@ async fn netstack_verification_failure_causes_reboot() {
     let reboot_sender = Arc::new(Mutex::new(Some(reboot_sender)));
     let env = TestEnv::builder()
         // Make sure we run health verifications.
-        .paver_service_builder(
-            MockPaverServiceBuilder::new()
-                .insert_hook(mphooks::config_status(|_| Ok(ConfigurationStatus::Pending))),
-        )
+        .paver_service_builder(MockPaverServiceBuilder::new().insert_hook(
+            mphooks::config_status_and_boot_attempts(|_| {
+                Ok((ConfigurationStatus::Pending, Some(1)))
+            }),
+        ))
         // Make the netstack health verifications fail.
         .netstack_verifier_service(MockVerifierService::new(|_| {
             Err(fidl_fuchsia_update_verify::VerifyError::Internal)
@@ -634,10 +642,11 @@ async fn verification_failure_does_not_cause_reboot() {
     let reboot_sender = Arc::new(Mutex::new(Some(reboot_sender)));
     let env = TestEnv::builder()
         // Make sure we run health verifications.
-        .paver_service_builder(
-            MockPaverServiceBuilder::new()
-                .insert_hook(mphooks::config_status(|_| Ok(ConfigurationStatus::Pending))),
-        )
+        .paver_service_builder(MockPaverServiceBuilder::new().insert_hook(
+            mphooks::config_status_and_boot_attempts(|_| {
+                Ok((ConfigurationStatus::Pending, Some(1)))
+            }),
+        ))
         // Make the health verifications fail.
         .blobfs_verifier_service(MockVerifierService::new(|_| {
             Err(fidl_fuchsia_update_verify::VerifyError::Internal)

@@ -227,7 +227,9 @@ mod tests {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .current_config(current_config.into())
-                .insert_hook(mphooks::config_status(|_| Ok(paver::ConfigurationStatus::Healthy)))
+                .insert_hook(mphooks::config_status_and_boot_attempts(|_| {
+                    Ok((paver::ConfigurationStatus::Healthy, None))
+                }))
                 .build(),
         );
         let (p_internal, p_external) = EventPair::create();
@@ -250,7 +252,9 @@ mod tests {
             paver.take_events(),
             vec![
                 PaverEvent::QueryCurrentConfiguration,
-                PaverEvent::QueryConfigurationStatus { configuration: current_config.into() }
+                PaverEvent::QueryConfigurationStatusAndBootAttempts {
+                    configuration: current_config.into()
+                }
             ]
         );
         assert_eq!(
@@ -276,7 +280,9 @@ mod tests {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .current_config(current_config.into())
-                .insert_hook(mphooks::config_status(|_| Ok(paver::ConfigurationStatus::Pending)))
+                .insert_hook(mphooks::config_status_and_boot_attempts(|_| {
+                    Ok((paver::ConfigurationStatus::Pending, Some(1)))
+                }))
                 .build(),
         );
         let (p_internal, p_external) = EventPair::create();
@@ -299,7 +305,9 @@ mod tests {
             paver.take_events(),
             vec![
                 PaverEvent::QueryCurrentConfiguration,
-                PaverEvent::QueryConfigurationStatus { configuration: current_config.into() },
+                PaverEvent::QueryConfigurationStatusAndBootAttempts {
+                    configuration: current_config.into()
+                },
                 PaverEvent::SetConfigurationHealthy { configuration: current_config.into() },
                 PaverEvent::SetConfigurationUnbootable {
                     configuration: current_config.to_alternate().into()
@@ -327,7 +335,9 @@ mod tests {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .current_config(current_config.into())
-                .insert_hook(mphooks::config_status(|_| Ok(paver::ConfigurationStatus::Pending)))
+                .insert_hook(mphooks::config_status_and_boot_attempts(|_| {
+                    Ok((paver::ConfigurationStatus::Pending, Some(1)))
+                }))
                 .build(),
         );
         let (p_internal, p_external) = EventPair::create();
@@ -350,7 +360,9 @@ mod tests {
             paver.take_events(),
             vec![
                 PaverEvent::QueryCurrentConfiguration,
-                PaverEvent::QueryConfigurationStatus { configuration: current_config.into() },
+                PaverEvent::QueryConfigurationStatusAndBootAttempts {
+                    configuration: current_config.into()
+                },
                 PaverEvent::SetConfigurationHealthy { configuration: current_config.into() },
                 PaverEvent::SetConfigurationUnbootable {
                     configuration: current_config.to_alternate().into()
@@ -378,7 +390,9 @@ mod tests {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .current_config(current_config.into())
-                .insert_hook(mphooks::config_status(|_| Ok(paver::ConfigurationStatus::Pending)))
+                .insert_hook(mphooks::config_status_and_boot_attempts(|_| {
+                    Ok((paver::ConfigurationStatus::Pending, Some(1)))
+                }))
                 .build(),
         );
         let (p_internal, p_external) = EventPair::create();
@@ -407,7 +421,9 @@ mod tests {
             paver.take_events(),
             vec![
                 PaverEvent::QueryCurrentConfiguration,
-                PaverEvent::QueryConfigurationStatus { configuration: current_config.into() },
+                PaverEvent::QueryConfigurationStatusAndBootAttempts {
+                    configuration: current_config.into()
+                },
             ]
         );
         assert_eq!(

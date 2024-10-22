@@ -23,6 +23,9 @@ pub enum BootManagerError {
         #[source]
         error: fidl::Error,
     },
+
+    #[error("the status field of QueryConfigurationStatusAndBootAttempts was not set")]
+    StatusNotSet,
 }
 
 /// Error condition that may be returned by the PolicyEngine.

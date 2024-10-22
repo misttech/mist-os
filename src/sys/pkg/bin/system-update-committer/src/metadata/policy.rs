@@ -47,10 +47,12 @@ impl PolicyEngine {
         };
 
         let current_config_status = boot_manager
-            .query_configuration_status((&current_config).into())
+            .query_configuration_status_and_boot_attempts((&current_config).into())
             .await
             .into_boot_manager_result("query_configuration_status")
-            .map_err(PolicyError::Build)?;
+            .map_err(PolicyError::Build)?
+            .status
+            .ok_or(PolicyError::Build(BootManagerError::StatusNotSet))?;
 
         Ok(Self { current_config: Some((current_config, current_config_status)) })
     }
@@ -120,7 +122,9 @@ mod tests {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .current_config(paver::Configuration::Recovery)
-                .insert_hook(mphooks::config_status(|_| Ok(paver::ConfigurationStatus::Healthy)))
+                .insert_hook(mphooks::config_status_and_boot_attempts(|_| {
+                    Ok((paver::ConfigurationStatus::Healthy, None))
+                }))
                 .build(),
         );
         let engine = PolicyEngine::build(&paver.spawn_boot_manager_service()).await.unwrap();
@@ -150,7 +154,9 @@ mod tests {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .current_config(current_config.into())
-                .insert_hook(mphooks::config_status(|_| Ok(paver::ConfigurationStatus::Healthy)))
+                .insert_hook(mphooks::config_status_and_boot_attempts(|_| {
+                    Ok((paver::ConfigurationStatus::Healthy, None))
+                }))
                 .build(),
         );
         let engine = PolicyEngine::build(&paver.spawn_boot_manager_service()).await.unwrap();
@@ -161,7 +167,9 @@ mod tests {
             paver.take_events(),
             vec![
                 PaverEvent::QueryCurrentConfiguration,
-                PaverEvent::QueryConfigurationStatus { configuration: current_config.into() },
+                PaverEvent::QueryConfigurationStatusAndBootAttempts {
+                    configuration: current_config.into()
+                },
             ]
         );
     }
@@ -181,7 +189,9 @@ mod tests {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .current_config(current_config.into())
-                .insert_hook(mphooks::config_status(|_| Ok(paver::ConfigurationStatus::Pending)))
+                .insert_hook(mphooks::config_status_and_boot_attempts(|_| {
+                    Ok((paver::ConfigurationStatus::Pending, Some(1)))
+                }))
                 .build(),
         );
         let engine = PolicyEngine::build(&paver.spawn_boot_manager_service()).await.unwrap();
@@ -192,7 +202,9 @@ mod tests {
             paver.take_events(),
             vec![
                 PaverEvent::QueryCurrentConfiguration,
-                PaverEvent::QueryConfigurationStatus { configuration: current_config.into() },
+                PaverEvent::QueryConfigurationStatusAndBootAttempts {
+                    configuration: current_config.into()
+                },
             ]
         );
     }
@@ -212,7 +224,9 @@ mod tests {
         let paver = Arc::new(
             MockPaverServiceBuilder::new()
                 .current_config(current_config.into())
-                .insert_hook(mphooks::config_status(|_| Ok(paver::ConfigurationStatus::Unbootable)))
+                .insert_hook(mphooks::config_status_and_boot_attempts(|_| {
+                    Ok((paver::ConfigurationStatus::Unbootable, None))
+                }))
                 .build(),
         );
         let engine = PolicyEngine::build(&paver.spawn_boot_manager_service()).await.unwrap();
@@ -226,7 +240,9 @@ mod tests {
             paver.take_events(),
             vec![
                 PaverEvent::QueryCurrentConfiguration,
-                PaverEvent::QueryConfigurationStatus { configuration: current_config.into() },
+                PaverEvent::QueryConfigurationStatusAndBootAttempts {
+                    configuration: current_config.into()
+                },
             ]
         );
     }

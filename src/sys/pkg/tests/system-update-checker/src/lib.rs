@@ -765,8 +765,8 @@ async fn test_installation_deferred() {
             .paver(
                 MockPaverServiceBuilder::new()
                     .insert_hook(throttle_hook)
-                    .insert_hook(mphooks::config_status(move |_| {
-                        Ok(*config_status_response.lock().as_ref().unwrap())
+                    .insert_hook(mphooks::config_status_and_boot_attempts(move |_| {
+                        Ok((*config_status_response.lock().as_ref().unwrap(), Some(1)))
                     }))
                     .build(),
             )
@@ -789,7 +789,9 @@ async fn test_installation_deferred() {
     // few enough to guarantee the commit is still pending.
     let () = throttler.emit_next_paver_events(&[
         PaverEvent::QueryCurrentConfiguration,
-        PaverEvent::QueryConfigurationStatus { configuration: fpaver::Configuration::A },
+        PaverEvent::QueryConfigurationStatusAndBootAttempts {
+            configuration: fpaver::Configuration::A,
+        },
     ]);
 
     // The update attempt should start, but the install should be deferred b/c we're pending commit.
