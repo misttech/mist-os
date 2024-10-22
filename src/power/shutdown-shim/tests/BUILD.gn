@@ -48,7 +48,7 @@ fuchsia_component("shutdown_shim_integration_test_component") {
 fuchsia_component("shutdown_shim_component") {
   manifest = "meta/shutdown-shim.cml"
   component_name = "shutdown-shim"
-  deps = [ "..:shutdown-shim" ]
+  deps = [ "..:bin" ]
   testonly = true
 }
 
