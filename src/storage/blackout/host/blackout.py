@@ -41,7 +41,9 @@ class BlackoutTest(test_case_revive.TestCaseRevive):
 
         self.device_label = self.user_params.get("device_label", "default-test")
         self.device_path = self.user_params.get("device_path")
-        self.test_duration = self.user_params.get("test_duration", 0)
+        self.load_generation_duration = self.user_params.get(
+            "load_generation_duration", 0
+        )
         self.destroy_after_test = self.user_params.get(
             "destroy_after_test", False
         )
@@ -80,7 +82,7 @@ class BlackoutTest(test_case_revive.TestCaseRevive):
                 device_label=self.device_label,
                 device_path=self.device_path,
                 seed=1234,
-                duration=self.test_duration,
+                duration=self.load_generation_duration,
             )
         )
         asserts.assert_equal(res.err, None, "Failed to run load generation")

@@ -43,9 +43,9 @@ test. It takes a set of configuration options.
    and it's optional in the Controller protocol too, so a None will be passed to the component if
    it's not provided. Like the label, it's up to the test to decide what should be done with it,
    but normally if it's provided, tests will ignore the label and use this device directly.
- - `test_duration` (optional) - How long the load generation step should block before returning. If
-   the value is zero, it will block until the test logic returns. This doesn't necessarily cancel
-   the load generation or shut down the filesystem.
+ - `load_generation_duration` (optional) - How long the load generation step should block before
+   returning. If the value is zero, it will block until the test logic returns. This doesn't
+   necessarily cancel the load generation or shut down the filesystem.
  - `test_case_revive` - This should always be `true` for blackout tests.
  - `fuchsia_device_operation` - This string describes the reboot strategy. See above for possible
    values and what they mean.
