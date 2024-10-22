@@ -85,28 +85,7 @@ class MetricProcessorsTest(unittest.TestCase):
             os.path.join(runtime_deps_path, model_file_name)
         )
 
-    def test_process_and_save(self) -> None:
-        test_suite = "ts"
-        expected_results = [
-            TCR(label="test", unit=U.countBiggerIsBetter, values=[1234, 5678])
-        ]
-        processor = trace_metrics.ConstantMetricsProcessor(
-            results=expected_results
-        )
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            output_path = (
-                pathlib.Path(tmpdir) / "actual_output.fuchsiaperf.json"
-            )
-            processor.process_and_save_metrics(
-                _EMPTY_MODEL, test_suite, output_path
-            )
-            actual_output = json.loads(output_path.read_text())
-            self.assertSequenceEqual(
-                actual_output, [r.to_json(test_suite) for r in expected_results]
-            )
-
-    def test_constant_processor_metrics(self) -> None:
+    def test_constant_processor(self) -> None:
         expected_results = [
             TCR(label="test", unit=U.countBiggerIsBetter, values=[1234, 5678])
         ]

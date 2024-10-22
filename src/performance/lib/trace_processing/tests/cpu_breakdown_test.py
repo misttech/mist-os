@@ -5,6 +5,7 @@
 """Unit tests for cpu_breakdown.py."""
 
 import unittest
+from typing import cast
 
 from trace_processing import trace_model, trace_time
 from trace_processing.metrics import cpu_breakdown
@@ -259,14 +260,14 @@ class CpuBreakdownTest(unittest.TestCase):
         self.assertEqual(model.processes[1].name, "small_process")
         self.assertEqual(len(model.processes[1].threads), 1)
 
-        processor = cpu_breakdown.CpuBreakdownMetricsProcessor(model)
-        breakdown = processor.process_metrics()
+        processor = cpu_breakdown.CpuBreakdownMetricsProcessor()
+        breakdown = processor.process_freeform_metrics(model)
 
         self.assertEqual(len(breakdown), 5)
 
         # Make it easier to compare breakdown results.
         for b in breakdown:
-            b["percent"] = round(float(b["percent"]), 3)
+            b["percent"] = round(cast(float, b["percent"]), 3)
 
         # Each process: thread has the correct numbers for each CPU.
         # Sorted by descending cpu and descending percent.
@@ -328,7 +329,7 @@ class CpuBreakdownTest(unittest.TestCase):
 
         # Make it easier to compare breakdown results.
         for b in consolidated_breakdown:
-            b["percent"] = round(float(b["percent"]), 3)
+            b["percent"] = round(cast(float, b["percent"]), 3)
 
         # Each process has been consolidated.
         # Sorted by descending cpu and descending percent.

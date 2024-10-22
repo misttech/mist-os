@@ -16,13 +16,19 @@ import enum
 import json
 import logging
 import pathlib
-from typing import Any, Dict, Iterable, List, Sequence, Union
+from typing import Any, Iterable, Mapping, Sequence, TypeAlias
 
 from trace_processing import trace_model
 
-JsonType = Union[
-    None, int, float, str, bool, List["JsonType"], Dict[str, "JsonType"]
-]
+JsonType: TypeAlias = (
+    Mapping[str, "JsonType"]
+    | Sequence["JsonType"]
+    | str
+    | int
+    | float
+    | bool
+    | None
+)
 
 _LOGGER: logging.Logger = logging.getLogger("Performance")
 
@@ -117,8 +123,11 @@ class MetricsProcessor(abc.ABC):
 
     ... gather traces, start and stop the power sampler, create the model ...
 
-    processor.process_and_save(model, output_path="my_test.fuchsiaperf.json")
+    TestCaseResult.write_fuchsiaperf_json(
+        processor.process_metrics(model), test_suite_name, output_path
+    )
     ```
+    NB: `output_path` must end in `fuchsiaperf.json`
     """
 
     @property
@@ -152,28 +161,9 @@ class MetricsProcessor(abc.ABC):
         """
         return None
 
-    def process_and_save_metrics(
-        self,
-        model: trace_model.Model,
-        test_suite: str,
-        output_path: pathlib.Path,
-    ) -> None:
-        """Convenience method for processing a model and saving the output into a fuchsiaperf.json file.
-
-        Args:
-            model: A model to process metrics from.
-            test_suite: A test suite name to embed in the json.
-                E.g. "fuchsia.uiperf.my_metric".
-            output_path: Output file path, must end with ".fuchsiaperf.json".
-        """
-        results = self.process_metrics(model)
-        TestCaseResult.write_fuchsiaperf_json(
-            results, test_suite=test_suite, output_path=output_path
-        )
-
 
 class ConstantMetricsProcessor(MetricsProcessor):
-    """A metrics processor that return a constant list of result."""
+    """A metrics processor that returns constant results."""
 
     # TODO(b/373899149): rename `result` into metrics.
     def __init__(
