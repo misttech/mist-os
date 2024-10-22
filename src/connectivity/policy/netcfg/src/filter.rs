@@ -18,7 +18,7 @@ use {
 };
 
 use anyhow::{bail, Context as _};
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use crate::{exit_with_fidl_error, FilterConfig, InterfaceId, InterfaceType};
 
@@ -449,7 +449,7 @@ impl FilterEnabledState {
                     .await
                     .unwrap_or_else(|err| exit_with_fidl_error(err))
                 {
-                    error!("failed to enable interface {interface_id}: {e:?}");
+                    warn!("failed to enable interface {interface_id}: {e:?}");
                     return Err(e);
                 }
                 let _ = entry.insert(vec![]);
@@ -460,7 +460,7 @@ impl FilterEnabledState {
                     .await
                     .unwrap_or_else(|err| exit_with_fidl_error(err))
                 {
-                    error!("failed to disable interface {interface_id}: {e:?}");
+                    warn!("failed to disable interface {interface_id}: {e:?}");
                     return Err(e);
                 }
                 let _ = entry.remove();

@@ -10,6 +10,8 @@ use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
 use std::num::NonZeroU16;
 use std::pin::pin;
+use std::sync::atomic::{AtomicU16, Ordering};
+use std::time::Duration;
 
 use fidl_fuchsia_net_ext::IntoExt as _;
 use fuchsia_async::{self as fasync, DurationExt as _, TimeoutExt as _};
@@ -2149,12 +2151,11 @@ struct MasqueradeTestResources<'a> {
     router_server_iface: netemul::TestInterface<'a>,
 }
 
-async fn check_source_ip(
-    expected_ip: std::net::IpAddr,
+async fn get_src_ip(
     sockaddr: SocketAddr,
     client_realm: &netemul::TestRealm<'_>,
     server_realm: &netemul::TestRealm<'_>,
-) {
+) -> std::net::IpAddr {
     let client = async {
         let mut stream = fuchsia_async::net::TcpStream::connect_in_realm(client_realm, sockaddr)
             .await
@@ -2172,10 +2173,11 @@ async fn check_source_ip(
     let server = async {
         let (_listener, _stream, remote) =
             listener.accept().await.expect("accept incoming connection");
-        assert_eq!(remote.ip(), expected_ip, "Encountered unexpected ip on connect");
+        remote.ip()
     };
 
-    futures_util::future::join(client, server).await;
+    let ((), source_ip) = futures_util::future::join(client, server).await;
+    source_ip
 }
 
 #[netstack_test]
@@ -2216,15 +2218,83 @@ async fn test_masquerade<N: Netstack, M: Manager>(name: &str, setup: MasqueradeT
     .expect("masq create");
 
     // Before masquerade, the source IP should be the client IP.
-    check_source_ip(client_ip, SocketAddr::from((server_ip, 8080)), client, server).await;
+    assert_eq!(client_ip, get_src_ip(SocketAddr::from((server_ip, 8080)), client, server).await);
 
     // Once masquerade is enabled, the source IP should appear to be router_ip instead.
     assert!(!masq_control.set_enabled(true).await.expect("set enabled fidl").expect("set enabled"));
-    check_source_ip(router_ip, SocketAddr::from((server_ip, 8081)), client, server).await;
+    assert_eq!(router_ip, get_src_ip(SocketAddr::from((server_ip, 8081)), client, server).await);
 
     // Ensure that we can turn off masquerade again.
     assert!(masq_control.set_enabled(false).await.expect("set enabled fidl").expect("set enabled"));
-    check_source_ip(client_ip, SocketAddr::from((server_ip, 8082)), client, server).await;
+    assert_eq!(client_ip, get_src_ip(SocketAddr::from((server_ip, 8082)), client, server).await);
+}
+
+// Verify that the masquerade configuration is associated with the lifetime of
+// the underlying FIDL connection.
+#[netstack_test]
+#[variant(N, Netstack)]
+#[variant(M, Manager)]
+#[test_case(MasqueradeTestSetup::ipv4(); "ipv4")]
+#[test_case(MasqueradeTestSetup::ipv6(); "ipv6")]
+async fn test_masquerade_lifetime<N: Netstack, M: Manager>(name: &str, setup: MasqueradeTestSetup) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+
+    let MasqueradeTestSetup {
+        client1_ip: client_ip,
+        server_ip,
+        router_ip,
+        router_client1_ip: router_client_ip,
+        ..
+    } = setup.clone();
+    let resources = setup.build::<N>(&sandbox, name).await;
+    let MasqueradeTestResources { client1: client, server, router, router_server_iface, .. } =
+        &resources;
+
+    let masq = router
+        .connect_to_protocol::<fnet_masquerade::FactoryMarker>()
+        .expect("connect to fuchsia.net.masquerade/Factory server");
+    let (masq_control, server_end) =
+        fidl::endpoints::create_proxy::<fnet_masquerade::ControlMarker>()
+            .expect("create fuchsia.net.masquerade/Control proxy and server end");
+
+    masq.create(
+        &fnet_masquerade::ControlConfig {
+            src_subnet: router_client_ip,
+            output_interface: router_server_iface.id(),
+        },
+        server_end,
+    )
+    .await
+    .expect("masq create fidl")
+    .expect("masq create");
+
+    // Before masquerade, the source IP should be the client IP.
+    assert_eq!(client_ip, get_src_ip(SocketAddr::from((server_ip, 8080)), client, server).await);
+
+    // Once masquerade is enabled, the source IP should appear to be router_ip instead.
+    assert!(!masq_control.set_enabled(true).await.expect("set enabled fidl").expect("set enabled"));
+    assert_eq!(router_ip, get_src_ip(SocketAddr::from((server_ip, 8081)), client, server).await);
+
+    // Drop the control handle, and verify that the masquerade config is removed.
+    // Note that we don't have a synchronization mechanism to wait for the
+    // config to be removed.  Instead, repeatedly check the source IP with a
+    // timeout until we observe the client IP again.
+    std::mem::drop(masq_control);
+    const MAX_ATTEMPTS: usize = 60;
+    const WAIT: Duration = Duration::from_secs(1);
+    // Ensure each attempt gets a unique port.
+    let port = AtomicU16::new(8082);
+    fuchsia_backoff::retry_or_last_error(std::iter::repeat(WAIT).take(MAX_ATTEMPTS), || async {
+        let port = port.fetch_add(1, Ordering::Relaxed);
+        let actual_ip = get_src_ip(SocketAddr::from((server_ip, port)), &client, &server).await;
+        if actual_ip == client_ip {
+            Ok(())
+        } else {
+            Err(actual_ip)
+        }
+    })
+    .await
+    .expect("IP does not match client")
 }
 
 #[netstack_test]
@@ -2271,13 +2341,13 @@ async fn test_masquerade_multiple_controllers<N: Netstack, M: Manager>(
     .expect("masq create");
 
     // Verify the first masquerade configuration.
-    check_source_ip(client1_ip, SocketAddr::from((server_ip, 8080)), client1, server).await;
+    assert_eq!(client1_ip, get_src_ip(SocketAddr::from((server_ip, 8080)), client1, server).await);
     assert!(!masq_control1
         .set_enabled(true)
         .await
         .expect("set enabled fidl")
         .expect("set enabled"));
-    check_source_ip(router_ip, SocketAddr::from((server_ip, 8081)), client1, server).await;
+    assert_eq!(router_ip, get_src_ip(SocketAddr::from((server_ip, 8081)), client1, server).await);
 
     // Creating a second controller with the same configuration should get
     // rejected.
@@ -2297,7 +2367,7 @@ async fn test_masquerade_multiple_controllers<N: Netstack, M: Manager>(
     assert_eq!(result, Err(fnet_masquerade::Error::AlreadyExists));
 
     // The first masquerade configuration should be unaffected.
-    check_source_ip(router_ip, SocketAddr::from((server_ip, 8082)), client1, server).await;
+    assert_eq!(router_ip, get_src_ip(SocketAddr::from((server_ip, 8082)), client1, server).await);
 
     // Create a second controller with different configuration.
     let (masq_control2, server_end2) =
@@ -2315,13 +2385,13 @@ async fn test_masquerade_multiple_controllers<N: Netstack, M: Manager>(
     .expect("masq create");
 
     // Verify the second masquerade configuration.
-    check_source_ip(client2_ip, SocketAddr::from((server_ip, 8083)), client2, server).await;
+    assert_eq!(client2_ip, get_src_ip(SocketAddr::from((server_ip, 8083)), client2, server).await);
     assert!(!masq_control2
         .set_enabled(true)
         .await
         .expect("set enabled fidl")
         .expect("set enabled"));
-    check_source_ip(router_ip, SocketAddr::from((server_ip, 8084)), client2, server).await;
+    assert_eq!(router_ip, get_src_ip(SocketAddr::from((server_ip, 8084)), client2, server).await);
 
     // Disable the first masquerade configuration.
     assert!(masq_control1
@@ -2329,10 +2399,10 @@ async fn test_masquerade_multiple_controllers<N: Netstack, M: Manager>(
         .await
         .expect("set enabled fidl")
         .expect("set enabled"));
-    check_source_ip(client1_ip, SocketAddr::from((server_ip, 8085)), client1, server).await;
+    assert_eq!(client1_ip, get_src_ip(SocketAddr::from((server_ip, 8085)), client1, server).await);
 
     // Verify the second masquerade configuration is unaffected.
-    check_source_ip(router_ip, SocketAddr::from((server_ip, 8086)), client2, server).await;
+    assert_eq!(router_ip, get_src_ip(SocketAddr::from((server_ip, 8086)), client2, server).await);
 }
 
 #[fuchsia::test]

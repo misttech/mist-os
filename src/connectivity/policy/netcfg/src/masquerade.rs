@@ -29,6 +29,7 @@ pub(super) enum Event {
     FactoryRequestStream(#[derivative(Debug = "ignore")] fnet_masquerade::FactoryRequestStream),
     FactoryRequest(fnet_masquerade::FactoryRequest),
     ControlRequest(ValidatedConfig, fnet_masquerade::ControlRequest),
+    Disconnect(ValidatedConfig),
 }
 
 pub(super) type EventStream = LocalBoxStream<'static, Result<Event, fidl::Error>>;
@@ -57,11 +58,11 @@ impl TryFrom<fnet_masquerade::ControlConfig> for ValidatedConfig {
 #[derive(Debug, Clone)]
 struct MasqueradeState {
     active: bool,
-    control: Option<fnet_masquerade::ControlControlHandle>,
+    control: fnet_masquerade::ControlControlHandle,
 }
 
 impl MasqueradeState {
-    fn new(control: Option<fnet_masquerade::ControlControlHandle>) -> Self {
+    fn new(control: fnet_masquerade::ControlControlHandle) -> Self {
         Self { active: false, control }
     }
 }
@@ -97,7 +98,7 @@ async fn update_interface<Filter: fnet_filter_deprecated::FilterProxyInterface>(
     {
         match e {
             fnet_filter_deprecated::EnableDisableInterfaceError::NotFound => {
-                error!("specified input_interface not found: {interface}");
+                warn!("specified input_interface not found: {interface}");
                 return Err(Error::NotFound);
             }
         }
@@ -212,8 +213,8 @@ impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
     fn create_control(
         &mut self,
         config: ValidatedConfig,
-        control: Option<fnet_masquerade::ControlControlHandle>,
-    ) -> Result<(), (Error, Option<fnet_masquerade::ControlControlHandle>)> {
+        control: fnet_masquerade::ControlControlHandle,
+    ) -> Result<(), (Error, fnet_masquerade::ControlControlHandle)> {
         if config.src_subnet == UNSPECIFIED_SUBNET {
             return Err((Error::Unsupported, control));
         }
@@ -266,7 +267,7 @@ impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
                         return;
                     }
                 };
-                match self.create_control(config, Some(control)) {
+                match self.create_control(config, control) {
                     Ok(()) => {
                         if let Err(e) = responder.send(Ok(())) {
                             error!("failed to notify control of successful creation: {e:?}");
@@ -276,6 +277,10 @@ impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
                                 .try_filter_map(move |r| {
                                     future::ok(Some(Event::ControlRequest(config, r)))
                                 })
+                                // Note: chaining a disconnect event onto the back of
+                                // the stream allows us to cleanup `active_controllers`
+                                // when the client hangs up.
+                                .chain(futures::stream::once(future::ok(Event::Disconnect(config))))
                                 .boxed(),
                         );
                     }
@@ -297,6 +302,31 @@ impl<Filter: fnet_filter_deprecated::FilterProxyInterface> Masquerade<Filter> {
                     .expect("no active_controller for the given interface");
                 state.respond_and_maybe_shutdown(response, |r| responder.send(r));
             }
+            Event::Disconnect(config) => {
+                match self.set_enabled(config, false, filter_enabled_state, interface_states).await
+                {
+                    Ok(_prev_enabled) => {}
+                    // Note: `NotFound` errors here aren't problematic. They may
+                    // happen when interface removal races with masquerade
+                    // controller disconnect.
+                    Err(Error::NotFound) => {}
+                    Err(Error::RetryExceeded) => error!(
+                        "Failed to removed masquerade configuration for disconnected client \
+                            (RetryExceeded): {config:?}"
+                    ),
+                    Err(Error::AlreadyExists)
+                    | Err(Error::BadRule)
+                    | Err(Error::InvalidArguments)
+                    | Err(Error::Unsupported) => {
+                        panic!("removing existing configuration cannot fail")
+                    }
+                    Err(Error::__SourceBreaking { unknown_ordinal: _ }) => {}
+                }
+                match self.active_controllers.remove(&config) {
+                    None => panic!("controller was unexpectedly missing on disconnect"),
+                    Some(_masquerade_state) => {}
+                }
+            }
         }
     }
 }
@@ -308,20 +338,6 @@ trait RespondAndMaybeShutdown {
         sender: Sender,
     ) where
         Sender: FnOnce(Result<T, fnet_masquerade::Error>) -> Result<(), fidl::Error>;
-}
-
-impl RespondAndMaybeShutdown for Option<fnet_masquerade::ControlControlHandle> {
-    fn respond_and_maybe_shutdown<T: Clone, Sender>(
-        &self,
-        response: Result<T, fnet_masquerade::Error>,
-        sender: Sender,
-    ) where
-        Sender: FnOnce(Result<T, fnet_masquerade::Error>) -> Result<(), fidl::Error>,
-    {
-        if let Some(h) = self {
-            h.respond_and_maybe_shutdown(response, sender);
-        }
-    }
 }
 
 fn to_epitaph(e: Error) -> fidl::Status {
@@ -519,7 +535,11 @@ pub mod test {
         let interface_states = HashMap::new();
         let state = filter.state.clone();
         let mut masq = Masquerade::new(filter);
-        assert_matches!(masq.create_control(DEFAULT_CONFIG, None), Ok(()));
+        let (_client, server) =
+            fidl::endpoints::create_endpoints::<fidl_fuchsia_net_masquerade::ControlMarker>();
+        let (_request_stream, control) =
+            server.into_stream_and_control_handle().expect("failed to extract control handle");
+        assert_matches!(masq.create_control(DEFAULT_CONFIG, control), Ok(()));
         assert_matches!(
             masq.set_enabled(DEFAULT_CONFIG, true, &mut filter_enabled_state, &interface_states)
                 .await,
@@ -589,9 +609,13 @@ pub mod test {
         if let Some(generations) = fail_generations {
             filter.state.lock().expect("lock poison").fail_generations = generations;
         }
+        let (_client, server) =
+            fidl::endpoints::create_endpoints::<fidl_fuchsia_net_masquerade::ControlMarker>();
+        let (_request_stream, control) =
+            server.into_stream_and_control_handle().expect("failed to extract control handle");
         let mut masq = Masquerade::new(filter);
         pretty_assertions::assert_eq!(
-            masq.create_control(config.clone(), None).map_err(|(e, _control)| e),
+            masq.create_control(config.clone(), control).map_err(|(e, _control)| e),
             create_control_response
         );
         pretty_assertions::assert_eq!(
