@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/rust/rustc_binary.gni")
 
 group("tests") {
   testonly = true
@@ -60,6 +59,8 @@ rustc_library("inspect_validator") {
     "//third_party/rust_crates:num-derive",
     "//third_party/rust_crates:tracing",
   ]
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 # Unit tests for validator_bin (not the validation tests themselves)
@@ -79,6 +80,8 @@ rustc_test("validator_bin") {
     ":inspect_validator",
     "//src/lib/fuchsia",
   ]
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 # The parent component of #validator_component and #puppet. Provides the necessary topology.

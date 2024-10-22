@@ -30,4 +30,6 @@ rustc_library("iquery_test_support") {
     "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:futures",
   ]
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }

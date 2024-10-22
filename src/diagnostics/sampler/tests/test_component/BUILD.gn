@@ -22,6 +22,7 @@ rustc_binary("bin") {
   ]
 
   sources = [ "src/main.rs" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("single_counter_test_component") {

@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/config.gni")
-import("//build/rust/rustc_binary.gni")
 
 fuchsia_component_manifest("manifest") {
   manifest = "meta/target.cml"

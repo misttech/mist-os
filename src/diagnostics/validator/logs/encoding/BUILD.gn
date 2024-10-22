@@ -22,6 +22,7 @@ rustc_binary("bin") {
     "//third_party/rust_crates:tracing",
   ]
   sources = [ "src/main.rs" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_package("encoding-validator-tests") {
@@ -53,6 +54,7 @@ rustc_test("test_bin") {
     "//src/lib/fuchsia-component",
     "//third_party/rust_crates:tracing",
   ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_test_component("component") {

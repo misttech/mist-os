@@ -23,6 +23,8 @@ rustc_binary("snapshot-filter-bin") {
   test_deps = [ "//src/lib/fuchsia" ]
 
   sources = [ "src/main.rs" ]
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("snapshot-filter-component") {

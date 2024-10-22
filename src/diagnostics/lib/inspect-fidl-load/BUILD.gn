@@ -35,6 +35,8 @@ rustc_library("inspect-fidl-load") {
   ]
 
   sources = [ "src/lib.rs" ]
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_package("inspect-fidl-load-test") {

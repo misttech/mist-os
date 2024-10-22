@@ -21,6 +21,8 @@ rustc_binary("reader-bin") {
   ]
 
   sources = [ "src/main.rs" ]
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("reader-component") {
