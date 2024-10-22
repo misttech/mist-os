@@ -24,6 +24,13 @@ pub struct ProductConfig {
     #[serde(default)]
     pub base_drivers: Vec<DriverDetails>,
 
+    /// Product-specific session information.
+    ///
+    /// Default to None which creates a "paused" config that launches nothing to start.
+    /// Only one of `session.url` or `session_url` below should be defined.
+    #[serde(default)]
+    pub session: Option<ProductSessionConfig>,
+
     /// Start URL to pass to `session_manager`.
     ///
     /// Default to the empty string which creates a "paused" config that launches nothing to start.
@@ -214,6 +221,52 @@ pub struct TrustedApp {
     pub component_url: String,
     /// The GUID that identifies this trusted app for clients.
     pub guid: String,
+}
+
+/// Product configuration options for the session:
+///
+/// ```json5
+///   session: {
+///     url: "fuchsia-pkg://fuchsia.com/my_session#meta/my_session.cm",
+///     initial_element: {
+///         collection: "elements",
+///         url: "fuchsia-pkg://fuchsia.com/my_component#meta/my_component.cm"
+///         view_id_annotation: "my_component"
+///     }
+///   }
+/// ```
+///
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ProductSessionConfig {
+    pub url: String,
+
+    /// Specifies initial element properties for the window manager.
+    #[serde(default)]
+    pub initial_element: Option<InitialElement>,
+}
+
+/// Platform configuration options for the window manager.
+#[derive(Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct InitialElement {
+    /// Specifies the collection in which the window manager should launch the
+    /// initial element, if one is given by `url`. Defaults to "elements".
+    #[serde(default = "collection_default")]
+    pub collection: String,
+
+    /// Specifies the Fuchsia package URL of the element the window manager
+    /// should launch on startup, if one is given.
+    pub url: String,
+
+    /// Specifies the annotation value by which the window manager can identify
+    /// a view presented by the element it launched on startup, if one is given
+    /// by `url`.
+    pub view_id_annotation: String,
+}
+
+fn collection_default() -> String {
+    String::from("elements")
 }
 
 #[cfg(test)]
