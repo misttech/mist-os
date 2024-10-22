@@ -307,8 +307,6 @@ enum StrictCheckErrorEnum {
     StrictAndIsolateMutuallyExclusive(PathBuf),
     #[error("ffx strict requires that the Log Destination be explicitly specified")]
     MustHaveLogDestination,
-    #[error("When running in strict mode, Log Destination must be a file. \"{}\" is not a file", .0)]
-    LogDestinationMustBeFile(LogDestination),
 }
 
 fn format_strict_check_error_enums(errors: &Vec<StrictCheckErrorEnum>) -> String {
@@ -343,14 +341,8 @@ pub fn check_strict_constraints(ffx: &Ffx) -> Result<()> {
         errors.push(StrictCheckErrorEnum::MustHaveMachineSpecified);
     }
 
-    match &ffx.log_destination {
-        Some(LogDestination::File(_)) => {}
-        None => {
-            errors.push(StrictCheckErrorEnum::MustHaveLogDestination);
-        }
-        Some(other) => {
-            errors.push(StrictCheckErrorEnum::LogDestinationMustBeFile(other.clone()));
-        }
+    if ffx.log_destination.is_none() {
+        errors.push(StrictCheckErrorEnum::MustHaveLogDestination);
     }
 
     match &ffx.target {
@@ -700,42 +692,6 @@ mod test {
                 name: "Strict and Isolate Mutually Exclusive".into(),
                 expected_errors: vec![StrictCheckErrorEnum::StrictAndIsolateMutuallyExclusive(
                     PathBuf::from("/tmp/foo"),
-                )],
-            },
-            TestCase {
-                inputs: vec![
-                    "ffx",
-                    "--strict",
-                    "--log-output",
-                    "-",
-                    "--machine",
-                    "json",
-                    "--target",
-                    "193.168.1.1:8081",
-                    "target",
-                    "echo",
-                ],
-                name: "Strict disallows stdout log destination".into(),
-                expected_errors: vec![StrictCheckErrorEnum::LogDestinationMustBeFile(
-                    LogDestination::from_str("-").expect("parse log destination"),
-                )],
-            },
-            TestCase {
-                inputs: vec![
-                    "ffx",
-                    "--strict",
-                    "--log-output",
-                    "stderr",
-                    "--machine",
-                    "json",
-                    "--target",
-                    "193.168.1.1:8081",
-                    "target",
-                    "echo",
-                ],
-                name: "Strict disallows stdout log destination".into(),
-                expected_errors: vec![StrictCheckErrorEnum::LogDestinationMustBeFile(
-                    LogDestination::from_str("stderr").expect("parse log destination"),
                 )],
             },
         ];
