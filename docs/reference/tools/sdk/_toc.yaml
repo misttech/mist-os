@@ -34,8 +34,6 @@ toc:
   section:
   - title: "bootserver"
     path: /reference/tools/sdk/bootserver.md
-  - title: "fserve"
-    path: /reference/tools/sdk/fserve.md
   - title: "funnel"
     path: /reference/tools/sdk/funnel.md
   - title: "minfs"
@@ -46,7 +44,5 @@ toc:
   section:
   - title: "blobfs-compression"
     path: /reference/tools/sdk/blobfs-compression.md
-  - title: "fpublish"
-    path: /reference/tools/sdk/fpublish.md
   - title: "pm"
     path: /reference/tools/sdk/pm.md

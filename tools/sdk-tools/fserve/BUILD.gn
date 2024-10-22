@@ -43,9 +43,3 @@ install_host_tools("fserve-host") {
   ]
   outputs = [ "fserve" ]
 }
-
-sdk_host_tool("fserve_sdk") {
-  category = "partner"
-  output_name = "fserve"
-  deps = [ ":fserve" ]
-}

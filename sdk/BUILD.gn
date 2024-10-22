@@ -627,8 +627,6 @@ if (is_host) {
       "//tools/fuchsia-sdk-run:fuchsia-sdk-run_sdk",
       "//tools/funnel:funnel_sdk",
       "//tools/net/device-finder:device-finder_sdk",
-      "//tools/sdk-tools/fpublish:fpublish_sdk",
-      "//tools/sdk-tools/fserve:fserve_sdk",
       "//tools/sdk-tools/fssh:fssh_sdk",
       "//tools/symbolizer:sdk",
       "//zircon/tools/merkleroot:merkleroot_sdk",

@@ -27,8 +27,6 @@ WANT_NAMES = [
     "clidoc/fidlgen_cpp.md",
     "clidoc/fidlgen_hlcpp.md",
     "clidoc/fidlgen_rust.md",
-    "clidoc/fpublish.md",
-    "clidoc/fserve.md",
     "clidoc/fssh.md",
     "clidoc/funnel.md",
     "clidoc/minfs.md",

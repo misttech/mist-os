@@ -30,9 +30,3 @@ install_host_tools("fpublish-host") {
   ]
   outputs = [ "fpublish" ]
 }
-
-sdk_host_tool("fpublish_sdk") {
-  category = "partner"
-  output_name = "fpublish"
-  deps = [ ":fpublish" ]
-}
