@@ -1100,8 +1100,7 @@ zx_status_t VnodeF2fs::TruncateInodeBlocks(pgoff_t from) {
 
 zx_status_t VnodeF2fs::RemoveInodePage() {
   LockedPage ipage;
-  nid_t ino = Ino();
-  if (zx_status_t err = fs()->GetNodeManager().GetNodePage(ino, &ipage); err != ZX_OK) {
+  if (zx_status_t err = fs()->GetNodeManager().GetNodePage(Ino(), &ipage); err != ZX_OK) {
     return err;
   }
 
@@ -1115,6 +1114,48 @@ zx_status_t VnodeF2fs::RemoveInodePage() {
   }
   ZX_DEBUG_ASSERT(!GetBlocks());
   TruncateNode(ipage);
+  return ZX_OK;
+}
+
+zx_status_t VnodeF2fs::InitInodeMetadata() {
+  std::lock_guard lock(mutex_);
+  return InitInodeMetadataUnsafe();
+}
+
+zx_status_t VnodeF2fs::InitInodeMetadataUnsafe() {
+  LockedPage ipage;
+  if (TestFlag(InodeInfoFlag::kNewInode)) {
+    zx::result page_or = NewInodePage();
+    if (page_or.is_error()) {
+      return page_or.error_value();
+    }
+    ipage = *std::move(page_or);
+#if 0  // porting needed
+    // err = f2fs_init_acl(inode, dir);
+    // if (err) {
+    //   remove_inode_page(inode);
+    //   return err;
+    // }
+#endif
+  } else {
+    if (zx_status_t err = fs()->GetNodeManager().GetNodePage(Ino(), &ipage); err != ZX_OK) {
+      return err;
+    }
+    ipage.WaitOnWriteback();
+  }
+  // copy name info. to this inode page
+  Inode &inode = ipage->GetAddress<Node>()->i;
+  std::string_view name = std::string_view(name_);
+  ZX_DEBUG_ASSERT(IsValidNameLength(name));
+  uint32_t size = safemath::checked_cast<uint32_t>(name.size());
+  inode.i_namelen = CpuToLe(size);
+  name.copy(reinterpret_cast<char *>(&inode.i_name[kCurrentBitPos]), size);
+  ipage.SetDirty();
+
+  if (TestFlag(InodeInfoFlag::kIncLink)) {
+    IncNlink();
+    SetDirty();
+  }
   return ZX_OK;
 }
 

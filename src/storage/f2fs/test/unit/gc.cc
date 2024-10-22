@@ -20,7 +20,10 @@ constexpr uint64_t kDefaultBlockCount = 143360;
 class GcTest : public F2fsFakeDevTestFixture {
  public:
   GcTest(TestOptions options = TestOptions{.block_count = kDefaultBlockCount})
-      : F2fsFakeDevTestFixture(std::move(options)) {}
+      : F2fsFakeDevTestFixture(std::move(options)) {
+    // GcTest should run with MountOption::kForceLfs set.
+    mount_options_.SetValue(MountOption::kForceLfs, true);
+  }
 
  protected:
   std::vector<std::string> MakeGcTriggerCondition(uint32_t invalidate_ratio = 25,
@@ -183,8 +186,8 @@ TEST_F(GcTest, PageColdData) {
   fs_->GetSegmentManager().DisableFgGc();
 
   // Get old block address.
-  auto old_blk_addr_or = file->FindDataBlkAddr(0);
-  ASSERT_EQ(old_blk_addr_or.is_ok(), true);
+  zx::result old_addrs_or = file->GetDataBlockAddresses(0, 1, true);
+  ASSERT_TRUE(old_addrs_or.is_ok());
 
   {
     fs::SharedLock lock(f2fs::GetGlobalLock());
@@ -194,9 +197,9 @@ TEST_F(GcTest, PageColdData) {
   }
   // If kPageColdData flag is not set, allocate its block as SSR or LFS.
   ASSERT_NE(file->Writeback(true, true), 0UL);
-  auto new_blk_addr_or = file->FindDataBlkAddr(0);
-  ASSERT_EQ(old_blk_addr_or.is_error(), false);
-  ASSERT_NE(new_blk_addr_or.value(), old_blk_addr_or.value());
+  zx::result new_addrs_or = file->GetDataBlockAddresses(0, 1, true);
+  ASSERT_TRUE(new_addrs_or.is_ok());
+  ASSERT_NE(new_addrs_or->front(), old_addrs_or->front());
 
   {
     fs::SharedLock lock(f2fs::GetGlobalLock());
@@ -210,10 +213,10 @@ TEST_F(GcTest, PageColdData) {
   auto expected_addr = fs_->GetSegmentManager().NextFreeBlkAddr(CursegType::kCursegColdData);
   ASSERT_EQ(cold_curseg->alloc_type, static_cast<uint8_t>(AllocMode::kLFS));
   ASSERT_NE(file->Writeback(true, true), 0UL);
-  new_blk_addr_or = file->FindDataBlkAddr(0);
-  ASSERT_EQ(old_blk_addr_or.is_error(), false);
-  ASSERT_NE(new_blk_addr_or.value(), old_blk_addr_or.value());
-  ASSERT_EQ(new_blk_addr_or.value(), expected_addr);
+  new_addrs_or = file->GetDataBlockAddresses(0, 1, true);
+  ASSERT_TRUE(old_addrs_or.is_ok());
+  ASSERT_NE(new_addrs_or->front(), old_addrs_or->front());
+  ASSERT_EQ(new_addrs_or->front(), expected_addr);
   {
     LockedPage data_page;
     ASSERT_EQ(file->GrabLockedPage(0, &data_page), ZX_OK);
@@ -240,11 +243,11 @@ TEST_F(GcTest, OrphanFileGc) {
   fs_->GetSegmentManager().AllocateNewSegments();
   fs_->SyncFs();
 
-  auto block_or = file->FindDataBlkAddr(0);
-  ASSERT_TRUE(block_or.is_ok());
+  zx::result addrs_or = file->GetDataBlockAddresses(0, 1, true);
+  ASSERT_TRUE(addrs_or.is_ok());
 
   // gc target segno
-  auto target_segno = fs_->GetSegmentManager().GetSegmentNumber(block_or.value());
+  auto target_segno = fs_->GetSegmentManager().GetSegmentNumber(addrs_or->front());
 
   // Check victim seg is dirty
   ASSERT_TRUE(dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirty)].GetOne(target_segno));
@@ -292,11 +295,11 @@ TEST_F(GcTest, ReadVmoDuringGc) {
   fs_->GetSegmentManager().AllocateNewSegments();
   fs_->SyncFs();
 
-  auto block_or = file->FindDataBlkAddr(0);
-  ASSERT_TRUE(block_or.is_ok());
+  zx::result addrs_or = file->GetDataBlockAddresses(0, 1, true);
+  ASSERT_TRUE(addrs_or.is_ok());
 
   // gc target segno
-  auto target_segno = fs_->GetSegmentManager().GetSegmentNumber(block_or.value());
+  auto target_segno = fs_->GetSegmentManager().GetSegmentNumber(addrs_or->front());
 
   // Check victim seg is dirty
   ASSERT_TRUE(dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirty)].GetOne(target_segno));

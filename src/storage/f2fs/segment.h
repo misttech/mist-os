@@ -338,7 +338,7 @@ class SegmentManager {
       __TA_REQUIRES_SHARED(sentry_lock_);
 
   size_t GetCostBenefitRatio(uint32_t segno) const __TA_REQUIRES_SHARED(sentry_lock_);
-  zx_status_t DoGarbageCollect(uint32_t segno, GcType gc_type);
+  zx_status_t DoGarbageCollect(uint32_t segno, GcType gc_type) __TA_REQUIRES(f2fs::GetGlobalLock());
 
   // for tests and fsck
   void DisableFgGc() { disable_gc_for_test_ = true; }
@@ -379,11 +379,13 @@ class SegmentManager {
   friend class F2fsFakeDevTestFixture;
   friend class GcTester;
 
-  zx_status_t GcNodeSegment(const SummaryBlock &sum_blk, uint32_t segno, GcType gc_type);
+  zx_status_t GcNodeSegment(const SummaryBlock &sum_blk, uint32_t segno, GcType gc_type)
+      __TA_REQUIRES(f2fs::GetGlobalLock());
   // CheckDnode() returns ino of target block and start block index of the target block's dnode
   // block. It also checks the validity of summary.
   zx::result<std::pair<nid_t, block_t>> CheckDnode(const Summary &sum, block_t blkaddr);
-  zx_status_t GcDataSegment(const SummaryBlock &sum_blk, unsigned int segno, GcType gc_type);
+  zx_status_t GcDataSegment(const SummaryBlock &sum_blk, unsigned int segno, GcType gc_type)
+      __TA_REQUIRES(f2fs::GetGlobalLock());
 
   uint32_t FindNextInuse(uint32_t max, uint32_t start) __TA_EXCLUDES(segmap_lock_);
   void SetFree(uint32_t segno) __TA_EXCLUDES(segmap_lock_);

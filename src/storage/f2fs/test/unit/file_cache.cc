@@ -272,9 +272,7 @@ TEST_F(FileCacheTest, GetLockedPages) {
   FileTester::AppendToFile(&file, buf, Page::Size() * kTestNum);
 
   std::vector<LockedPage> locked_pages;
-  std::vector<pgoff_t> pg_offsets(kTestEndNum);
-  std::iota(pg_offsets.begin(), pg_offsets.end(), 0);
-  zx::result pages_or = file.GrabLockedPages(pg_offsets);
+  zx::result pages_or = file.GrabLockedPages(0, kTestEndNum);
   ASSERT_TRUE(pages_or.is_ok());
   for (size_t i = 0; i < kTestNum; ++i) {
     ASSERT_EQ(pages_or.value()[i]->IsDirty(), true);
@@ -287,7 +285,7 @@ TEST_F(FileCacheTest, GetLockedPages) {
   auto task = [&]() {
     int i = 1000;
     while (--i) {
-      auto pages_or = file.GrabLockedPages(pg_offsets);
+      auto pages_or = file.GrabLockedPages(0, kTestEndNum);
       ASSERT_TRUE(pages_or.is_ok());
       for (size_t i = 0; i < kTestNum; ++i) {
         ASSERT_EQ(pages_or.value()[i]->IsDirty(), true);
@@ -384,16 +382,16 @@ TEST_F(FileCacheTest, Truncate) TA_NO_THREAD_SAFETY_ANALYSIS {
   // Check if each page has correct flags.
   for (size_t i = 0; i < nblocks; ++i) {
     LockedPage page = GetLockedPage(i);
-    auto data_blkaddr = file.FindDataBlkAddr(i);
+    zx::result data_blkaddr = file.GetDataBlockAddresses(i, 1, true);
     ASSERT_TRUE(data_blkaddr.is_ok());
     if (i >= start / kPageSize) {
       ASSERT_EQ(page->IsDirty(), false);
       ASSERT_EQ(page->IsUptodate(), false);
-      ASSERT_EQ(data_blkaddr.value(), kNullAddr);
+      ASSERT_EQ(data_blkaddr->front(), kNullAddr);
     } else {
       ASSERT_EQ(page->IsDirty(), true);
       ASSERT_EQ(page->IsUptodate(), true);
-      ASSERT_EQ(data_blkaddr.value(), kNewAddr);
+      ASSERT_EQ(data_blkaddr->front(), kNewAddr);
     }
   }
 
@@ -403,12 +401,12 @@ TEST_F(FileCacheTest, Truncate) TA_NO_THREAD_SAFETY_ANALYSIS {
 
   {
     LockedPage page = GetLockedPage(start);
-    auto data_blkaddr = file.FindDataBlkAddr(start);
+    zx::result data_blkaddr = file.GetDataBlockAddresses(start, 1, true);
     ASSERT_TRUE(data_blkaddr.is_ok());
     // |page| for the hole should be invalidated.
     ASSERT_EQ(page->IsDirty(), false);
     ASSERT_EQ(page->IsUptodate(), false);
-    ASSERT_EQ(data_blkaddr.value(), kNullAddr);
+    ASSERT_EQ(data_blkaddr->front(), kNullAddr);
   }
 }
 

@@ -308,29 +308,6 @@ zx::result<std::vector<fbl::RefPtr<Page>>> FileCache::GetPages(const pgoff_t sta
   return GetPagesUnsafe(start, end);
 }
 
-zx::result<std::vector<LockedPage>> FileCache::GetLockedPages(
-    const std::vector<pgoff_t> &page_offsets) {
-  std::lock_guard tree_lock(tree_lock_);
-  if (page_offsets.empty()) {
-    return zx::ok(std::vector<LockedPage>(0));
-  }
-
-  auto locked_pages = FindLockedPagesUnsafe(page_offsets);
-  uint32_t count = 0;
-  for (pgoff_t index : page_offsets) {
-    if (index != kInvalidPageOffset) {
-      if (!locked_pages[count]) {
-        locked_pages[count] = LockedPage(AddNewPageUnsafe(index));
-        if (zx_status_t ret = locked_pages[count]->GetVmo(); ret != ZX_OK) {
-          return zx::error(ret);
-        }
-      }
-    }
-    ++count;
-  }
-  return zx::ok(std::move(locked_pages));
-}
-
 fbl::RefPtr<Page> FileCache::AddNewPageUnsafe(const pgoff_t index) {
   fbl::RefPtr<Page> page;
   if (GetVnode().IsNode()) {
@@ -452,45 +429,8 @@ std::vector<LockedPage> FileCache::FindLockedPagesUnsafe(pgoff_t start, pgoff_t 
   return pages;
 }
 
-std::vector<LockedPage> FileCache::FindLockedPagesUnsafe(const std::vector<pgoff_t> &page_offsets) {
-  std::vector<LockedPage> pages(page_offsets.size());
-  if (page_tree_.is_empty()) {
-    return pages;
-  }
-
-  uint32_t index = 0;
-  while (index < page_offsets.size()) {
-    if (page_offsets[index] == kInvalidPageOffset) {
-      ++index;
-      continue;
-    }
-    auto current = page_tree_.find(page_offsets[index]);
-    if (current == page_tree_.end()) {
-      ++index;
-      continue;
-    }
-    if (!current->IsActive()) {
-      // No reference to |current|. It is safe to make a reference.
-      LockedPage locked_page(fbl::ImportFromRawPtr(current.CopyPointer()));
-      locked_page->SetActive();
-      pages[index] = std::move(locked_page);
-    } else {
-      auto locked_page_or = GetLockedPageFromRawUnsafe(current.CopyPointer());
-      if (locked_page_or.is_error()) {
-        continue;
-      }
-      pages[index] = std::move(*locked_page_or);
-    }
-    ++index;
-  }
-  return pages;
-}
-
 std::vector<LockedPage> FileCache::InvalidatePages(pgoff_t start, pgoff_t end, bool zero) {
-  std::lock_guard tree_lock(tree_lock_);
-  std::vector<LockedPage> pages = FindLockedPagesUnsafe(start, end);
-  // Unlock |tree_lock_| to allow |page_tree_| to serve other requests while invalidating pages.
-  tree_lock_.unlock();
+  std::vector<LockedPage> pages = FindLockedPages(start, end);
   // Invalidate pages after waiting for their writeback.
   for (auto &page : pages) {
     WaitOnWriteback(*page);
@@ -500,7 +440,7 @@ std::vector<LockedPage> FileCache::InvalidatePages(pgoff_t start, pgoff_t end, b
     // Make sure that all pages in the range are zeroed.
     vmo_manager_->ZeroBlocks(*vnode_->fs()->vfs(), start, end);
   }
-  tree_lock_.lock();
+  std::lock_guard tree_lock(tree_lock_);
   for (auto &page : pages) {
     EvictUnsafe(page.get());
   }

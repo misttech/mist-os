@@ -14,7 +14,13 @@
 namespace f2fs {
 namespace {
 
-using VnodeTest = F2fsFakeDevTestFixture;
+class VnodeTest : public F2fsFakeDevTestFixture {
+ public:
+  VnodeTest()
+      : F2fsFakeDevTestFixture(TestOptions{
+            .mount_options = {{MountOption::kInlineDentry, false}},
+        }) {}
+};
 
 template <typename T>
 void VgetFaultInjetionAndTest(F2fs &fs, Dir &root_dir, std::string_view name, T fault_injection,
@@ -291,140 +297,68 @@ TEST_F(VnodeTest, SyncFile) {
   file_vnode = nullptr;
 }
 
-TEST_F(VnodeTest, GrabLockedPages) {
-  zx::result file_fs_vnode = root_dir_->Create("test_file", fs::CreationType::kFile);
+TEST_F(VnodeTest, GetLockedDataPages) TA_NO_THREAD_SAFETY_ANALYSIS {
+  zx::result file_fs_vnode = root_dir_->Create("test_dir", fs::CreationType::kDirectory);
   ASSERT_TRUE(file_fs_vnode.is_ok()) << file_fs_vnode.status_string();
-  fbl::RefPtr<VnodeF2fs> file_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(file_fs_vnode));
+  fbl::RefPtr<Dir> dir = fbl::RefPtr<Dir>::Downcast(*std::move(file_fs_vnode));
 
-  constexpr pgoff_t kStartOffset = 0;
-  constexpr pgoff_t kEndOffset = 1000;
-
-  {
-    auto pages_or = file_vnode->GrabLockedPages(kStartOffset, kEndOffset);
-    ASSERT_TRUE(pages_or.is_ok());
-    for (pgoff_t i = kStartOffset; i < kEndOffset; ++i) {
-      LockedPage locked_page = std::move(pages_or.value()[i]);
-      auto unlocked_page = locked_page.release();
-      ASSERT_EQ(file_vnode->GrabLockedPage(i, &locked_page), ZX_OK);
-      ASSERT_EQ(locked_page.get(), unlocked_page.get());
-    }
-  }
-
-  // Test with holes
-  {
-    std::vector<pgoff_t> pg_offsets(kEndOffset - kStartOffset);
-    std::iota(pg_offsets.begin(), pg_offsets.end(), kStartOffset);
-    for (size_t i = 0; i < pg_offsets.size(); i += 2) {
-      pg_offsets[i] = kInvalidPageOffset;
-    }
-    auto pages_or = file_vnode->GrabLockedPages(pg_offsets);
-    ASSERT_TRUE(pages_or.is_ok());
-    for (size_t i = 0; i < pg_offsets.size(); ++i) {
-      if (pg_offsets[i] == kInvalidPageOffset) {
-        ASSERT_FALSE(pages_or.value()[i]);
-      } else {
-        LockedPage locked_page = std::move(pages_or.value()[i]);
-        auto unlocked_page = locked_page.release();
-        ASSERT_EQ(file_vnode->GrabLockedPage(pg_offsets[i], &locked_page), ZX_OK);
-        ASSERT_EQ(locked_page.get(), unlocked_page.get());
-      }
-    }
-  }
-
-  ASSERT_EQ(file_vnode->Close(), ZX_OK);
-  file_vnode = nullptr;
-}
-
-void CheckDataPages(LockedPagesAndAddrs &address_and_pages, pgoff_t start_offset,
-                    pgoff_t end_offset, std::set<block_t> removed_pages) {
-  for (uint32_t offset = 0; offset < end_offset - start_offset; ++offset) {
-    if (removed_pages.find(offset) != removed_pages.end()) {
-      ASSERT_EQ(address_and_pages.block_addrs[offset], kNullAddr);
-      continue;
-    }
-    uint32_t read_offset = 0;
-    ASSERT_EQ(address_and_pages.pages[offset]->Read(&read_offset, 0, sizeof(uint32_t)), ZX_OK);
-    ASSERT_EQ(read_offset, offset);
-  }
-}
-
-TEST_F(VnodeTest, FindDataBlockAddrsAndPages) {
-  zx::result file_fs_vnode = root_dir_->Create("test_file", fs::CreationType::kFile);
-  ASSERT_TRUE(file_fs_vnode.is_ok()) << file_fs_vnode.status_string();
-  fbl::RefPtr<File> file = fbl::RefPtr<File>::Downcast(*std::move(file_fs_vnode));
-
-  constexpr pgoff_t kStartOffset = 0;
-  constexpr pgoff_t kEndOffset = 1000;
+  constexpr pgoff_t kStartOffset = 1;
+  constexpr pgoff_t kPageCount = 1000;
+  constexpr pgoff_t kEndOffset = kStartOffset + kPageCount;
   constexpr pgoff_t kMidOffset = kEndOffset / 2;
-  constexpr pgoff_t kPageCount = kEndOffset - kStartOffset;
   uint32_t page_count = kPageCount;
-  std::set<block_t> removed_pages;
+  constexpr uint32_t kPunchHoles = 10;
 
   // Get null block address
   {
-    auto addrs_and_pages_or = file->FindDataBlockAddrsAndPages(kStartOffset, kEndOffset);
-    ASSERT_TRUE(addrs_and_pages_or.is_ok());
-    ASSERT_EQ(addrs_and_pages_or->block_addrs.size(), page_count);
-    ASSERT_EQ(addrs_and_pages_or->pages.size(), page_count);
-  }
-
-  // Get valid block address
-  {
-    uint32_t buf[kPageSize / sizeof(uint32_t)];
-    for (uint32_t i = 0; i < static_cast<uint32_t>(kPageCount); ++i) {
-      buf[0] = i;
-      FileTester::AppendToFile(file.get(), buf, kPageSize);
+    zx::result pages_or = dir->GetLockedDataPages(kStartOffset, kPageCount);
+    ASSERT_TRUE(pages_or.is_ok());
+    ASSERT_EQ(pages_or->size(), kPageCount);
+    for (auto &page : *pages_or) {
+      ASSERT_FALSE(page);
     }
-    file->SyncFile(false);
-
-    auto addrs_and_pages_or = file->FindDataBlockAddrsAndPages(kStartOffset, kEndOffset);
-    ASSERT_TRUE(addrs_and_pages_or.is_ok());
-    ASSERT_EQ(addrs_and_pages_or->block_addrs.size(), page_count);
-    ASSERT_EQ(addrs_and_pages_or->pages.size(), page_count);
-    CheckDataPages(addrs_and_pages_or.value(), kStartOffset, kEndOffset, removed_pages);
   }
 
-  // Punch a hole at start
+  // Make dirty pages
   {
-    file->TruncateHole(kStartOffset, kStartOffset + 1);
-    removed_pages.insert(kStartOffset);
-
-    auto addrs_and_pages_or = file->FindDataBlockAddrsAndPages(kStartOffset, kEndOffset);
-    ASSERT_TRUE(addrs_and_pages_or.is_ok());
-    ASSERT_EQ(addrs_and_pages_or->block_addrs.size(), page_count);
-    ASSERT_EQ(addrs_and_pages_or->pages.size(), page_count);
-    CheckDataPages(addrs_and_pages_or.value(), kStartOffset, kEndOffset, removed_pages);
+    for (size_t i = kStartOffset; i < kEndOffset; ++i) {
+      LockedPage page;
+      ASSERT_EQ(dir->GetNewDataPage(i, true, &page), ZX_OK);
+      page.SetDirty();
+    }
   }
 
-  // Punch a hole at end
+  // Cache hit case
   {
-    file->TruncateHole(kEndOffset - 1, kEndOffset);
-    removed_pages.insert(kEndOffset - 1);
-
-    auto addrs_and_pages_or = file->FindDataBlockAddrsAndPages(kStartOffset, kEndOffset);
-    ASSERT_TRUE(addrs_and_pages_or.is_ok());
-    ASSERT_EQ(addrs_and_pages_or->block_addrs.size(), page_count);
-    ASSERT_EQ(addrs_and_pages_or->pages.size(), page_count);
-    CheckDataPages(addrs_and_pages_or.value(), kStartOffset, kEndOffset, removed_pages);
+    zx::result pages_or = dir->GetLockedDataPages(kStartOffset, kPageCount);
+    ASSERT_TRUE(pages_or.is_ok());
+    ASSERT_EQ(pages_or->size(), page_count);
   }
+
+  // Writeback dirty pages
+  fs_->SyncFs();
 
   // Punch holes at middle
-  {
-    constexpr uint32_t kPunchHoles = 10;
-    file->TruncateHole(kMidOffset, kMidOffset + kPunchHoles);
-    for (uint32_t i = 0; i < kPunchHoles; ++i) {
-      removed_pages.insert(kMidOffset + i);
+  dir->TruncateHole(kMidOffset, kMidOffset + kPunchHoles);
+
+  // Test cache miss/hit cases
+  for (size_t test = 0; test < 2; ++test) {
+    zx::result pages_or = dir->GetLockedDataPages(kStartOffset, kPageCount);
+    ASSERT_TRUE(pages_or.is_ok());
+    ASSERT_EQ(pages_or->size(), page_count);
+    auto page = pages_or->begin();
+    for (size_t i = kStartOffset; i < kEndOffset; ++i, ++page) {
+      if (i >= kMidOffset && i < kMidOffset + kPunchHoles) {
+        ASSERT_FALSE(*page);
+      } else {
+        ASSERT_TRUE(*page);
+        ASSERT_EQ((*page)->GetKey(), i);
+      }
     }
-
-    auto addrs_and_pages_or = file->FindDataBlockAddrsAndPages(kStartOffset, kEndOffset);
-    ASSERT_TRUE(addrs_and_pages_or.is_ok());
-    ASSERT_EQ(addrs_and_pages_or->block_addrs.size(), page_count);
-    ASSERT_EQ(addrs_and_pages_or->pages.size(), page_count);
-    CheckDataPages(addrs_and_pages_or.value(), kStartOffset, kEndOffset, removed_pages);
+    pages_or->clear();
+    dir->GetFileCache().InvalidatePages(kMidOffset);
   }
-
-  ASSERT_EQ(file->Close(), ZX_OK);
-  file = nullptr;
+  ASSERT_EQ(dir->Close(), ZX_OK);
 }
 
 }  // namespace
