@@ -3971,7 +3971,7 @@ fn receive_ip_packet_action_common<
         *dst_ip,
         RuleInput {
             packet_origin: PacketOrigin::NonLocal { source_address, incoming_device: device_id },
-            // TODO(https://fxbug.dev/337134565): packets can have marks as a result of a filtering
+            // TODO(https://fxbug.dev/369133279): packets can have marks as a result of a filtering
             // target like `MARK`.
             marks: &Default::default(),
         },
