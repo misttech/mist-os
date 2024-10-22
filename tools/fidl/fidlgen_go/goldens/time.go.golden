@@ -9,9 +9,11 @@ import (
 )
 
 type AllInstants struct {
-	_         struct{} `fidl:"s" fidl_size_v2:"16" fidl_alignment_v2:"8"`
-	Monotonic int64    `fidl_offset_v2:"0"`
-	Boot      int64    `fidl_offset_v2:"8"`
+	_              struct{} `fidl:"s" fidl_size_v2:"32" fidl_alignment_v2:"8"`
+	Monotonic      int64    `fidl_offset_v2:"0"`
+	Boot           int64    `fidl_offset_v2:"8"`
+	MonotonicTicks int64    `fidl_offset_v2:"16"`
+	BootTicks      int64    `fidl_offset_v2:"24"`
 }
 
 var _mAllInstants = _bindings.CreateLazyMarshaler(AllInstants{})
@@ -21,12 +23,16 @@ func (msg *AllInstants) Marshaler() _bindings.Marshaler {
 }
 
 type ComplexInstants struct {
-	_                struct{} `fidl:"t" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
-	I_unknownData    interface{}
-	Monotonic        [10]int64 `fidl_ordinal:"1"`
-	MonotonicPresent bool
-	Boot             []int64 `fidl_bounds:"" fidl_ordinal:"2"`
-	BootPresent      bool
+	_                     struct{} `fidl:"t" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
+	I_unknownData         interface{}
+	Monotonic             [10]int64 `fidl_ordinal:"1"`
+	MonotonicPresent      bool
+	Boot                  []int64 `fidl_bounds:"" fidl_ordinal:"2"`
+	BootPresent           bool
+	MonotonicTicks        [10]int64 `fidl_ordinal:"3"`
+	MonotonicTicksPresent bool
+	BootTicks             [10]int64 `fidl_ordinal:"4"`
+	BootTicksPresent      bool
 }
 
 var _mComplexInstants = _bindings.CreateLazyMarshaler(ComplexInstants{})
@@ -81,6 +87,54 @@ func (u *ComplexInstants) HasBoot() bool {
 
 func (u *ComplexInstants) ClearBoot() {
 	u.BootPresent = false
+}
+
+func (u *ComplexInstants) SetMonotonicTicks(monotonicTicks [10]int64) {
+	u.MonotonicTicks = monotonicTicks
+	u.MonotonicTicksPresent = true
+}
+
+func (u *ComplexInstants) GetMonotonicTicks() [10]int64 {
+	return u.MonotonicTicks
+}
+
+func (u *ComplexInstants) GetMonotonicTicksWithDefault(_default [10]int64) [10]int64 {
+	if !u.HasMonotonicTicks() {
+		return _default
+	}
+	return u.MonotonicTicks
+}
+
+func (u *ComplexInstants) HasMonotonicTicks() bool {
+	return u.MonotonicTicksPresent
+}
+
+func (u *ComplexInstants) ClearMonotonicTicks() {
+	u.MonotonicTicksPresent = false
+}
+
+func (u *ComplexInstants) SetBootTicks(bootTicks [10]int64) {
+	u.BootTicks = bootTicks
+	u.BootTicksPresent = true
+}
+
+func (u *ComplexInstants) GetBootTicks() [10]int64 {
+	return u.BootTicks
+}
+
+func (u *ComplexInstants) GetBootTicksWithDefault(_default [10]int64) [10]int64 {
+	if !u.HasBootTicks() {
+		return _default
+	}
+	return u.BootTicks
+}
+
+func (u *ComplexInstants) HasBootTicks() bool {
+	return u.BootTicksPresent
+}
+
+func (u *ComplexInstants) ClearBootTicks() {
+	u.BootTicksPresent = false
 }
 
 func (u *ComplexInstants) HasUnknownData() bool {

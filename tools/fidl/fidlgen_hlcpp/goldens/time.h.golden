@@ -25,6 +25,10 @@ class AllInstants final {
 
   ::fidl::basic_time<ZX_CLOCK_BOOT> boot{};
 
+  ::fidl::basic_ticks<ZX_CLOCK_MONOTONIC> monotonic_ticks{};
+
+  ::fidl::basic_ticks<ZX_CLOCK_BOOT> boot_ticks{};
+
   static inline ::std::unique_ptr<AllInstants> New() { return ::std::make_unique<AllInstants>(); }
 
   void Encode(::fidl::Encoder* _encoder, size_t _offset,
@@ -94,6 +98,54 @@ class ComplexInstants final {
     Destruct(&boot_value_.value);
   }
 
+  const ::std::array<::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>, 10>& monotonic_ticks() const {
+    ZX_ASSERT(field_presence_.IsSet<2>());
+    return monotonic_ticks_value_.value;
+  }
+  bool has_monotonic_ticks() const {
+    return field_presence_.IsSet<2>();
+  }
+
+  ::std::array<::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>, 10>* mutable_monotonic_ticks() {
+    if (!field_presence_.IsSet<2>()) {
+      field_presence_.Set<2>();
+      Construct(&monotonic_ticks_value_.value);
+    }
+    return &monotonic_ticks_value_.value;
+  }
+  ComplexInstants& set_monotonic_ticks(::std::array<::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>, 10> _value);
+  void clear_monotonic_ticks() {
+    if (!field_presence_.IsSet<2>()) {
+      return;
+    }
+    field_presence_.Clear<2>();
+    Destruct(&monotonic_ticks_value_.value);
+  }
+
+  const ::std::array<::fidl::basic_ticks<ZX_CLOCK_BOOT>, 10>& boot_ticks() const {
+    ZX_ASSERT(field_presence_.IsSet<3>());
+    return boot_ticks_value_.value;
+  }
+  bool has_boot_ticks() const {
+    return field_presence_.IsSet<3>();
+  }
+
+  ::std::array<::fidl::basic_ticks<ZX_CLOCK_BOOT>, 10>* mutable_boot_ticks() {
+    if (!field_presence_.IsSet<3>()) {
+      field_presence_.Set<3>();
+      Construct(&boot_ticks_value_.value);
+    }
+    return &boot_ticks_value_.value;
+  }
+  ComplexInstants& set_boot_ticks(::std::array<::fidl::basic_ticks<ZX_CLOCK_BOOT>, 10> _value);
+  void clear_boot_ticks() {
+    if (!field_presence_.IsSet<3>()) {
+      return;
+    }
+    field_presence_.Clear<3>();
+    Destruct(&boot_ticks_value_.value);
+  }
+
   ComplexInstants();
   ComplexInstants(ComplexInstants&& other);
   ~ComplexInstants();
@@ -125,13 +177,15 @@ class ComplexInstants final {
     switch (ordinal) {
       case 1:
       case 2:
+      case 3:
+      case 4:
         return true;
       default:
         return false;
     }
   }
 
-  ::fidl::internal::BitSet<2> field_presence_;
+  ::fidl::internal::BitSet<4> field_presence_;
   union ValueUnion_monotonic {
     ValueUnion_monotonic() {}
     ~ValueUnion_monotonic() {}
@@ -146,6 +200,20 @@ class ComplexInstants final {
     ::std::vector<::fidl::basic_time<ZX_CLOCK_BOOT>> value;
   };
   ValueUnion_boot boot_value_;
+  union ValueUnion_monotonic_ticks {
+    ValueUnion_monotonic_ticks() {}
+    ~ValueUnion_monotonic_ticks() {}
+
+    ::std::array<::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>, 10> value;
+  };
+  ValueUnion_monotonic_ticks monotonic_ticks_value_;
+  union ValueUnion_boot_ticks {
+    ValueUnion_boot_ticks() {}
+    ~ValueUnion_boot_ticks() {}
+
+    ::std::array<::fidl::basic_ticks<ZX_CLOCK_BOOT>, 10> value;
+  };
+  ValueUnion_boot_ticks boot_ticks_value_;
 };
 
 using ComplexInstantsPtr = ::std::unique_ptr<ComplexInstants>;
@@ -156,11 +224,11 @@ namespace fidl {
 
 template <>
 struct CodingTraits<::test::time::AllInstants>
-    : public EncodableCodingTraits<::test::time::AllInstants, 16> {};
+    : public EncodableCodingTraits<::test::time::AllInstants, 32> {};
 
 template <>
 struct IsMemcpyCompatible<::test::time::AllInstants> : public internal::BoolConstant<
-                                                           !HasPadding<::test::time::AllInstants>::value && IsMemcpyCompatible<::fidl::basic_time<ZX_CLOCK_MONOTONIC>>::value && IsMemcpyCompatible<::fidl::basic_time<ZX_CLOCK_BOOT>>::value> {};
+                                                           !HasPadding<::test::time::AllInstants>::value && IsMemcpyCompatible<::fidl::basic_time<ZX_CLOCK_MONOTONIC>>::value && IsMemcpyCompatible<::fidl::basic_time<ZX_CLOCK_BOOT>>::value && IsMemcpyCompatible<::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>>::value && IsMemcpyCompatible<::fidl::basic_ticks<ZX_CLOCK_BOOT>>::value> {};
 
 inline zx_status_t Clone(const ::test::time::AllInstants& value,
                          ::test::time::AllInstants* result) {
@@ -174,6 +242,12 @@ struct Equality<::test::time::AllInstants> {
       return false;
     }
     if (!::fidl::Equals(_lhs.boot, _rhs.boot)) {
+      return false;
+    }
+    if (!::fidl::Equals(_lhs.monotonic_ticks, _rhs.monotonic_ticks)) {
+      return false;
+    }
+    if (!::fidl::Equals(_lhs.boot_ticks, _rhs.boot_ticks)) {
       return false;
     }
     return true;
@@ -208,6 +282,26 @@ struct Equality<::test::time::ComplexInstants> {
         return false;
       }
     } else if (_rhs.has_boot()) {
+      return false;
+    }
+    if (_lhs.has_monotonic_ticks()) {
+      if (!_rhs.has_monotonic_ticks()) {
+        return false;
+      }
+      if (!::fidl::Equals(_lhs.monotonic_ticks(), _rhs.monotonic_ticks())) {
+        return false;
+      }
+    } else if (_rhs.has_monotonic_ticks()) {
+      return false;
+    }
+    if (_lhs.has_boot_ticks()) {
+      if (!_rhs.has_boot_ticks()) {
+        return false;
+      }
+      if (!::fidl::Equals(_lhs.boot_ticks(), _rhs.boot_ticks())) {
+        return false;
+      }
+    } else if (_rhs.has_boot_ticks()) {
       return false;
     }
     return true;

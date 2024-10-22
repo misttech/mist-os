@@ -14,6 +14,10 @@ std::ostream& fidl::ostream::Formatter<::test_time::AllInstants>::Format(std::os
   os << " = " << fidl::ostream::Formatted<::fidl::basic_time<ZX_CLOCK_MONOTONIC>>(value.monotonic()) << ", ";
   os << "boot";
   os << " = " << fidl::ostream::Formatted<::fidl::basic_time<ZX_CLOCK_BOOT>>(value.boot()) << ", ";
+  os << "monotonic_ticks";
+  os << " = " << fidl::ostream::Formatted<::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>>(value.monotonic_ticks()) << ", ";
+  os << "boot_ticks";
+  os << " = " << fidl::ostream::Formatted<::fidl::basic_ticks<ZX_CLOCK_BOOT>>(value.boot_ticks()) << ", ";
   os << "}";
   return os;
 }
@@ -27,6 +31,14 @@ std::ostream& fidl::ostream::Formatter<::test_time::ComplexInstants>::Format(std
   if (value.boot().has_value()) {
     os << "boot";
     os << " = " << fidl::ostream::Formatted<::std::vector<::fidl::basic_time<ZX_CLOCK_BOOT>>>(value.boot().value()) << ", ";
+  }
+  if (value.monotonic_ticks().has_value()) {
+    os << "monotonic_ticks";
+    os << " = " << fidl::ostream::Formatted<::std::array<::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>, 10>>(value.monotonic_ticks().value()) << ", ";
+  }
+  if (value.boot_ticks().has_value()) {
+    os << "boot_ticks";
+    os << " = " << fidl::ostream::Formatted<::std::array<::fidl::basic_ticks<ZX_CLOCK_BOOT>, 10>>(value.boot_ticks().value()) << ", ";
   }
   os << "}";
   return os;

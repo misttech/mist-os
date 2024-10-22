@@ -344,7 +344,7 @@ func (m *Measurer) lookup(name fidlgen.Name) (keyedDecl, error) {
 	root, ok := m.roots[name.LibraryName()]
 	if !ok {
 		fqn := name.FullyQualifiedName()
-		if fqn == "zx/InstantBoot" || fqn == "zx/InstantMono" {
+		if fqn == "zx/InstantBoot" || fqn == "zx/InstantMono" || fqn == "zx/InstantMonoTicks" || fqn == "zx/InstantBootTicks" {
 			return keyedDecl{
 				key:  name.FullyQualifiedName(),
 				decl: primitiveDecl{size: toSize(fidlgen.Int64)},

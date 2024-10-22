@@ -9,6 +9,8 @@ include <test/time/c/fidl.h>
 test_time_AllInstantsInLine {
     monotonic int64
     boot int64
+    monotonic_ticks int64
+    boot_ticks int64
 } [packed]
 test_time_AllInstantsOutOfLine {
     void void

@@ -10,13 +10,17 @@
 ::test_time::AllInstants::Storage_ test_time::AllInstants::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.monotonic),
-      ::fidl::internal::NaturalClone(storage_.boot)};
+      ::fidl::internal::NaturalClone(storage_.boot),
+      ::fidl::internal::NaturalClone(storage_.monotonic_ticks),
+      ::fidl::internal::NaturalClone(storage_.boot_ticks)};
 }
 
 ::test_time::ComplexInstants::Storage_ test_time::ComplexInstants::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.monotonic),
-      ::fidl::internal::NaturalClone(storage_.boot)};
+      ::fidl::internal::NaturalClone(storage_.boot),
+      ::fidl::internal::NaturalClone(storage_.monotonic_ticks),
+      ::fidl::internal::NaturalClone(storage_.boot_ticks)};
 }
 
 #pragma clang diagnostic pop

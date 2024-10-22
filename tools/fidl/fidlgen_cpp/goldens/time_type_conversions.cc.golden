@@ -14,12 +14,16 @@ namespace internal {
   return ::test_time::AllInstants{{
       .monotonic = WireNaturalConversionTraits<::fidl::basic_time<ZX_CLOCK_MONOTONIC>, ::fidl::basic_time<ZX_CLOCK_MONOTONIC>>::ToNatural(std::move(src.monotonic)),
       .boot = WireNaturalConversionTraits<::fidl::basic_time<ZX_CLOCK_BOOT>, ::fidl::basic_time<ZX_CLOCK_BOOT>>::ToNatural(std::move(src.boot)),
+      .monotonic_ticks = WireNaturalConversionTraits<::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>, ::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>>::ToNatural(std::move(src.monotonic_ticks)),
+      .boot_ticks = WireNaturalConversionTraits<::fidl::basic_ticks<ZX_CLOCK_BOOT>, ::fidl::basic_ticks<ZX_CLOCK_BOOT>>::ToNatural(std::move(src.boot_ticks)),
   }};
 }
 ::test_time::wire::AllInstants WireNaturalConversionTraits<::test_time::wire::AllInstants, ::test_time::AllInstants>::ToWire(fidl::AnyArena& arena, ::test_time::AllInstants src) {
   return ::test_time::wire::AllInstants{
       .monotonic = WireNaturalConversionTraits<::fidl::basic_time<ZX_CLOCK_MONOTONIC>, ::fidl::basic_time<ZX_CLOCK_MONOTONIC>>::ToWire(arena, std::move(src.monotonic())),
       .boot = WireNaturalConversionTraits<::fidl::basic_time<ZX_CLOCK_BOOT>, ::fidl::basic_time<ZX_CLOCK_BOOT>>::ToWire(arena, std::move(src.boot())),
+      .monotonic_ticks = WireNaturalConversionTraits<::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>, ::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>>::ToWire(arena, std::move(src.monotonic_ticks())),
+      .boot_ticks = WireNaturalConversionTraits<::fidl::basic_ticks<ZX_CLOCK_BOOT>, ::fidl::basic_ticks<ZX_CLOCK_BOOT>>::ToWire(arena, std::move(src.boot_ticks())),
   };
 }
 
@@ -33,6 +37,14 @@ namespace internal {
     dst.boot() =
         WireNaturalConversionTraits<::fidl::VectorView<::fidl::basic_time<ZX_CLOCK_BOOT>>, ::std::vector<::fidl::basic_time<ZX_CLOCK_BOOT>>>::ToNatural(std::move(src.boot()));
   }
+  if (src.has_monotonic_ticks()) {
+    dst.monotonic_ticks() =
+        WireNaturalConversionTraits<::fidl::Array<::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>, 10>, ::std::array<::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>, 10>>::ToNatural(std::move(src.monotonic_ticks()));
+  }
+  if (src.has_boot_ticks()) {
+    dst.boot_ticks() =
+        WireNaturalConversionTraits<::fidl::Array<::fidl::basic_ticks<ZX_CLOCK_BOOT>, 10>, ::std::array<::fidl::basic_ticks<ZX_CLOCK_BOOT>, 10>>::ToNatural(std::move(src.boot_ticks()));
+  }
 
   return dst;
 }
@@ -45,6 +57,14 @@ namespace internal {
   if (src.boot().has_value()) {
     builder.boot(
         WireNaturalConversionTraits<::fidl::VectorView<::fidl::basic_time<ZX_CLOCK_BOOT>>, ::std::vector<::fidl::basic_time<ZX_CLOCK_BOOT>>>::ToWire(arena, std::move(src.boot().value())));
+  }
+  if (src.monotonic_ticks().has_value()) {
+    builder.monotonic_ticks(
+        WireNaturalConversionTraits<::fidl::Array<::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>, 10>, ::std::array<::fidl::basic_ticks<ZX_CLOCK_MONOTONIC>, 10>>::ToWire(arena, std::move(src.monotonic_ticks().value())));
+  }
+  if (src.boot_ticks().has_value()) {
+    builder.boot_ticks(
+        WireNaturalConversionTraits<::fidl::Array<::fidl::basic_ticks<ZX_CLOCK_BOOT>, 10>, ::std::array<::fidl::basic_ticks<ZX_CLOCK_BOOT>, 10>>::ToWire(arena, std::move(src.boot_ticks().value())));
   }
   return builder.Build();
 }
