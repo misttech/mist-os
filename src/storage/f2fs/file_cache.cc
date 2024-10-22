@@ -494,7 +494,7 @@ std::vector<fbl::RefPtr<Page>> FileCache::FindDirtyPages(const WritebackOperatio
   std::lock_guard tree_lock(tree_lock_);
   auto current = page_tree_.lower_bound(operation.start);
   // Get Pages from |operation.start| to |operation.end|.
-  while (nwritten <= operation.to_write && current != page_tree_.end() &&
+  while (nwritten < operation.to_write && current != page_tree_.end() &&
          current->GetKey() < operation.end) {
     fbl::RefPtr<Page> page;
     auto raw_page = current.CopyPointer();

@@ -190,7 +190,7 @@ class SegmentManager {
   bool CompareValidBlocks(uint32_t blocks, uint32_t segno, bool section)
       __TA_EXCLUDES(sentry_lock_);
   uint32_t GetValidBlocks(uint32_t segno, bool section) const __TA_REQUIRES_SHARED(sentry_lock_);
-  bool HasNotEnoughFreeSecs(uint32_t freed = 0, uint32_t needed = 0);
+  bool HasNotEnoughFreeSecs(size_t freed = 0, size_t needed = 0);
   uint32_t Utilization();
   uint32_t CursegSegno(int type);
   uint8_t CursegAllocType(int type);
