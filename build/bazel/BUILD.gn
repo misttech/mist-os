@@ -161,6 +161,32 @@ action("generate_fuchsia_sdk_repository") {
   hermetic_deps = false
 }
 
+# Generate a symlink that points to the final version of the in-tree IDK
+# Nothing should depend on this directly, as it should only be used
+# to run the Bazel SDK Test suite, see //build/bazel_sdk/tests/README.md
+action("generate_final_fuchsia_in_tree_idk") {
+  script = "//build/bazel/scripts/generate-fuchsia-idk-symlink.py"
+  outputs = [ "$bazel_main_top_dir/fuchsia_in_tree_idk" ]
+  inputs = [ "${bazel_main_top_dir}/bazel" ]
+  deps = [ ":generate_main_workspace" ]
+  args = [
+    "--bazel-launcher",
+    rebase_path(inputs[0], root_build_dir),
+    "--target-label",
+    "@fuchsia_in_tree_idk//:final_idk",
+    "--output-symlink",
+    rebase_path(outputs[0], root_build_dir),
+  ]
+
+  # This script invokes Bazel directly. Use console pool to prevent
+  # concurrent bazel invocations.
+  pool = "//:console($default_toolchain)"
+
+  # This cannot be hermetic as well since it creates a ton of
+  # files in the output base that cannot be listed in advance.
+  hermetic_deps = false
+}
+
 # Generate content hash files for python and Clang toolchains.
 #
 # These will be used to trigger new runs of the bazel_sdk_test_xxx targets
