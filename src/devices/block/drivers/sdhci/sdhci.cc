@@ -551,12 +551,12 @@ zx_status_t Sdhci::SetUpDma(const sdmmc_req_t& request,
 
   size_t descriptor_size;
   if (Capabilities0::Get().ReadFrom(&regs_mmio_buffer_).v3_64_bit_system_address_support()) {
-    const cpp20::span descriptors{reinterpret_cast<AdmaDescriptor96*>(iobuf_.virt()),
+    const cpp20::span descriptors{reinterpret_cast<AdmaDescriptor96*>(iobuf_->virt()),
                                   kDmaDescCount};
     descriptor_size = sizeof(descriptors[0]);
     status = builder.BuildDmaDescriptors(descriptors);
   } else {
-    const cpp20::span descriptors{reinterpret_cast<AdmaDescriptor64*>(iobuf_.virt()),
+    const cpp20::span descriptors{reinterpret_cast<AdmaDescriptor64*>(iobuf_->virt()),
                                   kDmaDescCount};
     descriptor_size = sizeof(descriptors[0]);
     status = builder.BuildDmaDescriptors(descriptors);
@@ -566,14 +566,15 @@ zx_status_t Sdhci::SetUpDma(const sdmmc_req_t& request,
     return status;
   }
 
-  status = iobuf_.CacheOp(ZX_VMO_OP_CACHE_CLEAN, 0, builder.descriptor_count() * descriptor_size);
+  status = zx_cache_flush(iobuf_->virt(), builder.descriptor_count() * descriptor_size,
+                          ZX_CACHE_FLUSH_DATA);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to clean cache: %s", zx_status_get_string(status));
     return status;
   }
 
-  AdmaSystemAddress::Get(0).FromValue(Lo32(iobuf_.phys())).WriteTo(&regs_mmio_buffer_);
-  AdmaSystemAddress::Get(1).FromValue(Hi32(iobuf_.phys())).WriteTo(&regs_mmio_buffer_);
+  AdmaSystemAddress::Get(0).FromValue(Lo32(iobuf_->phys())).WriteTo(&regs_mmio_buffer_);
+  AdmaSystemAddress::Get(1).FromValue(Hi32(iobuf_->phys())).WriteTo(&regs_mmio_buffer_);
   return ZX_OK;
 }
 
@@ -1067,17 +1068,20 @@ zx_status_t Sdhci::Init() {
 
   // allocate and setup DMA descriptor
   if (SupportsAdma2()) {
+    auto buffer_factory = dma_buffer::CreateBufferFactory();
     auto host_control1 = HostControl1::Get().ReadFrom(&regs_mmio_buffer_);
     if (caps0.v3_64_bit_system_address_support()) {
-      status = iobuf_.Init(bti_.get(), kDmaDescCount * sizeof(AdmaDescriptor96),
-                           IO_BUFFER_RW | IO_BUFFER_CONTIG);
+      const size_t buffer_size =
+          fbl::round_up(kDmaDescCount * sizeof(AdmaDescriptor96), zx_system_get_page_size());
+      status = buffer_factory->CreateContiguous(bti_, buffer_size, 0, &iobuf_);
       host_control1.set_dma_select(HostControl1::kDmaSelect64BitAdma2);
     } else {
-      status = iobuf_.Init(bti_.get(), kDmaDescCount * sizeof(AdmaDescriptor64),
-                           IO_BUFFER_RW | IO_BUFFER_CONTIG);
+      const size_t buffer_size =
+          fbl::round_up(kDmaDescCount * sizeof(AdmaDescriptor64), zx_system_get_page_size());
+      status = buffer_factory->CreateContiguous(bti_, buffer_size, 0, &iobuf_);
       host_control1.set_dma_select(HostControl1::kDmaSelect32BitAdma2);
 
-      if ((iobuf_.phys() & k32BitPhysAddrMask) != iobuf_.phys()) {
+      if ((iobuf_->phys() & k32BitPhysAddrMask) != iobuf_->phys()) {
         zxlogf(ERROR, "Got 64-bit physical address, only 32-bit DMA is supported");
         return ZX_ERR_NOT_SUPPORTED;
       }
