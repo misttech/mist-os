@@ -35,7 +35,7 @@ struct ConfigLoader;
 #[async_trait(?Send)]
 impl MdnsEnabledChecker for ConfigLoader {
     async fn enabled(&self) -> bool {
-        get("discovery.mdns.enabled").await.unwrap_or(true)
+        get("discovery.mdns.enabled").unwrap_or(true)
     }
 }
 

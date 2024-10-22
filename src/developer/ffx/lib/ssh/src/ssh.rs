@@ -98,7 +98,7 @@ async fn get_ssh_key_paths() -> Result<Vec<String>> {
 
 async fn apply_auth_sock(cmd: &mut Command) {
     const SSH_AUTH_SOCK: &str = "ssh.auth-sock";
-    if let Ok(path) = ffx_config::get::<String, _>(SSH_AUTH_SOCK).await {
+    if let Ok(path) = ffx_config::get::<String, _>(SSH_AUTH_SOCK) {
         cmd.env("SSH_AUTH_SOCK", path);
     }
 }

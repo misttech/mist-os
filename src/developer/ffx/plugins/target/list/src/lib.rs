@@ -120,7 +120,7 @@ async fn get_target_info(
     addrs: &[addr::TargetAddr],
 ) -> Result<(ffx::RemoteControlState, Option<String>, Option<String>)> {
     let ssh_timeout: u64 =
-        ffx_config::get("target.host_pipe_ssh_timeout").await.unwrap_or(DEFAULT_SSH_TIMEOUT_MS);
+        ffx_config::get("target.host_pipe_ssh_timeout").unwrap_or(DEFAULT_SSH_TIMEOUT_MS);
     let ssh_timeout = Duration::from_millis(ssh_timeout);
     for addr in addrs {
         // An address is, conveniently, a valid target spec as well

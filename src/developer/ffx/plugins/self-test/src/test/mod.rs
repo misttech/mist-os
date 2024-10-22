@@ -42,7 +42,7 @@ fn subtest_log_file(isolate: &ffx_isolate::Isolate) -> PathBuf {
 /// Create a new ffx isolate. This method relies on the environment provided by
 /// the ffx binary and should only be called within ffx.
 pub async fn new_isolate(name: &str) -> Result<ffx_isolate::Isolate> {
-    let ssh_key = ffx_config::get::<String, _>("ssh.priv").await?.into();
+    let ssh_key = ffx_config::get::<String, _>("ssh.priv")?.into();
     let context = global_env_context().context("No global context")?;
     let isolate = ffx_isolate::Isolate::new_with_sdk(name, ssh_key, &context).await?;
     set_value_in_isolate(&isolate, "watchdogs.host_pipe.enabled", true.into()).await?;

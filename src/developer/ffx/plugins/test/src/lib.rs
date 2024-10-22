@@ -90,7 +90,7 @@ impl Experiments {
     async fn get_experiment(experiment_name: &'static str) -> Experiment {
         Experiment {
             name: experiment_name,
-            enabled: match ffx_config::get(experiment_name).await {
+            enabled: match ffx_config::get(experiment_name) {
                 Ok(enabled) => enabled,
                 Err(_) => false,
             },
@@ -174,8 +174,7 @@ async fn run_test<W: 'static + Write + Send + Sync>(
             false => run_test_suite_lib::TimeoutBehavior::TerminateRemaining,
             true => run_test_suite_lib::TimeoutBehavior::Continue,
         },
-        timeout_grace_seconds: ffx_config::get::<u64, _>("test.timeout_grace_seconds").await?
-            as u32,
+        timeout_grace_seconds: ffx_config::get::<u64, _>("test.timeout_grace_seconds")? as u32,
         stop_after_failures: match cmd.stop_after_failures.map(std::num::NonZeroU32::new) {
             None => None,
             Some(None) => ffx_bail!("--stop-after-failures should be greater than zero."),

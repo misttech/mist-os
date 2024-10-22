@@ -378,7 +378,7 @@ impl<R: Reader, O: OutputSink> Shell<R, O> {
         no_syslog: bool,
     ) -> Result<NextAction> {
         let url = Url::parse(url).context("invalid fuzzer URL")?;
-        let output = match (output, ffx_config::get(DEFAULT_FUZZING_OUTPUT_VARIABLE).await) {
+        let output = match (output, ffx_config::get(DEFAULT_FUZZING_OUTPUT_VARIABLE)) {
             (Some(output), _) | (None, Ok(output)) => output,
             _ => {
                 self.writer.error("output directory is not set.");

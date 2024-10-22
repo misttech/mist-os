@@ -181,7 +181,7 @@ pub fn query<'a>(with: impl Into<ConfigQuery<'a>>) -> ConfigQuery<'a> {
 
 /// A shorthand for the very common case of querying a value from the global config
 /// cache and environment, using the provided value converted into a query.
-pub async fn get<'a, T, U>(with: U) -> std::result::Result<T, T::Error>
+pub fn get<'a, T, U>(with: U) -> std::result::Result<T, T::Error>
 where
     T: TryFrom<ConfigValue> + ValueStrategy,
     <T as std::convert::TryFrom<ConfigValue>>::Error: std::convert::From<ConfigError>,

@@ -257,7 +257,7 @@ impl FidlProtocol for Forward {
     async fn start(&mut self, cx: &Context) -> Result<()> {
         tracing::info!("started port forwarding protocol");
 
-        let tunnels: Vec<Value> = ffx_config::get(TUNNEL_CFG).await.unwrap_or_else(|_| Vec::new());
+        let tunnels: Vec<Value> = ffx_config::get(TUNNEL_CFG).unwrap_or_else(|_| Vec::new());
 
         for tunnel in tunnels {
             let tunnel: ForwardConfig = match serde_json::from_value(tunnel) {

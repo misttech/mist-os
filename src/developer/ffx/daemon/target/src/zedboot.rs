@@ -37,7 +37,6 @@ pub async fn zedboot_discovery(e: events::Queue<DaemonEvent>) -> Result<Task<()>
 
 async fn port() -> Result<NonZeroU16> {
     ffx_config::get(DISCOVERY_ZEDBOOT_ADVERT_PORT)
-        .await
         .map(|port| {
             NonZeroU16::new(port).ok_or_else(|| anyhow::anyhow!("advert port must be nonzero"))
         })
@@ -65,13 +64,13 @@ pub async fn interface_discovery(
     let mut should_log_v6_listen_error = true;
     let mut v6_listen_socket: Weak<UdpSocket> = Weak::new();
 
-    if ffx_config::get(DISCOVERY_ZEDBOOT_ENABLED).await.unwrap_or(false) {
+    if ffx_config::get(DISCOVERY_ZEDBOOT_ENABLED).unwrap_or(false) {
         tracing::debug!("Starting Zedboot discovery loop");
     };
 
     loop {
         // https://fxbug.dev/42171647 - disabled by default
-        let is_enabled: bool = ffx_config::get(DISCOVERY_ZEDBOOT_ENABLED).await.unwrap_or(false);
+        let is_enabled: bool = ffx_config::get(DISCOVERY_ZEDBOOT_ENABLED).unwrap_or(false);
         if is_enabled {
             if v6_listen_socket.upgrade().is_none() {
                 match make_listen_socket((ZEDBOOT_MCAST_V6, port.get()).into())
@@ -118,7 +117,7 @@ pub async fn interface_discovery(
 async fn recv_loop(sock: Arc<UdpSocket>, e: events::Queue<DaemonEvent>) {
     loop {
         // https://fxbug.dev/42171647 - disabled by default
-        let is_enabled: bool = ffx_config::get(DISCOVERY_ZEDBOOT_ENABLED).await.unwrap_or(false);
+        let is_enabled: bool = ffx_config::get(DISCOVERY_ZEDBOOT_ENABLED).unwrap_or(false);
         if !is_enabled {
             return;
         }

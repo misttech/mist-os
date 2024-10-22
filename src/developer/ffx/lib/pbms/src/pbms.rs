@@ -65,7 +65,7 @@ pub(crate) async fn local_path_helper(
 /// Retrieve the storage directory path from the config.
 pub async fn get_storage_dir() -> Result<PathBuf> {
     let storage_path: PathBuf =
-        ffx_config::get(CONFIG_STORAGE_PATH).await.context("getting CONFIG_STORAGE_PATH")?;
+        ffx_config::get(CONFIG_STORAGE_PATH).context("getting CONFIG_STORAGE_PATH")?;
     Ok(storage_path)
 }
 

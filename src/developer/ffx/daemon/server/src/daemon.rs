@@ -477,7 +477,7 @@ impl Daemon {
             ascendd::Opt {
                 sockpath: Some(self.socket_path.clone()),
                 client_routing,
-                usb: ffx_config::get(OVERNET_ENABLE_USB).await.unwrap_or(false),
+                usb: ffx_config::get(OVERNET_ENABLE_USB).unwrap_or(false),
                 ..Default::default()
             },
             node,

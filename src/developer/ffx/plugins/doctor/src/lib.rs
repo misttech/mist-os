@@ -156,7 +156,7 @@ impl DefaultDoctorStepHandler {
 }
 
 async fn get_config_permission<W: Write>(mut writer: W) -> Result<bool> {
-    match get(RECORD_CONFIG_SETTING).await {
+    match get(RECORD_CONFIG_SETTING) {
         Ok(true) => {
             writeln!(
                 &mut writer,

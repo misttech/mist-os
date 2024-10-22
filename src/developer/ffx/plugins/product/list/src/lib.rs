@@ -98,7 +98,6 @@ where
     I: structured_ui::Interface,
 {
     let base_urls = ffx_config::get::<Vec<String>, _>(CONFIG_BASE_URLS)
-        .await
         .context("get config CONFIG_BASE_URLS")?;
 
     // If branch is not provided, use version to build base_urls

@@ -155,7 +155,6 @@ pub async fn get_daemon_proxy_single_link(
     let find = find_next_daemon(node, exclusions).fuse();
     let mut find = Box::pin(find);
     let timeout_ms = ffx_config::get(CONFIG_DAEMON_CONNECT_TIMEOUT_MS)
-        .await
         .map_err(|_| ffx_error!("Could not get {} config", CONFIG_DAEMON_CONNECT_TIMEOUT_MS))?;
     let mut timeout = Timer::new(Duration::from_millis(timeout_ms)).fuse();
 
