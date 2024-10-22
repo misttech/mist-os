@@ -17,7 +17,7 @@ use syn::{parse_macro_input, Data, Fields, Result};
 #[derive(Clone)]
 struct PatOpenVersionRange {
     lo: syn::LitInt,
-    dots: syn::token::Dot2,
+    dots: syn::token::DotDot,
 }
 impl PatOpenVersionRange {
     fn lo_value(&self) -> u32 {
@@ -63,12 +63,7 @@ struct Input {
 }
 impl Parse for Input {
     fn parse(input: ParseStream<'_>) -> Result<Self> {
-        Ok(Self {
-            arms: input
-                .parse_terminated::<Arm, syn::token::Comma>(Arm::parse)?
-                .into_iter()
-                .collect(),
-        })
+        Ok(Self { arms: input.parse_terminated(Arm::parse, syn::Token![,])?.into_iter().collect() })
     }
 }
 
@@ -186,11 +181,11 @@ pub fn derive_migrate(input: TokenStream) -> TokenStream {
     let input: syn::DeriveInput = parse_macro_input!(input);
 
     let ident = input.ident;
-    let target = if let Some(attr) = input.attrs.iter().find(|a| {
-        a.style == syn::AttrStyle::Outer
-            && a.path.get_ident().is_some()
-            && a.path.get_ident().unwrap().to_string() == "migrate_to_version"
-    }) {
+    let target = if let Some(attr) = input
+        .attrs
+        .iter()
+        .find(|a| a.style == syn::AttrStyle::Outer && a.path().is_ident("migrate_to_version"))
+    {
         match attr.parse_args::<syn::Type>() {
             Ok(ident) => ident.into_token_stream(),
             Err(error) => error.into_compile_error(),
@@ -263,9 +258,7 @@ pub fn derive_migrate(input: TokenStream) -> TokenStream {
                 .attrs
                 .iter()
                 .filter(|a| {
-                    a.style == syn::AttrStyle::Outer
-                        && a.path.get_ident().is_some()
-                        && a.path.get_ident().unwrap().to_string() == "migrate_nodefault"
+                    a.style == syn::AttrStyle::Outer && a.path().is_ident("migrate_nodefault")
                 })
                 .collect::<Vec<&syn::Attribute>>()
                 .is_empty()
