@@ -287,7 +287,7 @@ void LinkSystem::UpdateViewportPropertiesFor(
   // 2. Resolved link -> Layout stored in |parent_to_child_map_|.
   // 3. Dead link -> Layout stored nowhere.
   std::scoped_lock lock(mutex_);
-  FX_DCHECK((initial_layout_infos_.empty() && parent_to_child_map_.empty()) ||
+  FX_DCHECK((initial_layout_infos_.count(handle) == 0 && parent_to_child_map_.count(handle) == 0) ||
             (initial_layout_infos_.count(handle) != parent_to_child_map_.count(handle)))
       << "Layout should only exist in at most one map at a time.";
   if (auto initial_layout_it = initial_layout_infos_.find(handle);
