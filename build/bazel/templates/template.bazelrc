@@ -54,7 +54,8 @@ common --experimental_workspace_rules_log_file={workspace_log_file}
 # that appears as an invocation artifact named 'execution.log'.
 common:exec_log --experimental_execution_log_compact_file={execution_log_file}
 # Need the following to ensure the execution.log is actually uploaded to the RBE CAS.
-common:exec_log --remote_build_event_upload=all
+# Do not use =all, because that will attempt to upload locally built targets to CAS.
+common:exec_log --remote_build_event_upload=minimal
 # go/slipstream-bazel: detailed performance analysis and visualization
 common:exec_log --experimental_execution_graph_log_dep_type=all
 common:exec_log --experimental_enable_execution_graph_log
