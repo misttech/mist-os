@@ -413,7 +413,7 @@ struct IncomingNamespace {
 
   fdf_testing::TestNode node{"root"};
   fdf_testing::internal::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
-  fdf_fake_platform_device::FakePDev pdev_server;
+  fdf_fake::FakePDev pdev_server;
   FakeClock clock_server;
   zx::event exec_opportunistic, wake_assertive;
   std::optional<FakeSystemActivityGovernor> system_activity_governor;
@@ -456,8 +456,8 @@ class AmlSdmmcWithBanjoTest : public zxtest::Test {
       ASSERT_OK(incoming->env.Initialize(std::move(start_args_result->incoming_directory_server)));
 
       // Serve (fake) pdev_server.
-      fdf_fake_platform_device::FakePDev::Config config{.use_fake_irq = true,
-                                                        .device_info = fdf::PDev::DeviceInfo{}};
+      fdf_fake::FakePDev::Config config{.use_fake_irq = true,
+                                        .device_info = fdf::PDev::DeviceInfo{}};
       zx::vmo dup;
       mmio_buffer_.get_vmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
       config.mmios[0] = fdf::PDev::MmioInfo{

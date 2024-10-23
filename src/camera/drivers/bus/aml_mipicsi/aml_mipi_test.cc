@@ -19,8 +19,7 @@ namespace camera::test {
 class IncomingNamespace {
  public:
   void Init(fidl::ServerEnd<fuchsia_io::Directory> outgoing_server) {
-    fdf_fake_platform_device::FakePDev::Config pdev_config{.use_fake_bti = true,
-                                                           .use_fake_irq = true};
+    fdf_fake::FakePDev::Config pdev_config{.use_fake_bti = true, .use_fake_irq = true};
     pdev_config.mmios[AmlMipiDevice::kCsiPhy0] = fake_mmio_.GetMmioBuffer();
     pdev_config.mmios[AmlMipiDevice::kAphy0] = fake_mmio_.GetMmioBuffer();
     pdev_config.mmios[AmlMipiDevice::kCsiHost0] = fake_mmio_.GetMmioBuffer();
@@ -33,7 +32,7 @@ class IncomingNamespace {
   }
 
  private:
-  fdf_fake_platform_device::FakePDev pdev_;
+  fdf_fake::FakePDev pdev_;
   component::OutgoingDirectory outgoing_{async_get_default_dispatcher()};
   ddk_fake::FakeMmioRegRegion fake_mmio_{1, 1};
 };

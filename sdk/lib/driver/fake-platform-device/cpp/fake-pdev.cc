@@ -9,7 +9,7 @@
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 
-namespace fdf_fake_platform_device {
+namespace fdf_fake {
 
 void FakePDev::GetMmioById(GetMmioByIdRequestView request, GetMmioByIdCompleter::Sync& completer) {
   auto mmio = config_.mmios.find(request->index);
@@ -179,7 +179,7 @@ void FakePDev::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {}
 
-}  // namespace fdf_fake_platform_device
+}  // namespace fdf_fake
 
 zx::result<fdf::MmioBuffer> fdf::internal::PDevMakeMmioBufferWeak(fdf::PDev::MmioInfo& pdev_mmio,
                                                                   uint32_t cache_policy) {

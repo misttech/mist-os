@@ -36,7 +36,7 @@ class IncomingNamespace {
  public:
   void Init(fidl::ServerEnd<fuchsia_io::Directory> outgoing_server, fdf::MmioBuffer hiu_buffer,
             fdf::MmioBuffer dos_buffer, uint32_t pdev_did) {
-    fdf_fake_platform_device::FakePDev::Config pdev_config{
+    fdf_fake::FakePDev::Config pdev_config{
         .device_info = std::make_optional<fdf::PDev::DeviceInfo>({.did = pdev_did})};
     pdev_config.mmios[AmlClock::kHiuMmio] = std::move(hiu_buffer);
     pdev_config.mmios[AmlClock::kDosbusMmio] = std::move(dos_buffer);
@@ -47,7 +47,7 @@ class IncomingNamespace {
   }
 
  private:
-  fdf_fake_platform_device::FakePDev pdev_;
+  fdf_fake::FakePDev pdev_;
   component::OutgoingDirectory outgoing_{async_get_default_dispatcher()};
 };
 
