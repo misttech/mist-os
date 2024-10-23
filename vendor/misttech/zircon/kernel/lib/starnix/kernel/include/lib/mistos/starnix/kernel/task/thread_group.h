@@ -10,7 +10,7 @@
 #include <lib/mistos/starnix/kernel/mm/flags.h>
 #include <lib/mistos/starnix/kernel/task/current_task.h>
 #include <lib/mistos/starnix/kernel/task/exit_status.h>
-#include <lib/mistos/starnix/kernel/task/zombie_process.h>
+#include <lib/mistos/starnix/kernel/task/waiter.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/resource_limits.h>
 #include <lib/mistos/starnix_uapi/stats.h>
@@ -23,6 +23,8 @@
 #include <fbl/vector.h>
 #include <ktl/optional.h>
 #include <object/handle.h>
+
+#include "fbl/ref_counted_upgradeable.h"
 
 class ProcessDispatcher;
 
@@ -60,6 +62,70 @@ struct WaitResult {
     return SignalInfo::new_sigchld(pid, uid, exit_info.status.SignalInfoStatus(),
                                    exit_info.status.SignalInfoCode());
   }*/
+};
+
+class ThreadGroupMutableState;
+class ZombieProcess : public fbl::RefCountedUpgradeable<ZombieProcess> {
+ public:
+  pid_t pid;
+  pid_t pgid;
+  uid_t pid_tuid;
+
+  ProcessExitInfo exit_info;
+
+  /// Cumulative time stats for the process and its children.
+  // pub time_stats: TaskTimeStats,
+
+  // Whether dropping this ZombieProcess should imply removing the pid from
+  // the PidTable
+  bool is_canonical;
+
+  // PartialEq for ZombieProcess
+  bool operator==(const ZombieProcess& other) const {
+    return pid == other.pid && pgid == other.pgid && pid_tuid == other.pid_tuid &&
+           is_canonical == other.is_canonical;
+  }
+
+  bool operator!=(const ZombieProcess& other) const { return !(*this == other); }
+  bool operator<(const ZombieProcess& other) const { return pid < other.pid; }
+  bool operator>(const ZombieProcess& other) const { return other < *this; }
+  bool operator<=(const ZombieProcess& other) const { return !(other < *this); }
+  bool operator>=(const ZombieProcess& other) const { return !(*this < other); }
+
+  // impl ZombieProcess
+  static fbl::RefPtr<ZombieProcess> New(const ThreadGroupMutableState& thread_group,
+                                        const Credentials& credentials, ProcessExitInfo exit_info);
+
+  WaitResult ToWaitResult() const {
+    return WaitResult{
+        .pid = pid,
+        .uid = pid_tuid,
+        .exit_info = exit_info,
+        .time_stats = TaskTimeStats()  // Placeholder, as time_stats is commented out
+    };
+  }
+
+  /*fbl::RefCounted<ZombieProcess> CopyForKey() const {
+    copy->pid = pid;
+    copy->pgid = pgid;
+    copy->pid_tuid = pid_tuid;
+    copy->exit_info = exit_info;
+    // copy->time_stats = time_stats; // Commented out as it's not implemented
+    copy->is_canonical = false;
+    return ZombieProcess{.pid = this->pid, .pgid = this->pgid, };
+  }*/
+
+  // impl Releasable for ZombieProcess
+  void release(PidTable& pids);
+
+ private:
+  explicit ZombieProcess(pid_t pid, pid_t pgid, uid_t uid, ProcessExitInfo exit_info,
+                         bool is_canonical)
+      : pid(pid),
+        pgid(pgid),
+        pid_tuid(uid),
+        exit_info(ktl::move(exit_info)),
+        is_canonical(is_canonical) {}
 };
 
 // Represents the result of checking for a waitable child
@@ -211,7 +277,7 @@ class ThreadGroupMutableState {
   // fbl::Vector<std::pair<pid_t, pid_t>> deferred_zombie_ptracers;
 
   /// WaitQueue for updates to the WaitResults of tasks in this group.
-  // WaitQueue child_status_waiters;
+  WaitQueue child_status_waiters_;
 
   /// Whether this thread group will inherit from children of dying processes in its descendant
   /// tree.
@@ -275,6 +341,11 @@ class ThreadGroupMutableState {
   /// either WSTOPPED or WCONTINUED.
   bool is_waitable() const;
 
+  using ZombieListFn = fbl::Vector<fbl::RefPtr<ZombieProcess>>& (*)(ThreadGroupMutableState*);
+
+  ktl::optional<WaitResult> get_waitable_zombie(ZombieListFn zombie_list, ProcessSelector selector,
+                                                const WaitingOptions& options, PidTable& pids);
+
   // Returns true if the exit signal matches the wait options for clone or non-clone processes
   static bool is_correct_exit_signal(bool wait_for_clone, ktl::optional<Signal> exit_signal);
 
@@ -308,12 +379,15 @@ class ThreadGroupMutableState {
   const bool& terminating() const { return terminating_; }
   bool& terminating() { return terminating_; }
 
+  WaitQueue& child_status_waiters() { return child_status_waiters_; }
+
   ThreadGroupMutableState();
   ThreadGroupMutableState(ThreadGroup* base, ktl::optional<ThreadGroupParent> parent,
                           fbl::RefPtr<ProcessGroup> process_group);
 
  private:
   friend class ThreadGroup;
+  friend class ZombieProcess;
 
   ThreadGroup* base_ = nullptr;
 };
@@ -424,6 +498,8 @@ class ThreadGroup
 
   void remove(fbl::RefPtr<Task> task) const;
 
+  void do_zombie_notifications(fbl::RefPtr<ZombieProcess> zombie) const;
+
   // Sets the session ID for this thread group
   fit::result<Errno> setsid() const;
 
@@ -454,12 +530,29 @@ class ThreadGroup
   ~ThreadGroup();
 
  private:
+  class ProcessSignalObserver final : public SignalObserver {
+   public:
+    ProcessSignalObserver(util::WeakPtr<ThreadGroup> tg) : SignalObserver(), tg_(ktl::move(tg)) {}
+    ~ProcessSignalObserver() final = default;
+
+   private:
+    // |SignalObserver| implementation.
+    void OnMatch(zx_signals_t signals) final;
+    void OnCancel(zx_signals_t signals) final;
+
+    fbl::Canary<fbl::magic("PGSO")> canary_;
+
+    util::WeakPtr<ThreadGroup> tg_;
+  };
+
   ThreadGroup(
       fbl::RefPtr<Kernel> kernel, KernelHandle<ProcessDispatcher> process,
       ktl::optional<starnix_sync::RwLock<ThreadGroupMutableState>::RwLockWriteGuard>& parent,
       pid_t leader, fbl::RefPtr<ProcessGroup> process_group);
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(ThreadGroup);
+
+  ProcessSignalObserver observer_;
 };
 
 }  // namespace starnix

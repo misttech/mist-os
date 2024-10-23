@@ -16,6 +16,8 @@
 namespace starnix {
 
 class CurrentTask;
+class ProcessSelector;
+struct WaitResult;
 
 class WaitingOptions {
  public:
@@ -72,6 +74,10 @@ class WaitingOptions {
 fit::result<Errno, pid_t> sys_wait4(const CurrentTask& current_task, pid_t raw_selector,
                                     starnix_uapi::UserRef<int32_t> user_wstatus, uint32_t options,
                                     starnix_uapi::UserRef<struct ::rusage> user_rusage);
+
+fit::result<Errno, ktl::optional<WaitResult>> friend_wait_on_pid(const CurrentTask& current_task,
+                                                                 const ProcessSelector& selector,
+                                                                 const WaitingOptions& options);
 
 }  // namespace starnix
 

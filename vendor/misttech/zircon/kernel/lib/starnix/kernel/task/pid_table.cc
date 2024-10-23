@@ -7,7 +7,6 @@
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
-#include <lib/mistos/starnix/kernel/task/zombie_process.h>
 #include <lib/mistos/util/num.h>
 #include <lib/mistos/util/weak_wrapper.h>
 #include <zircon/assert.h>
@@ -22,19 +21,9 @@
 
 // #include <ktl/enforce.h>
 
-namespace {
-#if 0
-template <typename K, class V>
-V&& get(const fbl::HashTable<K, V>& table, const K& key) {
-  auto iter = table.find(key);
-  if (iter != table.end() && iter.IsValid()) {
-    return *iter;
-  }
-}
-#endif
-}  // namespace
-
 namespace starnix {
+
+ProcessEntry ProcessEntry::None() { return ProcessEntry({}); }
 
 ProcessEntry ProcessEntry::ThreadGroupCtor(util::WeakPtr<ThreadGroup> thread_group) {
   return ProcessEntry(thread_group);
@@ -43,7 +32,6 @@ ProcessEntry ProcessEntry::ZombieProcessCtor(util::WeakPtr<ZombieProcess> zombie
   return ProcessEntry(zombie_process);
 }
 
-ProcessEntry::ProcessEntry() = default;
 ProcessEntry::~ProcessEntry() = default;
 ProcessEntry::ProcessEntry(Variant variant) : process_(ktl::move(variant)) {}
 
@@ -53,6 +41,14 @@ ktl::optional<std::reference_wrapper<const util::WeakPtr<ThreadGroup>>> ProcessE
     const {
   if (auto* ptr = ktl::get_if<util::WeakPtr<ThreadGroup>>(&process_)) {
     return std::reference_wrapper<const util::WeakPtr<ThreadGroup>>(*ptr);
+  }
+  return ktl::nullopt;
+}
+
+ktl::optional<std::reference_wrapper<const util::WeakPtr<ZombieProcess>>> ProcessEntry::zombie()
+    const {
+  if (auto* ptr = ktl::get_if<util::WeakPtr<ZombieProcess>>(&process_)) {
+    return std::reference_wrapper<const util::WeakPtr<ZombieProcess>>(*ptr);
   }
   return ktl::nullopt;
 }
@@ -80,6 +76,15 @@ PidEntry& PidTable::get_entry_mut(pid_t pid) {
     table_.insert_or_find(ktl::move(default_ptr));
   }
   return *table_.find(pid);
+}
+
+template <typename F>
+void PidTable::remove_item(pid_t pid, F&& do_remove) {
+  auto& entry = get_entry_mut(pid);
+  do_remove(entry);
+  if (!entry.task_.has_value() && entry.process_.is_none() && !entry.process_group_.has_value()) {
+    table_.erase(pid);
+  }
 }
 
 pid_t PidTable::allocate_pid() {
@@ -116,6 +121,7 @@ void PidTable::add_task(const fbl::RefPtr<Task>& task) {
 void PidTable::remove_task(pid_t pid) {
   remove_item(pid, [](auto& entry) {
     auto removed = ktl::move(entry.task_);
+    entry.task_ = ktl::nullopt;
     ZX_ASSERT(removed.has_value());
   });
 }
@@ -124,6 +130,30 @@ void PidTable::add_thread_group(const fbl::RefPtr<ThreadGroup>& thread_group) {
   auto& entry = get_entry_mut(thread_group->leader());
   ASSERT(entry.process_.is_none());
   entry.process_ = ProcessEntry::ThreadGroupCtor(util::WeakPtr<ThreadGroup>(thread_group.get()));
+}
+
+void PidTable::kill_process(pid_t pid, util::WeakPtr<ZombieProcess> zombie) {
+  auto& entry = get_entry_mut(pid);
+  ZX_ASSERT(entry.process_.thread_group().has_value());
+
+  // All tasks from the process are expected to be cleared from the table before the process
+  // becomes a zombie. We can't verify this for all tasks here, check it just for the leader.
+  ZX_ASSERT(!entry.task_.has_value());
+
+  entry.process_ = ProcessEntry::ZombieProcessCtor(zombie);
+}
+
+void PidTable::remove_zombie(pid_t pid) {
+  remove_item(pid, [](auto& entry) {
+    ZX_ASSERT(entry.process_.zombie().has_value());
+    entry.process_ = ProcessEntry::None();
+  });
+
+  // Notify thread group changes.
+  // TODO: Implement thread group change notification mechanism
+  // if (thread_group_notifier_) {
+  //   thread_group_notifier_->Notify();
+  // }
 }
 
 void PidTable::add_process_group(const fbl::RefPtr<ProcessGroup>& process_group) {

@@ -24,6 +24,44 @@ using namespace starnix::testing;
 namespace unit_testing {
 
 using starnix::ExitStatus;
+using starnix::ProcessExitInfo;
+using starnix::ProcessSelector;
+using starnix::WaitingOptions;
+using starnix::WaitResult;
+
+bool test_no_error_when_zombie() {
+  BEGIN_TEST;
+  auto [kernel, current_task] = create_kernel_task_and_unlocked();
+  auto child = (*current_task).clone_task_for_test(0, starnix_uapi::kSIGCHLD);
+
+  auto expected_result = WaitResult{
+      .pid = (*child)->id(),
+      .uid = 0,
+      .exit_info =
+          ProcessExitInfo{
+              .status = ExitStatus::Exit(1),
+              .exit_signal = starnix_uapi::kSIGCHLD,
+          },
+      .time_stats = {},
+  };
+
+  (*child)->thread_group()->exit(ExitStatus::Exit(1), ktl::nullopt);
+  child.~AutoReleasableTask();
+
+  auto result = friend_wait_on_pid(*current_task, ProcessSelector::AnyProcess(),
+                                   WaitingOptions::new_for_wait4(0, 0).value());
+  ASSERT_TRUE(result.is_ok());
+  ASSERT_TRUE(result.value().has_value());
+
+  ASSERT_EQ(expected_result.pid, result.value()->pid);
+  ASSERT_EQ(expected_result.uid, result.value()->uid);
+  ASSERT_EQ(ExitStatus::wait_status(expected_result.exit_info.status),
+            ExitStatus::wait_status(result.value()->exit_info.status));
+  ASSERT_EQ(expected_result.time_stats.user_time_ns, result.value()->time_stats.user_time_ns);
+  ASSERT_EQ(expected_result.time_stats.system_time_ns, result.value()->time_stats.system_time_ns);
+
+  END_TEST;
+}
 
 bool test_wait4_by_pgid() {
   BEGIN_TEST;
@@ -53,6 +91,7 @@ bool test_wait4_by_pgid() {
 }  // namespace unit_testing
 
 UNITTEST_START_TESTCASE(starnix_signal_syscalls)
+UNITTEST("test no error when zombie", unit_testing::test_no_error_when_zombie)
 UNITTEST("test wait4 by pgid", unit_testing::test_wait4_by_pgid)
 UNITTEST_END_TESTCASE(starnix_signal_syscalls, "starnix_signal_syscalls",
                       "Tests for Signal Syscalls")
