@@ -8,7 +8,7 @@ import("//build/sdk/sdk_molecule.gni")
 # The list of FIDLs to include in the core IDK.
 # When removing a library from all such lists, delete all of its history files:
 #   git rm sdk/history/*/<library_name>.api_summary.json
-sdk_fidl_targets = [
+_partner_idk_fidl_libraries_targets_list = [
   # keep-sorted: begin
   "//sdk/fidl/fuchsia.accessibility.gesture:fuchsia.accessibility.gesture",
   "//sdk/fidl/fuchsia.accessibility.semantics:fuchsia.accessibility.semantics",
@@ -212,7 +212,7 @@ sdk_fidl_targets = [
 group("plasa") {
   testonly = true
   deps = []
-  foreach(target, sdk_fidl_targets) {
+  foreach(target, _partner_idk_fidl_libraries_targets_list) {
     deps += [ "${target}_plasa($fidl_toolchain)" ]
   }
 }
@@ -228,7 +228,7 @@ sdk_molecule("fidl") {
   category = "partner"
 
   deps = []
-  foreach(target, sdk_fidl_targets) {
+  foreach(target, _partner_idk_fidl_libraries_targets_list) {
     deps += [ "${target}_sdk($fidl_toolchain)" ]
   }
 
@@ -241,14 +241,12 @@ sdk_molecule("fidl") {
 }
 
 group("sdk_fidl_partner_allowlist") {
-  visibility = sdk_fidl_targets
+  visibility = _partner_idk_fidl_libraries_targets_list
 }
 
 group("sdk_partner_libs") {
   public_deps = []
-  fidl_libs = sdk_fidl_targets
-
-  foreach(fidl_library, fidl_libs) {
+  foreach(fidl_library, _partner_idk_fidl_libraries_targets_list) {
     public_deps += [
       "${fidl_library}($fidl_toolchain)",
       "${fidl_library}_sdk($fidl_toolchain)",
@@ -262,57 +260,54 @@ group("sdk_partner_libs") {
 # these libraries.
 # When removing a library from all such lists, delete all of its history files:
 #   git rm sdk/history/*/<library_name>.api_summary.json
-_sdk_partner_internal_fidl_libraries = [
+_partner_internal_fidl_libraries_targets_list = [
   # keep-sorted: begin
-  "fuchsia.audio",
-  "fuchsia.audio.controller",
-  "fuchsia.audio.device",
-  "fuchsia.bluetooth.pandora",
-  "fuchsia.dash",
-  "fuchsia.debugdata",
-  "fuchsia.debugger",
-  "fuchsia.developer.ffxdaemonlifecycle",
-  "fuchsia.developer.remotecontrol",
-  "fuchsia.diagnostics.host",
-  "fuchsia.drm",
-  "fuchsia.fs",
-  "fuchsia.hardware.pty",
-  "fuchsia.media2",
-  "fuchsia.memory.attribution.plugin",
-  "fuchsia.memory.debug",
-  "fuchsia.memory.heapdump.client",
-  "fuchsia.memory.inspection",
-  "fuchsia.net.name",
-  "fuchsia.overnet.protocol",
-  "fuchsia.posix",
-  "fuchsia.posix.socket",
-  "fuchsia.posix.socket.packet",
-  "fuchsia.posix.socket.raw",
-  "fuchsia.power.metrics",
-  "fuchsia.session.power",
-  "fuchsia.starnix.container",
-  "fuchsia.starnix.runner",
-  "fuchsia.sys2",
-  "fuchsia.test.manager",
-  "fuchsia.testing.harness",
-  "fuchsia.vulkan.loader",
+  "//sdk/fidl/fuchsia.audio:fuchsia.audio",
+  "//sdk/fidl/fuchsia.audio.controller:fuchsia.audio.controller",
+  "//sdk/fidl/fuchsia.audio.device:fuchsia.audio.device",
+  "//sdk/fidl/fuchsia.bluetooth.pandora:fuchsia.bluetooth.pandora",
+  "//sdk/fidl/fuchsia.dash:fuchsia.dash",
+  "//sdk/fidl/fuchsia.debugdata:fuchsia.debugdata",
+  "//sdk/fidl/fuchsia.debugger:fuchsia.debugger",
+  "//sdk/fidl/fuchsia.developer.ffxdaemonlifecycle:fuchsia.developer.ffxdaemonlifecycle",
+  "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol",
+  "//sdk/fidl/fuchsia.diagnostics.host:fuchsia.diagnostics.host",
+  "//sdk/fidl/fuchsia.drm:fuchsia.drm",
+  "//sdk/fidl/fuchsia.fs:fuchsia.fs",
+  "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty",
+  "//sdk/fidl/fuchsia.media2:fuchsia.media2",
+  "//sdk/fidl/fuchsia.memory.attribution.plugin:fuchsia.memory.attribution.plugin",
+  "//sdk/fidl/fuchsia.memory.debug:fuchsia.memory.debug",
+  "//sdk/fidl/fuchsia.memory.heapdump.client:fuchsia.memory.heapdump.client",
+  "//sdk/fidl/fuchsia.memory.inspection:fuchsia.memory.inspection",
+  "//sdk/fidl/fuchsia.net.name:fuchsia.net.name",
+  "//sdk/fidl/fuchsia.overnet.protocol:fuchsia.overnet.protocol",
+  "//sdk/fidl/fuchsia.posix:fuchsia.posix",
+  "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket",
+  "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet",
+  "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw",
+  "//sdk/fidl/fuchsia.power.metrics:fuchsia.power.metrics",
+  "//sdk/fidl/fuchsia.session.power:fuchsia.session.power",
+  "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container",
+  "//sdk/fidl/fuchsia.starnix.runner:fuchsia.starnix.runner",
+  "//sdk/fidl/fuchsia.sys2:fuchsia.sys2",
+  "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager",
+  "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness",
+  "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader",
 
   # keep-sorted: end
 ]
 
 group("sdk_partner_internal_libs") {
   public_deps = []
-  foreach(fidl_library, _sdk_partner_internal_fidl_libraries) {
+  foreach(fidl_library, _partner_internal_fidl_libraries_targets_list) {
     public_deps += [
-      "//sdk/fidl/${fidl_library}:${fidl_library}_sdk($fidl_toolchain)",
-      "//sdk/fidl/${fidl_library}($fidl_toolchain)",
+      "${fidl_library}($fidl_toolchain)",
+      "${fidl_library}_sdk($fidl_toolchain)",
     ]
   }
 }
 
 group("sdk_partner_internal_libs_allowlist") {
-  visibility = []
-  foreach(fidl_library, _sdk_partner_internal_fidl_libraries) {
-    visibility += [ "//sdk/fidl/${fidl_library}($fidl_toolchain)" ]
-  }
+  visibility = _partner_internal_fidl_libraries_targets_list
 }
