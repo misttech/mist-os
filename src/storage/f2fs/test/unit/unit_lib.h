@@ -112,9 +112,9 @@ class FileTester {
                           std::string_view oldname, std::string_view newname);
   static void CreateChildren(F2fs *fs, std::vector<fbl::RefPtr<VnodeF2fs>> &vnodes,
                              std::vector<uint32_t> &inos, fbl::RefPtr<Dir> &parent,
-                             std::string name, uint32_t inode_cnt);
+                             std::string name, size_t inode_cnt);
   static void DeleteChildren(std::vector<fbl::RefPtr<VnodeF2fs>> &vnodes, fbl::RefPtr<Dir> &parent,
-                             uint32_t inode_cnt);
+                             size_t inode_cnt);
 
   static void VnodeWithoutParent(F2fs *fs, umode_t mode, fbl::RefPtr<VnodeF2fs> &vnode);
 

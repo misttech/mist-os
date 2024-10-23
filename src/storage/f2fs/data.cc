@@ -258,9 +258,7 @@ zx::result<std::vector<LockedPage>> VnodeF2fs::WriteBegin(const size_t offset, c
   const size_t offset_end = safemath::CheckAdd<size_t>(offset, len).ValueOrDie();
   const pgoff_t index_end = CheckedDivRoundUp<pgoff_t>(offset_end, kBlockSize);
 
-  std::vector<LockedPage> data_pages;
-  data_pages.reserve(index_end - index_start);
-  auto pages_or = GrabLockedPages(index_start, index_end);
+  zx::result pages_or = GrabLockedPages(index_start, index_end);
   if (unlikely(pages_or.is_error())) {
     return pages_or.take_error();
   }
@@ -269,17 +267,19 @@ zx::result<std::vector<LockedPage>> VnodeF2fs::WriteBegin(const size_t offset, c
     ZX_DEBUG_ASSERT(!HasLink());
     return zx::ok(std::move(pages_or.value()));
   }
-  data_pages = std::move(pages_or.value());
-  for (auto &page : data_pages) {
+
+  for (auto &page : *pages_or) {
     page.WaitOnWriteback();
     page.SetDirty();
   }
   std::vector<block_t> data_block_addresses;
   if (auto result = GetDataBlockAddresses(index_start, index_end - index_start);
       result.is_error()) {
+    pages_or->clear();
+    TruncateHoleUnsafe(index_start, index_end);
     return result.take_error();
   }
-  return zx::ok(std::move(data_pages));
+  return zx::ok(*std::move(pages_or));
 }
 
 zx::result<std::vector<block_t>> VnodeF2fs::GetDataBlockAddresses(
