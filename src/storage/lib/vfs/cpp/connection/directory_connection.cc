@@ -103,6 +103,11 @@ void DirectoryConnection::Clone(CloneRequestView request, CloneCompleter::Sync& 
   Connection::NodeClone(request->flags, VnodeProtocol::kDirectory, std::move(request->object));
 }
 
+void DirectoryConnection::Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) {
+  Connection::NodeClone2(fio::Flags::kProtocolDirectory | fs::internal::RightsToFlags(rights()),
+                         request->request.TakeChannel());
+}
+
 void DirectoryConnection::Close(CloseCompleter::Sync& completer) {
   completer.Reply(CloseVnode(koid_));
   Unbind();

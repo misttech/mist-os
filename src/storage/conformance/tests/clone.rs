@@ -3,9 +3,8 @@
 // found in the LICENSE file.
 
 use assert_matches::assert_matches;
-use fidl::endpoints::{create_proxy, ServerEnd};
+use fidl::endpoints::{create_proxy, Proxy as _, ServerEnd};
 use fidl_fuchsia_io as fio;
-use futures::TryStreamExt as _;
 use io_conformance_util::flags::Rights;
 use io_conformance_util::test_harness::TestHarness;
 use io_conformance_util::*;
@@ -152,71 +151,125 @@ async fn clone_directory_with_additional_rights() {
 }
 
 #[fuchsia::test]
-async fn clone2_file_unsupported() {
+async fn clone2_file() {
     let harness = TestHarness::new().await;
 
     let root = root_directory(vec![file(TEST_FILE, vec![])]);
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
-    let file_proxy =
-        open_file_with_flags(&test_dir, fio::OpenFlags::RIGHT_READABLE, TEST_FILE).await;
+    let file = test_dir
+        .open3_node::<fio::FileMarker>(
+            &TEST_FILE,
+            fio::Flags::PROTOCOL_FILE | fio::Flags::PERM_GET_ATTRIBUTES | fio::Flags::PERM_READ,
+            None,
+        )
+        .await
+        .unwrap();
 
-    // fuchsia.unknown/Cloneable.Clone2
-    let (clone_proxy, clone_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    file_proxy.clone2(ServerEnd::new(clone_server.into_channel())).unwrap();
-    assert_matches!(
-        clone_proxy.take_event_stream().try_next().await,
-        Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+    let (clone_proxy, clone_server) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+    file.clone2(ServerEnd::new(clone_server.into_channel())).unwrap();
+    assert_eq!(
+        clone_proxy.get_connection_info().await.unwrap(),
+        fio::ConnectionInfo {
+            rights: Some(fio::Rights::GET_ATTRIBUTES | fio::Rights::READ_BYTES),
+            ..Default::default()
+        }
     );
+    // Make sure the file protocol was served by invoking some file methods.
+    let _data: Vec<u8> = clone_proxy
+        .read(0)
+        .await
+        .expect("read failed")
+        .map_err(zx::Status::from_raw)
+        .expect("read error");
 }
 
 #[fuchsia::test]
-async fn clone2_file_node_reference_unsupported() {
+async fn clone2_file_node_reference() {
     let harness = TestHarness::new().await;
 
     let root = root_directory(vec![file(TEST_FILE, vec![])]);
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
-    let file_proxy =
-        open_file_with_flags(&test_dir, fio::OpenFlags::NODE_REFERENCE, TEST_FILE).await;
+    let node = test_dir
+        .open3_node::<fio::NodeMarker>(
+            &TEST_FILE,
+            fio::Flags::PROTOCOL_NODE | fio::Flags::PERM_GET_ATTRIBUTES,
+            None,
+        )
+        .await
+        .unwrap();
 
     // fuchsia.unknown/Cloneable.Clone2
     let (clone_proxy, clone_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    file_proxy.clone2(ServerEnd::new(clone_server.into_channel())).unwrap();
+    node.clone2(ServerEnd::new(clone_server.into_channel())).unwrap();
+    assert_eq!(
+        clone_proxy.get_connection_info().await.unwrap(),
+        fio::ConnectionInfo { rights: Some(fio::Rights::GET_ATTRIBUTES), ..Default::default() }
+    );
+
+    // We should fail to invoke file methods since this connection doesn't serve the file protocol.
+    let wrong_protocol = fio::FileProxy::from_channel(clone_proxy.into_channel().unwrap());
     assert_matches!(
-        clone_proxy.take_event_stream().try_next().await,
-        Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+        wrong_protocol.read(0).await,
+        Err(fidl::Error::ClientChannelClosed { status: zx::Status::PEER_CLOSED, .. })
     );
 }
 
 #[fuchsia::test]
-async fn clone2_directory_unsupported() {
+async fn clone2_directory() {
     let harness = TestHarness::new().await;
 
     let root = root_directory(vec![directory("dir", vec![])]);
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
-    let dir_proxy = open_dir_with_flags(&test_dir, fio::OpenFlags::RIGHT_READABLE, "dir").await;
+    let dir = test_dir
+        .open3_node::<fio::DirectoryMarker>(
+            "dir",
+            fio::Flags::PROTOCOL_DIRECTORY | fio::Flags::PERM_TRAVERSE,
+            None,
+        )
+        .await
+        .unwrap();
 
-    // fuchsia.unknown/Cloneable.Clone2
-    let (clone_proxy, clone_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    dir_proxy.clone2(ServerEnd::new(clone_server.into_channel())).unwrap();
+    let (clone_proxy, clone_server) =
+        fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+    dir.clone2(ServerEnd::new(clone_server.into_channel())).unwrap();
+    assert_eq!(
+        clone_proxy.get_connection_info().await.unwrap(),
+        fio::ConnectionInfo { rights: Some(fio::Rights::TRAVERSE), ..Default::default() }
+    );
+    // Make sure the directory protocol was served by invoking a directory method.
     assert_matches!(
-        clone_proxy.take_event_stream().try_next().await,
-        Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+        clone_proxy.open3_node::<fio::NodeMarker>(".", fio::Flags::PROTOCOL_NODE, None).await,
+        Ok(_)
     );
 }
 
 #[fuchsia::test]
-async fn clone2_directory_node_reference_unsupported() {
+async fn clone2_directory_node_reference() {
     let harness = TestHarness::new().await;
 
     let root = root_directory(vec![directory("dir", vec![])]);
     let test_dir = harness.get_directory(root, harness.dir_rights.all());
-    let dir_proxy = open_dir_with_flags(&test_dir, fio::OpenFlags::NODE_REFERENCE, "dir").await;
+    let node = test_dir
+        .open3_node::<fio::NodeMarker>(
+            "dir",
+            fio::Flags::PROTOCOL_NODE | fio::Flags::PERM_GET_ATTRIBUTES,
+            None,
+        )
+        .await
+        .unwrap();
 
     // fuchsia.unknown/Cloneable.Clone2
     let (clone_proxy, clone_server) = fidl::endpoints::create_proxy::<fio::NodeMarker>().unwrap();
-    dir_proxy.clone2(ServerEnd::new(clone_server.into_channel())).unwrap();
+    node.clone2(ServerEnd::new(clone_server.into_channel())).unwrap();
+    assert_eq!(
+        clone_proxy.get_connection_info().await.unwrap(),
+        fio::ConnectionInfo { rights: Some(fio::Rights::GET_ATTRIBUTES), ..Default::default() }
+    );
+
+    // We should fail to invoke directory methods since this isn't a directory connection.
+    let wrong_protocol = fio::DirectoryProxy::from_channel(clone_proxy.into_channel().unwrap());
     assert_matches!(
-        clone_proxy.take_event_stream().try_next().await,
-        Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_SUPPORTED, .. })
+        wrong_protocol.open3_node::<fio::NodeMarker>(".", fio::Flags::PROTOCOL_NODE, None).await,
+        Err(zx::Status::PEER_CLOSED)
     );
 }

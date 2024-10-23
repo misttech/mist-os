@@ -163,7 +163,7 @@ impl<N: Node> Connection<N> {
             fio::NodeRequest::Clone2 { request, control_handle: _ } => {
                 // TODO(https://fxbug.dev/324112547): Handle unimplemented io2 method.
                 // Suppress any errors in the event a bad `request` channel was provided.
-                let _: Result<_, _> = request.close_with_epitaph(Status::NOT_SUPPORTED);
+                self.handle_reopen(ServerEnd::new(request.into_channel()));
             }
             fio::NodeRequest::Close { responder } => {
                 responder.send(Ok(()))?;
@@ -246,6 +246,20 @@ impl<N: Node> Connection<N> {
             });
 
             Ok(())
+        });
+    }
+
+    fn handle_reopen(&mut self, server_end: ServerEnd<fio::NodeMarker>) {
+        self.node.will_clone();
+        let connection = Self {
+            scope: self.scope.clone(),
+            node: OpenNode::new(self.node.clone()),
+            options: self.options,
+        };
+        self.scope.spawn(async move {
+            if let Ok(requests) = server_end.into_stream() {
+                connection.handle_requests(requests).await;
+            }
         });
     }
 }

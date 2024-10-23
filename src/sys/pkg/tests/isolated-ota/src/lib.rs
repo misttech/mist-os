@@ -538,10 +538,11 @@ async fn serve_failing_blobfs(
             fio::DirectoryRequest::Clone { flags, object, control_handle: _ } => {
                 launch_cloned_blobfs(object, flags, open_flags)
             }
-            fio::DirectoryRequest::Clone2 { request, control_handle: _ } => {
-                let _ = request;
-                todo!("https://fxbug.dev/324112547");
-            }
+            fio::DirectoryRequest::Clone2 { request, control_handle: _ } => launch_cloned_blobfs(
+                ServerEnd::new(request.into_channel()),
+                fio::OpenFlags::CLONE_SAME_RIGHTS,
+                open_flags & fio::OPEN_RIGHTS,
+            ),
             fio::DirectoryRequest::Close { responder } => {
                 responder.send(Err(zx::Status::IO.into_raw())).context("failing close")?
             }

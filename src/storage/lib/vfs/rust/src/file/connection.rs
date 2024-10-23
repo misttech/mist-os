@@ -575,9 +575,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
             }
             fio::FileRequest::Clone2 { request, control_handle: _ } => {
                 trace::duration!(c"storage", c"File::Clone2");
-                // TODO(https://fxbug.dev/324112547): Handle unimplemented io2 method.
-                // Suppress any errors in the event a bad `request` channel was provided.
-                let _: Result<_, _> = request.close_with_epitaph(Status::NOT_SUPPORTED);
+                self.handle_clone2(ServerEnd::new(request.into_channel()));
             }
             fio::FileRequest::Close { responder } => {
                 return Ok(ConnectionState::Closed(responder));
@@ -847,6 +845,21 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
             });
 
             Ok(())
+        });
+    }
+
+    fn handle_clone2(&mut self, server_end: ServerEnd<fio::FileMarker>) {
+        let connection = match self.file.clone_connection(self.options) {
+            Ok(file) => Self { scope: self.scope.clone(), file, options: self.options },
+            Err(status) => {
+                let _ = server_end.close_with_epitaph(status);
+                return;
+            }
+        };
+        self.scope.spawn(async move {
+            if let Ok(requests) = server_end.into_stream() {
+                connection.handle_requests(requests).await;
+            }
         });
     }
 

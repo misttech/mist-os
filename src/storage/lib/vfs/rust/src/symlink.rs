@@ -96,7 +96,10 @@ impl<T: Symlink> Connection<T> {
             }
             fio::SymlinkRequest::Clone2 { request, control_handle: _ } => {
                 // TODO(https://fxbug.dev/324112547): Handle unimplemented io2 method.
-                // Suppress any errors in the event a bad `request` channel was provided.
+                // Suppress any errors in the event a bad `request` channel was provided.\
+
+                // FIXME
+
                 let _: Result<_, _> = request.close_with_epitaph(Status::NOT_SUPPORTED);
             }
             fio::SymlinkRequest::Close { responder } => {

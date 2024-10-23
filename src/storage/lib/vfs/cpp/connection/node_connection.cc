@@ -47,6 +47,11 @@ void NodeConnection::Clone(CloneRequestView request, CloneCompleter::Sync& compl
   Connection::NodeClone(request->flags, VnodeProtocol::kNode, std::move(request->object));
 }
 
+void NodeConnection::Clone2(Clone2RequestView request, Clone2Completer::Sync& completer) {
+  Connection::NodeClone2(fio::Flags::kProtocolNode | fs::internal::RightsToFlags(rights()),
+                         request->request.TakeChannel());
+}
+
 void NodeConnection::Close(CloseCompleter::Sync& completer) {
   completer.Reply(zx::ok());
   Unbind();
