@@ -41,10 +41,6 @@ declare_args() {
 #     Alternative to gopackages, a library GN label corresponding to the
 #     package to build.
 #
-#   use_prebuilt_go (optional)
-#     If true, use a prebuilt go toolchain, rather than building the toolchain.
-#     If not set, defaults to false when targeting Fuchsia and true otherwise.
-#
 #   sdk_category (optional)
 #     Publication level of the library in SDKs.
 #     See //build/sdk/sdk_atom.gni.
@@ -125,8 +121,16 @@ template("go_build") {
 
   use_prebuilt_go = !is_fuchsia
   if (defined(invoker.use_prebuilt_go)) {
-    use_prebuilt_go = invoker.use_prebuilt_go
+    msg = "caller passing 'use_prebuilt_go': " +
+          get_label_info(":${target_name}", "label_with_toolchain") + " -> "
+    if (use_prebuilt_go == invoker.use_prebuilt_go) {
+      msg = "${msg}  passing default value for toolchain"
+    } else {
+      msg = "${msg}  overriding toolchain value: ${invoker.use_prebuilt_go}"
+    }
+    assert(false, msg)
   }
+
   goroot_deps = []
   if (use_prebuilt_go) {
     goroot = rebase_path(prebuilt_go_dir, root_build_dir)

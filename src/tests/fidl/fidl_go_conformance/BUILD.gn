@@ -11,7 +11,9 @@ import(
     "//third_party/go/src/syscall/zx/fidl/fidl_test/conformance_test_files.gni")
 import("//tools/fidl/gidl/gidl.gni")
 
-if ((is_host && is_linux) || has_board) {
+if (has_board) {
+  assert(!is_host, "conformance test is fuchsia-only (${current_toolchain})")
+
   generated_dir = "$target_gen_dir"
   generated_source = "$generated_dir/conformance_test.go"
 
@@ -52,11 +54,6 @@ if ((is_host && is_linux) || has_board) {
   go_test("fidl_go_conformance_tests") {
     library = ":conformance_tests_library"
     non_go_deps = [ ":conformance_suite" ]
-
-    # This runs both on target device and as a host test.
-    # In both cases, it needs to build a go toolchain rather than using a prebuilt because
-    # it is testing the fidl package, which is implemented in the toolcahin itself.
-    use_prebuilt_go = false
   }
 
   fuchsia_unittest_package("fidl_go_conformance") {
