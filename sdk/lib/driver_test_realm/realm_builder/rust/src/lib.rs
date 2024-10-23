@@ -64,6 +64,7 @@ impl DriverTestRealmBuilder for RealmBuilder {
                     "fuchsia.component.resolution.Resolver-hermetic",
                 ))
                 .capability(Capability::protocol_by_name("fuchsia.pkg.PackageResolver-hermetic"))
+                .capability(Capability::dictionary("diagnostics"))
                 .from(Ref::parent())
                 .to(&driver_realm),
         )
