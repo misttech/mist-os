@@ -56,7 +56,7 @@ fit::result<zx_status_t, ktl::pair<KernelHandle<ProcessDispatcher>, Vmar>> creat
 fit::result<zx_status_t, KernelHandle<ThreadDispatcher>> create_thread(
     fbl::RefPtr<ProcessDispatcher> parent, const ktl::string_view& name);
 
-fit::result<zx_status_t> run_task(const CurrentTask& current_task);
+fit::result<zx_status_t> run_task(CurrentTask current_task);
 
 template <typename PreRunFn, typename TaskCompleteFn>
 void execute_task(TaskBuilder task_builder, PreRunFn&& pre_run,
@@ -82,7 +82,7 @@ void execute_task(TaskBuilder task_builder, PreRunFn&& pre_run,
            pre_run_result.error_value().error_code());
   } else {
     // Spawn the process' thread.
-    auto run_result = run_task(current_task);
+    auto run_result = run_task(ktl::move(current_task));
     if (run_result.is_error()) {
       TRACEF("Failed to run task %d\n", run_result.error_value());
     }

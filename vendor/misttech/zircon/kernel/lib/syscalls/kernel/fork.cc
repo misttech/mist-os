@@ -21,7 +21,7 @@ long sys_a0056_clone(uint64_t clone_flags, uint64_t newsp, user_out_ptr<int32_t>
                      user_out_ptr<int32_t> child_tidptr, uint64_t tls) {
   LTRACEF_LEVEL(2, "clone_flags=0x%lx, newsp=0x%lx, parent_tidptr=%p, child_tidptr=%p, tls=%lu\n",
                 clone_flags, newsp, parent_tidptr.get(), child_tidptr.get(), tls);
-  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  auto& current_task = ThreadDispatcher::GetCurrent()->task()->into();
   return execute_syscall(
       starnix::sys_clone, current_task, clone_flags, UserAddress::const_from(newsp),
       UserRef<pid_t>::From(
@@ -31,11 +31,11 @@ long sys_a0056_clone(uint64_t clone_flags, uint64_t newsp, user_out_ptr<int32_t>
 }
 
 long sys_a0057_fork() {
-  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  auto& current_task = ThreadDispatcher::GetCurrent()->task()->into();
   return execute_syscall(starnix::sys_fork, current_task);
 }
 
 long sys_a0058_vfork() {
-  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  auto& current_task = ThreadDispatcher::GetCurrent()->task()->into();
   return execute_syscall(starnix::sys_vfork, current_task);
 }

@@ -21,14 +21,15 @@
 
 long sys_a0060_exit(int32_t error_code) {
   LTRACEF_LEVEL(2, "error_code=%d\n", error_code);
-  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
-  return execute_syscall(starnix::sys_exit, current_task, error_code);
+  auto& current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  execute_syscall(starnix::sys_exit, current_task, error_code);
+  __UNREACHABLE;
 }
 
 long sys_a0061_wait4(int32_t upid, user_in_ptr<const int32_t> stat_addr, int32_t options,
                      user_out_ptr<void> ru) {
   LTRACEF_LEVEL(2, "upid=%d options=0x%x\n", upid, options);
-  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  auto& current_task = ThreadDispatcher::GetCurrent()->task()->into();
   return execute_syscall(starnix::sys_wait4, current_task, upid,
                          UserRef<int32_t>::From(UserAddress::from_ptr((zx_vaddr_t)stat_addr.get())),
                          static_cast<uint32_t>(options),
@@ -38,6 +39,7 @@ long sys_a0061_wait4(int32_t upid, user_in_ptr<const int32_t> stat_addr, int32_t
 
 long sys_a0231_exit_group(int32_t error_code) {
   LTRACEF_LEVEL(2, "error_code=%d\n", error_code);
-  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
-  return execute_syscall(starnix::sys_exit_group, current_task, error_code);
+  auto& current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  execute_syscall(starnix::sys_exit_group, current_task, error_code);
+  __UNREACHABLE;
 }

@@ -17,7 +17,7 @@
 
 long sys_a0010_mprotect(uint64_t start, size_t len, uint64_t prot) {
   LTRACEF_LEVEL(2, "start=0x%lx len=%ld prot=0x%lx\n", start, len, prot);
-  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  auto& current_task = ThreadDispatcher::GetCurrent()->task()->into();
   return execute_syscall(starnix::sys_mprotect, current_task, UserAddress::const_from(start), len,
                          static_cast<uint32_t>(prot));
 }

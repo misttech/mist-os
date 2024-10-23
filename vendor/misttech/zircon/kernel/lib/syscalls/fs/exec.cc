@@ -22,7 +22,7 @@ using starnix_uapi::UserRef;
 
 long sys_a0059_execve(user_in_ptr<const char> filename, user_in_ptr<const char> argv,
                       user_in_ptr<const char> envp) {
-  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  auto& current_task = ThreadDispatcher::GetCurrent()->task()->into();
   auto user_argv = UserCString::New(UserAddress::from_ptr((zx_vaddr_t)(argv.get())));
   auto user_envp = UserCString::New(UserAddress::from_ptr((zx_vaddr_t)(envp.get())));
   return execute_syscall(starnix::sys_execve, current_task,
@@ -33,7 +33,7 @@ long sys_a0059_execve(user_in_ptr<const char> filename, user_in_ptr<const char> 
 
 long sys_a0322_execveat(int32_t fd, user_in_ptr<const char> filename, user_in_ptr<const char> argv,
                         user_in_ptr<const char> envp, int32_t flags) {
-  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  auto& current_task = ThreadDispatcher::GetCurrent()->task()->into();
   auto user_filename = UserCString::New(UserAddress::from_ptr((zx_vaddr_t)(filename.get())));
   auto user_argv = UserCString::New(UserAddress::from_ptr((zx_vaddr_t)(argv.get())));
   auto user_envp = UserCString::New(UserAddress::from_ptr((zx_vaddr_t)(envp.get())));

@@ -97,25 +97,24 @@ fit::result<zx_status_t, KernelHandle<ThreadDispatcher>> create_thread(
   return fit::ok(ktl::move(handle));
 }
 
-fit::result<zx_status_t> run_task(const CurrentTask& current_task) {
-  auto thread = current_task->thread().Read();
-
-  if (thread->has_value()) {
-    auto t = thread->value();
+fit::result<zx_status_t> run_task(CurrentTask current_task) {
+  auto thread_lock = current_task->thread().Read();
+  if (thread_lock->has_value()) {
+    auto thread = thread_lock->value();
     auto task = current_task.weak_task().Lock();
+    auto thread_state = current_task.thread_state();
     fbl::AllocChecker ac;
-    t->SetTask(fbl::MakeRefCountedChecked<TaskWrapper>(&ac, task));
+    thread->SetTask(fbl::MakeRefCountedChecked<TaskWrapper>(&ac, ktl::move(current_task)));
     if (!ac.check()) {
       return fit::error(ZX_ERR_NO_MEMORY);
     }
-    ZX_ASSERT(t->AddObserver(task->observer(), task.get(), ZX_THREAD_TERMINATED) == ZX_OK);
+    ZX_ASSERT(thread->AddObserver(task->observer(), task.get(), ZX_THREAD_TERMINATED) == ZX_OK);
 
-    auto status =
-        t->Start(ThreadDispatcher::EntryState{.pc = current_task.thread_state().registers->rip,
-                                              .sp = current_task.thread_state().registers->rsp,
-                                              .arg1 = {},
-                                              .arg2 = 0},
-                 /* ensure_initial_thread= */ false);
+    auto status = thread->Start(ThreadDispatcher::EntryState{.pc = thread_state.registers->rip,
+                                                             .sp = thread_state.registers->rsp,
+                                                             .arg1 = {},
+                                                             .arg2 = 0},
+                                /* ensure_initial_thread= */ false);
     if (status != ZX_OK) {
       TRACEF("failed to start process %d\n", status);
       return fit::error(status);

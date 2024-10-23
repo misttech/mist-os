@@ -18,7 +18,7 @@
 int64_t sys_a0257_openat(int32_t dfd, user_in_ptr<const char> filename, int32_t flags,
                          uint16_t mode) {
   LTRACEF_LEVEL(2, "dfd=%d path=%p flags=%x mode=%x\n", dfd, filename.get(), flags, mode);
-  auto current_task = ThreadDispatcher::GetCurrent()->task()->into();
+  auto& current_task = ThreadDispatcher::GetCurrent()->task()->into();
   return execute_syscall(
       starnix::sys_openat, current_task, starnix::FdNumber::from_raw(dfd),
       starnix_uapi::UserCString::New(UserAddress::from_ptr((zx_vaddr_t)filename.get())), flags,
