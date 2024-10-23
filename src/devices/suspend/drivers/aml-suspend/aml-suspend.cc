@@ -149,7 +149,7 @@ zx_status_t AmlSuspend::SystemSuspendEnter(zx_time_t resume_deadline) {
 
 void AmlSuspend::Suspend(SuspendRequestView request, SuspendCompleter::Sync& completer) {
   fidl::Arena arena;
-  auto function_start = zx_clock_get_monotonic();
+  auto function_start = zx_clock_get_boot();
 
   if (!request->has_state_index() || request->state_index() != 0) {
     // This driver only supports one suspend state for now.
@@ -158,28 +158,29 @@ void AmlSuspend::Suspend(SuspendRequestView request, SuspendCompleter::Sync& com
     return;
   }
 
-  inspect_events_.CreateEntry(
-      [](inspect::Node& n) { n.RecordInt(fobs::kSuspendAttemptedAt, zx_clock_get_monotonic()); });
+  inspect_events_.CreateEntry([function_start](inspect::Node& n) {
+    n.RecordInt(fobs::kSuspendAttemptedAt, function_start);
+  });
 
-  // TODO(b/347768611): The Monotonic clock is not a suitable way to measure suspend duration.
-  //                    Switch to CLOCK_BOOTTIME when that becomes available.
-  auto suspend_start = zx_clock_get_monotonic();
+  auto suspend_start = zx_clock_get_boot();
   zx_status_t result = SystemSuspendEnter(zx::deadline_after(kDebugSuspendDuration).get());
-  auto suspend_return = zx_clock_get_monotonic();
+  auto suspend_return = zx_clock_get_boot();
 
   if (result != ZX_OK) {
     FDF_LOG(ERROR, "zx_system_suspend_enter failed: %s", zx_status_get_string(result));
-    inspect_events_.CreateEntry(
-        [](inspect::Node& n) { n.RecordInt(fobs::kSuspendFailedAt, zx_clock_get_monotonic()); });
+    inspect_events_.CreateEntry([suspend_return](inspect::Node& n) {
+      n.RecordInt(fobs::kSuspendFailedAt, suspend_return);
+    });
     completer.ReplyError(result);
   } else {
-    inspect_events_.CreateEntry(
-        [](inspect::Node& n) { n.RecordInt(fobs::kSuspendResumedAt, zx_clock_get_monotonic()); });
-    auto resp = fuchsia_hardware_suspend::wire::SuspenderSuspendResponse::Builder(arena)
-                    .suspend_duration(suspend_return - suspend_start)
-                    .suspend_overhead(suspend_start - function_start + zx_clock_get_monotonic() -
-                                      suspend_return)
-                    .Build();
+    inspect_events_.CreateEntry([suspend_return](inspect::Node& n) {
+      n.RecordInt(fobs::kSuspendResumedAt, suspend_return);
+    });
+    auto resp =
+        fuchsia_hardware_suspend::wire::SuspenderSuspendResponse::Builder(arena)
+            .suspend_duration(suspend_return - suspend_start)
+            .suspend_overhead(suspend_start - function_start + zx_clock_get_boot() - suspend_return)
+            .Build();
     completer.ReplySuccess(resp);
   }
 }
