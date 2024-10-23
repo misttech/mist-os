@@ -25,6 +25,9 @@
             environment: "#elf-env",
         },
     ],
+    capabilities: [
+        { dictionary: "diagnostics" },
+    ],
     offer: [
         {
             protocol: "fuchsia.logger.LogSink",
@@ -37,6 +40,21 @@
         {
             protocol: "fuchsia.logger.LogSink",
             from: "#archivist",
+            to: "#routing-tests",
+        },
+        {
+            protocol: "fuchsia.logger.LogSink",
+            from: "#archivist",
+            to: "self/diagnostics",
+        },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "#archivist",
+            to: "self/diagnostics",
+        },
+        {
+            dictionary: "diagnostics",
+            from: "self",
             to: "#routing-tests",
         },
         {
