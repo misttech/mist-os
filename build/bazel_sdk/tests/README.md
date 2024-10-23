@@ -108,7 +108,7 @@ fx set core.x64
 
 # Generate the final in-tree IDK. See //build/bazel/bazel_sdk/README.md
 # for more information.
-fx build //build/bazel:generate_final_in_tree_idk
+fx build //build/bazel:final_fuchsia_in_tree_idk
 export LOCAL_FUCHSIA_IDK_DIRECTORY=$(fx get-build-dir)/gen/build/bazel/fuchsia_in_tree_idk
 
 bazel test --config=fuchsia_x64 :tests

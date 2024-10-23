@@ -49,6 +49,14 @@ py_binary(
     main = "compare_bazel_sdks.py",
 )
 
+# An alias to @fuchsia_idk//:final_idk because the GN bazel_action()
+# template does not support listing targets that belong to repository
+# rules in its `bazel_targets` argument.
+alias(
+    name = "final_fuchsia_in_tree_idk",
+    actual = "@fuchsia_in_tree_idk//:final_idk",
+)
+
 generate_bazel_sdk(
     name = "bazel_in_tree_sdk",
     idk_export_dir = "@gn_targets//sdk:bazel_in_tree_idk",

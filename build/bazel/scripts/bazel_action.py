@@ -929,6 +929,34 @@ class DirectoryOutputsAction(argparse.Action):
 
 
 @dataclasses.dataclass
+class FinalSymlinkOutputs:
+    bazel_path: str
+    ninja_path: str
+
+
+class FinalSymlinkOutputsAction(argparse.Action):
+    """ArgumentParser action class to convert --final-symlink-outputs arguments into a FinalSymlinkOutputs instances."""
+
+    def __init__(  # type: ignore
+        self, option_strings, dest, nargs=None, default=None, **kwargs
+    ):
+        if nargs is not None:
+            raise ValueError("nargs not allowed")
+        if default is not None:
+            raise ValueError("default not allowed")
+        super().__init__(option_strings, dest, nargs="+", default=[], **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string):  # type: ignore
+        if len(values) != 2:
+            raise ValueError(f"expected 2 arguments for {option_string}")
+        dest_list = getattr(namespace, self.dest, [])
+        bazel_path = values[0]
+        ninja_path = values[1]
+        dest_list.append(FinalSymlinkOutputs(bazel_path, ninja_path))
+        setattr(namespace, self.dest, dest_list)
+
+
+@dataclasses.dataclass
 class PackageOutputs:
     package_label: str
     archive_path: Optional[str] = None
@@ -1021,6 +1049,11 @@ def main() -> int:
         "--package-outputs",
         action=PackageOutputsAction,
         help="A tuple of four values describing Fuchsia package related outputs. Fields are Bazel package target label, archive output path or 'NONE', manifest output path or 'NONE', and copy debug symbols flag as either 'true' or 'false' string",
+    )
+    parser.add_argument(
+        "--final-symlink-outputs",
+        action=FinalSymlinkOutputsAction,
+        help="A (bazel_path, ninja_path) pair to specify a single final symlink to a Bazel artifact.",
     )
 
     parser.add_argument(
@@ -1323,6 +1356,15 @@ def main() -> int:
         )
         return 1
 
+    final_symlinks = []
+    for final_symlink_output in args.final_symlink_outputs:
+        src_path = os.path.join(
+            os.path.join(args.workspace_dir, final_symlink_output.bazel_path)
+        )
+        target_path = os.path.realpath(src_path)
+        link_path = final_symlink_output.ninja_path
+        final_symlinks.append((target_path, link_path))
+
     if _build_fuchsia_package:
         bazel_execroot = find_bazel_execroot(args.workspace_dir)
 
@@ -1373,6 +1415,9 @@ def main() -> int:
 
     for src_path, dst_path in file_copies:
         copy_file_if_changed(src_path, dst_path, bazel_output_base_dir)
+
+    for target_path, link_path in final_symlinks:
+        force_symlink(target_path, link_path)
 
     dir_copies = []
     unwanted_files = []

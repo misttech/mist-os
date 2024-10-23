@@ -2103,7 +2103,7 @@ group("root_targets") {
 
     # Required to generate the symlink used by the Bazel SDK test suite when
     # invoked directly with Bazel. See //build/bazel_sdk/tests/README.md.
-    "//build/bazel:generate_final_fuchsia_in_tree_idk",
+    "//build/bazel:final_fuchsia_in_tree_idk",
   ]
 
   # Required by `fx publish` at runtime. Only included when package serving processes are needed.
