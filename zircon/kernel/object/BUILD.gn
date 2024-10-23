@@ -119,7 +119,21 @@ zx_library("object") {
   ]
 
   if (is_mistos) {
-    deps += [ "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-zircon" ]
+    deps += [
+      "//vendor/misttech/third_party/linux_uapi",
+      "//vendor/misttech/zircon/kernel/lib/mistos/util:headers",
+      "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-sync:headers",
+      "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-syscalls:headers",
+      "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-uapi:headers",
+      "//vendor/misttech/zircon/kernel/lib/starnix/lib/starnix-zircon",
+    ]
+
+    configs += [
+      # <object/thread_dispacther.h> has #include <lib/mistos/starnix/kernel/task/task.h>.
+      # But this is a circular dependency, so we can't use its :headers in deps.
+      #"//zircon/kernel/object:headers.config",
+      "//vendor/misttech/zircon/kernel/lib/starnix/kernel:starnix_core.headers.config",
+    ]
   }
 }
 

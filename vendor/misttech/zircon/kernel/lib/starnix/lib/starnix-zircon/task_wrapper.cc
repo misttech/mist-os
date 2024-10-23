@@ -14,11 +14,18 @@
 
 #define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
-TaskWrapper::TaskWrapper(fbl::RefPtr<starnix::Task> task) : task_(ktl::move(task)) {}
+TaskWrapper::TaskWrapper(ktl::optional<starnix::CurrentTask> task) : task_(ktl::move(task)) {
+  LTRACE_ENTRY_OBJ;
+}
 
-TaskWrapper::~TaskWrapper() { LTRACE_ENTRY_OBJ; }
+TaskWrapper::~TaskWrapper() {
+  LTRACE_ENTRY_OBJ;
+  ZX_ASSERT(task_.has_value());
+  task_->release();
+  LTRACE_EXIT_OBJ;
+}
 
-starnix::CurrentTask TaskWrapper::into() {
-  starnix::TaskBuilder builder(task_);
-  return starnix::CurrentTask::From(ktl::move(builder));
+starnix::CurrentTask& TaskWrapper::into() {
+  ZX_ASSERT(task_.has_value());
+  return task_.value();
 }
