@@ -180,6 +180,7 @@ template("golden_files") {
 
             forward_variables_from(invoker,
                                    [
+                                     "assert_no_deps",
                                      "deps",
                                      "public_deps",
                                    ])
@@ -233,6 +234,7 @@ template("golden_files") {
   action(main_target) {
     forward_variables_from(invoker,
                            [
+                             "assert_no_deps",
                              "visibility",
                              "testonly",
                              "deps",

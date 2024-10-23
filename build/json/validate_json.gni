@@ -50,6 +50,7 @@ template("validate_json") {
     forward_variables_from(invoker,
                            [
                              "applicable_licenses",
+                             "assert_no_deps",
                              "deps",
                              "sources",
                              "public_deps",
