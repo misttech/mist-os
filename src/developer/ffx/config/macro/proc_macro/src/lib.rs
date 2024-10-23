@@ -132,7 +132,7 @@ impl<'a> quote::ToTokens for FfxConfigField<'a> {
             ),
         };
         tokens.extend(quote! {
-            pub async fn #func_name(&self) -> ffx_config::macro_deps::anyhow::Result<#return_value> {
+            pub fn #func_name(&self) -> ffx_config::macro_deps::anyhow::Result<#return_value> {
                 let field = self.#func_name.clone();
                 Ok(if let Some(t) = field {
                     #top_level_return

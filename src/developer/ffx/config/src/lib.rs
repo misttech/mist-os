@@ -376,9 +376,9 @@ mod test {
         let env = ffx_config::test_init().await.expect("create test config");
         let mut empty_config_struct = TestConfigBackedStruct::default();
         assert!(empty_config_struct.value.is_none());
-        assert_eq!(empty_config_struct.value().await.unwrap(), "thing");
+        assert_eq!(empty_config_struct.value().unwrap(), "thing");
         assert!(empty_config_struct.reverse_value.is_none());
-        assert_eq!(empty_config_struct.reverse_value().await.unwrap(), "what");
+        assert_eq!(empty_config_struct.reverse_value().unwrap(), "what");
 
         env.context
             .query("test.test.thing")
@@ -395,10 +395,10 @@ mod test {
 
         // If this is set, this should pop up before the config values.
         empty_config_struct.value = Some("wat".to_owned());
-        assert_eq!(empty_config_struct.value().await.unwrap(), "wat");
+        assert_eq!(empty_config_struct.value().unwrap(), "wat");
         empty_config_struct.value = None;
-        assert_eq!(empty_config_struct.value().await.unwrap(), "config_value_thingy");
-        assert_eq!(empty_config_struct.other_value().await.unwrap().unwrap(), 2f64);
+        assert_eq!(empty_config_struct.value().unwrap(), "config_value_thingy");
+        assert_eq!(empty_config_struct.other_value().unwrap().unwrap(), 2f64);
         env.context
             .query("other.test.thing")
             .level(Some(ConfigLevel::User))

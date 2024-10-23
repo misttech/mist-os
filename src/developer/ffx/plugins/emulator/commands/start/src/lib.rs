@@ -189,9 +189,8 @@ impl<T: EngineOperations> EmuStartTool<T> {
             &self.engine_operations.get_emu_instances(),
         )
         .await?;
-        let engine_type =
-            EngineType::from_str(&self.cmd.engine().await.unwrap_or("femu".to_string()))
-                .context("Reading engine type from ffx config.")?;
+        let engine_type = EngineType::from_str(&self.cmd.engine().unwrap_or("femu".to_string()))
+            .context("Reading engine type from ffx config.")?;
 
         // Get the staged instance, if any
         let mut existing = self.engine_operations.get_engine_by_name(&mut self.cmd.name).await?;
@@ -360,7 +359,7 @@ impl<T: EngineOperations> EmuStartTool<T> {
     async fn finalize_start_command(&mut self) -> Result<Option<LoadedProductBundle>> {
         // name is important to not be empty since it is used to
         // create a directory path.
-        let mut name = self.cmd.name().await?;
+        let mut name = self.cmd.name()?;
         if self.cmd.name.is_none() || name == "" {
             if name == "" {
                 name = DEFAULT_NAME.into();
@@ -379,17 +378,17 @@ impl<T: EngineOperations> EmuStartTool<T> {
                 return Ok(Some(loaded_product_bundle));
             }
 
-            let gpu = self.cmd.gpu().await?;
+            let gpu = self.cmd.gpu()?;
             if self.cmd.gpu.is_none() && gpu != "" {
                 self.cmd.gpu = Some(gpu);
             }
 
-            let net = self.cmd.net().await?;
+            let net = self.cmd.net()?;
             if self.cmd.net.is_none() && net != "" {
                 self.cmd.net = Some(net);
             }
 
-            let startup_timeout = self.cmd.startup_timeout().await?;
+            let startup_timeout = self.cmd.startup_timeout()?;
             if self.cmd.startup_timeout.is_none() && startup_timeout > 0 {
                 self.cmd.startup_timeout = Some(startup_timeout);
             }
@@ -406,7 +405,7 @@ impl<T: EngineOperations> EmuStartTool<T> {
                     )
                 }
                 // Virtual device spec name
-                if let Some(device_name) = self.cmd.device().await? {
+                if let Some(device_name) = self.cmd.device()? {
                     if self.cmd.device.is_none() && device_name != "" {
                         self.cmd.device = Some(device_name);
                     } else {
@@ -431,7 +430,7 @@ impl<T: EngineOperations> EmuStartTool<T> {
                     None => Some("qemu".into()),
                 };
             } else {
-                let engine = self.cmd.engine().await?;
+                let engine = self.cmd.engine()?;
                 if self.cmd.engine.is_none() {
                     if engine != "" {
                         self.cmd.engine = Some(engine);
@@ -490,7 +489,7 @@ impl<T: EngineOperations> EmuStartTool<T> {
             return Ok((true, engine));
         } else {
             let engine_type =
-                EngineType::from_str(&self.cmd.engine().await.unwrap_or("femu".to_string()))
+                EngineType::from_str(&self.cmd.engine().unwrap_or("femu".to_string()))
                     .context("Reading engine type from ffx config.")?;
             engine = self.engine_operations.new_engine(&new_config, engine_type).await?;
             let config = engine.emu_config_mut();
