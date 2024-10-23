@@ -38,7 +38,7 @@ namespace usb_cdc_function {
 #define ETH_MTU 1500
 
 class UsbCdc;
-using UsbCdcType = ddk::Device<UsbCdc, ddk::Unbindable>;
+using UsbCdcType = ddk::Device<UsbCdc, ddk::Initializable, ddk::Unbindable>;
 
 class UsbCdc : public UsbCdcType,
                public ddk::EthernetImplProtocol<UsbCdc, ddk::base_protocol>,
@@ -49,6 +49,7 @@ class UsbCdc : public UsbCdcType,
   // Driver bind method.
   static zx_status_t Bind(void* ctx, zx_device_t* parent);
 
+  void DdkInit(ddk::InitTxn txn);
   void DdkRelease();
   void DdkSuspend(ddk::SuspendTxn txn);
   void DdkUnbind(ddk::UnbindTxn txn);
