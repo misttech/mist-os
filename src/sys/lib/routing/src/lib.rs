@@ -871,7 +871,7 @@ impl OfferVisitor for DirectoryState {
         match offer {
             cm_rust::OfferDecl::Directory(dir) => match dir.source {
                 OfferSource::Framework => self.finalize(
-                    RightsWalker::new(fio::RW_STAR_DIR, moniker.clone()),
+                    RightsWalker::new(fio::RX_STAR_DIR, moniker.clone()),
                     dir.subdir.clone(),
                 ),
                 _ => self.advance_with_offer(moniker, dir),
@@ -890,7 +890,7 @@ impl ExposeVisitor for DirectoryState {
         match expose {
             cm_rust::ExposeDecl::Directory(dir) => match dir.source {
                 ExposeSource::Framework => self.finalize(
-                    RightsWalker::new(fio::RW_STAR_DIR, moniker.clone()),
+                    RightsWalker::new(fio::RX_STAR_DIR, moniker.clone()),
                     dir.subdir.clone(),
                 ),
                 _ => self.advance_with_expose(moniker, dir),
@@ -948,7 +948,7 @@ where
             );
             if let UseSource::Framework = &use_decl.source {
                 state.finalize(
-                    RightsWalker::new(fio::RW_STAR_DIR, target.moniker().clone()),
+                    RightsWalker::new(fio::RX_STAR_DIR, target.moniker().clone()),
                     Default::default(),
                 )?;
             }
