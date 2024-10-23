@@ -80,14 +80,16 @@ async fn shutdown_watchdog(root: Arc<ComponentInstance>) {
     let mut interval = fuchsia_async::Interval::new(SHUTDOWN_WATCHDOG_INTERVAL);
     while let Some(_) = interval.next().await {
         info!(
-            "Shutdown not yet complete, pending components:\n{}",
-            get_all_remaining_monikers(&root).await.join("\n\t")
+            "Shutdown not yet complete, pending components: {}.\n\
+            To troubleshoot, try searching for component_manager log lines that begin with \
+            `=` such as =RS, =PS, and =FS (actions/shutdown.rs for details)",
+            num_still_running(&root).await
         );
     }
 }
 
-async fn get_all_remaining_monikers(root: &Arc<ComponentInstance>) -> Vec<String> {
-    let mut monikers = vec![];
+async fn num_still_running(root: &Arc<ComponentInstance>) -> usize {
+    let mut ctr = 0;
     let mut queue = VecDeque::new();
     queue.push_back(root.clone());
 
@@ -97,11 +99,11 @@ async fn get_all_remaining_monikers(root: &Arc<ComponentInstance>) -> Vec<String
             queue.extend(resolved_state.children().map(|(_, i)| i.clone()));
         }
         if state.is_started() {
-            monikers.push(next.moniker.to_string());
+            ctr += 1;
         }
     }
 
-    monikers
+    ctr
 }
 
 #[cfg(test)]
