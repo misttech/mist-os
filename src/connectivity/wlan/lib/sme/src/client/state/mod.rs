@@ -841,147 +841,6 @@ impl Roaming {
         Err(self.to_idle(msg, failure, state_change_ctx))
     }
 
-    // If the roam attempt succeeded, move into Associated with the selected BSS.
-    // If the roam attempt failed, return the next state, wrapped in AfterRoamFailureState.
-    fn on_roam_result_ind(
-        mut self,
-        ind: &fidl_mlme::RoamResultIndication,
-        state_change_ctx: &mut Option<StateChangeContext>,
-        context: &mut Context,
-    ) -> Result<Associated, AfterRoamFailureState> {
-        if ind.original_association_maintained {
-            warn!("RoamResultIndication claims that device is still associated with original BSS, but Fast BSS Transition is currently unsupported");
-        }
-
-        if ind.selected_bssid != *self.cmd.bss.bssid.as_array() {
-            let disconnect_info = make_roam_disconnect_info(
-                fidl_sme::DisconnectMlmeEventName::RoamResultIndication,
-                None,
-            );
-            let failure = RoamFailure {
-                failure_type: RoamFailureType::RoamResultMalformedFailure,
-                selected_bss: None,
-                disconnect_info,
-                selected_bssid: self.cmd.bss.bssid,
-                auth_method: self.auth_method,
-                status_code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
-                establish_rsna_failure_reason: None,
-            };
-            let msg = "Roam failed, RoamResultIndication has unexpected BSSID";
-            return Err(AfterRoamFailureState::Disconnecting(Self::to_disconnecting(
-                msg.to_owned(),
-                failure,
-                self.cfg,
-                self.cmd.connect_txn_sink,
-                state_change_ctx,
-                context,
-            )));
-        }
-
-        match ind.status_code {
-            fidl_ieee80211::StatusCode::Success => {
-                let wmm_param = parse_wmm_from_ies(&ind.association_ies);
-
-                // Get started with link state before going to Associated.
-                let link_state = match LinkState::new(self.cmd.protection, context) {
-                    Ok(link_state) => link_state,
-                    Err(failure_reason) => {
-                        let msg = format!("Roam failed; SME failed to initialize LinkState");
-                        let disconnect_info = make_roam_disconnect_info(
-                            fidl_sme::DisconnectMlmeEventName::RoamResultIndication,
-                            None,
-                        );
-                        let failure = RoamFailure {
-                            failure_type: RoamFailureType::EstablishRsnaFailure,
-                            selected_bss: Some(*self.cmd.bss.clone()),
-                            disconnect_info,
-                            selected_bssid: self.cmd.bss.bssid,
-                            auth_method: self.auth_method,
-                            status_code: fidl_ieee80211::StatusCode::EstablishRsnaFailure,
-                            establish_rsna_failure_reason: Some(failure_reason),
-                        };
-
-                        if ind.target_bss_authenticated {
-                            return Err(AfterRoamFailureState::Disconnecting(
-                                Self::to_disconnecting(
-                                    msg.to_owned(),
-                                    failure,
-                                    self.cfg,
-                                    self.cmd.connect_txn_sink,
-                                    state_change_ctx,
-                                    context,
-                                ),
-                            ));
-                        } else {
-                            report_roam_finished(&mut self.cmd.connect_txn_sink, failure.into());
-                            return Err(AfterRoamFailureState::Idle(Idle { cfg: self.cfg }));
-                        }
-                    }
-                };
-
-                let msg = "Fullmac-initiated roam succeeded";
-                let ssid = self.cmd.bss.ssid.clone();
-                _ = state_change_ctx.replace(StateChangeContext::Connect {
-                    msg: msg.to_owned(),
-                    bssid: self.cmd.bss.bssid.clone(),
-                    ssid,
-                });
-                self.cmd
-                    .connect_txn_sink
-                    .send_roam_result(RoamResult::Success(Box::new(*self.cmd.bss.clone())));
-                Ok(Associated {
-                    cfg: self.cfg,
-                    connect_txn_sink: self.cmd.connect_txn_sink,
-                    latest_ap_state: self.cmd.bss,
-                    auth_method: self.auth_method,
-                    last_signal_report_time: now(),
-                    link_state,
-                    protection_ie: self.protection_ie,
-                    // TODO(https://fxbug.dev/82654): Remove `wmm_param` field when wlanstack telemetry is deprecated.
-                    wmm_param,
-                    last_channel_switch_time: None,
-                    reassociation_loop_count: 0,
-                    authentication: self.cmd.authentication,
-                })
-            }
-            // Roam attempt failed.
-            _ => {
-                let msg = format!("Roam failed, status_code {:?}", ind.status_code);
-                error!("{}", msg);
-                let disconnect_info = make_roam_disconnect_info(
-                    fidl_sme::DisconnectMlmeEventName::RoamResultIndication,
-                    None,
-                );
-                let failure = RoamFailure {
-                    failure_type: RoamFailureType::ReassociationFailure,
-                    selected_bss: Some(*self.cmd.bss.clone()),
-                    disconnect_info,
-                    selected_bssid: self.cmd.bss.bssid,
-                    auth_method: self.auth_method,
-                    status_code: ind.status_code,
-                    establish_rsna_failure_reason: None,
-                };
-
-                if ind.target_bss_authenticated {
-                    Err(AfterRoamFailureState::Disconnecting(Self::to_disconnecting(
-                        msg.to_owned(),
-                        failure,
-                        self.cfg,
-                        self.cmd.connect_txn_sink,
-                        state_change_ctx,
-                        context,
-                    )))
-                } else {
-                    Err(AfterRoamFailureState::Idle(self.to_idle(
-                        msg.to_owned(),
-                        failure,
-                        state_change_ctx,
-                    )))
-                }
-            }
-        }
-    }
-
     fn on_sae_handshake_ind(
         &mut self,
         ind: fidl_mlme::SaeHandshakeIndication,
@@ -1310,7 +1169,18 @@ impl ClientState {
                 }
                 MlmeEvent::RoamResultInd { ind } => {
                     let (transition, roaming) = state.release_data();
-                    match roaming.on_roam_result_ind(&ind, &mut state_change_ctx, context) {
+                    match roam_handle_result(
+                        roaming,
+                        RoamResultFields {
+                            selected_bssid: ind.selected_bssid.into(),
+                            status_code: ind.status_code,
+                            original_association_maintained: ind.original_association_maintained,
+                            target_bss_authenticated: ind.target_bss_authenticated,
+                            association_ies: ind.association_ies,
+                        },
+                        context,
+                        &mut state_change_ctx,
+                    ) {
                         Ok(associated) => transition.to(associated).into(),
                         Err(after_roam_failure_state) => match after_roam_failure_state {
                             AfterRoamFailureState::Disconnecting(disconnecting) => {
@@ -1652,6 +1522,152 @@ fn roam_internal(
         // protection_ie from original connection is preserved.
         protection_ie: state.protection_ie,
     })
+}
+
+struct RoamResultFields {
+    selected_bssid: Bssid,
+    status_code: fidl_ieee80211::StatusCode,
+    original_association_maintained: bool,
+    target_bss_authenticated: bool,
+    association_ies: Vec<u8>,
+}
+
+fn roam_handle_result(
+    mut state: Roaming,
+    result_fields: RoamResultFields,
+    context: &mut Context,
+    state_change_ctx: &mut Option<StateChangeContext>,
+) -> Result<Associated, AfterRoamFailureState> {
+    if result_fields.original_association_maintained {
+        warn!("Roam result claims that device is still associated with original BSS, but Fast BSS Transition is currently unsupported");
+    }
+
+    if result_fields.selected_bssid != state.cmd.bss.bssid {
+        let disconnect_info = make_roam_disconnect_info(
+            fidl_sme::DisconnectMlmeEventName::RoamResultIndication,
+            None,
+        );
+        let failure_type = RoamFailureType::RoamResultMalformedFailure;
+        let failure = RoamFailure {
+            failure_type,
+            selected_bss: None,
+            disconnect_info,
+            selected_bssid: state.cmd.bss.bssid,
+            auth_method: state.auth_method,
+            status_code: fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+            establish_rsna_failure_reason: None,
+        };
+        return Err(AfterRoamFailureState::Disconnecting(Roaming::to_disconnecting(
+            "Roam failed; unexpected BSSID in result".to_owned(),
+            failure,
+            state.cfg,
+            state.cmd.connect_txn_sink,
+            state_change_ctx,
+            context,
+        )));
+    }
+
+    match result_fields.status_code {
+        fidl_ieee80211::StatusCode::Success => {
+            let wmm_param = parse_wmm_from_ies(&result_fields.association_ies);
+
+            // Get started with link state before going to Associated.
+            let link_state = match LinkState::new(state.cmd.protection, context) {
+                Ok(link_state) => link_state,
+                Err(failure_reason) => {
+                    let disconnect_info = make_roam_disconnect_info(
+                        fidl_sme::DisconnectMlmeEventName::RoamResultIndication,
+                        None,
+                    );
+                    let failure = RoamFailure {
+                        failure_type: RoamFailureType::EstablishRsnaFailure,
+                        selected_bss: Some(*state.cmd.bss.clone()),
+                        disconnect_info,
+                        selected_bssid: state.cmd.bss.bssid,
+                        auth_method: state.auth_method,
+                        status_code: fidl_ieee80211::StatusCode::EstablishRsnaFailure,
+                        establish_rsna_failure_reason: Some(failure_reason),
+                    };
+
+                    if result_fields.target_bss_authenticated {
+                        return Err(AfterRoamFailureState::Disconnecting(
+                            Roaming::to_disconnecting(
+                                "Roam failed; SME failed to initialize LinkState".to_owned(),
+                                failure,
+                                state.cfg,
+                                state.cmd.connect_txn_sink,
+                                state_change_ctx,
+                                context,
+                            ),
+                        ));
+                    } else {
+                        report_roam_finished(&mut state.cmd.connect_txn_sink, failure.into());
+                        return Err(AfterRoamFailureState::Idle(Idle { cfg: state.cfg }));
+                    }
+                }
+            };
+
+            let ssid = state.cmd.bss.ssid.clone();
+            _ = state_change_ctx.replace(StateChangeContext::Connect {
+                msg: "Fullmac-initiated roam succeeded".to_owned(),
+                bssid: state.cmd.bss.bssid.clone(),
+                ssid,
+            });
+            state
+                .cmd
+                .connect_txn_sink
+                .send_roam_result(RoamResult::Success(Box::new(*state.cmd.bss.clone())));
+            Ok(Associated {
+                cfg: state.cfg,
+                connect_txn_sink: state.cmd.connect_txn_sink,
+                latest_ap_state: state.cmd.bss,
+                auth_method: state.auth_method,
+                last_signal_report_time: now(),
+                link_state,
+                protection_ie: state.protection_ie,
+                // TODO(https://fxbug.dev/82654): Remove `wmm_param` field when wlanstack telemetry is deprecated.
+                wmm_param,
+                last_channel_switch_time: None,
+                reassociation_loop_count: 0,
+                authentication: state.cmd.authentication,
+            })
+        }
+        // Roam attempt failed.
+        _ => {
+            let msg = format!("Roam failed, status_code {:?}", result_fields.status_code);
+            error!("{}", msg);
+            let disconnect_info = make_roam_disconnect_info(
+                fidl_sme::DisconnectMlmeEventName::RoamResultIndication,
+                None,
+            );
+            let failure = RoamFailure {
+                failure_type: RoamFailureType::ReassociationFailure,
+                selected_bss: Some(*state.cmd.bss.clone()),
+                disconnect_info,
+                selected_bssid: state.cmd.bss.bssid,
+                auth_method: state.auth_method,
+                status_code: result_fields.status_code,
+                establish_rsna_failure_reason: None,
+            };
+
+            if result_fields.target_bss_authenticated {
+                Err(AfterRoamFailureState::Disconnecting(Roaming::to_disconnecting(
+                    msg.to_owned(),
+                    failure,
+                    state.cfg,
+                    state.cmd.connect_txn_sink,
+                    state_change_ctx,
+                    context,
+                )))
+            } else {
+                Err(AfterRoamFailureState::Idle(state.to_idle(
+                    msg.to_owned(),
+                    failure,
+                    state_change_ctx,
+                )))
+            }
+        }
+    }
 }
 
 fn update_wmm_ac_param(ac_params: &mut ie::WmmAcParams, update: &fidl_internal::WmmAcParams) {
