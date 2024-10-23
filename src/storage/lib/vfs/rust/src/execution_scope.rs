@@ -18,7 +18,7 @@
 
 use crate::token_registry::TokenRegistry;
 
-use fuchsia_async::{Scope, Task};
+use fuchsia_async::{JoinHandle, Scope, Task};
 use futures::task::{self, Poll};
 use futures::Future;
 use std::future::{pending, poll_fn};
@@ -96,7 +96,7 @@ impl ExecutionScope {
     /// access.  And as the implementation is employing internal mutability there are no downsides.
     /// This way `ExecutionScope` can actually also implement [`futures::task::Spawn`] - it just was
     /// not necessary for now.
-    pub fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) {
+    pub fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) -> JoinHandle<()> {
         let executor = self.executor.clone();
         self.executor.scope().spawn(async move {
             let mut task = std::pin::pin!(task);
@@ -116,7 +116,7 @@ impl ExecutionScope {
                 }
             })
             .await;
-        });
+        })
     }
 
     pub fn token_registry(&self) -> &TokenRegistry {

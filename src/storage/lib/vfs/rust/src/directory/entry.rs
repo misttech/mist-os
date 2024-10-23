@@ -316,20 +316,22 @@ impl<'a> OpenRequest<'a> {
         let OpenRequest { scope, request_flags, path, object_request } = self;
         let mut object_request = object_request.take();
         match request_flags {
-            RequestFlags::Open1(flags) => scope.clone().spawn(async move {
-                match entry
-                    .open_entry_async(OpenRequest::new(
-                        scope,
-                        RequestFlags::Open1(flags),
-                        path,
-                        &mut object_request,
-                    ))
-                    .await
-                {
-                    Ok(()) => {}
-                    Err(s) => object_request.shutdown(s),
-                }
-            }),
+            RequestFlags::Open1(flags) => {
+                scope.clone().spawn(async move {
+                    match entry
+                        .open_entry_async(OpenRequest::new(
+                            scope,
+                            RequestFlags::Open1(flags),
+                            path,
+                            &mut object_request,
+                        ))
+                        .await
+                    {
+                        Ok(()) => {}
+                        Err(s) => object_request.shutdown(s),
+                    }
+                });
+            }
             RequestFlags::Open3(flags) => {
                 scope.clone().spawn(async move {
                     match entry

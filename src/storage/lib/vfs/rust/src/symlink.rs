@@ -309,7 +309,9 @@ pub fn serve(
         let options = protocols.to_node_options(link.entry_info().type_())?;
         link.open_as_node(scope, options, object_request)
     } else {
-        Connection::create(scope.clone(), link, protocols, object_request).map(|x| scope.spawn(x))
+        Connection::create(scope.clone(), link, protocols, object_request).map(|x| {
+            scope.spawn(x);
+        })
     }
 }
 

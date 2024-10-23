@@ -110,7 +110,7 @@ async fn to_success_response(
         ..Default::default()
     };
 
-    scope.spawn(async move {
+    let _ = scope.spawn(async move {
         let hyper_body = hyper_response.body_mut();
         while let Some(chunk) = hyper_body.next().await {
             if let Ok(chunk) = chunk {

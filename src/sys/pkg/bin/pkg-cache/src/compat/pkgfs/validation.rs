@@ -117,7 +117,7 @@ impl vfs::directory::entry_container::Directory for Validation {
         }
 
         if path.as_ref() == "missing" {
-            let () = scope.clone().spawn(async move {
+            scope.clone().spawn(async move {
                 let missing_contents = self.make_missing_contents().await;
                 object_request.handle(|object_request| {
                     vfs::file::serve(

@@ -330,7 +330,7 @@ impl VolumesDirectory {
         let volumes;
         // Take the mounted_volumes lock first to keep consistent lock ordering with other
         // operations, but don't need to hold it for the entire operation. We need to take the
-        // profiling_state lock before the mounted_volumes lock is  dropped to ensure that another
+        // profiling_state lock before the mounted_volumes lock is dropped to ensure that another
         // thread doesn't mount a volume and start a profile task on it in between.
         {
             volumes = self
@@ -452,9 +452,14 @@ impl VolumesDirectory {
         self.lock().await.remove_volume(name).await
     }
 
-    /// Terminates all opened volumes.
+    /// Terminates all opened volumes.  This will not cancel any profiling that might be taking
+    /// place.
     pub async fn terminate(self: &Arc<Self>) {
-        self.stop_profile_tasks().await;
+        // Cancel the profiling timer task.
+        let profiling_state = self.profiling_state.lock().await.take();
+        if let Some((_, timer_task)) = profiling_state {
+            timer_task.cancel().await;
+        }
         self.lock().await.terminate().await
     }
 
@@ -1851,7 +1856,9 @@ mod tests {
                 .await
                 .expect("Reopen volume");
 
-            // Don't explicitly stop the recording, ensure that terminate is able to progress.
+            // Wait for the recordings to finish.
+            volumes_directory.stop_profile_tasks().await;
+
             volumes_directory.terminate().await;
             std::mem::drop(volumes_directory);
             filesystem.close().await.expect("Filesystem close");
