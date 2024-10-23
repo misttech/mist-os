@@ -34,6 +34,25 @@
 
 namespace starnix {
 
+fbl::RefPtr<ZombieProcess> ZombieProcess::New(const ThreadGroupMutableState& thread_group,
+                                              const Credentials& credentials,
+                                              ProcessExitInfo exit_info) {
+  // TaskTimeStats time_stats = thread_group.base.TimeStats() + thread_group.children_time_stats;
+  // Note: TaskTimeStats addition is commented out as it's not implemented in the C++ version
+  fbl::AllocChecker ac;
+  auto zp = fbl::AdoptRef(new (&ac) ZombieProcess(thread_group.base_->leader(),
+                                                  thread_group.process_group_->leader(),
+                                                  credentials.uid, ktl::move(exit_info), true));
+  ZX_ASSERT(ac.check());
+  return zp;
+}
+
+void ZombieProcess::release(PidTable& pids) {
+  if (is_canonical) {
+    pids.remove_zombie(pid);
+  }
+}
+
 ThreadGroupMutableState::ThreadGroupMutableState() = default;
 
 ThreadGroupMutableState::ThreadGroupMutableState(ThreadGroup* base,
@@ -124,6 +143,51 @@ bool ThreadGroupMutableState::is_waitable() const {
   return false;
 }
 
+ktl::optional<WaitResult> ThreadGroupMutableState::get_waitable_zombie(
+    ZombieListFn zombie_list, ProcessSelector selector, const WaitingOptions& options,
+    PidTable& pids) {
+  // The zombies whose pid matches the pid selector queried.
+  auto zombie_matches_pid_selector = [&](const fbl::RefPtr<ZombieProcess>& zombie) {
+    return ktl::visit(ProcessSelector::overloaded{
+                          [](ProcessSelector::Any) { return true; },
+                          [&](ProcessSelector::Pid pid) { return zombie->pid == pid.value; },
+                          [&](ProcessSelector::Pgid pgid) { return zombie->pgid == pgid.value; }},
+                      selector.selector());
+  };
+
+  // The zombies whose exit signal matches the waiting options queried.
+  auto zombie_matches_wait_options = [&](const fbl::RefPtr<ZombieProcess>& zombie) {
+    if (options.wait_for_all()) {
+      return true;
+    }
+    return ThreadGroupMutableState::is_correct_exit_signal(options.wait_for_clone(),
+                                                           zombie->exit_info.exit_signal);
+  };
+
+  // We look for the last zombie in the vector that matches pid selector and waiting options
+  auto it = std::find_if(zombie_list(this).rbegin(), zombie_list(this).rend(),
+                         [&](const fbl::RefPtr<ZombieProcess>& zombie) {
+                           return zombie_matches_wait_options(zombie) &&
+                                  zombie_matches_pid_selector(zombie);
+                         });
+
+  if (it == zombie_list(this).rend()) {
+    return ktl::nullopt;
+  }
+
+  size_t position = std::distance(it, zombie_list(this).rend()) - 1;
+
+  if (options.keep_waitable_state()) {
+    return zombie_list(this)[position]->ToWaitResult();
+  } else {
+    auto zombie = zombie_list(this).erase(position);
+    // children_time_stats_ += zombie->time_stats;
+    auto result = zombie->ToWaitResult();
+    // zombie->release(pids);
+    return result;
+  }
+}
+
 bool ThreadGroupMutableState::is_correct_exit_signal(bool wait_for_clone,
                                                      ktl::optional<Signal> exit_signal) {
   return wait_for_clone == (exit_signal != kSIGCHLD);
@@ -154,13 +218,13 @@ WaitableChildResult ThreadGroupMutableState::get_waitable_running_children(
       // Child is terminating.  In addition to its original location,
       // the leader may have exited, and its exit signal may be in the
       // leader_exit_info.
-      /*if (child_state->leader_exit_info_.has_value()) {
+      if (child_state->leader_exit_info_.has_value()) {
         auto& info = child_state->leader_exit_info_.value();
         if (info.exit_signal.has_value()) {
-          return ThreadGroup::is_correct_exit_signal(options.wait_for_clone(),
-                                                     info.exit_signal.value());
+          return ThreadGroupMutableState::is_correct_exit_signal(options.wait_for_clone(),
+                                                                 info.exit_signal.value());
         }
-      }*/
+      }
     }
 
     for (const auto& task : tasks_) {
@@ -252,11 +316,14 @@ WaitableChildResult ThreadGroupMutableState::get_waitable_child(ProcessSelector 
                                                                 const WaitingOptions& options,
                                                                 PidTable& pids) {
   if (options.wait_for_exited()) {
-    /*if (auto waitable_zombie = get_waitable_zombie(
-            &|state: &mut ThreadGroupMutableState| &mut state.zombie_children, selector,
-            options, pids)) {
-      return WaitableChildResult::ReadyNow(waitable_zombie);
-    }*/
+    auto waitable_zombie = get_waitable_zombie(
+        [](ThreadGroupMutableState* state) -> fbl::Vector<fbl::RefPtr<ZombieProcess>>& {
+          return state->zombie_children_;
+        },
+        selector, options, pids);
+    if (waitable_zombie.has_value()) {
+      return WaitableChildResult::ReadyNow(waitable_zombie.value());
+    }
   }
   return get_waitable_running_children(selector, options, pids);
 }
@@ -288,9 +355,10 @@ ThreadGroup::ThreadGroup(
       kernel_(ktl::move(kernel)),
       process_(ktl::move(process)),
       leader_(leader),
-      stop_state_(AtomicStopState(StopState::Awake)) {
+      stop_state_(AtomicStopState(StopState::Awake)),
+      observer_(util::WeakPtr(this)) {
+  LTRACE_ENTRY_OBJ;
   ktl::optional<ThreadGroupParent> tgp;
-  LTRACEF("ThreadGroup(%p)\n", this);
 
   if (parent.has_value()) {
     // A child process created via fork(2) inherits its parent's
@@ -302,15 +370,24 @@ ThreadGroup::ThreadGroup(
   }
 
   *mutable_state_.Write() = ktl::move(ThreadGroupMutableState(this, tgp, process_group));
+
+  if (process_.dispatcher()) {
+    // process_.dispatcher()->AddObserver(&observer_, this, ZX_PROCESS_TERMINATED);
+  }
+  LTRACE_EXIT_OBJ;
 }
 
 ThreadGroup::~ThreadGroup() {
+  LTRACE_ENTRY_OBJ;
   auto state = mutable_state_.Read();
   ZX_ASSERT(state->tasks_.is_empty());
   ZX_ASSERT(state->children_.is_empty());
+  LTRACE_EXIT_OBJ;
 }
 
 void ThreadGroup::exit(ExitStatus exit_status, ktl::optional<CurrentTask> current_task) {
+  LTRACE_ENTRY_OBJ;
+
   if (current_task.has_value()) {
     // current_task
     //             .ptrace_event(PtraceOptions::TRACEEXIT, exit_status.signal_info_status() as u64);
@@ -343,9 +420,10 @@ void ThreadGroup::exit(ExitStatus exit_status, ktl::optional<CurrentTask> curren
   //    }
   //}
   for (auto task : tasks) {
-    // task->mutable_state_.Write()
-    // task->thread.Write()->
+    task->Write()->set_exit_status(exit_status);
+    // send_standard_signal(&task, SignalInfo::default(SIGKILL));
   }
+  LTRACE_EXIT_OBJ;
 }
 
 uint64_t ThreadGroup::get_rlimit(starnix_uapi::Resource resource) const {
@@ -370,10 +448,10 @@ void ThreadGroup::remove(fbl::RefPtr<Task> task) const {
 
   auto state = Write();
 
-  // TaskPersistentInfo persistent_info;
+  TaskPersistentInfo persistent_info;
   auto it = state->tasks_.find(task->id());
   if (it != state->tasks_.end()) {
-    // persistent_info = it->();
+    persistent_info = it->into();
     state->tasks_.erase(it);
   } else {
     // The task has never been added. The only expected case is that this thread was
@@ -383,20 +461,21 @@ void ThreadGroup::remove(fbl::RefPtr<Task> task) const {
   }
 
   if (task->id() == leader_) {
-    // ExitStatus exit_status = task->exit_status().value_or(ExitStatus::Exit(255));
-    // state->leader_exit_info_ = ProcessExitInfo{
-    //    .status = exit_status,
-    //    .exit_signal = persistent_info.Lock()->exit_signal(),
-    //};
+    ExitStatus exit_status = task->exit_status().value_or(ExitStatus::Exit(255));
+    state->leader_exit_info_ = ProcessExitInfo{
+        .status = exit_status,
+        .exit_signal = persistent_info->Lock()->exit_signal(),
+    };
   }
 
   if (state->tasks_.is_empty()) {
     state->terminating_ = true;
 
     // Replace PID table entry with a zombie.
-    // auto exit_info = ktl::move(state->leader_exit_info_.value());
-    // auto zombie = ZombieProcess::New(this, persistent_info.Lock()->creds(), exit_info);
-    // pids->kill_process(leader_, fbl::WrapRefPtr(zombie.get()));
+    ZX_ASSERT_MSG(state->leader_exit_info_.has_value(), "Failed to capture leader exit status");
+    auto exit_info = ktl::move(state->leader_exit_info_.value());
+    auto zombie = ZombieProcess::New(*state, persistent_info->Lock()->creds(), exit_info);
+    pids->kill_process(leader_, util::WeakPtr(zombie.get()));
 
     state->leave_process_group(*pids);
 
@@ -420,12 +499,66 @@ void ThreadGroup::remove(fbl::RefPtr<Task> task) const {
     }
 
     if (parent.has_value()) {
-      // TODO (Herrera) Replace by ZombieProcess logic;
       auto strong_parent = parent->upgrade();
-      auto pstate = strong_parent->Write();
+      ktl::optional<pid_t> tracer_pid;
+      {
+        // auto task_state = task->Read();
+        //  if (task_state->ptrace().has_value()) {
+        //    tracer_pid = task_state->ptrace()->get_pid();
+        //  }
+      }
 
-      auto deleted = pstate->children_.erase(Read()->base_->leader_);
+      ktl::optional<fbl::RefPtr<ZombieProcess>> maybe_zombie = ktl::move(zombie);
+      if (tracer_pid.has_value()) {
+        /*auto tracer = pids->get_task(tracer_pid.value()).Lock();
+        if (tracer) {
+          maybe_zombie = tracer->thread_group()->maybe_notify_tracer(
+              task, pids, strong_parent.get(), ktl::move(maybe_zombie.value()));
+        }*/
+      }
+      if (maybe_zombie.has_value()) {
+        strong_parent->do_zombie_notifications(ktl::move(maybe_zombie.value()));
+      }
+    } else {
+      zombie->release(*pids);
     }
+
+    // TODO: Set the error_code on the Zircon process object. Currently missing a way
+    // to do this in Zircon. Might be easier in the new execution model.
+
+    // Once the last zircon thread stops, the zircon process will also stop executing.
+
+    /*if let
+      Some(parent) = parent {
+        let parent = parent.upgrade();
+        parent.check_orphans(locked);
+      }*/
+  }
+}
+
+void ThreadGroup::do_zombie_notifications(fbl::RefPtr<ZombieProcess> zombie) const {
+  auto state = Write();
+
+  state->children_.erase(zombie->pid);
+  /*state->deferred_zombie_ptracers_.erase(
+      std::remove_if(state->deferred_zombie_ptracers_.begin(),
+                     state->deferred_zombie_ptracers_.end(),
+                     [&](const auto& pair) { return pair.second == zombie->pid(); }),
+      state->deferred_zombie_ptracers_.end());
+*/
+
+  auto exit_signal = zombie->exit_info.exit_signal;
+  // auto signal_info = zombie->ToWaitResult().as_signal_info();
+
+  fbl::AllocChecker ac;
+  state->zombie_children_.push_back(ktl::move(zombie), &ac);
+  ZX_ASSERT(ac.check());
+  // state->child_status_waiters_.NotifyAll();
+
+  // Send signals
+  if (exit_signal.has_value()) {
+    // signal_info.signal = exit_signal.value();
+    //  state->send_signal(signal_info);
   }
 }
 
@@ -460,6 +593,16 @@ bool ProcessSelector::DoMatch(pid_t pid, const PidTable& pid_table) const {
                           return false;
                         }},
                     selector_);
+}
+
+void ThreadGroup::ProcessSignalObserver::OnMatch(zx_signals_t signals) {
+  canary_.Assert();
+  LTRACEF("process signal: 0x%x\n", signals);
+}
+
+void ThreadGroup::ProcessSignalObserver::OnCancel(zx_signals_t signals) {
+  canary_.Assert();
+  LTRACEF("process signal: 0x%x\n", signals);
 }
 
 }  // namespace starnix

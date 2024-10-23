@@ -104,10 +104,11 @@ fit::result<Errno, pid_t> do_clone(CurrentTask& current_task, struct clone_args 
     new_task.thread_state().registers.set_thread_pointer_register(args.tls);
   }
 
-  // RegisterState::print_regs(stdout, &*new_task.thread_state.registers);
+  if (LOCAL_TRACE >= 2) {
+    RegisterState::print_regs(stdout, &*new_task.thread_state().registers);
+  }
 
   auto tid = new_task.task()->id();
-  // auto task_ref = util::WeakPtr(new_task.task.get());
   execute_task(
       ktl::move(new_task),
       [](CurrentTask& current_task) -> fit::result<Errno> {
@@ -118,7 +119,7 @@ fit::result<Errno, pid_t> do_clone(CurrentTask& current_task, struct clone_args 
           // Copy register state in the current task to fork_frame
           thread->SetForkFrame(*current_task.thread_state().registers);
 
-          if (LOCAL_TRACE) {
+          if (LOCAL_TRACE >= 2) {
             RegisterState::print_regs(stdout, &*current_task.thread_state().registers);
           }
         }
@@ -131,6 +132,7 @@ fit::result<Errno, pid_t> do_clone(CurrentTask& current_task, struct clone_args 
     // current_task.ptrace_event(PtraceOptions::TRACEVFORKDONE, tid as u64);
   }
 
+  LTRACEF_LEVEL(2, "Return tid: %d\n", tid);
   return fit::ok(tid);
 }
 
@@ -337,22 +339,15 @@ fit::result<Errno, pid_t> sys_getppid(const CurrentTask& current_task) {
 
 fit::result<Errno, pid_t> sys_getsid(const CurrentTask& current_task, pid_t pid) {
   util::WeakPtr<Task> weak = get_task_or_current(current_task, pid);
-  auto result = Task::from_weak(weak);
-  if (result.is_error())
-    return result.take_error();
-  auto target_task = result.value();
+  auto task = Task::from_weak(weak) _EP(task);
   // security::check_task_getsid(current_task, &target_task)?;
-  auto sid = target_task->thread_group()->Read()->process_group()->session()->leader();
+  auto sid = task->thread_group()->Read()->process_group()->session()->leader();
   return fit::ok(sid);
 }
 
 fit::result<Errno, pid_t> sys_getpgid(const CurrentTask& current_task, pid_t pid) {
   util::WeakPtr<Task> weak = get_task_or_current(current_task, pid);
-  auto result = Task::from_weak(weak);
-  if (result.is_error())
-    return result.take_error();
-
-  auto task = result.value();
+  auto task = Task::from_weak(weak) _EP(task);
   // selinux_hooks::check_getpgid_access(current_task, &task)?;
   auto pgid = task->thread_group()->Read()->process_group()->leader();
   return fit::ok(pgid);
