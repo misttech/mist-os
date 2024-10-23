@@ -28,7 +28,7 @@
 
 #include "../kernel_priv.h"
 
-#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(2)
+#define LOCAL_TRACE STARNIX_KERNEL_GLOBAL_TRACE(0)
 
 namespace starnix {
 
