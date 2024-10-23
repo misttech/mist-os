@@ -23,6 +23,7 @@ macro_rules! bitfield_fields {
         paste::item! {
             $(#[$attr])*
             #[inline]
+            #[allow(clippy::identity_op)]
             pub fn $name<T: Deref<Target=Q>, Q: ReadBytes>(b: &Block<T>) -> $type {
                 if let Some(value) = b.container.get_value::<u64>(b.$offset_fn()) {
                     static MASK : u64 = (1 << ($msb - $lsb + 1)) - 1;
@@ -34,6 +35,7 @@ macro_rules! bitfield_fields {
 
             $(#[$attr])*
             #[inline]
+            #[allow(clippy::identity_op)]
             pub fn [<set_ $name>]<T: Deref<Target=Q> + DerefMut<Target=Q>, Q: WriteBytes + ReadBytes>(
                    b: &mut Block<T>, value: $type) {
                 let offset = b.$offset_fn();

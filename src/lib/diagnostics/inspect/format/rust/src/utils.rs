@@ -3,15 +3,13 @@
 // found in the LICENSE file.
 
 use crate::{constants, BlockType};
-use std::cmp::{max, min};
 
 /// Returns the smallest order such that (MIN_ORDER_SHIFT << order) >= size.
 /// Size must be non zero.
 pub fn fit_order(size: usize) -> usize {
     // Safety: `leading_zeros` returns a u32, so this is safe promotion
     (std::mem::size_of::<usize>() * 8 - (size - 1).leading_zeros() as usize)
-        .checked_sub(constants::MIN_ORDER_SHIFT)
-        .unwrap_or(0)
+        .saturating_sub(constants::MIN_ORDER_SHIFT)
 }
 
 /// Get size in bytes of a given |order|.
@@ -22,10 +20,8 @@ pub fn order_to_size(order: u8) -> usize {
 /// Get the necessary |block size| to fit the given |payload_size| in range
 /// MIN_ORDER_SIZE <= block size <= MAX_ORDER_SIZE
 pub fn block_size_for_payload(payload_size: usize) -> usize {
-    min(
-        constants::MAX_ORDER_SIZE,
-        max(payload_size + constants::HEADER_SIZE_BYTES, constants::MIN_ORDER_SIZE),
-    )
+    (payload_size + constants::HEADER_SIZE_BYTES)
+        .clamp(constants::MIN_ORDER_SIZE, constants::MAX_ORDER_SIZE)
 }
 
 /// Get the size in bytes for the payload section of a block of the given |order|.

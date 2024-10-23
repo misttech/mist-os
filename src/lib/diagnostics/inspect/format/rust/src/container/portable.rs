@@ -10,6 +10,7 @@ pub struct Container {
 }
 
 impl Container {
+    #[allow(clippy::result_unit_err)]
     pub fn read_and_write(size: usize) -> Result<(Self, ()), ()> {
         let buffer = vec![0; size];
         Ok((Self { buffer }, ()))

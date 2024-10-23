@@ -24,12 +24,12 @@ impl Container {
     pub fn read_only(vmo: &zx::Vmo) -> Result<Self, zx::Status> {
         let vmo_size = vmo.get_size()? as usize;
         let flags = zx::VmarFlags::PERM_READ | zx::VmarFlags::REQUIRE_NON_RESIZABLE;
-        let buffer_addr = Self::map_vmo(&vmo, vmo_size, flags)?;
+        let buffer_addr = Self::map_vmo(vmo, vmo_size, flags)?;
         Ok(Self { buffer_addr, vmo_size })
     }
 
     fn map_vmo(vmo: &zx::Vmo, vmo_size: usize, flags: zx::VmarFlags) -> Result<usize, zx::Status> {
-        let buffer_addr = fuchsia_runtime::vmar_root_self().map(0, &vmo, 0, vmo_size, flags)?;
+        let buffer_addr = fuchsia_runtime::vmar_root_self().map(0, vmo, 0, vmo_size, flags)?;
         Ok(buffer_addr)
     }
 }
@@ -64,9 +64,7 @@ impl ReadBytes for Container {
         if offset >= self.len() {
             return None;
         }
-        let Some(upper_bound) = offset.checked_add(size) else {
-            return None;
-        };
+        let upper_bound = offset.checked_add(size)?;
         if upper_bound > self.len() {
             return None;
         }
@@ -95,9 +93,7 @@ impl WriteBytes for Container {
         if offset >= self.len() {
             return None;
         }
-        let Some(upper_bound) = offset.checked_add(size) else {
-            return None;
-        };
+        let upper_bound = offset.checked_add(size)?;
         if upper_bound > self.len() {
             return None;
         }

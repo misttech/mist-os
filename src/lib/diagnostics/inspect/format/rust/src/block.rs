@@ -153,7 +153,7 @@ impl<'a, T: Deref<Target = Q>, Q: ReadBytes + 'a> Block<T> {
     /// Gets the flags of a PROPERTY block.
     pub fn property_format(&self) -> Result<PropertyFormat, Error> {
         self.check_type(BlockType::BufferValue)?;
-        let raw_format = PayloadFields::property_flags(&self);
+        let raw_format = PayloadFields::property_flags(self);
 
         PropertyFormat::from_u8(raw_format)
             .ok_or_else(|| Error::invalid_flags("property", raw_format, self.index()))
@@ -162,7 +162,7 @@ impl<'a, T: Deref<Target = Q>, Q: ReadBytes + 'a> Block<T> {
     /// Returns the next EXTENT in an EXTENT chain.
     pub fn next_extent(&self) -> Result<BlockIndex, Error> {
         self.check_multi_type(&[BlockType::Extent, BlockType::StringReference])?;
-        Ok(HeaderFields::extent_next_index(&self).into())
+        Ok(HeaderFields::extent_next_index(self).into())
     }
 
     /// Returns the payload bytes value of an EXTENT block.
@@ -176,13 +176,13 @@ impl<'a, T: Deref<Target = Q>, Q: ReadBytes + 'a> Block<T> {
     /// Gets the NAME block index of a *_VALUE block.
     pub fn name_index(&self) -> Result<BlockIndex, Error> {
         self.check_any_value()?;
-        Ok(HeaderFields::value_name_index(&self).into())
+        Ok(HeaderFields::value_name_index(self).into())
     }
 
     /// Gets the format of an ARRAY_VALUE block.
     pub fn array_format(&self) -> Result<ArrayFormat, Error> {
         self.check_type(BlockType::ArrayValue)?;
-        let raw_flags = PayloadFields::array_flags(&self);
+        let raw_flags = PayloadFields::array_flags(self);
         ArrayFormat::from_u8(raw_flags)
             .ok_or_else(|| Error::invalid_flags("array", raw_flags, self.index()))
     }
@@ -190,13 +190,13 @@ impl<'a, T: Deref<Target = Q>, Q: ReadBytes + 'a> Block<T> {
     /// Gets the number of slots in an ARRAY_VALUE block.
     pub fn array_slots(&self) -> Result<usize, Error> {
         self.check_type(BlockType::ArrayValue)?;
-        Ok(PayloadFields::array_slots_count(&self) as usize)
+        Ok(PayloadFields::array_slots_count(self) as usize)
     }
 
     /// Gets the type of each slot in an ARRAY_VALUE block.
     pub fn array_entry_type(&self) -> Result<BlockType, Error> {
         self.check_type(BlockType::ArrayValue)?;
-        let array_type_raw = PayloadFields::array_entry_type(&self);
+        let array_type_raw = PayloadFields::array_entry_type(self);
         let array_type = BlockType::from_u8(array_type_raw)
             .ok_or_else(|| Error::InvalidBlockTypeNumber(self.index(), array_type_raw))?;
         if !array_type.is_valid_for_array() {
@@ -247,13 +247,13 @@ impl<'a, T: Deref<Target = Q>, Q: ReadBytes + 'a> Block<T> {
     /// Gets the index of the content of this LINK_VALUE block.
     pub fn link_content_index(&self) -> Result<BlockIndex, Error> {
         self.check_type(BlockType::LinkValue)?;
-        Ok(PayloadFields::content_index(&self).into())
+        Ok(PayloadFields::content_index(self).into())
     }
 
     /// Gets the node disposition of a LINK_VALUE block.
     pub fn link_node_disposition(&self) -> Result<LinkNodeDisposition, Error> {
         self.check_type(BlockType::LinkValue)?;
-        let flag = PayloadFields::disposition_flags(&self);
+        let flag = PayloadFields::disposition_flags(self);
         LinkNodeDisposition::from_u8(flag)
             .ok_or_else(|| Error::invalid_flags("disposition type", flag, self.index()))
     }
@@ -282,25 +282,25 @@ impl<'a, T: Deref<Target = Q>, Q: ReadBytes + 'a> Block<T> {
     /// Get the parent block index of a *_VALUE block.
     pub fn parent_index(&self) -> Result<BlockIndex, Error> {
         self.check_any_value()?;
-        Ok(HeaderFields::value_parent_index(&self).into())
+        Ok(HeaderFields::value_parent_index(self).into())
     }
 
     /// Get the child count of a NODE_VALUE block.
     pub fn child_count(&self) -> Result<u64, Error> {
         self.check_multi_type(&[BlockType::NodeValue, BlockType::Tombstone])?;
-        Ok(PayloadFields::numeric_value(&self))
+        Ok(PayloadFields::numeric_value(self))
     }
 
     /// Get next free block
     pub fn free_next_index(&self) -> Result<BlockIndex, Error> {
         self.check_type(BlockType::Free)?;
-        Ok(HeaderFields::free_next_index(&self).into())
+        Ok(HeaderFields::free_next_index(self).into())
     }
 
     /// Get the length of the name of a NAME block
     pub fn name_length(&self) -> Result<usize, Error> {
         self.check_type(BlockType::Name)?;
-        Ok(HeaderFields::name_length(&self).into())
+        Ok(HeaderFields::name_length(self).into())
     }
 
     /// Returns the contents of a NAME block.
@@ -310,13 +310,13 @@ impl<'a, T: Deref<Target = Q>, Q: ReadBytes + 'a> Block<T> {
         let offset = self.payload_offset();
         let bytes =
             self.container.get_slice_at(offset, length).ok_or(Error::InvalidOffset(offset))?;
-        Ok(std::str::from_utf8(bytes).map_err(|_| Error::NameNotUtf8)?)
+        std::str::from_utf8(bytes).map_err(|_| Error::NameNotUtf8)
     }
 
     /// Returns the current reference count of a string reference.
     pub fn string_reference_count(&self) -> Result<u32, Error> {
         self.check_type(BlockType::StringReference)?;
-        Ok(HeaderFields::string_reference_count(&self))
+        Ok(HeaderFields::string_reference_count(self))
     }
 
     /// Read the inline portion of a STRING_REFERENCE
@@ -335,14 +335,14 @@ impl<'a, T: Deref<Target = Q>, Q: ReadBytes + 'a> Block<T> {
 
     /// Returns the type of a block. Panics on an invalid value.
     pub fn block_type(&self) -> BlockType {
-        let block_type = HeaderFields::block_type(&self);
+        let block_type = HeaderFields::block_type(self);
         // Safety: BlockType is repr(u8). We never write anything but BlockTypes here.
         BlockType::from_u8(block_type).unwrap()
     }
 
     /// Returns the type of a block or an error if invalid.
     pub fn block_type_or(&self) -> Result<BlockType, Error> {
-        let raw_type = HeaderFields::block_type(&self);
+        let raw_type = HeaderFields::block_type(self);
         BlockType::from_u8(raw_type)
             .ok_or_else(|| Error::InvalidBlockTypeNumber(self.index(), raw_type))
     }
@@ -350,7 +350,7 @@ impl<'a, T: Deref<Target = Q>, Q: ReadBytes + 'a> Block<T> {
     /// Check that the block type is |block_type|
     fn check_type(&self, block_type: BlockType) -> Result<(), Error> {
         if cfg!(any(debug_assertions, test)) {
-            let self_type = HeaderFields::block_type(&self);
+            let self_type = HeaderFields::block_type(self);
             return self.check_type_eq(self_type, block_type);
         }
         Ok(())
@@ -359,7 +359,7 @@ impl<'a, T: Deref<Target = Q>, Q: ReadBytes + 'a> Block<T> {
     fn check_type_eq(&self, actual_num: u8, expected: BlockType) -> Result<(), Error> {
         if cfg!(any(debug_assertions, test)) {
             let actual = BlockType::from_u8(actual_num)
-                .ok_or(Error::InvalidBlockTypeNumber(self.index, actual_num.into()))?;
+                .ok_or(Error::InvalidBlockTypeNumber(self.index, actual_num))?;
             if actual != expected {
                 return Err(Error::UnexpectedBlockType(expected, actual));
             }
@@ -381,7 +381,7 @@ impl<'a, T: Deref<Target = Q>, Q: ReadBytes + 'a> Block<T> {
     /// NOTE: this should only be used for testing.
     pub fn check_locked(&self, value: bool) -> Result<(), Error> {
         if cfg!(any(debug_assertions, test)) {
-            let generation_count = PayloadFields::header_generation_count(&self);
+            let generation_count = PayloadFields::header_generation_count(self);
             if (generation_count & 1 == 1) != value {
                 return Err(Error::ExpectedLockState(value));
             }
@@ -473,7 +473,7 @@ impl<T: Deref<Target = Q> + DerefMut<Target = Q>, Q: WriteBytes + ReadBytes> Blo
     pub fn become_header(&mut self, size: usize) -> Result<(), Error> {
         self.check_type(BlockType::Reserved)?;
         self.index = BlockIndex::HEADER;
-        HeaderFields::set_order(self, constants::HEADER_ORDER as u8);
+        HeaderFields::set_order(self, constants::HEADER_ORDER);
         HeaderFields::set_block_type(self, BlockType::Header as u8);
         HeaderFields::set_header_magic(self, constants::HEADER_MAGIC_NUMBER);
         HeaderFields::set_header_version(self, constants::HEADER_VERSION_NUMBER);
@@ -817,7 +817,7 @@ impl<T: Deref<Target = Q> + DerefMut<Target = Q>, Q: WriteBytes + ReadBytes> Blo
     /// Increment the reference count by 1.
     pub fn increment_string_reference_count(&mut self) -> Result<(), Error> {
         self.check_type(BlockType::StringReference)?;
-        let cur = HeaderFields::string_reference_count(&self);
+        let cur = HeaderFields::string_reference_count(self);
         let new_count = cur.checked_add(1).ok_or(Error::InvalidReferenceCount)?;
         HeaderFields::set_string_reference_count(self, new_count);
         Ok(())
@@ -826,7 +826,7 @@ impl<T: Deref<Target = Q> + DerefMut<Target = Q>, Q: WriteBytes + ReadBytes> Blo
     /// Decrement the reference count by 1.
     pub fn decrement_string_reference_count(&mut self) -> Result<(), Error> {
         self.check_type(BlockType::StringReference)?;
-        let cur = HeaderFields::string_reference_count(&self);
+        let cur = HeaderFields::string_reference_count(self);
         let new_count = cur.checked_sub(1).ok_or(Error::InvalidReferenceCount)?;
         HeaderFields::set_string_reference_count(self, new_count);
         Ok(())
@@ -974,8 +974,8 @@ mod tests {
         if cfg!(any(debug_assertions, test)) {
             let (mut container, _storage) =
                 Container::read_and_write(constants::MIN_ORDER_SIZE * 3).unwrap();
-            for block_type in BlockType::all().iter() {
-                let block = create_with_type(&mut container, BlockIndex::EMPTY, block_type.clone());
+            for block_type in BlockType::all() {
+                let block = create_with_type(&mut container, BlockIndex::EMPTY, block_type);
                 let result = f(block);
                 if error_types.contains(&block_type) {
                     assert!(result.is_err());
@@ -994,9 +994,9 @@ mod tests {
             let (mut container, _storage) =
                 Container::read_and_write(constants::MIN_ORDER_SIZE * 3).unwrap();
             for block_type in BlockType::all().iter() {
-                let block = create_with_type(&mut container, BlockIndex::EMPTY, block_type.clone());
+                let block = create_with_type(&mut container, BlockIndex::EMPTY, *block_type);
                 let result = f(block);
-                if ok_types.contains(&block_type) {
+                if ok_types.contains(block_type) {
                     assert!(
                         result.is_ok(),
                         "BlockType {:?} should be ok but is not: {:?}",
@@ -1150,7 +1150,7 @@ mod tests {
         let (mut container, _storage) =
             Container::read_and_write(constants::MIN_ORDER_SIZE * 2).unwrap();
         let mut block = get_reserved(&mut container);
-        assert!(block.become_header((constants::MIN_ORDER_SIZE * 2).try_into().unwrap()).is_ok());
+        assert!(block.become_header(constants::MIN_ORDER_SIZE * 2).is_ok());
         let block = block;
         assert_eq!(block.block_type(), BlockType::Header);
         assert_eq!(*block.index(), 0);
@@ -1167,7 +1167,7 @@ mod tests {
         assert_8_bytes!(container, 24, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
         test_ok_types(
-            |mut b| b.become_header((constants::MIN_ORDER_SIZE * 2).try_into().unwrap()),
+            |mut b| b.become_header(constants::MIN_ORDER_SIZE * 2),
             &BTreeSet::from_iter(vec![BlockType::Reserved]),
         );
         test_ok_types(move |b| b.header_magic(), &BTreeSet::from_iter(vec![BlockType::Header]));
@@ -1179,7 +1179,7 @@ mod tests {
         let (mut container, _storage) =
             Container::read_and_write(constants::MIN_ORDER_SIZE * 2).unwrap();
         let mut block = get_reserved(&mut container);
-        assert!(block.become_header((constants::MIN_ORDER_SIZE * 2).try_into().unwrap()).is_ok());
+        assert!(block.become_header(constants::MIN_ORDER_SIZE * 2).is_ok());
         let block = block;
         assert_eq!(block.block_type(), BlockType::Header);
         assert_eq!(*block.index(), 0);
@@ -1205,8 +1205,7 @@ mod tests {
     fn test_lock_unlock_header() {
         let (mut container, _storage) =
             Container::read_and_write(constants::MIN_ORDER_SIZE * 2).unwrap();
-        let mut block =
-            get_header(&mut container, (constants::MIN_ORDER_SIZE * 2).try_into().unwrap());
+        let mut block = get_header(&mut container, constants::MIN_ORDER_SIZE * 2);
         // Can't unlock unlocked header.
         assert!(block.unlock_header().is_err());
         assert!(block.lock_header().is_ok());
@@ -1230,7 +1229,7 @@ mod tests {
 
         // Test overflow: set payload bytes to max u64 value. Ensure we cannot lock
         // and after unlocking, the value is zero.
-        container.set_value(8, u64::max_value());
+        container.set_value(8, u64::MAX);
         let mut block = container.block_at_mut(BlockIndex::HEADER);
         assert!(block.lock_header().is_err());
         assert!(block.unlock_header().is_ok());
@@ -1253,8 +1252,7 @@ mod tests {
     fn test_header_vmo_size() {
         let (mut container, _storage) =
             Container::read_and_write(constants::MIN_ORDER_SIZE * 2).unwrap();
-        let mut block =
-            get_header(&mut container, (constants::MIN_ORDER_SIZE * 2).try_into().unwrap());
+        let mut block = get_header(&mut container, constants::MIN_ORDER_SIZE * 2);
         assert!(block
             .set_header_vmo_size(constants::DEFAULT_VMO_SIZE_BYTES.try_into().unwrap())
             .is_ok());
@@ -1279,11 +1277,8 @@ mod tests {
     fn test_header_vmo_size_wrong_order() {
         let (mut container, _storage) =
             Container::read_and_write(constants::MIN_ORDER_SIZE * 2).unwrap();
-        let mut block =
-            get_header(&mut container, (constants::MIN_ORDER_SIZE * 2).try_into().unwrap());
-        assert!(block
-            .set_header_vmo_size(constants::DEFAULT_VMO_SIZE_BYTES.try_into().unwrap())
-            .is_ok());
+        let mut block = get_header(&mut container, constants::MIN_ORDER_SIZE * 2);
+        assert!(block.set_header_vmo_size(constants::DEFAULT_VMO_SIZE_BYTES as u32).is_ok());
         assert!(block.set_order(0).is_ok());
         assert!(block.header_vmo_size().unwrap().is_none());
         assert!(block.set_header_vmo_size(1).is_ok());
@@ -1360,7 +1355,7 @@ mod tests {
         assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
         let mut block = container.block_at_mut(BlockIndex::EMPTY);
-        assert_eq!(block.extent_set_contents(&"test-rust-inspect".as_bytes()).unwrap(), 17);
+        assert_eq!(block.extent_set_contents("test-rust-inspect".as_bytes()).unwrap(), 17);
         assert_eq!(
             String::from_utf8(block.extent_contents().unwrap().to_vec()).unwrap(),
             "test-rust-inspect\0\0\0\0\0\0\0"
@@ -1387,7 +1382,7 @@ mod tests {
             &BTreeSet::from_iter(vec![BlockType::Extent, BlockType::StringReference]),
         );
         test_ok_types(
-            move |mut b| b.extent_set_contents(&"test".as_bytes()),
+            move |mut b| b.extent_set_contents("test".as_bytes()),
             &BTreeSet::from_iter(vec![BlockType::Extent]),
         );
     }
@@ -1404,8 +1399,8 @@ mod tests {
             BlockType::LinkValue,
             BlockType::BoolValue,
         ]);
-        test_ok_types(move |b| b.name_index(), &any_value);
-        test_ok_types(move |b| b.parent_index(), &any_value);
+        test_ok_types(move |b| b.name_index(), any_value);
+        test_ok_types(move |b| b.parent_index(), any_value);
     }
 
     #[fuchsia::test]
@@ -1506,13 +1501,13 @@ mod tests {
         assert_eq!(block.block_type(), BlockType::BoolValue);
         assert_eq!(*block.name_index().unwrap(), 2);
         assert_eq!(*block.parent_index().unwrap(), 3);
-        assert_eq!(block.bool_value().unwrap(), false);
+        assert!(!block.bool_value().unwrap());
         assert_8_bytes!(container, 0, [0x01, 0x0D, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
         assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
         let mut block = container.block_at_mut(BlockIndex::EMPTY);
         assert!(block.set_bool_value(true).is_ok());
-        assert_eq!(block.bool_value().unwrap(), true);
+        assert!(block.bool_value().unwrap());
         assert_8_bytes!(container, 0, [0x01, 0x0D, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
         assert_8_bytes!(container, 8, [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         test_ok_types(move |b| b.bool_value(), &BTreeSet::from_iter(vec![BlockType::BoolValue]));
