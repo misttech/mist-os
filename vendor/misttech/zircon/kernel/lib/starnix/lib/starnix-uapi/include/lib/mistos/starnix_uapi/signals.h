@@ -116,6 +116,9 @@ struct SigSet {
   static SigSet From(sigset_t value) { return SigSet(value); }
   static SigSet From(Signal value) { return SigSet(value.mask()); }
 
+  SigSet operator&(const SigSet& other) const { return SigSet(value_ & other.value_); }
+  SigSet operator~() const { return SigSet(~value_); }
+
   SigSet() = default;
 
  private:
