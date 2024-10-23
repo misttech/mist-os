@@ -215,11 +215,8 @@ pub struct ArchiveReader {
     max_aggregated_content_size_bytes: Option<u64>,
 }
 
-impl ArchiveReader {
-    /// Creates a new data fetcher with default configuration:
-    ///  - Maximum retries: 2^64-1
-    ///  - Timeout: Never. Use with_timeout() to set a timeout.
-    pub fn new() -> Self {
+impl Default for ArchiveReader {
+    fn default() -> Self {
         Self {
             timeout: None,
             selectors: vec![],
@@ -228,6 +225,15 @@ impl ArchiveReader {
             batch_retrieval_timeout_seconds: None,
             max_aggregated_content_size_bytes: None,
         }
+    }
+}
+
+impl ArchiveReader {
+    /// Creates a new data fetcher with default configuration:
+    ///  - Maximum retries: 2^64-1
+    ///  - Timeout: Never. Use with_timeout() to set a timeout.
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn with_archive(&mut self, archive: ArchiveAccessorProxy) -> &mut Self {
@@ -246,7 +252,7 @@ impl ArchiveReader {
 
     /// Requests all data for the component identified by the given moniker.
     pub fn select_all_for_moniker(&mut self, moniker: &str) -> &mut Self {
-        let selector = format!("{}:root", selectors::sanitize_moniker_for_selectors(&moniker));
+        let selector = format!("{}:root", selectors::sanitize_moniker_for_selectors(moniker));
         self.add_selector(selector)
     }
 
@@ -333,12 +339,10 @@ impl ArchiveReader {
 
     /// Connects to the ArchiveAccessor and returns a stream of data containing a snapshot of the
     /// current buffer in the Archivist as well as new data that arrives.
-    pub fn snapshot_then_subscribe_raw<D, T: SerializableValue + 'static>(
-        &self,
-    ) -> Result<Subscription<T>, Error>
+    pub fn snapshot_then_subscribe_raw<D, T>(&self) -> Result<Subscription<T>, Error>
     where
         D: DiagnosticsData + 'static,
-        T: for<'a> Deserialize<'a> + Send,
+        T: for<'a> Deserialize<'a> + Send + SerializableValue + 'static,
     {
         let iterator =
             self.batch_iterator::<D>(StreamMode::SnapshotThenSubscribe, T::FORMAT_OF_VALUE)?;
@@ -390,22 +394,22 @@ impl ArchiveReader {
         let (iterator, server_end) = fidl::endpoints::create_proxy::<BatchIteratorMarker>()
             .map_err(Error::CreateIteratorProxy)?;
 
-        let mut stream_parameters = StreamParameters::default();
-        stream_parameters.stream_mode = Some(mode);
-        stream_parameters.data_type = Some(D::DATA_TYPE);
-        stream_parameters.format = Some(format);
-
-        stream_parameters.client_selector_configuration = if self.selectors.is_empty() {
-            Some(ClientSelectorConfiguration::SelectAll(true))
-        } else {
-            Some(ClientSelectorConfiguration::Selectors(self.selectors.iter().cloned().collect()))
-        };
-
-        stream_parameters.performance_configuration = Some(PerformanceConfiguration {
-            max_aggregate_content_size_bytes: self.max_aggregated_content_size_bytes,
-            batch_retrieval_timeout_seconds: self.batch_retrieval_timeout_seconds,
+        let stream_parameters = StreamParameters {
+            stream_mode: Some(mode),
+            data_type: Some(D::DATA_TYPE),
+            format: Some(format),
+            client_selector_configuration: if self.selectors.is_empty() {
+                Some(ClientSelectorConfiguration::SelectAll(true))
+            } else {
+                Some(ClientSelectorConfiguration::Selectors(self.selectors.to_vec()))
+            },
+            performance_configuration: Some(PerformanceConfiguration {
+                max_aggregate_content_size_bytes: self.max_aggregated_content_size_bytes,
+                batch_retrieval_timeout_seconds: self.batch_retrieval_timeout_seconds,
+                ..Default::default()
+            }),
             ..Default::default()
-        });
+        };
 
         archive
             .stream_diagnostics(&stream_parameters, server_end)
@@ -881,8 +885,7 @@ mod tests {
                                         let content = serde_json::to_string_pretty(&data)
                                             .expect("json pretty");
                                         let vmo_size = content.len() as u64;
-                                        let vmo =
-                                            zx::Vmo::create(vmo_size as u64).expect("create vmo");
+                                        let vmo = zx::Vmo::create(vmo_size).expect("create vmo");
                                         vmo.write(content.as_bytes(), 0).expect("write vmo");
                                         let buffer =
                                             fidl_fuchsia_mem::Buffer { vmo, size: vmo_size };
@@ -909,7 +912,7 @@ mod tests {
             }
         })
         .detach();
-        return proxy;
+        proxy
     }
 
     async fn create_realm() -> RealmBuilder {

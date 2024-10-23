@@ -16,6 +16,8 @@ rustc_test("integration_tests_bin") {
   ]
 
   sources = [ "src/lib.rs" ]
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("archive_reader_integration_test") {
