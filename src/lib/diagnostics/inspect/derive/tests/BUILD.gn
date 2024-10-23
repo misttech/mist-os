@@ -21,8 +21,6 @@ rustc_test("fuchsia_inspect_derive_tests") {
   ]
 
   sources = [ "src/main.rs" ]
-
-  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 rustc_test("fuchsia_inspect_derive_import_tests") {
@@ -35,8 +33,6 @@ rustc_test("fuchsia_inspect_derive_import_tests") {
   ]
 
   sources = [ "src/import.rs" ]
-
-  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_component("fuchsia-inspect-derive-test") {

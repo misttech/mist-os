@@ -5,6 +5,7 @@ import("//build/components.gni")
 import("//build/config.gni")
 import("//build/fuzz.gni")
 import("//build/images/filesystem_limits.gni")
+import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_fuzzer.gni")
 import("//build/rust/rustc_library.gni")
 import("//src/diagnostics/archivist/build/archivist.gni")
@@ -176,6 +177,7 @@ archivist_optimized_binary("bin") {
   ]
 
   sources = [ "src/main.rs" ]
+  configs = [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component_manifest("root-manifest") {

@@ -35,8 +35,6 @@ rustc_binary("self_profile_integration_test") {
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
   ]
-
-  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 rustc_binary("profile_duration_puppet") {
@@ -57,8 +55,6 @@ rustc_binary("profile_duration_puppet") {
   # Instrumentation affects the relative runtimes of durations and this test relies on
   # predictable timing on hardware.
   exclude_toolchain_tags = [ "instrumented" ]
-
-  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("puppet_to_profile") {

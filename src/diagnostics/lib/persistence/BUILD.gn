@@ -22,8 +22,6 @@ rustc_library("lib") {
   sources = [ "src/lib.rs" ]
 
   test_deps = [ "//src/lib/fuchsia" ]
-
-  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_package("persistence-config-test") {

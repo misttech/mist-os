@@ -43,8 +43,6 @@ rustc_test("integration-bin") {
   ]
 
   inputs = [ "test_data/config/test_config.persist" ]
-
-  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_component("persistence-integration-test") {

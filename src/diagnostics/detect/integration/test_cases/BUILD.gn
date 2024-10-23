@@ -37,7 +37,6 @@ rustc_test("bin") {
     "src/test_snapshot_throttle.rs",
     "src/test_trigger_truth.rs",
   ]
-  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_component("component") {

@@ -19,6 +19,5 @@ template("archivist_optimized_binary") {
       configs += invoker.configs
     }
     configs += [ "//build/config/rust:bootfs" ]
-    configs += [ "//build/config/rust/lints:clippy_warn_all" ]
   }
 }

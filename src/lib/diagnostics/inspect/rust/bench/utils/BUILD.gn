@@ -30,8 +30,6 @@ rustc_library("fuchsia_inspect_bench_utils") {
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
   ]
-
-  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_package("inspect-bench-utils-unittests") {

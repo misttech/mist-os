@@ -46,8 +46,6 @@ rustc_library("log-command") {
     "src/log_formatter.rs",
     "src/log_socket_stream.rs",
   ]
-
-  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_package("log-command-test") {

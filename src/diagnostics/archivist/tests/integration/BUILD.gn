@@ -3,6 +3,8 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+import("//build/rust/rustc_test.gni")
 import("//src/diagnostics/archivist/build/pipeline.gni")
 
 fuchsia_test_component("integration_tests_component") {

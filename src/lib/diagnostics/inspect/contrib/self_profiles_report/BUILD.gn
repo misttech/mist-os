@@ -20,8 +20,6 @@ rustc_library("self_profiles_report") {
   ]
 
   sources = [ "src/lib.rs" ]
-
-  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 rustc_binary("self_profiles_report_bin") {
@@ -35,6 +33,4 @@ rustc_binary("self_profiles_report_bin") {
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:serde_json",
   ]
-
-  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }

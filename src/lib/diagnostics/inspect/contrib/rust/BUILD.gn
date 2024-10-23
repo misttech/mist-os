@@ -58,8 +58,6 @@ rustc_library("fuchsia-inspect-contrib") {
     "src/nodes/mod.rs",
     "src/self_profile.rs",
   ]
-
-  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_package("fuchsia-inspect-contrib-tests") {

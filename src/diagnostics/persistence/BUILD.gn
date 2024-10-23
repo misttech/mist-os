@@ -56,8 +56,6 @@ rustc_library("lib") {
     "//third_party/rust_crates:pretty_assertions",
     "//third_party/rust_crates:serde_json5",
   ]
-
-  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 # Rules defining the Persistence component.
