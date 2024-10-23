@@ -343,10 +343,6 @@ class CurrentTask : public TaskMemoryAccessor {
   UserAddress maximum_valid_address() const final;
 
   // C++
-  CurrentTask(CurrentTask&& other);
-  CurrentTask& operator=(CurrentTask&& other);
-  ~CurrentTask() override;
-
   const fbl::RefPtr<Task>& task() const { return task_; }
   fbl::RefPtr<Task>& task() { return task_; }
 
@@ -358,6 +354,10 @@ class CurrentTask : public TaskMemoryAccessor {
 
   Task& operator*();
   const Task& operator*() const;
+
+  CurrentTask(CurrentTask&& other);
+  CurrentTask& operator=(CurrentTask&& other);
+  ~CurrentTask() override;
 
  private:
   explicit CurrentTask(fbl::RefPtr<Task> task, ThreadState thread_state);
