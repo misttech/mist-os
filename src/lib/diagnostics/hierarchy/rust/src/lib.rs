@@ -222,7 +222,7 @@ where
 
     /// Provides an iterator over the diagnostics hierarchy returning properties in pre-order.
     pub fn property_iter(&self) -> DiagnosticsHierarchyIterator<'_, Key> {
-        DiagnosticsHierarchyIterator::new(&self)
+        DiagnosticsHierarchyIterator::new(self)
     }
 
     /// Adds a value that couldn't be read. This can happen when loading a lazy child.
@@ -679,11 +679,16 @@ where
         }
     }
 
+    /// Returns whether the array is empty or not.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// Returns the raw values of this Array content. In the case of a histogram, returns the
     /// bucket counts.
     pub fn raw_values(&self) -> Cow<'_, Vec<T>> {
         match self {
-            Self::Values(values) => Cow::Borrowed(&values),
+            Self::Values(values) => Cow::Borrowed(values),
             Self::LinearHistogram(LinearHistogram { size, counts, indexes, .. })
             | Self::ExponentialHistogram(ExponentialHistogram { size, counts, indexes, .. }) => {
                 if let Some(indexes) = indexes {
@@ -695,7 +700,7 @@ where
                     }
                     Cow::Owned(values)
                 } else {
-                    Cow::Borrowed(&counts)
+                    Cow::Borrowed(counts)
                 }
             }
         }
@@ -733,7 +738,7 @@ pub mod testing {
     {
         fn condense_histogram(&mut self) {
             match self {
-                Self::Values(_) => return,
+                Self::Values(_) => (),
                 Self::LinearHistogram(histogram) => {
                     if histogram.indexes.is_some() {
                         return;
@@ -947,9 +952,8 @@ where
     let mut stack = vec![stack_entry];
     let mut result = vec![];
 
-    while !stack.is_empty() {
+    while let Some(StackEntry { node, node_path_index, mut explored_path }) = stack.pop() {
         // Unwrap is safe since we validate is_empty right above.
-        let StackEntry { node, node_path_index, mut explored_path } = stack.pop().unwrap();
         if !selectors::match_string(&node_path[node_path_index], &node.name) {
             continue;
         }
@@ -961,7 +965,7 @@ where
             // If this node matches the next selector we are looking at, then explore its children.
             for child in node.children.iter() {
                 stack.push(StackEntry {
-                    node: &child,
+                    node: child,
                     node_path_index: node_path_index + 1,
                     explored_path: explored_path.clone(),
                 });
@@ -1024,7 +1028,7 @@ where
     Key: AsRef<str>,
 {
     let starts_empty = root_node.children.is_empty() && root_node.properties.is_empty();
-    if filter_hierarchy_helper(&mut root_node, &[&hierarchy_matcher]) {
+    if filter_hierarchy_helper(&mut root_node, &[hierarchy_matcher]) {
         if !starts_empty && root_node.children.is_empty() && root_node.properties.is_empty() {
             return None;
         }
@@ -1040,7 +1044,7 @@ fn filter_hierarchy_helper<Key>(
 where
     Key: AsRef<str>,
 {
-    let child_matchers = eval_matchers_on_node_name(&node.name, &hierarchy_matchers);
+    let child_matchers = eval_matchers_on_node_name(&node.name, hierarchy_matchers);
     if child_matchers.is_empty() {
         node.children.clear();
         node.properties.clear();
@@ -1140,13 +1144,9 @@ mod tests {
         let expected_num_entries = results_vec.len();
         let mut num_entries = 0;
         for (key, val) in test_hierarchy.property_iter() {
-            num_entries = num_entries + 1;
+            num_entries += 1;
             let (expected_key, expected_property) = results_vec.pop().unwrap();
-            assert_eq!(
-                key.iter().map(|s| *s).collect::<Vec<&str>>().join("/"),
-                expected_key.iter().map(|s| s.as_str()).collect::<Vec<&str>>().join("/")
-            );
-
+            assert_eq!(key.to_vec().join("/"), expected_key.to_vec().join("/"));
             assert_eq!(val, expected_property.as_ref());
         }
 
@@ -1270,12 +1270,12 @@ mod tests {
         );
         assert_matches!(hierarchy.get_child("child"), Some(node) if *node == child);
         assert_matches!(hierarchy.get_child_mut("child"), Some(node) if *node == child);
-        assert_matches!(hierarchy.get_child_by_path(&vec!["child", "child2"]),
+        assert_matches!(hierarchy.get_child_by_path(&["child", "child2"]),
                         Some(node) if *node == child2);
-        assert_matches!(hierarchy.get_child_by_path_mut(&vec!["child", "child2"]),
+        assert_matches!(hierarchy.get_child_by_path_mut(&["child", "child2"]),
                         Some(node) if *node == child2);
         assert_matches!(hierarchy.get_property("a"), Some(prop) if *prop == a_prop);
-        assert_matches!(hierarchy.get_property_by_path(&vec!["child", "b"]),
+        assert_matches!(hierarchy.get_property_by_path(&["child", "b"]),
                         Some(prop) if *prop == b_prop);
     }
 
@@ -1696,7 +1696,7 @@ mod tests {
                     "foo",
                     vec![
                         Property::Int("11".to_string(), -4),
-                        Property::Bytes("123".to_string(), "foo".bytes().into_iter().collect()),
+                        Property::Bytes("123".to_string(), "foo".bytes().collect()),
                         Property::Double("0".to_string(), 8.1),
                     ],
                     vec![],
@@ -1721,7 +1721,7 @@ mod tests {
                     vec![
                         Property::Double("0".to_string(), 8.1),
                         Property::Int("11".to_string(), -4),
-                        Property::Bytes("123".to_string(), "foo".bytes().into_iter().collect()),
+                        Property::Bytes("123".to_string(), "foo".bytes().collect()),
                     ],
                     vec![],
                 ),
@@ -1765,7 +1765,7 @@ mod tests {
                     "foo",
                     vec![
                         Property::Int("11".to_string(), -4),
-                        Property::Bytes("123".to_string(), "foo".bytes().into_iter().collect()),
+                        Property::Bytes("123".to_string(), "foo".bytes().collect()),
                         Property::Double("0".to_string(), 8.1),
                     ],
                     vec![DiagnosticsHierarchy::new(
@@ -1924,7 +1924,7 @@ mod tests {
     fn test_select_from_hierarchy() {
         let int_11 = Property::Int("11".to_string(), -4);
         let double_0 = Property::Double("0".to_string(), 8.1);
-        let bytes_123 = Property::Bytes("123".to_string(), "foo".bytes().into_iter().collect());
+        let bytes_123 = Property::Bytes("123".to_string(), "foo".bytes().collect());
         let int_13 = Property::Int("13".to_string(), -4);
         let test_cases = vec![
             ("*:root/foo:11", vec![&int_11]),
