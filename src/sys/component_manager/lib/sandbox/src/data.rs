@@ -15,7 +15,11 @@ pub enum Data {
     Uint64(u64),
 }
 
-impl CapabilityBound for Data {}
+impl CapabilityBound for Data {
+    fn debug_typename() -> &'static str {
+        "Data"
+    }
+}
 
 impl TryFrom<fsandbox::Data> for Data {
     type Error = RemoteError;

@@ -159,7 +159,7 @@ async fn do_start(
     let runner = match runner_router {
         Some(runner_router) => open_runner(
             component,
-            runner_router,
+            runner_router.into(),
             runner_name.expect(
                 "runner is set in sandbox but is missing use decl, this should be impossible",
             ),

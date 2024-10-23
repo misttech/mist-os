@@ -53,10 +53,26 @@ pub struct SpecificRouter<T: CapabilityBound> {
     routable: Arc<dyn SpecificRoutable<T>>,
 }
 
-impl CapabilityBound for SpecificRouter<crate::Connector> {}
-impl CapabilityBound for SpecificRouter<crate::Data> {}
-impl CapabilityBound for SpecificRouter<crate::DirEntry> {}
-impl CapabilityBound for SpecificRouter<crate::Dict> {}
+impl CapabilityBound for SpecificRouter<crate::Connector> {
+    fn debug_typename() -> &'static str {
+        "ConnectorRouter"
+    }
+}
+impl CapabilityBound for SpecificRouter<crate::Data> {
+    fn debug_typename() -> &'static str {
+        "DataRouter"
+    }
+}
+impl CapabilityBound for SpecificRouter<crate::DirEntry> {
+    fn debug_typename() -> &'static str {
+        "DirEntryRouter"
+    }
+}
+impl CapabilityBound for SpecificRouter<crate::Dict> {
+    fn debug_typename() -> &'static str {
+        "DictionaryRouter"
+    }
+}
 
 impl<T: CapabilityBound> fmt::Debug for SpecificRouter<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

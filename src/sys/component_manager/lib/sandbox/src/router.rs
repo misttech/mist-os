@@ -65,7 +65,11 @@ pub struct Router {
     routable: Arc<dyn Routable>,
 }
 
-impl CapabilityBound for Router {}
+impl CapabilityBound for Router {
+    fn debug_typename() -> &'static str {
+        "Router"
+    }
+}
 
 impl fmt::Debug for Router {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -64,7 +64,7 @@ use {
     routing_test_helpers::{
         default_service_capability, instantiate_common_routing_tests, RoutingTestModel,
     },
-    sandbox::{Routable, WeakInstanceToken},
+    sandbox::{Connector, SpecificRouter, SpecificRouterResponse, WeakInstanceToken},
     std::{
         collections::HashSet,
         pin::pin,
@@ -3255,9 +3255,9 @@ async fn source_component_stopping_when_routing() {
     let output = root.lock_resolved_state().await.unwrap().sandbox.component_output_dict.clone();
     let route_and_open_fut = async {
         // Route the capability.
-        let entry = output
-            .get_capability(&RelativePath::new("foo").unwrap())
-            .unwrap()
+        let cap = output.get_capability(&RelativePath::new("foo").unwrap()).unwrap();
+        let cap = SpecificRouter::<Connector>::try_from(cap).unwrap();
+        let Ok(SpecificRouterResponse::Capability(conn)) = cap
             .route(
                 Some(sandbox::Request {
                     target: root.as_weak().into(),
@@ -3266,15 +3266,12 @@ async fn source_component_stopping_when_routing() {
                 false,
             )
             .await
-            .unwrap();
+        else {
+            panic!()
+        };
 
         // Connect to the capability.
-        match entry {
-            sandbox::Capability::Connector(s) => {
-                s.send(sandbox::Message { channel: server_end }).unwrap()
-            }
-            e => panic!("{:#?}", e),
-        };
+        conn.send(sandbox::Message { channel: server_end }).unwrap()
     };
 
     // Both should complete after the response delay has passed.
@@ -3322,9 +3319,10 @@ async fn source_component_stopped_after_routing_before_open() {
 
     // Request a capability from the component.
     let output = root.lock_resolved_state().await.unwrap().sandbox.component_output_dict.clone();
-    let cap = output
-        .get_capability(&RelativePath::new("foo").unwrap())
-        .unwrap()
+
+    let cap = output.get_capability(&RelativePath::new("foo").unwrap()).unwrap();
+    let cap = SpecificRouter::<Connector>::try_from(cap).unwrap();
+    let Ok(SpecificRouterResponse::Capability(conn)) = cap
         .route(
             Some(sandbox::Request {
                 target: root.as_weak().into(),
@@ -3333,10 +3331,8 @@ async fn source_component_stopped_after_routing_before_open() {
             false,
         )
         .await
-        .unwrap();
-    let sender = match cap {
-        sandbox::Capability::Connector(s) => s,
-        c => panic!("{:#?}", c),
+    else {
+        panic!()
     };
 
     // It should be started with the capability access start reason.
@@ -3352,7 +3348,7 @@ async fn source_component_stopped_after_routing_before_open() {
 
     // Connect to the capability. The component should be started again.
     let (client_end, server_end) = zx::Channel::create();
-    sender.send(sandbox::Message { channel: server_end }).unwrap();
+    conn.send(sandbox::Message { channel: server_end }).unwrap();
 
     let server_end = open_request_rx.next().await.unwrap();
     assert_eq!(
@@ -3394,9 +3390,9 @@ async fn source_component_shutdown_after_routing_before_open() {
 
     // Request a capability from the component.
     let output = root.lock_resolved_state().await.unwrap().sandbox.component_output_dict.clone();
-    let cap = output
-        .get_capability(&RelativePath::new("foo").unwrap())
-        .unwrap()
+    let cap = output.get_capability(&RelativePath::new("foo").unwrap()).unwrap();
+    let cap = SpecificRouter::<Connector>::try_from(cap).unwrap();
+    let Ok(SpecificRouterResponse::Capability(conn)) = cap
         .route(
             Some(sandbox::Request {
                 target: root.as_weak().into(),
@@ -3405,10 +3401,8 @@ async fn source_component_shutdown_after_routing_before_open() {
             false,
         )
         .await
-        .unwrap();
-    let sender = match cap {
-        sandbox::Capability::Connector(s) => s,
-        c => panic!("{:#?}", c),
+    else {
+        panic!()
     };
 
     // It should be started with the capability access start reason.
@@ -3424,7 +3418,7 @@ async fn source_component_shutdown_after_routing_before_open() {
 
     // Connect to the capability. The request will fail and the component is not started.
     let (client_end, server_end) = zx::Channel::create();
-    sender.send(sandbox::Message { channel: server_end }).unwrap();
+    conn.send(sandbox::Message { channel: server_end }).unwrap();
     fasync::OnSignals::new(&client_end, zx::Signals::CHANNEL_PEER_CLOSED).await.unwrap();
     assert!(!root.is_started().await);
 }

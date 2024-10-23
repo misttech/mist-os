@@ -29,7 +29,9 @@ use ::routing::resolving::{
     ComponentAddress, ComponentResolutionContext, ResolvedComponent, ResolvedPackage, ResolverError,
 };
 use async_trait::async_trait;
-use cm_rust::{ChildDecl, CollectionDecl, ComponentDecl, UseDecl, UseStorageDecl};
+use cm_rust::{
+    CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl, UseDecl, UseStorageDecl,
+};
 use cm_types::{Name, Url};
 use cm_util::TaskGroup;
 use component_id_index::InstanceId;
@@ -51,7 +53,7 @@ use manager::ComponentManagerInstance;
 use moniker::{ChildName, Moniker};
 use router_error::{Explain, RouterError};
 use sandbox::{
-    Capability, Connectable, Dict, DirEntry, Message, Request, Router, SpecificRoutable,
+    Capability, Connector, Data, Dict, DirEntry, Message, Request, SpecificRoutable,
     SpecificRouter, SpecificRouterResponse,
 };
 use std::clone::Clone;
@@ -514,15 +516,14 @@ impl ComponentInstance {
                 // Currently there is no way to create a Router externally, so assume these
                 // are Connector capabilities and convert them to Router here.
                 //
-                // TODO(https://fxbug.dev/319542502): Consider using the external Router type, once
-                // it exists
-                let router = match value {
-                    Capability::Connector(s) => Router::new_ok(s),
-                    Capability::Data(d) => Router::new_ok(d),
+                // TODO(https://fxbug.dev/319542502): Consider using the external router types
+                let router: Capability = match value {
+                    Capability::Connector(s) => SpecificRouter::<Connector>::new_ok(s).into(),
+                    Capability::Data(d) => SpecificRouter::<Data>::new_ok(d).into(),
                     _ => return Err(AddDynamicChildError::InvalidDictionary),
                 };
 
-                if let Err(_) = child_dict_entries.insert(key.clone(), router.into()) {
+                if let Err(_) = child_dict_entries.insert(key.clone(), router) {
                     return Err(AddDynamicChildError::StaticRouteConflict { capability_name: key });
                 }
             }
@@ -1321,12 +1322,12 @@ probably not intended: {}",
         let resolver_capability_res =
             resolvers_dict.get(&Name::new(component_address.scheme()).unwrap());
         let resolver_router = match resolver_capability_res {
-            Ok(Some(Capability::Router(resolver_router))) => resolver_router,
+            Ok(Some(Capability::ConnectorRouter(resolver_router))) => resolver_router,
             _ => {
                 return Err(ResolverError::SchemeNotRegistered);
             }
         };
-        let resolver_capability = resolver_router
+        let resp = resolver_router
             .route(
                 Some(Request {
                     target: self.as_weak().into(),
@@ -1337,10 +1338,10 @@ probably not intended: {}",
             .await
             .map_err(|err| ResolverError::routing_error(err))?;
         // TODO(361308923): only support the Connector type here.
-        let resolver_proxy = match &resolver_capability {
+        let resolver_proxy = match resp {
             // Built-in resolver are hosted by a LaunchTaskOnReceive, which returns a Connector
             // capability for new routes.
-            Capability::Connector(resolver_connector) => {
+            SpecificRouterResponse::<Connector>::Capability(resolver_connector) => {
                 let (proxy, server_end) = create_proxy::<fresolution::ResolverMarker>().unwrap();
                 resolver_connector.send(Message { channel: server_end.into_channel() }).map_err(
                     |_| {
@@ -1352,28 +1353,19 @@ probably not intended: {}",
                 )?;
                 proxy
             }
-            // Component provided resolvers are handled by a program router, which returns a DirEntry
-            // capability for new routes.
-            Capability::DirEntry(resolver_dir_entry) => {
-                let (proxy, server_end) = create_proxy::<fresolution::ResolverMarker>().unwrap();
-                resolver_dir_entry.send(Message { channel: server_end.into_channel() }).map_err(
-                    |_| {
-                        ResolverError::routing_error(RoutingError::BedrockFailedToSend {
-                            moniker: self.moniker.clone().into(),
-                            capability_id: component_address.scheme().to_string(),
-                        })
-                    },
-                )?;
-                proxy
-            }
-            cap => {
+            SpecificRouterResponse::<Connector>::Unavailable => {
                 return Err(ResolverError::routing_error(
-                    RoutingError::BedrockWrongCapabilityType {
-                        actual: cap.debug_typename().to_string(),
-                        expected: "Connector or DirEntry".to_string(),
+                    RoutingError::RouteUnexpectedUnavailable {
+                        type_name: CapabilityTypeName::Resolver,
                         moniker: self.moniker.clone().into(),
                     },
                 ));
+            }
+            SpecificRouterResponse::<Connector>::Debug(_) => {
+                return Err(ResolverError::routing_error(RoutingError::RouteUnexpectedDebug {
+                    type_name: CapabilityTypeName::Resolver,
+                    moniker: self.moniker.clone().into(),
+                }));
             }
         };
         let (component_url, some_context) = component_address.to_url_and_context();

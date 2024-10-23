@@ -25,8 +25,8 @@ use futures::{future, FutureExt};
 use moniker::{ChildName, ExtendedMoniker};
 use router_error::RouterError;
 use sandbox::{
-    CapabilityBound, Connector, Data, Dict, DirEntry, Request, Router, SpecificRoutable,
-    SpecificRouter, SpecificRouterResponse,
+    CapabilityBound, Connector, Data, Dict, DirEntry, Request, SpecificRoutable, SpecificRouter,
+    SpecificRouterResponse,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -94,13 +94,21 @@ pub fn build_root_component_input(
             // registry, skip it.
             continue;
         }
-        let capability: sandbox::Capability = capability_source
+        let data: sandbox::Data = capability_source
             .clone()
             .try_into()
-            .expect("failed to convert capability source to bedrock capability");
-        let router = Router::new_ok(capability)
-            .with_policy_check::<ComponentInstanceForAnalyzer>(capability_source, policy.clone())
-            .with_porcelain_type(capability_type, ExtendedMoniker::ComponentManager);
+            .expect("failed to convert capability source to Data");
+        let router = match capability_type {
+            CapabilityTypeName::Protocol | CapabilityTypeName::Runner => {
+                SpecificRouter::<Connector>::new_debug(data)
+                    .with_policy_check::<ComponentInstanceForAnalyzer>(
+                        capability_source,
+                        policy.clone(),
+                    )
+                    .with_porcelain_type(capability_type, ExtendedMoniker::ComponentManager)
+            }
+            _ => unreachable!("other types were filtered out above"),
+        };
         root_component_input
             .capabilities()
             .insert_capability(&name, router.clone().into())
@@ -136,8 +144,6 @@ pub fn build_framework_dictionary(component: &Arc<ComponentInstanceForAnalyzer>)
                 moniker: component.moniker().clone(),
             },
         ));
-        // Specific -> general router
-        let router = Router::from(router);
         framework_dict
             .insert_capability(&name, router.into())
             .expect("failed to insert framework capability into dictionary");
@@ -158,8 +164,6 @@ pub fn build_capability_sourced_capabilities_dictionary(
                     moniker: component.moniker().clone(),
                 },
             ));
-            // Specific -> general router
-            let router = Router::from(router);
             output
                 .insert_capability(&storage_decl.name, router.into())
                 .expect("failed to insert capability backed capability into dictionary");

@@ -47,19 +47,26 @@ impl RouterExt for Router {
                 // This capability is not cloneable. Skip it.
                 continue;
             };
-            let value = match value {
+
+            fn router_to_direntry(router: impl Into<Router>, scope: &ExecutionScope) -> Capability {
+                let router: Router = router.into();
+                // TODO: Should we convert the DirEntry to a Directory here if the Router wraps a
+                // Dict?
+                Capability::DirEntry(DirEntry::new(router.into_directory_entry(
+                    fio::DirentType::Service,
+                    scope.clone(),
+                    |_| None,
+                )))
+            }
+            let value: Capability = match value {
                 Capability::Dictionary(dict) => {
                     Capability::Dictionary(Self::dict_routers_to_open(scope, &dict))
                 }
-                Capability::Router(router) => {
-                    // TODO: Should we convert the Open to a Directory here if the Router wraps a
-                    // Dict?
-                    Capability::DirEntry(DirEntry::new(router.into_directory_entry(
-                        fio::DirentType::Service,
-                        scope.clone(),
-                        |_| None,
-                    )))
-                }
+                Capability::Router(router) => router_to_direntry(router, scope),
+                Capability::ConnectorRouter(router) => router_to_direntry(router, scope),
+                Capability::DataRouter(router) => router_to_direntry(router, scope),
+                Capability::DirEntryRouter(router) => router_to_direntry(router, scope),
+                Capability::DictionaryRouter(router) => router_to_direntry(router, scope),
                 other => other,
             };
             out.insert(key, value).ok();

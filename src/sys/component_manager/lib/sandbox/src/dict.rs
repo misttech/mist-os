@@ -40,7 +40,11 @@ pub(crate) struct DictInner {
     task_group: Option<fasync::TaskGroup>,
 }
 
-impl CapabilityBound for Dict {}
+impl CapabilityBound for Dict {
+    fn debug_typename() -> &'static str {
+        "Dictionary"
+    }
+}
 
 impl Default for Dict {
     fn default() -> Self {

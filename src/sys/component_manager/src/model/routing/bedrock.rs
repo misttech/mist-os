@@ -48,20 +48,21 @@ impl UseRouteRequest {
                         decl.target_path, target.moniker
                     );
                 };
-                let Capability::Router(router) = capability else {
+                let Capability::ConnectorRouter(router) = capability else {
                     panic!(
                         "program input dictionary for component {} had an entry with an unexpected \
                                  type: {:?}",
                         target.moniker, capability
                     );
                 };
-                router
+                router.into()
             }
             Self::UseRunner(_) => {
                 // A component can only use one runner, it must be this one.
-                program_input
+                let router = program_input
                     .runner()
-                    .expect("component has `use runner` but no runner in program input?")
+                    .expect("component has `use runner` but no runner in program input?");
+                router.into()
             }
         }
     }
@@ -101,26 +102,65 @@ impl TryFrom<&Vec<&ExposeDecl>> for ExposeRouteRequest {
 
 impl ExposeRouteRequest {
     pub fn into_router(self, target: WeakComponentInstance, sandbox: &ComponentSandbox) -> Router {
-        let target_name: &cm_types::Name = match &self {
-            Self::ExposeProtocol(decl) => &decl.target_name,
-            Self::ExposeDictionary(decl) => &decl.target_name,
-            Self::ExposeRunner(decl) => &decl.target_name,
-        };
-        let Some(capability) = sandbox.component_output_dict.get_capability(target_name) else {
-            panic!(
-                "router for capability {:?} is missing from component output \
-                dictionary for component {}",
-                target_name, target.moniker
-            );
-        };
-        let Capability::Router(router) = capability else {
-            panic!(
-                "program input dictionary for component {} had an entry with \
-                an unexpected type: {:?}",
-                target.moniker, capability
-            );
-        };
-        router
+        match self {
+            Self::ExposeProtocol(decl) => {
+                let Some(capability) =
+                    sandbox.component_output_dict.get_capability(&decl.target_name)
+                else {
+                    panic!(
+                        "router for capability {:?} is missing from component output dictionary for \
+                         component {}",
+                        decl.target_name, target.moniker
+                    );
+                };
+                let Capability::ConnectorRouter(router) = capability else {
+                    panic!(
+                        "program input dictionary for component {} had an entry with an unexpected \
+                                 type: {:?}",
+                        target.moniker, capability
+                    );
+                };
+                router.into()
+            }
+            Self::ExposeDictionary(decl) => {
+                let Some(capability) =
+                    sandbox.component_output_dict.get_capability(&decl.target_name)
+                else {
+                    panic!(
+                        "router for capability {:?} is missing from component output dictionary for \
+                         component {}",
+                        decl.target_name, target.moniker
+                    );
+                };
+                let Capability::DictionaryRouter(router) = capability else {
+                    panic!(
+                        "program input dictionary for component {} had an entry with an unexpected \
+                                 type: {:?}",
+                        target.moniker, capability
+                    );
+                };
+                router.into()
+            }
+            Self::ExposeRunner(decl) => {
+                let Some(capability) =
+                    sandbox.component_output_dict.get_capability(&decl.target_name)
+                else {
+                    panic!(
+                        "router for capability {:?} is missing from component output dictionary for \
+                         component {}",
+                        decl.target_name, target.moniker
+                    );
+                };
+                let Capability::ConnectorRouter(router) = capability else {
+                    panic!(
+                        "program input dictionary for component {} had an entry with an unexpected \
+                                 type: {:?}",
+                        target.moniker, capability
+                    );
+                };
+                router.into()
+            }
+        }
     }
 
     pub fn availability(&self) -> cm_rust::Availability {

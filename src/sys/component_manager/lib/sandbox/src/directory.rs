@@ -29,7 +29,11 @@ impl Directory {
     }
 }
 
-impl CapabilityBound for Directory {}
+impl CapabilityBound for Directory {
+    fn debug_typename() -> &'static str {
+        "Directory"
+    }
+}
 
 impl fmt::Debug for Directory {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -20,7 +20,11 @@ impl From<Unit> for fsandbox::Capability {
     }
 }
 
-impl CapabilityBound for Unit {}
+impl CapabilityBound for Unit {
+    fn debug_typename() -> &'static str {
+        "Unit"
+    }
+}
 
 #[cfg(test)]
 mod tests {

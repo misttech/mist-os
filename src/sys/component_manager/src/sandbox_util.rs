@@ -20,8 +20,8 @@ use futures::future::BoxFuture;
 use futures::FutureExt;
 use router_error::{Explain, RouterError};
 use sandbox::{
-    Capability, Connectable, Connector, Message, Request, Routable, Router, SpecificRoutable,
-    SpecificRouter, SpecificRouterResponse,
+    Connectable, Connector, Message, Request, SpecificRoutable, SpecificRouter,
+    SpecificRouterResponse,
 };
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -103,36 +103,37 @@ impl LaunchTaskOnReceive {
         Connector::new_sendable(TaskAndTarget { task: self, target })
     }
 
-    pub fn into_router(self) -> Router {
+    pub fn into_router(self) -> SpecificRouter<Connector> {
         #[derive(Debug)]
         struct LaunchTaskRouter {
             inner: Arc<LaunchTaskOnReceive>,
         }
         #[async_trait]
-        impl Routable for LaunchTaskRouter {
+        impl SpecificRoutable<Connector> for LaunchTaskRouter {
             async fn route(
                 &self,
                 request: Option<Request>,
                 debug: bool,
-            ) -> Result<Capability, RouterError> {
+            ) -> Result<SpecificRouterResponse<Connector>, RouterError> {
                 let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
                 let WeakExtendedInstance::Component(target) = request.target.to_instance() else {
                     return Err(cm_unexpected());
                 };
-                let cap = self.inner.clone().into_sender(target).into();
+                let conn = self.inner.clone().into_sender(target);
                 if !debug {
-                    Ok(cap)
+                    Ok(SpecificRouterResponse::<Connector>::Capability(conn))
                 } else {
-                    Ok(self
+                    let data = self
                         .inner
                         .capability_source
                         .clone()
                         .try_into()
-                        .expect("failed to convert capability source to dictionary"))
+                        .expect("failed to convert capability source to Data");
+                    Ok(SpecificRouterResponse::<Connector>::Debug(data))
                 }
             }
         }
-        Router::new(LaunchTaskRouter { inner: Arc::new(self) })
+        SpecificRouter::<Connector>::new(LaunchTaskRouter { inner: Arc::new(self) })
     }
 
     fn launch_task(&self, channel: zx::Channel, instance: WeakComponentInstance) {
@@ -351,8 +352,8 @@ pub mod tests {
     use router_error::DowncastErrorForTest;
     use routing::availability::AvailabilityMetadata;
     use routing::bedrock::structured_dict::ComponentInput;
-    use routing::{test_invalid_instance_token, DictExt, LazyGet};
-    use sandbox::{Data, Dict, RemotableCapability};
+    use routing::{test_invalid_instance_token, DictExt, GenericRouterResponse, LazyGet};
+    use sandbox::{Capability, Data, Dict, RemotableCapability};
     use std::pin::pin;
     use std::sync::Weak;
     use std::task::Poll;
@@ -415,16 +416,13 @@ pub mod tests {
         let bar = Dict::new();
         let data = Data::String("hello".to_owned());
         assert!(bar.insert_capability(&RelativePath::new("data").unwrap(), data.into()).is_ok());
-        // Put bar behind a few layers of Router for good measure.
-        let bar_router = Router::new_ok(bar);
-        let bar_router = Router::new_ok(bar_router);
-        let bar_router = Router::new_ok(bar_router);
+        let bar_router = SpecificRouter::<Dict>::new_ok(bar);
 
         let foo = Dict::new();
         assert!(foo
             .insert_capability(&RelativePath::new("bar").unwrap(), bar_router.into())
             .is_ok());
-        let foo_router = Router::new_ok(foo);
+        let foo_router = SpecificRouter::<Dict>::new_ok(foo);
 
         let dict = Dict::new();
         assert!(dict
@@ -435,7 +433,7 @@ pub mod tests {
         metadata.set_availability(Availability::Required);
         let cap = dict
             .get_with_request(
-                Moniker::root(),
+                &Moniker::root().into(),
                 &RelativePath::new("foo/bar/data").unwrap(),
                 Some(Request {
                     target: test_invalid_instance_token::<ComponentInstance>(),
@@ -446,21 +444,23 @@ pub mod tests {
             .await;
         assert_matches!(
             cap,
-            Ok(Some(Capability::Data(Data::String(str)))) if str == "hello"
+            Ok(Some(GenericRouterResponse::Capability(Capability::Data(Data::String(str)))))
+                if str == "hello"
         );
     }
 
     #[fuchsia::test]
     async fn get_with_request_error() {
         let dict = Dict::new();
-        let foo =
-            Router::new_error(RoutingError::SourceCapabilityIsVoid { moniker: Moniker::root() });
+        let foo = SpecificRouter::<Dict>::new_error(RoutingError::SourceCapabilityIsVoid {
+            moniker: Moniker::root(),
+        });
         assert!(dict.insert_capability(&RelativePath::new("foo").unwrap(), foo.into()).is_ok());
         let metadata = Dict::new();
         metadata.set_availability(Availability::Required);
         let cap = dict
             .get_with_request(
-                Moniker::root(),
+                &Moniker::root().into(),
                 &RelativePath::new("foo/bar").unwrap(),
                 Some(Request {
                     target: test_invalid_instance_token::<ComponentInstance>(),
@@ -486,7 +486,7 @@ pub mod tests {
         metadata.set_availability(Availability::Required);
         let cap = dict
             .get_with_request(
-                Moniker::root(),
+                &Moniker::root().into(),
                 &RelativePath::new("foo/bar").unwrap(),
                 Some(Request {
                     target: test_invalid_instance_token::<ComponentInstance>(),
@@ -503,14 +503,14 @@ pub mod tests {
         let dict = Dict::new();
 
         let foo = Dict::new();
-        let foo = Router::new_ok(foo);
+        let foo = SpecificRouter::<Dict>::new_ok(foo);
         assert!(dict.insert_capability(&RelativePath::new("foo").unwrap(), foo.into()).is_ok());
 
         let metadata = Dict::new();
         metadata.set_availability(Availability::Required);
         let cap = dict
             .get_with_request(
-                Moniker::root(),
+                &Moniker::root().into(),
                 &RelativePath::new("foo").unwrap(),
                 Some(Request {
                     target: test_invalid_instance_token::<ComponentInstance>(),
@@ -519,13 +519,16 @@ pub mod tests {
                 false,
             )
             .await;
-        assert_matches!(cap, Ok(Some(Capability::Dictionary(_))));
+        assert_matches!(
+            cap,
+            Ok(Some(GenericRouterResponse::Capability(Capability::Dictionary(_))))
+        );
 
         let metadata = Dict::new();
         metadata.set_availability(Availability::Required);
         let cap = dict
             .get_with_request(
-                Moniker::root(),
+                &Moniker::root().into(),
                 &RelativePath::new("foo/bar").unwrap(),
                 Some(Request {
                     target: test_invalid_instance_token::<ComponentInstance>(),
@@ -719,7 +722,7 @@ pub mod tests {
         dict1.insert("source".parse().unwrap(), source).expect("dict entry already exists");
 
         let base_router = SpecificRouter::<Dict>::new_ok(dict1);
-        let downscoped_router = base_router.lazy_get(
+        let downscoped_router: SpecificRouter<Data> = base_router.lazy_get(
             RelativePath::new("source").unwrap(),
             RoutingError::BedrockMemberAccessUnsupported { moniker: Moniker::root().into() },
         );
@@ -737,7 +740,7 @@ pub mod tests {
             .await
             .unwrap();
         let capability = match capability {
-            Capability::Data(d) => d,
+            SpecificRouterResponse::<Data>::Capability(d) => d,
             c => panic!("Bad enum {:#?}", c),
         };
         assert_eq!(capability, Data::String("hello".to_string()));
@@ -762,7 +765,7 @@ pub mod tests {
             .expect("dict entry already exists");
 
         let base_router = SpecificRouter::<Dict>::new_ok(dict4);
-        let downscoped_router = base_router.lazy_get(
+        let downscoped_router: SpecificRouter<Data> = base_router.lazy_get(
             RelativePath::new("dict3/dict2/dict1/source").unwrap(),
             RoutingError::BedrockMemberAccessUnsupported { moniker: Moniker::root().into() },
         );
@@ -780,7 +783,7 @@ pub mod tests {
             .await
             .unwrap();
         let capability = match capability {
-            Capability::Data(d) => d,
+            SpecificRouterResponse::<Data>::Capability(d) => d,
             c => panic!("Bad enum {:#?}", c),
         };
         assert_eq!(capability, Data::String("hello".to_string()));
@@ -788,11 +791,11 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn get_router_or_not_found() {
-        let source = Router::new(Capability::Data(Data::String("hello".to_string())));
+        let source = SpecificRouter::<Data>::new_ok(Data::String("hello".to_string()));
         let dict1 = Dict::new();
         dict1.insert("source".parse().unwrap(), source.into()).expect("dict entry already exists");
 
-        let router = dict1.get_router_or_not_found(
+        let router = dict1.get_router_or_not_found::<Data>(
             &RelativePath::new("source").unwrap(),
             RoutingError::BedrockMemberAccessUnsupported { moniker: Moniker::root().into() },
         );
@@ -801,7 +804,7 @@ pub mod tests {
         metadata.set_availability(Availability::Optional);
         let capability = router.route(None, false).await.unwrap();
         let capability = match capability {
-            Capability::Data(d) => d,
+            SpecificRouterResponse::<Data>::Capability(d) => d,
             c => panic!("Bad enum {:#?}", c),
         };
         assert_eq!(capability, Data::String("hello".to_string()));
@@ -809,7 +812,7 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn get_router_or_not_found_deep() {
-        let source = Capability::Data(Data::String("hello".to_string()));
+        let source = Data::String("hello".to_string());
         let dict1 = Dict::new();
         dict1.insert("source".parse().unwrap(), source.into()).expect("dict entry already exists");
         let dict2 = Dict::new();
@@ -822,10 +825,10 @@ pub mod tests {
             .expect("dict entry already exists");
         let dict4 = Dict::new();
         dict4
-            .insert("dict3".parse().unwrap(), Router::new(dict3).into())
+            .insert("dict3".parse().unwrap(), SpecificRouter::<Dict>::new_ok(dict3).into())
             .expect("dict entry already exists");
 
-        let router = dict4.get_router_or_not_found(
+        let router = dict4.get_router_or_not_found::<Data>(
             &RelativePath::new("dict3/dict2/dict1/source").unwrap(),
             RoutingError::BedrockMemberAccessUnsupported { moniker: Moniker::root().into() },
         );
@@ -834,7 +837,7 @@ pub mod tests {
         metadata.set_availability(Availability::Optional);
         let capability = router.route(None, false).await.unwrap();
         let capability = match capability {
-            Capability::Data(d) => d,
+            SpecificRouterResponse::<Data>::Capability(d) => d,
             c => panic!("Bad enum {:#?}", c),
         };
         assert_eq!(capability, Data::String("hello".to_string()));

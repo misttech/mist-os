@@ -4294,6 +4294,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     UseBuilder::protocol()
                         .source(UseSource::Self_)
                         .name("A")
+                        .path("/svc/B")
                         .from_dictionary("my_dict"),
                 )
                 .build(),
@@ -4307,7 +4308,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 source: UseSource::Self_,
                 source_name: "A".parse().unwrap(),
                 source_dictionary: "my_dict".parse().unwrap(),
-                target_path: "/svc/A".parse().unwrap(),
+                target_path: "/svc/B".parse().unwrap(),
                 dependency_type: DependencyType::Strong,
                 availability: Availability::Required,
             }),

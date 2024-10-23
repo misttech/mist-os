@@ -44,7 +44,11 @@ pub struct Connector {
     _receiver_task: Option<Arc<dyn Any + Send + Sync>>,
 }
 
-impl CapabilityBound for Connector {}
+impl CapabilityBound for Connector {
+    fn debug_typename() -> &'static str {
+        "Connector"
+    }
+}
 
 impl Connector {
     pub fn new() -> (Receiver, Self) {

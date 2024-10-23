@@ -21,7 +21,10 @@ use itertools::Itertools;
 use lazy_static::lazy_static;
 use moniker::{ChildName, Moniker};
 use router_error::RouterError;
-use sandbox::{Capability, Data, Dict, Request, Router, SpecificRouter, Unit};
+use sandbox::{
+    Capability, CapabilityBound, Connector, Data, Dict, Request, SpecificRoutable, SpecificRouter,
+    SpecificRouterResponse,
+};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -39,7 +42,7 @@ lazy_static! {
 pub struct ProgramInput {
     // This will always have the following fields:
     // - namespace: Dict
-    // - runner: Option<Router>
+    // - runner: Option<SpecificRouter<Connector>>
     // - config: Dict
     inner: Dict,
 }
@@ -51,7 +54,7 @@ impl Default for ProgramInput {
 }
 
 impl ProgramInput {
-    pub fn new(namespace: Dict, runner: Option<Router>, config: Dict) -> Self {
+    pub fn new(namespace: Dict, runner: Option<SpecificRouter<Connector>>, config: Dict) -> Self {
         let inner = Dict::new();
         inner.insert(NAMESPACE.clone(), namespace.into()).unwrap();
         if let Some(runner) = runner {
@@ -71,16 +74,16 @@ impl ProgramInput {
     }
 
     /// A router for the runner that a component has used (if any).
-    pub fn runner(&self) -> Option<Router> {
+    pub fn runner(&self) -> Option<SpecificRouter<Connector>> {
         let cap = self.inner.get(&*RUNNER).expect("capabilities must be cloneable");
         match cap {
             None => None,
-            Some(Capability::Router(r)) => Some(r),
+            Some(Capability::ConnectorRouter(r)) => Some(r),
             cap => unreachable!("runner entry must be a router: {cap:?}"),
         }
     }
 
-    fn set_runner(&self, router: Router) {
+    fn set_runner(&self, router: SpecificRouter<Connector>) {
         self.inner.insert(RUNNER.clone(), router.into()).unwrap()
     }
 
@@ -289,10 +292,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
     }
 
     for offer in &decl.offers {
-        if !is_supported_offer(offer) {
-            continue;
-        }
-        let target_dict = match offer.target() {
+        let get_target_dict = || match offer.target() {
             cm_rust::OfferTarget::Child(child_ref) => {
                 assert!(child_ref.collection.is_none(), "unexpected dynamic offer target");
                 let child_name = Name::new(child_ref.name.as_str())
@@ -331,30 +331,82 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                 dict
             }
         };
-        extend_dict_with_offer(
-            component,
-            &child_component_output_dictionary_routers,
-            &component_input,
-            &program_output_dict,
-            &framework_dict,
-            &capability_sourced_capabilities_dict,
-            offer,
-            &target_dict,
-            error_reporter.clone(),
-        );
+        match offer {
+            cm_rust::OfferDecl::Config(_) => extend_dict_with_offer::<Data, _>(
+                component,
+                &child_component_output_dictionary_routers,
+                &component_input,
+                &program_output_dict,
+                &framework_dict,
+                &capability_sourced_capabilities_dict,
+                offer,
+                &(get_target_dict)(),
+                error_reporter.clone(),
+            ),
+            cm_rust::OfferDecl::Dictionary(_) => extend_dict_with_offer::<Dict, _>(
+                component,
+                &child_component_output_dictionary_routers,
+                &component_input,
+                &program_output_dict,
+                &framework_dict,
+                &capability_sourced_capabilities_dict,
+                offer,
+                &(get_target_dict)(),
+                error_reporter.clone(),
+            ),
+            cm_rust::OfferDecl::Protocol(_)
+            | cm_rust::OfferDecl::Runner(_)
+            | cm_rust::OfferDecl::Resolver(_) => extend_dict_with_offer::<Connector, _>(
+                component,
+                &child_component_output_dictionary_routers,
+                &component_input,
+                &program_output_dict,
+                &framework_dict,
+                &capability_sourced_capabilities_dict,
+                offer,
+                &(get_target_dict)(),
+                error_reporter.clone(),
+            ),
+            _ => {}
+        }
     }
 
     for expose in &decl.exposes {
-        extend_dict_with_expose(
-            component,
-            &child_component_output_dictionary_routers,
-            &program_output_dict,
-            &framework_dict,
-            &capability_sourced_capabilities_dict,
-            expose,
-            &component_output_dict,
-            error_reporter.clone(),
-        );
+        match expose {
+            cm_rust::ExposeDecl::Config(_) => extend_dict_with_expose::<Data, _>(
+                component,
+                &child_component_output_dictionary_routers,
+                &program_output_dict,
+                &framework_dict,
+                &capability_sourced_capabilities_dict,
+                expose,
+                &component_output_dict,
+                error_reporter.clone(),
+            ),
+            cm_rust::ExposeDecl::Dictionary(_) => extend_dict_with_expose::<Dict, _>(
+                component,
+                &child_component_output_dictionary_routers,
+                &program_output_dict,
+                &framework_dict,
+                &capability_sourced_capabilities_dict,
+                expose,
+                &component_output_dict,
+                error_reporter.clone(),
+            ),
+            cm_rust::ExposeDecl::Protocol(_)
+            | cm_rust::ExposeDecl::Runner(_)
+            | cm_rust::ExposeDecl::Resolver(_) => extend_dict_with_expose::<Connector, _>(
+                component,
+                &child_component_output_dictionary_routers,
+                &program_output_dict,
+                &framework_dict,
+                &capability_sourced_capabilities_dict,
+                expose,
+                &component_output_dict,
+                error_reporter.clone(),
+            ),
+            _ => {}
+        }
     }
 
     ComponentSandbox {
@@ -409,8 +461,8 @@ fn build_environment(
     for (source_name, target_name, source, cap_type) in debug.chain(runners).chain(resolvers) {
         let source_path =
             SeparatedPath { dirname: Default::default(), basename: source_name.clone() };
-        let router = match &source {
-            cm_rust::RegistrationSource::Parent => use_from_parent_router(
+        let router: SpecificRouter<Connector> = match &source {
+            cm_rust::RegistrationSource::Parent => use_from_parent_router::<Connector>(
                 component_input,
                 source_path,
                 moniker,
@@ -418,7 +470,7 @@ fn build_environment(
             )
             .with_porcelain_type(cap_type, moniker.clone()),
             cm_rust::RegistrationSource::Self_ => program_output_dict
-                .get_router_or_not_found(
+                .get_router_or_not_found::<Connector>(
                     &source_path,
                     RoutingError::use_from_self_not_found(
                         moniker,
@@ -433,17 +485,15 @@ fn build_environment(
                 else {
                     continue;
                 };
-                child_component_output
-                    .clone()
-                    .lazy_get(
-                        source_path,
-                        RoutingError::use_from_child_expose_not_found(
-                            &child_name,
-                            &moniker,
-                            source_name.clone(),
-                        ),
-                    )
-                    .with_porcelain_type(cap_type, moniker.clone())
+                let r: SpecificRouter<Connector> = child_component_output.clone().lazy_get(
+                    source_path,
+                    RoutingError::use_from_child_expose_not_found(
+                        &child_name,
+                        &moniker,
+                        source_name.clone(),
+                    ),
+                );
+                r.with_porcelain_type(cap_type, moniker.clone())
             }
         };
         let dict_to_insert_to = match cap_type {
@@ -474,17 +524,44 @@ pub fn extend_dict_with_offers<C: ComponentInstanceInterface + 'static>(
     error_reporter: impl ErrorReporter,
 ) {
     for offer in dynamic_offers {
-        extend_dict_with_offer(
-            component,
-            &child_component_output_dictionary_routers,
-            component_input,
-            program_output_dict,
-            framework_dict,
-            capability_sourced_capabilities_dict,
-            offer,
-            &target_input.capabilities(),
-            error_reporter.clone(),
-        );
+        match offer {
+            cm_rust::OfferDecl::Config(_) => extend_dict_with_offer::<Data, _>(
+                component,
+                &child_component_output_dictionary_routers,
+                component_input,
+                program_output_dict,
+                framework_dict,
+                capability_sourced_capabilities_dict,
+                offer,
+                &target_input.capabilities(),
+                error_reporter.clone(),
+            ),
+            cm_rust::OfferDecl::Dictionary(_) => extend_dict_with_offer::<Dict, _>(
+                component,
+                &child_component_output_dictionary_routers,
+                component_input,
+                program_output_dict,
+                framework_dict,
+                capability_sourced_capabilities_dict,
+                offer,
+                &target_input.capabilities(),
+                error_reporter.clone(),
+            ),
+            cm_rust::OfferDecl::Protocol(_)
+            | cm_rust::OfferDecl::Runner(_)
+            | cm_rust::OfferDecl::Resolver(_) => extend_dict_with_offer::<Connector, _>(
+                component,
+                &child_component_output_dictionary_routers,
+                component_input,
+                program_output_dict,
+                framework_dict,
+                capability_sourced_capabilities_dict,
+                offer,
+                &target_input.capabilities(),
+                error_reporter.clone(),
+            ),
+            _ => {}
+        }
     }
 }
 
@@ -510,8 +587,8 @@ fn extend_dict_with_config_use<C: ComponentInstanceInterface + 'static>(
     let moniker = component.moniker();
     let source_path = config_use.source_path();
     let porcelain_type = CapabilityTypeName::Config;
-    let router = match config_use.source() {
-        cm_rust::UseSource::Parent => use_from_parent_router(
+    let router: SpecificRouter<Data> = match config_use.source() {
+        cm_rust::UseSource::Parent => use_from_parent_router::<Data>(
             component_input,
             source_path.to_owned(),
             moniker,
@@ -519,7 +596,7 @@ fn extend_dict_with_config_use<C: ComponentInstanceInterface + 'static>(
         )
         .with_porcelain_type(porcelain_type, moniker.clone()),
         cm_rust::UseSource::Self_ => program_output_dict
-            .get_router_or_not_found(
+            .get_router_or_not_found::<Data>(
                 &source_path,
                 RoutingError::use_from_self_not_found(
                     moniker,
@@ -534,17 +611,15 @@ fn extend_dict_with_config_use<C: ComponentInstanceInterface + 'static>(
             else {
                 panic!("use declaration in manifest for component {} has a source of a nonexistent child {}, this should be prevented by manifest validation", moniker, child_name);
             };
-            child_component_output
-                .clone()
-                .lazy_get(
-                    source_path.to_owned(),
-                    RoutingError::use_from_child_expose_not_found(
-                        &child_name,
-                        &moniker,
-                        config_use.source_name().clone(),
-                    ),
-                )
-                .with_porcelain_type(porcelain_type, moniker.clone())
+            let r: SpecificRouter<Data> = child_component_output.clone().lazy_get(
+                source_path.to_owned(),
+                RoutingError::use_from_child_expose_not_found(
+                    &child_name,
+                    &moniker,
+                    config_use.source_name().clone(),
+                ),
+            );
+            r.with_porcelain_type(porcelain_type, moniker.clone())
         }
         // The following are not used with config capabilities.
         cm_rust::UseSource::Environment => return,
@@ -608,8 +683,8 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
 
     let source_path = use_.source_path();
     let porcelain_type = CapabilityTypeName::from(use_);
-    let router = match use_.source() {
-        cm_rust::UseSource::Parent => use_from_parent_router(
+    let router: SpecificRouter<Connector> = match use_.source() {
+        cm_rust::UseSource::Parent => use_from_parent_router::<Connector>(
             component_input,
             source_path.to_owned(),
             moniker,
@@ -617,7 +692,7 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
         )
         .with_porcelain_type(porcelain_type, moniker.clone()),
         cm_rust::UseSource::Self_ => program_output_dict
-            .get_router_or_not_found(
+            .get_router_or_not_found::<Connector>(
                 &source_path,
                 RoutingError::use_from_self_not_found(
                     moniker,
@@ -632,26 +707,26 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
             else {
                 panic!("use declaration in manifest for component {} has a source of a nonexistent child {}, this should be prevented by manifest validation", moniker, child_name);
             };
-            child_component_output
-                .clone()
-                .lazy_get(
-                    source_path.to_owned(),
-                    RoutingError::use_from_child_expose_not_found(
-                        &child_name,
-                        &moniker,
-                        use_.source_name().clone(),
-                    ),
-                )
-                .with_porcelain_type(porcelain_type, moniker.clone())
+            let r: SpecificRouter<Connector> = child_component_output.clone().lazy_get(
+                source_path.to_owned(),
+                RoutingError::use_from_child_expose_not_found(
+                    &child_name,
+                    &moniker,
+                    use_.source_name().clone(),
+                ),
+            );
+            r.with_porcelain_type(porcelain_type, moniker.clone())
         }
         cm_rust::UseSource::Framework if use_.is_from_dictionary() => {
-            Router::new_error(RoutingError::capability_from_framework_not_found(
-                moniker,
-                source_path.iter_segments().join("/"),
-            ))
+            SpecificRouter::<Connector>::new_error(
+                RoutingError::capability_from_framework_not_found(
+                    moniker,
+                    source_path.iter_segments().join("/"),
+                ),
+            )
         }
         cm_rust::UseSource::Framework => framework_dict
-            .get_router_or_not_found(
+            .get_router_or_not_found::<Connector>(
                 &source_path,
                 RoutingError::capability_from_framework_not_found(
                     moniker,
@@ -667,7 +742,7 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
             if source_path.iter_segments().join("/") == fsys::StorageAdminMarker::PROTOCOL_NAME {
                 capability_sourced_capabilities_dict.get_router_or_not_found(&capability_name, err)
             } else {
-                Router::new_error(err)
+                SpecificRouter::<Connector>::new_error(err)
             }
         }
         cm_rust::UseSource::Debug => {
@@ -677,7 +752,7 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
             component_input
                 .environment()
                 .debug()
-                .get_router_or_not_found(
+                .get_router_or_not_found::<Connector>(
                     &use_protocol.source_name,
                     RoutingError::use_from_environment_not_found(
                         moniker,
@@ -694,7 +769,7 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
             component_input
                 .environment()
                 .runners()
-                .get_router_or_not_found(
+                .get_router_or_not_found::<Connector>(
                     &use_runner.source_name,
                     RoutingError::use_from_environment_not_found(
                         moniker,
@@ -738,12 +813,16 @@ fn extend_dict_with_use<C: ComponentInstanceInterface + 'static>(
 ///
 /// The capability is usually an entry in the `component_input.capabilities` dict unless it is
 /// overridden by an eponymous capability in the `program_input_dict_additions` when started.
-fn use_from_parent_router(
+fn use_from_parent_router<T>(
     component_input: &ComponentInput,
     source_path: impl IterablePath + 'static + Debug,
     moniker: &Moniker,
     program_input_dict_additions: &Dict,
-) -> Router {
+) -> SpecificRouter<T>
+where
+    T: CapabilityBound + Clone,
+    SpecificRouter<T>: TryFrom<Capability>,
+{
     let err = if moniker == &Moniker::root() {
         RoutingError::register_from_component_manager_not_found(
             source_path.iter_segments().join("/"),
@@ -751,21 +830,19 @@ fn use_from_parent_router(
     } else {
         RoutingError::use_from_parent_not_found(moniker, source_path.iter_segments().join("/"))
     };
-    let component_input_capability =
-        component_input.capabilities().get_router_or_not_found(&source_path, err);
+    let component_input_router =
+        component_input.capabilities().get_router_or_not_found::<T>(&source_path, err);
 
     let program_input_dict_additions = program_input_dict_additions.clone();
 
-    Router::new(move |request: Option<Request>, debug: bool| {
+    SpecificRouter::<T>::new(move |request: Option<Request>, debug: bool| {
         let source_path = source_path.clone();
-        let component_input_capability = component_input_capability.clone();
-        let router = match program_input_dict_additions.get_capability(&source_path) {
-            // There's an addition to the program input dictionary for this
-            // capability, let's use it.
-            Some(Capability::Connector(s)) => Router::new_ok(s),
-            // There's no addition to the program input dictionary for this
-            // capability, let's use the component input dictionary.
-            _ => component_input_capability,
+        let router = match program_input_dict_additions
+            .get_capability(&source_path)
+            .and_then(|c| T::try_from(c).ok())
+        {
+            Some(c) => SpecificRouter::<T>::new_ok(c),
+            None => component_input_router.clone(),
         };
         async move { router.route(request, debug).await }.boxed()
     })
@@ -782,7 +859,7 @@ fn is_supported_offer(offer: &cm_rust::OfferDecl) -> bool {
     )
 }
 
-fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
+fn extend_dict_with_offer<T, C: ComponentInstanceInterface + 'static>(
     component: &Arc<C>,
     child_component_output_dictionary_routers: &HashMap<ChildName, SpecificRouter<Dict>>,
     component_input: &ComponentInput,
@@ -792,10 +869,12 @@ fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
     offer: &cm_rust::OfferDecl,
     target_dict: &Dict,
     error_reporter: impl ErrorReporter,
-) {
-    if !is_supported_offer(offer) {
-        return;
-    }
+) where
+    T: CapabilityBound + Clone,
+    SpecificRouter<T>: TryFrom<Capability> + Into<Capability>,
+{
+    assert!(is_supported_offer(offer), "{offer:?}");
+
     let source_path = offer.source_path();
     let target_name = offer.target_name();
     if target_dict.get_capability(&source_path).is_some() {
@@ -807,7 +886,7 @@ fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
         return;
     }
     let porcelain_type = CapabilityTypeName::from(offer);
-    let router = match offer.source() {
+    let router: SpecificRouter<T> = match offer.source() {
         cm_rust::OfferSource::Parent => {
             let err = if component.moniker() == &Moniker::root() {
                 RoutingError::register_from_component_manager_not_found(
@@ -819,11 +898,12 @@ fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
                     source_path.iter_segments().join("/"),
                 )
             };
-            let router = component_input.capabilities().get_router_or_not_found(&source_path, err);
+            let router =
+                component_input.capabilities().get_router_or_not_found::<T>(&source_path, err);
             router.with_porcelain_type(porcelain_type, component.moniker().clone())
         }
         cm_rust::OfferSource::Self_ => program_output_dict
-            .get_router_or_not_found(
+            .get_router_or_not_found::<T>(
                 &source_path,
                 RoutingError::offer_from_self_not_found(
                     &component.moniker(),
@@ -834,13 +914,15 @@ fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
         cm_rust::OfferSource::Child(child_ref) => {
             let child_name: ChildName = child_ref.clone().try_into().expect("invalid child ref");
             match child_component_output_dictionary_routers.get(&child_name) {
-                None => Router::new_error(RoutingError::offer_from_child_instance_not_found(
-                    &child_name,
-                    &component.moniker(),
-                    source_path.iter_segments().join("/"),
-                )),
+                None => SpecificRouter::<T>::new_error(
+                    RoutingError::offer_from_child_instance_not_found(
+                        &child_name,
+                        &component.moniker(),
+                        source_path.iter_segments().join("/"),
+                    ),
+                ),
                 Some(child_component_output) => {
-                    let router = child_component_output.clone().lazy_get(
+                    let router: SpecificRouter<T> = child_component_output.clone().lazy_get(
                         source_path.to_owned(),
                         RoutingError::offer_from_child_expose_not_found(
                             &child_name,
@@ -864,7 +946,7 @@ fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
                 );
                 return;
             }
-            let router = framework_dict.clone().get_router_or_not_found(
+            let router = framework_dict.get_router_or_not_found::<T>(
                 &source_path,
                 RoutingError::capability_from_framework_not_found(
                     &component.moniker(),
@@ -879,16 +961,15 @@ fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
                 capability_name.as_str().to_string(),
             );
             if source_path.iter_segments().join("/") == fsys::StorageAdminMarker::PROTOCOL_NAME {
-                capability_sourced_capabilities_dict
-                    .clone()
-                    .get_router_or_not_found(&capability_name, err)
+                capability_sourced_capabilities_dict.get_router_or_not_found(&capability_name, err)
             } else {
-                Router::new_error(err)
+                SpecificRouter::<T>::new_error(err)
             }
         }
-        cm_rust::OfferSource::Void => {
-            UnitRouter::new(InternalCapability::Protocol(offer.source_name().clone()), component)
-        }
+        cm_rust::OfferSource::Void => UnavailableRouter::new::<T>(
+            InternalCapability::Protocol(offer.source_name().clone()),
+            component,
+        ),
         // This is only relevant for services, so this arm is never reached.
         cm_rust::OfferSource::Collection(_name) => return,
     };
@@ -933,7 +1014,7 @@ pub fn is_supported_expose(expose: &cm_rust::ExposeDecl) -> bool {
     )
 }
 
-fn extend_dict_with_expose<C: ComponentInstanceInterface + 'static>(
+fn extend_dict_with_expose<T, C: ComponentInstanceInterface + 'static>(
     component: &Arc<C>,
     child_component_output_dictionary_routers: &HashMap<ChildName, SpecificRouter<Dict>>,
     program_output_dict: &Dict,
@@ -942,11 +1023,13 @@ fn extend_dict_with_expose<C: ComponentInstanceInterface + 'static>(
     expose: &cm_rust::ExposeDecl,
     target_dict: &Dict,
     error_reporter: impl ErrorReporter,
-) {
-    if !is_supported_expose(expose) {
-        return;
-    }
-    // We only support exposing to the parent right now
+) where
+    T: CapabilityBound + Clone,
+    SpecificRouter<T>: TryFrom<Capability> + Into<Capability>,
+{
+    assert!(is_supported_expose(expose), "{expose:?}");
+
+    // Exposing to the framework is vestigial
     if expose.target() != &cm_rust::ExposeTarget::Parent {
         return;
     }
@@ -954,9 +1037,9 @@ fn extend_dict_with_expose<C: ComponentInstanceInterface + 'static>(
     let target_name = expose.target_name();
 
     let porcelain_type = CapabilityTypeName::from(expose);
-    let router = match expose.source() {
+    let router: SpecificRouter<T> = match expose.source() {
         cm_rust::ExposeSource::Self_ => program_output_dict
-            .get_router_or_not_found(
+            .get_router_or_not_found::<T>(
                 &source_path,
                 RoutingError::expose_from_self_not_found(
                     &component.moniker(),
@@ -969,7 +1052,7 @@ fn extend_dict_with_expose<C: ComponentInstanceInterface + 'static>(
             if let Some(child_component_output) =
                 child_component_output_dictionary_routers.get(&child_name)
             {
-                let router = child_component_output.clone().lazy_get(
+                let router: SpecificRouter<T> = child_component_output.clone().lazy_get(
                     source_path.to_owned(),
                     RoutingError::expose_from_child_expose_not_found(
                         &child_name,
@@ -984,7 +1067,7 @@ fn extend_dict_with_expose<C: ComponentInstanceInterface + 'static>(
                     _ => router,
                 }
             } else {
-                Router::new_error(RoutingError::expose_from_child_instance_not_found(
+                SpecificRouter::<T>::new_error(RoutingError::expose_from_child_instance_not_found(
                     &child_name,
                     &component.moniker(),
                     expose.source_name().clone(),
@@ -999,7 +1082,7 @@ fn extend_dict_with_expose<C: ComponentInstanceInterface + 'static>(
                 return;
             }
             framework_dict
-                .get_router_or_not_found(
+                .get_router_or_not_found::<T>(
                     &source_path,
                     RoutingError::capability_from_framework_not_found(
                         &component.moniker(),
@@ -1016,14 +1099,15 @@ fn extend_dict_with_expose<C: ComponentInstanceInterface + 'static>(
             if source_path.iter_segments().join("/") == fsys::StorageAdminMarker::PROTOCOL_NAME {
                 capability_sourced_capabilities_dict
                     .clone()
-                    .get_router_or_not_found(&capability_name, err)
+                    .get_router_or_not_found::<T>(&capability_name, err)
             } else {
-                Router::new_error(err)
+                SpecificRouter::<T>::new_error(err)
             }
         }
-        cm_rust::ExposeSource::Void => {
-            UnitRouter::new(InternalCapability::Protocol(expose.source_name().clone()), component)
-        }
+        cm_rust::ExposeSource::Void => UnavailableRouter::new(
+            InternalCapability::Protocol(expose.source_name().clone()),
+            component,
+        ),
         // This is only relevant for services, so this arm is never reached.
         cm_rust::ExposeSource::Collection(_name) => return,
     };
@@ -1049,31 +1133,37 @@ fn extend_dict_with_expose<C: ComponentInstanceInterface + 'static>(
     }
 }
 
-struct UnitRouter<C: ComponentInstanceInterface> {
+struct UnavailableRouter<C: ComponentInstanceInterface> {
     capability: InternalCapability,
     component: WeakComponentInstanceInterface<C>,
 }
 
-impl<C: ComponentInstanceInterface + 'static> UnitRouter<C> {
-    fn new(capability: InternalCapability, component: &Arc<C>) -> Router {
-        Router::new(UnitRouter { capability, component: component.as_weak() })
+impl<C: ComponentInstanceInterface + 'static> UnavailableRouter<C> {
+    fn new<T: CapabilityBound>(
+        capability: InternalCapability,
+        component: &Arc<C>,
+    ) -> SpecificRouter<T> {
+        SpecificRouter::<T>::new(UnavailableRouter { capability, component: component.as_weak() })
     }
 }
 
 #[async_trait]
-impl<C: ComponentInstanceInterface + 'static> sandbox::Routable for UnitRouter<C> {
+impl<T: CapabilityBound, C: ComponentInstanceInterface + 'static> SpecificRoutable<T>
+    for UnavailableRouter<C>
+{
     async fn route(
         &self,
         request: Option<Request>,
         debug: bool,
-    ) -> Result<Capability, RouterError> {
+    ) -> Result<SpecificRouterResponse<T>, RouterError> {
         if debug {
-            return Ok(CapabilitySource::Void(VoidSource {
+            let data = CapabilitySource::Void(VoidSource {
                 capability: self.capability.clone(),
                 moniker: self.component.moniker.clone(),
             })
             .try_into()
-            .expect("failed to convert capability source to dictionary"));
+            .expect("failed to convert capability source to Data");
+            return Ok(SpecificRouterResponse::<T>::Debug(data));
         }
         let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
         let availability = request.metadata.get_availability().ok_or(RouterError::InvalidArgs)?;
@@ -1085,7 +1175,7 @@ impl<C: ComponentInstanceInterface + 'static> sandbox::Routable for UnitRouter<C
                 .into())
             }
             cm_rust::Availability::Optional | cm_rust::Availability::Transitional => {
-                Ok(Unit {}.into())
+                Ok(SpecificRouterResponse::Unavailable)
             }
         }
     }
