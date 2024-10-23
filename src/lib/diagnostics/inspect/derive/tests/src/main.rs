@@ -149,7 +149,7 @@ impl AutoYak {
 struct AutoYakWrapper {
     // Attaches the inner field to parent[name]
     #[inspect(forward)]
-    inner: fuchsia_sync::Mutex<AutoYak>,
+    inner: lock::Mutex<AutoYak>,
 
     // `wrapper_data` is ignored, because we have forwarded to inner.
     _wrapper_data: IValue<String>,
@@ -206,7 +206,7 @@ fn unit_primitive() {
     let inspector = Inspector::default();
     let root = inspector.root();
     let mut num = 127i8;
-    let mut num_data = num.inspect_create(&root, "num");
+    let mut num_data = num.inspect_create(root, "num");
     assert_data_tree!(inspector, root: { num: 127i64 });
     num = -128;
     num.inspect_update(&mut num_data);
@@ -220,7 +220,7 @@ fn unit_flat() {
     let inspector = Inspector::default();
     let root = inspector.root();
     let mut yakling = Yakling { name: "Lil Sebastian".to_string(), age: 5 };
-    let mut yakling_data = yakling.inspect_create(&root, "yak");
+    let mut yakling_data = yakling.inspect_create(root, "yak");
     assert_data_tree!(inspector, root: {
         yak: { name: "Lil Sebastian", years_old: 5u64 }
     });
@@ -244,7 +244,7 @@ fn unit_nested() {
         credit_card_no: "12345678".to_string(),
         yakling: Yakling { name: "Lil Sebastian".to_string(), age: 2 },
     };
-    let mut yak_data = yak.inspect_create(&root, "my_yak");
+    let mut yak_data = yak.inspect_create(root, "my_yak");
     assert_data_tree!(inspector, root: {
         my_yak: {
             name: "Big Sebastian",
@@ -278,7 +278,7 @@ fn unit_basic_types() {
     let inspector = Inspector::default();
     let root = inspector.root();
     let mut basic = BasicTypes::default();
-    let mut basic_data = basic.inspect_create(&root, "basic");
+    let mut basic_data = basic.inspect_create(root, "basic");
     assert_data_tree!(inspector, root: {
         basic: {
             t_u8: 0u64,
@@ -332,7 +332,7 @@ fn unit_generic() {
     let root = inspector.root();
     let a = "some_ref".to_string();
     let mut generic_unit = GenericUnit { _convoluted: &a, easy: "owned".to_string() };
-    let mut inspect_data = generic_unit.inspect_create(&root, "a_struct");
+    let mut inspect_data = generic_unit.inspect_create(root, "a_struct");
     assert_data_tree!(inspector, root: {
         a_struct: { easy: "owned" }
     });
@@ -395,7 +395,7 @@ fn unit_option() -> Result<(), AttachError> {
 fn ivalue_primitive() {
     let inspector = Inspector::default();
     let root = inspector.root();
-    let mut num = IValue::attached(126i8, &root, "num");
+    let mut num = IValue::attached(126i8, root, "num");
     assert_data_tree!(inspector, root: { num: 126i64 });
 
     // Modifying num should change its value but not update inspect
@@ -425,7 +425,7 @@ fn ivalue_nested() {
         credit_card_no: "12345678".to_string(),
         yakling: Yakling { name: "Lil Sebastian".to_string(), age: 2 },
     };
-    let mut yak = IValue::attached(yak_base, &root, "my_yak");
+    let mut yak = IValue::attached(yak_base, root, "my_yak");
     assert_data_tree!(inspector, root: {
         my_yak: {
             name: "Big Sebastian",
@@ -460,7 +460,7 @@ fn ivalue_nested() {
 fn idebug_enum() {
     let inspector = Inspector::default();
     let root = inspector.root();
-    let mut horse = IDebug::attached(Horse::Arabian, &root, "horse");
+    let mut horse = IDebug::attached(Horse::Arabian, root, "horse");
     assert_data_tree!(inspector, root: { horse: "Arabian" });
     horse.iset(Horse::Icelandic);
     assert_data_tree!(inspector, root: { horse: "Icelandic" });
@@ -691,7 +691,7 @@ async fn with_inspect_interior_mutability() -> Result<(), AttachError> {
             },
         },
     });
-    yak.inner.lock().host_bday().await;
+    yak.inner.lock().await.host_bday().await;
     assert_data_tree!(inspector, root: {
         my_yak: {
             name: "Sebastian",
