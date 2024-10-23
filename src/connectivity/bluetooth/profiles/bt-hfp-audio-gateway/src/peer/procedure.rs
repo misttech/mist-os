@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_inspect_contrib::nodes::NodeExt;
+use fuchsia_inspect_contrib::nodes::NodeTimeExt;
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use thiserror::Error;
 use tracing::warn;
@@ -450,7 +450,7 @@ impl IProcedure {
         }
 
         self.inspect.take().map(|n| {
-            n.record_time("completed_at");
+            NodeTimeExt::<zx::MonotonicTimeline>::record_time(&n, "completed_at");
             n
         })
     }
@@ -482,7 +482,7 @@ impl Inspect for &mut IProcedure {
 
         // By default, every procedure will expose the procedure name & the time it was started at.
         node.record_string("name", &self.marker().to_string());
-        node.record_time("started_at");
+        NodeTimeExt::<zx::MonotonicTimeline>::record_time(&node, "started_at");
         // In some cases, a procedure may want to expose additional inspect properties. A weak_clone
         // of the node can be used by the procedure to record any extra information.
         // The effectiveness of the weak clone is tied to that of the original `node`.

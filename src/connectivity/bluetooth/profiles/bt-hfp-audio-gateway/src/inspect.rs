@@ -7,7 +7,7 @@ use fidl_fuchsia_bluetooth_hfp::{CallState, NetworkInformation};
 use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_inspect::{self as inspect, Property};
-use fuchsia_inspect_contrib::nodes::{NodeExt, TimeProperty};
+use fuchsia_inspect_contrib::nodes::{MonotonicTimeProperty, NodeTimeExt};
 use fuchsia_inspect_derive::{AttachError, Inspect};
 use std::collections::VecDeque;
 
@@ -162,10 +162,10 @@ const MAX_RECENT_PROCEDURES: usize = 10;
 pub struct ServiceLevelConnectionInspect {
     /// When the SLC was first connected.
     #[inspect(skip)]
-    connected_at: Option<TimeProperty>,
+    connected_at: Option<MonotonicTimeProperty>,
     /// When the SLC was initialized - e.g the initialization procedures complete.
     #[inspect(skip)]
-    initialized_at: Option<TimeProperty>,
+    initialized_at: Option<MonotonicTimeProperty>,
     hf_supported_codecs: inspect::StringProperty,
     #[inspect(skip)]
     selected_codec: Option<inspect::StringProperty>,

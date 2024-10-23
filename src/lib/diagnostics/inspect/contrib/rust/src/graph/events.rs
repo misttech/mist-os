@@ -5,7 +5,7 @@
 use super::types::*;
 use super::MetadataValue;
 use crate::inspect_log;
-use crate::nodes::{BoundedListNode, NodeExt};
+use crate::nodes::{BoundedListNode, NodeTimeExt};
 use fuchsia_inspect::{self as inspect, InspectTypeReparentable};
 use std::marker::PhantomData;
 use std::ops::Deref;
@@ -62,7 +62,7 @@ where
     pub fn record_added(&self, id: &I, meta_event_node: MetaEventNode) {
         let meta_event_node = meta_event_node.take_node();
         self.buffer.lock().unwrap().add_entry(|node| {
-            node.record_time("@time");
+            NodeTimeExt::<zx::BootTimeline>::record_time(node, "@time");
             node.record_string("event", "add_vertex");
             node.record_string("vertex_id", id.get_id().as_ref());
             let _ = meta_event_node.reparent(&node);
@@ -84,7 +84,7 @@ impl GraphObjectEventTracker<EdgeMarker> {
         let mut buffer = self.buffer.lock().unwrap();
         let meta_event_node = meta_event_node.take_node();
         buffer.add_entry(|node| {
-            node.record_time("@time");
+            NodeTimeExt::<zx::BootTimeline>::record_time(node, "@time");
             node.record_string("event", "add_edge");
             node.record_string("from", from);
             node.record_string("to", to);
@@ -110,7 +110,7 @@ where
     pub fn metadata_updated(&self, id: &T::Id, key: &str, value: &MetadataValue<'_>) {
         let mut buffer = self.buffer.lock().unwrap();
         buffer.add_entry(|node| {
-            node.record_time("@time");
+            NodeTimeExt::<zx::BootTimeline>::record_time(node, "@time");
             node.record_string("event", "update_key");
             node.record_string("key", key);
             value.record_inspect(&node, "update");
@@ -121,7 +121,7 @@ where
     pub fn metadata_dropped(&self, id: &T::Id, key: &str) {
         let mut buffer = self.buffer.lock().unwrap();
         buffer.add_entry(|node| {
-            node.record_time("@time");
+            NodeTimeExt::<zx::BootTimeline>::record_time(node, "@time");
             node.record_string("event", "drop_key");
             node.record_string("key", key);
             T::write_to_node(node, id);

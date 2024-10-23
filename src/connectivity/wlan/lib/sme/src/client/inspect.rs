@@ -8,7 +8,7 @@ use fuchsia_inspect::{
 };
 use fuchsia_inspect_contrib::inspect_insert;
 use fuchsia_inspect_contrib::log::{InspectListClosure, InspectUintArray};
-use fuchsia_inspect_contrib::nodes::{BoundedListNode, NodeExt, TimeProperty};
+use fuchsia_inspect_contrib::nodes::{BoundedListNode, MonotonicTimeProperty, NodeTimeExt};
 use fuchsia_sync::Mutex;
 use ieee80211::Ssid;
 use wlan_common::ie::{self, wsc};
@@ -106,9 +106,9 @@ impl SmeTree {
 
 pub struct PulseNode {
     node: Node,
-    _started: TimeProperty,
-    last_updated: TimeProperty,
-    last_link_up: Option<TimeProperty>,
+    _started: MonotonicTimeProperty,
+    last_updated: MonotonicTimeProperty,
+    last_link_up: Option<MonotonicTimeProperty>,
     status_node: Option<ClientSmeStatusNode>,
 
     // Not part of Inspect node. We use it to compare new status against existing status
@@ -248,7 +248,7 @@ pub struct ServingApInfoNode {
 
     rssi_dbm: IntProperty,
     snr_db: IntProperty,
-    signal_report_time: TimeProperty,
+    signal_report_time: MonotonicTimeProperty,
     channel: ChannelNode,
     protection: StringProperty,
     is_wmm_assoc: BoolProperty,

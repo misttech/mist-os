@@ -15,7 +15,7 @@ use fidl_fuchsia_power_system::{
 use fuchsia_inspect::{
     ArrayProperty, IntProperty as IInt, Node as INode, Property, UintProperty as IUint,
 };
-use fuchsia_inspect_contrib::nodes::{BoundedListNode as IRingBuffer, NodeExt};
+use fuchsia_inspect_contrib::nodes::{BoundedListNode as IRingBuffer, NodeTimeExt};
 use futures::future::FutureExt;
 use futures::lock::Mutex;
 use futures::prelude::*;
@@ -438,7 +438,7 @@ impl LeaseManager {
         inspect_lease_node.record_string("name", name.clone());
         inspect_lease_node.record_string("type", "application_activity");
         inspect_lease_node.record_uint("client_token_koid", related_koid);
-        inspect_lease_node.record_time("created_at");
+        NodeTimeExt::<zx::BootTimeline>::record_time(&inspect_lease_node, "created_at");
 
         fasync::Task::local(async move {
             // Keep lease alive for as long as the client keeps it alive.
@@ -481,7 +481,7 @@ impl LeaseManager {
         inspect_lease_node.record_string("name", name.clone());
         inspect_lease_node.record_string("type", "wake");
         inspect_lease_node.record_uint("client_token_koid", related_koid);
-        inspect_lease_node.record_time("created_at");
+        NodeTimeExt::<zx::BootTimeline>::record_time(&inspect_lease_node, "created_at");
 
         fasync::Task::local(async move {
             // Keep lease alive for as long as the client keeps it alive.

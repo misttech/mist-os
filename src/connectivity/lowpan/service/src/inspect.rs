@@ -11,7 +11,7 @@ use fuchsia_async::Task;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_inspect::{LazyNode, Node, StringProperty};
 use fuchsia_inspect_contrib::inspect_log;
-use fuchsia_inspect_contrib::nodes::{BoundedListNode, NodeExt, TimeProperty};
+use fuchsia_inspect_contrib::nodes::{BoundedListNode, MonotonicTimeProperty, NodeTimeExt};
 use fuchsia_sync::Mutex;
 use std::collections::{HashMap, HashSet};
 
@@ -190,7 +190,7 @@ pub struct IfaceStatusNode {
     node: Node,
     // Properties of "iface-*/status" node.
     _connectivity_state: StringProperty,
-    _online_since: Option<TimeProperty>,
+    _online_since: Option<MonotonicTimeProperty>,
     _role: StringProperty,
     _channel: StringProperty,
     _net_type: StringProperty,

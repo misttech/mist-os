@@ -7,7 +7,7 @@ use fuchsia_inspect_derive::Unit;
 use lru_cache::LruCache;
 use std::hash::Hash;
 
-use crate::nodes::NodeExt;
+use crate::nodes::NodeTimeExt;
 
 /// A Inspect node that holds an ordered, bounded set of data. When a new unique
 /// item needs to be inserted, the least-recently-used item is evicted.
@@ -38,7 +38,7 @@ impl<T: Unit + Eq + Hash> LruCacheNode<T> {
                     self.items.remove_lru().map(|entry| entry.1.index).unwrap_or(0)
                 };
                 let child = self.node.create_child(index.to_string());
-                child.record_time("@time");
+                NodeTimeExt::<zx::BootTimeline>::record_time(&child, "@time");
                 let data = item.inspect_create(&child, "data");
                 self.items.insert(item, CacheItem { index, _node: child, _data: data });
                 index

@@ -4,7 +4,7 @@
 
 use fuchsia_async as fasync;
 use fuchsia_inspect::{self as inspect, Node, NumericProperty, Property};
-use fuchsia_inspect_contrib::nodes::NodeExt;
+use fuchsia_inspect_contrib::nodes::NodeTimeExt;
 use fuchsia_inspect_derive::Inspect;
 use std::fmt;
 
@@ -178,7 +178,7 @@ pub struct DataStreamInspect {
     /// Time that this stream started.
     /// Managed manually.
     #[inspect(skip)]
-    start_time_prop: Option<fuchsia_inspect_contrib::nodes::TimeProperty>,
+    start_time_prop: Option<fuchsia_inspect_contrib::nodes::MonotonicTimeProperty>,
     /// Time that we were last started.  Used to calculate seconds running.
     #[inspect(skip)]
     started: Option<fasync::MonotonicInstant>,
