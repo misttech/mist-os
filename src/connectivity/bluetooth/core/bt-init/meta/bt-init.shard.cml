@@ -64,9 +64,9 @@
     ],
     offer: [
         {
+            config: "fuchsia.bluetooth.LegacyPairing",
             from: "parent",
             to: [ "#bt-host-collection" ],
-            config: "fuchsia.bluetooth.LegacyPairing",
         },
         {
             directory: "dev-bt-hci",
@@ -125,6 +125,7 @@
                 "fuchsia.bluetooth.gatt2.Server",
                 "fuchsia.bluetooth.le.Central",
                 "fuchsia.bluetooth.le.Peripheral",
+                "fuchsia.bluetooth.le.PrivilegedPeripheral",
                 "fuchsia.bluetooth.sys.Access",
                 "fuchsia.bluetooth.sys.Bootstrap",
                 "fuchsia.bluetooth.sys.Configuration",
