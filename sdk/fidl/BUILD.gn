@@ -5,7 +5,7 @@
 import("//build/fidl/toolchain.gni")
 import("//build/sdk/sdk_molecule.gni")
 
-# The list of FIDLs to include in the core IDK.
+# The list of FIDL libraries distributed in the partner IDK.
 # Targets must be included if and only if the `fidl()` target specifies:
 # `sdk_category = "partner"`.
 # When removing a library from all such lists, delete all of its history files:
@@ -258,10 +258,10 @@ group("sdk_partner_libs") {
   }
 }
 
-# Contains all the API libraries that are in the "partner_internal" SDK
-# category. This is to create the "sdk_partner_internal_libs" group below,
-# this group is used to ensure that we run the FIDL API compatibility tests on
-# these libraries.
+# The list of FIDL libraries in the "partner_internal" SDK category.
+# These libraries are NOT included in the IDK and is only used by the targets
+# below to ensure that we run the FIDL API compatibility tests on these
+# libraries and allowlist additions.
 # Targets must be included if and only if the `fidl()` target specifies:
 # `sdk_category = "partner_internal"`.
 # When removing a library from all such lists, delete all of its history files:
@@ -273,7 +273,6 @@ _partner_internal_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.audio.device:fuchsia.audio.device",
   "//sdk/fidl/fuchsia.bluetooth.pandora:fuchsia.bluetooth.pandora",
   "//sdk/fidl/fuchsia.dash:fuchsia.dash",
-  "//sdk/fidl/fuchsia.debugdata:fuchsia.debugdata",
   "//sdk/fidl/fuchsia.debugger:fuchsia.debugger",
   "//sdk/fidl/fuchsia.developer.ffxdaemonlifecycle:fuchsia.developer.ffxdaemonlifecycle",
   "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol",
@@ -319,6 +318,12 @@ group("sdk_partner_internal_libs") {
 group("sdk_partner_internal_libs_allowlist") {
   visibility = _partner_internal_fidl_libraries_targets_list
 }
+
+# Ensure the lists are mutually exclusive.
+assert(_partner_idk_fidl_libraries_targets_list +
+       _partner_internal_fidl_libraries_targets_list -
+       _partner_internal_fidl_libraries_targets_list ==
+       _partner_idk_fidl_libraries_targets_list)
 
 group("internal_only_idk_libs_allowlist") {
   visibility = []

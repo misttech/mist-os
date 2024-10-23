@@ -135,6 +135,16 @@ _partner_idk_unstable_source_sets_list_testonly = [
   # keep-sorted: end
 ]
 
+# Ensure the lists are mutually exclusive.
+_unstable_source_sets = _partner_idk_unstable_source_sets_list +
+                        _partner_idk_unstable_source_sets_list_testonly
+assert(_partner_idk_source_sets_list + _unstable_source_sets -
+       _unstable_source_sets == _partner_idk_source_sets_list)
+assert(_partner_idk_unstable_source_sets_list +
+       _partner_idk_unstable_source_sets_list_testonly -
+       _partner_idk_unstable_source_sets_list_testonly ==
+       _partner_idk_unstable_source_sets_list)
+
 # Ensure no testonly atoms are in the non-test lists.
 group("partner_idk_source_sets") {
   visibility = [ ":*" ]
