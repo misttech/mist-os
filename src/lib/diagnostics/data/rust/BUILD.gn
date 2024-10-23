@@ -52,6 +52,8 @@ rustc_library("lib") {
 
     sources += [ "src/logs_legacy.rs" ]
   }
+
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
 }
 
 fuchsia_unittest_package("diagnostics-data-tests") {

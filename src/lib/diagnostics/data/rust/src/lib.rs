@@ -96,17 +96,12 @@ impl AsRef<str> for InspectHandleName {
 }
 
 /// The source of diagnostics data
-#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Default, Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum DataSource {
+    #[default]
     Unknown,
     Inspect,
     Logs,
-}
-
-impl Default for DataSource {
-    fn default() -> Self {
-        DataSource::Unknown
-    }
 }
 
 pub trait MetadataError {
@@ -163,7 +158,7 @@ impl Metadata for InspectMetadata {
     }
 
     fn errors(&self) -> Option<&[Self::Error]> {
-        self.errors.as_ref().map(|errors| errors.as_slice())
+        self.errors.as_deref()
     }
 
     fn set_errors(&mut self, errors: Vec<Self::Error>) {
@@ -189,7 +184,7 @@ impl Metadata for LogsMetadata {
     }
 
     fn errors(&self) -> Option<&[Self::Error]> {
-        self.errors.as_ref().map(|errors| errors.as_slice())
+        self.errors.as_deref()
     }
 
     fn set_errors(&mut self, errors: Vec<Self::Error>) {
@@ -696,7 +691,7 @@ impl LogsDataBuilder {
         ret.metadata.pid = self.pid;
         ret.metadata.tid = self.tid;
         ret.metadata.tags = Some(self.tags);
-        return ret;
+        ret
     }
 
     /// Adds an error
@@ -761,7 +756,7 @@ impl Data<Logs> {
             payload,
             metadata: LogsMetadata {
                 timestamp: timestamp.into(),
-                component_url: component_url,
+                component_url,
                 severity: severity.into(),
                 raw_severity: None,
                 errors,
@@ -891,7 +886,7 @@ impl Data<Logs> {
 
     /// Returns the file path associated with the message, if one exists.
     pub fn file_path(&self) -> Option<&str> {
-        self.metadata.file.as_ref().map(|file| file.as_str())
+        self.metadata.file.as_deref()
     }
 
     /// Returns the line number associated with the message, if one exists.
@@ -921,30 +916,22 @@ impl Data<Logs> {
 
     /// Returns number of dropped logs if reported in the message.
     pub fn dropped_logs(&self) -> Option<u64> {
-        self.metadata
-            .errors
-            .as_ref()
-            .map(|errors| {
-                errors.iter().find_map(|e| match e {
-                    LogError::DroppedLogs { count } => Some(*count),
-                    _ => None,
-                })
+        self.metadata.errors.as_ref().and_then(|errors| {
+            errors.iter().find_map(|e| match e {
+                LogError::DroppedLogs { count } => Some(*count),
+                _ => None,
             })
-            .flatten()
+        })
     }
 
     /// Returns number of rolled out logs if reported in the message.
     pub fn rolled_out_logs(&self) -> Option<u64> {
-        self.metadata
-            .errors
-            .as_ref()
-            .map(|errors| {
-                errors.iter().find_map(|e| match e {
-                    LogError::RolledOutLogs { count } => Some(*count),
-                    _ => None,
-                })
+        self.metadata.errors.as_ref().and_then(|errors| {
+            errors.iter().find_map(|e| match e {
+                LogError::RolledOutLogs { count } => Some(*count),
+                _ => None,
             })
-            .flatten()
+        })
     }
 
     /// Returns the component nam. This only makes sense for v1 components.
@@ -1015,7 +1002,7 @@ pub enum LogTextColor {
 
 impl LogTextColor {
     fn begin_record(&self, f: &mut fmt::Formatter<'_>, severity: Severity) -> fmt::Result {
-        Ok(match self {
+        match self {
             LogTextColor::BySeverity => match severity {
                 Severity::Fatal => {
                     write!(f, "{}{}", color::Bg(color::Red), color::Fg(color::White))?
@@ -1027,8 +1014,9 @@ impl LogTextColor {
                 Severity::Trace => write!(f, "{}", color::Fg(color::LightMagenta))?,
             },
             LogTextColor::Highlight => write!(f, "{}", color::Fg(color::LightYellow))?,
-            LogTextColor::None => (),
-        })
+            LogTextColor::None => {}
+        }
+        Ok(())
     }
 
     fn begin_lost_message_counts(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1040,10 +1028,11 @@ impl LogTextColor {
     }
 
     fn end_record(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Ok(match self {
+        match self {
             LogTextColor::BySeverity | LogTextColor::Highlight => write!(f, "{}", style::Reset)?,
-            LogTextColor::None => (),
-        })
+            LogTextColor::None => {}
+        };
+        Ok(())
     }
 }
 
@@ -1425,7 +1414,7 @@ mod tests {
     use selectors::FastError;
     use serde_json::json;
 
-    const TEST_URL: &'static str = "fuchsia-pkg://test";
+    const TEST_URL: &str = "fuchsia-pkg://test";
 
     #[fuchsia::test]
     fn test_canonical_json_inspect_formatting() {
@@ -1593,7 +1582,7 @@ mod tests {
           }
         });
 
-        let result_json = serde_json::to_value(&data.filter(&selectors).expect("Filter Ok"))
+        let result_json = serde_json::to_value(data.filter(&selectors).expect("Filter Ok"))
             .expect("serialization should succeed.");
 
         pretty_assertions::assert_eq!(result_json, expected_json, "golden diff failed.");
@@ -1627,7 +1616,7 @@ mod tests {
           }
         });
         let result_json =
-            serde_json::to_value(&builder.build()).expect("serialization should succeed.");
+            serde_json::to_value(builder.build()).expect("serialization should succeed.");
         pretty_assertions::assert_eq!(result_json, expected_json, "golden diff failed.");
     }
 
@@ -1679,7 +1668,7 @@ mod tests {
           }
         });
         let result_json =
-            serde_json::to_value(&builder.build()).expect("serialization should succeed.");
+            serde_json::to_value(builder.build()).expect("serialization should succeed.");
         pretty_assertions::assert_eq!(result_json, expected_json, "golden diff failed.");
     }
 

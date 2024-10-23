@@ -2,41 +2,39 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![cfg(target_os = "fuchsia")]
-
 use crate::{Data, Logs};
 use fidl_fuchsia_logger::LogMessage;
 
 use std::fmt::Write;
 
 /// Convert this `Message` to a FIDL representation suitable for sending to `LogListenerSafe`.
-impl Into<LogMessage> for &Data<Logs> {
-    fn into(self) -> LogMessage {
-        let mut msg = self.msg().unwrap_or("").to_string();
+impl From<&Data<Logs>> for LogMessage {
+    fn from(data: &Data<Logs>) -> LogMessage {
+        let mut msg = data.msg().unwrap_or("").to_string();
 
-        if let Some(payload) = self.payload_keys() {
+        if let Some(payload) = data.payload_keys() {
             for property in payload.properties.iter() {
                 write!(&mut msg, " {property}").expect("allocations have to fail for this to fail");
             }
         }
-        let file = self.metadata.file.as_ref();
-        let line = self.metadata.line.as_ref();
+        let file = data.metadata.file.as_ref();
+        let line = data.metadata.line.as_ref();
         if let (Some(file), Some(line)) = (file, line) {
             msg = format!("[{}({})] {}", file, line, msg);
         }
 
-        let tags = match &self.metadata.tags {
-            None => vec![self.component_name().to_string()],
-            Some(tags) if tags.is_empty() => vec![self.component_name().to_string()],
+        let tags = match &data.metadata.tags {
+            None => vec![data.component_name().to_string()],
+            Some(tags) if tags.is_empty() => vec![data.component_name().to_string()],
             Some(tags) => tags.clone(),
         };
 
         LogMessage {
-            pid: self.pid().unwrap_or(zx::sys::ZX_KOID_INVALID),
-            tid: self.tid().unwrap_or(zx::sys::ZX_KOID_INVALID),
-            time: self.metadata.timestamp,
-            severity: self.metadata.raw_severity() as i32,
-            dropped_logs: self.dropped_logs().unwrap_or(0) as _,
+            pid: data.pid().unwrap_or(zx::sys::ZX_KOID_INVALID),
+            tid: data.tid().unwrap_or(zx::sys::ZX_KOID_INVALID),
+            time: data.metadata.timestamp,
+            severity: data.metadata.raw_severity() as i32,
+            dropped_logs: data.dropped_logs().unwrap_or(0) as _,
             tags,
             msg,
         }
@@ -44,30 +42,30 @@ impl Into<LogMessage> for &Data<Logs> {
 }
 
 /// Convert this `Message` to a FIDL representation suitable for sending to `LogListenerSafe`.
-impl Into<LogMessage> for Data<Logs> {
-    fn into(self) -> LogMessage {
-        let mut msg = self.msg().unwrap_or("").to_string();
+impl From<Data<Logs>> for LogMessage {
+    fn from(data: Data<Logs>) -> LogMessage {
+        let mut msg = data.msg().unwrap_or("").to_string();
 
-        if let Some(payload) = self.payload_keys() {
+        if let Some(payload) = data.payload_keys() {
             for property in payload.properties.iter() {
                 write!(&mut msg, " {property}").expect("allocations have to fail for this to fail");
             }
         }
-        let file = self.metadata.file.as_ref();
-        let line = self.metadata.line.as_ref();
+        let file = data.metadata.file.as_ref();
+        let line = data.metadata.line.as_ref();
         if let (Some(file), Some(line)) = (file, line) {
             msg = format!("[{}({})] {}", file, line, msg);
         }
 
         LogMessage {
-            pid: self.pid().unwrap_or(zx::sys::ZX_KOID_INVALID),
-            tid: self.tid().unwrap_or(zx::sys::ZX_KOID_INVALID),
-            time: self.metadata.timestamp,
-            severity: self.metadata.raw_severity() as i32,
-            dropped_logs: self.dropped_logs().unwrap_or(0) as _,
-            tags: match self.metadata.tags {
+            pid: data.pid().unwrap_or(zx::sys::ZX_KOID_INVALID),
+            tid: data.tid().unwrap_or(zx::sys::ZX_KOID_INVALID),
+            time: data.metadata.timestamp,
+            severity: data.metadata.raw_severity() as i32,
+            dropped_logs: data.dropped_logs().unwrap_or(0) as _,
+            tags: match data.metadata.tags {
                 Some(tags) => tags,
-                None => vec![self.component_name().to_string()],
+                None => vec![data.component_name().to_string()],
             },
             msg,
         }
@@ -80,8 +78,8 @@ mod test {
     use crate::{BuilderArgs, LogsDataBuilder, Severity, Timestamp};
     use fidl_fuchsia_diagnostics as fdiagnostics;
 
-    const TEST_URL: &'static str = "fuchsia-pkg://test";
-    const TEST_MONIKER: &'static str = "fake-test/moniker";
+    const TEST_URL: &str = "fuchsia-pkg://test";
+    const TEST_MONIKER: &str = "fake-test/moniker";
 
     macro_rules! severity_roundtrip_test {
         ($raw:expr, $expected:expr) => {
