@@ -24,6 +24,10 @@
 #include <vm/vm_aspace.h>
 #include <vm/vm_object.h>
 
+#if defined(__aarch64__)
+#include <dev/timer/arm_generic.h>
+#endif
+
 #include "sysret-offsets.h"
 #include "vdso-code.h"
 
@@ -207,6 +211,7 @@ void SetTimeValues(const fbl::RefPtr<VmObject>& vmo) {
   const bool usermode_can_access_ticks =
       platform_usermode_can_access_tick_registers() && !gBootOptions->vdso_ticks_get_force_syscall;
   bool needs_a73_mitigation = false;
+  bool use_pct_instead_of_vct = false;
 #if ARCH_ARM64
   // We only need to install the A73 quirks for zx_ticks_get if we can access ticks from usermode.
   if (usermode_can_access_ticks) {
@@ -227,11 +232,18 @@ void SetTimeValues(const fbl::RefPtr<VmObject>& vmo) {
       if (wait_status != ZX_OK) {
         dprintf(ALWAYS,
                 "WARNING: Timed out waiting for all CPUs to start.  "
-                "Installing A73 quirks for zx_ticks_get in VDSO as a defensive measure.\n");
+                "Using A73 quirks for zx_ticks_get in VDSO as a defensive measure.\n");
       } else {
-        dprintf(INFO, "Installing A73 quirks for zx_ticks_get in VDSO\n");
+        dprintf(INFO, "Using A73 quirks for zx_ticks_get in VDSO\n");
       }
       needs_a73_mitigation = true;
+    }
+
+    if (ArmUsePhysTimerInVdso()) {
+      dprintf(INFO,
+              "Using PCT instead of VCT as the system counter reference for zx_ticks_get in "
+              "the VDSO");
+      use_pct_instead_of_vct = true;
     }
   }
 #endif
@@ -246,6 +258,7 @@ void SetTimeValues(const fbl::RefPtr<VmObject>& vmo) {
       .ticks_to_time_denominator = ticks_to_time_ratio.denominator(),
       .usermode_can_access_ticks = usermode_can_access_ticks,
       .use_a73_errata_mitigation = needs_a73_mitigation,
+      .use_pct_instead_of_vct = use_pct_instead_of_vct,
   };
 
   // Write the time values to the appropriate section in the vDSO.

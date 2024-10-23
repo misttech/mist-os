@@ -114,6 +114,10 @@ void arm64_fpu_restore_state(Thread* t);
 
 uint64_t arm64_get_boot_el();
 
+// Called during clock selection (if it is called at all) before secondary CPUs
+// have started.
+void arm64_allow_pct_in_el0();
+
 /*
  * Creates a stack and sets the stack pointer for the specified secondary CPU.
  */

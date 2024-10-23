@@ -173,6 +173,7 @@ if (is_kernel) {
       ":headers",
       ":rodso",
       ":vdso-code.h",
+      "//zircon/kernel/dev/timer/arm_generic:headers",
       "//zircon/kernel/lib/boot-options",
       "//zircon/kernel/lib/fasttime:headers",
       "//zircon/kernel/lib/syscalls",

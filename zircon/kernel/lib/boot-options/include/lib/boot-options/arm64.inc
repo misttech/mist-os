@@ -96,3 +96,12 @@ CPU-specific issues on entry to EL1 from EL0.  Values can be:
 As on SoCs with heterogeneous cores, a different selection should be made for
 each individual CPU, values other than `auto` should only be used in testing.
 )""")
+DEFINE_OPTION("kernel.arm64.force-pct", bool, arm64_force_pct, {false}, R"""(
+By default, the kernel will select the ARM virtual counter (VCT) to use as the
+time reference for the system.  It will only choose the physical counter (PCT)
+if it was given an IRQ for the physical timer hardware, but not the virtual
+timer hardware.  When the force-pct option is set, the kernel will _always_
+choose to use the PCT as the time reference, even if a VCT IRQ is offered in the
+ZBI.  Please note, setting force-pct on a target which has no defined PCT IRQ
+will result in a panic during early boot.
+)""")

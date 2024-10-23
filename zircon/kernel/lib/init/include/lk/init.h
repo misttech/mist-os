@@ -53,6 +53,14 @@ enum lk_init_level {
   LK_INIT_LEVEL_PLATFORM = 0xc0000,
   LK_INIT_LEVEL_ARCH_LATE = 0xd0000,
 
+  // At this level we wait for secondary CPUs to finish booting and "check-in" as ready.
+  //
+  // See also mp_wait_for_all_cpus_ready.
+  LK_INIT_LEVEL_SMP_WAIT = 0xd4000,
+
+  // At this level the secondary CPUs have checked-in.
+  LK_INIT_LEVEL_SMP_READY = 0xd8000,
+
   // Userspace started.
   LK_INIT_LEVEL_USER = 0xe0000,
 

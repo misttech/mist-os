@@ -47,6 +47,12 @@ struct TimeValues {
   // Whether the A73 errata mitigation must be used when getting ticks.
   // Should always be false on x86 and RISC-V.
   const bool use_a73_errata_mitigation;
+
+  // Whether (on ARM64) the physical counter should be sampled instead of the
+  // virtual counter.
+  //
+  // Should always be false on x86 and RISC-V.
+  const bool use_pct_instead_of_vct;
 };
 
 }  // namespace fasttime::internal

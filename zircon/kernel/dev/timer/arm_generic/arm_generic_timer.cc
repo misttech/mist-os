@@ -67,6 +67,10 @@ KCOUNTER(platform_timer_cancel_counter, "platform.timer.cancel")
 
 namespace {
 
+// Counter-timer Kernel Control Register, EL1.
+static constexpr uint64_t CNTKCTL_EL1_ENABLE_PHYSICAL_COUNTER = 1 << 0;
+static constexpr uint64_t CNTKCTL_EL1_ENABLE_VIRTUAL_COUNTER = 1 << 1;
+
 // Global saved config state
 int timer_irq;
 uint32_t timer_cntfrq;  // Timer tick rate in Hz.
@@ -83,17 +87,14 @@ timer_irq_assignment timer_assignment;
 uint32_t event_stream_shift;
 uint32_t event_stream_freq;
 
+// Definition of the function signature we use to fetch the value of the chosen
+// reference counter.
+using ReadArmCounterFunc = uint64_t();
+
 }  // anonymous namespace
 
-zx_time_t cntpct_to_zx_time(uint64_t cntpct) {
-  DEBUG_ASSERT(cntpct < static_cast<uint64_t>(ktl::numeric_limits<int64_t>::max()));
-  return timer_get_ticks_to_time_ratio().Scale(static_cast<int64_t>(cntpct));
-}
-
 static uint32_t read_cntp_ctl() { return __arm_rsr(TIMER_REG_CNTP_CTL); }
-
 static uint32_t read_cntv_ctl() { return __arm_rsr(TIMER_REG_CNTV_CTL); }
-
 static uint32_t read_cntps_ctl() { return __arm_rsr(TIMER_REG_CNTPS_CTL); }
 
 static void write_cntp_ctl(uint32_t val) {
@@ -150,6 +151,13 @@ static void write_cntps_tval(int32_t val) {
   __isb(ARM_MB_SY);
 }
 
+// fwd decls to ensure that the read counter function all match the signature
+// defined by ReadArmCounterFunc.
+static ReadArmCounterFunc read_cntpct_a73;
+static ReadArmCounterFunc read_cntvct_a73;
+static ReadArmCounterFunc read_cntpct;
+static ReadArmCounterFunc read_cntvct;
+
 static uint64_t read_cntpct_a73() {
   // Workaround for Cortex-A73 erratum 858921.
   // Fix will be applied to all cores, as two consecutive reads should be
@@ -171,14 +179,12 @@ static uint64_t read_cntvct_a73() {
 }
 
 static uint64_t read_cntpct() { return __arm_rsr64(TIMER_REG_CNTPCT); }
-
 static uint64_t read_cntvct() { return __arm_rsr64(TIMER_REG_CNTVCT); }
 
 struct timer_reg_procs {
   void (*write_ctl)(uint32_t val);
   void (*write_cval)(uint64_t val);
   void (*write_tval)(int32_t val);
-  uint64_t (*read_ct)();
   uint64_t arch::EarlyTicks::* early_ticks;
 };
 
@@ -186,15 +192,6 @@ struct timer_reg_procs {
     .write_ctl = write_cntp_ctl,
     .write_cval = write_cntp_cval,
     .write_tval = write_cntp_tval,
-    .read_ct = read_cntpct,
-    .early_ticks = &arch::EarlyTicks::cntpct_el0,
-};
-
-[[maybe_unused]] static const struct timer_reg_procs cntp_procs_a73 = {
-    .write_ctl = write_cntp_ctl,
-    .write_cval = write_cntp_cval,
-    .write_tval = write_cntp_tval,
-    .read_ct = read_cntpct_a73,
     .early_ticks = &arch::EarlyTicks::cntpct_el0,
 };
 
@@ -202,15 +199,6 @@ struct timer_reg_procs {
     .write_ctl = write_cntv_ctl,
     .write_cval = write_cntv_cval,
     .write_tval = write_cntv_tval,
-    .read_ct = read_cntvct,
-    .early_ticks = &arch::EarlyTicks::cntvct_el0,
-};
-
-[[maybe_unused]] static const struct timer_reg_procs cntv_procs_a73 = {
-    .write_ctl = write_cntv_ctl,
-    .write_cval = write_cntv_cval,
-    .write_tval = write_cntv_tval,
-    .read_ct = read_cntvct_a73,
     .early_ticks = &arch::EarlyTicks::cntvct_el0,
 };
 
@@ -218,36 +206,46 @@ struct timer_reg_procs {
     .write_ctl = write_cntps_ctl,
     .write_cval = write_cntps_cval,
     .write_tval = write_cntps_tval,
-    .read_ct = read_cntpct,
     .early_ticks = &arch::EarlyTicks::cntpct_el0,
 };
 
-[[maybe_unused]] static const struct timer_reg_procs cntps_procs_a73 = {
-    .write_ctl = write_cntps_ctl,
-    .write_cval = write_cntps_cval,
-    .write_tval = write_cntps_tval,
-    .read_ct = read_cntpct_a73,
-    .early_ticks = &arch::EarlyTicks::cntpct_el0,
-};
-
+// Notes about the `read_arm_counter` function pointer:
+//
+// There exists a bug in certain ARM Cortex-A73 CPUs which can lead to a bad
+// read of either the VCT or PCT counters.  It is documented as Errata 858921
+// ( https://documentation-service.arm.com/static/5fa29fa7b209f547eebd3613 )
+//
+// At startup time, we have not had a chance (yet) to figure out what CPUs we
+// are running on.  So, we start by using the read methods which implement the
+// workaround for errata-858921; they are safe to use no matter what CPU you are
+// on, they are just a bit slower.  Later on, once we have had a chance for all
+// of our secondary CPUs to boot, identify their HW, and check in with the rest
+// of the system, we can switch to the faster version (but only if there are no
+// A73s present in the system).
+//
+// In order to make this switch, however, and not need any locks, we need to
+// make sure that the function pointer is declared as an atomic.  Otherwise, we
+// could be writing to the pointer when someone else is reading it (in order to
+// read the clock) which would be a formal data race.  Note that we don't need
+// any ordering of the loads and stores of the function pointer beyond
+// `memory_order_relaxed`.  It is not important that we establish a specific
+// order of the pointer's value relative to other memory accesses in the system.
+// We just need to make sure that _if_ we decide to switch to the faster version
+// of the counter read, that all of the CPUs _eventually_ see the pointer
+// update (which they will do because of unavoidable synchronizing events like
+// taking exceptions).
+//
 #if (TIMER_ARM_GENERIC_SELECTED_CNTV)
 static struct timer_reg_procs reg_procs = cntv_procs;
+static ktl::atomic<ReadArmCounterFunc*> read_arm_counter{read_cntvct_a73};
 #else
 static struct timer_reg_procs reg_procs = cntp_procs;
+static ktl::atomic<ReadArmCounterFunc*> read_arm_counter{read_cntpct_a73};
 #endif
 
 static inline void write_ctl(uint32_t val) { reg_procs.write_ctl(val); }
-
 static inline void write_cval(uint64_t val) { reg_procs.write_cval(val); }
-
 [[maybe_unused]] static inline void write_tval(uint32_t val) { reg_procs.write_tval(val); }
-
-static zx_ticks_t read_ct() {
-  zx_ticks_t cntpct = static_cast<zx_ticks_t>(reg_procs.read_ct());
-  LTRACEF_LEVEL(3, "cntpct: 0x%016" PRIx64 ", %" PRIi64 "\n", static_cast<uint64_t>(cntpct),
-                cntpct);
-  return cntpct;
-}
 
 static void platform_tick(void* arg) {
   write_ctl(0);
@@ -332,12 +330,8 @@ inline zx_ticks_t platform_current_raw_ticks_synchronized() {
                              // prevent re-ordering, as a signal fence would do.
   }
 
-  // Now actually read from the system timer.
-  //
-  // TODO(johngro): Replace this with inline assembly to explicitly read the
-  // virtual EL0 count register using inline assembly rather than going through
-  // a function pointer thunk.
-  const zx_ticks_t ret = read_ct();
+  // Now actually read from the configured system timer.
+  const zx_ticks_t ret = read_arm_counter.load(ktl::memory_order_relaxed)();
 
   // Do we need to guarantee that this clock read occurs before subsequent loads,
   // stores, or both?  If so, the recipe is the same in all cases.  We introduce
@@ -510,9 +504,22 @@ static void arm_generic_timer_init(uint32_t freq_override) {
   zx_status_t status = register_permanent_int_handler(timer_irq, &platform_tick, NULL);
   DEBUG_ASSERT(status == ZX_OK);
 
-  // assert that access to the virtual counter is available in EL0
-  auto cntkctl = __arm_rsr64(TIMER_REG_CNTKCTL);
-  ASSERT(cntkctl & (1 << 1));  // EL0VCTEN
+  // At this point in time, we expect that the `cntkctl_el1` timer register has
+  // the bit which permits EL0 access to the VCT to be set, and perhaps also the
+  // bit which allows access to the PCT if that happens to be the time reference
+  // we have decided to use.
+  //
+  // *None* of the other timer HW access bits should be set.  EL0 only gets to
+  // look at the counter, and nothing more.
+  //
+  // ASSERT this now.
+  [[maybe_unused]] const uint64_t expected =
+      CNTKCTL_EL1_ENABLE_VIRTUAL_COUNTER |
+      (ArmUsePhysTimerInVdso() ? CNTKCTL_EL1_ENABLE_PHYSICAL_COUNTER : 0);
+  ASSERT_MSG(const uint64_t current = __arm_rsr64(TIMER_REG_CNTKCTL);
+             current == expected,
+             "CNTKCTL_EL1 register does not match reference counter selection (%016lx != %016lx)",
+             current, expected);
 
   // Determine and compute values for the event stream if requested
   event_stream_init(timer_cntfrq);
@@ -542,26 +549,48 @@ void ArmGenericTimerInit(const zbi_dcfg_arm_generic_timer_driver_t& config) {
   uint32_t irq_virt = config.irq_virt;
   uint32_t irq_sphys = config.irq_sphys;
 
-  if (irq_phys && irq_virt && arm64_get_boot_el() < 2) {
-    // If we did not boot at EL2 or above, prefer the virtual timer.
-    irq_phys = 0;
+  // If boot-options have been configured to force us to use the physical
+  // counter as our reference, clear out any virtual timer hardware and let
+  // nature take its course.  If we don't have an interrupt configured for using
+  // the physical timer hardware (either PHYS or SPHYS), we are going to end up
+  // panicking.
+  if (gBootOptions->arm64_force_pct) {
+    dprintf(INFO,
+            "arm generic timer forcing use of PCT.  IRQs provided were "
+            "(virt %u, phys %u, sphys %u)\n",
+            irq_virt, irq_phys, irq_sphys);
+    irq_virt = 0;
   }
+
+  // Always prefer to use the virtual timer if we have the option to do so.
+  // Additionally, always start by using the versions of the timer read which
+  // have the A73 errata workaround.
+  //
+  // Currently, we have not had a chance to boot all of our CPUs and determine
+  // if we have any A73's in the mix.  Until we know, it is safe to use the A73
+  // versions of the reads, just a small bit slower.  Later on, if we know it is
+  // safe to do so, we can switch to using the workaround-free version.
   const char* timer_str = "";
-  if (irq_phys) {
-    timer_str = "phys";
-    timer_irq = irq_phys;
-    timer_assignment = IRQ_PHYS;
-    reg_procs = cntp_procs;
-  } else if (irq_virt) {
+  if (irq_virt) {
     timer_str = "virt";
     timer_irq = irq_virt;
     timer_assignment = IRQ_VIRT;
     reg_procs = cntv_procs;
+    read_arm_counter.store(read_cntvct_a73, ktl::memory_order_relaxed);
+  } else if (irq_phys) {
+    timer_str = "phys";
+    timer_irq = irq_phys;
+    timer_assignment = IRQ_PHYS;
+    reg_procs = cntp_procs;
+    read_arm_counter.store(read_cntpct_a73, ktl::memory_order_relaxed);
+    arm64_allow_pct_in_el0();
   } else if (irq_sphys) {
     timer_str = "sphys";
     timer_irq = irq_sphys;
     timer_assignment = IRQ_SPHYS;
     reg_procs = cntps_procs;
+    read_arm_counter.store(read_cntpct_a73, ktl::memory_order_relaxed);
+    arm64_allow_pct_in_el0();
   } else {
     panic("no irqs set in arm_generic_timer_pdev_init\n");
   }
@@ -570,7 +599,7 @@ void ArmGenericTimerInit(const zbi_dcfg_arm_generic_timer_driver_t& config) {
   // We cannot actually reset the value on the ticks timer, so instead we use
   // the time of clock selection (now) to define the zero point on our ticks
   // timeline moving forward.
-  timer_set_initial_ticks_offset(-reg_procs.read_ct());
+  timer_set_initial_ticks_offset(-read_arm_counter.load(ktl::memory_order_relaxed)());
   arch::ThreadMemoryBarrier();
 
   dprintf(INFO, "arm generic timer using %s timer, irq %d\n", timer_str, timer_irq);
@@ -578,34 +607,34 @@ void ArmGenericTimerInit(const zbi_dcfg_arm_generic_timer_driver_t& config) {
   arm_generic_timer_init(config.freq_override);
 }
 
-// Called once per cpu in the system post cpu detection.
-static void late_update_reg_procs(uint) {
-  ASSERT(timer_assignment == IRQ_PHYS || timer_assignment == IRQ_VIRT ||
-         timer_assignment == IRQ_SPHYS);
+bool ArmUsePhysTimerInVdso() { return timer_assignment != IRQ_VIRT; }
 
-  // If at least one of the cpus are an A73, switch the read hooks to a specialized
-  // A73 errata workaround version. Note this will duplicately run on every
-  // core in the system.
-  if (arm64_read_percpu_ptr()->microarch == ARM_CORTEX_A73) {
-    if (timer_assignment == IRQ_PHYS) {
-      reg_procs = cntp_procs_a73;
-    } else if (timer_assignment == IRQ_VIRT) {
-      reg_procs = cntv_procs_a73;
-    } else if (timer_assignment == IRQ_SPHYS) {
-      reg_procs = cntps_procs_a73;
+static void late_update_keep_or_disable_a73_timer_workaround(uint) {
+  // By the time we make it to LK_INIT_LEVEL_SMP_READY we should have started
+  // and sync'ed up with all of our secondary CPUs. If not, something has gone
+  // terribly wrong, and we should continue to use the A73 workaround out of an
+  // abundance of caution.
+  //
+  zx_status_t status = mp_wait_for_all_cpus_ready(Deadline::no_slack(0));
+  if (status != ZX_OK) {
+    dprintf(ALWAYS,
+            "At least one CPU has failed to check in by INIT_LEVEL_SMP_READY in the "
+            "init sequence.  Keeping A73 counter workarounds in place.\n");
+  } else {
+    if (arch_quirks_needs_arm_erratum_858921_mitigation() == false) {
+      // If all of our CPUs have checked in, and we have not discovered any A73
+      // CPUs, we can switch to using the simple register read instead of the
+      // double-read required by the A73 workaround.
+      ReadArmCounterFunc& thunk = ArmUsePhysTimerInVdso() ? read_cntpct : read_cntvct;
+      read_arm_counter.store(thunk, ktl::memory_order_relaxed);
     } else {
-      panic("no irqs set in late_update_reg_procs\n");
+      dprintf(INFO, "A73 cores detected.  Keeping arm generic timer A73 workaround\n");
     }
-    ZX_ASSERT(reg_procs.early_ticks);
-
-    arch::ThreadMemoryBarrier();
-
-    dprintf(INFO, "arm generic timer applying A73 workaround\n");
   }
 }
 
-LK_INIT_HOOK_FLAGS(late_update_reg_procs, &late_update_reg_procs, LK_INIT_LEVEL_PLATFORM_EARLY + 1,
-                   LK_INIT_FLAG_ALL_CPUS)
+LK_INIT_HOOK(late_update_keep_or_disable_a73_timer_workaround,
+             &late_update_keep_or_disable_a73_timer_workaround, LK_INIT_LEVEL_SMP_READY)
 
 /********************************************************************************
  *
@@ -632,20 +661,7 @@ bool test_time_conversion_check_result(uint64_t a, uint64_t b, uint64_t limit) {
   END_TEST;
 }
 
-#if 0
-static void test_zx_time_to_cntpct(uint32_t cntfrq, zx_time_t zx_time) {
-    uint64_t cntpct = zx_time_to_cntpct(zx_time);
-    const uint64_t nanos_per_sec = ZX_SEC(1);
-    uint64_t expected_cntpct = ((uint64_t)cntfrq * zx_time + nanos_per_sec / 2) / nanos_per_sec;
-
-    test_time_conversion_check_result(cntpct, expected_cntpct, 1);
-    LTRACEF_LEVEL(2, "zx_time_to_cntpct(%" PRIi64 "): got %" PRIu64
-                     ", expect %" PRIu64 "\n",
-                  zx_time, cntpct, expected_cntpct);
-}
-#endif
-
-bool test_time_to_cntpct(uint32_t cntfrq) {
+bool test_time_to_ticks(uint32_t cntfrq) {
   BEGIN_TEST;
 
   affine::Ratio time_to_ticks;
@@ -673,7 +689,7 @@ bool test_time_to_cntpct(uint32_t cntfrq) {
     uint64_t expected_cntpct = ((uint64_t)cntfrq * vec + (nanos_per_sec / 2)) / nanos_per_sec;
 
     if (!test_time_conversion_check_result(cntpct, expected_cntpct, 1)) {
-      printf("FAIL: zx_time_to_cntpct(%" PRIu64 "): got %" PRIu64 ", expect %" PRIu64 "\n", vec,
+      printf("FAIL: zx_time_to_ticks(%" PRIu64 "): got %" PRIu64 ", expect %" PRIu64 "\n", vec,
              cntpct, expected_cntpct);
       ASSERT_TRUE(false);
     }
@@ -682,7 +698,7 @@ bool test_time_to_cntpct(uint32_t cntfrq) {
   END_TEST;
 }
 
-bool test_cntpct_to_time(uint32_t cntfrq) {
+bool test_ticks_to_time(uint32_t cntfrq) {
   BEGIN_TEST;
 
   affine::Ratio ticks_to_time;
@@ -710,7 +726,7 @@ bool test_cntpct_to_time(uint32_t cntfrq) {
 
     const uint64_t limit = (1000 * 1000 + cntfrq - 1) / cntfrq;
     if (!test_time_conversion_check_result(zx_time, expected_zx_time, limit)) {
-      printf("cntpct_to_zx_time(0x%" PRIx64 "): got 0x%" PRIx64 ", expect 0x%" PRIx64 "\n", cntpct,
+      printf("ticks_to_zx_time(0x%" PRIx64 "): got 0x%" PRIx64 ", expect 0x%" PRIx64 "\n", cntpct,
              static_cast<uint64_t>(zx_time), static_cast<uint64_t>(expected_zx_time));
       ASSERT_TRUE(false);
     }
@@ -805,11 +821,11 @@ bool test_event_stream() {
 }  // namespace
 
 UNITTEST_START_TESTCASE(arm_clock_tests)
-UNITTEST("Time --> CNTPCT (min freq)", []() -> bool { return test_time_to_cntpct(kMinTestFreq); })
-UNITTEST("Time --> CNTPCT (max freq)", []() -> bool { return test_time_to_cntpct(kMaxTestFreq); })
-UNITTEST("Time --> CNTPCT (cur freq)", []() -> bool { return test_time_to_cntpct(kCurTestFreq); })
-UNITTEST("CNTPCT --> Time (min freq)", []() -> bool { return test_cntpct_to_time(kMinTestFreq); })
-UNITTEST("CNTPCT --> Time (max freq)", []() -> bool { return test_cntpct_to_time(kMaxTestFreq); })
-UNITTEST("CNTPCT --> Time (cur freq)", []() -> bool { return test_cntpct_to_time(kCurTestFreq); })
+UNITTEST("Time --> Ticks (min freq)", []() -> bool { return test_time_to_ticks(kMinTestFreq); })
+UNITTEST("Time --> Ticks (max freq)", []() -> bool { return test_time_to_ticks(kMaxTestFreq); })
+UNITTEST("Time --> Ticks (cur freq)", []() -> bool { return test_time_to_ticks(kCurTestFreq); })
+UNITTEST("Ticks --> Time (min freq)", []() -> bool { return test_ticks_to_time(kMinTestFreq); })
+UNITTEST("Ticks --> Time (max freq)", []() -> bool { return test_ticks_to_time(kMaxTestFreq); })
+UNITTEST("Ticks --> Time (cur freq)", []() -> bool { return test_ticks_to_time(kCurTestFreq); })
 UNITTEST("Event Stream", test_event_stream)
 UNITTEST_END_TESTCASE(arm_clock_tests, "arm_clock", "Tests for ARM tick count and current time")
