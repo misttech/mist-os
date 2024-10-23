@@ -142,6 +142,14 @@ class HoneydewLocationError(HoneydewError):
     """Raised by location affordance."""
 
 
+class TracingError(HoneydewError):
+    """Raised by tracing affordance."""
+
+
+class TracingStateError(TracingError):
+    """Raised by tracing affordance when in an unexpected state."""
+
+
 class NetworkInterfaceNotFoundError(HoneydewError):
     """Raised when a matching network interface is not found."""
 
