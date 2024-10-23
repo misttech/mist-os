@@ -48,8 +48,8 @@ template("platform_ir") {
     }
 
     deps = [
+      # Generates `sdk_fidl_json`.
       "//build/fidl:sdk_fidl",
-      "//sdk/fidl:sdk_partner_libs",
     ]
   }
 }

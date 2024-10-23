@@ -230,32 +230,21 @@ sdk_molecule("fidl") {
   category = "partner"
 
   deps = []
-  foreach(target, _partner_idk_fidl_libraries_targets_list) {
-    deps += [ "${target}_sdk($fidl_toolchain)" ]
+  non_sdk_deps = []
+  foreach(fidl_library_path, _partner_idk_fidl_libraries_targets_list) {
+    deps += [ "${fidl_library_path}_sdk($fidl_toolchain)" ]
+
+    # For completeness, build the underlying libraries too.
+    non_sdk_deps += [ "${fidl_library_path}($fidl_toolchain)" ]
   }
 
-  non_sdk_deps = [
-    # Ensure that the API compatibility tests run on libraries that require
-    # compatibility.
-    ":sdk_partner_internal_libs",
-    ":sdk_partner_libs",
-  ]
+  # Ensure that the API compatibility tests run on libraries that require
+  # compatibility but are not in the IDK.
+  non_sdk_deps += [ ":partner_internal_fidl_libraries_non_sdk_molecule" ]
 }
 
 group("sdk_fidl_partner_allowlist") {
   visibility = _partner_idk_fidl_libraries_targets_list
-}
-
-group("sdk_partner_libs") {
-  public_deps = []
-  foreach(fidl_library, _partner_idk_fidl_libraries_targets_list) {
-    public_deps += [
-      "${fidl_library}_sdk($fidl_toolchain)",
-
-      # For completeness, build the underlying libraries too.
-      "${fidl_library}($fidl_toolchain)",
-    ]
-  }
 }
 
 # The list of FIDL libraries in the "partner_internal" SDK category.
@@ -303,15 +292,22 @@ _partner_internal_fidl_libraries_targets_list = [
   # keep-sorted: end
 ]
 
-group("sdk_partner_internal_libs") {
-  public_deps = []
-  foreach(fidl_library, _partner_internal_fidl_libraries_targets_list) {
-    public_deps += [
-      "${fidl_library}_sdk($fidl_toolchain)",
+# Do NOT depend on this molecule from another SDK atom's `deps`. If is only
+# to be used in `non_sdk_deps` of the "fidl" target to ensure a) there are no
+# category violations and b) that compatibility tests are run.
+# It must be an `sdk_molecule()` and not a `group()` because category checking
+# is not performed on `non_sdk_deps`.
+sdk_molecule("partner_internal_fidl_libraries_non_sdk_molecule") {
+  visibility = [ ":*" ]
+  category = "partner_internal"
 
-      # For completeness, build the underlying libraries too.
-      "${fidl_library}($fidl_toolchain)",
-    ]
+  deps = []
+  non_sdk_deps = []
+  foreach(fidl_library, _partner_internal_fidl_libraries_targets_list) {
+    deps += [ "${fidl_library}_sdk($fidl_toolchain)" ]
+
+    # For completeness, build the underlying libraries too.
+    non_sdk_deps += [ "${fidl_library}($fidl_toolchain)" ]
   }
 }
 
