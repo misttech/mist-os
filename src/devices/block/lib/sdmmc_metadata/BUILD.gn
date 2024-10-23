@@ -1,0 +1,17 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+source_set("sdmmc_metadata_legacy") {
+  sources = [ "metadata_legacy.h" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
+    "//src/lib/ddktl",
+  ]
+}
+source_set("sdmmc_metadata") {
+  sources = [ "metadata.h" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
+    "//sdk/lib/driver/metadata/cpp",
+  ]
+}

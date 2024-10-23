@@ -34,6 +34,7 @@
 #include <soc/aml-common/aml-sdmmc.h>
 
 #include "src/devices/block/drivers/aml-sdmmc/aml_sdmmc_config.h"
+#include "src/devices/block/lib/sdmmc_metadata/metadata.h"
 #include "src/lib/vmo_store/vmo_store.h"
 
 namespace aml_sdmmc {
@@ -310,6 +311,8 @@ class AmlSdmmc : public fdf::DriverBase,
   // Serves requests that were delayed because they were received during suspended state.
   void ServeDelayedRequests() TA_REQ(tuning_lock_, lock_);
 
+  zx_status_t InitMetadataServer(fdf::PDev& pdev);
+
   std::optional<fdf::MmioBuffer> mmio_ TA_GUARDED(lock_);
 
   aml_sdmmc_config::Config config_;
@@ -351,6 +354,8 @@ class AmlSdmmc : public fdf::DriverBase,
 
   // Dedicated dispatcher for inlining fuchsia_hardware_sdmmc::Sdmmc FIDL requests.
   fdf::Dispatcher worker_dispatcher_;
+
+  sdmmc::MetadataServer metadata_server_;
 };
 
 }  // namespace aml_sdmmc

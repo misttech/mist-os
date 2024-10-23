@@ -15,5 +15,16 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
-    use: [],
+    capabilities: [
+        { service: "fuchsia.hardware.sdmmc.SdmmcMetadata" },
+    ],
+    use: [
+        { service: "fuchsia.hardware.sdmmc.SdmmcMetadata" },
+    ],
+    expose: [
+        {
+            service: "fuchsia.hardware.sdmmc.SdmmcMetadata",
+            from: "self",
+        },
+    ],
 }

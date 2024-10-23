@@ -143,6 +143,7 @@ source_set("ddktl") {
     "//src/devices/block/drivers/zxcrypt:*",
     "//src/devices/block/lib/scsi:*",
     "//src/devices/block/lib/scsi/tests:*",
+    "//src/devices/block/lib/sdmmc_metadata:sdmmc_metadata_legacy",
     "//src/devices/board/drivers/acpi-arm64:*",
     "//src/devices/board/drivers/astro:*",
     "//src/devices/board/drivers/integration-test:*",

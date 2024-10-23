@@ -232,8 +232,13 @@ zx_status_t Sherlock::SdioInit() {
   }
 
   const std::vector<fpbus::Metadata> sd_emmc_metadata{
+      // TODO(b/355244376): Remove this entry once DEVICE_METADATA_SDMMC is no longer referenced.
       {{
           .id = std::to_string(DEVICE_METADATA_SDMMC),
+          .data = std::vector<uint8_t>{sdmmc_metadata.value()},
+      }},
+      {{
+          .id = fuchsia_hardware_sdmmc::wire::kMetadataTypeName,
           .data = std::move(sdmmc_metadata.value()),
       }},
   };

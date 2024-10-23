@@ -5,7 +5,6 @@
 #include "sdio-controller-device.h"
 
 #include <lib/ddk/metadata.h>
-#include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/fzl/vmo-mapper.h>
