@@ -7,6 +7,7 @@
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_SIGNALS_TYPES_H_
 
 #include <lib/mistos/linux_uapi/typedefs.h>
+#include <lib/mistos/starnix/kernel/task/waiter.h>
 #include <lib/mistos/starnix_uapi/signals.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <zircon/types.h>
@@ -125,7 +126,64 @@ struct SignalInfo {
   }
 };
 
-class SignalState {};
+class SignalState {
+ private:
+  // See https://man7.org/linux/man-pages/man2/sigaltstack.2.html
+  ktl::optional<sigaltstack> alt_stack_;
+
+  /// Wait queue for signalfd and sigtimedwait. Signaled whenever a signal is added to the queue.
+  WaitQueue signal_wait_;
+
+  /// A handle for interrupting this task, if any.
+  // RunState run_state_;
+
+  /// The signal mask of the task.
+  ///
+  /// It is the set of signals whose delivery is currently blocked for the caller.
+  /// See https://man7.org/linux/man-pages/man7/signal.7.html
+  starnix_uapi::SigSet mask_;
+
+  /// The signal mask that should be restored by the signal handling machinery, after dequeuing
+  /// a signal.
+  ///
+  /// Some syscalls apply a temporary signal mask by setting `SignalState.mask` during the wait.
+  /// This means that the mask must be set to the temporary mask when the signal is dequeued,
+  /// which is done by the syscall dispatch loop before returning to userspace. After the signal
+  /// is dequeued `mask` can be reset to `saved_mask`.
+  ktl::optional<starnix_uapi::SigSet> saved_mask_;
+
+  /// The queue of signals for the task.
+  // QueuedSignals queue_;
+
+ public:
+  static SignalState with_mask(starnix_uapi::SigSet mask) { return SignalState(mask); }
+
+  starnix_uapi::SigSet set_mask(starnix_uapi::SigSet signal_mask) {
+    starnix_uapi::SigSet old_mask = mask_;
+    mask_ = signal_mask & ~starnix_uapi::UNBLOCKABLE_SIGNALS;
+    return old_mask;
+  }
+
+  void set_temporary_mask(starnix_uapi::SigSet signal_mask) {
+    ASSERT(!saved_mask_.has_value());
+    saved_mask_ = mask_;
+    mask_ = signal_mask & ~starnix_uapi::UNBLOCKABLE_SIGNALS;
+  }
+
+  void restore_mask() {
+    if (saved_mask_.has_value()) {
+      mask_ = *saved_mask_;
+      saved_mask_.reset();
+    }
+  }
+
+  starnix_uapi::SigSet mask() const { return mask_; }
+
+  ktl::optional<starnix_uapi::SigSet> saved_mask() const { return saved_mask_; }
+
+ private:
+  explicit SignalState(starnix_uapi::SigSet mask) : mask_(mask) {}
+};
 
 }  // namespace starnix
 
