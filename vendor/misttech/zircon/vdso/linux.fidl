@@ -288,6 +288,7 @@ closed protocol Linux {
     }) -> () error int64;
 
     // #60, SYSCALL_DEFINE1(exit, int, error_code)
+    @noreturn
     strict A0060Exit(resource struct {
         error_code int32;
     }) -> () error int64;
@@ -835,6 +836,7 @@ closed protocol Linux {
     strict A0230ClockNanosleep() -> () error int64;
 
     // #231, SYSCALL_DEFINE1(exit_group, int, error_code)
+    @noreturn
     strict A0231ExitGroup(resource struct {
         error_code int32;
     }) -> () error int64;
