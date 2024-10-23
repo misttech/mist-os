@@ -48,8 +48,7 @@ use starnix_uapi::{
     FALLOC_FL_COLLAPSE_RANGE, FALLOC_FL_INSERT_RANGE, FALLOC_FL_KEEP_SIZE, FALLOC_FL_PUNCH_HOLE,
     FALLOC_FL_UNSHARE_RANGE, FALLOC_FL_ZERO_RANGE, LOCK_EX, LOCK_NB, LOCK_SH, LOCK_UN, STATX_ATIME,
     STATX_ATTR_VERITY, STATX_BASIC_STATS, STATX_BLOCKS, STATX_CTIME, STATX_GID, STATX_INO,
-    STATX_MTIME, STATX_NLINK, STATX_SIZE, STATX_UID, STATX__RESERVED, XATTR_TRUSTED_PREFIX,
-    XATTR_USER_PREFIX,
+    STATX_MTIME, STATX_NLINK, STATX_SIZE, STATX_UID, STATX__RESERVED, XATTR_USER_PREFIX,
 };
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Weak};
@@ -2145,24 +2144,25 @@ impl FsNode {
     }
 
     /// Check that `current_task` can access the extended attributed `name`. Will return the result
-    /// of `error` in case the attributed is trusted and the task has not the CAP_SYS_ADMIN
-    /// capability.
+    /// of `error` in case the attribute is not in the 'user' namespace and the task has not the
+    /// CAP_SYS_ADMIN capability.
     fn check_trusted_attribute_access(
         &self,
         current_task: &CurrentTask,
         name: &FsStr,
         error: impl FnOnce() -> Errno,
     ) -> Result<(), Errno> {
-        if name.starts_with(XATTR_TRUSTED_PREFIX.to_bytes())
-            && !current_task.creds().has_capability(CAP_SYS_ADMIN)
-        {
-            return Err(error());
-        }
+        // Some irregular file types, most notably symlinks, tend to have very permissive write
+        // settings since the type precludes normal data storage anyways. So only allow privileged
+        // namespaces to be used on them.
         if name.starts_with(XATTR_USER_PREFIX.to_bytes()) {
             let info = self.info();
             if !info.mode.is_reg() && !info.mode.is_dir() {
                 return Err(error());
             }
+        } else if !current_task.creds().has_capability(CAP_SYS_ADMIN) {
+            // Non-privileged callers only have access to the user namespace.
+            return Err(error());
         }
         Ok(())
     }
@@ -2198,7 +2198,7 @@ impl FsNode {
         op: XattrOp,
     ) -> Result<(), Errno> {
         // Based on the man page for xattr(7), write access permissions to security attributes
-        // depend on the security module. If there isn't any, write access is liminuted to
+        // depend on the security module. If there isn't any, write access is limited to
         // processed with the CAP_SYS_ADMIN capability.
         if name.starts_with(XATTR_SECURITY_PREFIX.to_bytes()) {
             return security::fs_node_setsecurity(current_task, self, name, value, op);
@@ -2614,6 +2614,45 @@ mod tests {
                 &MountInfo::detached(),
                 "security.name".into(),
                 "security_label".into(),
+                XattrOp::Create,
+            ),
+            error!(EPERM)
+        );
+    }
+
+    #[::fuchsia::test]
+    async fn set_non_user_xattr_fails_without_security_module_or_root() {
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let mut creds = Credentials::with_ids(1, 2);
+        creds.groups = vec![3, 4];
+        current_task.set_creds(creds);
+
+        // Create a node.
+        let node = &current_task
+            .fs()
+            .root()
+            .create_node(
+                &mut locked,
+                &current_task,
+                "foo".into(),
+                FileMode::IFREG,
+                DeviceType::NONE,
+            )
+            .expect("create_node")
+            .entry
+            .node;
+
+        // Give read-write-execute access.
+        node.update_info(|info| info.mode = mode!(IFREG, 0o777));
+
+        // Without a security module, and without CAP_SYS_ADMIN capabilities, setting the xattr
+        // should fail.
+        assert_eq!(
+            node.set_xattr(
+                &current_task,
+                &MountInfo::detached(),
+                "trusted.name".into(),
+                "some data".into(),
                 XattrOp::Create,
             ),
             error!(EPERM)
