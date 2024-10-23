@@ -4,7 +4,5 @@
 
 import("//build/fidl/fidl.gni")
 fidl("fuchsia.test.suspend") {
-  sdk_category = "internal"
-
   sources = [ "suspend.test.fidl" ]
 }

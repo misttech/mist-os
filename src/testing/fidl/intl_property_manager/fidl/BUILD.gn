@@ -7,5 +7,4 @@ import("//build/fidl/fidl.gni")
 fidl("fuchsia.test.intl.manager") {
   sources = [ "manager.fidl" ]
   public_deps = [ "//sdk/fidl/fuchsia.intl" ]
-  sdk_category = "internal"
 }

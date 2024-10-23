@@ -247,7 +247,6 @@ cc_test_executable("server_daemon_test") {
 }
 
 fidl("fuchsia.virtualization.guest.interaction") {
-  sdk_category = "internal"
   sources = [ "fidl/guest_interaction.fidl" ]
   public_deps = [ "//sdk/fidl/fuchsia.io" ]
   enable_hlcpp = true
