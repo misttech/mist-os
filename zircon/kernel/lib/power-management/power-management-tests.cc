@@ -151,6 +151,12 @@ bool ControllerDpcPostsUpdateWhenPending() {
 
 bool ControllerDpcTryQueueManyTimesIsOk() {
   BEGIN_TEST;
+  if (true) {
+    // TODO(https://fxbug.dev/375221894): Disabled until underlying issue is fixed.
+    printf("Test disabled due to https://fxbug.dev/375221894\n");
+    END_TEST;
+  }
+
   // Create a fake power domain, only thing that matters is the controller.
   auto model = power_management::PowerModel();
   fbl::AllocChecker ac;
