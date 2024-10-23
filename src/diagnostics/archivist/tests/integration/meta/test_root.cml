@@ -28,11 +28,6 @@
             to: [ "#realm_factory" ],
         },
         {
-            protocol: [ "fuchsia.logger.Log" ],
-            from: "parent",
-            to: [ "#test_cases" ],
-        },
-        {
             protocol: [ "fuchsia.tracing.provider.Registry" ],
             from: "parent",
             to: [ "#realm_factory" ],
