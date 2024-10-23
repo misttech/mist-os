@@ -13,6 +13,11 @@ import("//build/sdk/sdk_atom.gni")
 # An equivalent to the built-in source_set which adds an SDK atom declaration to
 # allow the set to be included in an SDK as sources.
 #
+# The SDK atom target (`${target_name}_sdk) does NOT build the underlying
+# `source_set` (`target_name`).
+# To provide build coverage, ensure some other target in the build graph
+# depends on `target_name`.
+#
 # Parameters
 #
 #   category (required)
@@ -371,8 +376,18 @@ template("sdk_source_set") {
     if (is_stable) {
       args += [ "--stable" ]
     }
+
+    # Unlike the other C++ library templates, the main target
+    # (`main_target_name`) is not required for the metadata and is not
+    # built with the atom.
     deps = sdk_deps
   }
+
+  # As described at the top of this file, this atom does NOT build the
+  # underlying source files.
+  # Ensure the behavior matches this documentation.
+  # Both could be changed if it makes sense.
+  assert_no_deps = [ ":${main_target_name}" ]
 
   sdk_atom(sdk_target_name) {
     forward_variables_from(invoker,
@@ -423,13 +438,15 @@ template("sdk_source_set") {
 
     deps = sdk_deps
 
-    non_sdk_deps = [ ":$metadata_target_name" ]
-    non_sdk_deps += [ ":${verify_public_headers_target}" ]
+    non_sdk_deps = [
+      ":${metadata_target_name}",
+      ":${verify_public_headers_target}",
+    ]
     if (should_verify_pragma) {
-      non_sdk_deps += [ ":$verify_pragma_target_name" ]
+      non_sdk_deps += [ ":${verify_pragma_target_name}" ]
     }
     if (generate_plasa_artifacts) {
-      non_sdk_deps += [ ":$_plasa_artifacts_target_name" ]
+      non_sdk_deps += [ ":${_plasa_artifacts_target_name}" ]
     }
 
     # Explicitly add non-public dependencies, in case some of the source files

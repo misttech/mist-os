@@ -337,12 +337,6 @@ if (!is_host) {
       category = "partner"
 
       deps = [
-        # The C++ source libraries must be buildable at each supported API level
-        # but are only built once (per target CPU architecture).
-        # TODO(https://fxbug.dev/42083950): Ensure the libraries build and are
-        # complete at all API levels.
-        ":core_cc_source_libraries",
-
         # TODO(https://fxbug.dev/327223536): `loadable_modules` (a.k.a., the
         # "Vulkan layers") support being built at individual API levels, but
         # each of the subbuilds currently puts the build files at the same path,
@@ -377,6 +371,10 @@ if (!is_host) {
         category = "partner"
 
         deps = [
+          # This target contains atoms that depend on FIDL libraries, but it
+          # does not build the underlying libraries.
+          ":core_cc_source_libraries",
+
           # This target compiles the FIDL files, but the output used in the IDK
           # is not specific to any API level or CPU architecture.
           "//sdk/fidl",
@@ -759,9 +757,14 @@ sdk_molecule("core_cc_prebuilt_libraries") {
   ]
 }
 
-# C/C++ code that is provided as source in the SDK. Must be buildable at each
-# supported API level, though this is not part of the build.
+# C/C++ code that is provided as source in the SDK.
 # Prefer providing source code if all dependencies are available in the SDK.
+# All source files must be buildable at each supported API level.
+# There is currently not mechanism to ensure this, even at "PLATFORM" because
+# it does not cause the source files to be compiled. It only generates the SDK
+# atoms
+# TODO(https://fxbug.dev/42083950): Ensure the libraries build and are
+# complete at all API levels.
 sdk_molecule("core_cc_source_libraries") {
   category = "partner"
   deps = [
