@@ -7,7 +7,7 @@
 
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
-use fidl::encoding::ProxyChannelBox;
+use fidl::encoding::{MessageBufFor, ProxyChannelBox, ResourceDialect};
 use fidl::endpoints::{ControlHandle as _, Responder as _};
 use futures::future::{self, MaybeDone, TryFutureExt};
 use zx_status;
@@ -2420,7 +2420,6 @@ pub struct UnknownInteractionsAjarProtocolMarker;
 impl fidl::endpoints::ProtocolMarker for UnknownInteractionsAjarProtocolMarker {
     type Proxy = UnknownInteractionsAjarProtocolProxy;
     type RequestStream = UnknownInteractionsAjarProtocolRequestStream;
-
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = UnknownInteractionsAjarProtocolSynchronousProxy;
 
@@ -2469,7 +2468,6 @@ pub trait UnknownInteractionsAjarProtocolProxyInterface: Send + Sync {
         > + Send;
     fn r#strict_two_way_table_err(&self) -> Self::StrictTwoWayTableErrResponseFut;
 }
-
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct UnknownInteractionsAjarProtocolSynchronousProxy {
@@ -2654,13 +2652,13 @@ impl UnknownInteractionsAjarProtocolSynchronousProxy {
 
 #[derive(Debug, Clone)]
 pub struct UnknownInteractionsAjarProtocolProxy {
-    client: fidl::client::Client,
+    client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl fidl::endpoints::Proxy for UnknownInteractionsAjarProtocolProxy {
     type Protocol = UnknownInteractionsAjarProtocolMarker;
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: ::fidl::AsyncChannel) -> Self {
         Self::new(inner)
     }
 
@@ -2675,7 +2673,7 @@ impl fidl::endpoints::Proxy for UnknownInteractionsAjarProtocolProxy {
 
 impl UnknownInteractionsAjarProtocolProxy {
     /// Create a new Proxy for test.unknowninteractions/UnknownInteractionsAjarProtocol.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
+    pub fn new(channel: ::fidl::AsyncChannel) -> Self {
         let protocol_name =
             <UnknownInteractionsAjarProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
@@ -2700,52 +2698,69 @@ impl UnknownInteractionsAjarProtocolProxy {
         UnknownInteractionsAjarProtocolProxyInterface::r#flexible_one_way(self)
     }
 
-    pub fn r#strict_two_way(&self) -> fidl::client::QueryResponseFut<()> {
+    pub fn r#strict_two_way(
+        &self,
+    ) -> fidl::client::QueryResponseFut<(), fidl::encoding::DefaultFuchsiaResourceDialect> {
         UnknownInteractionsAjarProtocolProxyInterface::r#strict_two_way(self)
     }
 
-    pub fn r#strict_two_way_fields(&self) -> fidl::client::QueryResponseFut<i32> {
+    pub fn r#strict_two_way_fields(
+        &self,
+    ) -> fidl::client::QueryResponseFut<i32, fidl::encoding::DefaultFuchsiaResourceDialect> {
         UnknownInteractionsAjarProtocolProxyInterface::r#strict_two_way_fields(self)
     }
 
     pub fn r#strict_two_way_union(
         &self,
-    ) -> fidl::client::QueryResponseFut<UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse>
-    {
+    ) -> fidl::client::QueryResponseFut<
+        UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         UnknownInteractionsAjarProtocolProxyInterface::r#strict_two_way_union(self)
     }
 
     pub fn r#strict_two_way_table(
         &self,
-    ) -> fidl::client::QueryResponseFut<UnknownInteractionsAjarProtocolStrictTwoWayTableResponse>
-    {
+    ) -> fidl::client::QueryResponseFut<
+        UnknownInteractionsAjarProtocolStrictTwoWayTableResponse,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         UnknownInteractionsAjarProtocolProxyInterface::r#strict_two_way_table(self)
     }
 
     pub fn r#strict_two_way_err(
         &self,
-    ) -> fidl::client::QueryResponseFut<UnknownInteractionsAjarProtocolStrictTwoWayErrResult> {
+    ) -> fidl::client::QueryResponseFut<
+        UnknownInteractionsAjarProtocolStrictTwoWayErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         UnknownInteractionsAjarProtocolProxyInterface::r#strict_two_way_err(self)
     }
 
     pub fn r#strict_two_way_fields_err(
         &self,
-    ) -> fidl::client::QueryResponseFut<UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult>
-    {
+    ) -> fidl::client::QueryResponseFut<
+        UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         UnknownInteractionsAjarProtocolProxyInterface::r#strict_two_way_fields_err(self)
     }
 
     pub fn r#strict_two_way_union_err(
         &self,
-    ) -> fidl::client::QueryResponseFut<UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult>
-    {
+    ) -> fidl::client::QueryResponseFut<
+        UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         UnknownInteractionsAjarProtocolProxyInterface::r#strict_two_way_union_err(self)
     }
 
     pub fn r#strict_two_way_table_err(
         &self,
-    ) -> fidl::client::QueryResponseFut<UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult>
-    {
+    ) -> fidl::client::QueryResponseFut<
+        UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         UnknownInteractionsAjarProtocolProxyInterface::r#strict_two_way_table_err(self)
     }
 }
@@ -2767,9 +2782,12 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
         )
     }
 
-    type StrictTwoWayResponseFut = fidl::client::QueryResponseFut<()>;
+    type StrictTwoWayResponseFut =
+        fidl::client::QueryResponseFut<(), fidl::encoding::DefaultFuchsiaResourceDialect>;
     fn r#strict_two_way(&self) -> Self::StrictTwoWayResponseFut {
-        fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
+        fn _decode(
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
+        ) -> Result<(), fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::EmptyPayload,
                 fidl::encoding::DefaultFuchsiaResourceDialect,
@@ -2785,9 +2803,12 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
         )
     }
 
-    type StrictTwoWayFieldsResponseFut = fidl::client::QueryResponseFut<i32>;
+    type StrictTwoWayFieldsResponseFut =
+        fidl::client::QueryResponseFut<i32, fidl::encoding::DefaultFuchsiaResourceDialect>;
     fn r#strict_two_way_fields(&self) -> Self::StrictTwoWayFieldsResponseFut {
-        fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i32, fidl::Error> {
+        fn _decode(
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
+        ) -> Result<i32, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse,
                 fidl::encoding::DefaultFuchsiaResourceDialect,
@@ -2803,11 +2824,13 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
         )
     }
 
-    type StrictTwoWayUnionResponseFut =
-        fidl::client::QueryResponseFut<UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse>;
+    type StrictTwoWayUnionResponseFut = fidl::client::QueryResponseFut<
+        UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#strict_two_way_union(&self) -> Self::StrictTwoWayUnionResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse,
@@ -2827,11 +2850,13 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
         )
     }
 
-    type StrictTwoWayTableResponseFut =
-        fidl::client::QueryResponseFut<UnknownInteractionsAjarProtocolStrictTwoWayTableResponse>;
+    type StrictTwoWayTableResponseFut = fidl::client::QueryResponseFut<
+        UnknownInteractionsAjarProtocolStrictTwoWayTableResponse,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#strict_two_way_table(&self) -> Self::StrictTwoWayTableResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<UnknownInteractionsAjarProtocolStrictTwoWayTableResponse, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 UnknownInteractionsAjarProtocolStrictTwoWayTableResponse,
@@ -2851,11 +2876,13 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
         )
     }
 
-    type StrictTwoWayErrResponseFut =
-        fidl::client::QueryResponseFut<UnknownInteractionsAjarProtocolStrictTwoWayErrResult>;
+    type StrictTwoWayErrResponseFut = fidl::client::QueryResponseFut<
+        UnknownInteractionsAjarProtocolStrictTwoWayErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#strict_two_way_err(&self) -> Self::StrictTwoWayErrResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<UnknownInteractionsAjarProtocolStrictTwoWayErrResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>,
@@ -2875,11 +2902,13 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
         )
     }
 
-    type StrictTwoWayFieldsErrResponseFut =
-        fidl::client::QueryResponseFut<UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult>;
+    type StrictTwoWayFieldsErrResponseFut = fidl::client::QueryResponseFut<
+        UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#strict_two_way_fields_err(&self) -> Self::StrictTwoWayFieldsErrResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult, fidl::Error>
         {
             let _response = fidl::client::decode_transaction_body::<
@@ -2903,11 +2932,13 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
         )
     }
 
-    type StrictTwoWayUnionErrResponseFut =
-        fidl::client::QueryResponseFut<UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult>;
+    type StrictTwoWayUnionErrResponseFut = fidl::client::QueryResponseFut<
+        UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#strict_two_way_union_err(&self) -> Self::StrictTwoWayUnionErrResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult, fidl::Error>
         {
             let _response = fidl::client::decode_transaction_body::<
@@ -2931,11 +2962,13 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
         )
     }
 
-    type StrictTwoWayTableErrResponseFut =
-        fidl::client::QueryResponseFut<UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult>;
+    type StrictTwoWayTableErrResponseFut = fidl::client::QueryResponseFut<
+        UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#strict_two_way_table_err(&self) -> Self::StrictTwoWayTableErrResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult, fidl::Error>
         {
             let _response = fidl::client::decode_transaction_body::<
@@ -2961,7 +2994,7 @@ impl UnknownInteractionsAjarProtocolProxyInterface for UnknownInteractionsAjarPr
 }
 
 pub struct UnknownInteractionsAjarProtocolEventStream {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl std::marker::Unpin for UnknownInteractionsAjarProtocolEventStream {}
@@ -3096,7 +3129,7 @@ impl UnknownInteractionsAjarProtocolEvent {
 
     /// Decodes a message buffer as a [`UnknownInteractionsAjarProtocolEvent`].
     fn decode(
-        mut buf: fidl::MessageBufEtc,
+        mut buf: <fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc,
     ) -> Result<UnknownInteractionsAjarProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
@@ -3183,7 +3216,7 @@ impl UnknownInteractionsAjarProtocolEvent {
 
 /// A Stream of incoming requests for test.unknowninteractions/UnknownInteractionsAjarProtocol.
 pub struct UnknownInteractionsAjarProtocolRequestStream {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
     is_terminated: bool,
 }
 
@@ -3199,7 +3232,7 @@ impl fidl::endpoints::RequestStream for UnknownInteractionsAjarProtocolRequestSt
     type Protocol = UnknownInteractionsAjarProtocolMarker;
     type ControlHandle = UnknownInteractionsAjarProtocolControlHandle;
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: ::fidl::AsyncChannel) -> Self {
         Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
     }
 
@@ -3207,11 +3240,17 @@ impl fidl::endpoints::RequestStream for UnknownInteractionsAjarProtocolRequestSt
         UnknownInteractionsAjarProtocolControlHandle { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(
+        self,
+    ) -> (::std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>, bool)
+    {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(
+        inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
+        is_terminated: bool,
+    ) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -3583,14 +3622,13 @@ impl UnknownInteractionsAjarProtocolRequest {
 
 #[derive(Debug, Clone)]
 pub struct UnknownInteractionsAjarProtocolControlHandle {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
 }
 
 impl fidl::endpoints::ControlHandle for UnknownInteractionsAjarProtocolControlHandle {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
-
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
@@ -3598,7 +3636,6 @@ impl fidl::endpoints::ControlHandle for UnknownInteractionsAjarProtocolControlHa
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
-
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
@@ -5163,7 +5200,6 @@ pub struct UnknownInteractionsClosedProtocolMarker;
 impl fidl::endpoints::ProtocolMarker for UnknownInteractionsClosedProtocolMarker {
     type Proxy = UnknownInteractionsClosedProtocolProxy;
     type RequestStream = UnknownInteractionsClosedProtocolRequestStream;
-
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = UnknownInteractionsClosedProtocolSynchronousProxy;
 
@@ -5223,7 +5259,6 @@ pub trait UnknownInteractionsClosedProtocolProxyInterface: Send + Sync {
         > + Send;
     fn r#strict_two_way_table_err(&self) -> Self::StrictTwoWayTableErrResponseFut;
 }
-
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct UnknownInteractionsClosedProtocolSynchronousProxy {
@@ -5399,13 +5434,13 @@ impl UnknownInteractionsClosedProtocolSynchronousProxy {
 
 #[derive(Debug, Clone)]
 pub struct UnknownInteractionsClosedProtocolProxy {
-    client: fidl::client::Client,
+    client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl fidl::endpoints::Proxy for UnknownInteractionsClosedProtocolProxy {
     type Protocol = UnknownInteractionsClosedProtocolMarker;
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: ::fidl::AsyncChannel) -> Self {
         Self::new(inner)
     }
 
@@ -5420,7 +5455,7 @@ impl fidl::endpoints::Proxy for UnknownInteractionsClosedProtocolProxy {
 
 impl UnknownInteractionsClosedProtocolProxy {
     /// Create a new Proxy for test.unknowninteractions/UnknownInteractionsClosedProtocol.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
+    pub fn new(channel: ::fidl::AsyncChannel) -> Self {
         let protocol_name = <UnknownInteractionsClosedProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
@@ -5440,53 +5475,69 @@ impl UnknownInteractionsClosedProtocolProxy {
         UnknownInteractionsClosedProtocolProxyInterface::r#strict_one_way(self)
     }
 
-    pub fn r#strict_two_way(&self) -> fidl::client::QueryResponseFut<()> {
+    pub fn r#strict_two_way(
+        &self,
+    ) -> fidl::client::QueryResponseFut<(), fidl::encoding::DefaultFuchsiaResourceDialect> {
         UnknownInteractionsClosedProtocolProxyInterface::r#strict_two_way(self)
     }
 
-    pub fn r#strict_two_way_fields(&self) -> fidl::client::QueryResponseFut<i32> {
+    pub fn r#strict_two_way_fields(
+        &self,
+    ) -> fidl::client::QueryResponseFut<i32, fidl::encoding::DefaultFuchsiaResourceDialect> {
         UnknownInteractionsClosedProtocolProxyInterface::r#strict_two_way_fields(self)
     }
 
     pub fn r#strict_two_way_union(
         &self,
-    ) -> fidl::client::QueryResponseFut<UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse>
-    {
+    ) -> fidl::client::QueryResponseFut<
+        UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         UnknownInteractionsClosedProtocolProxyInterface::r#strict_two_way_union(self)
     }
 
     pub fn r#strict_two_way_table(
         &self,
-    ) -> fidl::client::QueryResponseFut<UnknownInteractionsClosedProtocolStrictTwoWayTableResponse>
-    {
+    ) -> fidl::client::QueryResponseFut<
+        UnknownInteractionsClosedProtocolStrictTwoWayTableResponse,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         UnknownInteractionsClosedProtocolProxyInterface::r#strict_two_way_table(self)
     }
 
     pub fn r#strict_two_way_err(
         &self,
-    ) -> fidl::client::QueryResponseFut<UnknownInteractionsClosedProtocolStrictTwoWayErrResult>
-    {
+    ) -> fidl::client::QueryResponseFut<
+        UnknownInteractionsClosedProtocolStrictTwoWayErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         UnknownInteractionsClosedProtocolProxyInterface::r#strict_two_way_err(self)
     }
 
     pub fn r#strict_two_way_fields_err(
         &self,
-    ) -> fidl::client::QueryResponseFut<UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult>
-    {
+    ) -> fidl::client::QueryResponseFut<
+        UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         UnknownInteractionsClosedProtocolProxyInterface::r#strict_two_way_fields_err(self)
     }
 
     pub fn r#strict_two_way_union_err(
         &self,
-    ) -> fidl::client::QueryResponseFut<UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult>
-    {
+    ) -> fidl::client::QueryResponseFut<
+        UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         UnknownInteractionsClosedProtocolProxyInterface::r#strict_two_way_union_err(self)
     }
 
     pub fn r#strict_two_way_table_err(
         &self,
-    ) -> fidl::client::QueryResponseFut<UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult>
-    {
+    ) -> fidl::client::QueryResponseFut<
+        UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         UnknownInteractionsClosedProtocolProxyInterface::r#strict_two_way_table_err(self)
     }
 }
@@ -5500,9 +5551,12 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
         )
     }
 
-    type StrictTwoWayResponseFut = fidl::client::QueryResponseFut<()>;
+    type StrictTwoWayResponseFut =
+        fidl::client::QueryResponseFut<(), fidl::encoding::DefaultFuchsiaResourceDialect>;
     fn r#strict_two_way(&self) -> Self::StrictTwoWayResponseFut {
-        fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
+        fn _decode(
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
+        ) -> Result<(), fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::EmptyPayload,
                 fidl::encoding::DefaultFuchsiaResourceDialect,
@@ -5518,9 +5572,12 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
         )
     }
 
-    type StrictTwoWayFieldsResponseFut = fidl::client::QueryResponseFut<i32>;
+    type StrictTwoWayFieldsResponseFut =
+        fidl::client::QueryResponseFut<i32, fidl::encoding::DefaultFuchsiaResourceDialect>;
     fn r#strict_two_way_fields(&self) -> Self::StrictTwoWayFieldsResponseFut {
-        fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i32, fidl::Error> {
+        fn _decode(
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
+        ) -> Result<i32, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse,
                 fidl::encoding::DefaultFuchsiaResourceDialect,
@@ -5536,11 +5593,13 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
         )
     }
 
-    type StrictTwoWayUnionResponseFut =
-        fidl::client::QueryResponseFut<UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse>;
+    type StrictTwoWayUnionResponseFut = fidl::client::QueryResponseFut<
+        UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#strict_two_way_union(&self) -> Self::StrictTwoWayUnionResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse, fidl::Error>
         {
             let _response = fidl::client::decode_transaction_body::<
@@ -5561,11 +5620,13 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
         )
     }
 
-    type StrictTwoWayTableResponseFut =
-        fidl::client::QueryResponseFut<UnknownInteractionsClosedProtocolStrictTwoWayTableResponse>;
+    type StrictTwoWayTableResponseFut = fidl::client::QueryResponseFut<
+        UnknownInteractionsClosedProtocolStrictTwoWayTableResponse,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#strict_two_way_table(&self) -> Self::StrictTwoWayTableResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<UnknownInteractionsClosedProtocolStrictTwoWayTableResponse, fidl::Error>
         {
             let _response = fidl::client::decode_transaction_body::<
@@ -5586,11 +5647,13 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
         )
     }
 
-    type StrictTwoWayErrResponseFut =
-        fidl::client::QueryResponseFut<UnknownInteractionsClosedProtocolStrictTwoWayErrResult>;
+    type StrictTwoWayErrResponseFut = fidl::client::QueryResponseFut<
+        UnknownInteractionsClosedProtocolStrictTwoWayErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#strict_two_way_err(&self) -> Self::StrictTwoWayErrResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<UnknownInteractionsClosedProtocolStrictTwoWayErrResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>,
@@ -5612,10 +5675,11 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
 
     type StrictTwoWayFieldsErrResponseFut = fidl::client::QueryResponseFut<
         UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
     >;
     fn r#strict_two_way_fields_err(&self) -> Self::StrictTwoWayFieldsErrResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult, fidl::Error>
         {
             let _response = fidl::client::decode_transaction_body::<
@@ -5639,11 +5703,13 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
         )
     }
 
-    type StrictTwoWayUnionErrResponseFut =
-        fidl::client::QueryResponseFut<UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult>;
+    type StrictTwoWayUnionErrResponseFut = fidl::client::QueryResponseFut<
+        UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#strict_two_way_union_err(&self) -> Self::StrictTwoWayUnionErrResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult, fidl::Error>
         {
             let _response = fidl::client::decode_transaction_body::<
@@ -5667,11 +5733,13 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
         )
     }
 
-    type StrictTwoWayTableErrResponseFut =
-        fidl::client::QueryResponseFut<UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult>;
+    type StrictTwoWayTableErrResponseFut = fidl::client::QueryResponseFut<
+        UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#strict_two_way_table_err(&self) -> Self::StrictTwoWayTableErrResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult, fidl::Error>
         {
             let _response = fidl::client::decode_transaction_body::<
@@ -5697,7 +5765,7 @@ impl UnknownInteractionsClosedProtocolProxyInterface for UnknownInteractionsClos
 }
 
 pub struct UnknownInteractionsClosedProtocolEventStream {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl std::marker::Unpin for UnknownInteractionsClosedProtocolEventStream {}
@@ -5775,7 +5843,7 @@ impl UnknownInteractionsClosedProtocolEvent {
 
     /// Decodes a message buffer as a [`UnknownInteractionsClosedProtocolEvent`].
     fn decode(
-        mut buf: fidl::MessageBufEtc,
+        mut buf: <fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc,
     ) -> Result<UnknownInteractionsClosedProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
@@ -5824,7 +5892,7 @@ impl UnknownInteractionsClosedProtocolEvent {
 
 /// A Stream of incoming requests for test.unknowninteractions/UnknownInteractionsClosedProtocol.
 pub struct UnknownInteractionsClosedProtocolRequestStream {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
     is_terminated: bool,
 }
 
@@ -5840,7 +5908,7 @@ impl fidl::endpoints::RequestStream for UnknownInteractionsClosedProtocolRequest
     type Protocol = UnknownInteractionsClosedProtocolMarker;
     type ControlHandle = UnknownInteractionsClosedProtocolControlHandle;
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: ::fidl::AsyncChannel) -> Self {
         Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
     }
 
@@ -5848,11 +5916,17 @@ impl fidl::endpoints::RequestStream for UnknownInteractionsClosedProtocolRequest
         UnknownInteractionsClosedProtocolControlHandle { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(
+        self,
+    ) -> (::std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>, bool)
+    {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(
+        inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
+        is_terminated: bool,
+    ) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -6187,14 +6261,13 @@ impl UnknownInteractionsClosedProtocolRequest {
 
 #[derive(Debug, Clone)]
 pub struct UnknownInteractionsClosedProtocolControlHandle {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
 }
 
 impl fidl::endpoints::ControlHandle for UnknownInteractionsClosedProtocolControlHandle {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
-
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
@@ -6202,7 +6275,6 @@ impl fidl::endpoints::ControlHandle for UnknownInteractionsClosedProtocolControl
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
-
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
@@ -8560,7 +8632,6 @@ pub struct UnknownInteractionsProtocolMarker;
 impl fidl::endpoints::ProtocolMarker for UnknownInteractionsProtocolMarker {
     type Proxy = UnknownInteractionsProtocolProxy;
     type RequestStream = UnknownInteractionsProtocolRequestStream;
-
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = UnknownInteractionsProtocolSynchronousProxy;
 
@@ -8641,7 +8712,6 @@ pub trait UnknownInteractionsProtocolProxyInterface: Send + Sync {
         > + Send;
     fn r#flexible_two_way_table_err(&self) -> Self::FlexibleTwoWayTableErrResponseFut;
 }
-
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct UnknownInteractionsProtocolSynchronousProxy {
@@ -8950,13 +9020,13 @@ impl UnknownInteractionsProtocolSynchronousProxy {
 
 #[derive(Debug, Clone)]
 pub struct UnknownInteractionsProtocolProxy {
-    client: fidl::client::Client,
+    client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl fidl::endpoints::Proxy for UnknownInteractionsProtocolProxy {
     type Protocol = UnknownInteractionsProtocolMarker;
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: ::fidl::AsyncChannel) -> Self {
         Self::new(inner)
     }
 
@@ -8971,7 +9041,7 @@ impl fidl::endpoints::Proxy for UnknownInteractionsProtocolProxy {
 
 impl UnknownInteractionsProtocolProxy {
     /// Create a new Proxy for test.unknowninteractions/UnknownInteractionsProtocol.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
+    pub fn new(channel: ::fidl::AsyncChannel) -> Self {
         let protocol_name =
             <UnknownInteractionsProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
@@ -8994,97 +9064,135 @@ impl UnknownInteractionsProtocolProxy {
         UnknownInteractionsProtocolProxyInterface::r#flexible_one_way(self)
     }
 
-    pub fn r#strict_two_way(&self) -> fidl::client::QueryResponseFut<()> {
+    pub fn r#strict_two_way(
+        &self,
+    ) -> fidl::client::QueryResponseFut<(), fidl::encoding::DefaultFuchsiaResourceDialect> {
         UnknownInteractionsProtocolProxyInterface::r#strict_two_way(self)
     }
 
-    pub fn r#strict_two_way_fields(&self) -> fidl::client::QueryResponseFut<i32> {
+    pub fn r#strict_two_way_fields(
+        &self,
+    ) -> fidl::client::QueryResponseFut<i32, fidl::encoding::DefaultFuchsiaResourceDialect> {
         UnknownInteractionsProtocolProxyInterface::r#strict_two_way_fields(self)
     }
 
     pub fn r#strict_two_way_union(
         &self,
-    ) -> fidl::client::QueryResponseFut<UnknownInteractionsProtocolStrictTwoWayUnionResponse> {
+    ) -> fidl::client::QueryResponseFut<
+        UnknownInteractionsProtocolStrictTwoWayUnionResponse,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         UnknownInteractionsProtocolProxyInterface::r#strict_two_way_union(self)
     }
 
     pub fn r#strict_two_way_table(
         &self,
-    ) -> fidl::client::QueryResponseFut<UnknownInteractionsProtocolStrictTwoWayTableResponse> {
+    ) -> fidl::client::QueryResponseFut<
+        UnknownInteractionsProtocolStrictTwoWayTableResponse,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         UnknownInteractionsProtocolProxyInterface::r#strict_two_way_table(self)
     }
 
     pub fn r#strict_two_way_err(
         &self,
-    ) -> fidl::client::QueryResponseFut<UnknownInteractionsProtocolStrictTwoWayErrResult> {
+    ) -> fidl::client::QueryResponseFut<
+        UnknownInteractionsProtocolStrictTwoWayErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         UnknownInteractionsProtocolProxyInterface::r#strict_two_way_err(self)
     }
 
     pub fn r#strict_two_way_fields_err(
         &self,
-    ) -> fidl::client::QueryResponseFut<UnknownInteractionsProtocolStrictTwoWayFieldsErrResult>
-    {
+    ) -> fidl::client::QueryResponseFut<
+        UnknownInteractionsProtocolStrictTwoWayFieldsErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         UnknownInteractionsProtocolProxyInterface::r#strict_two_way_fields_err(self)
     }
 
     pub fn r#strict_two_way_union_err(
         &self,
-    ) -> fidl::client::QueryResponseFut<UnknownInteractionsProtocolStrictTwoWayUnionErrResult> {
+    ) -> fidl::client::QueryResponseFut<
+        UnknownInteractionsProtocolStrictTwoWayUnionErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         UnknownInteractionsProtocolProxyInterface::r#strict_two_way_union_err(self)
     }
 
     pub fn r#strict_two_way_table_err(
         &self,
-    ) -> fidl::client::QueryResponseFut<UnknownInteractionsProtocolStrictTwoWayTableErrResult> {
+    ) -> fidl::client::QueryResponseFut<
+        UnknownInteractionsProtocolStrictTwoWayTableErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         UnknownInteractionsProtocolProxyInterface::r#strict_two_way_table_err(self)
     }
 
-    pub fn r#flexible_two_way(&self) -> fidl::client::QueryResponseFut<()> {
+    pub fn r#flexible_two_way(
+        &self,
+    ) -> fidl::client::QueryResponseFut<(), fidl::encoding::DefaultFuchsiaResourceDialect> {
         UnknownInteractionsProtocolProxyInterface::r#flexible_two_way(self)
     }
 
-    pub fn r#flexible_two_way_fields(&self) -> fidl::client::QueryResponseFut<i32> {
+    pub fn r#flexible_two_way_fields(
+        &self,
+    ) -> fidl::client::QueryResponseFut<i32, fidl::encoding::DefaultFuchsiaResourceDialect> {
         UnknownInteractionsProtocolProxyInterface::r#flexible_two_way_fields(self)
     }
 
     pub fn r#flexible_two_way_union(
         &self,
-    ) -> fidl::client::QueryResponseFut<UnknownInteractionsProtocolFlexibleTwoWayUnionResponse>
-    {
+    ) -> fidl::client::QueryResponseFut<
+        UnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         UnknownInteractionsProtocolProxyInterface::r#flexible_two_way_union(self)
     }
 
     pub fn r#flexible_two_way_table(
         &self,
-    ) -> fidl::client::QueryResponseFut<UnknownInteractionsProtocolFlexibleTwoWayTableResponse>
-    {
+    ) -> fidl::client::QueryResponseFut<
+        UnknownInteractionsProtocolFlexibleTwoWayTableResponse,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         UnknownInteractionsProtocolProxyInterface::r#flexible_two_way_table(self)
     }
 
     pub fn r#flexible_two_way_err(
         &self,
-    ) -> fidl::client::QueryResponseFut<UnknownInteractionsProtocolFlexibleTwoWayErrResult> {
+    ) -> fidl::client::QueryResponseFut<
+        UnknownInteractionsProtocolFlexibleTwoWayErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         UnknownInteractionsProtocolProxyInterface::r#flexible_two_way_err(self)
     }
 
     pub fn r#flexible_two_way_fields_err(
         &self,
-    ) -> fidl::client::QueryResponseFut<UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult>
-    {
+    ) -> fidl::client::QueryResponseFut<
+        UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         UnknownInteractionsProtocolProxyInterface::r#flexible_two_way_fields_err(self)
     }
 
     pub fn r#flexible_two_way_union_err(
         &self,
-    ) -> fidl::client::QueryResponseFut<UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult>
-    {
+    ) -> fidl::client::QueryResponseFut<
+        UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         UnknownInteractionsProtocolProxyInterface::r#flexible_two_way_union_err(self)
     }
 
     pub fn r#flexible_two_way_table_err(
         &self,
-    ) -> fidl::client::QueryResponseFut<UnknownInteractionsProtocolFlexibleTwoWayTableErrResult>
-    {
+    ) -> fidl::client::QueryResponseFut<
+        UnknownInteractionsProtocolFlexibleTwoWayTableErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         UnknownInteractionsProtocolProxyInterface::r#flexible_two_way_table_err(self)
     }
 }
@@ -9106,9 +9214,12 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         )
     }
 
-    type StrictTwoWayResponseFut = fidl::client::QueryResponseFut<()>;
+    type StrictTwoWayResponseFut =
+        fidl::client::QueryResponseFut<(), fidl::encoding::DefaultFuchsiaResourceDialect>;
     fn r#strict_two_way(&self) -> Self::StrictTwoWayResponseFut {
-        fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
+        fn _decode(
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
+        ) -> Result<(), fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::EmptyPayload,
                 fidl::encoding::DefaultFuchsiaResourceDialect,
@@ -9124,9 +9235,12 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         )
     }
 
-    type StrictTwoWayFieldsResponseFut = fidl::client::QueryResponseFut<i32>;
+    type StrictTwoWayFieldsResponseFut =
+        fidl::client::QueryResponseFut<i32, fidl::encoding::DefaultFuchsiaResourceDialect>;
     fn r#strict_two_way_fields(&self) -> Self::StrictTwoWayFieldsResponseFut {
-        fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i32, fidl::Error> {
+        fn _decode(
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
+        ) -> Result<i32, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 UnknownInteractionsProtocolStrictTwoWayFieldsResponse,
                 fidl::encoding::DefaultFuchsiaResourceDialect,
@@ -9142,11 +9256,13 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         )
     }
 
-    type StrictTwoWayUnionResponseFut =
-        fidl::client::QueryResponseFut<UnknownInteractionsProtocolStrictTwoWayUnionResponse>;
+    type StrictTwoWayUnionResponseFut = fidl::client::QueryResponseFut<
+        UnknownInteractionsProtocolStrictTwoWayUnionResponse,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#strict_two_way_union(&self) -> Self::StrictTwoWayUnionResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<UnknownInteractionsProtocolStrictTwoWayUnionResponse, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 UnknownInteractionsProtocolStrictTwoWayUnionResponse,
@@ -9166,11 +9282,13 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         )
     }
 
-    type StrictTwoWayTableResponseFut =
-        fidl::client::QueryResponseFut<UnknownInteractionsProtocolStrictTwoWayTableResponse>;
+    type StrictTwoWayTableResponseFut = fidl::client::QueryResponseFut<
+        UnknownInteractionsProtocolStrictTwoWayTableResponse,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#strict_two_way_table(&self) -> Self::StrictTwoWayTableResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<UnknownInteractionsProtocolStrictTwoWayTableResponse, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 UnknownInteractionsProtocolStrictTwoWayTableResponse,
@@ -9190,11 +9308,13 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         )
     }
 
-    type StrictTwoWayErrResponseFut =
-        fidl::client::QueryResponseFut<UnknownInteractionsProtocolStrictTwoWayErrResult>;
+    type StrictTwoWayErrResponseFut = fidl::client::QueryResponseFut<
+        UnknownInteractionsProtocolStrictTwoWayErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#strict_two_way_err(&self) -> Self::StrictTwoWayErrResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<UnknownInteractionsProtocolStrictTwoWayErrResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<fidl::encoding::EmptyStruct, i32>,
@@ -9214,11 +9334,13 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         )
     }
 
-    type StrictTwoWayFieldsErrResponseFut =
-        fidl::client::QueryResponseFut<UnknownInteractionsProtocolStrictTwoWayFieldsErrResult>;
+    type StrictTwoWayFieldsErrResponseFut = fidl::client::QueryResponseFut<
+        UnknownInteractionsProtocolStrictTwoWayFieldsErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#strict_two_way_fields_err(&self) -> Self::StrictTwoWayFieldsErrResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<UnknownInteractionsProtocolStrictTwoWayFieldsErrResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<
@@ -9241,11 +9363,13 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         )
     }
 
-    type StrictTwoWayUnionErrResponseFut =
-        fidl::client::QueryResponseFut<UnknownInteractionsProtocolStrictTwoWayUnionErrResult>;
+    type StrictTwoWayUnionErrResponseFut = fidl::client::QueryResponseFut<
+        UnknownInteractionsProtocolStrictTwoWayUnionErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#strict_two_way_union_err(&self) -> Self::StrictTwoWayUnionErrResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<UnknownInteractionsProtocolStrictTwoWayUnionErrResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<
@@ -9268,11 +9392,13 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         )
     }
 
-    type StrictTwoWayTableErrResponseFut =
-        fidl::client::QueryResponseFut<UnknownInteractionsProtocolStrictTwoWayTableErrResult>;
+    type StrictTwoWayTableErrResponseFut = fidl::client::QueryResponseFut<
+        UnknownInteractionsProtocolStrictTwoWayTableErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#strict_two_way_table_err(&self) -> Self::StrictTwoWayTableErrResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<UnknownInteractionsProtocolStrictTwoWayTableErrResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<
@@ -9295,9 +9421,12 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         )
     }
 
-    type FlexibleTwoWayResponseFut = fidl::client::QueryResponseFut<()>;
+    type FlexibleTwoWayResponseFut =
+        fidl::client::QueryResponseFut<(), fidl::encoding::DefaultFuchsiaResourceDialect>;
     fn r#flexible_two_way(&self) -> Self::FlexibleTwoWayResponseFut {
-        fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
+        fn _decode(
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
+        ) -> Result<(), fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::FlexibleType<fidl::encoding::EmptyStruct>,
                 fidl::encoding::DefaultFuchsiaResourceDialect,
@@ -9314,9 +9443,12 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         )
     }
 
-    type FlexibleTwoWayFieldsResponseFut = fidl::client::QueryResponseFut<i32>;
+    type FlexibleTwoWayFieldsResponseFut =
+        fidl::client::QueryResponseFut<i32, fidl::encoding::DefaultFuchsiaResourceDialect>;
     fn r#flexible_two_way_fields(&self) -> Self::FlexibleTwoWayFieldsResponseFut {
-        fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i32, fidl::Error> {
+        fn _decode(
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
+        ) -> Result<i32, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::FlexibleType<
                     UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse,
@@ -9335,11 +9467,13 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         )
     }
 
-    type FlexibleTwoWayUnionResponseFut =
-        fidl::client::QueryResponseFut<UnknownInteractionsProtocolFlexibleTwoWayUnionResponse>;
+    type FlexibleTwoWayUnionResponseFut = fidl::client::QueryResponseFut<
+        UnknownInteractionsProtocolFlexibleTwoWayUnionResponse,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#flexible_two_way_union(&self) -> Self::FlexibleTwoWayUnionResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<UnknownInteractionsProtocolFlexibleTwoWayUnionResponse, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::FlexibleType<
@@ -9362,11 +9496,13 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         )
     }
 
-    type FlexibleTwoWayTableResponseFut =
-        fidl::client::QueryResponseFut<UnknownInteractionsProtocolFlexibleTwoWayTableResponse>;
+    type FlexibleTwoWayTableResponseFut = fidl::client::QueryResponseFut<
+        UnknownInteractionsProtocolFlexibleTwoWayTableResponse,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#flexible_two_way_table(&self) -> Self::FlexibleTwoWayTableResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<UnknownInteractionsProtocolFlexibleTwoWayTableResponse, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::FlexibleType<
@@ -9389,11 +9525,13 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         )
     }
 
-    type FlexibleTwoWayErrResponseFut =
-        fidl::client::QueryResponseFut<UnknownInteractionsProtocolFlexibleTwoWayErrResult>;
+    type FlexibleTwoWayErrResponseFut = fidl::client::QueryResponseFut<
+        UnknownInteractionsProtocolFlexibleTwoWayErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#flexible_two_way_err(&self) -> Self::FlexibleTwoWayErrResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<UnknownInteractionsProtocolFlexibleTwoWayErrResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::FlexibleResultType<fidl::encoding::EmptyStruct, i32>,
@@ -9414,11 +9552,13 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         )
     }
 
-    type FlexibleTwoWayFieldsErrResponseFut =
-        fidl::client::QueryResponseFut<UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult>;
+    type FlexibleTwoWayFieldsErrResponseFut = fidl::client::QueryResponseFut<
+        UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#flexible_two_way_fields_err(&self) -> Self::FlexibleTwoWayFieldsErrResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::FlexibleResultType<
@@ -9442,11 +9582,13 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         )
     }
 
-    type FlexibleTwoWayUnionErrResponseFut =
-        fidl::client::QueryResponseFut<UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult>;
+    type FlexibleTwoWayUnionErrResponseFut = fidl::client::QueryResponseFut<
+        UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#flexible_two_way_union_err(&self) -> Self::FlexibleTwoWayUnionErrResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::FlexibleResultType<
@@ -9470,11 +9612,13 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
         )
     }
 
-    type FlexibleTwoWayTableErrResponseFut =
-        fidl::client::QueryResponseFut<UnknownInteractionsProtocolFlexibleTwoWayTableErrResult>;
+    type FlexibleTwoWayTableErrResponseFut = fidl::client::QueryResponseFut<
+        UnknownInteractionsProtocolFlexibleTwoWayTableErrResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#flexible_two_way_table_err(&self) -> Self::FlexibleTwoWayTableErrResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<UnknownInteractionsProtocolFlexibleTwoWayTableErrResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::FlexibleResultType<
@@ -9500,7 +9644,7 @@ impl UnknownInteractionsProtocolProxyInterface for UnknownInteractionsProtocolPr
 }
 
 pub struct UnknownInteractionsProtocolEventStream {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl std::marker::Unpin for UnknownInteractionsProtocolEventStream {}
@@ -9635,7 +9779,7 @@ impl UnknownInteractionsProtocolEvent {
 
     /// Decodes a message buffer as a [`UnknownInteractionsProtocolEvent`].
     fn decode(
-        mut buf: fidl::MessageBufEtc,
+        mut buf: <fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc,
     ) -> Result<UnknownInteractionsProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
@@ -9722,7 +9866,7 @@ impl UnknownInteractionsProtocolEvent {
 
 /// A Stream of incoming requests for test.unknowninteractions/UnknownInteractionsProtocol.
 pub struct UnknownInteractionsProtocolRequestStream {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
     is_terminated: bool,
 }
 
@@ -9738,7 +9882,7 @@ impl fidl::endpoints::RequestStream for UnknownInteractionsProtocolRequestStream
     type Protocol = UnknownInteractionsProtocolMarker;
     type ControlHandle = UnknownInteractionsProtocolControlHandle;
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: ::fidl::AsyncChannel) -> Self {
         Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
     }
 
@@ -9746,11 +9890,17 @@ impl fidl::endpoints::RequestStream for UnknownInteractionsProtocolRequestStream
         UnknownInteractionsProtocolControlHandle { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(
+        self,
+    ) -> (::std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>, bool)
+    {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(
+        inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
+        is_terminated: bool,
+    ) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -10381,14 +10531,13 @@ impl UnknownInteractionsProtocolRequest {
 
 #[derive(Debug, Clone)]
 pub struct UnknownInteractionsProtocolControlHandle {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
 }
 
 impl fidl::endpoints::ControlHandle for UnknownInteractionsProtocolControlHandle {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
-
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
@@ -10396,7 +10545,6 @@ impl fidl::endpoints::ControlHandle for UnknownInteractionsProtocolControlHandle
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
-
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }

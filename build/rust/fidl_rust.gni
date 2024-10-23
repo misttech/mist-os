@@ -162,7 +162,7 @@ template("fidl_rust") {
       # the warning.
       configs += [ "//build/config/rust/lints:allow_unused_crate_dependencies" ]
 
-      if (is_fuchsia) {
+      if (is_fuchsia && !fdomain) {
         deps += [ "//sdk/rust/zx" ]
         if (defined(invoker.contains_drivers) && invoker.contains_drivers) {
           deps += [ "//src/lib/fidl/rust/fidl_driver" ]

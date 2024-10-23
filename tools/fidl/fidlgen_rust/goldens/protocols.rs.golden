@@ -7,7 +7,7 @@
 
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
-use fidl::encoding::ProxyChannelBox;
+use fidl::encoding::{MessageBufFor, ProxyChannelBox, ResourceDialect};
 use fidl::endpoints::{ControlHandle as _, Responder as _};
 use futures::future::{self, MaybeDone, TryFutureExt};
 use zx_status;
@@ -371,7 +371,6 @@ pub struct AnotherDiscoverableProtocolMarker;
 impl fidl::endpoints::ProtocolMarker for AnotherDiscoverableProtocolMarker {
     type Proxy = AnotherDiscoverableProtocolProxy;
     type RequestStream = AnotherDiscoverableProtocolRequestStream;
-
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = AnotherDiscoverableProtocolSynchronousProxy;
 
@@ -380,7 +379,6 @@ impl fidl::endpoints::ProtocolMarker for AnotherDiscoverableProtocolMarker {
 impl fidl::endpoints::DiscoverableProtocolMarker for AnotherDiscoverableProtocolMarker {}
 
 pub trait AnotherDiscoverableProtocolProxyInterface: Send + Sync {}
-
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct AnotherDiscoverableProtocolSynchronousProxy {
@@ -429,13 +427,13 @@ impl AnotherDiscoverableProtocolSynchronousProxy {
 
 #[derive(Debug, Clone)]
 pub struct AnotherDiscoverableProtocolProxy {
-    client: fidl::client::Client,
+    client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl fidl::endpoints::Proxy for AnotherDiscoverableProtocolProxy {
     type Protocol = AnotherDiscoverableProtocolMarker;
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: ::fidl::AsyncChannel) -> Self {
         Self::new(inner)
     }
 
@@ -450,7 +448,7 @@ impl fidl::endpoints::Proxy for AnotherDiscoverableProtocolProxy {
 
 impl AnotherDiscoverableProtocolProxy {
     /// Create a new Proxy for test.protocols/AnotherDiscoverableProtocol.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
+    pub fn new(channel: ::fidl::AsyncChannel) -> Self {
         let protocol_name =
             <AnotherDiscoverableProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
@@ -469,7 +467,7 @@ impl AnotherDiscoverableProtocolProxy {
 impl AnotherDiscoverableProtocolProxyInterface for AnotherDiscoverableProtocolProxy {}
 
 pub struct AnotherDiscoverableProtocolEventStream {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl std::marker::Unpin for AnotherDiscoverableProtocolEventStream {}
@@ -505,7 +503,7 @@ pub enum AnotherDiscoverableProtocolEvent {}
 impl AnotherDiscoverableProtocolEvent {
     /// Decodes a message buffer as a [`AnotherDiscoverableProtocolEvent`].
     fn decode(
-        mut buf: fidl::MessageBufEtc,
+        mut buf: <fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc,
     ) -> Result<AnotherDiscoverableProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
@@ -521,7 +519,7 @@ impl AnotherDiscoverableProtocolEvent {
 
 /// A Stream of incoming requests for test.protocols/AnotherDiscoverableProtocol.
 pub struct AnotherDiscoverableProtocolRequestStream {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
     is_terminated: bool,
 }
 
@@ -537,7 +535,7 @@ impl fidl::endpoints::RequestStream for AnotherDiscoverableProtocolRequestStream
     type Protocol = AnotherDiscoverableProtocolMarker;
     type ControlHandle = AnotherDiscoverableProtocolControlHandle;
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: ::fidl::AsyncChannel) -> Self {
         Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
     }
 
@@ -545,11 +543,17 @@ impl fidl::endpoints::RequestStream for AnotherDiscoverableProtocolRequestStream
         AnotherDiscoverableProtocolControlHandle { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(
+        self,
+    ) -> (::std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>, bool)
+    {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(
+        inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
+        is_terminated: bool,
+    ) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -611,14 +615,13 @@ impl AnotherDiscoverableProtocolRequest {
 
 #[derive(Debug, Clone)]
 pub struct AnotherDiscoverableProtocolControlHandle {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
 }
 
 impl fidl::endpoints::ControlHandle for AnotherDiscoverableProtocolControlHandle {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
-
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
@@ -626,7 +629,6 @@ impl fidl::endpoints::ControlHandle for AnotherDiscoverableProtocolControlHandle
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
-
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
@@ -650,7 +652,6 @@ pub struct ChannelProtocolMarker;
 impl fidl::endpoints::ProtocolMarker for ChannelProtocolMarker {
     type Proxy = ChannelProtocolProxy;
     type RequestStream = ChannelProtocolRequestStream;
-
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = ChannelProtocolSynchronousProxy;
 
@@ -667,7 +668,6 @@ pub trait ChannelProtocolProxyInterface: Send + Sync {
         + Send;
     fn r#mutate_socket(&self, a: fidl::Socket) -> Self::MutateSocketResponseFut;
 }
-
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct ChannelProtocolSynchronousProxy {
@@ -772,13 +772,13 @@ impl ChannelProtocolSynchronousProxy {
 
 #[derive(Debug, Clone)]
 pub struct ChannelProtocolProxy {
-    client: fidl::client::Client,
+    client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl fidl::endpoints::Proxy for ChannelProtocolProxy {
     type Protocol = ChannelProtocolMarker;
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: ::fidl::AsyncChannel) -> Self {
         Self::new(inner)
     }
 
@@ -793,7 +793,7 @@ impl fidl::endpoints::Proxy for ChannelProtocolProxy {
 
 impl ChannelProtocolProxy {
     /// Create a new Proxy for test.protocols/ChannelProtocol.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
+    pub fn new(channel: ::fidl::AsyncChannel) -> Self {
         let protocol_name = <ChannelProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
@@ -811,18 +811,26 @@ impl ChannelProtocolProxy {
         ChannelProtocolProxyInterface::r#method_a(self, a, b)
     }
 
-    pub fn r#method_b(&self, mut a: i64, mut b: i64) -> fidl::client::QueryResponseFut<i64> {
+    pub fn r#method_b(
+        &self,
+        mut a: i64,
+        mut b: i64,
+    ) -> fidl::client::QueryResponseFut<i64, fidl::encoding::DefaultFuchsiaResourceDialect> {
         ChannelProtocolProxyInterface::r#method_b(self, a, b)
     }
 
-    pub fn r#take_handle(&self, mut h: fidl::Handle) -> fidl::client::QueryResponseFut<()> {
+    pub fn r#take_handle(
+        &self,
+        mut h: fidl::Handle,
+    ) -> fidl::client::QueryResponseFut<(), fidl::encoding::DefaultFuchsiaResourceDialect> {
         ChannelProtocolProxyInterface::r#take_handle(self, h)
     }
 
     pub fn r#mutate_socket(
         &self,
         mut a: fidl::Socket,
-    ) -> fidl::client::QueryResponseFut<fidl::Socket> {
+    ) -> fidl::client::QueryResponseFut<fidl::Socket, fidl::encoding::DefaultFuchsiaResourceDialect>
+    {
         ChannelProtocolProxyInterface::r#mutate_socket(self, a)
     }
 }
@@ -836,9 +844,12 @@ impl ChannelProtocolProxyInterface for ChannelProtocolProxy {
         )
     }
 
-    type MethodBResponseFut = fidl::client::QueryResponseFut<i64>;
+    type MethodBResponseFut =
+        fidl::client::QueryResponseFut<i64, fidl::encoding::DefaultFuchsiaResourceDialect>;
     fn r#method_b(&self, mut a: i64, mut b: i64) -> Self::MethodBResponseFut {
-        fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i64, fidl::Error> {
+        fn _decode(
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
+        ) -> Result<i64, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 ChannelProtocolMethodBResponse,
                 fidl::encoding::DefaultFuchsiaResourceDialect,
@@ -854,9 +865,12 @@ impl ChannelProtocolProxyInterface for ChannelProtocolProxy {
         )
     }
 
-    type TakeHandleResponseFut = fidl::client::QueryResponseFut<()>;
+    type TakeHandleResponseFut =
+        fidl::client::QueryResponseFut<(), fidl::encoding::DefaultFuchsiaResourceDialect>;
     fn r#take_handle(&self, mut h: fidl::Handle) -> Self::TakeHandleResponseFut {
-        fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
+        fn _decode(
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
+        ) -> Result<(), fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::EmptyPayload,
                 fidl::encoding::DefaultFuchsiaResourceDialect,
@@ -872,10 +886,11 @@ impl ChannelProtocolProxyInterface for ChannelProtocolProxy {
         )
     }
 
-    type MutateSocketResponseFut = fidl::client::QueryResponseFut<fidl::Socket>;
+    type MutateSocketResponseFut =
+        fidl::client::QueryResponseFut<fidl::Socket, fidl::encoding::DefaultFuchsiaResourceDialect>;
     fn r#mutate_socket(&self, mut a: fidl::Socket) -> Self::MutateSocketResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<fidl::Socket, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 ChannelProtocolMutateSocketResponse,
@@ -894,7 +909,7 @@ impl ChannelProtocolProxyInterface for ChannelProtocolProxy {
 }
 
 pub struct ChannelProtocolEventStream {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl std::marker::Unpin for ChannelProtocolEventStream {}
@@ -938,7 +953,9 @@ impl ChannelProtocolEvent {
     }
 
     /// Decodes a message buffer as a [`ChannelProtocolEvent`].
-    fn decode(mut buf: fidl::MessageBufEtc) -> Result<ChannelProtocolEvent, fidl::Error> {
+    fn decode(
+        mut buf: <fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc,
+    ) -> Result<ChannelProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
         debug_assert_eq!(tx_header.tx_id, 0);
@@ -962,7 +979,7 @@ impl ChannelProtocolEvent {
 
 /// A Stream of incoming requests for test.protocols/ChannelProtocol.
 pub struct ChannelProtocolRequestStream {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
     is_terminated: bool,
 }
 
@@ -978,7 +995,7 @@ impl fidl::endpoints::RequestStream for ChannelProtocolRequestStream {
     type Protocol = ChannelProtocolMarker;
     type ControlHandle = ChannelProtocolControlHandle;
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: ::fidl::AsyncChannel) -> Self {
         Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
     }
 
@@ -986,11 +1003,17 @@ impl fidl::endpoints::RequestStream for ChannelProtocolRequestStream {
         ChannelProtocolControlHandle { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(
+        self,
+    ) -> (::std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>, bool)
+    {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(
+        inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
+        is_terminated: bool,
+    ) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -1167,14 +1190,13 @@ impl ChannelProtocolRequest {
 
 #[derive(Debug, Clone)]
 pub struct ChannelProtocolControlHandle {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
 }
 
 impl fidl::endpoints::ControlHandle for ChannelProtocolControlHandle {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
-
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
@@ -1182,7 +1204,6 @@ impl fidl::endpoints::ControlHandle for ChannelProtocolControlHandle {
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
-
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
@@ -1404,7 +1425,6 @@ pub struct DiscoverableProtocolMarker;
 impl fidl::endpoints::ProtocolMarker for DiscoverableProtocolMarker {
     type Proxy = DiscoverableProtocolProxy;
     type RequestStream = DiscoverableProtocolRequestStream;
-
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = DiscoverableProtocolSynchronousProxy;
 
@@ -1415,7 +1435,6 @@ impl fidl::endpoints::DiscoverableProtocolMarker for DiscoverableProtocolMarker 
 pub trait DiscoverableProtocolProxyInterface: Send + Sync {
     fn r#method(&self) -> Result<(), fidl::Error>;
 }
-
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct DiscoverableProtocolSynchronousProxy {
@@ -1472,13 +1491,13 @@ impl DiscoverableProtocolSynchronousProxy {
 
 #[derive(Debug, Clone)]
 pub struct DiscoverableProtocolProxy {
-    client: fidl::client::Client,
+    client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl fidl::endpoints::Proxy for DiscoverableProtocolProxy {
     type Protocol = DiscoverableProtocolMarker;
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: ::fidl::AsyncChannel) -> Self {
         Self::new(inner)
     }
 
@@ -1493,7 +1512,7 @@ impl fidl::endpoints::Proxy for DiscoverableProtocolProxy {
 
 impl DiscoverableProtocolProxy {
     /// Create a new Proxy for test.protocols/DiscoverableProtocol.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
+    pub fn new(channel: ::fidl::AsyncChannel) -> Self {
         let protocol_name =
             <DiscoverableProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
@@ -1524,7 +1543,7 @@ impl DiscoverableProtocolProxyInterface for DiscoverableProtocolProxy {
 }
 
 pub struct DiscoverableProtocolEventStream {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl std::marker::Unpin for DiscoverableProtocolEventStream {}
@@ -1557,7 +1576,9 @@ pub enum DiscoverableProtocolEvent {}
 
 impl DiscoverableProtocolEvent {
     /// Decodes a message buffer as a [`DiscoverableProtocolEvent`].
-    fn decode(mut buf: fidl::MessageBufEtc) -> Result<DiscoverableProtocolEvent, fidl::Error> {
+    fn decode(
+        mut buf: <fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc,
+    ) -> Result<DiscoverableProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
         debug_assert_eq!(tx_header.tx_id, 0);
@@ -1573,7 +1594,7 @@ impl DiscoverableProtocolEvent {
 
 /// A Stream of incoming requests for test.protocols/DiscoverableProtocol.
 pub struct DiscoverableProtocolRequestStream {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
     is_terminated: bool,
 }
 
@@ -1589,7 +1610,7 @@ impl fidl::endpoints::RequestStream for DiscoverableProtocolRequestStream {
     type Protocol = DiscoverableProtocolMarker;
     type ControlHandle = DiscoverableProtocolControlHandle;
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: ::fidl::AsyncChannel) -> Self {
         Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
     }
 
@@ -1597,11 +1618,17 @@ impl fidl::endpoints::RequestStream for DiscoverableProtocolRequestStream {
         DiscoverableProtocolControlHandle { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(
+        self,
+    ) -> (::std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>, bool)
+    {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(
+        inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
+        is_terminated: bool,
+    ) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -1687,14 +1714,13 @@ impl DiscoverableProtocolRequest {
 
 #[derive(Debug, Clone)]
 pub struct DiscoverableProtocolControlHandle {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
 }
 
 impl fidl::endpoints::ControlHandle for DiscoverableProtocolControlHandle {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
-
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
@@ -1702,7 +1728,6 @@ impl fidl::endpoints::ControlHandle for DiscoverableProtocolControlHandle {
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
-
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
@@ -1726,7 +1751,6 @@ pub struct HandleRightsProtocolMarker;
 impl fidl::endpoints::ProtocolMarker for HandleRightsProtocolMarker {
     type Proxy = HandleRightsProtocolProxy;
     type RequestStream = HandleRightsProtocolRequestStream;
-
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = HandleRightsProtocolSynchronousProxy;
 
@@ -1739,7 +1763,6 @@ pub trait HandleRightsProtocolProxyInterface: Send + Sync {
         + Send;
     fn r#response_method(&self, h: fidl::Socket) -> Self::ResponseMethodResponseFut;
 }
-
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct HandleRightsProtocolSynchronousProxy {
@@ -1813,13 +1836,13 @@ impl HandleRightsProtocolSynchronousProxy {
 
 #[derive(Debug, Clone)]
 pub struct HandleRightsProtocolProxy {
-    client: fidl::client::Client,
+    client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl fidl::endpoints::Proxy for HandleRightsProtocolProxy {
     type Protocol = HandleRightsProtocolMarker;
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: ::fidl::AsyncChannel) -> Self {
         Self::new(inner)
     }
 
@@ -1834,7 +1857,7 @@ impl fidl::endpoints::Proxy for HandleRightsProtocolProxy {
 
 impl HandleRightsProtocolProxy {
     /// Create a new Proxy for test.protocols/HandleRightsProtocol.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
+    pub fn new(channel: ::fidl::AsyncChannel) -> Self {
         let protocol_name =
             <HandleRightsProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
@@ -1856,7 +1879,8 @@ impl HandleRightsProtocolProxy {
     pub fn r#response_method(
         &self,
         mut h: fidl::Socket,
-    ) -> fidl::client::QueryResponseFut<fidl::Socket> {
+    ) -> fidl::client::QueryResponseFut<fidl::Socket, fidl::encoding::DefaultFuchsiaResourceDialect>
+    {
         HandleRightsProtocolProxyInterface::r#response_method(self, h)
     }
 }
@@ -1870,10 +1894,11 @@ impl HandleRightsProtocolProxyInterface for HandleRightsProtocolProxy {
         )
     }
 
-    type ResponseMethodResponseFut = fidl::client::QueryResponseFut<fidl::Socket>;
+    type ResponseMethodResponseFut =
+        fidl::client::QueryResponseFut<fidl::Socket, fidl::encoding::DefaultFuchsiaResourceDialect>;
     fn r#response_method(&self, mut h: fidl::Socket) -> Self::ResponseMethodResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<fidl::Socket, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 HandleRightsProtocolResponseMethodResponse,
@@ -1893,7 +1918,7 @@ impl HandleRightsProtocolProxyInterface for HandleRightsProtocolProxy {
 }
 
 pub struct HandleRightsProtocolEventStream {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl std::marker::Unpin for HandleRightsProtocolEventStream {}
@@ -1937,7 +1962,9 @@ impl HandleRightsProtocolEvent {
     }
 
     /// Decodes a message buffer as a [`HandleRightsProtocolEvent`].
-    fn decode(mut buf: fidl::MessageBufEtc) -> Result<HandleRightsProtocolEvent, fidl::Error> {
+    fn decode(
+        mut buf: <fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc,
+    ) -> Result<HandleRightsProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
         debug_assert_eq!(tx_header.tx_id, 0);
@@ -1961,7 +1988,7 @@ impl HandleRightsProtocolEvent {
 
 /// A Stream of incoming requests for test.protocols/HandleRightsProtocol.
 pub struct HandleRightsProtocolRequestStream {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
     is_terminated: bool,
 }
 
@@ -1977,7 +2004,7 @@ impl fidl::endpoints::RequestStream for HandleRightsProtocolRequestStream {
     type Protocol = HandleRightsProtocolMarker;
     type ControlHandle = HandleRightsProtocolControlHandle;
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: ::fidl::AsyncChannel) -> Self {
         Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
     }
 
@@ -1985,11 +2012,17 @@ impl fidl::endpoints::RequestStream for HandleRightsProtocolRequestStream {
         HandleRightsProtocolControlHandle { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(
+        self,
+    ) -> (::std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>, bool)
+    {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(
+        inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
+        is_terminated: bool,
+    ) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -2106,14 +2139,13 @@ impl HandleRightsProtocolRequest {
 
 #[derive(Debug, Clone)]
 pub struct HandleRightsProtocolControlHandle {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
 }
 
 impl fidl::endpoints::ControlHandle for HandleRightsProtocolControlHandle {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
-
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
@@ -2121,7 +2153,6 @@ impl fidl::endpoints::ControlHandle for HandleRightsProtocolControlHandle {
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
-
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
@@ -2217,7 +2248,6 @@ pub struct ManyParametersMarker;
 impl fidl::endpoints::ProtocolMarker for ManyParametersMarker {
     type Proxy = ManyParametersProxy;
     type RequestStream = ManyParametersRequestStream;
-
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = ManyParametersSynchronousProxy;
 
@@ -2244,7 +2274,6 @@ pub trait ManyParametersProxyInterface: Send + Sync {
         p15: bool,
     ) -> Result<(), fidl::Error>;
 }
-
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct ManyParametersSynchronousProxy {
@@ -2317,13 +2346,13 @@ impl ManyParametersSynchronousProxy {
 
 #[derive(Debug, Clone)]
 pub struct ManyParametersProxy {
-    client: fidl::client::Client,
+    client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl fidl::endpoints::Proxy for ManyParametersProxy {
     type Protocol = ManyParametersMarker;
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: ::fidl::AsyncChannel) -> Self {
         Self::new(inner)
     }
 
@@ -2338,7 +2367,7 @@ impl fidl::endpoints::Proxy for ManyParametersProxy {
 
 impl ManyParametersProxy {
     /// Create a new Proxy for test.protocols/ManyParameters.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
+    pub fn new(channel: ::fidl::AsyncChannel) -> Self {
         let protocol_name = <ManyParametersMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
@@ -2404,7 +2433,7 @@ impl ManyParametersProxyInterface for ManyParametersProxy {
 }
 
 pub struct ManyParametersEventStream {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl std::marker::Unpin for ManyParametersEventStream {}
@@ -2437,7 +2466,9 @@ pub enum ManyParametersEvent {}
 
 impl ManyParametersEvent {
     /// Decodes a message buffer as a [`ManyParametersEvent`].
-    fn decode(mut buf: fidl::MessageBufEtc) -> Result<ManyParametersEvent, fidl::Error> {
+    fn decode(
+        mut buf: <fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc,
+    ) -> Result<ManyParametersEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
         debug_assert_eq!(tx_header.tx_id, 0);
@@ -2453,7 +2484,7 @@ impl ManyParametersEvent {
 
 /// A Stream of incoming requests for test.protocols/ManyParameters.
 pub struct ManyParametersRequestStream {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
     is_terminated: bool,
 }
 
@@ -2469,7 +2500,7 @@ impl fidl::endpoints::RequestStream for ManyParametersRequestStream {
     type Protocol = ManyParametersMarker;
     type ControlHandle = ManyParametersControlHandle;
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: ::fidl::AsyncChannel) -> Self {
         Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
     }
 
@@ -2477,11 +2508,17 @@ impl fidl::endpoints::RequestStream for ManyParametersRequestStream {
         ManyParametersControlHandle { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(
+        self,
+    ) -> (::std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>, bool)
+    {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(
+        inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
+        is_terminated: bool,
+    ) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -2640,14 +2677,13 @@ impl ManyParametersRequest {
 
 #[derive(Debug, Clone)]
 pub struct ManyParametersControlHandle {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
 }
 
 impl fidl::endpoints::ControlHandle for ManyParametersControlHandle {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
-
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
@@ -2655,7 +2691,6 @@ impl fidl::endpoints::ControlHandle for ManyParametersControlHandle {
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
-
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
@@ -2679,7 +2714,6 @@ pub struct MethodWithUnionMarker;
 impl fidl::endpoints::ProtocolMarker for MethodWithUnionMarker {
     type Proxy = MethodWithUnionProxy;
     type RequestStream = MethodWithUnionRequestStream;
-
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = MethodWithUnionSynchronousProxy;
 
@@ -2691,7 +2725,6 @@ pub trait MethodWithUnionProxyInterface: Send + Sync {
         + Send;
     fn r#union_method(&self, u: &TheUnion) -> Self::UnionMethodResponseFut;
 }
-
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct MethodWithUnionSynchronousProxy {
@@ -2755,13 +2788,13 @@ impl MethodWithUnionSynchronousProxy {
 
 #[derive(Debug, Clone)]
 pub struct MethodWithUnionProxy {
-    client: fidl::client::Client,
+    client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl fidl::endpoints::Proxy for MethodWithUnionProxy {
     type Protocol = MethodWithUnionMarker;
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: ::fidl::AsyncChannel) -> Self {
         Self::new(inner)
     }
 
@@ -2776,7 +2809,7 @@ impl fidl::endpoints::Proxy for MethodWithUnionProxy {
 
 impl MethodWithUnionProxy {
     /// Create a new Proxy for test.protocols/MethodWithUnion.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
+    pub fn new(channel: ::fidl::AsyncChannel) -> Self {
         let protocol_name = <MethodWithUnionMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
@@ -2793,16 +2826,22 @@ impl MethodWithUnionProxy {
     pub fn r#union_method(
         &self,
         mut u: &TheUnion,
-    ) -> fidl::client::QueryResponseFut<Option<Box<TheUnion>>> {
+    ) -> fidl::client::QueryResponseFut<
+        Option<Box<TheUnion>>,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         MethodWithUnionProxyInterface::r#union_method(self, u)
     }
 }
 
 impl MethodWithUnionProxyInterface for MethodWithUnionProxy {
-    type UnionMethodResponseFut = fidl::client::QueryResponseFut<Option<Box<TheUnion>>>;
+    type UnionMethodResponseFut = fidl::client::QueryResponseFut<
+        Option<Box<TheUnion>>,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#union_method(&self, mut u: &TheUnion) -> Self::UnionMethodResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<Option<Box<TheUnion>>, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 MethodWithUnionUnionMethodResponse,
@@ -2822,7 +2861,7 @@ impl MethodWithUnionProxyInterface for MethodWithUnionProxy {
 }
 
 pub struct MethodWithUnionEventStream {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl std::marker::Unpin for MethodWithUnionEventStream {}
@@ -2855,7 +2894,9 @@ pub enum MethodWithUnionEvent {}
 
 impl MethodWithUnionEvent {
     /// Decodes a message buffer as a [`MethodWithUnionEvent`].
-    fn decode(mut buf: fidl::MessageBufEtc) -> Result<MethodWithUnionEvent, fidl::Error> {
+    fn decode(
+        mut buf: <fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc,
+    ) -> Result<MethodWithUnionEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
         debug_assert_eq!(tx_header.tx_id, 0);
@@ -2871,7 +2912,7 @@ impl MethodWithUnionEvent {
 
 /// A Stream of incoming requests for test.protocols/MethodWithUnion.
 pub struct MethodWithUnionRequestStream {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
     is_terminated: bool,
 }
 
@@ -2887,7 +2928,7 @@ impl fidl::endpoints::RequestStream for MethodWithUnionRequestStream {
     type Protocol = MethodWithUnionMarker;
     type ControlHandle = MethodWithUnionControlHandle;
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: ::fidl::AsyncChannel) -> Self {
         Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
     }
 
@@ -2895,11 +2936,17 @@ impl fidl::endpoints::RequestStream for MethodWithUnionRequestStream {
         MethodWithUnionControlHandle { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(
+        self,
+    ) -> (::std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>, bool)
+    {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(
+        inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
+        is_terminated: bool,
+    ) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -2993,14 +3040,13 @@ impl MethodWithUnionRequest {
 
 #[derive(Debug, Clone)]
 pub struct MethodWithUnionControlHandle {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
 }
 
 impl fidl::endpoints::ControlHandle for MethodWithUnionControlHandle {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
-
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
@@ -3008,7 +3054,6 @@ impl fidl::endpoints::ControlHandle for MethodWithUnionControlHandle {
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
-
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
@@ -3095,7 +3140,6 @@ pub struct PlatformServer_Marker;
 impl fidl::endpoints::ProtocolMarker for PlatformServer_Marker {
     type Proxy = PlatformServer_Proxy;
     type RequestStream = PlatformServer_RequestStream;
-
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = PlatformServer_SynchronousProxy;
 
@@ -3104,7 +3148,6 @@ impl fidl::endpoints::ProtocolMarker for PlatformServer_Marker {
 impl fidl::endpoints::DiscoverableProtocolMarker for PlatformServer_Marker {}
 
 pub trait PlatformServer_ProxyInterface: Send + Sync {}
-
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct PlatformServer_SynchronousProxy {
@@ -3152,13 +3195,13 @@ impl PlatformServer_SynchronousProxy {
 
 #[derive(Debug, Clone)]
 pub struct PlatformServer_Proxy {
-    client: fidl::client::Client,
+    client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl fidl::endpoints::Proxy for PlatformServer_Proxy {
     type Protocol = PlatformServer_Marker;
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: ::fidl::AsyncChannel) -> Self {
         Self::new(inner)
     }
 
@@ -3173,7 +3216,7 @@ impl fidl::endpoints::Proxy for PlatformServer_Proxy {
 
 impl PlatformServer_Proxy {
     /// Create a new Proxy for test.protocols/PlatformServer.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
+    pub fn new(channel: ::fidl::AsyncChannel) -> Self {
         let protocol_name = <PlatformServer_Marker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
@@ -3191,7 +3234,7 @@ impl PlatformServer_Proxy {
 impl PlatformServer_ProxyInterface for PlatformServer_Proxy {}
 
 pub struct PlatformServer_EventStream {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl std::marker::Unpin for PlatformServer_EventStream {}
@@ -3224,7 +3267,9 @@ pub enum PlatformServer_Event {}
 
 impl PlatformServer_Event {
     /// Decodes a message buffer as a [`PlatformServer_Event`].
-    fn decode(mut buf: fidl::MessageBufEtc) -> Result<PlatformServer_Event, fidl::Error> {
+    fn decode(
+        mut buf: <fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc,
+    ) -> Result<PlatformServer_Event, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
         debug_assert_eq!(tx_header.tx_id, 0);
@@ -3240,7 +3285,7 @@ impl PlatformServer_Event {
 
 /// A Stream of incoming requests for test.protocols/PlatformServer.
 pub struct PlatformServer_RequestStream {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
     is_terminated: bool,
 }
 
@@ -3256,7 +3301,7 @@ impl fidl::endpoints::RequestStream for PlatformServer_RequestStream {
     type Protocol = PlatformServer_Marker;
     type ControlHandle = PlatformServer_ControlHandle;
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: ::fidl::AsyncChannel) -> Self {
         Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
     }
 
@@ -3264,11 +3309,17 @@ impl fidl::endpoints::RequestStream for PlatformServer_RequestStream {
         PlatformServer_ControlHandle { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(
+        self,
+    ) -> (::std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>, bool)
+    {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(
+        inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
+        is_terminated: bool,
+    ) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -3331,14 +3382,13 @@ impl PlatformServer_Request {
 
 #[derive(Debug, Clone)]
 pub struct PlatformServer_ControlHandle {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
 }
 
 impl fidl::endpoints::ControlHandle for PlatformServer_ControlHandle {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
-
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
@@ -3346,7 +3396,6 @@ impl fidl::endpoints::ControlHandle for PlatformServer_ControlHandle {
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
-
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
@@ -3370,7 +3419,6 @@ pub struct WithAndWithoutRequestResponseMarker;
 impl fidl::endpoints::ProtocolMarker for WithAndWithoutRequestResponseMarker {
     type Proxy = WithAndWithoutRequestResponseProxy;
     type RequestStream = WithAndWithoutRequestResponseRequestStream;
-
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = WithAndWithoutRequestResponseSynchronousProxy;
 
@@ -3394,7 +3442,6 @@ pub trait WithAndWithoutRequestResponseProxyInterface: Send + Sync {
         + Send;
     fn r#with_request_with_response(&self, arg: &str) -> Self::WithRequestWithResponseResponseFut;
 }
-
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct WithAndWithoutRequestResponseSynchronousProxy {
@@ -3523,13 +3570,13 @@ impl WithAndWithoutRequestResponseSynchronousProxy {
 
 #[derive(Debug, Clone)]
 pub struct WithAndWithoutRequestResponseProxy {
-    client: fidl::client::Client,
+    client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl fidl::endpoints::Proxy for WithAndWithoutRequestResponseProxy {
     type Protocol = WithAndWithoutRequestResponseMarker;
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: ::fidl::AsyncChannel) -> Self {
         Self::new(inner)
     }
 
@@ -3544,7 +3591,7 @@ impl fidl::endpoints::Proxy for WithAndWithoutRequestResponseProxy {
 
 impl WithAndWithoutRequestResponseProxy {
     /// Create a new Proxy for test.protocols/WithAndWithoutRequestResponse.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
+    pub fn new(channel: ::fidl::AsyncChannel) -> Self {
         let protocol_name =
             <WithAndWithoutRequestResponseMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
@@ -3565,11 +3612,15 @@ impl WithAndWithoutRequestResponseProxy {
         WithAndWithoutRequestResponseProxyInterface::r#no_request_no_response(self)
     }
 
-    pub fn r#no_request_empty_response(&self) -> fidl::client::QueryResponseFut<()> {
+    pub fn r#no_request_empty_response(
+        &self,
+    ) -> fidl::client::QueryResponseFut<(), fidl::encoding::DefaultFuchsiaResourceDialect> {
         WithAndWithoutRequestResponseProxyInterface::r#no_request_empty_response(self)
     }
 
-    pub fn r#no_request_with_response(&self) -> fidl::client::QueryResponseFut<String> {
+    pub fn r#no_request_with_response(
+        &self,
+    ) -> fidl::client::QueryResponseFut<String, fidl::encoding::DefaultFuchsiaResourceDialect> {
         WithAndWithoutRequestResponseProxyInterface::r#no_request_with_response(self)
     }
 
@@ -3580,14 +3631,14 @@ impl WithAndWithoutRequestResponseProxy {
     pub fn r#with_request_empty_response(
         &self,
         mut arg: &str,
-    ) -> fidl::client::QueryResponseFut<()> {
+    ) -> fidl::client::QueryResponseFut<(), fidl::encoding::DefaultFuchsiaResourceDialect> {
         WithAndWithoutRequestResponseProxyInterface::r#with_request_empty_response(self, arg)
     }
 
     pub fn r#with_request_with_response(
         &self,
         mut arg: &str,
-    ) -> fidl::client::QueryResponseFut<String> {
+    ) -> fidl::client::QueryResponseFut<String, fidl::encoding::DefaultFuchsiaResourceDialect> {
         WithAndWithoutRequestResponseProxyInterface::r#with_request_with_response(self, arg)
     }
 }
@@ -3601,9 +3652,12 @@ impl WithAndWithoutRequestResponseProxyInterface for WithAndWithoutRequestRespon
         )
     }
 
-    type NoRequestEmptyResponseResponseFut = fidl::client::QueryResponseFut<()>;
+    type NoRequestEmptyResponseResponseFut =
+        fidl::client::QueryResponseFut<(), fidl::encoding::DefaultFuchsiaResourceDialect>;
     fn r#no_request_empty_response(&self) -> Self::NoRequestEmptyResponseResponseFut {
-        fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
+        fn _decode(
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
+        ) -> Result<(), fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::EmptyPayload,
                 fidl::encoding::DefaultFuchsiaResourceDialect,
@@ -3619,10 +3673,11 @@ impl WithAndWithoutRequestResponseProxyInterface for WithAndWithoutRequestRespon
         )
     }
 
-    type NoRequestWithResponseResponseFut = fidl::client::QueryResponseFut<String>;
+    type NoRequestWithResponseResponseFut =
+        fidl::client::QueryResponseFut<String, fidl::encoding::DefaultFuchsiaResourceDialect>;
     fn r#no_request_with_response(&self) -> Self::NoRequestWithResponseResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<String, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 WithAndWithoutRequestResponseNoRequestWithResponseResponse,
@@ -3647,12 +3702,15 @@ impl WithAndWithoutRequestResponseProxyInterface for WithAndWithoutRequestRespon
         )
     }
 
-    type WithRequestEmptyResponseResponseFut = fidl::client::QueryResponseFut<()>;
+    type WithRequestEmptyResponseResponseFut =
+        fidl::client::QueryResponseFut<(), fidl::encoding::DefaultFuchsiaResourceDialect>;
     fn r#with_request_empty_response(
         &self,
         mut arg: &str,
     ) -> Self::WithRequestEmptyResponseResponseFut {
-        fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
+        fn _decode(
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
+        ) -> Result<(), fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::EmptyPayload,
                 fidl::encoding::DefaultFuchsiaResourceDialect,
@@ -3671,13 +3729,14 @@ impl WithAndWithoutRequestResponseProxyInterface for WithAndWithoutRequestRespon
         )
     }
 
-    type WithRequestWithResponseResponseFut = fidl::client::QueryResponseFut<String>;
+    type WithRequestWithResponseResponseFut =
+        fidl::client::QueryResponseFut<String, fidl::encoding::DefaultFuchsiaResourceDialect>;
     fn r#with_request_with_response(
         &self,
         mut arg: &str,
     ) -> Self::WithRequestWithResponseResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<String, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 WithAndWithoutRequestResponseWithRequestWithResponseResponse,
@@ -3699,7 +3758,7 @@ impl WithAndWithoutRequestResponseProxyInterface for WithAndWithoutRequestRespon
 }
 
 pub struct WithAndWithoutRequestResponseEventStream {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl std::marker::Unpin for WithAndWithoutRequestResponseEventStream {}
@@ -3755,7 +3814,7 @@ impl WithAndWithoutRequestResponseEvent {
 
     /// Decodes a message buffer as a [`WithAndWithoutRequestResponseEvent`].
     fn decode(
-        mut buf: fidl::MessageBufEtc,
+        mut buf: <fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc,
     ) -> Result<WithAndWithoutRequestResponseEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
@@ -3788,7 +3847,7 @@ impl WithAndWithoutRequestResponseEvent {
 
 /// A Stream of incoming requests for test.protocols/WithAndWithoutRequestResponse.
 pub struct WithAndWithoutRequestResponseRequestStream {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
     is_terminated: bool,
 }
 
@@ -3804,7 +3863,7 @@ impl fidl::endpoints::RequestStream for WithAndWithoutRequestResponseRequestStre
     type Protocol = WithAndWithoutRequestResponseMarker;
     type ControlHandle = WithAndWithoutRequestResponseControlHandle;
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: ::fidl::AsyncChannel) -> Self {
         Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
     }
 
@@ -3812,11 +3871,17 @@ impl fidl::endpoints::RequestStream for WithAndWithoutRequestResponseRequestStre
         WithAndWithoutRequestResponseControlHandle { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(
+        self,
+    ) -> (::std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>, bool)
+    {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(
+        inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
+        is_terminated: bool,
+    ) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -4072,14 +4137,13 @@ impl WithAndWithoutRequestResponseRequest {
 
 #[derive(Debug, Clone)]
 pub struct WithAndWithoutRequestResponseControlHandle {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
 }
 
 impl fidl::endpoints::ControlHandle for WithAndWithoutRequestResponseControlHandle {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
-
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
@@ -4087,7 +4151,6 @@ impl fidl::endpoints::ControlHandle for WithAndWithoutRequestResponseControlHand
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
-
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
@@ -4385,7 +4448,6 @@ pub struct WithErrorSyntaxMarker;
 impl fidl::endpoints::ProtocolMarker for WithErrorSyntaxMarker {
     type Proxy = WithErrorSyntaxProxy;
     type RequestStream = WithErrorSyntaxRequestStream;
-
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = WithErrorSyntaxSynchronousProxy;
 
@@ -4410,7 +4472,6 @@ pub trait WithErrorSyntaxProxyInterface: Send + Sync {
         + Send;
     fn r#handle_in_result(&self) -> Self::HandleInResultResponseFut;
 }
-
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct WithErrorSyntaxSynchronousProxy {
@@ -4522,13 +4583,13 @@ impl WithErrorSyntaxSynchronousProxy {
 
 #[derive(Debug, Clone)]
 pub struct WithErrorSyntaxProxy {
-    client: fidl::client::Client,
+    client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl fidl::endpoints::Proxy for WithErrorSyntaxProxy {
     type Protocol = WithErrorSyntaxMarker;
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: ::fidl::AsyncChannel) -> Self {
         Self::new(inner)
     }
 
@@ -4543,7 +4604,7 @@ impl fidl::endpoints::Proxy for WithErrorSyntaxProxy {
 
 impl WithErrorSyntaxProxy {
     /// Create a new Proxy for test.protocols/WithErrorSyntax.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
+    pub fn new(channel: ::fidl::AsyncChannel) -> Self {
         let protocol_name = <WithErrorSyntaxMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
@@ -4559,35 +4620,49 @@ impl WithErrorSyntaxProxy {
 
     pub fn r#response_as_struct(
         &self,
-    ) -> fidl::client::QueryResponseFut<WithErrorSyntaxResponseAsStructResult> {
+    ) -> fidl::client::QueryResponseFut<
+        WithErrorSyntaxResponseAsStructResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         WithErrorSyntaxProxyInterface::r#response_as_struct(self)
     }
 
     pub fn r#error_as_primitive(
         &self,
-    ) -> fidl::client::QueryResponseFut<WithErrorSyntaxErrorAsPrimitiveResult> {
+    ) -> fidl::client::QueryResponseFut<
+        WithErrorSyntaxErrorAsPrimitiveResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         WithErrorSyntaxProxyInterface::r#error_as_primitive(self)
     }
 
     pub fn r#error_as_enum(
         &self,
-    ) -> fidl::client::QueryResponseFut<WithErrorSyntaxErrorAsEnumResult> {
+    ) -> fidl::client::QueryResponseFut<
+        WithErrorSyntaxErrorAsEnumResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         WithErrorSyntaxProxyInterface::r#error_as_enum(self)
     }
 
     pub fn r#handle_in_result(
         &self,
-    ) -> fidl::client::QueryResponseFut<WithErrorSyntaxHandleInResultResult> {
+    ) -> fidl::client::QueryResponseFut<
+        WithErrorSyntaxHandleInResultResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         WithErrorSyntaxProxyInterface::r#handle_in_result(self)
     }
 }
 
 impl WithErrorSyntaxProxyInterface for WithErrorSyntaxProxy {
-    type ResponseAsStructResponseFut =
-        fidl::client::QueryResponseFut<WithErrorSyntaxResponseAsStructResult>;
+    type ResponseAsStructResponseFut = fidl::client::QueryResponseFut<
+        WithErrorSyntaxResponseAsStructResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#response_as_struct(&self) -> Self::ResponseAsStructResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<WithErrorSyntaxResponseAsStructResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<WithErrorSyntaxResponseAsStructResponse, u32>,
@@ -4607,11 +4682,13 @@ impl WithErrorSyntaxProxyInterface for WithErrorSyntaxProxy {
         )
     }
 
-    type ErrorAsPrimitiveResponseFut =
-        fidl::client::QueryResponseFut<WithErrorSyntaxErrorAsPrimitiveResult>;
+    type ErrorAsPrimitiveResponseFut = fidl::client::QueryResponseFut<
+        WithErrorSyntaxErrorAsPrimitiveResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#error_as_primitive(&self) -> Self::ErrorAsPrimitiveResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<WithErrorSyntaxErrorAsPrimitiveResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<fidl::encoding::EmptyStruct, u32>,
@@ -4631,10 +4708,13 @@ impl WithErrorSyntaxProxyInterface for WithErrorSyntaxProxy {
         )
     }
 
-    type ErrorAsEnumResponseFut = fidl::client::QueryResponseFut<WithErrorSyntaxErrorAsEnumResult>;
+    type ErrorAsEnumResponseFut = fidl::client::QueryResponseFut<
+        WithErrorSyntaxErrorAsEnumResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#error_as_enum(&self) -> Self::ErrorAsEnumResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<WithErrorSyntaxErrorAsEnumResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<fidl::encoding::EmptyStruct, ErrorEnum>,
@@ -4654,11 +4734,13 @@ impl WithErrorSyntaxProxyInterface for WithErrorSyntaxProxy {
         )
     }
 
-    type HandleInResultResponseFut =
-        fidl::client::QueryResponseFut<WithErrorSyntaxHandleInResultResult>;
+    type HandleInResultResponseFut = fidl::client::QueryResponseFut<
+        WithErrorSyntaxHandleInResultResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#handle_in_result(&self) -> Self::HandleInResultResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<WithErrorSyntaxHandleInResultResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<WithErrorSyntaxHandleInResultResponse, u32>,
@@ -4680,7 +4762,7 @@ impl WithErrorSyntaxProxyInterface for WithErrorSyntaxProxy {
 }
 
 pub struct WithErrorSyntaxEventStream {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl std::marker::Unpin for WithErrorSyntaxEventStream {}
@@ -4713,7 +4795,9 @@ pub enum WithErrorSyntaxEvent {}
 
 impl WithErrorSyntaxEvent {
     /// Decodes a message buffer as a [`WithErrorSyntaxEvent`].
-    fn decode(mut buf: fidl::MessageBufEtc) -> Result<WithErrorSyntaxEvent, fidl::Error> {
+    fn decode(
+        mut buf: <fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc,
+    ) -> Result<WithErrorSyntaxEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
         debug_assert_eq!(tx_header.tx_id, 0);
@@ -4729,7 +4813,7 @@ impl WithErrorSyntaxEvent {
 
 /// A Stream of incoming requests for test.protocols/WithErrorSyntax.
 pub struct WithErrorSyntaxRequestStream {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
     is_terminated: bool,
 }
 
@@ -4745,7 +4829,7 @@ impl fidl::endpoints::RequestStream for WithErrorSyntaxRequestStream {
     type Protocol = WithErrorSyntaxMarker;
     type ControlHandle = WithErrorSyntaxControlHandle;
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: ::fidl::AsyncChannel) -> Self {
         Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
     }
 
@@ -4753,11 +4837,17 @@ impl fidl::endpoints::RequestStream for WithErrorSyntaxRequestStream {
         WithErrorSyntaxControlHandle { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(
+        self,
+    ) -> (::std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>, bool)
+    {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(
+        inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
+        is_terminated: bool,
+    ) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -4930,14 +5020,13 @@ impl WithErrorSyntaxRequest {
 
 #[derive(Debug, Clone)]
 pub struct WithErrorSyntaxControlHandle {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
 }
 
 impl fidl::endpoints::ControlHandle for WithErrorSyntaxControlHandle {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
-
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
@@ -4945,7 +5034,6 @@ impl fidl::endpoints::ControlHandle for WithErrorSyntaxControlHandle {
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
-
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
@@ -5240,7 +5328,6 @@ pub struct WithProtocolEndsMarker;
 impl fidl::endpoints::ProtocolMarker for WithProtocolEndsMarker {
     type Proxy = WithProtocolEndsProxy;
     type RequestStream = WithProtocolEndsRequestStream;
-
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = WithProtocolEndsSynchronousProxy;
 
@@ -5269,7 +5356,6 @@ pub trait WithProtocolEndsProxyInterface: Send + Sync {
         + Send;
     fn r#struct_containing_ends(&self, in_: ProtocolEnds) -> Self::StructContainingEndsResponseFut;
 }
-
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct WithProtocolEndsSynchronousProxy {
@@ -5366,13 +5452,13 @@ impl WithProtocolEndsSynchronousProxy {
 
 #[derive(Debug, Clone)]
 pub struct WithProtocolEndsProxy {
-    client: fidl::client::Client,
+    client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl fidl::endpoints::Proxy for WithProtocolEndsProxy {
     type Protocol = WithProtocolEndsMarker;
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: ::fidl::AsyncChannel) -> Self {
         Self::new(inner)
     }
 
@@ -5387,7 +5473,7 @@ impl fidl::endpoints::Proxy for WithProtocolEndsProxy {
 
 impl WithProtocolEndsProxy {
     /// Create a new Proxy for test.protocols/WithProtocolEnds.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
+    pub fn new(channel: ::fidl::AsyncChannel) -> Self {
         let protocol_name = <WithProtocolEndsMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
@@ -5406,6 +5492,7 @@ impl WithProtocolEndsProxy {
         mut in_: fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>,
     ) -> fidl::client::QueryResponseFut<
         Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
     > {
         WithProtocolEndsProxyInterface::r#client_ends(self, in_)
     }
@@ -5413,15 +5500,18 @@ impl WithProtocolEndsProxy {
     pub fn r#server_ends(
         &self,
         mut in_: Option<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>,
-    ) -> fidl::client::QueryResponseFut<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>
-    {
+    ) -> fidl::client::QueryResponseFut<
+        fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         WithProtocolEndsProxyInterface::r#server_ends(self, in_)
     }
 
     pub fn r#struct_containing_ends(
         &self,
         mut in_: ProtocolEnds,
-    ) -> fidl::client::QueryResponseFut<ProtocolEnds> {
+    ) -> fidl::client::QueryResponseFut<ProtocolEnds, fidl::encoding::DefaultFuchsiaResourceDialect>
+    {
         WithProtocolEndsProxyInterface::r#struct_containing_ends(self, in_)
     }
 }
@@ -5429,13 +5519,14 @@ impl WithProtocolEndsProxy {
 impl WithProtocolEndsProxyInterface for WithProtocolEndsProxy {
     type ClientEndsResponseFut = fidl::client::QueryResponseFut<
         Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
     >;
     fn r#client_ends(
         &self,
         mut in_: fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>,
     ) -> Self::ClientEndsResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>, fidl::Error>
         {
             let _response = fidl::client::decode_transaction_body::<
@@ -5456,14 +5547,16 @@ impl WithProtocolEndsProxyInterface for WithProtocolEndsProxy {
         )
     }
 
-    type ServerEndsResponseFut =
-        fidl::client::QueryResponseFut<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>;
+    type ServerEndsResponseFut = fidl::client::QueryResponseFut<
+        fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#server_ends(
         &self,
         mut in_: Option<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>,
     ) -> Self::ServerEndsResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 WithProtocolEndsServerEndsResponse,
@@ -5483,13 +5576,14 @@ impl WithProtocolEndsProxyInterface for WithProtocolEndsProxy {
         )
     }
 
-    type StructContainingEndsResponseFut = fidl::client::QueryResponseFut<ProtocolEnds>;
+    type StructContainingEndsResponseFut =
+        fidl::client::QueryResponseFut<ProtocolEnds, fidl::encoding::DefaultFuchsiaResourceDialect>;
     fn r#struct_containing_ends(
         &self,
         mut in_: ProtocolEnds,
     ) -> Self::StructContainingEndsResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<ProtocolEnds, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 WithProtocolEndsStructContainingEndsResponse,
@@ -5509,7 +5603,7 @@ impl WithProtocolEndsProxyInterface for WithProtocolEndsProxy {
 }
 
 pub struct WithProtocolEndsEventStream {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl std::marker::Unpin for WithProtocolEndsEventStream {}
@@ -5542,7 +5636,9 @@ pub enum WithProtocolEndsEvent {}
 
 impl WithProtocolEndsEvent {
     /// Decodes a message buffer as a [`WithProtocolEndsEvent`].
-    fn decode(mut buf: fidl::MessageBufEtc) -> Result<WithProtocolEndsEvent, fidl::Error> {
+    fn decode(
+        mut buf: <fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc,
+    ) -> Result<WithProtocolEndsEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
         debug_assert_eq!(tx_header.tx_id, 0);
@@ -5558,7 +5654,7 @@ impl WithProtocolEndsEvent {
 
 /// A Stream of incoming requests for test.protocols/WithProtocolEnds.
 pub struct WithProtocolEndsRequestStream {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
     is_terminated: bool,
 }
 
@@ -5574,7 +5670,7 @@ impl fidl::endpoints::RequestStream for WithProtocolEndsRequestStream {
     type Protocol = WithProtocolEndsMarker;
     type ControlHandle = WithProtocolEndsControlHandle;
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: ::fidl::AsyncChannel) -> Self {
         Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
     }
 
@@ -5582,11 +5678,17 @@ impl fidl::endpoints::RequestStream for WithProtocolEndsRequestStream {
         WithProtocolEndsControlHandle { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(
+        self,
+    ) -> (::std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>, bool)
+    {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(
+        inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
+        is_terminated: bool,
+    ) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -5759,14 +5861,13 @@ impl WithProtocolEndsRequest {
 
 #[derive(Debug, Clone)]
 pub struct WithProtocolEndsControlHandle {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
 }
 
 impl fidl::endpoints::ControlHandle for WithProtocolEndsControlHandle {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
-
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
@@ -5774,7 +5875,6 @@ impl fidl::endpoints::ControlHandle for WithProtocolEndsControlHandle {
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
-
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }

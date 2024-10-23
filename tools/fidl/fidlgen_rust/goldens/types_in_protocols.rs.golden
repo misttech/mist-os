@@ -7,7 +7,7 @@
 
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
-use fidl::encoding::ProxyChannelBox;
+use fidl::encoding::{MessageBufFor, ProxyChannelBox, ResourceDialect};
 use fidl::endpoints::{ControlHandle as _, Responder as _};
 use futures::future::{self, MaybeDone, TryFutureExt};
 use zx_status;
@@ -374,7 +374,6 @@ pub struct ProtocolMarker;
 impl fidl::endpoints::ProtocolMarker for ProtocolMarker {
     type Proxy = ProtocolProxy;
     type RequestStream = ProtocolRequestStream;
-
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = ProtocolSynchronousProxy;
 
@@ -874,7 +873,6 @@ pub trait ProtocolProxyInterface: Send + Sync {
         + Send;
     fn r#error_resource(&self) -> Self::ErrorResourceResponseFut;
 }
-
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct ProtocolSynchronousProxy {
@@ -1898,13 +1896,13 @@ impl ProtocolSynchronousProxy {
 
 #[derive(Debug, Clone)]
 pub struct ProtocolProxy {
-    client: fidl::client::Client,
+    client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl fidl::endpoints::Proxy for ProtocolProxy {
     type Protocol = ProtocolMarker;
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: ::fidl::AsyncChannel) -> Self {
         Self::new(inner)
     }
 
@@ -1919,7 +1917,7 @@ impl fidl::endpoints::Proxy for ProtocolProxy {
 
 impl ProtocolProxy {
     /// Create a new Proxy for test.typesinprotocols/Protocol.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
+    pub fn new(channel: ::fidl::AsyncChannel) -> Self {
         let protocol_name = <ProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
@@ -1968,27 +1966,22 @@ impl ProtocolProxy {
         mut float64: f64,
         mut string: &str,
         mut opt_string: Option<&str>,
-    ) -> fidl::client::QueryResponseFut<(
-        u8,
-        u16,
-        u32,
-        u64,
-        i8,
-        i16,
-        i32,
-        i64,
-        f32,
-        f64,
-        String,
-        Option<String>,
-    )> {
+    ) -> fidl::client::QueryResponseFut<
+        (u8, u16, u32, u64, i8, i16, i32, i64, f32, f64, String, Option<String>),
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         ProtocolProxyInterface::r#two_way_basic(
             self, uint8, uint16, uint32, uint64, int8, int16, int32, int64, float32, float64,
             string, opt_string,
         )
     }
 
-    pub fn r#error_basic(&self) -> fidl::client::QueryResponseFut<ProtocolErrorBasicResult> {
+    pub fn r#error_basic(
+        &self,
+    ) -> fidl::client::QueryResponseFut<
+        ProtocolErrorBasicResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         ProtocolProxyInterface::r#error_basic(self)
     }
 
@@ -2016,21 +2009,21 @@ impl ProtocolProxy {
         mut union: &Union,
         mut opt_struct: Option<&Struct>,
         mut opt_union: Option<&Union>,
-    ) -> fidl::client::QueryResponseFut<(
-        Bits,
-        Enum,
-        Struct,
-        Table,
-        Union,
-        Option<Box<Struct>>,
-        Option<Box<Union>>,
-    )> {
+    ) -> fidl::client::QueryResponseFut<
+        (Bits, Enum, Struct, Table, Union, Option<Box<Struct>>, Option<Box<Union>>),
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         ProtocolProxyInterface::r#two_way_compound(
             self, bits, enum_, struct_, table, union, opt_struct, opt_union,
         )
     }
 
-    pub fn r#error_compound(&self) -> fidl::client::QueryResponseFut<ProtocolErrorCompoundResult> {
+    pub fn r#error_compound(
+        &self,
+    ) -> fidl::client::QueryResponseFut<
+        ProtocolErrorCompoundResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         ProtocolProxyInterface::r#error_compound(self)
     }
 
@@ -2080,20 +2073,23 @@ impl ProtocolProxy {
         mut array_float64: &[f64; 5],
         mut array_string: &[String; 5],
         mut array_opt_string: &[Option<String>; 5],
-    ) -> fidl::client::QueryResponseFut<(
-        [u8; 5],
-        [u16; 5],
-        [u32; 5],
-        [u64; 5],
-        [i8; 5],
-        [i16; 5],
-        [i32; 5],
-        [i64; 5],
-        [f32; 5],
-        [f64; 5],
-        [String; 5],
-        [Option<String>; 5],
-    )> {
+    ) -> fidl::client::QueryResponseFut<
+        (
+            [u8; 5],
+            [u16; 5],
+            [u32; 5],
+            [u64; 5],
+            [i8; 5],
+            [i16; 5],
+            [i32; 5],
+            [i64; 5],
+            [f32; 5],
+            [f64; 5],
+            [String; 5],
+            [Option<String>; 5],
+        ),
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         ProtocolProxyInterface::r#two_way_array_basic(
             self,
             array_uint8,
@@ -2113,7 +2109,10 @@ impl ProtocolProxy {
 
     pub fn r#error_array_basic(
         &self,
-    ) -> fidl::client::QueryResponseFut<ProtocolErrorArrayBasicResult> {
+    ) -> fidl::client::QueryResponseFut<
+        ProtocolErrorArrayBasicResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         ProtocolProxyInterface::r#error_array_basic(self)
     }
 
@@ -2148,15 +2147,18 @@ impl ProtocolProxy {
         mut array_union: &[Union; 5],
         mut array_opt_struct: &[Option<Box<Struct>>; 5],
         mut array_opt_union: &[Option<Box<Union>>; 5],
-    ) -> fidl::client::QueryResponseFut<(
-        [Bits; 5],
-        [Enum; 5],
-        [Struct; 5],
-        [Table; 5],
-        [Union; 5],
-        [Option<Box<Struct>>; 5],
-        [Option<Box<Union>>; 5],
-    )> {
+    ) -> fidl::client::QueryResponseFut<
+        (
+            [Bits; 5],
+            [Enum; 5],
+            [Struct; 5],
+            [Table; 5],
+            [Union; 5],
+            [Option<Box<Struct>>; 5],
+            [Option<Box<Union>>; 5],
+        ),
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         ProtocolProxyInterface::r#two_way_array_compound(
             self,
             array_bits,
@@ -2171,7 +2173,10 @@ impl ProtocolProxy {
 
     pub fn r#error_array_compound(
         &self,
-    ) -> fidl::client::QueryResponseFut<ProtocolErrorArrayCompoundResult> {
+    ) -> fidl::client::QueryResponseFut<
+        ProtocolErrorArrayCompoundResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         ProtocolProxyInterface::r#error_array_compound(self)
     }
 
@@ -2221,20 +2226,23 @@ impl ProtocolProxy {
         mut vector_float64: &[f64],
         mut vector_string: &[String],
         mut vector_opt_string: &[Option<String>],
-    ) -> fidl::client::QueryResponseFut<(
-        Vec<u8>,
-        Vec<u16>,
-        Vec<u32>,
-        Vec<u64>,
-        Vec<i8>,
-        Vec<i16>,
-        Vec<i32>,
-        Vec<i64>,
-        Vec<f32>,
-        Vec<f64>,
-        Vec<String>,
-        Vec<Option<String>>,
-    )> {
+    ) -> fidl::client::QueryResponseFut<
+        (
+            Vec<u8>,
+            Vec<u16>,
+            Vec<u32>,
+            Vec<u64>,
+            Vec<i8>,
+            Vec<i16>,
+            Vec<i32>,
+            Vec<i64>,
+            Vec<f32>,
+            Vec<f64>,
+            Vec<String>,
+            Vec<Option<String>>,
+        ),
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         ProtocolProxyInterface::r#two_way_vector_basic(
             self,
             vector_uint8,
@@ -2254,7 +2262,10 @@ impl ProtocolProxy {
 
     pub fn r#error_vector_basic(
         &self,
-    ) -> fidl::client::QueryResponseFut<ProtocolErrorVectorBasicResult> {
+    ) -> fidl::client::QueryResponseFut<
+        ProtocolErrorVectorBasicResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         ProtocolProxyInterface::r#error_vector_basic(self)
     }
 
@@ -2289,15 +2300,18 @@ impl ProtocolProxy {
         mut vector_union: &[Union],
         mut vector_opt_struct: &[Option<Box<Struct>>],
         mut vector_opt_union: &[Option<Box<Union>>],
-    ) -> fidl::client::QueryResponseFut<(
-        Vec<Bits>,
-        Vec<Enum>,
-        Vec<Struct>,
-        Vec<Table>,
-        Vec<Union>,
-        Vec<Option<Box<Struct>>>,
-        Vec<Option<Box<Union>>>,
-    )> {
+    ) -> fidl::client::QueryResponseFut<
+        (
+            Vec<Bits>,
+            Vec<Enum>,
+            Vec<Struct>,
+            Vec<Table>,
+            Vec<Union>,
+            Vec<Option<Box<Struct>>>,
+            Vec<Option<Box<Union>>>,
+        ),
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         ProtocolProxyInterface::r#two_way_vector_compound(
             self,
             vector_bits,
@@ -2312,7 +2326,10 @@ impl ProtocolProxy {
 
     pub fn r#error_vector_compound(
         &self,
-    ) -> fidl::client::QueryResponseFut<ProtocolErrorVectorCompoundResult> {
+    ) -> fidl::client::QueryResponseFut<
+        ProtocolErrorVectorCompoundResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         ProtocolProxyInterface::r#error_vector_compound(self)
     }
 
@@ -2338,12 +2355,15 @@ impl ProtocolProxy {
         mut opt_vector_string: Option<&[String]>,
         mut opt_vector_struct: Option<&[Struct]>,
         mut opt_vector_opt_struct: Option<&[Option<Box<Struct>>]>,
-    ) -> fidl::client::QueryResponseFut<(
-        Option<Vec<u8>>,
-        Option<Vec<String>>,
-        Option<Vec<Struct>>,
-        Option<Vec<Option<Box<Struct>>>>,
-    )> {
+    ) -> fidl::client::QueryResponseFut<
+        (
+            Option<Vec<u8>>,
+            Option<Vec<String>>,
+            Option<Vec<Struct>>,
+            Option<Vec<Option<Box<Struct>>>>,
+        ),
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         ProtocolProxyInterface::r#two_way_vector_optional(
             self,
             opt_vector_uint8,
@@ -2355,7 +2375,10 @@ impl ProtocolProxy {
 
     pub fn r#error_vector_optional(
         &self,
-    ) -> fidl::client::QueryResponseFut<ProtocolErrorVectorOptionalResult> {
+    ) -> fidl::client::QueryResponseFut<
+        ProtocolErrorVectorOptionalResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         ProtocolProxyInterface::r#error_vector_optional(self)
     }
 
@@ -2381,8 +2404,10 @@ impl ProtocolProxy {
         mut array_vector_uint8: &[Vec<u8>; 5],
         mut vector_array_uint8: &[[u8; 5]],
         mut vector_vector_uint8: &[Vec<u8>],
-    ) -> fidl::client::QueryResponseFut<([[u8; 5]; 5], [Vec<u8>; 5], Vec<[u8; 5]>, Vec<Vec<u8>>)>
-    {
+    ) -> fidl::client::QueryResponseFut<
+        ([[u8; 5]; 5], [Vec<u8>; 5], Vec<[u8; 5]>, Vec<Vec<u8>>),
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         ProtocolProxyInterface::r#two_way_array_vector_nested(
             self,
             array_array_uint8,
@@ -2394,7 +2419,10 @@ impl ProtocolProxy {
 
     pub fn r#error_array_vector_nested(
         &self,
-    ) -> fidl::client::QueryResponseFut<ProtocolErrorArrayVectorNestedResult> {
+    ) -> fidl::client::QueryResponseFut<
+        ProtocolErrorArrayVectorNestedResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         ProtocolProxyInterface::r#error_array_vector_nested(self)
     }
 
@@ -2489,35 +2517,38 @@ impl ProtocolProxy {
         mut vector_struct: Vec<ResourceStruct>,
         mut vector_table: Vec<ResourceTable>,
         mut vector_union: Vec<ResourceUnion>,
-    ) -> fidl::client::QueryResponseFut<(
-        fidl::Handle,
-        fidl::Vmo,
-        fidl::endpoints::ClientEnd<ProtocolMarker>,
-        fidl::endpoints::ServerEnd<ProtocolMarker>,
-        ResourceStruct,
-        ResourceTable,
-        ResourceUnion,
-        Option<fidl::Handle>,
-        Option<fidl::Vmo>,
-        Option<fidl::endpoints::ClientEnd<ProtocolMarker>>,
-        Option<fidl::endpoints::ServerEnd<ProtocolMarker>>,
-        Option<Box<ResourceStruct>>,
-        Option<Box<ResourceUnion>>,
-        [fidl::Handle; 5],
-        [fidl::Vmo; 5],
-        [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
-        [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
-        [ResourceStruct; 5],
-        [ResourceTable; 5],
-        [ResourceUnion; 5],
-        Vec<fidl::Handle>,
-        Vec<fidl::Vmo>,
-        Vec<fidl::endpoints::ClientEnd<ProtocolMarker>>,
-        Vec<fidl::endpoints::ServerEnd<ProtocolMarker>>,
-        Vec<ResourceStruct>,
-        Vec<ResourceTable>,
-        Vec<ResourceUnion>,
-    )> {
+    ) -> fidl::client::QueryResponseFut<
+        (
+            fidl::Handle,
+            fidl::Vmo,
+            fidl::endpoints::ClientEnd<ProtocolMarker>,
+            fidl::endpoints::ServerEnd<ProtocolMarker>,
+            ResourceStruct,
+            ResourceTable,
+            ResourceUnion,
+            Option<fidl::Handle>,
+            Option<fidl::Vmo>,
+            Option<fidl::endpoints::ClientEnd<ProtocolMarker>>,
+            Option<fidl::endpoints::ServerEnd<ProtocolMarker>>,
+            Option<Box<ResourceStruct>>,
+            Option<Box<ResourceUnion>>,
+            [fidl::Handle; 5],
+            [fidl::Vmo; 5],
+            [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
+            [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
+            [ResourceStruct; 5],
+            [ResourceTable; 5],
+            [ResourceUnion; 5],
+            Vec<fidl::Handle>,
+            Vec<fidl::Vmo>,
+            Vec<fidl::endpoints::ClientEnd<ProtocolMarker>>,
+            Vec<fidl::endpoints::ServerEnd<ProtocolMarker>>,
+            Vec<ResourceStruct>,
+            Vec<ResourceTable>,
+            Vec<ResourceUnion>,
+        ),
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         ProtocolProxyInterface::r#two_way_resource(
             self,
             handle,
@@ -2550,7 +2581,12 @@ impl ProtocolProxy {
         )
     }
 
-    pub fn r#error_resource(&self) -> fidl::client::QueryResponseFut<ProtocolErrorResourceResult> {
+    pub fn r#error_resource(
+        &self,
+    ) -> fidl::client::QueryResponseFut<
+        ProtocolErrorResourceResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         ProtocolProxyInterface::r#error_resource(self)
     }
 }
@@ -2581,20 +2617,10 @@ impl ProtocolProxyInterface for ProtocolProxy {
         )
     }
 
-    type TwoWayBasicResponseFut = fidl::client::QueryResponseFut<(
-        u8,
-        u16,
-        u32,
-        u64,
-        i8,
-        i16,
-        i32,
-        i64,
-        f32,
-        f64,
-        String,
-        Option<String>,
-    )>;
+    type TwoWayBasicResponseFut = fidl::client::QueryResponseFut<
+        (u8, u16, u32, u64, i8, i16, i32, i64, f32, f64, String, Option<String>),
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#two_way_basic(
         &self,
         mut uint8: u8,
@@ -2611,7 +2637,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut opt_string: Option<&str>,
     ) -> Self::TwoWayBasicResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<
             (u8, u16, u32, u64, i8, i16, i32, i64, f32, f64, String, Option<String>),
             fidl::Error,
@@ -2647,10 +2673,13 @@ impl ProtocolProxyInterface for ProtocolProxy {
         )
     }
 
-    type ErrorBasicResponseFut = fidl::client::QueryResponseFut<ProtocolErrorBasicResult>;
+    type ErrorBasicResponseFut = fidl::client::QueryResponseFut<
+        ProtocolErrorBasicResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#error_basic(&self) -> Self::ErrorBasicResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<ProtocolErrorBasicResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<Basic, u32>,
@@ -2699,15 +2728,10 @@ impl ProtocolProxyInterface for ProtocolProxy {
         )
     }
 
-    type TwoWayCompoundResponseFut = fidl::client::QueryResponseFut<(
-        Bits,
-        Enum,
-        Struct,
-        Table,
-        Union,
-        Option<Box<Struct>>,
-        Option<Box<Union>>,
-    )>;
+    type TwoWayCompoundResponseFut = fidl::client::QueryResponseFut<
+        (Bits, Enum, Struct, Table, Union, Option<Box<Struct>>, Option<Box<Union>>),
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#two_way_compound(
         &self,
         mut bits: Bits,
@@ -2719,7 +2743,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut opt_union: Option<&Union>,
     ) -> Self::TwoWayCompoundResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<
             (Bits, Enum, Struct, Table, Union, Option<Box<Struct>>, Option<Box<Union>>),
             fidl::Error,
@@ -2750,10 +2774,13 @@ impl ProtocolProxyInterface for ProtocolProxy {
         )
     }
 
-    type ErrorCompoundResponseFut = fidl::client::QueryResponseFut<ProtocolErrorCompoundResult>;
+    type ErrorCompoundResponseFut = fidl::client::QueryResponseFut<
+        ProtocolErrorCompoundResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#error_compound(&self) -> Self::ErrorCompoundResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<ProtocolErrorCompoundResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<Compound, u32>,
@@ -2807,20 +2834,23 @@ impl ProtocolProxyInterface for ProtocolProxy {
         )
     }
 
-    type TwoWayArrayBasicResponseFut = fidl::client::QueryResponseFut<(
-        [u8; 5],
-        [u16; 5],
-        [u32; 5],
-        [u64; 5],
-        [i8; 5],
-        [i16; 5],
-        [i32; 5],
-        [i64; 5],
-        [f32; 5],
-        [f64; 5],
-        [String; 5],
-        [Option<String>; 5],
-    )>;
+    type TwoWayArrayBasicResponseFut = fidl::client::QueryResponseFut<
+        (
+            [u8; 5],
+            [u16; 5],
+            [u32; 5],
+            [u64; 5],
+            [i8; 5],
+            [i16; 5],
+            [i32; 5],
+            [i64; 5],
+            [f32; 5],
+            [f64; 5],
+            [String; 5],
+            [Option<String>; 5],
+        ),
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#two_way_array_basic(
         &self,
         mut array_uint8: &[u8; 5],
@@ -2837,7 +2867,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut array_opt_string: &[Option<String>; 5],
     ) -> Self::TwoWayArrayBasicResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<
             (
                 [u8; 5],
@@ -2909,10 +2939,13 @@ impl ProtocolProxyInterface for ProtocolProxy {
         )
     }
 
-    type ErrorArrayBasicResponseFut = fidl::client::QueryResponseFut<ProtocolErrorArrayBasicResult>;
+    type ErrorArrayBasicResponseFut = fidl::client::QueryResponseFut<
+        ProtocolErrorArrayBasicResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#error_array_basic(&self) -> Self::ErrorArrayBasicResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<ProtocolErrorArrayBasicResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<ArrayBasic, u32>,
@@ -2970,15 +3003,18 @@ impl ProtocolProxyInterface for ProtocolProxy {
         )
     }
 
-    type TwoWayArrayCompoundResponseFut = fidl::client::QueryResponseFut<(
-        [Bits; 5],
-        [Enum; 5],
-        [Struct; 5],
-        [Table; 5],
-        [Union; 5],
-        [Option<Box<Struct>>; 5],
-        [Option<Box<Union>>; 5],
-    )>;
+    type TwoWayArrayCompoundResponseFut = fidl::client::QueryResponseFut<
+        (
+            [Bits; 5],
+            [Enum; 5],
+            [Struct; 5],
+            [Table; 5],
+            [Union; 5],
+            [Option<Box<Struct>>; 5],
+            [Option<Box<Union>>; 5],
+        ),
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#two_way_array_compound(
         &self,
         mut array_bits: &[Bits; 5],
@@ -2990,7 +3026,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut array_opt_union: &[Option<Box<Union>>; 5],
     ) -> Self::TwoWayArrayCompoundResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<
             (
                 [Bits; 5],
@@ -3042,11 +3078,13 @@ impl ProtocolProxyInterface for ProtocolProxy {
         )
     }
 
-    type ErrorArrayCompoundResponseFut =
-        fidl::client::QueryResponseFut<ProtocolErrorArrayCompoundResult>;
+    type ErrorArrayCompoundResponseFut = fidl::client::QueryResponseFut<
+        ProtocolErrorArrayCompoundResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#error_array_compound(&self) -> Self::ErrorArrayCompoundResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<ProtocolErrorArrayCompoundResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<ArrayCompound, u32>,
@@ -3111,20 +3149,23 @@ impl ProtocolProxyInterface for ProtocolProxy {
         )
     }
 
-    type TwoWayVectorBasicResponseFut = fidl::client::QueryResponseFut<(
-        Vec<u8>,
-        Vec<u16>,
-        Vec<u32>,
-        Vec<u64>,
-        Vec<i8>,
-        Vec<i16>,
-        Vec<i32>,
-        Vec<i64>,
-        Vec<f32>,
-        Vec<f64>,
-        Vec<String>,
-        Vec<Option<String>>,
-    )>;
+    type TwoWayVectorBasicResponseFut = fidl::client::QueryResponseFut<
+        (
+            Vec<u8>,
+            Vec<u16>,
+            Vec<u32>,
+            Vec<u64>,
+            Vec<i8>,
+            Vec<i16>,
+            Vec<i32>,
+            Vec<i64>,
+            Vec<f32>,
+            Vec<f64>,
+            Vec<String>,
+            Vec<Option<String>>,
+        ),
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#two_way_vector_basic(
         &self,
         mut vector_uint8: &[u8],
@@ -3141,7 +3182,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut vector_opt_string: &[Option<String>],
     ) -> Self::TwoWayVectorBasicResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<
             (
                 Vec<u8>,
@@ -3213,11 +3254,13 @@ impl ProtocolProxyInterface for ProtocolProxy {
         )
     }
 
-    type ErrorVectorBasicResponseFut =
-        fidl::client::QueryResponseFut<ProtocolErrorVectorBasicResult>;
+    type ErrorVectorBasicResponseFut = fidl::client::QueryResponseFut<
+        ProtocolErrorVectorBasicResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#error_vector_basic(&self) -> Self::ErrorVectorBasicResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<ProtocolErrorVectorBasicResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<VectorBasic, u32>,
@@ -3275,15 +3318,18 @@ impl ProtocolProxyInterface for ProtocolProxy {
         )
     }
 
-    type TwoWayVectorCompoundResponseFut = fidl::client::QueryResponseFut<(
-        Vec<Bits>,
-        Vec<Enum>,
-        Vec<Struct>,
-        Vec<Table>,
-        Vec<Union>,
-        Vec<Option<Box<Struct>>>,
-        Vec<Option<Box<Union>>>,
-    )>;
+    type TwoWayVectorCompoundResponseFut = fidl::client::QueryResponseFut<
+        (
+            Vec<Bits>,
+            Vec<Enum>,
+            Vec<Struct>,
+            Vec<Table>,
+            Vec<Union>,
+            Vec<Option<Box<Struct>>>,
+            Vec<Option<Box<Union>>>,
+        ),
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#two_way_vector_compound(
         &self,
         mut vector_bits: &[Bits],
@@ -3295,7 +3341,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut vector_opt_union: &[Option<Box<Union>>],
     ) -> Self::TwoWayVectorCompoundResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<
             (
                 Vec<Bits>,
@@ -3347,11 +3393,13 @@ impl ProtocolProxyInterface for ProtocolProxy {
         )
     }
 
-    type ErrorVectorCompoundResponseFut =
-        fidl::client::QueryResponseFut<ProtocolErrorVectorCompoundResult>;
+    type ErrorVectorCompoundResponseFut = fidl::client::QueryResponseFut<
+        ProtocolErrorVectorCompoundResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#error_vector_compound(&self) -> Self::ErrorVectorCompoundResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<ProtocolErrorVectorCompoundResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<VectorCompound, u32>,
@@ -3395,12 +3443,15 @@ impl ProtocolProxyInterface for ProtocolProxy {
         )
     }
 
-    type TwoWayVectorOptionalResponseFut = fidl::client::QueryResponseFut<(
-        Option<Vec<u8>>,
-        Option<Vec<String>>,
-        Option<Vec<Struct>>,
-        Option<Vec<Option<Box<Struct>>>>,
-    )>;
+    type TwoWayVectorOptionalResponseFut = fidl::client::QueryResponseFut<
+        (
+            Option<Vec<u8>>,
+            Option<Vec<String>>,
+            Option<Vec<Struct>>,
+            Option<Vec<Option<Box<Struct>>>>,
+        ),
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#two_way_vector_optional(
         &self,
         mut opt_vector_uint8: Option<&[u8]>,
@@ -3409,7 +3460,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut opt_vector_opt_struct: Option<&[Option<Box<Struct>>]>,
     ) -> Self::TwoWayVectorOptionalResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<
             (
                 Option<Vec<u8>>,
@@ -3444,11 +3495,13 @@ impl ProtocolProxyInterface for ProtocolProxy {
         )
     }
 
-    type ErrorVectorOptionalResponseFut =
-        fidl::client::QueryResponseFut<ProtocolErrorVectorOptionalResult>;
+    type ErrorVectorOptionalResponseFut = fidl::client::QueryResponseFut<
+        ProtocolErrorVectorOptionalResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#error_vector_optional(&self) -> Self::ErrorVectorOptionalResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<ProtocolErrorVectorOptionalResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<VectorOptional, u32>,
@@ -3489,8 +3542,10 @@ impl ProtocolProxyInterface for ProtocolProxy {
         )
     }
 
-    type TwoWayArrayVectorNestedResponseFut =
-        fidl::client::QueryResponseFut<([[u8; 5]; 5], [Vec<u8>; 5], Vec<[u8; 5]>, Vec<Vec<u8>>)>;
+    type TwoWayArrayVectorNestedResponseFut = fidl::client::QueryResponseFut<
+        ([[u8; 5]; 5], [Vec<u8>; 5], Vec<[u8; 5]>, Vec<Vec<u8>>),
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#two_way_array_vector_nested(
         &self,
         mut array_array_uint8: &[[u8; 5]; 5],
@@ -3499,7 +3554,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut vector_vector_uint8: &[Vec<u8>],
     ) -> Self::TwoWayArrayVectorNestedResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<([[u8; 5]; 5], [Vec<u8>; 5], Vec<[u8; 5]>, Vec<Vec<u8>>), fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 ArrayVectorNested,
@@ -3524,11 +3579,13 @@ impl ProtocolProxyInterface for ProtocolProxy {
         )
     }
 
-    type ErrorArrayVectorNestedResponseFut =
-        fidl::client::QueryResponseFut<ProtocolErrorArrayVectorNestedResult>;
+    type ErrorArrayVectorNestedResponseFut = fidl::client::QueryResponseFut<
+        ProtocolErrorArrayVectorNestedResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#error_array_vector_nested(&self) -> Self::ErrorArrayVectorNestedResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<ProtocolErrorArrayVectorNestedResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<ArrayVectorNested, u32>,
@@ -3620,35 +3677,38 @@ impl ProtocolProxyInterface for ProtocolProxy {
         )
     }
 
-    type TwoWayResourceResponseFut = fidl::client::QueryResponseFut<(
-        fidl::Handle,
-        fidl::Vmo,
-        fidl::endpoints::ClientEnd<ProtocolMarker>,
-        fidl::endpoints::ServerEnd<ProtocolMarker>,
-        ResourceStruct,
-        ResourceTable,
-        ResourceUnion,
-        Option<fidl::Handle>,
-        Option<fidl::Vmo>,
-        Option<fidl::endpoints::ClientEnd<ProtocolMarker>>,
-        Option<fidl::endpoints::ServerEnd<ProtocolMarker>>,
-        Option<Box<ResourceStruct>>,
-        Option<Box<ResourceUnion>>,
-        [fidl::Handle; 5],
-        [fidl::Vmo; 5],
-        [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
-        [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
-        [ResourceStruct; 5],
-        [ResourceTable; 5],
-        [ResourceUnion; 5],
-        Vec<fidl::Handle>,
-        Vec<fidl::Vmo>,
-        Vec<fidl::endpoints::ClientEnd<ProtocolMarker>>,
-        Vec<fidl::endpoints::ServerEnd<ProtocolMarker>>,
-        Vec<ResourceStruct>,
-        Vec<ResourceTable>,
-        Vec<ResourceUnion>,
-    )>;
+    type TwoWayResourceResponseFut = fidl::client::QueryResponseFut<
+        (
+            fidl::Handle,
+            fidl::Vmo,
+            fidl::endpoints::ClientEnd<ProtocolMarker>,
+            fidl::endpoints::ServerEnd<ProtocolMarker>,
+            ResourceStruct,
+            ResourceTable,
+            ResourceUnion,
+            Option<fidl::Handle>,
+            Option<fidl::Vmo>,
+            Option<fidl::endpoints::ClientEnd<ProtocolMarker>>,
+            Option<fidl::endpoints::ServerEnd<ProtocolMarker>>,
+            Option<Box<ResourceStruct>>,
+            Option<Box<ResourceUnion>>,
+            [fidl::Handle; 5],
+            [fidl::Vmo; 5],
+            [fidl::endpoints::ClientEnd<ProtocolMarker>; 5],
+            [fidl::endpoints::ServerEnd<ProtocolMarker>; 5],
+            [ResourceStruct; 5],
+            [ResourceTable; 5],
+            [ResourceUnion; 5],
+            Vec<fidl::Handle>,
+            Vec<fidl::Vmo>,
+            Vec<fidl::endpoints::ClientEnd<ProtocolMarker>>,
+            Vec<fidl::endpoints::ServerEnd<ProtocolMarker>>,
+            Vec<ResourceStruct>,
+            Vec<ResourceTable>,
+            Vec<ResourceUnion>,
+        ),
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#two_way_resource(
         &self,
         mut handle: fidl::Handle,
@@ -3680,7 +3740,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
         mut vector_union: Vec<ResourceUnion>,
     ) -> Self::TwoWayResourceResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<
             (
                 fidl::Handle,
@@ -3812,10 +3872,13 @@ impl ProtocolProxyInterface for ProtocolProxy {
         )
     }
 
-    type ErrorResourceResponseFut = fidl::client::QueryResponseFut<ProtocolErrorResourceResult>;
+    type ErrorResourceResponseFut = fidl::client::QueryResponseFut<
+        ProtocolErrorResourceResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#error_resource(&self) -> Self::ErrorResourceResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<ProtocolErrorResourceResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<Resource, u32>,
@@ -3865,7 +3928,7 @@ impl ProtocolProxyInterface for ProtocolProxy {
 }
 
 pub struct ProtocolEventStream {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl std::marker::Unpin for ProtocolEventStream {}
@@ -4358,7 +4421,9 @@ impl ProtocolEvent {
     }
 
     /// Decodes a message buffer as a [`ProtocolEvent`].
-    fn decode(mut buf: fidl::MessageBufEtc) -> Result<ProtocolEvent, fidl::Error> {
+    fn decode(
+        mut buf: <fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc,
+    ) -> Result<ProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
         debug_assert_eq!(tx_header.tx_id, 0);
@@ -4530,7 +4595,7 @@ impl ProtocolEvent {
 
 /// A Stream of incoming requests for test.typesinprotocols/Protocol.
 pub struct ProtocolRequestStream {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
     is_terminated: bool,
 }
 
@@ -4546,7 +4611,7 @@ impl fidl::endpoints::RequestStream for ProtocolRequestStream {
     type Protocol = ProtocolMarker;
     type ControlHandle = ProtocolControlHandle;
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: ::fidl::AsyncChannel) -> Self {
         Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
     }
 
@@ -4554,11 +4619,17 @@ impl fidl::endpoints::RequestStream for ProtocolRequestStream {
         ProtocolControlHandle { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(
+        self,
+    ) -> (::std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>, bool)
+    {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(
+        inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
+        is_terminated: bool,
+    ) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -6416,14 +6487,13 @@ impl ProtocolRequest {
 
 #[derive(Debug, Clone)]
 pub struct ProtocolControlHandle {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
 }
 
 impl fidl::endpoints::ControlHandle for ProtocolControlHandle {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
-
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
@@ -6431,7 +6501,6 @@ impl fidl::endpoints::ControlHandle for ProtocolControlHandle {
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
-
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
@@ -8771,78 +8840,10 @@ impl ProtocolErrorResourceResponder {
         >,
     ) -> Result<(), fidl::Error> {
         self.control_handle.inner.send::<fidl::encoding::ResultType<Resource, u32>>(
-            result.as_mut().map_err(|e| *e).map(
-                |(
-                    handle,
-                    vmo,
-                    client_end,
-                    server_end,
-                    struct_,
-                    table,
-                    union,
-                    opt_handle,
-                    opt_vmo,
-                    opt_client_end,
-                    opt_server_end,
-                    opt_struct,
-                    opt_union,
-                    array_handle,
-                    array_vmo,
-                    array_client_end,
-                    array_server_end,
-                    array_struct,
-                    array_table,
-                    array_union,
-                    vector_handle,
-                    vector_vmo,
-                    vector_client_end,
-                    vector_server_end,
-                    vector_struct,
-                    vector_table,
-                    vector_union,
-                )| {
-                    (
-                        std::mem::replace(handle, fidl::Handle::invalid().into()),
-                        std::mem::replace(vmo, fidl::Handle::invalid().into()),
-                        std::mem::replace(client_end, fidl::Handle::invalid().into()),
-                        std::mem::replace(server_end, fidl::Handle::invalid().into()),
-                        struct_,
-                        table,
-                        union,
-                        opt_handle
-                            .as_mut()
-                            .map(|x| std::mem::replace(x, fidl::Handle::invalid().into())),
-                        opt_vmo
-                            .as_mut()
-                            .map(|x| std::mem::replace(x, fidl::Handle::invalid().into())),
-                        opt_client_end
-                            .as_mut()
-                            .map(|x| std::mem::replace(x, fidl::Handle::invalid().into())),
-                        opt_server_end
-                            .as_mut()
-                            .map(|x| std::mem::replace(x, fidl::Handle::invalid().into())),
-                        opt_struct.as_mut(),
-                        opt_union.as_mut(),
-                        array_handle,
-                        array_vmo,
-                        array_client_end,
-                        array_server_end,
-                        array_struct,
-                        array_table,
-                        array_union,
-                        vector_handle.as_mut_slice(),
-                        vector_vmo.as_mut_slice(),
-                        vector_client_end.as_mut_slice(),
-                        vector_server_end.as_mut_slice(),
-                        vector_struct.as_mut_slice(),
-                        vector_table.as_mut_slice(),
-                        vector_union.as_mut_slice(),
-                    )
-                },
-            ),
+            result.as_mut().map_err(|e| *e).map(|(handle, vmo, client_end, server_end, struct_, table, union, opt_handle, opt_vmo, opt_client_end, opt_server_end, opt_struct, opt_union, array_handle, array_vmo, array_client_end, array_server_end, array_struct, array_table, array_union, vector_handle, vector_vmo, vector_client_end, vector_server_end, vector_struct, vector_table, vector_union)| (std::mem::replace(handle, <<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::Handle as fidl::encoding::HandleFor<fidl::encoding::DefaultFuchsiaResourceDialect>>::invalid().into()), std::mem::replace(vmo, <<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::Handle as fidl::encoding::HandleFor<fidl::encoding::DefaultFuchsiaResourceDialect>>::invalid().into()), std::mem::replace(client_end, <<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::Handle as fidl::encoding::HandleFor<fidl::encoding::DefaultFuchsiaResourceDialect>>::invalid().into()), std::mem::replace(server_end, <<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::Handle as fidl::encoding::HandleFor<fidl::encoding::DefaultFuchsiaResourceDialect>>::invalid().into()), struct_, table, union, opt_handle.as_mut().map(|x| std::mem::replace(x, <<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::Handle as fidl::encoding::HandleFor<fidl::encoding::DefaultFuchsiaResourceDialect>>::invalid().into())), opt_vmo.as_mut().map(|x| std::mem::replace(x, <<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::Handle as fidl::encoding::HandleFor<fidl::encoding::DefaultFuchsiaResourceDialect>>::invalid().into())), opt_client_end.as_mut().map(|x| std::mem::replace(x, <<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::Handle as fidl::encoding::HandleFor<fidl::encoding::DefaultFuchsiaResourceDialect>>::invalid().into())), opt_server_end.as_mut().map(|x| std::mem::replace(x, <<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::Handle as fidl::encoding::HandleFor<fidl::encoding::DefaultFuchsiaResourceDialect>>::invalid().into())), opt_struct.as_mut(), opt_union.as_mut(), array_handle, array_vmo, array_client_end, array_server_end, array_struct, array_table, array_union, vector_handle.as_mut_slice(), vector_vmo.as_mut_slice(), vector_client_end.as_mut_slice(), vector_server_end.as_mut_slice(), vector_struct.as_mut_slice(), vector_table.as_mut_slice(), vector_union.as_mut_slice(),)),
             self.tx_id,
             0x5b28634d603175b6,
-            fidl::encoding::DynamicFlags::empty(),
+            fidl::encoding::DynamicFlags::empty()
         )
     }
 }

@@ -7,7 +7,7 @@
 
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
-use fidl::encoding::ProxyChannelBox;
+use fidl::encoding::{MessageBufFor, ProxyChannelBox, ResourceDialect};
 use fidl::endpoints::{ControlHandle as _, Responder as _};
 use futures::future::{self, MaybeDone, TryFutureExt};
 use zx_status;
@@ -33,7 +33,6 @@ pub struct SubMarker;
 impl fidl::endpoints::ProtocolMarker for SubMarker {
     type Proxy = SubProxy;
     type RequestStream = SubRequestStream;
-
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = SubSynchronousProxy;
 
@@ -44,7 +43,6 @@ pub trait SubProxyInterface: Send + Sync {
     type FooResponseFut: std::future::Future<Output = Result<i64, fidl::Error>> + Send;
     fn r#foo(&self, s: &str) -> Self::FooResponseFut;
 }
-
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct SubSynchronousProxy {
@@ -103,13 +101,13 @@ impl SubSynchronousProxy {
 
 #[derive(Debug, Clone)]
 pub struct SubProxy {
-    client: fidl::client::Client,
+    client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl fidl::endpoints::Proxy for SubProxy {
     type Protocol = SubMarker;
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: ::fidl::AsyncChannel) -> Self {
         Self::new(inner)
     }
 
@@ -124,7 +122,7 @@ impl fidl::endpoints::Proxy for SubProxy {
 
 impl SubProxy {
     /// Create a new Proxy for test.inheritance/sub.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
+    pub fn new(channel: ::fidl::AsyncChannel) -> Self {
         let protocol_name = <SubMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
@@ -138,15 +136,21 @@ impl SubProxy {
         SubEventStream { event_receiver: self.client.take_event_receiver() }
     }
 
-    pub fn r#foo(&self, mut s: &str) -> fidl::client::QueryResponseFut<i64> {
+    pub fn r#foo(
+        &self,
+        mut s: &str,
+    ) -> fidl::client::QueryResponseFut<i64, fidl::encoding::DefaultFuchsiaResourceDialect> {
         SubProxyInterface::r#foo(self, s)
     }
 }
 
 impl SubProxyInterface for SubProxy {
-    type FooResponseFut = fidl::client::QueryResponseFut<i64>;
+    type FooResponseFut =
+        fidl::client::QueryResponseFut<i64, fidl::encoding::DefaultFuchsiaResourceDialect>;
     fn r#foo(&self, mut s: &str) -> Self::FooResponseFut {
-        fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i64, fidl::Error> {
+        fn _decode(
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
+        ) -> Result<i64, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 SuperFooResponse,
                 fidl::encoding::DefaultFuchsiaResourceDialect,
@@ -164,7 +168,7 @@ impl SubProxyInterface for SubProxy {
 }
 
 pub struct SubEventStream {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl std::marker::Unpin for SubEventStream {}
@@ -197,7 +201,9 @@ pub enum SubEvent {}
 
 impl SubEvent {
     /// Decodes a message buffer as a [`SubEvent`].
-    fn decode(mut buf: fidl::MessageBufEtc) -> Result<SubEvent, fidl::Error> {
+    fn decode(
+        mut buf: <fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc,
+    ) -> Result<SubEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
         debug_assert_eq!(tx_header.tx_id, 0);
@@ -212,7 +218,7 @@ impl SubEvent {
 
 /// A Stream of incoming requests for test.inheritance/sub.
 pub struct SubRequestStream {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
     is_terminated: bool,
 }
 
@@ -228,7 +234,7 @@ impl fidl::endpoints::RequestStream for SubRequestStream {
     type Protocol = SubMarker;
     type ControlHandle = SubControlHandle;
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: ::fidl::AsyncChannel) -> Self {
         Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
     }
 
@@ -236,11 +242,17 @@ impl fidl::endpoints::RequestStream for SubRequestStream {
         SubControlHandle { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(
+        self,
+    ) -> (::std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>, bool)
+    {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(
+        inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
+        is_terminated: bool,
+    ) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -332,14 +344,13 @@ impl SubRequest {
 
 #[derive(Debug, Clone)]
 pub struct SubControlHandle {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
 }
 
 impl fidl::endpoints::ControlHandle for SubControlHandle {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
-
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
@@ -347,7 +358,6 @@ impl fidl::endpoints::ControlHandle for SubControlHandle {
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
-
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
@@ -434,7 +444,6 @@ pub struct Super_Marker;
 impl fidl::endpoints::ProtocolMarker for Super_Marker {
     type Proxy = Super_Proxy;
     type RequestStream = Super_RequestStream;
-
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = Super_SynchronousProxy;
 
@@ -445,7 +454,6 @@ pub trait Super_ProxyInterface: Send + Sync {
     type FooResponseFut: std::future::Future<Output = Result<i64, fidl::Error>> + Send;
     fn r#foo(&self, s: &str) -> Self::FooResponseFut;
 }
-
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct Super_SynchronousProxy {
@@ -507,13 +515,13 @@ impl Super_SynchronousProxy {
 
 #[derive(Debug, Clone)]
 pub struct Super_Proxy {
-    client: fidl::client::Client,
+    client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl fidl::endpoints::Proxy for Super_Proxy {
     type Protocol = Super_Marker;
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: ::fidl::AsyncChannel) -> Self {
         Self::new(inner)
     }
 
@@ -528,7 +536,7 @@ impl fidl::endpoints::Proxy for Super_Proxy {
 
 impl Super_Proxy {
     /// Create a new Proxy for test.inheritance/super.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
+    pub fn new(channel: ::fidl::AsyncChannel) -> Self {
         let protocol_name = <Super_Marker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
@@ -542,15 +550,21 @@ impl Super_Proxy {
         Super_EventStream { event_receiver: self.client.take_event_receiver() }
     }
 
-    pub fn r#foo(&self, mut s: &str) -> fidl::client::QueryResponseFut<i64> {
+    pub fn r#foo(
+        &self,
+        mut s: &str,
+    ) -> fidl::client::QueryResponseFut<i64, fidl::encoding::DefaultFuchsiaResourceDialect> {
         Super_ProxyInterface::r#foo(self, s)
     }
 }
 
 impl Super_ProxyInterface for Super_Proxy {
-    type FooResponseFut = fidl::client::QueryResponseFut<i64>;
+    type FooResponseFut =
+        fidl::client::QueryResponseFut<i64, fidl::encoding::DefaultFuchsiaResourceDialect>;
     fn r#foo(&self, mut s: &str) -> Self::FooResponseFut {
-        fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i64, fidl::Error> {
+        fn _decode(
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
+        ) -> Result<i64, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 SuperFooResponse,
                 fidl::encoding::DefaultFuchsiaResourceDialect,
@@ -568,7 +582,7 @@ impl Super_ProxyInterface for Super_Proxy {
 }
 
 pub struct Super_EventStream {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl std::marker::Unpin for Super_EventStream {}
@@ -601,7 +615,9 @@ pub enum Super_Event {}
 
 impl Super_Event {
     /// Decodes a message buffer as a [`Super_Event`].
-    fn decode(mut buf: fidl::MessageBufEtc) -> Result<Super_Event, fidl::Error> {
+    fn decode(
+        mut buf: <fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc,
+    ) -> Result<Super_Event, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
         debug_assert_eq!(tx_header.tx_id, 0);
@@ -616,7 +632,7 @@ impl Super_Event {
 
 /// A Stream of incoming requests for test.inheritance/super.
 pub struct Super_RequestStream {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
     is_terminated: bool,
 }
 
@@ -632,7 +648,7 @@ impl fidl::endpoints::RequestStream for Super_RequestStream {
     type Protocol = Super_Marker;
     type ControlHandle = Super_ControlHandle;
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: ::fidl::AsyncChannel) -> Self {
         Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
     }
 
@@ -640,11 +656,17 @@ impl fidl::endpoints::RequestStream for Super_RequestStream {
         Super_ControlHandle { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(
+        self,
+    ) -> (::std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>, bool)
+    {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(
+        inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
+        is_terminated: bool,
+    ) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -737,14 +759,13 @@ impl Super_Request {
 
 #[derive(Debug, Clone)]
 pub struct Super_ControlHandle {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
 }
 
 impl fidl::endpoints::ControlHandle for Super_ControlHandle {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
-
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
@@ -752,7 +773,6 @@ impl fidl::endpoints::ControlHandle for Super_ControlHandle {
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
-
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }

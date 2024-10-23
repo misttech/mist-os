@@ -7,7 +7,7 @@
 
 use bitflags::bitflags;
 use fidl::client::QueryResponseFut;
-use fidl::encoding::ProxyChannelBox;
+use fidl::encoding::{MessageBufFor, ProxyChannelBox, ResourceDialect};
 use fidl::endpoints::{ControlHandle as _, Responder as _};
 use futures::future::{self, MaybeDone, TryFutureExt};
 use zx_status;
@@ -325,7 +325,6 @@ pub struct ComposedProtocolMarker;
 impl fidl::endpoints::ProtocolMarker for ComposedProtocolMarker {
     type Proxy = ComposedProtocolProxy;
     type RequestStream = ComposedProtocolRequestStream;
-
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = ComposedProtocolSynchronousProxy;
 
@@ -369,7 +368,6 @@ pub trait ComposedProtocolProxyInterface: Send + Sync {
         payload: &TablePayload,
     ) -> Self::TwoWayNamedComposedWithErrorResponseFut;
 }
-
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct ComposedProtocolSynchronousProxy {
@@ -499,13 +497,13 @@ impl ComposedProtocolSynchronousProxy {
 
 #[derive(Debug, Clone)]
 pub struct ComposedProtocolProxy {
-    client: fidl::client::Client,
+    client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl fidl::endpoints::Proxy for ComposedProtocolProxy {
     type Protocol = ComposedProtocolMarker;
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: ::fidl::AsyncChannel) -> Self {
         Self::new(inner)
     }
 
@@ -520,7 +518,7 @@ impl fidl::endpoints::Proxy for ComposedProtocolProxy {
 
 impl ComposedProtocolProxy {
     /// Create a new Proxy for test.protocollayoutssamelibrary/ComposedProtocol.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
+    pub fn new(channel: ::fidl::AsyncChannel) -> Self {
         let protocol_name = <ComposedProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
@@ -544,14 +542,20 @@ impl ComposedProtocolProxy {
     pub fn r#two_way_anon_composed(
         &self,
         mut payload: &ComposedProtocolTwoWayAnonComposedRequest,
-    ) -> fidl::client::QueryResponseFut<ComposedProtocolTwoWayAnonComposedResponse> {
+    ) -> fidl::client::QueryResponseFut<
+        ComposedProtocolTwoWayAnonComposedResponse,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         ComposedProtocolProxyInterface::r#two_way_anon_composed(self, payload)
     }
 
     pub fn r#two_way_anon_composed_with_error(
         &self,
         mut payload: &ComposedProtocolTwoWayAnonComposedWithErrorRequest,
-    ) -> fidl::client::QueryResponseFut<ComposedProtocolTwoWayAnonComposedWithErrorResult> {
+    ) -> fidl::client::QueryResponseFut<
+        ComposedProtocolTwoWayAnonComposedWithErrorResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         ComposedProtocolProxyInterface::r#two_way_anon_composed_with_error(self, payload)
     }
 
@@ -562,14 +566,18 @@ impl ComposedProtocolProxy {
     pub fn r#two_way_named_composed(
         &self,
         mut payload: &UnionPayload,
-    ) -> fidl::client::QueryResponseFut<TablePayload> {
+    ) -> fidl::client::QueryResponseFut<TablePayload, fidl::encoding::DefaultFuchsiaResourceDialect>
+    {
         ComposedProtocolProxyInterface::r#two_way_named_composed(self, payload)
     }
 
     pub fn r#two_way_named_composed_with_error(
         &self,
         mut payload: &TablePayload,
-    ) -> fidl::client::QueryResponseFut<ComposedProtocolTwoWayNamedComposedWithErrorResult> {
+    ) -> fidl::client::QueryResponseFut<
+        ComposedProtocolTwoWayNamedComposedWithErrorResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         ComposedProtocolProxyInterface::r#two_way_named_composed_with_error(self, payload)
     }
 }
@@ -586,14 +594,16 @@ impl ComposedProtocolProxyInterface for ComposedProtocolProxy {
         )
     }
 
-    type TwoWayAnonComposedResponseFut =
-        fidl::client::QueryResponseFut<ComposedProtocolTwoWayAnonComposedResponse>;
+    type TwoWayAnonComposedResponseFut = fidl::client::QueryResponseFut<
+        ComposedProtocolTwoWayAnonComposedResponse,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#two_way_anon_composed(
         &self,
         mut payload: &ComposedProtocolTwoWayAnonComposedRequest,
     ) -> Self::TwoWayAnonComposedResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<ComposedProtocolTwoWayAnonComposedResponse, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 ComposedProtocolTwoWayAnonComposedResponse,
@@ -613,14 +623,16 @@ impl ComposedProtocolProxyInterface for ComposedProtocolProxy {
         )
     }
 
-    type TwoWayAnonComposedWithErrorResponseFut =
-        fidl::client::QueryResponseFut<ComposedProtocolTwoWayAnonComposedWithErrorResult>;
+    type TwoWayAnonComposedWithErrorResponseFut = fidl::client::QueryResponseFut<
+        ComposedProtocolTwoWayAnonComposedWithErrorResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#two_way_anon_composed_with_error(
         &self,
         mut payload: &ComposedProtocolTwoWayAnonComposedWithErrorRequest,
     ) -> Self::TwoWayAnonComposedWithErrorResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<ComposedProtocolTwoWayAnonComposedWithErrorResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<
@@ -651,13 +663,14 @@ impl ComposedProtocolProxyInterface for ComposedProtocolProxy {
         )
     }
 
-    type TwoWayNamedComposedResponseFut = fidl::client::QueryResponseFut<TablePayload>;
+    type TwoWayNamedComposedResponseFut =
+        fidl::client::QueryResponseFut<TablePayload, fidl::encoding::DefaultFuchsiaResourceDialect>;
     fn r#two_way_named_composed(
         &self,
         mut payload: &UnionPayload,
     ) -> Self::TwoWayNamedComposedResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<TablePayload, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 TablePayload,
@@ -674,14 +687,16 @@ impl ComposedProtocolProxyInterface for ComposedProtocolProxy {
         )
     }
 
-    type TwoWayNamedComposedWithErrorResponseFut =
-        fidl::client::QueryResponseFut<ComposedProtocolTwoWayNamedComposedWithErrorResult>;
+    type TwoWayNamedComposedWithErrorResponseFut = fidl::client::QueryResponseFut<
+        ComposedProtocolTwoWayNamedComposedWithErrorResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#two_way_named_composed_with_error(
         &self,
         mut payload: &TablePayload,
     ) -> Self::TwoWayNamedComposedWithErrorResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<ComposedProtocolTwoWayNamedComposedWithErrorResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<UnionPayload, u32>,
@@ -703,7 +718,7 @@ impl ComposedProtocolProxyInterface for ComposedProtocolProxy {
 }
 
 pub struct ComposedProtocolEventStream {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl std::marker::Unpin for ComposedProtocolEventStream {}
@@ -756,7 +771,9 @@ impl ComposedProtocolEvent {
     }
 
     /// Decodes a message buffer as a [`ComposedProtocolEvent`].
-    fn decode(mut buf: fidl::MessageBufEtc) -> Result<ComposedProtocolEvent, fidl::Error> {
+    fn decode(
+        mut buf: <fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc,
+    ) -> Result<ComposedProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
         debug_assert_eq!(tx_header.tx_id, 0);
@@ -786,7 +803,7 @@ impl ComposedProtocolEvent {
 
 /// A Stream of incoming requests for test.protocollayoutssamelibrary/ComposedProtocol.
 pub struct ComposedProtocolRequestStream {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
     is_terminated: bool,
 }
 
@@ -802,7 +819,7 @@ impl fidl::endpoints::RequestStream for ComposedProtocolRequestStream {
     type Protocol = ComposedProtocolMarker;
     type ControlHandle = ComposedProtocolControlHandle;
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: ::fidl::AsyncChannel) -> Self {
         Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
     }
 
@@ -810,11 +827,17 @@ impl fidl::endpoints::RequestStream for ComposedProtocolRequestStream {
         ComposedProtocolControlHandle { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(
+        self,
+    ) -> (::std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>, bool)
+    {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(
+        inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
+        is_terminated: bool,
+    ) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -1081,14 +1104,13 @@ impl ComposedProtocolRequest {
 
 #[derive(Debug, Clone)]
 pub struct ComposedProtocolControlHandle {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
 }
 
 impl fidl::endpoints::ControlHandle for ComposedProtocolControlHandle {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
-
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
@@ -1096,7 +1118,6 @@ impl fidl::endpoints::ControlHandle for ComposedProtocolControlHandle {
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
-
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }
@@ -1417,7 +1438,6 @@ pub struct MainProtocolMarker;
 impl fidl::endpoints::ProtocolMarker for MainProtocolMarker {
     type Proxy = MainProtocolProxy;
     type RequestStream = MainProtocolRequestStream;
-
     #[cfg(target_os = "fuchsia")]
     type SynchronousProxy = MainProtocolSynchronousProxy;
 
@@ -1484,7 +1504,6 @@ pub trait MainProtocolProxyInterface: Send + Sync {
         payload: &MainProtocolTwoWayAnonWithErrorRequest,
     ) -> Self::TwoWayAnonWithErrorResponseFut;
 }
-
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
 pub struct MainProtocolSynchronousProxy {
@@ -1695,13 +1714,13 @@ impl MainProtocolSynchronousProxy {
 
 #[derive(Debug, Clone)]
 pub struct MainProtocolProxy {
-    client: fidl::client::Client,
+    client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl fidl::endpoints::Proxy for MainProtocolProxy {
     type Protocol = MainProtocolMarker;
 
-    fn from_channel(inner: fidl::AsyncChannel) -> Self {
+    fn from_channel(inner: ::fidl::AsyncChannel) -> Self {
         Self::new(inner)
     }
 
@@ -1716,7 +1735,7 @@ impl fidl::endpoints::Proxy for MainProtocolProxy {
 
 impl MainProtocolProxy {
     /// Create a new Proxy for test.protocollayoutssamelibrary/MainProtocol.
-    pub fn new(channel: fidl::AsyncChannel) -> Self {
+    pub fn new(channel: ::fidl::AsyncChannel) -> Self {
         let protocol_name = <MainProtocolMarker as fidl::endpoints::ProtocolMarker>::DEBUG_NAME;
         Self { client: fidl::client::Client::new(channel, protocol_name) }
     }
@@ -1740,14 +1759,20 @@ impl MainProtocolProxy {
     pub fn r#two_way_anon_composed(
         &self,
         mut payload: &ComposedProtocolTwoWayAnonComposedRequest,
-    ) -> fidl::client::QueryResponseFut<ComposedProtocolTwoWayAnonComposedResponse> {
+    ) -> fidl::client::QueryResponseFut<
+        ComposedProtocolTwoWayAnonComposedResponse,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         MainProtocolProxyInterface::r#two_way_anon_composed(self, payload)
     }
 
     pub fn r#two_way_anon_composed_with_error(
         &self,
         mut payload: &ComposedProtocolTwoWayAnonComposedWithErrorRequest,
-    ) -> fidl::client::QueryResponseFut<ComposedProtocolTwoWayAnonComposedWithErrorResult> {
+    ) -> fidl::client::QueryResponseFut<
+        ComposedProtocolTwoWayAnonComposedWithErrorResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         MainProtocolProxyInterface::r#two_way_anon_composed_with_error(self, payload)
     }
 
@@ -1758,14 +1783,18 @@ impl MainProtocolProxy {
     pub fn r#two_way_named_composed(
         &self,
         mut payload: &UnionPayload,
-    ) -> fidl::client::QueryResponseFut<TablePayload> {
+    ) -> fidl::client::QueryResponseFut<TablePayload, fidl::encoding::DefaultFuchsiaResourceDialect>
+    {
         MainProtocolProxyInterface::r#two_way_named_composed(self, payload)
     }
 
     pub fn r#two_way_named_composed_with_error(
         &self,
         mut payload: &TablePayload,
-    ) -> fidl::client::QueryResponseFut<ComposedProtocolTwoWayNamedComposedWithErrorResult> {
+    ) -> fidl::client::QueryResponseFut<
+        ComposedProtocolTwoWayNamedComposedWithErrorResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         MainProtocolProxyInterface::r#two_way_named_composed_with_error(self, payload)
     }
 
@@ -1776,14 +1805,18 @@ impl MainProtocolProxy {
     pub fn r#two_way_local(
         &self,
         mut payload: &UnionPayload,
-    ) -> fidl::client::QueryResponseFut<TablePayload> {
+    ) -> fidl::client::QueryResponseFut<TablePayload, fidl::encoding::DefaultFuchsiaResourceDialect>
+    {
         MainProtocolProxyInterface::r#two_way_local(self, payload)
     }
 
     pub fn r#two_way_local_with_error(
         &self,
         mut payload: &TablePayload,
-    ) -> fidl::client::QueryResponseFut<MainProtocolTwoWayLocalWithErrorResult> {
+    ) -> fidl::client::QueryResponseFut<
+        MainProtocolTwoWayLocalWithErrorResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         MainProtocolProxyInterface::r#two_way_local_with_error(self, payload)
     }
 
@@ -1797,14 +1830,20 @@ impl MainProtocolProxy {
     pub fn r#two_way_anon(
         &self,
         mut payload: &MainProtocolTwoWayAnonRequest,
-    ) -> fidl::client::QueryResponseFut<MainProtocolTwoWayAnonResponse> {
+    ) -> fidl::client::QueryResponseFut<
+        MainProtocolTwoWayAnonResponse,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         MainProtocolProxyInterface::r#two_way_anon(self, payload)
     }
 
     pub fn r#two_way_anon_with_error(
         &self,
         mut payload: &MainProtocolTwoWayAnonWithErrorRequest,
-    ) -> fidl::client::QueryResponseFut<MainProtocolTwoWayAnonWithErrorResult> {
+    ) -> fidl::client::QueryResponseFut<
+        MainProtocolTwoWayAnonWithErrorResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    > {
         MainProtocolProxyInterface::r#two_way_anon_with_error(self, payload)
     }
 }
@@ -1821,14 +1860,16 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         )
     }
 
-    type TwoWayAnonComposedResponseFut =
-        fidl::client::QueryResponseFut<ComposedProtocolTwoWayAnonComposedResponse>;
+    type TwoWayAnonComposedResponseFut = fidl::client::QueryResponseFut<
+        ComposedProtocolTwoWayAnonComposedResponse,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#two_way_anon_composed(
         &self,
         mut payload: &ComposedProtocolTwoWayAnonComposedRequest,
     ) -> Self::TwoWayAnonComposedResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<ComposedProtocolTwoWayAnonComposedResponse, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 ComposedProtocolTwoWayAnonComposedResponse,
@@ -1848,14 +1889,16 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         )
     }
 
-    type TwoWayAnonComposedWithErrorResponseFut =
-        fidl::client::QueryResponseFut<ComposedProtocolTwoWayAnonComposedWithErrorResult>;
+    type TwoWayAnonComposedWithErrorResponseFut = fidl::client::QueryResponseFut<
+        ComposedProtocolTwoWayAnonComposedWithErrorResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#two_way_anon_composed_with_error(
         &self,
         mut payload: &ComposedProtocolTwoWayAnonComposedWithErrorRequest,
     ) -> Self::TwoWayAnonComposedWithErrorResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<ComposedProtocolTwoWayAnonComposedWithErrorResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<
@@ -1886,13 +1929,14 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         )
     }
 
-    type TwoWayNamedComposedResponseFut = fidl::client::QueryResponseFut<TablePayload>;
+    type TwoWayNamedComposedResponseFut =
+        fidl::client::QueryResponseFut<TablePayload, fidl::encoding::DefaultFuchsiaResourceDialect>;
     fn r#two_way_named_composed(
         &self,
         mut payload: &UnionPayload,
     ) -> Self::TwoWayNamedComposedResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<TablePayload, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 TablePayload,
@@ -1909,14 +1953,16 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         )
     }
 
-    type TwoWayNamedComposedWithErrorResponseFut =
-        fidl::client::QueryResponseFut<ComposedProtocolTwoWayNamedComposedWithErrorResult>;
+    type TwoWayNamedComposedWithErrorResponseFut = fidl::client::QueryResponseFut<
+        ComposedProtocolTwoWayNamedComposedWithErrorResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#two_way_named_composed_with_error(
         &self,
         mut payload: &TablePayload,
     ) -> Self::TwoWayNamedComposedWithErrorResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<ComposedProtocolTwoWayNamedComposedWithErrorResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<UnionPayload, u32>,
@@ -1944,10 +1990,11 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         )
     }
 
-    type TwoWayLocalResponseFut = fidl::client::QueryResponseFut<TablePayload>;
+    type TwoWayLocalResponseFut =
+        fidl::client::QueryResponseFut<TablePayload, fidl::encoding::DefaultFuchsiaResourceDialect>;
     fn r#two_way_local(&self, mut payload: &UnionPayload) -> Self::TwoWayLocalResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<TablePayload, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 TablePayload,
@@ -1964,14 +2011,16 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         )
     }
 
-    type TwoWayLocalWithErrorResponseFut =
-        fidl::client::QueryResponseFut<MainProtocolTwoWayLocalWithErrorResult>;
+    type TwoWayLocalWithErrorResponseFut = fidl::client::QueryResponseFut<
+        MainProtocolTwoWayLocalWithErrorResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#two_way_local_with_error(
         &self,
         mut payload: &TablePayload,
     ) -> Self::TwoWayLocalWithErrorResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<MainProtocolTwoWayLocalWithErrorResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<UnionPayload, u32>,
@@ -1999,13 +2048,16 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
         )
     }
 
-    type TwoWayAnonResponseFut = fidl::client::QueryResponseFut<MainProtocolTwoWayAnonResponse>;
+    type TwoWayAnonResponseFut = fidl::client::QueryResponseFut<
+        MainProtocolTwoWayAnonResponse,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#two_way_anon(
         &self,
         mut payload: &MainProtocolTwoWayAnonRequest,
     ) -> Self::TwoWayAnonResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<MainProtocolTwoWayAnonResponse, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 MainProtocolTwoWayAnonResponse,
@@ -2023,14 +2075,16 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
             )
     }
 
-    type TwoWayAnonWithErrorResponseFut =
-        fidl::client::QueryResponseFut<MainProtocolTwoWayAnonWithErrorResult>;
+    type TwoWayAnonWithErrorResponseFut = fidl::client::QueryResponseFut<
+        MainProtocolTwoWayAnonWithErrorResult,
+        fidl::encoding::DefaultFuchsiaResourceDialect,
+    >;
     fn r#two_way_anon_with_error(
         &self,
         mut payload: &MainProtocolTwoWayAnonWithErrorRequest,
     ) -> Self::TwoWayAnonWithErrorResponseFut {
         fn _decode(
-            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+            mut _buf: Result<<fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc, fidl::Error>,
         ) -> Result<MainProtocolTwoWayAnonWithErrorResult, fidl::Error> {
             let _response = fidl::client::decode_transaction_body::<
                 fidl::encoding::ResultType<MainProtocolTwoWayAnonWithErrorResponse, u32>,
@@ -2052,7 +2106,7 @@ impl MainProtocolProxyInterface for MainProtocolProxy {
 }
 
 pub struct MainProtocolEventStream {
-    event_receiver: fidl::client::EventReceiver,
+    event_receiver: fidl::client::EventReceiver<fidl::encoding::DefaultFuchsiaResourceDialect>,
 }
 
 impl std::marker::Unpin for MainProtocolEventStream {}
@@ -2123,7 +2177,9 @@ impl MainProtocolEvent {
     }
 
     /// Decodes a message buffer as a [`MainProtocolEvent`].
-    fn decode(mut buf: fidl::MessageBufEtc) -> Result<MainProtocolEvent, fidl::Error> {
+    fn decode(
+        mut buf: <fidl::encoding::DefaultFuchsiaResourceDialect as fidl::encoding::ResourceDialect>::MessageBufEtc,
+    ) -> Result<MainProtocolEvent, fidl::Error> {
         let (bytes, _handles) = buf.split_mut();
         let (tx_header, _body_bytes) = fidl::encoding::decode_transaction_header(bytes)?;
         debug_assert_eq!(tx_header.tx_id, 0);
@@ -2166,7 +2222,7 @@ impl MainProtocolEvent {
 
 /// A Stream of incoming requests for test.protocollayoutssamelibrary/MainProtocol.
 pub struct MainProtocolRequestStream {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
     is_terminated: bool,
 }
 
@@ -2182,7 +2238,7 @@ impl fidl::endpoints::RequestStream for MainProtocolRequestStream {
     type Protocol = MainProtocolMarker;
     type ControlHandle = MainProtocolControlHandle;
 
-    fn from_channel(channel: fidl::AsyncChannel) -> Self {
+    fn from_channel(channel: ::fidl::AsyncChannel) -> Self {
         Self { inner: std::sync::Arc::new(fidl::ServeInner::new(channel)), is_terminated: false }
     }
 
@@ -2190,11 +2246,17 @@ impl fidl::endpoints::RequestStream for MainProtocolRequestStream {
         MainProtocolControlHandle { inner: self.inner.clone() }
     }
 
-    fn into_inner(self) -> (::std::sync::Arc<fidl::ServeInner>, bool) {
+    fn into_inner(
+        self,
+    ) -> (::std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>, bool)
+    {
         (self.inner, self.is_terminated)
     }
 
-    fn from_inner(inner: std::sync::Arc<fidl::ServeInner>, is_terminated: bool) -> Self {
+    fn from_inner(
+        inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
+        is_terminated: bool,
+    ) -> Self {
         Self { inner, is_terminated }
     }
 }
@@ -2637,14 +2699,13 @@ impl MainProtocolRequest {
 
 #[derive(Debug, Clone)]
 pub struct MainProtocolControlHandle {
-    inner: std::sync::Arc<fidl::ServeInner>,
+    inner: std::sync::Arc<fidl::ServeInner<fidl::encoding::DefaultFuchsiaResourceDialect>>,
 }
 
 impl fidl::endpoints::ControlHandle for MainProtocolControlHandle {
     fn shutdown(&self) {
         self.inner.shutdown()
     }
-
     fn shutdown_with_epitaph(&self, status: zx_status::Status) {
         self.inner.shutdown_with_epitaph(status)
     }
@@ -2652,7 +2713,6 @@ impl fidl::endpoints::ControlHandle for MainProtocolControlHandle {
     fn is_closed(&self) -> bool {
         self.inner.channel().is_closed()
     }
-
     fn on_closed(&self) -> fidl::OnSignalsRef<'_> {
         self.inner.channel().on_closed()
     }

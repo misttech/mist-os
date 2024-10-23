@@ -68,7 +68,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	generator := codegen.NewGenerator(*flags.rustfmtPath, *flags.rustfmtConfigPath)
+	generator := codegen.NewGenerator(*flags.rustfmtPath, *flags.rustfmtConfigPath, *flags.fdomain)
 	err = generator.GenerateFidl(
 		root, *flags.outputFilenamePath, *flags.includeDrivers)
 	if err != nil {

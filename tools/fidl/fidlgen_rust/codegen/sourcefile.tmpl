@@ -17,15 +17,18 @@
 use {
     bitflags::bitflags,
     zx_status as zx_status,
-    fidl::encoding::ProxyChannelBox,
+    fidl::encoding::{MessageBufFor, ProxyChannelBox, ResourceDialect},
     futures::future::{self, MaybeDone, TryFutureExt},
-    fidl::{
-        endpoints::{ControlHandle as _, Responder as _},
-        client::QueryResponseFut,
-    },
 };
 
-
+{{- if FDomain }}
+use fdomain_client::fidl::{ControlHandle as _, Responder as _, FDomainFlexibleIntoResult as _};
+{{- else }}
+use fidl::{
+    endpoints::{ControlHandle as _, Responder as _},
+    client::QueryResponseFut,
+};
+{{- end }}
 
 {{- range .Aliases }}
 {{ template "AliasDeclaration" . }}
@@ -52,8 +55,10 @@ use {
 {{ template "ProtocolDeclaration" . }}
 {{ template "DriverProtocolDeclaration" . }}
 {{- end }}
+{{- if not FDomain }}
 {{- range .Services }}
 {{ template "ServiceDeclaration" . }}
+{{- end }}
 {{- end }}
 
 mod internal {
