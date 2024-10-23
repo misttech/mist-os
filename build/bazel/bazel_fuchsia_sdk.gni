@@ -114,8 +114,8 @@ template("generate_fuchsia_bazel_sdk") {
 #  3) There is no way to list all inputs / outputs properly.
 #
 # Arguments:
-#    target_cpu: (optional)
-#       Target cpu name. Default to current_cpu otherwise.
+#    target_cpus: (optional)
+#       List of target CPU names. Default is [ target_cpu ].
 #
 #    idk_exported_path: (optional)
 #       GN path to an IDK `exported` directory to use to run the
@@ -137,15 +137,15 @@ template("generate_fuchsia_bazel_sdk") {
 #
 #    output_base: (optional)
 #       GN path to a Bazel output_base directory to use to run the
-#       test suite. This is useful to run the test suite repeatedly through
-#       multiple targets that each have a different target_cpu value.
+#       test suite. Its content will be shared by all CPU architectures.
+#       Default is $target_out_dir/$target_name/output_base
 #
 #       See technical note below for proper usage.
 #
 #    output_user_root: (optional)
 #       GN path to a Bazel output_user_root directory to use to run
-#       the test suite. This is useful to run the test suite multiple times
-#       with different target_cpu values or even IDK export directories.
+#       the test suite. Its content will be shared by all CPU architectures.
+#       Default is $target_out_dir/$target_name/output_user_root
 #
 #    remote_build: (optional)
 #       Set to false to prevent use of remote services for building,
@@ -180,144 +180,159 @@ template("run_fuchsia_bazel_sdk_tests") {
            "fuchsia_sdk_path requires fuchsia_sdk_target to be defined!")
   }
 
-  _target_cpu = target_cpu
-  if (defined(invoker.target_cpu)) {
-    _target_cpu = invoker.target_cpu
+  if (defined(invoker.target_cpus)) {
+    _target_cpus = invoker.target_cpus
+  } else {
+    _target_cpus = [ target_cpu ]
   }
 
   if (defined(invoker.output_base)) {
     _output_base = invoker.output_base
   } else {
-    _output_base = "${target_gen_dir}/${target_name}/output_base"
+    _output_base = "${target_out_dir}/${target_name}/output_base"
   }
   if (defined(invoker.output_user_root)) {
     _output_user_root = invoker.output_user_root
   } else {
-    _output_user_root = "${target_gen_dir}/${target_name}/output_user_root"
+    _output_user_root = "${target_out_dir}/${target_name}/output_user_root"
   }
 
-  action(target_name) {
+  _main_target_name = target_name
+
+  _all_targets = []
+  foreach(_target_cpu, _target_cpus) {
+    _cpu_target_name = "${target_name}_${_target_cpu}"
+    _all_targets += [ ":${_cpu_target_name}" ]
+
+    action(_cpu_target_name) {
+      testonly = true
+      script = "//build/bazel_sdk/tests/scripts/bazel_test.py"
+      inputs = [ "//prebuilt/third_party/bazel/${host_os}-${host_cpu}/bazel" ]
+      outputs = [
+        "$target_gen_dir/$target_name.stamp",
+        "$target_out_dir/$target_name.bazel_events_logs.json",
+      ]
+      _exec_log = "$target_out_dir/$target_name.bazel_exec_log.pb.zstd"
+      depfile = "$target_gen_dir/$target_name.d"
+
+      args = [
+        "--verbose",
+        "--fuchsia_source_dir=" + rebase_path("//", root_build_dir),
+        "--output_base=" + rebase_path(_output_base, root_build_dir),
+        "--output_user_root=" + rebase_path(_output_user_root, root_build_dir),
+        "--target_cpu=${_target_cpu}",
+        "--bazel=" + rebase_path(inputs[0], root_build_dir),
+        "--stamp-file=" + rebase_path(outputs[0], root_build_dir),
+        "--depfile=" + rebase_path(depfile, root_build_dir),
+        "--quiet",
+      ]
+
+      deps = []
+
+      _remote_build = enable_bazel_remote_rbe
+      if (_remote_build) {
+        if (defined(invoker.remote_build)) {
+          _remote_build = invoker.remote_build
+        }
+      } else {
+        not_needed(invoker, [ "remote_build" ])
+      }
+      _remote_build_strategy = bazel_rbe_exec_strategy
+      if (defined(invoker.remote_build_strategy)) {
+        _remote_build_strategy = invoker.remote_build_strategy
+      }
+      if (_remote_build || bazel_upload_build_events != "") {
+        _remote_services_bazelrc_target =
+            "//build/bazel:remote_services_bazelrc"
+        _remote_services_bazelrc_path =
+            get_label_info(_remote_services_bazelrc_target, "target_out_dir") +
+            "/remote_services.bazelrc"
+        args += [
+          "--bazelrc",
+          rebase_path(_remote_services_bazelrc_path, root_build_dir),
+        ]
+        deps += [ _remote_services_bazelrc_target ]
+      }
+      if (_remote_build) {
+        if (_remote_build_strategy == "remote") {
+          args += [ "--bazel-config=remote" ]
+        } else if (_remote_build_strategy == "local") {
+          args += [ "--bazel-config=remote_cache_only" ]
+        }
+        if (is_hwasan || is_asan) {
+          args += [ "--bazel-config=link_local" ]  # Workaround for b/353675498
+        }
+      } else {
+        not_needed([ "_remote_build_strategy" ])
+      }
+      if (bazel_upload_build_events != "") {
+        args += [ "--bazel-config=" + bazel_upload_build_events ]
+      }
+
+      if (_use_idk_exported) {
+        args += [
+          "--fuchsia_idk_directory",
+          rebase_path(_idk_exported_path, root_build_dir),
+        ]
+        deps += [ _idk_exported_target ]
+      } else if (_use_fuchsia_sdk) {
+        args += [
+          "--fuchsia_build_dir",
+          rebase_path(root_build_dir, root_build_dir),
+          "--fuchsia_sdk_dir",
+          rebase_path(_fuchsia_sdk_path, root_build_dir),
+        ]
+        deps += [ _fuchsia_sdk_target ]
+      } else {
+        args += [
+          "--fuchsia_build_dir",
+          rebase_path(root_build_dir, root_build_dir),
+        ]
+        deps += [ "//build/bazel:generate_fuchsia_sdk_repository" ]
+      }
+      args += [
+        "--prebuilt-python-version-file",
+        rebase_path(prebuilt_content_hash_files.python, root_build_dir),
+        "--prebuilt-clang-version-file",
+        rebase_path(prebuilt_content_hash_files.clang, root_build_dir),
+      ]
+
+      if (bazel_execution_logs) {
+        args += [
+          "--bazel-exec-log-compact",
+          rebase_path(_exec_log, root_build_dir),
+        ]
+      }
+      args += [
+        "--bazel-build-events-log-json",
+        rebase_path(outputs[1], root_build_dir),
+      ]
+
+      metadata = {
+        # Used by //:bazel_build_events_logs Build API module
+        bazel_build_events_log = [
+          {
+            gn_label = get_label_info(":$target_name", "label_no_toolchain")
+            build_events_log = rebase_path(outputs[1], root_build_dir)
+            format = "json"
+          },
+        ]
+      }
+
+      deps += [
+        prebuilt_content_hash_labels.clang,
+        prebuilt_content_hash_labels.python,
+      ]
+      pool = "//:console"
+      hermetic_deps = false
+
+      # The build events log contains absolute paths written by Bazel!
+      no_output_dir_leaks = false
+    }
+  }
+
+  group(_main_target_name) {
     testonly = true
-    script = "//build/bazel_sdk/tests/scripts/bazel_test.py"
-    inputs = [ "//prebuilt/third_party/bazel/${host_os}-${host_cpu}/bazel" ]
-    outputs = [
-      "$target_gen_dir/$target_name.stamp",
-      "$target_out_dir/$target_name.bazel_events_logs.json",
-    ]
-    _exec_log = "$target_out_dir/$target_name.bazel_exec_log.pb.zstd"
-    depfile = "$target_gen_dir/$target_name.d"
-
-    args = [
-      "--verbose",
-      "--fuchsia_source_dir=" + rebase_path("//", root_build_dir),
-      "--output_base=" + rebase_path(_output_base, root_build_dir),
-      "--output_user_root=" + rebase_path(_output_user_root, root_build_dir),
-      "--target_cpu=${_target_cpu}",
-      "--bazel=" + rebase_path(inputs[0], root_build_dir),
-      "--stamp-file=" + rebase_path(outputs[0], root_build_dir),
-      "--depfile=" + rebase_path(depfile, root_build_dir),
-      "--quiet",
-    ]
-
-    deps = []
-
-    _remote_build = enable_bazel_remote_rbe
-    if (_remote_build) {
-      if (defined(invoker.remote_build)) {
-        _remote_build = invoker.remote_build
-      }
-    } else {
-      not_needed(invoker, [ "remote_build" ])
-    }
-    _remote_build_strategy = bazel_rbe_exec_strategy
-    if (defined(invoker.remote_build_strategy)) {
-      _remote_build_strategy = invoker.remote_build_strategy
-    }
-    if (_remote_build || bazel_upload_build_events != "") {
-      _remote_services_bazelrc_target = "//build/bazel:remote_services_bazelrc"
-      _remote_services_bazelrc_path =
-          get_label_info(_remote_services_bazelrc_target, "target_out_dir") +
-          "/remote_services.bazelrc"
-      args += [
-        "--bazelrc",
-        rebase_path(_remote_services_bazelrc_path, root_build_dir),
-      ]
-      deps += [ _remote_services_bazelrc_target ]
-    }
-    if (_remote_build) {
-      if (_remote_build_strategy == "remote") {
-        args += [ "--bazel-config=remote" ]
-      } else if (_remote_build_strategy == "local") {
-        args += [ "--bazel-config=remote_cache_only" ]
-      }
-      if (is_hwasan || is_asan) {
-        args += [ "--bazel-config=link_local" ]  # Workaround for b/353675498
-      }
-    } else {
-      not_needed([ "_remote_build_strategy" ])
-    }
-    if (bazel_upload_build_events != "") {
-      args += [ "--bazel-config=" + bazel_upload_build_events ]
-    }
-
-    if (_use_idk_exported) {
-      args += [
-        "--fuchsia_idk_directory",
-        rebase_path(_idk_exported_path, root_build_dir),
-      ]
-      deps += [ _idk_exported_target ]
-    } else if (_use_fuchsia_sdk) {
-      args += [
-        "--fuchsia_build_dir",
-        rebase_path(root_build_dir, root_build_dir),
-        "--fuchsia_sdk_dir",
-        rebase_path(_fuchsia_sdk_path, root_build_dir),
-      ]
-      deps += [ _fuchsia_sdk_target ]
-    } else {
-      args += [
-        "--fuchsia_build_dir",
-        rebase_path(root_build_dir, root_build_dir),
-      ]
-      deps += [ "//build/bazel:generate_fuchsia_sdk_repository" ]
-    }
-    args += [
-      "--prebuilt-python-version-file",
-      rebase_path(prebuilt_content_hash_files.python, root_build_dir),
-      "--prebuilt-clang-version-file",
-      rebase_path(prebuilt_content_hash_files.clang, root_build_dir),
-    ]
-
-    if (bazel_execution_logs) {
-      args += [
-        "--bazel-exec-log-compact",
-        rebase_path(_exec_log, root_build_dir),
-      ]
-    }
-    args += [
-      "--bazel-build-events-log-json",
-      rebase_path(outputs[1], root_build_dir),
-    ]
-
-    metadata = {
-      # Used by //:bazel_build_events_logs Build API module
-      bazel_build_events_log = [
-        {
-          gn_label = get_label_info(":$target_name", "label_no_toolchain")
-          build_events_log = rebase_path(outputs[1], root_build_dir)
-          format = "json"
-        },
-      ]
-    }
-
-    deps += [
-      prebuilt_content_hash_labels.clang,
-      prebuilt_content_hash_labels.python,
-    ]
-    pool = "//:console"
-    hermetic_deps = false
-
-    # The build events log contains absolute paths written by Bazel!
-    no_output_dir_leaks = false
+    deps = _all_targets
   }
 }

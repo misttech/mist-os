@@ -188,33 +188,14 @@ group("final_fuchsia_idk.validation") {
   testonly = true
 }
 
-foreach(cpu, idk_target_cpus) {
-  # This target runs the test suite against a locally-generated IDK
-  # (which includes support for all target architectures), but only
-  # for target_cpu. E.g. `bazel_sdk_tests_arm64` will run the
-  # test suite with a build configuration that generates Fuchsia/arm64
-  # binaries.
-  run_fuchsia_bazel_sdk_tests("final_fuchsia_idk_bazel_sdk_tests_${cpu}") {
-    target_cpu = cpu
-    idk_exported_path = "$root_build_dir/sdk/exported/fuchsia_idk"
-    idk_exported_target = "//sdk:final_fuchsia_idk.exported"
-
-    # Use shared output_base and output_user_root between CPU-specific test runs.
-    output_base = "$target_out_dir/output_base"
-    output_user_root = "$target_out_dir/output_user_root"
-  }
-}
-
 # This target runs the test suite against each target architecture
 # supported by the IDK. Currently, this runs multiple instances of
 # the test suite, one per target cpu. This is a dependency of
 # //sdk:final_fuchsia_idk.validation.
-group("final_fuchsia_idk_bazel_sdk_tests") {
-  testonly = true
-  deps = []
-  foreach(cpu, idk_target_cpus) {
-    deps += [ ":final_fuchsia_idk_bazel_sdk_tests_${cpu}" ]
-  }
+run_fuchsia_bazel_sdk_tests("final_fuchsia_idk_bazel_sdk_tests") {
+  target_cpus = idk_target_cpus
+  idk_exported_path = "$root_build_dir/sdk/exported/fuchsia_idk"
+  idk_exported_target = "//sdk:final_fuchsia_idk.exported"
 }
 
 # This target generate a Fuchsia Bazel SDK directory directly
@@ -227,20 +208,11 @@ generate_fuchsia_bazel_sdk("final_fuchsia_sdk") {
   idk_export_dir = "$root_build_dir/sdk/exported/fuchsia_idk"
 }
 
-foreach(cpu, idk_target_cpus) {
-  run_fuchsia_bazel_sdk_tests("final_fuchsia_sdk_tests_$cpu") {
-    fuchsia_sdk_target = ":final_fuchsia_sdk"
-  }
-}
-
 # Verify the content of the final_fuchsia_sdk target by running
 # the Bazel SDK test suite with it for all supported target cpus.
-group("final_fuchsia_sdk_tests") {
-  testonly = true
-  deps = []
-  foreach(cpu, idk_target_cpus) {
-    deps += [ ":final_fuchsia_sdk_tests_$cpu" ]
-  }
+run_fuchsia_bazel_sdk_tests("final_fuchsia_sdk_tests") {
+  target_cpus = idk_target_cpus
+  fuchsia_sdk_target = ":final_fuchsia_sdk"
 
   # NOTE: For now, nothing should depend on the :final_fuchsia_sdk_test
   # target, except //:root_targets. This ensures the target is always
@@ -917,21 +889,11 @@ if (current_toolchain == default_toolchain) {
   # as the content of the @fuchsia_sdk repository, populated
   # from the same IDK, is already checked by a different suite
   # of tests defined under //build/bazel/bazel_sdk.
+  run_fuchsia_bazel_sdk_tests("bazel_in_tree_idk_tests") {
+    target_cpus = _bazel_in_tree_idk_cpus
 
-  foreach(cpu, _bazel_in_tree_idk_cpus) {
-    run_fuchsia_bazel_sdk_tests("bazel_in_tree_idk_tests_${cpu}") {
-      target_cpu = cpu
-      idk_exported_target = "//sdk:bazel_in_tree_idk"
-      idk_exported_path = "$root_build_dir/sdk/exported/bazel_in_tree_idk"
-    }
-  }
-
-  group("bazel_in_tree_idk_tests") {
-    testonly = true
-    deps = []
-    foreach(cpu, _bazel_in_tree_idk_cpus) {
-      deps += [ ":bazel_in_tree_idk_tests_${cpu}" ]
-    }
+    idk_exported_target = "//sdk:bazel_in_tree_idk"
+    idk_exported_path = "$root_build_dir/sdk/exported/bazel_in_tree_idk"
 
     # For now, nothing should depend on this except
     # //:root_targets to ensure it can be launched manually

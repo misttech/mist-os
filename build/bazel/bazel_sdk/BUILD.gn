@@ -47,21 +47,8 @@ bazel_action("verify_fuchsia_sdk_repository") {
 # repository. This launches in a separate Bazel workspace, as many
 # times as the number of CPU architectures used to populate the
 # //sdk:bazel_in_tree_idk target.
-
-foreach(cpu, _bazel_in_tree_idk_cpus) {
-  # Run the test suite against the internal IDK used to populate
-  # @fuchsia_sdk, for the current target cpu only.
-  run_fuchsia_bazel_sdk_tests("bazel_sdk_tests_${cpu}") {
-    target_cpu = cpu
-  }
-}
-
-group("bazel_sdk_tests") {
-  testonly = true
-  deps = []
-  foreach(cpu, _bazel_in_tree_idk_cpus) {
-    deps += [ ":bazel_sdk_tests_${cpu}" ]
-  }
+run_fuchsia_bazel_sdk_tests("bazel_sdk_tests") {
+  target_cpus = _bazel_in_tree_idk_cpus
 }
 
 group("tests") {
