@@ -6,6 +6,9 @@
 #include <lib/syscalls/forward.h>
 #include <trace.h>
 #include <zircon/compiler.h>
+#include <zircon/syscalls/pci.h>
+#include <zircon/syscalls/smc.h>
+#include <zircon/syscalls/profile.h>
 #include <zircon/syscalls/types.h>
 #include <zircon/types.h>
 
