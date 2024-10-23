@@ -41,11 +41,6 @@ open protocol Gpio {
         mode BufferMode;
     }) -> () error zx.Status;
 
-    /// Sets the current value of the GPIO (any non-zero value maps to 1).
-    strict Write(struct {
-        value uint8;
-    }) -> () error zx.Status;
-
     /// Gets an interrupt object pertaining to a particular GPIO pin. Only one interrupt may
     /// be outstanding per pin, and it must be released by calling `ReleaseInterrupt()` before the
     /// next call to `GetInterrupt()` will succeed.

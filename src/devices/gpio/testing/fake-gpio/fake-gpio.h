@@ -71,7 +71,6 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
                           ConfigureInterruptCompleter::Sync& completer) override;
   void SetBufferMode(SetBufferModeRequestView request,
                      SetBufferModeCompleter::Sync& completer) override;
-  void Write(WriteRequestView request, WriteCompleter::Sync& completer) override;
   void Read(ReadCompleter::Sync& completer) override;
   void ReleaseInterrupt(ReleaseInterruptCompleter::Sync& completer) override;
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_gpio::Gpio> metadata,

@@ -109,18 +109,6 @@ void FakeGpio::SetBufferMode(SetBufferModeRequestView request,
   }
 }
 
-void FakeGpio::Write(WriteRequestView request, WriteCompleter::Sync& completer) {
-  // Gpio must be configured to output in order to be written to.
-  if (state_log_.empty() || !std::holds_alternative<WriteSubState>(state_log_.back().sub_state)) {
-    completer.ReplyError(ZX_ERR_BAD_STATE);
-    return;
-  }
-
-  state_log_.emplace_back(State{.interrupt_mode = GetCurrentInterruptMode(),
-                                .sub_state = WriteSubState{.value = request->value}});
-  completer.ReplySuccess();
-}
-
 void FakeGpio::Read(ReadCompleter::Sync& completer) {
   ZX_ASSERT(std::holds_alternative<ReadSubState>(state_log_.back().sub_state));
   zx::result<bool> response;

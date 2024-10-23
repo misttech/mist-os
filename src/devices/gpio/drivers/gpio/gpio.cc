@@ -71,24 +71,6 @@ void GpioDevice::SetBufferMode(SetBufferModeRequestView request,
               }));
 }
 
-void GpioDevice::Write(WriteRequestView request, WriteCompleter::Sync& completer) {
-  fdf::Arena arena('GPIO');
-  pinimpl_.buffer(arena)
-      ->SetBufferMode(pin_, request->value == 0 ? fuchsia_hardware_gpio::BufferMode::kOutputLow
-                                                : fuchsia_hardware_gpio::BufferMode::kOutputHigh)
-      .ThenExactlyOnce(
-          fit::inline_callback<
-              void(fdf::WireUnownedResult<fuchsia_hardware_pinimpl::PinImpl::SetBufferMode>&),
-              sizeof(WriteCompleter::Async)>(
-              [completer = completer.ToAsync()](auto& result) mutable {
-                if (result.ok()) {
-                  completer.Reply(*result);
-                } else {
-                  completer.ReplyError(result.status());
-                }
-              }));
-}
-
 void GpioDevice::GetInterrupt(GetInterruptRequestView request,
                               GetInterruptCompleter::Sync& completer) {
   fdf::Arena arena('GPIO');
