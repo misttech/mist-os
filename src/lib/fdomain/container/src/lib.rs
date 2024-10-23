@@ -27,6 +27,66 @@ pub type Result<T, E = proto::Error> = std::result::Result<T, E>;
 
 use handles::{AnyHandle, HandleType as _};
 
+/// A queue. Basically just a `VecDeque` except we can asynchronously wait for
+/// an element to pop if it is empty.
+struct Queue<T>(VecDeque<T>, Option<Waker>);
+
+impl<T> Queue<T> {
+    /// Create a new queue.
+    fn new() -> Self {
+        Queue(VecDeque::new(), None)
+    }
+
+    /// Whether the queue is empty.
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Removes and discards the first element in the queue.
+    ///
+    /// # Panics
+    /// There *must* be a first element or this will panic.
+    fn destroy_front(&mut self) {
+        assert!(self.0.pop_front().is_some(), "Expected to find a value!");
+    }
+
+    /// Pop the first element from the queue if available.
+    fn pop_front(&mut self, ctx: &mut Context<'_>) -> Poll<T> {
+        if let Some(t) = self.0.pop_front() {
+            Poll::Ready(t)
+        } else {
+            self.1 = Some(ctx.waker().clone());
+            Poll::Pending
+        }
+    }
+
+    /// Return an element to the front of the queue. Does not wake any waiters
+    /// as it is assumed the waiter is the one who popped it to begin with.
+    ///
+    /// This is used when we'd *like* to use `front_mut` but we can't borrow the
+    /// source of `self` for that long without giving ourselves lifetime
+    /// headaches.
+    fn push_front_no_wake(&mut self, t: T) {
+        self.0.push_front(t)
+    }
+
+    /// Push a new element to the back of the queue.
+    fn push_back(&mut self, t: T) {
+        self.0.push_back(t);
+        self.1.take().map(Waker::wake);
+    }
+
+    /// Get a mutable reference to the first element in the queue.
+    fn front_mut(&mut self, ctx: &mut Context<'_>) -> Poll<&mut T> {
+        if let Some(t) = self.0.front_mut() {
+            Poll::Ready(t)
+        } else {
+            self.1 = Some(ctx.waker().clone());
+            Poll::Pending
+        }
+    }
+}
+
 /// Maximum amount to read for an async socket read.
 const ASYNC_READ_BUFSIZE: u64 = 40960;
 
@@ -111,7 +171,7 @@ impl ShuttingDownHandle {
                 state.poll(event_queue, ctx);
 
                 if state.write_queue.is_empty() {
-                    while let Some(op) = state.read_queue.pop_front() {
+                    while let Poll::Ready(op) = state.read_queue.pop_front(ctx) {
                         match op {
                             ReadOp::StreamingChannel(tid, start) => {
                                 let err = Err(proto::Error::BadHid(proto::BadHid { id: hid.id }));
@@ -290,14 +350,14 @@ struct HandleState {
     /// loop or be unable to handle further requests while a long read request
     /// is blocking. Also we want to retire read requests in the order they were
     /// submitted, otherwise pipelined reads could return data in a strange order.
-    read_queue: VecDeque<ReadOp>,
+    read_queue: Queue<ReadOp>,
     /// Queue of client requests to write to the handle. We have to queue write
     /// requests for the same reason we have to queue read requests. Since we
     /// process the queue one at a time, we need a separate queue for writes
     /// otherwise we'd effectively make handles half-duplex, with read requests
     /// unable to proceed if a write request is blocked at the head of the
     /// queue.
-    write_queue: VecDeque<WriteOp>,
+    write_queue: Queue<WriteOp>,
     /// List of outstanding `WaitForSignals` transactions.
     signal_waiters: Vec<SignalWaiter>,
     /// Contains a waiter on this handle for IO reading and writing. Populated
@@ -312,8 +372,8 @@ impl HandleState {
             hid,
             async_read_in_progress: false,
             write_error_pending: false,
-            read_queue: VecDeque::new(),
-            write_queue: VecDeque::new(),
+            read_queue: Queue::new(),
+            write_queue: Queue::new(),
             signal_waiters: Vec::new(),
             io_waiter: None,
         }
@@ -353,7 +413,7 @@ impl HandleState {
                 if let Poll::Ready(sigs) = signal_waiter.poll_unpin(ctx) {
                     if let Ok(sigs) = sigs {
                         if sigs.intersects(read_signals) {
-                            self.process_read_queue(event_queue);
+                            self.process_read_queue(event_queue, ctx);
                         }
                         if sigs.intersects(write_signals) {
                             self.process_write_queue(event_queue, ctx);
@@ -361,19 +421,16 @@ impl HandleState {
                     }
                 } else {
                     let need_read = matches!(
-                        self.read_queue.front(),
-                        Some(ReadOp::StreamingChannel(_, _) | ReadOp::StreamingSocket(_, _))
+                        self.read_queue.front_mut(ctx),
+                        Poll::Ready(ReadOp::StreamingChannel(_, _) | ReadOp::StreamingSocket(_, _))
                     );
-                    let need_write =
-                        matches!(self.write_queue.front(), Some(WriteOp::SetDisposition(_, _, _)));
+                    let need_write = matches!(
+                        self.write_queue.front_mut(ctx),
+                        Poll::Ready(WriteOp::SetDisposition(_, _, _))
+                    );
 
-                    if need_read {
-                        self.process_read_queue(event_queue);
-                    }
-
-                    if need_write {
-                        self.process_write_queue(event_queue, ctx);
-                    }
+                    self.process_read_queue(event_queue, ctx);
+                    self.process_write_queue(event_queue, ctx);
 
                     if !(need_read || need_write) {
                         break;
@@ -421,48 +478,54 @@ impl HandleState {
     }
 
     /// Handle events from the front of the read queue.
-    fn process_read_queue(&mut self, event_queue: &mut VecDeque<UnprocessedFDomainEvent>) {
-        while let Some(op) = self.read_queue.front() {
+    fn process_read_queue(
+        &mut self,
+        event_queue: &mut VecDeque<UnprocessedFDomainEvent>,
+        ctx: &mut Context<'_>,
+    ) {
+        while let Poll::Ready(op) = self.read_queue.front_mut(ctx) {
             match op {
                 ReadOp::StreamingChannel(tid, true) => {
                     let tid = *tid;
                     let result = self.try_enable_async_read();
                     event_queue
                         .push_back(FDomainEvent::ChannelStreamingReadStart(tid, result).into());
-                    self.read_queue.pop_front();
+                    self.read_queue.destroy_front();
                 }
                 ReadOp::StreamingChannel(tid, false) => {
                     let tid = *tid;
                     let result = self.try_disable_async_read();
                     event_queue
                         .push_back(FDomainEvent::ChannelStreamingReadStop(tid, result).into());
-                    self.read_queue.pop_front();
+                    self.read_queue.destroy_front();
                 }
                 ReadOp::StreamingSocket(tid, true) => {
                     let tid = *tid;
                     let result = self.try_enable_async_read();
                     event_queue
                         .push_back(FDomainEvent::SocketStreamingReadStart(tid, result).into());
-                    self.read_queue.pop_front();
+                    self.read_queue.destroy_front();
                 }
                 ReadOp::StreamingSocket(tid, false) => {
                     let tid = *tid;
                     let result = self.try_disable_async_read();
                     event_queue
                         .push_back(FDomainEvent::SocketStreamingReadStop(tid, result).into());
-                    self.read_queue.pop_front();
+                    self.read_queue.destroy_front();
                 }
                 ReadOp::Socket(tid, max_bytes) => {
-                    if let Some(event) = self.do_read_socket(*tid, *max_bytes) {
-                        let _ = self.read_queue.pop_front();
+                    let (tid, max_bytes) = (*tid, *max_bytes);
+                    if let Some(event) = self.do_read_socket(tid, max_bytes) {
+                        let _ = self.read_queue.pop_front(ctx);
                         event_queue.push_back(event.into());
                     } else {
                         break;
                     }
                 }
                 ReadOp::Channel(tid) => {
-                    if let Some(event) = self.do_read_channel(*tid) {
-                        let _ = self.read_queue.pop_front();
+                    let tid = *tid;
+                    if let Some(event) = self.do_read_channel(tid) {
+                        let _ = self.read_queue.pop_front(ctx);
                         event_queue.push_back(event.into());
                     } else {
                         break;
@@ -553,13 +616,17 @@ impl HandleState {
         event_queue: &mut VecDeque<UnprocessedFDomainEvent>,
         ctx: &mut Context<'_>,
     ) {
-        while let Some(op) = self.write_queue.pop_front() {
+        // We want to mutate and *maybe* pop the front of the write queue, but
+        // lifetime shenanigans mean we can't do that and also access `self`,
+        // which we need. So we pop the item always, and then maybe push it to
+        // the front again if we didn't actually want to pop it.
+        while let Poll::Ready(op) = self.write_queue.pop_front(ctx) {
             match op {
                 WriteOp::Socket(mut op) => {
                     if let Some(event) = self.do_write_socket(&mut op) {
                         event_queue.push_back(event.into());
                     } else {
-                        self.write_queue.push_front(WriteOp::Socket(op));
+                        self.write_queue.push_front_no_wake(WriteOp::Socket(op));
                         break;
                     }
                 }
@@ -572,7 +639,7 @@ impl HandleState {
                         .do_write_channel(tid, &data, &mut handles, event_queue, ctx)
                         .is_pending()
                     {
-                        self.write_queue.push_front(WriteOp::Channel(tid, data, handles));
+                        self.write_queue.push_front_no_wake(WriteOp::Channel(tid, data, handles));
                         break;
                     }
                 }
