@@ -188,10 +188,10 @@ mod tests {
         let open_and_read_file = move |file_path: &'static str| {
             let outgoing_dir_proxy = Clone::clone(&outgoing_dir_proxy);
             async move {
-                let file_proxy = fuchsia_fs::directory::open_file_deprecated(
+                let file_proxy = fuchsia_fs::directory::open_file(
                     &outgoing_dir_proxy,
                     file_path,
-                    fuchsia_fs::OpenFlags::RIGHT_READABLE,
+                    fuchsia_fs::PERM_READABLE,
                 )
                 .await
                 .unwrap_or_else(|e| panic!("failed to open file {:?}: {:?}", file_path, e));
