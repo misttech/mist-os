@@ -769,6 +769,13 @@ enum AfterRoamFailureState {
     Disconnecting(Disconnecting),
 }
 
+// When a roam attempt starts, SME needs to keep track of where the attempt initiated, in order to
+// handle a failure.
+enum RoamInitiator {
+    RoamStartInd,
+    RoamRequest,
+}
+
 impl Roaming {
     // Disassociation while roaming requires special handling. Since roaming causes loss of
     // association with the original BSS, we must ignore a disassoc from the original BSS. But a
@@ -1131,6 +1138,7 @@ impl ClientState {
                         ind.selected_bssid.into(),
                         ind.selected_bss,
                         &mut state_change_ctx,
+                        RoamInitiator::RoamStartInd,
                     ) {
                         Ok(roaming) => transition.to(roaming).into(),
                         Err(disconnecting) => transition.to(disconnecting).into(),
@@ -1167,8 +1175,34 @@ impl ClientState {
                         Err(idle) => transition.to(idle).into(),
                     }
                 }
+                MlmeEvent::RoamConf { conf } => {
+                    let (transition, roaming) = state.release_data();
+
+                    match roam_handle_result(
+                        roaming,
+                        RoamResultFields {
+                            selected_bssid: conf.selected_bssid.into(),
+                            status_code: conf.status_code,
+                            original_association_maintained: conf.original_association_maintained,
+                            target_bss_authenticated: conf.target_bss_authenticated,
+                            association_ies: conf.association_ies,
+                        },
+                        context,
+                        &mut state_change_ctx,
+                        RoamInitiator::RoamRequest,
+                    ) {
+                        Ok(associated) => transition.to(associated).into(),
+                        Err(after_roam_failure_state) => match after_roam_failure_state {
+                            AfterRoamFailureState::Disconnecting(disconnecting) => {
+                                transition.to(disconnecting).into()
+                            }
+                            AfterRoamFailureState::Idle(idle) => transition.to(idle).into(),
+                        },
+                    }
+                }
                 MlmeEvent::RoamResultInd { ind } => {
                     let (transition, roaming) = state.release_data();
+
                     match roam_handle_result(
                         roaming,
                         RoamResultFields {
@@ -1180,6 +1214,7 @@ impl ClientState {
                         },
                         context,
                         &mut state_change_ctx,
+                        RoamInitiator::RoamStartInd,
                     ) {
                         Ok(associated) => transition.to(associated).into(),
                         Err(after_roam_failure_state) => match after_roam_failure_state {
@@ -1269,6 +1304,52 @@ impl ClientState {
             PostDisconnectAction::BeginConnect { cmd },
             &mut state_change_ctx,
         );
+
+        log_state_change(start_state, &new_state, state_change_ctx, context);
+        new_state
+    }
+
+    pub fn roam(self, context: &mut Context, selected_bss: fidl_common::BssDescription) -> Self {
+        let start_state = self.state_name();
+        let mut state_change_ctx =
+            Some(StateChangeContext::Msg("Policy-initiated roam attempt in progress".to_owned()));
+
+        let new_state = match self {
+            ClientState::Associated(state) => {
+                let (transition, state) = state.release_data();
+                match roam_internal(
+                    state,
+                    context,
+                    selected_bss.bssid.into(),
+                    selected_bss,
+                    &mut state_change_ctx,
+                    RoamInitiator::RoamRequest,
+                ) {
+                    Ok(roaming) => transition.to(roaming).into(),
+                    Err(disconnecting) => transition.to(disconnecting).into(),
+                }
+            }
+            // The roam function should only be called from Associated state; these branches are
+            // present for logging, but they should be fairly rare. If we see these, it is likely
+            // due to a roam request coming in during the short periods when one layer is
+            // transitioning (e.g. SME started a disconnect just as Policy sent a roam request).
+            ClientState::Connecting(state) => {
+                warn!("Requested roam could not be attempted, client is connecting");
+                state.into()
+            }
+            ClientState::Roaming(state) => {
+                error!("Overlapping roam request ignored, client is already roaming");
+                state.into()
+            }
+            ClientState::Disconnecting(state) => {
+                warn!("Requested roam could not be attempted, client is disconnecting");
+                state.into()
+            }
+            ClientState::Idle(state) => {
+                warn!("Requested roam could not be attempted, client is idle");
+                state.into()
+            }
+        };
 
         log_state_change(start_state, &new_state, state_change_ctx, context);
         new_state
@@ -1419,6 +1500,7 @@ fn roam_internal(
     selected_bssid: Bssid,
     selected_bss: fidl_common::BssDescription,
     state_change_ctx: &mut Option<StateChangeContext>,
+    roam_initiator: RoamInitiator,
 ) -> Result<Roaming, Disconnecting> {
     // Reassociation is imminent, so consider client disassociated from original BSS. Need a new ESS-SA.
     let (mut orig_bss_protection, _connected_duration) = state.link_state.disconnect();
@@ -1427,20 +1509,33 @@ fn roam_internal(
         rsna.supplicant.reset();
     }
 
+    // If a failure occurs in this function, SME will need to know how to log the failure, and where
+    // to send a deauth.
+    let (mlme_event_name, deauth_addr) = match roam_initiator {
+        // RoamStartInd means that auth may have already started with target BSS.
+        RoamInitiator::RoamStartInd => {
+            (fidl_sme::DisconnectMlmeEventName::RoamStartIndication, &selected_bssid)
+        }
+        // RoamRequest means that client is only authenticated with the original BSS.
+        RoamInitiator::RoamRequest => {
+            (fidl_sme::DisconnectMlmeEventName::RoamRequest, &state.latest_ap_state.bssid)
+        }
+    };
+
     let selected_bss = match BssDescription::try_from(selected_bss) {
         Ok(selected_bss) => selected_bss,
         Err(error) => {
             error!("Roam cannot proceed due to missing/malformed BSS description: {:?}", error);
 
-            send_deauthenticate_request(&selected_bssid, &context.mlme_sink);
+            send_deauthenticate_request(deauth_addr, &context.mlme_sink);
             let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
 
-            let disconnect_info = make_roam_disconnect_info(
-                fidl_sme::DisconnectMlmeEventName::RoamStartIndication,
-                None,
-            );
+            let disconnect_info = make_roam_disconnect_info(mlme_event_name, None);
 
-            let failure_type = RoamFailureType::RoamStartMalformedFailure;
+            let failure_type = match roam_initiator {
+                RoamInitiator::RoamStartInd => RoamFailureType::RoamStartMalformedFailure,
+                RoamInitiator::RoamRequest => RoamFailureType::RoamRequestMalformedFailure,
+            };
 
             return Err(Disconnecting {
                 cfg: state.cfg,
@@ -1478,13 +1573,10 @@ fn roam_internal(
         Err(error) => {
             error!("Failed to configure protection for selected BSS during roam: {:?}", error);
 
-            send_deauthenticate_request(&selected_bssid, &context.mlme_sink);
+            send_deauthenticate_request(deauth_addr, &context.mlme_sink);
             let timeout_id = context.timer.schedule(event::DeauthenticateTimeout);
 
-            let disconnect_info = make_roam_disconnect_info(
-                fidl_sme::DisconnectMlmeEventName::RoamStartIndication,
-                None,
-            );
+            let disconnect_info = make_roam_disconnect_info(mlme_event_name, None);
 
             return Err(Disconnecting {
                 cfg: state.cfg,
@@ -1505,6 +1597,12 @@ fn roam_internal(
             });
         }
     };
+
+    // Policy-initiated roam requires that SME send a roam request to MLME.
+    if matches!(roam_initiator, RoamInitiator::RoamRequest) {
+        let roam_req = fidl_mlme::RoamRequest { selected_bss: selected_bss.clone().into() };
+        context.mlme_sink.send(MlmeRequest::Roam(roam_req));
+    }
 
     _ = state_change_ctx.replace(StateChangeContext::Roam {
         msg: "Roam attempt in progress".to_owned(),
@@ -1532,22 +1630,31 @@ struct RoamResultFields {
     association_ies: Vec<u8>,
 }
 
+// If the roam attempt succeeded, move into Associated with the selected BSS.
+// If the roam attempt failed, return the next state, wrapped in AfterRoamFailureState.
 fn roam_handle_result(
     mut state: Roaming,
     result_fields: RoamResultFields,
     context: &mut Context,
     state_change_ctx: &mut Option<StateChangeContext>,
+    roam_initiator: RoamInitiator,
 ) -> Result<Associated, AfterRoamFailureState> {
     if result_fields.original_association_maintained {
         warn!("Roam result claims that device is still associated with original BSS, but Fast BSS Transition is currently unsupported");
     }
 
+    // If a failure occurs in this function, SME will need to know how to log the failure.
+    let mlme_event_name = match roam_initiator {
+        RoamInitiator::RoamStartInd => fidl_sme::DisconnectMlmeEventName::RoamResultIndication,
+        RoamInitiator::RoamRequest => fidl_sme::DisconnectMlmeEventName::RoamConfirmation,
+    };
+
     if result_fields.selected_bssid != state.cmd.bss.bssid {
-        let disconnect_info = make_roam_disconnect_info(
-            fidl_sme::DisconnectMlmeEventName::RoamResultIndication,
-            None,
-        );
-        let failure_type = RoamFailureType::RoamResultMalformedFailure;
+        let disconnect_info = make_roam_disconnect_info(mlme_event_name, None);
+        let failure_type = match roam_initiator {
+            RoamInitiator::RoamStartInd => RoamFailureType::RoamResultMalformedFailure,
+            RoamInitiator::RoamRequest => RoamFailureType::RoamConfirmationMalformedFailure,
+        };
         let failure = RoamFailure {
             failure_type,
             selected_bss: None,
@@ -1575,10 +1682,7 @@ fn roam_handle_result(
             let link_state = match LinkState::new(state.cmd.protection, context) {
                 Ok(link_state) => link_state,
                 Err(failure_reason) => {
-                    let disconnect_info = make_roam_disconnect_info(
-                        fidl_sme::DisconnectMlmeEventName::RoamResultIndication,
-                        None,
-                    );
+                    let disconnect_info = make_roam_disconnect_info(mlme_event_name, None);
                     let failure = RoamFailure {
                         failure_type: RoamFailureType::EstablishRsnaFailure,
                         selected_bss: Some(*state.cmd.bss.clone()),
@@ -1636,10 +1740,7 @@ fn roam_handle_result(
         _ => {
             let msg = format!("Roam failed, status_code {:?}", result_fields.status_code);
             error!("{}", msg);
-            let disconnect_info = make_roam_disconnect_info(
-                fidl_sme::DisconnectMlmeEventName::RoamResultIndication,
-                None,
-            );
+            let disconnect_info = make_roam_disconnect_info(mlme_event_name, None);
             let failure = RoamFailure {
                 failure_type: RoamFailureType::ReassociationFailure,
                 selected_bss: Some(*state.cmd.bss.clone()),
@@ -3332,8 +3433,35 @@ mod tests {
         assert_connecting(state, &connect_command_two().0.bss);
     }
 
+    fn expect_state_events_link_up_roaming_link_up(
+        inspector: &Inspector,
+        selected_bss: BssDescription,
+    ) {
+        assert_data_tree!(inspector, root: contains {
+            usme: contains {
+                state_events: {
+                    "0": {
+                        "@time": AnyNumericProperty,
+                        bssid: selected_bss.bssid.to_string(),
+                        ctx: AnyStringProperty,
+                        from: LINK_UP_STATE,
+                        to: ROAMING_STATE,
+                    },
+                    "1": {
+                        "@time": AnyNumericProperty,
+                        bssid: selected_bss.bssid.to_string(),
+                        ctx: AnyStringProperty,
+                        from: ROAMING_STATE,
+                        ssid: selected_bss.ssid.to_string(),
+                        to: LINK_UP_STATE,
+                    },
+                },
+            },
+        });
+    }
+
     #[test]
-    fn fullmac_roam_happy_path_unprotected() {
+    fn fullmac_initiated_roam_happy_path_unprotected() {
         let mut h = TestHelper::new();
         let (cmd, mut connect_txn_stream) = connect_command_one();
         let mut selected_bss = cmd.bss.clone();
@@ -3371,7 +3499,52 @@ mod tests {
             assert_eq!(result, RoamResult::Success(Box::new(*selected_bss.clone())));
         });
 
-        assert_data_tree!(h.inspector, root: contains {
+        expect_state_events_link_up_roaming_link_up(&h.inspector, *selected_bss.clone());
+    }
+
+    #[test]
+    fn policy_initiated_roam_happy_path_unprotected() {
+        let mut h = TestHelper::new();
+        let (cmd, mut connect_txn_stream) = connect_command_one();
+        let mut selected_bss = cmd.bss.clone();
+        let state = link_up_state(cmd);
+        let selected_bssid = [0, 1, 2, 3, 4, 5];
+        selected_bss.bssid = selected_bssid.into();
+
+        let fidl_selected_bss = fidl_common::BssDescription::from(*selected_bss.clone());
+        let state = state.roam(&mut h.context, fidl_selected_bss);
+
+        assert_roaming(&state);
+
+        let mut association_ies = vec![];
+        association_ies.extend_from_slice(selected_bss.ies());
+        let conf = fidl_mlme::RoamConfirm {
+            selected_bssid,
+            status_code: fidl_ieee80211::StatusCode::Success,
+            original_association_maintained: false,
+            target_bss_authenticated: true,
+            association_id: 42,
+            association_ies,
+        };
+        let roam_conf_event = MlmeEvent::RoamConf { conf: conf.clone() };
+        let state = state.on_mlme_event(roam_conf_event, &mut h.context);
+        assert_variant!(&state, ClientState::Associated(state) => {
+            assert_variant!(&state.link_state, LinkState::LinkUp { .. });
+        });
+
+        // User should be notified that the roam succeeded.
+        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnRoamResult {result})) => {
+            assert_eq!(result, RoamResult::Success(Box::new(*selected_bss.clone())));
+        });
+
+        expect_state_events_link_up_roaming_link_up(&h.inspector, *selected_bss.clone());
+    }
+
+    fn expect_state_events_link_up_roaming_rsna(
+        inspector: &Inspector,
+        selected_bss: BssDescription,
+    ) {
+        assert_data_tree!(inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -3387,7 +3560,7 @@ mod tests {
                         ctx: AnyStringProperty,
                         from: ROAMING_STATE,
                         ssid: selected_bss.ssid.to_string(),
-                        to: LINK_UP_STATE,
+                        to: RSNA_STATE,
                     },
                 },
             },
@@ -3395,7 +3568,7 @@ mod tests {
     }
 
     #[test]
-    fn fullmac_roam_happy_path_protected() {
+    fn fullmac_initiated_roam_happy_path_protected() {
         let mut h = TestHelper::new();
         let (supplicant, suppl_mock) = mock_psk_supplicant();
 
@@ -3445,27 +3618,56 @@ mod tests {
             assert_eq!(result, RoamResult::Success(Box::new(selected_bss.clone())));
         });
 
-        assert_data_tree!(h.inspector, root: contains {
-            usme: contains {
-                state_events: {
-                    "0": {
-                        "@time": AnyNumericProperty,
-                        bssid: selected_bss.bssid.to_string(),
-                        ctx: AnyStringProperty,
-                        from: LINK_UP_STATE,
-                        to: ROAMING_STATE,
-                    },
-                    "1": {
-                        "@time": AnyNumericProperty,
-                        bssid: selected_bss.bssid.to_string(),
-                        ctx: AnyStringProperty,
-                        from: ROAMING_STATE,
-                        ssid: selected_bss.ssid.to_string(),
-                        to: RSNA_STATE,
-                    },
-                },
-            },
+        expect_state_events_link_up_roaming_rsna(&h.inspector, selected_bss);
+    }
+
+    #[test]
+    fn policy_initiated_roam_happy_path_protected() {
+        let mut h = TestHelper::new();
+        let (supplicant, suppl_mock) = mock_psk_supplicant();
+
+        let (cmd, mut connect_txn_stream) = connect_command_wpa2(supplicant);
+        let bss = (*cmd.bss).clone();
+        let mut selected_bss = bss.clone();
+        let selected_bssid = [1, 2, 3, 4, 5, 6];
+        selected_bss.bssid = selected_bssid.into();
+        let association_ies = selected_bss.ies().to_vec();
+
+        let state = link_up_state(cmd);
+        // Initiate a roam attempt.
+        let fidl_selected_bss = fidl_common::BssDescription::from(selected_bss.clone());
+        let state = state.roam(&mut h.context, fidl_selected_bss);
+
+        assert_roaming(&state);
+
+        // Real supplicant would be reset here. Reset the mock supplicant.
+        suppl_mock
+            .set_start_updates(vec![SecAssocUpdate::Status(SecAssocStatus::PmkSaEstablished)]);
+
+        let conf = fidl_mlme::RoamConfirm {
+            selected_bssid,
+            status_code: fidl_ieee80211::StatusCode::Success,
+            original_association_maintained: false,
+            target_bss_authenticated: true,
+            association_id: 42,
+            association_ies,
+        };
+        let roam_conf_event = MlmeEvent::RoamConf { conf: conf.clone() };
+        let state = state.on_mlme_event(roam_conf_event, &mut h.context);
+
+        assert_variant!(&state, ClientState::Associated(state)  => {
+            assert_variant!(&state.link_state, LinkState::EstablishingRsna { .. });
         });
+
+        // Note: because a new supplicant is created for the roam to the target, we can't easily
+        // test the 802.1X portion of the roam.
+
+        // User should be notified that the roam succeeded.
+        assert_variant!(connect_txn_stream.try_next(), Ok(Some(ConnectTransactionEvent::OnRoamResult {result})) => {
+            assert_eq!(result, RoamResult::Success(Box::new(selected_bss.clone())));
+        });
+
+        expect_state_events_link_up_roaming_rsna(&h.inspector, selected_bss);
     }
 
     fn expect_roam_failure_emitted(
@@ -3487,14 +3689,9 @@ mod tests {
         });
     }
 
-    #[test]
-    fn malformed_roam_start_ind_causes_disconnect() {
-        let mut h = TestHelper::new();
-        let (cmd, mut connect_txn_stream) = connect_command_one();
-        let state = link_up_state(cmd);
-        // Note: this is intentionally malformed. Roam cannot proceed without the missing data, such
-        // as the IEs.
-        let selected_bss = fidl_common::BssDescription {
+    // An all-zero BssDescription: malformed, in particular due to empty IEs (missing SSID).
+    fn malformed_bss_description() -> fidl_common::BssDescription {
+        fidl_common::BssDescription {
             bssid: [0, 0, 0, 0, 0, 0],
             bss_type: fidl_common::BssType::Infrastructure,
             beacon_period: 0,
@@ -3507,40 +3704,11 @@ mod tests {
             },
             rssi_dbm: 0,
             snr_db: 0,
-        };
-        let selected_bssid = [0, 1, 2, 3, 4, 5];
-        let roam_start_ind = MlmeEvent::RoamStartInd {
-            ind: fidl_mlme::RoamStartIndication {
-                selected_bssid,
-                original_association_maintained: false,
-                selected_bss,
-            },
-        };
-        let state = state.on_mlme_event(roam_start_ind, &mut h.context);
+        }
+    }
 
-        // Check that SME sends a deauthenticate request.
-        expect_deauth_req(
-            &mut h.mlme_stream,
-            selected_bssid.into(),
-            fidl_ieee80211::ReasonCode::StaLeaving,
-        );
-
-        // (mlme->sme) Send a DeauthenticateConf as a response, to advance to the post disconnect action.
-        let deauth_conf = MlmeEvent::DeauthenticateConf {
-            resp: fidl_mlme::DeauthenticateConfirm { peer_sta_address: selected_bssid },
-        };
-        let state = state.on_mlme_event(deauth_conf, &mut h.context);
-        assert_idle(state);
-
-        expect_roam_failure_emitted(
-            RoamFailureType::RoamStartMalformedFailure,
-            fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
-            selected_bssid,
-            fidl_sme::DisconnectMlmeEventName::RoamStartIndication,
-            &mut connect_txn_stream,
-        );
-
-        assert_data_tree!(h.inspector, root: contains {
+    fn expect_state_events_link_up_disconnecting_idle(inspector: &Inspector) {
+        assert_data_tree!(inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -3557,6 +3725,131 @@ mod tests {
                 },
             },
         });
+    }
+
+    #[test]
+    fn malformed_roam_start_ind_causes_disconnect() {
+        let mut h = TestHelper::new();
+        let (cmd, mut connect_txn_stream) = connect_command_one();
+        let state = link_up_state(cmd);
+        // Note: this is intentionally malformed. Roam cannot proceed without the missing data, such
+        // as the IEs.
+        let selected_bss = malformed_bss_description();
+        // Note that this BSSID does not match the BssDescription.
+        let selected_bssid = [0, 1, 2, 3, 4, 5];
+        let roam_start_ind = MlmeEvent::RoamStartInd {
+            ind: fidl_mlme::RoamStartIndication {
+                selected_bssid,
+                original_association_maintained: false,
+                selected_bss,
+            },
+        };
+        let state = state.on_mlme_event(roam_start_ind, &mut h.context);
+
+        // Check that SME sends a deauthenticate request to target BSS, since roam started.
+        expect_deauth_req(
+            &mut h.mlme_stream,
+            selected_bssid.into(),
+            fidl_ieee80211::ReasonCode::StaLeaving,
+        );
+
+        // (mlme->sme) Send a DeauthenticateConf as a response, to advance to the post disconnect action.
+        let deauth_conf = MlmeEvent::DeauthenticateConf {
+            resp: fidl_mlme::DeauthenticateConfirm { peer_sta_address: selected_bssid },
+        };
+        let state = state.on_mlme_event(deauth_conf, &mut h.context);
+        assert_idle(state);
+
+        // Roam failure will have the target BSSID from the roam start ind.
+        expect_roam_failure_emitted(
+            RoamFailureType::RoamStartMalformedFailure,
+            fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+            selected_bssid,
+            fidl_sme::DisconnectMlmeEventName::RoamStartIndication,
+            &mut connect_txn_stream,
+        );
+
+        expect_state_events_link_up_disconnecting_idle(&h.inspector);
+    }
+
+    #[test]
+    fn malformed_roam_req_causes_disconnect() {
+        let mut h = TestHelper::new();
+        let (cmd, mut connect_txn_stream) = connect_command_one();
+        let original_bssid = cmd.bss.bssid.clone();
+        let state = link_up_state(cmd);
+        // Note: this is intentionally malformed. Roam cannot proceed without the missing data, such
+        // as the IEs.
+        let selected_bss = malformed_bss_description();
+
+        let state = state.roam(&mut h.context, selected_bss.clone().into());
+
+        // Check that SME sends a deauthenticate request to the current BSS, since roam has not started.
+        expect_deauth_req(
+            &mut h.mlme_stream,
+            original_bssid.into(),
+            fidl_ieee80211::ReasonCode::StaLeaving,
+        );
+
+        // (mlme->sme) Send a DeauthenticateConf as a response, to advance to the post disconnect action.
+        let deauth_conf = MlmeEvent::DeauthenticateConf {
+            resp: fidl_mlme::DeauthenticateConfirm { peer_sta_address: original_bssid.to_array() },
+        };
+        let state = state.on_mlme_event(deauth_conf, &mut h.context);
+        assert_idle(state);
+
+        // Malformed roam request will have the target BSSID from the roam request.
+        expect_roam_failure_emitted(
+            RoamFailureType::RoamRequestMalformedFailure,
+            fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+            selected_bss.bssid,
+            fidl_sme::DisconnectMlmeEventName::RoamRequest,
+            &mut connect_txn_stream,
+        );
+
+        expect_state_events_link_up_disconnecting_idle(&h.inspector);
+    }
+
+    #[test]
+    fn roam_req_with_incorrect_security_ies_causes_disconnect_on_protected_network() {
+        let mut h = TestHelper::new();
+        let (supplicant, _suppl_mock) = mock_psk_supplicant();
+
+        let (cmd, mut connect_txn_stream) = connect_command_wpa2(supplicant);
+        let original_bssid = cmd.bss.bssid.clone();
+
+        // Note: intentionally incorrect security config is created for this test.
+        let mut selected_bss = fake_bss_description!(Wpa1, ssid: Ssid::try_from("wpa2").unwrap());
+        let selected_bssid = [3, 2, 1, 0, 9, 8];
+        selected_bss.bssid = selected_bssid.into();
+
+        let state = link_up_state(cmd);
+
+        let state = state.roam(&mut h.context, selected_bss.into());
+
+        // Check that SME sends a deauthenticate request to original BSS.
+        expect_deauth_req(
+            &mut h.mlme_stream,
+            original_bssid.into(),
+            fidl_ieee80211::ReasonCode::StaLeaving,
+        );
+
+        // (mlme->sme) Send a DeauthenticateConf as a response, to advance to the post disconnect action.
+        let deauth_conf = MlmeEvent::DeauthenticateConf {
+            resp: fidl_mlme::DeauthenticateConfirm { peer_sta_address: original_bssid.to_array() },
+        };
+        let state = state.on_mlme_event(deauth_conf, &mut h.context);
+        assert_idle(state);
+
+        expect_roam_failure_emitted(
+            RoamFailureType::SelectNetworkFailure,
+            fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+            selected_bssid,
+            fidl_sme::DisconnectMlmeEventName::RoamRequest,
+            &mut connect_txn_stream,
+        );
+
+        expect_state_events_link_up_disconnecting_idle(&h.inspector);
     }
 
     #[test]
@@ -3602,23 +3895,7 @@ mod tests {
             &mut connect_txn_stream,
         );
 
-        assert_data_tree!(h.inspector, root: contains {
-            usme: contains {
-                state_events: {
-                    "0": {
-                        "@time": AnyNumericProperty,
-                        ctx: AnyStringProperty,
-                        from: LINK_UP_STATE,
-                        to: DISCONNECTING_STATE,
-                    },
-                    "1": {
-                        "@time": AnyNumericProperty,
-                        from: DISCONNECTING_STATE,
-                        to: IDLE_STATE,
-                    },
-                },
-            },
-        });
+        expect_state_events_link_up_disconnecting_idle(&h.inspector);
     }
 
     #[test]
@@ -3637,6 +3914,23 @@ mod tests {
             },
         };
         let state = state.on_mlme_event(roam_start_ind, &mut h.context);
+        assert_idle(state);
+
+        assert_variant!(connect_txn_stream.try_next(), Err(_));
+    }
+
+    #[test]
+    fn roam_req_ignored_while_idle() {
+        let mut h = TestHelper::new();
+        let (cmd, mut connect_txn_stream) = connect_command_one();
+        let mut selected_bss = cmd.bss.clone();
+        let state = idle_state();
+        let selected_bssid = [0, 1, 2, 3, 4, 5];
+        selected_bss.bssid = selected_bssid.into();
+        let fidl_selected_bss = fidl_common::BssDescription::from(*selected_bss.clone());
+
+        let state = state.roam(&mut h.context, fidl_selected_bss);
+
         assert_idle(state);
 
         assert_variant!(connect_txn_stream.try_next(), Err(_));
@@ -3666,6 +3960,25 @@ mod tests {
     }
 
     #[test]
+    fn roam_req_ignored_while_connecting() {
+        let mut h = TestHelper::new();
+        let (cmd, mut connect_txn_stream) = connect_command_one();
+        let original_bss = cmd.bss.clone();
+        let mut selected_bss = cmd.bss.clone();
+        let state = connecting_state(cmd);
+        let selected_bssid = [0, 1, 2, 3, 4, 5];
+        selected_bss.bssid = selected_bssid.into();
+        let fidl_selected_bss = fidl_common::BssDescription::from(*selected_bss.clone());
+
+        let state = state.roam(&mut h.context, fidl_selected_bss);
+
+        assert_connecting(state, &(*original_bss));
+
+        // Nothing should be sent upward.
+        assert_variant!(connect_txn_stream.try_next(), Ok(None));
+    }
+
+    #[test]
     fn roam_start_ind_ignored_while_disconnecting() {
         let mut h = TestHelper::new();
         let (cmd, mut connect_txn_stream) = connect_command_one();
@@ -3685,6 +3998,44 @@ mod tests {
 
         // Nothing should be sent upward.
         assert_variant!(connect_txn_stream.try_next(), Ok(None));
+    }
+
+    #[test]
+    fn roam_req_ignored_while_disconnecting() {
+        let mut h = TestHelper::new();
+        let (cmd, mut connect_txn_stream) = connect_command_one();
+        let mut selected_bss = cmd.bss.clone();
+        let state = disconnecting_state(PostDisconnectAction::BeginConnect { cmd });
+        let selected_bssid = [0, 1, 2, 3, 4, 5];
+        selected_bss.bssid = selected_bssid.into();
+        let fidl_selected_bss = fidl_common::BssDescription::from(*selected_bss.clone());
+
+        let state = state.roam(&mut h.context, fidl_selected_bss);
+
+        assert_disconnecting(state);
+
+        // Nothing should be sent upward.
+        assert_variant!(connect_txn_stream.try_next(), Ok(None));
+    }
+
+    fn expect_state_events_roaming_disconnecting_idle(inspector: &Inspector) {
+        assert_data_tree!(inspector, root: contains {
+            usme: contains {
+                state_events: {
+                    "0": {
+                        "@time": AnyNumericProperty,
+                        ctx: AnyStringProperty,
+                        from: ROAMING_STATE,
+                        to: DISCONNECTING_STATE,
+                    },
+                    "1": {
+                        "@time": AnyNumericProperty,
+                        from: DISCONNECTING_STATE,
+                        to: IDLE_STATE,
+                    },
+                },
+            },
+        });
     }
 
     #[test]
@@ -3728,23 +4079,7 @@ mod tests {
             &mut connect_txn_stream,
         );
 
-        assert_data_tree!(h.inspector, root: contains {
-            usme: contains {
-                state_events: {
-                    "0": {
-                        "@time": AnyNumericProperty,
-                        ctx: AnyStringProperty,
-                        from: ROAMING_STATE,
-                        to: DISCONNECTING_STATE,
-                    },
-                    "1": {
-                        "@time": AnyNumericProperty,
-                        from: DISCONNECTING_STATE,
-                        to: IDLE_STATE,
-                    },
-                },
-            },
-        });
+        expect_state_events_roaming_disconnecting_idle(&h.inspector);
     }
 
     #[test]
@@ -3789,23 +4124,7 @@ mod tests {
             &mut connect_txn_stream,
         );
 
-        assert_data_tree!(h.inspector, root: contains {
-            usme: contains {
-                state_events: {
-                    "0": {
-                        "@time": AnyNumericProperty,
-                        ctx: AnyStringProperty,
-                        from: ROAMING_STATE,
-                        to: DISCONNECTING_STATE,
-                    },
-                    "1": {
-                        "@time": AnyNumericProperty,
-                        from: DISCONNECTING_STATE,
-                        to: IDLE_STATE,
-                    },
-                },
-            },
-        });
+        expect_state_events_roaming_disconnecting_idle(&h.inspector);
     }
 
     fn make_disconnect_request(

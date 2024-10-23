@@ -126,6 +126,7 @@ impl<D: DeviceOps> MlmeMainLoop<D> {
                 self.device.reconnect(mlme_to_fullmac::convert_reconnect_request(req))?;
             }
             Roam(req) => {
+                self.set_link_state(fidl_mlme::ControlledPortState::Closed)?;
                 self.device.roam(mlme_to_fullmac::convert_roam_request(req))?;
             }
             AuthResponse(resp) => {
@@ -1638,6 +1639,29 @@ mod handle_driver_event_tests {
     }
 
     #[test]
+    fn test_roam_req() {
+        let (mut h, mut test_fut) =
+            TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
+
+        let selected_bss = create_bss_descriptions();
+        let roam_req = wlan_sme::MlmeRequest::Roam(fidl_mlme::RoamRequest {
+            selected_bss: selected_bss.clone(),
+        });
+
+        h.mlme_request_sender.unbounded_send(roam_req).expect("sending RoamReq should succeed");
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+
+        // Receipt of a roam request causes MLME to close the controlled port.
+        assert_variant!(
+            h.driver_calls.try_next(),
+            Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
+        );
+        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::RoamReq { req })) => {
+            assert_eq!(selected_bss, req.selected_bss.clone().unwrap());
+        });
+    }
+
+    #[test]
     fn test_roam_result_ind() {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
@@ -1677,6 +1701,56 @@ mod handle_driver_event_tests {
         assert_eq!(
             ind,
             fidl_mlme::RoamResultIndication {
+                selected_bssid: selected_bss.bssid,
+                status_code: fidl_ieee80211::StatusCode::Success,
+                original_association_maintained,
+                target_bss_authenticated,
+                association_id,
+                association_ies,
+            }
+        );
+    }
+
+    #[test]
+    fn test_roam_conf() {
+        let (mut h, mut test_fut) = TestHelper::set_up();
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+
+        let selected_bss = create_bss_descriptions();
+        let original_association_maintained = false;
+        let target_bss_authenticated = true;
+        let association_id = 42;
+        let association_ies = Vec::new();
+
+        let roam_conf = fidl_fullmac::WlanFullmacImplIfcRoamConfRequest {
+            selected_bssid: Some(selected_bss.bssid.clone()),
+            status_code: Some(fidl_ieee80211::StatusCode::Success),
+            original_association_maintained: Some(original_association_maintained),
+            target_bss_authenticated: Some(target_bss_authenticated),
+            association_id: Some(association_id),
+            association_ies: Some(association_ies.clone()),
+            ..Default::default()
+        };
+
+        assert_variant!(
+            h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.roam_conf(&roam_conf)),
+            Poll::Ready(Ok(()))
+        );
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+
+        // Receipt of a roam result success causes MLME to open the controlled port on an open network.
+        assert_variant!(
+            h.driver_calls.try_next(),
+            Ok(Some(DriverCall::OnLinkStateChanged { online: true }))
+        );
+
+        let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
+        let conf = assert_variant!(event, fidl_mlme::MlmeEvent::RoamConf { conf } => conf);
+
+        // SME is notified of the roam result.
+        assert_eq!(
+            conf,
+            fidl_mlme::RoamConfirm {
                 selected_bssid: selected_bss.bssid,
                 status_code: fidl_ieee80211::StatusCode::Success,
                 original_association_maintained,

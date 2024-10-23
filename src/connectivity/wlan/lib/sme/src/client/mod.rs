@@ -408,6 +408,8 @@ pub enum RoamFailureType {
     SelectNetworkFailure,
     RoamStartMalformedFailure,
     RoamResultMalformedFailure,
+    RoamRequestMalformedFailure,
+    RoamConfirmationMalformedFailure,
     ReassociationFailure,
     EstablishRsnaFailure,
 }
@@ -704,6 +706,15 @@ impl ClientSme {
 
         self.state = self.state.take().map(|state| state.connect(cmd, &mut self.context));
         connect_txn_stream
+    }
+
+    pub fn on_roam_command(&mut self, req: fidl_sme::RoamRequest) {
+        if !self.status().is_connected() {
+            error!("SME ignoring roam request because client is not connected");
+        } else {
+            self.state =
+                self.state.take().map(|state| state.roam(&mut self.context, req.bss_description));
+        }
     }
 
     pub fn on_disconnect_command(
