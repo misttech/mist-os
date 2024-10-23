@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#![cfg(test)]
-
 use crate::writer::{Heap, State};
 use inspect_format::{Block, Container};
 use std::sync::Arc;
@@ -17,7 +15,7 @@ pub fn get_state(size: usize) -> State {
 pub trait GetBlockExt: crate::private::InspectTypeInternal {
     fn get_block<F>(&self, callback: F)
     where
-        F: FnOnce(&Block<&Container>) -> (),
+        F: FnOnce(&Block<&Container>),
     {
         let block_index = self.block_index().expect("block index is set");
         let state = self.state().expect("state is set");
@@ -26,7 +24,7 @@ pub trait GetBlockExt: crate::private::InspectTypeInternal {
 
     fn get_block_mut<F>(&self, callback: F)
     where
-        F: FnOnce(&mut Block<&mut Container>) -> (),
+        F: FnOnce(&mut Block<&mut Container>),
     {
         let block_index = self.block_index().expect("block index is set");
         let state = self.state().expect("state is set");
@@ -42,7 +40,7 @@ macro_rules! assert_update_is_atomic {
         // some types (eg Node) get their state method from InspectTypeInternal,
         // but some (eg Inspector) just have them as regular methods
         #[allow(unused_imports)]
-        use crate::writer::types::base::private::InspectTypeInternal;
+        use $crate::writer::types::base::private::InspectTypeInternal;
         let gen = $updateable_thing
             .state()
             .unwrap()

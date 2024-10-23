@@ -97,8 +97,7 @@ impl StatsNode {
         if let Some(stats) = self
             .root_of_instrumented_inspector
             .state()
-            .map(|outer_state| outer_state.try_lock().ok().map(|state| state.stats()))
-            .flatten()
+            .and_then(|outer_state| outer_state.try_lock().ok().map(|state| state.stats()))
         {
             // just piggy-backing on current_size; it doesn't matter how the atomic_update
             // is triggered
@@ -128,8 +127,7 @@ impl StatsNode {
     fn from_nodes(root_of_instrumented_inspector: Node, stats_root: Node) -> Self {
         if let Some(stats) = root_of_instrumented_inspector
             .state()
-            .map(|outer_state| outer_state.try_lock().ok().map(|state| state.stats()))
-            .flatten()
+            .and_then(|outer_state| outer_state.try_lock().ok().map(|state| state.stats()))
         {
             let mut n = stats_root.atomic_update(|stats_root| StatsNode {
                 root_of_instrumented_inspector,

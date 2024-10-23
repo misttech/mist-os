@@ -78,12 +78,16 @@ impl Node {
 
     /// Keeps track of the given property for the lifetime of the node.
     pub fn record(&self, property: impl InspectType + 'static) {
-        self.inner.inner_ref().map(|inner_ref| inner_ref.data.values.record(property));
+        if let Some(inner_ref) = self.inner.inner_ref() {
+            inner_ref.data.values.record(property);
+        }
     }
 
     /// Drop all recorded data from the node.
     pub fn clear_recorded(&self) {
-        self.inner.inner_ref().map(|inner_ref| inner_ref.data.values.clear());
+        if let Some(inner_ref) = self.inner.inner_ref() {
+            inner_ref.data.values.clear();
+        }
     }
 
     /// Creates a new `IntProperty` with the given `name` and `value`.
@@ -287,7 +291,7 @@ impl Node {
         name: impl Into<StringReference>,
         params: LinearHistogramParams<i64>,
     ) -> IntLinearHistogramProperty {
-        IntLinearHistogramProperty::new(name.into(), params, &self)
+        IntLinearHistogramProperty::new(name.into(), params, self)
     }
 
     /// Creates a new `UintLinearHistogramProperty` with the given `name` and `params`.
@@ -297,7 +301,7 @@ impl Node {
         name: impl Into<StringReference>,
         params: LinearHistogramParams<u64>,
     ) -> UintLinearHistogramProperty {
-        UintLinearHistogramProperty::new(name.into(), params, &self)
+        UintLinearHistogramProperty::new(name.into(), params, self)
     }
 
     /// Creates a new `DoubleLinearHistogramProperty` with the given `name` and `params`.
@@ -307,7 +311,7 @@ impl Node {
         name: impl Into<StringReference>,
         params: LinearHistogramParams<f64>,
     ) -> DoubleLinearHistogramProperty {
-        DoubleLinearHistogramProperty::new(name.into(), params, &self)
+        DoubleLinearHistogramProperty::new(name.into(), params, self)
     }
 
     /// Creates a new `IntExponentialHistogramProperty` with the given `name` and `params`.
@@ -317,7 +321,7 @@ impl Node {
         name: impl Into<StringReference>,
         params: ExponentialHistogramParams<i64>,
     ) -> IntExponentialHistogramProperty {
-        IntExponentialHistogramProperty::new(name.into(), params, &self)
+        IntExponentialHistogramProperty::new(name.into(), params, self)
     }
 
     /// Creates a new `UintExponentialHistogramProperty` with the given `name` and `params`.
@@ -327,7 +331,7 @@ impl Node {
         name: impl Into<StringReference>,
         params: ExponentialHistogramParams<u64>,
     ) -> UintExponentialHistogramProperty {
-        UintExponentialHistogramProperty::new(name.into(), params, &self)
+        UintExponentialHistogramProperty::new(name.into(), params, self)
     }
 
     /// Creates a new `DoubleExponentialHistogramProperty` with the given `name` and `params`.
@@ -337,7 +341,7 @@ impl Node {
         name: impl Into<StringReference>,
         params: ExponentialHistogramParams<f64>,
     ) -> DoubleExponentialHistogramProperty {
-        DoubleExponentialHistogramProperty::new(name.into(), params, &self)
+        DoubleExponentialHistogramProperty::new(name.into(), params, self)
     }
 
     /// Creates a new lazy child with the given `name` and `callback`.

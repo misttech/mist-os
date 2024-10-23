@@ -220,7 +220,7 @@ impl InspectorConfig {
     }
 
     fn create_no_op(self) -> Inspector {
-        return Inspector { storage: self.storage, root_node: Arc::new(Node::new_no_op()) };
+        Inspector { storage: self.storage, root_node: Arc::new(Node::new_no_op()) }
     }
 
     fn adjusted_buffer_size(max_size: usize) -> usize {
@@ -255,7 +255,7 @@ impl InspectorConfig {
             }
             Err(e) => {
                 error!("Failed to create root node. Error: {:?}", e);
-                return self.create_no_op();
+                self.create_no_op()
             }
         }
     }
@@ -300,8 +300,8 @@ impl InspectorConfig {
         let size = Self::adjusted_buffer_size(max_size);
         let (container, storage) = Container::read_and_write(size).unwrap();
         let heap = Heap::new(container).map_err(|e| Error::CreateHeap(Box::new(e)))?;
-        let state = State::create(heap, Arc::new(storage.clone()))
-            .map_err(|e| Error::CreateState(Box::new(e)))?;
+        let state =
+            State::create(heap, Arc::new(storage)).map_err(|e| Error::CreateState(Box::new(e)))?;
         Ok((Node::new_root(state), Arc::new(storage)))
     }
 }

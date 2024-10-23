@@ -56,7 +56,7 @@ mod tests {
             let property = node.create_bool("property", true);
             property.get_block(|block| {
                 assert_eq!(block.block_type(), BlockType::BoolValue);
-                assert_eq!(block.bool_value().unwrap(), true);
+                assert!(block.bool_value().unwrap());
             });
             node.get_block(|block| {
                 assert_eq!(block.child_count().unwrap(), 1);
@@ -64,7 +64,7 @@ mod tests {
 
             property.set(false);
             property.get_block(|block| {
-                assert_eq!(block.bool_value().unwrap(), false);
+                assert!(!block.bool_value().unwrap());
             });
         }
         node.get_block(|block| {

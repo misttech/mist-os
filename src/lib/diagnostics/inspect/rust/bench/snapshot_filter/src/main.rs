@@ -30,7 +30,7 @@ fn generate_selectors_till_level(depth: usize) -> Vec<String> {
 /// Parse selectors and returns an HierarchyMatcher
 fn parse_selectors(selectors: &[String]) -> HierarchyMatcher {
     selectors
-        .into_iter()
+        .iter()
         .map(|selector| {
             Arc::new(
                 selectors::parse_selector::<VerboseError>(selector)
@@ -45,7 +45,7 @@ fn parse_selectors(selectors: &[String]) -> HierarchyMatcher {
 fn snapshot_and_select_bench(b: &mut criterion::Bencher, size: usize) {
     let hierarchy_generator =
         fuchsia_inspect_bench_utils::filled_hierarchy_generator(HIERARCHY_GENERATOR_SEED, size);
-    let hierarchy_matcher = parse_selectors(&*SELECTOR_TILL_LEVEL_30);
+    let hierarchy_matcher = parse_selectors(&SELECTOR_TILL_LEVEL_30);
 
     b.iter_with_large_drop(|| {
         let hierarchy = hierarchy_generator.get_diagnostics_hierarchy().into_owned();
@@ -58,7 +58,7 @@ fn main() {
         fuchsia_inspect_bench_utils::CriterionConfig::default(),
     );
 
-    let mut bench = criterion::Benchmark::new(format!("SnapshotAndSelect/10"), move |b| {
+    let mut bench = criterion::Benchmark::new("SnapshotAndSelect/10", move |b| {
         snapshot_and_select_bench(b, 10usize);
     });
     for exponent in 2..=5 {
@@ -66,7 +66,7 @@ fn main() {
         // inspect hierarchy in a vmo and then applies the given selectors
         // to the snapshot to filter it down.
         let size = 10i32.pow(exponent);
-        bench = bench.with_function(format!("SnapshotAndSelect/{}", size), move |b| {
+        bench = bench.with_function(format!("SnapshotAndSelect/{size}"), move |b| {
             snapshot_and_select_bench(b, size as usize);
         });
     }

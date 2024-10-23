@@ -34,6 +34,9 @@ pub trait NumericProperty<'t>: Property<'t> {
 /// Get the usable length of a type.
 pub trait Length {
     fn len(&self) -> Option<usize>;
+    fn is_empty(&self) -> Option<bool> {
+        self.len().map(|s| s == 0)
+    }
 }
 
 impl<T: ArrayProperty + InspectTypeInternal> Length for T {

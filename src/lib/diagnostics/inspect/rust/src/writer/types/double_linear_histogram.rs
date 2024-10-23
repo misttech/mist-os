@@ -42,7 +42,7 @@ impl DoubleLinearHistogramProperty {
             current_floor += self.step_size;
             index += 1;
         }
-        index as usize
+        index
     }
 }
 

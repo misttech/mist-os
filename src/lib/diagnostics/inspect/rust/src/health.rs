@@ -40,6 +40,7 @@
 
 use super::{InspectType, Property, StringProperty};
 use injectable_time::TimeSource;
+use std::fmt;
 
 #[cfg(not(target_os = "fuchsia"))]
 use injectable_time::UtcInstant as TimeType;
@@ -81,13 +82,13 @@ enum Status {
     Ok,
 }
 
-impl ToString for Status {
-    fn to_string(&self) -> String {
-        String::from(match self {
-            Status::StartingUp => "STARTING_UP",
-            Status::Unhealthy => "UNHEALTHY",
-            Status::Ok => "OK",
-        })
+impl fmt::Display for Status {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Status::StartingUp => write!(f, "STARTING_UP"),
+            Status::Unhealthy => write!(f, "UNHEALTHY"),
+            Status::Ok => write!(f, "OK"),
+        }
     }
 }
 
@@ -131,7 +132,7 @@ impl Node {
     /// Creates a new health checking node as a child of `parent`.  The initial observed state
     /// is `STARTING_UP`, and remains so until the programs call one of `set_ok` or `set_unhealthy`.
     pub fn new(parent: &super::Node) -> Self {
-        return Self::new_internal(parent, TimeType::new());
+        Self::new_internal(parent, TimeType::new())
     }
 
     // Creates a health node using a specified timestamp. Useful for tests.
@@ -151,7 +152,7 @@ impl Node {
     // Sets the health status from the supplied `status` and `message`.  Panics if setting invalid
     // status, e.g. setting `UNHEALTHY` without a message.
     fn set_status_enum(&mut self, status: Status, message: Option<&str>) {
-        assert!(status != Status::Unhealthy || message != None, "UNHEALTHY must have a message.");
+        assert!(status != Status::Unhealthy || message.is_some(), "UNHEALTHY must have a message.");
         self.set_status(&status.to_string(), message);
     }
 

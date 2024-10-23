@@ -105,13 +105,13 @@ impl PartialNodeHierarchy {
 
 /// Transforms the partial hierarchy into a `DiagnosticsHierarchy`. If the node hierarchy had
 /// unexpanded links, those will appear as missing values.
-impl Into<DiagnosticsHierarchy> for PartialNodeHierarchy {
-    fn into(self) -> DiagnosticsHierarchy {
-        let hierarchy = DiagnosticsHierarchy {
-            name: self.name,
-            children: self.children.into_iter().map(|child| child.into()).collect(),
-            properties: self.properties,
-            missing: self
+impl From<PartialNodeHierarchy> for DiagnosticsHierarchy {
+    fn from(partial: PartialNodeHierarchy) -> DiagnosticsHierarchy {
+        DiagnosticsHierarchy {
+            name: partial.name,
+            children: partial.children.into_iter().map(|child| child.into()).collect(),
+            properties: partial.properties,
+            missing: partial
                 .links
                 .into_iter()
                 .map(|link_value| MissingValue {
@@ -119,8 +119,7 @@ impl Into<DiagnosticsHierarchy> for PartialNodeHierarchy {
                     name: link_value.name,
                 })
                 .collect(),
-        };
-        hierarchy
+        }
     }
 }
 
@@ -177,7 +176,7 @@ fn read_snapshot(snapshot: &Snapshot) -> Result<PartialNodeHierarchy, ReaderErro
     result.reduce()
 }
 
-fn scan_blocks<'a>(snapshot: &'a Snapshot) -> Result<ScanResult<'a>, ReaderError> {
+fn scan_blocks(snapshot: &Snapshot) -> Result<ScanResult<'_>, ReaderError> {
     let mut result = ScanResult::new(snapshot);
     for block in snapshot.scan() {
         if block.index() == BlockIndex::ROOT
@@ -339,7 +338,7 @@ impl<'a> ScanResult<'a> {
             }
         }
 
-        return Err(ReaderError::MalformedTree);
+        Err(ReaderError::MalformedTree)
     }
 
     pub fn get_name(&self, index: BlockIndex) -> Option<String> {
@@ -580,7 +579,7 @@ mod tests {
                     assert_eq!(n, "foo");
                     assert_eq!(*v, i as i64);
                 }
-                _ => assert!(false),
+                _ => panic!("We only record int properties"),
             }
         }
     }
@@ -700,7 +699,7 @@ mod tests {
 
         // Get the raw VMO bytes to mess with.
         let vmo_size = BlockContainer::len(&vmo);
-        let mut buf = vec![0u8; vmo_size as usize];
+        let mut buf = vec![0u8; vmo_size];
         vmo.copy_bytes(&mut buf[..]);
 
         // Mess up the first byte of the string property value such that the byte is an invalid
@@ -730,7 +729,7 @@ mod tests {
         let vmo = inspector.vmo().await.unwrap();
         let vmo_size = BlockContainer::len(&vmo);
 
-        let mut buf = vec![0u8; vmo_size as usize];
+        let mut buf = vec![0u8; vmo_size];
         vmo.copy_bytes(&mut buf[..]);
 
         assert!(PartialNodeHierarchy::try_from(Snapshot::build(&buf)).is_err());

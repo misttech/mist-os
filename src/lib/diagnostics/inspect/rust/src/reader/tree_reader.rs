@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//!
-
 use crate::reader::error::ReaderError;
 use crate::reader::{
     DiagnosticsHierarchy, MissingValueReason, PartialNodeHierarchy, ReadableTree, Snapshot,
@@ -275,7 +273,7 @@ mod tests {
     #[fuchsia::test]
     async fn missing_value_not_found() -> Result<(), anyhow::Error> {
         let inspector = Inspector::default();
-        inspector.state().map(|state| {
+        if let Some(state) = inspector.state() {
             let mut state = state.try_lock().expect("lock state");
             state
                 .allocate_link(
@@ -285,7 +283,7 @@ mod tests {
                     0.into(),
                 )
                 .unwrap();
-        });
+        }
         let hierarchy = reader::read(&inspector).await?;
         assert_eq!(hierarchy.missing.len(), 1);
         assert_eq!(hierarchy.missing[0].reason, MissingValueReason::LinkNotFound);
