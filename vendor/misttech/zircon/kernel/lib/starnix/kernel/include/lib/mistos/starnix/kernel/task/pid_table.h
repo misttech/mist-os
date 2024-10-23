@@ -31,14 +31,15 @@ class ProcessEntry {
   using Variant =
       ktl::variant<ktl::monostate, util::WeakPtr<ThreadGroup>, util::WeakPtr<ZombieProcess>>;
 
-  ProcessEntry();
   ~ProcessEntry();
+  static ProcessEntry None();
   static ProcessEntry ThreadGroupCtor(util::WeakPtr<ThreadGroup> thread_group);
   static ProcessEntry ZombieProcessCtor(util::WeakPtr<ZombieProcess> thread_group);
 
   bool is_none() const;
 
   ktl::optional<std::reference_wrapper<const util::WeakPtr<ThreadGroup>>> thread_group() const;
+  ktl::optional<std::reference_wrapper<const util::WeakPtr<ZombieProcess>>> zombie() const;
 
  private:
   explicit ProcessEntry(Variant variant);
@@ -50,7 +51,7 @@ struct PidEntry : public fbl::SinglyLinkedListable<ktl::unique_ptr<PidEntry>> {
  private:
   ktl::optional<util::WeakPtr<Task>> task_;
 
-  ProcessEntry process_;
+  ProcessEntry process_ = ProcessEntry::None();
 
   ktl::optional<util::WeakPtr<ProcessGroup>> process_group_;
 
@@ -90,13 +91,7 @@ class PidTable {
   PidEntry& get_entry_mut(pid_t pid);
 
   template <typename F>
-  void remove_item(pid_t pid, F&& do_remove) {
-    auto& entry = get_entry_mut(pid);
-    do_remove(entry);
-    if (!entry.task_.has_value() && entry.process_.is_none() && !entry.process_group_.has_value()) {
-      table_.erase(pid);
-    }
-  }
+  void remove_item(pid_t pid, F&& do_remove);
 
  public:
   pid_t allocate_pid();
@@ -112,6 +107,11 @@ class PidTable {
   void remove_task(pid_t pid);
 
   void add_thread_group(const fbl::RefPtr<ThreadGroup>& thread_group);
+
+  /// Replace process with the specified `pid` with the `zombie`.
+  void kill_process(pid_t pid, util::WeakPtr<ZombieProcess> zombie);
+
+  void remove_zombie(pid_t pid);
 
   void add_process_group(const fbl::RefPtr<ProcessGroup>& process_group);
 

@@ -11,6 +11,7 @@
 #include <lib/mistos/starnix/kernel/task/process_group.h>
 #include <lib/mistos/starnix/kernel/task/task.h>
 #include <lib/mistos/starnix/kernel/task/thread_group.h>
+#include <lib/mistos/starnix/kernel/task/waiter.h>
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
 #include <lib/mistos/starnix_uapi/user_buffer.h>
@@ -37,21 +38,18 @@ fit::result<Errno, pid_t> negate_pid(pid_t pid) {
 }
 }  // namespace
 
-// Waits on the task with `pid` to exit or change state.
-//
-// - `current_task`: The current task.
-// - `selector`: The selector for the task(s) to wait on.
-// - `options`: The options passed to the wait syscall.
+/// Waits on the task with `pid` to exit or change state.
+///
+/// - `current_task`: The current task.
+/// - `pid`: The id of the task to wait on.
+/// - `options`: The options passed to the wait syscall.
 fit::result<Errno, ktl::optional<WaitResult>> wait_on_pid(const CurrentTask& current_task,
                                                           const ProcessSelector& selector,
                                                           const WaitingOptions& options) {
-  // TODO: Implement Waiter class
-  // auto waiter = Waiter::new();
-
+  auto waiter = Waiter::New();
   do {
     {
       auto pids = current_task->kernel()->pids.Write();
-
       // Waits and notifies on a given task need to be done atomically
       // with respect to changes to the task's waitable state; otherwise,
       // we see missing notifications. We do that by holding the task lock.
@@ -70,9 +68,11 @@ fit::result<Errno, ktl::optional<WaitResult>> wait_on_pid(const CurrentTask& cur
       {
         auto thread_group = current_task->thread_group()->Write();
 
-        // TODO: Implement ptrace-related functionality
+        // TODO (Herrera): Implement ptrace-related functionality
+        // Per the above, see if traced tasks have become waitable. If they have, release
+        // the lock and retry getting waitable tracees.
         // bool has_waitable_tracee = false;
-        // bool has_any_tracee = false;
+        bool has_any_tracee = false;
         // current_task.thread_group->get_ptracees_and(
         //     selector,
         //     &pids,
@@ -91,9 +91,12 @@ fit::result<Errno, ktl::optional<WaitResult>> wait_on_pid(const CurrentTask& cur
           case WaitableChildResult::Type::ShouldWait:
             break;
           case WaitableChildResult::Type::NoneFound:
-            // if !has_any_tracee {}
-            return fit::error(errno(ECHILD));
+            if (!has_any_tracee) {
+              return fit::error(errno(ECHILD));
+            }
+            break;
         }
+        thread_group->child_status_waiters().WaitAsync(waiter);
       }
     }
 
@@ -101,13 +104,8 @@ fit::result<Errno, ktl::optional<WaitResult>> wait_on_pid(const CurrentTask& cur
       return fit::ok(ktl::nullopt);
     }
 
-    // TODO: Implement waiting mechanism
-    // waiter.wait();
-    break;
+    _EP(map_eintr(waiter.Wait(current_task), errno(EINTR)));
   } while (true);
-
-  // This return statement is unreachable but added to satisfy the compiler
-  return fit::error(errno(EINTR));
 }
 
 fit::result<Errno, pid_t> sys_wait4(const CurrentTask& current_task, pid_t raw_selector,
@@ -137,32 +135,39 @@ fit::result<Errno, pid_t> sys_wait4(const CurrentTask& current_task, pid_t raw_s
     return fit::error(errno(ENOSYS));
   }() _EP(selector);
 
-  auto waitable_process =
-      wait_on_pid(current_task, selector.value(), waiting_options.value()) _EP(waitable_process);
+  {
+    auto waitable_process =
+        wait_on_pid(current_task, selector.value(), waiting_options.value()) _EP(waitable_process);
 
-  if (waitable_process.value().has_value()) {
-    auto& process = waitable_process.value().value();
-    int32_t status = ExitStatus::wait_status(process.exit_info.status);
+    if (waitable_process.value().has_value()) {
+      auto& process = waitable_process.value().value();
+      int32_t status = ExitStatus::wait_status(process.exit_info.status);
 
-    if (!user_rusage->is_null()) {
-      // TODO(https://fxbug.dev/322874768): Implement real rusage from wait4
-      /*struct ::rusage usage = {
-          .ru_utime = timeval_from_duration(process.time_stats.user_time),
-          .ru_stime = timeval_from_duration(process.time_stats.system_time),
-      };*/
+      if (!user_rusage->is_null()) {
+        // TODO(https://fxbug.dev/322874768): Implement real rusage from wait4
+        /*struct ::rusage usage = {
+            .ru_utime = timeval_from_duration(process.time_stats.user_time),
+            .ru_stime = timeval_from_duration(process.time_stats.system_time),
+        };*/
 
-      struct ::rusage usage = {};
-      _EP(current_task->write_object(user_rusage, usage));
+        struct ::rusage usage = {};
+        _EP(current_task->write_object(user_rusage, usage));
+      }
+
+      if (!user_wstatus->is_null()) {
+        _EP(current_task.write_object(user_wstatus, status));
+      }
+
+      return fit::ok(process.pid);
     }
-
-    if (!user_wstatus->is_null()) {
-      _EP(current_task.write_object(user_wstatus, status));
-    }
-
-    return fit::ok(process.pid);
+    return fit::ok(0);
   }
+}
 
-  return fit::ok(0);
+fit::result<Errno, ktl::optional<WaitResult>> friend_wait_on_pid(const CurrentTask& current_task,
+                                                                 const ProcessSelector& selector,
+                                                                 const WaitingOptions& options) {
+  return wait_on_pid(current_task, selector, options);
 }
 
 }  // namespace starnix
