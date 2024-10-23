@@ -62,6 +62,7 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
   }
 
  protected:
+  // FIDL natural C++ methods for fuchsia.hardware.hrtimer.
   void Start(StartRequest& request, StartCompleter::Sync& completer) override;
   void Stop(StopRequest& request, StopCompleter::Sync& completer) override;
   void GetTicksLeft(GetTicksLeftRequest& request, GetTicksLeftCompleter::Sync& completer) override;
@@ -114,6 +115,7 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
 
   static size_t TimerIndexFromId(uint64_t id) { return id; }
 
+  bool IsTimerStarted(size_t id);
   fit::result<const fuchsia_hardware_hrtimer::DriverError> StartHardware(size_t timer_index);
   zx::result<fidl::ClientEnd<fuchsia_power_broker::LeaseControl>> LeaseWakeHandling();
   void WatchRequiredLevel();
@@ -152,7 +154,6 @@ class AmlHrtimerServer : public fidl::Server<fuchsia_hardware_hrtimer::Device> {
       Timer(*this, timers_properties_[6]), Timer(*this, timers_properties_[7]),
       Timer(*this, timers_properties_[8])};
   std::optional<fdf::MmioBuffer> mmio_;
-  zx::interrupt irq_;
   // Need to keep the ElementControl channel end (returned from adding the power element
   // aml-timer-wake) so the power element stays in the topology.
   std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control_;
