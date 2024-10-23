@@ -2,15 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//src/ui/scenic/lib/flatland/engine/build_args.gni")
-
-config("engine_config") {
-  defines = []
-  if (flatland_visual_debugging) {
-    defines += [ "VISUAL_DEBUGGING_ENABLED" ]
-  }
-}
-
 config("cpu_accessible_config") {
   defines = [ "CPU_ACCESSIBLE_VMO=1" ]
 }
@@ -52,7 +43,8 @@ template("engine_library") {
       "//sdk/lib/sys/cpp",
     ]
 
-    public_configs = [ ":engine_config" ]
+    public_configs = []
+
     if (make_cpu_accessible) {
       public_configs += [ ":cpu_accessible_config" ]
     }
