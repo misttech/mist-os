@@ -13,6 +13,7 @@
 #include <lib/mistos/starnix/kernel/task/exit_status.h>
 #include <lib/mistos/starnix/kernel/vfs/fd_table.h>
 #include <lib/mistos/starnix_uapi/auth.h>
+#include <lib/mistos/util/bitflags.h>
 #include <lib/mistos/util/weak_wrapper.h>
 #include <lib/starnix_sync/locks.h>
 
@@ -23,6 +24,7 @@
 #include <fbl/ref_counted_upgradeable.h>
 #include <fbl/ref_ptr.h>
 #include <kernel/mutex.h>
+#include <ktl/atomic.h>
 #include <ktl/optional.h>
 #include <ktl/string_view.h>
 #include <ktl/unique_ptr.h>
@@ -41,20 +43,49 @@ namespace testing {
 TaskBuilder create_test_init_task(fbl::RefPtr<Kernel> kernel, fbl::RefPtr<FsContext> fs);
 }
 
-class TaskMutableState {
+enum class TaskFlagsEnum : uint8_t {
+  EXITED = 0x1,
+  SIGNALS_AVAILABLE = 0x2,
+  TEMPORARY_SIGNAL_MASK = 0x4,
+  /// Whether the executor should dump the stack of this task when it exits.
+  /// Currently used to implement ExitStatus::CoreDump.
+  DUMP_ON_EXIT = 0x8,
+};
+
+using TaskFlags = Flags<TaskFlagsEnum>;
+
+class AtomicTaskFlags {
  public:
+  explicit AtomicTaskFlags(TaskFlags flags) : flags_(flags.bits()) {}
+
+  TaskFlags load(ktl::memory_order order) const {
+    uint8_t bits = flags_.load(order);
+    // We only ever store values from a `TaskFlags`.
+    return TaskFlags::from_bits_retain(bits);
+  }
+
+  TaskFlags swap(TaskFlags flags, ktl::memory_order ordering) {
+    uint8_t old_bits = flags_.exchange(flags.bits(), ordering);
+    // We only ever store values from a `TaskFlags`.
+    return TaskFlags::from_bits_retain(old_bits);
+  }
+
+ private:
+  ktl::atomic<uint8_t> flags_;
+};
+
+class TaskMutableState {
+ private:
   // See https://man7.org/linux/man-pages/man2/set_tid_address.2.html
-  // UserRef<pid_t> clear_child_tid;
+  UserRef<pid_t> clear_child_tid_;
 
   /// Signal handler related state. This is grouped together for when atomicity is needed during
   /// signal sending and delivery.
-  SignalState signals;
+  SignalState signals_;
 
- private:
   // The exit status that this task exited with.
   ktl::optional<ExitStatus> exit_status_;
 
- public:
   /// Desired scheduler policy for the task.
   // pub scheduler_policy: SchedulerPolicy,
 
@@ -67,7 +98,6 @@ class TaskMutableState {
   /// by any other thread that shares this namespace.
   // pub uts_ns: UtsNamespaceHandle,
 
- private:
   /// Bit that determines whether a newly started program can have privileges its parent does
   /// not have.  See Documentation/prctl/no_new_privs.txt in the Linux kernel for details.
   /// Note that Starnix does not currently implement the relevant privileges (e.g.,
@@ -79,6 +109,7 @@ class TaskMutableState {
   /// for this field ensure this property.
   bool no_new_privs_;
 
+ public:
   /// Userspace hint about how to adjust the OOM score for this process.
   // int32_t oom_score_adj_;
 
@@ -89,31 +120,116 @@ class TaskMutableState {
   /// userspace. See get_robust_list(2)
   // pub robust_list_head: UserRef<robust_list_head>,
 
- public:
   /// The timer slack used to group timer expirations for the calling thread.
   ///
   /// Timers may expire up to `timerslack_ns` late, but never early.
   ///
   /// If this value is 0, the task's default timerslack is used.
-  uint64_t timerslack_nsl;
+  uint64_t timerslack_ns_;
 
   /// The default value for `timerslack_ns`. This value cannot change during the lifetime of a
   /// task.
   ///
   /// This value is set to the `timerslack_ns` of the creating thread, and thus is not constant
   /// across tasks.
-  // pub default_timerslack_ns: u64,
+  uint64_t default_timerslack_ns_;
 
   /// Information that a tracer needs to communicate with this process, if it
   /// is being traced.
-  // pub ptrace: Option<PtraceState>,
+  // ktl::optional<PtraceState> ptrace_;
 
- public:
   /// impl TaskMutableState
   bool no_new_privs() const { return no_new_privs_; }
 
- public:
-  // TaskMutableState(const TaskMutableState&) = delete;
+  /// Sets the value of no_new_privs to true.  It is an error to set
+  /// it to anything else.
+  void enable_no_new_privs() { no_new_privs_ = true; }
+
+  uint64_t get_timerslack_ns() { return timerslack_ns_; }
+
+  /// Sets the current timerslack of the task to `ns`.
+  ///
+  /// If `ns` is zero, the current timerslack gets reset to the task's default timerslack.
+  void set_timerslack_ns(uint64_t ns) {
+    if (ns == 0) {
+      timerslack_ns_ = default_timerslack_ns_;
+    } else {
+      timerslack_ns_ = ns;
+    }
+  }
+
+  bool is_ptraced() { return false; }
+
+  bool is_ptrace_listening() { return false; }
+
+  /// Returns the task's currently active signal mask.
+  SigSet signal_mask() const { return signals_.mask(); }
+
+  /// Returns true if `signal` is currently blocked by this task's signal mask.
+  bool is_signal_masked(Signal signal) const { return signals_.mask().has_signal(signal); }
+
+  /// Returns true if `signal` is blocked by the saved signal mask.
+  ///
+  /// Note that the current signal mask may still not be blocking the signal.
+  bool is_signal_masked_by_saved_mask(Signal signal) const {
+    auto saved_mask = signals_.saved_mask();
+    return saved_mask.has_value() && saved_mask->has_signal(signal);
+  }
+
+  /// Enqueues a signal at the back of the task's signal queue.
+  // void enqueue_signal(const SignalInfo& signal) { signals_.enqueue(signal); }
+
+  /// Enqueues the signal, allowing the signal to skip straight to the front of the task's queue.
+  ///
+  /// `enqueue_signal` is the more common API to use.
+  ///
+  /// Note that this will not guarantee that the signal is dequeued before any process-directed
+  /// signals.
+  // void enqueue_signal_front(const SignalInfo& signal) { signals_.enqueue_front(signal); }
+
+  /// Sets the current signal mask of the task.
+  void set_signal_mask(const SigSet& mask) { signals_.set_mask(mask); }
+
+  /// Sets a temporary signal mask for the task.
+  ///
+  /// This mask should be removed by a matching call to `restore_signal_mask`.
+  void set_temporary_signal_mask(const SigSet& mask) { signals_.set_temporary_mask(mask); }
+
+  void update_flags(TaskFlags clear, TaskFlags set);
+
+  void set_flags(TaskFlags flag, bool v) {
+    TaskFlags clear = v ? TaskFlags::empty() : flag;
+    TaskFlags set = v ? flag : TaskFlags::empty();
+
+    update_flags(clear, set);
+  }
+
+  void set_exit_status(ExitStatus status) {
+    set_flags(TaskFlags(TaskFlagsEnum::EXITED), true);
+    exit_status_ = status;
+  }
+
+  void set_exit_status_if_not_already(ExitStatus status) {
+    set_flags(TaskFlags(TaskFlagsEnum::EXITED), true);
+    if (!exit_status_.has_value()) {
+      exit_status_ = status;
+    }
+  }
+
+ private:
+  friend class Task;
+  TaskMutableState(Task* base, UserRef<pid_t> clear_child_tid, SignalState signal,
+                   ktl::optional<ExitStatus> exit_status, bool no_new_privs, uint64_t timerslack_ns,
+                   uint64_t default_timerslack_ns)
+      : clear_child_tid_(clear_child_tid),
+        signals_(ktl::move(signal)),
+        exit_status_(exit_status),
+        no_new_privs_(no_new_privs),
+        timerslack_ns_(timerslack_ns),
+        default_timerslack_ns_(default_timerslack_ns),
+        base_(base) {}
+
+  Task* base_;
 };
 
 enum class TaskStateCode {
@@ -141,7 +257,6 @@ class TaskPersistentInfoState {
  private:
   /// Immutable information about the task
   pid_t tid_;
-
   pid_t pid_;
 
   /// The command of this task.
@@ -235,40 +350,36 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   // This table can be share by many tasks.
   FdTable files_;
 
- private:
   // The memory manager for this task.
   ktl::optional<fbl::RefPtr<MemoryManager>> mm_;
 
   // The file system for this task.
   ktl::optional<starnix_sync::RwLock<fbl::RefPtr<FsContext>>> fs_;
 
- public:
   /// The namespace for abstract AF_UNIX sockets for this task.
   // pub abstract_socket_namespace: Arc<AbstractUnixSocketNamespace>,
 
   /// The namespace for AF_VSOCK for this task.
   // pub abstract_vsock_namespace: Arc<AbstractVsockSocketNamespace>,
 
- private:
   /// The stop state of the task, distinct from the stop state of the thread group.
   ///
   /// Must only be set when the `mutable_state` write lock is held.
-  // stop_state: AtomicStopState,
+  AtomicStopState stop_state_;
 
   /// The flags for the task.
   ///
   /// Must only be set the then `mutable_state` write lock is held.
-  // flags: AtomicTaskFlags,
+  AtomicTaskFlags flags_;
 
   // The mutable state of the Task.
   mutable starnix_sync::RwLock<TaskMutableState> mutable_state_;
 
- public:
   // The information of the task that needs to be available to the `ThreadGroup` while computing
   // which process a wait can target.
   // Contains the command line, the task credentials and the exit signal.
   // See `TaskPersistentInfo` for more information.
-  TaskPersistentInfo persistent_info;
+  TaskPersistentInfo persistent_info_;
 
   /// For vfork and clone() with CLONE_VFORK, this is set when the task exits or calls execve().
   /// It allows the calling task to block until the fork has been completed. Only populated
@@ -286,7 +397,24 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   // pub trace_syscalls: AtomicBool,
 
   /// impl Task
+ public:
   fbl::RefPtr<Kernel>& kernel() const;
+
+  bool has_same_address_space(const Task* other) const { return mm() == other->mm(); }
+
+  TaskFlags flags() const { return flags_.load(std::memory_order_relaxed); }
+
+  ktl::optional<ExitStatus> exit_status() const {
+    if (!is_exited()) {
+      return ktl::nullopt;
+    }
+    auto state = mutable_state_.Read();
+    return state->exit_status_.has_value() ? state->exit_status_ : ktl::nullopt;
+  }
+
+  bool is_exited() const { return flags().contains(TaskFlagsEnum::EXITED); }
+
+  // StopState load_stopped() const { return stop_state_.load(std::memory_order_relaxed); }
 
   /// Upgrade a Reference to a Task, returning a ESRCH errno if the reference cannot be borrowed.
   static fit::result<Errno, fbl::RefPtr<Task>> from_weak(util::WeakPtr<Task> weak) {
@@ -307,11 +435,12 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
                                fbl::RefPtr<ThreadGroup> thread_group,
                                ktl::optional<fbl::RefPtr<ThreadDispatcher>> thread, FdTable files,
                                fbl::RefPtr<MemoryManager> mm, fbl::RefPtr<FsContext> fs,
-                               Credentials creds, ktl::optional<Signal> exit_signal);
+                               Credentials creds, ktl::optional<Signal> exit_signal,
+                               SigSet signal_mask, bool no_new_privs, uint64_t timerslack_ns);
 
   fit::result<Errno, FdNumber> add_file(FileHandle file, FdFlags flags) const;
 
-  Credentials creds() const { return (persistent_info->Lock())->creds(); }
+  Credentials creds() const { return (persistent_info_->Lock())->creds(); }
 
   /*
     pub fn exit_signal(&self) -> Option<Signal> {
@@ -335,7 +464,7 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
 
   FsCred as_fscred() const { return creds().as_fscred(); }
 
-  ktl::string_view command() const { return persistent_info->Lock()->command(); }
+  ktl::string_view command() const { return persistent_info_->Lock()->command(); }
 
   /// impl Releasable for Task
   void release(ThreadState context);
@@ -359,7 +488,6 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   fit::result<Errno, size_t> zero(UserAddress addr, size_t length) const final;
 
   // C++
-
   starnix_sync::RwLock<TaskMutableState>::RwLockReadGuard Read() const {
     return mutable_state_.Read();
   }
@@ -400,8 +528,11 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
   ~Task() override;
 
  private:
+  friend class TaskMutableState;
   friend class CurrentTask;
   friend class ThreadGroup;
+  friend class TaskContainer;
+
   friend TaskBuilder testing::create_test_init_task(fbl::RefPtr<Kernel> kernel,
                                                     fbl::RefPtr<FsContext> fs);
 
@@ -409,7 +540,9 @@ class Task : public fbl::RefCountedUpgradeable<Task>, public MemoryAccessorExt {
 
   Task(pid_t id, fbl::RefPtr<ThreadGroup> thread_group,
        ktl::optional<fbl::RefPtr<ThreadDispatcher>> thread, FdTable files,
-       ktl::optional<fbl::RefPtr<MemoryManager>> mm, ktl::optional<fbl::RefPtr<FsContext>> fs);
+       ktl::optional<fbl::RefPtr<MemoryManager>> mm, ktl::optional<fbl::RefPtr<FsContext>> fs,
+       ktl::optional<Signal> exit_signal, SigSet signal_mask, bool no_new_privs,
+       uint64_t timerslack_ns);
 
   ThreadSignalObserver observer_;
 };
@@ -425,7 +558,7 @@ class TaskContainer : public fbl::WAVLTreeContainable<ktl::unique_ptr<TaskContai
   static ktl::unique_ptr<TaskContainer> From(fbl::RefPtr<Task> task) {
     fbl::AllocChecker ac;
     ktl::unique_ptr<TaskContainer> ptr = ktl::unique_ptr<TaskContainer>(
-        new (&ac) TaskContainer(util::WeakPtr<Task>(task.get()), task->persistent_info));
+        new (&ac) TaskContainer(util::WeakPtr<Task>(task.get()), task->persistent_info_));
     ZX_ASSERT(ac.check());
     return ptr;
   }
@@ -446,7 +579,7 @@ class TaskContainer : public fbl::WAVLTreeContainable<ktl::unique_ptr<TaskContai
 
   starnix_sync::MutexGuard<TaskPersistentInfoState> info() const { return info_->Lock(); }
 
-  operator TaskPersistentInfoState() const { return *info_->Lock(); }
+  TaskPersistentInfo into() const { return info_; }
 
  private:
   TaskContainer(util::WeakPtr<Task> weak, TaskPersistentInfo& info)
@@ -458,5 +591,13 @@ class TaskContainer : public fbl::WAVLTreeContainable<ktl::unique_ptr<TaskContai
 };
 
 }  // namespace starnix
+
+template <>
+constexpr Flag<starnix::TaskFlagsEnum> Flags<starnix::TaskFlagsEnum>::FLAGS[] = {
+    {starnix::TaskFlagsEnum::EXITED},
+    {starnix::TaskFlagsEnum::SIGNALS_AVAILABLE},
+    {starnix::TaskFlagsEnum::TEMPORARY_SIGNAL_MASK},
+    {starnix::TaskFlagsEnum::DUMP_ON_EXIT},
+};
 
 #endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_STARNIX_KERNEL_INCLUDE_LIB_MISTOS_STARNIX_KERNEL_TASK_TASK_H_

@@ -219,11 +219,11 @@ fit::result<Errno, TaskBuilder> CurrentTask::create_task_with_pid(
   // > nanoseconds (50 microseconds).  The timer slack value is inherited by a child created
   // > via fork(2), and is preserved across execve(2).
   // https://man7.org/linux/man-pages/man2/prctl.2.html
-  // const uint64_t default_timerslack = 50_000;
+  const uint64_t default_timerslack = 50000;
 
-  auto builder =
-      TaskBuilder{Task::New(pid, initial_name, task_info.thread_group, ktl::move(task_info.thread),
-                            FdTable::Create(), task_info.memory_manager, root_fs, creds, kSIGCHLD)};
+  auto builder = TaskBuilder{Task::New(
+      pid, initial_name, task_info.thread_group, ktl::move(task_info.thread), FdTable::Create(),
+      task_info.memory_manager, root_fs, creds, kSIGCHLD, SigSet(), false, default_timerslack)};
 
   // TODO (Herrera) Add fit::defer
   {
@@ -331,10 +331,10 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
   bool no_new_privs;
   // let seccomp_filters;
   // let robust_list_head = UserAddress::NULL.into();
-  // SigSet child_signal_mask;
-  // let timerslack_ns;
-
-  LTRACE;
+  SigSet child_signal_mask;
+  uint64_t timerslack_ns;
+  // let uts_ns;
+  // let security_state = security::task_alloc(&self, flags);
 
   auto task_info = [&]() -> fit::result<Errno, TaskInfo> {
     // These variables hold the original parent in case we need to switch the parent of the
@@ -367,14 +367,16 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
     auto state = task_->Read();
 
     no_new_privs = (*state).no_new_privs();
+
     // seccomp_filters = state.seccomp_filters.clone();
-    // child_signal_mask = state.signals.mask();
+
+    child_signal_mask = (*state).signal_mask();
 
     pid = pids->allocate_pid();
     command = task_->command();
     creds = task_->creds();
     // scheduler_policy = state.scheduler_policy.fork();
-    // timerslack_ns = state.timerslack_ns;
+    timerslack_ns = (*state).timerslack_ns_;
 
     /*
     uts_ns = if new_uts {
@@ -420,9 +422,9 @@ fit::result<Errno, TaskBuilder> CurrentTask::clone_task(uint64_t flags,
 
   auto& [thread, thread_group, memory_manager] = task_info.value();
 
-  auto child =
-      TaskBuilder(Task::New(pid, command, ktl::move(thread_group), ktl::move(thread), files,
-                            ktl::move(memory_manager), fs, creds, child_exit_signal));
+  auto child = TaskBuilder(Task::New(pid, command, ktl::move(thread_group), ktl::move(thread),
+                                     files, ktl::move(memory_manager), fs, creds, child_exit_signal,
+                                     child_signal_mask, no_new_privs, timerslack_ns));
 
   {
     auto child_task = child.task();

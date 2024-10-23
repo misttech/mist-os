@@ -12,7 +12,10 @@
 #include <lib/mistos/starnix/kernel/vfs/file_object.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_context.h>
 #include <lib/mistos/starnix/kernel/vfs/fs_node.h>
+#include <lib/mistos/starnix_uapi/user_address.h>
+#include <lib/mistos/util/default_construct.h>
 #include <lib/mistos/util/weak_wrapper.h>
+#include <lib/starnix_zircon/task_wrapper.h>
 #include <trace.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -40,18 +43,31 @@ TaskPersistentInfo TaskPersistentInfoState::New(pid_t tid, pid_t pid,
   return info;
 }
 
+void TaskMutableState::update_flags(TaskFlags clear, TaskFlags set) {
+  // We don't actually use the guard but we require it to enforce that the
+  // caller holds the task's mutable state lock (identified by mutable
+  // access to the task's mutable state).
+
+  DEBUG_ASSERT((clear ^ set) == (clear | set));
+  TaskFlags observed = base_->flags();
+  TaskFlags swapped = base_->flags_.swap((observed | set) & ~clear, std::memory_order_relaxed);
+  DEBUG_ASSERT(swapped == observed);
+}
+
 fbl::RefPtr<Task> Task::New(pid_t id, const ktl::string_view& command,
                             fbl::RefPtr<ThreadGroup> thread_group,
                             ktl::optional<fbl::RefPtr<ThreadDispatcher>> thread, FdTable files,
                             fbl::RefPtr<MemoryManager> mm, fbl::RefPtr<FsContext> fs,
-                            Credentials creds, ktl::optional<Signal> exit_signal) {
+                            Credentials creds, ktl::optional<Signal> exit_signal,
+                            SigSet signal_mask, bool no_new_privs, uint64_t timerslack_ns) {
   fbl::AllocChecker ac;
   fbl::RefPtr<Task> task =
-      fbl::AdoptRef(new (&ac) Task(id, thread_group, ktl::move(thread), ktl::move(files), mm, fs));
+      fbl::AdoptRef(new (&ac) Task(id, thread_group, ktl::move(thread), ktl::move(files), mm, fs,
+                                   exit_signal, signal_mask, no_new_privs, timerslack_ns));
   ASSERT(ac.check());
 
   pid_t pid = thread_group->leader();
-  task->persistent_info = TaskPersistentInfoState::New(id, pid, command, creds, exit_signal);
+  task->persistent_info_ = TaskPersistentInfoState::New(id, pid, command, creds, exit_signal);
 
   return ktl::move(task);
 }  // namespace starnix
@@ -62,12 +78,21 @@ fit::result<Errno, FdNumber> Task::add_file(FileHandle file, FdFlags flags) cons
 
 Task::Task(pid_t id, fbl::RefPtr<ThreadGroup> thread_group,
            ktl::optional<fbl::RefPtr<ThreadDispatcher>> thread, FdTable files,
-           ktl::optional<fbl::RefPtr<MemoryManager>> mm, ktl::optional<fbl::RefPtr<FsContext>> fs)
+           ktl::optional<fbl::RefPtr<MemoryManager>> mm, ktl::optional<fbl::RefPtr<FsContext>> fs,
+           ktl::optional<Signal> exit_signal, SigSet signal_mask, bool no_new_privs,
+           uint64_t timerslack_ns)
     : id_(id),
       thread_group_(ktl::move(thread_group)),
       files_(files),
       mm_(ktl::move(mm)),
       fs_(ktl::move(fs)),
+      stop_state_(AtomicStopState(StopState::Awake)),
+      flags_(AtomicTaskFlags(TaskFlags::empty())),
+      mutable_state_(ktl::move(TaskMutableState(
+          this, mtl::DefaultConstruct<UserRef<pid_t>>(), SignalState::with_mask(signal_mask), {},
+          no_new_privs, timerslack_ns,
+          /*The default timerslack is set to the current timerslack of the creating thread.*/
+          timerslack_ns))),
       observer_(util::WeakPtr(this)) {
   *thread_.Write() = ktl::move(thread);
 
@@ -151,20 +176,17 @@ fit::result<Errno, size_t> Task::zero(UserAddress addr, size_t length) const {
 
 void Task::ThreadSignalObserver::OnMatch(zx_signals_t signals) {
   canary_.Assert();
-  LTRACEF("signal: 0x%x\n", signals);
+  LTRACEF("thread signal: 0x%x\n", signals);
+
   auto task = task_.Lock();
   if (task) {
-    starnix::TaskBuilder builder(task);
-    auto current_task = starnix::CurrentTask::From(ktl::move(builder));
-    current_task.release();
-
-    auto thread_guard = task->thread().Write();
-    *thread_guard = nullptr;
+    // Set the current TaskWrapper to null to force CurrentTask to release.
+    task->thread().Write()->value()->SetTask(nullptr);
   }
 }
 void Task::ThreadSignalObserver::OnCancel(zx_signals_t signals) {
   canary_.Assert();
-  LTRACEF("signal: 0x%x\n", signals);
+  LTRACEF("thread signal: 0x%x\n", signals);
 }
 
 }  // namespace starnix
