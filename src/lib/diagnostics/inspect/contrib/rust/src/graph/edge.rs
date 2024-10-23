@@ -108,7 +108,7 @@ impl EdgeState {
 
     fn metadata(&self) -> &EdgeGraphMetadata {
         match self {
-            EdgeState::Active { metadata, .. } | EdgeState::Gone { metadata, .. } => &metadata,
+            EdgeState::Active { metadata, .. } | EdgeState::Gone { metadata, .. } => metadata,
         }
     }
 }
@@ -130,7 +130,7 @@ impl WeakEdgeRef {
 
 impl Drop for Edge {
     fn drop(&mut self) {
-        if let Some(ref events_tracker) = self.state.read().metadata().events_tracker() {
+        if let Some(events_tracker) = self.state.read().metadata().events_tracker() {
             events_tracker.record_removed(self.id());
         }
     }

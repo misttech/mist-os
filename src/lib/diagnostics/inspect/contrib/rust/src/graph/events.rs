@@ -65,7 +65,7 @@ where
             NodeTimeExt::<zx::BootTimeline>::record_time(node, "@time");
             node.record_string("event", "add_vertex");
             node.record_string("vertex_id", id.get_id().as_ref());
-            let _ = meta_event_node.reparent(&node);
+            let _ = meta_event_node.reparent(node);
             node.record(meta_event_node);
         });
     }
@@ -89,7 +89,7 @@ impl GraphObjectEventTracker<EdgeMarker> {
             node.record_string("from", from);
             node.record_string("to", to);
             node.record_uint("edge_id", id);
-            let _ = meta_event_node.reparent(&node);
+            let _ = meta_event_node.reparent(node);
             node.record(meta_event_node);
         });
     }
@@ -113,7 +113,7 @@ where
             NodeTimeExt::<zx::BootTimeline>::record_time(node, "@time");
             node.record_string("event", "update_key");
             node.record_string("key", key);
-            value.record_inspect(&node, "update");
+            value.record_inspect(node, "update");
             T::write_to_node(node, id);
         });
     }

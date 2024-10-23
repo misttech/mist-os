@@ -75,22 +75,20 @@ impl<'a, T> Drop for AutoPersistGuard<'a, T> {
     fn drop(&mut self) {
         if self.persistence_req_sender.try_send(self.persistence_tag.to_string()).is_err() {
             // If sender has not been blocked before, set bool to true and log error message
-            if let Ok(_) = self.sender_is_blocked.compare_exchange(
-                false,
-                true,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) {
+            if self
+                .sender_is_blocked
+                .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
+            {
                 error!("PersistenceReqSender dropped a persistence request: either buffer is full or no receiver is waiting");
             }
         } else {
             // If sender has been blocked before, set bool to false and log message
-            if let Ok(_) = self.sender_is_blocked.compare_exchange(
-                true,
-                false,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-            ) {
+            if self
+                .sender_is_blocked
+                .compare_exchange(true, false, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
+            {
                 info!("PersistenceReqSender recovered and resumed sending");
             }
         }
@@ -160,6 +158,7 @@ mod tests {
     use futures::task::Poll;
     use std::cell::RefCell;
     use std::pin::pin;
+    use std::rc::Rc;
 
     #[fuchsia::test]
     fn test_auto_persist() {
@@ -219,7 +218,7 @@ mod tests {
 
     #[derive(Debug)]
     struct FakeTimeSource {
-        now: Arc<RefCell<zx::MonotonicInstant>>,
+        now: Rc<RefCell<zx::MonotonicInstant>>,
     }
 
     impl TimeSource for FakeTimeSource {
@@ -230,8 +229,8 @@ mod tests {
 
     #[fuchsia::test]
     fn test_log_at_most_once_per_min_factory() {
-        let log_count = Arc::new(RefCell::new(0));
-        let now = Arc::new(RefCell::new(zx::MonotonicInstant::from_nanos(0)));
+        let log_count = Rc::new(RefCell::new(0));
+        let now = Rc::new(RefCell::new(zx::MonotonicInstant::from_nanos(0)));
         let fake_time_source = FakeTimeSource { now: now.clone() };
         let mut log =
             log_at_most_once_per_min_factory(fake_time_source, |_| *log_count.borrow_mut() += 1);
